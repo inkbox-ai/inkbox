@@ -1,5 +1,7 @@
 # inkbox-kernel
 
+Inkbox integration with [Kernel](https://www.kernel.sh) browsers.
+
 Give your agent an email, phone number, and browser. Everything it needs to use the internet like you do.
 
 ## Setup

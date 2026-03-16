@@ -1,5 +1,5 @@
 """
-inkbox_kernel/data_models.py
+kernel/src/data_models.py
 
 Shared data models and enums used across the package.
 """

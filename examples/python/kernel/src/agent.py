@@ -1,5 +1,5 @@
 """
-inkbox_kernel/agent.py
+kernel/src/agent.py
 
 Orchestrates identity creation, browser setup, and the tool-use agent loop.
 """
@@ -14,10 +14,10 @@ from textwrap import dedent
 from inkbox import Inkbox
 from kernel import Kernel
 
-from inkbox_kernel.config import Config
-from inkbox_kernel.identity import create_agent_identity
-from inkbox_kernel.llm import LLMClient
-from inkbox_kernel.tools import TOOLS, ToolExecutor
+from src.config import Config
+from src.identity import create_agent_identity
+from src.llm import LLMClient
+from src.tools import TOOLS, ToolExecutor
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,5 @@
 """
-inkbox_kernel/tools.py
+kernel/src/tools.py
 
 Tool definitions and executor for browser, email, and phone actions.
 """
@@ -10,7 +10,7 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from inkbox_kernel.data_models import ToolDefinition
+from src.data_models import ToolDefinition
 
 if TYPE_CHECKING:
     from inkbox.agent_identity import AgentIdentity

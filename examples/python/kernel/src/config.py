@@ -1,5 +1,5 @@
 """
-inkbox_kernel/config.py
+kernel/src/config.py
 
 Centralized configuration loaded from environment variables.
 """

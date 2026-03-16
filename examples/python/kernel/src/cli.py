@@ -1,5 +1,5 @@
 """
-inkbox_kernel/cli.py
+kernel/src/cli.py
 
 CLI entry point for running the agent.
 """
@@ -9,8 +9,8 @@ from __future__ import annotations
 import argparse
 import logging
 
-from inkbox_kernel.agent import run_agent
-from inkbox_kernel.config import Config
+from src.agent import run_agent
+from src.config import Config
 
 
 def main() -> None:

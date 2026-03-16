@@ -1,5 +1,5 @@
 """
-inkbox_kernel/llm.py
+kernel/src/llm.py
 
 Unified LLM client for OpenAI and Anthropic tool-use APIs.
 """
@@ -11,8 +11,8 @@ from typing import Any
 
 import logging
 
-from inkbox_kernel.config import Config
-from inkbox_kernel.data_models import LLMResponse, LLMVendor, ToolCall
+from src.config import Config
+from src.data_models import LLMResponse, LLMVendor, ToolCall
 
 logger = logging.getLogger(__name__)
 

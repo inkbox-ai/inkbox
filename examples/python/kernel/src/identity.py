@@ -1,5 +1,5 @@
 """
-inkbox_kernel/identity.py
+kernel/src/identity.py
 
 Creates a fresh Inkbox agent identity with email and optional phone.
 """

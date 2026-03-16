@@ -1,5 +1,5 @@
 """
-inkbox_kernel/__init__.py
+kernel/src/__init__.py
 
 Package root for inkbox-kernel.
 """
