@@ -51,14 +51,13 @@ def main() -> None:
         sys.exit(1)
 
     inkbox_client = Inkbox(api_key=Config.INKBOX_API_KEY)
-    identity, is_new = select_or_create_identity(inkbox_client)
+    identity, _ = select_or_create_identity(inkbox_client)
 
     run_agent(
         task=args.task,
         provider=args.provider,
         model=args.model,
         identity=identity,
-        cleanup_identity=is_new,
     )
 
 

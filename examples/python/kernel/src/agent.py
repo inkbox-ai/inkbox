@@ -33,7 +33,6 @@ def run_agent(
     provider: str,
     model: str | None,
     identity: AgentIdentity,
-    cleanup_identity: bool = True,
 ) -> None:
     """
     Run the agent loop: set up a browser, then execute tools until the task is complete.
@@ -43,7 +42,6 @@ def run_agent(
         provider: LLM provider to use ("openai" or "anthropic").
         model: Optional model name override (e.g. "gpt-4o", "claude-sonnet-4-20250514").
         identity: The Inkbox agent identity to use.
-        cleanup_identity: If True, delete the identity when the agent finishes.
     """
     kernel_client = Kernel(api_key=Config.KERNEL_API_KEY)
 
@@ -106,9 +104,3 @@ def run_agent(
             kernel_client.browsers.delete_by_id(browser.session_id)
         except Exception:
             pass
-        if cleanup_identity:
-            logger.info("Deleting agent identity '%s'...", identity.agent_handle)
-            try:
-                identity.delete()
-            except Exception:
-                pass

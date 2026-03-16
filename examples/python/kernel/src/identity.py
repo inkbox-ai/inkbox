@@ -9,23 +9,26 @@ from __future__ import annotations
 import logging
 import uuid
 
+import questionary
 from inkbox import Inkbox
 from inkbox.agent_identity import AgentIdentity
 
 logger = logging.getLogger(__name__)
 
 
-def create_agent_identity(client: Inkbox) -> AgentIdentity:
+def create_agent_identity(client: Inkbox, handle: str | None = None) -> AgentIdentity:
     """
     Create a fresh agent identity with a mailbox.
 
     Args:
         client: Authenticated Inkbox client.
+        handle: Optional name for the identity. If not provided, a random one is generated.
 
     Returns:
         The newly created AgentIdentity with a mailbox attached.
     """
-    handle = f"agent-{uuid.uuid4().hex[:8]}"
+    if not handle:
+        handle = f"agent-{uuid.uuid4().hex[:8]}"
     identity = client.create_identity(handle)
 
     identity.create_mailbox(display_name="inkbox-kernel Agent")
@@ -39,31 +42,34 @@ def select_or_create_identity(client: Inkbox) -> tuple[AgentIdentity, bool]:
     Returns:
         (identity, is_new) — is_new is True if a fresh identity was created.
     """
+    CREATE_NEW = "Create new"
+
     summaries = client.list_identities()
 
     if not summaries:
         logger.info("No existing identities found, creating a new one...")
-        return create_agent_identity(client), True
+        name = questionary.text("Agent name (leave blank for random):").ask()
+        return create_agent_identity(client, handle=name or None), True
 
-    logger.info("\nAgent identities:")
-    for i, s in enumerate(summaries, 1):
+    choices = []
+    for s in summaries:
         email = getattr(s, "email_address", None) or "no mailbox"
-        logger.info("  %d. %s  (%s)", i, s.agent_handle, email)
-    create_idx = len(summaries) + 1
-    logger.info("  %d. Create new", create_idx)
+        choices.append(f"{s.agent_handle}  ({email})")
+    choices.append(CREATE_NEW)
 
-    while True:
-        choice = input(f"\nSelect [1-{create_idx}]: ").strip()
-        try:
-            idx = int(choice)
-        except ValueError:
-            continue
-        if idx == create_idx:
-            return create_agent_identity(client), True
-        if 1 <= idx <= len(summaries):
-            handle = summaries[idx - 1].agent_handle
-            identity = client.get_identity(handle)
-            if not identity.mailbox:
-                logger.info("  '%s' has no mailbox — creating one...", handle)
-                identity.create_mailbox(display_name="inkbox-kernel Agent")
-            return identity, False
+    picked = questionary.select("Select an identity:", choices=choices).ask()
+    if picked is None:  # user hit Ctrl-C
+        raise SystemExit(0)
+
+    if picked == CREATE_NEW:
+        name = questionary.text("Agent name (leave blank for random):").ask()
+        return create_agent_identity(client, handle=name or None), True
+
+    # map selection back to the summary
+    idx = choices.index(picked)
+    handle = summaries[idx].agent_handle
+    identity = client.get_identity(handle)
+    if not identity.mailbox:
+        logger.info("'%s' has no mailbox — creating one...", handle)
+        identity.create_mailbox(display_name="inkbox-kernel Agent")
+    return identity, False
