@@ -1,0 +1,42 @@
+{
+  "name": "@inkbox/sdk",
+  "version": "0.1.1",
+  "description": "TypeScript SDK for the Inkbox API",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@vitest/coverage-v8": "^2.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inkbox-ai/inkbox",
+    "directory": "sdk/typescript"
+  },
+  "homepage": "https://inkbox.ai",
+  "bugs": {
+    "url": "https://github.com/inkbox-ai/inkbox/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

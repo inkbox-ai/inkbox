@@ -1,0 +1,100 @@
+# Inkbox
+
+[![PyPI](https://img.shields.io/pypi/v/inkbox)](https://pypi.org/project/inkbox/)
+[![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+API-first communication infrastructure for AI agents — email, phone, and identities.
+
+| Package | Language | Install |
+|---|---|---|
+| [`inkbox`](./sdk/python/) | Python ≥ 3.11 | `pip install inkbox` |
+| [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 18 | `npm install @inkbox/sdk` |
+
+---
+
+## Quick Start
+
+Get an API key from the [Inkbox Console](https://console.inkbox.ai/), then:
+
+### Python
+
+```python
+from inkbox import Inkbox
+
+with Inkbox(api_key="ApiKey_...") as inkbox:
+    identity = inkbox.get_identity("my-agent")
+
+    # Send an email
+    identity.send_email(
+        to=["user@example.com"],
+        subject="Hello",
+        body_text="Hi from my agent!",
+    )
+
+    # List recent emails
+    for msg in identity.iter_emails():
+        print(msg.subject, msg.from_address)
+
+    # Place a phone call
+    call = identity.place_call(to_number="+15551234567")
+```
+
+### TypeScript
+
+```typescript
+import { Inkbox } from "@inkbox/sdk";
+
+const inkbox = new Inkbox({ apiKey: "ApiKey_..." });
+const identity = await inkbox.getIdentity("my-agent");
+
+// Send an email
+await identity.sendEmail({
+  to: ["user@example.com"],
+  subject: "Hello",
+  bodyText: "Hi from my agent!",
+});
+
+// List recent emails
+for await (const msg of identity.iterEmails()) {
+  console.log(msg.subject, msg.fromAddress);
+}
+
+// Place a phone call
+const call = await identity.placeCall({ toNumber: "+15551234567" });
+```
+
+---
+
+## What's in this repo
+
+| Directory | Description |
+|---|---|
+| [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
+| [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
+| [`skills/`](./skills/) | Agent skills for Claude Code and other coding agents |
+| [`examples/typescript/`](./examples/typescript/) | Runnable TypeScript examples |
+
+---
+
+## Agent Skills
+
+Load the Inkbox skills into your coding agent so it automatically knows how to use the SDK:
+
+```bash
+npx skills add inkbox-ai/inkbox/skills
+```
+
+See [`skills/README.md`](./skills/README.md) for details.
+
+---
+
+## Documentation
+
+- [Inkbox Docs](https://www.inkbox.ai/docs)
+- [API Reference](https://www.inkbox.ai/docs/api-reference)
+- [Console](https://console.inkbox.ai/)
+
+## License
+
+MIT
