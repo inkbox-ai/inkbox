@@ -24,12 +24,11 @@ logger = logging.getLogger(__name__)
 MAX_ITERATIONS = 25
 
 SYSTEM_PROMPT = dedent("""\
-    You are an AI agent with real tools for browsing the web, sending/receiving email, and making phone calls.
+    You are an AI agent with real tools for browsing the web and sending/receiving email.
 
     Your identity:
     - Handle: {handle}
     - Email: {email}
-    - Phone: {phone}
 
     You have a live cloud browser session. Use your tools to accomplish the given task.
     Think step by step. When done, respond with a summary of what you accomplished.""")
@@ -39,7 +38,6 @@ def run_agent(
     task: str,
     provider: str,
     model: str | None,
-    with_phone: bool,
 ) -> None:
     """
     Run the agent loop: create an identity and browser, then execute tools until the task is complete.
@@ -48,7 +46,6 @@ def run_agent(
         task: Natural-language description of what the agent should accomplish.
         provider: LLM provider to use ("openai" or "anthropic").
         model: Optional model name override (e.g. "gpt-4o", "claude-sonnet-4-20250514").
-        with_phone: If True, provision a toll-free phone number for the agent.
     """
     # validate config
     try:
@@ -64,10 +61,9 @@ def run_agent(
 
     # create identity
     logger.info("Creating agent identity...")
-    identity = create_agent_identity(inkbox_client, with_phone=with_phone)
+    identity = create_agent_identity(inkbox_client)
     email = identity.mailbox.email_address if identity.mailbox else "N/A"
-    phone = identity.phone_number.number if identity.phone_number else "Not provisioned"
-    logger.info("%s | email: %s | phone: %s", identity.agent_handle, email, phone)
+    logger.info("%s | email: %s", identity.agent_handle, email)
 
     # create browser
     logger.info("Creating browser session...")
@@ -80,7 +76,6 @@ def run_agent(
     system = SYSTEM_PROMPT.format(
         handle=identity.agent_handle,
         email=email,
-        phone=phone,
     )
 
     # set up executor and LLM
@@ -109,7 +104,12 @@ def run_agent(
                 results.append((tc.id, result))
 
             logger.debug("Sending %d tool result(s) back to LLM", len(results))
-            response = llm.follow_up(system, TOOLS, response, results)
+            response = llm.follow_up(
+                system=system,
+                tool_defs=TOOLS,
+                response=response,
+                tool_results=results,
+            )
         else:
             logger.warning("Reached max iterations, stopping.")
 

@@ -18,10 +18,13 @@ def main() -> None:
     logging.basicConfig(level=Config.LOG_LEVEL, format="%(message)s")
 
     parser = argparse.ArgumentParser(
-        description="AI agent with a browser, email, and phone.",
+        description="AI agent with a browser and email.",
     )
 
-    parser.add_argument("task", help="What you want the agent to accomplish")
+    parser.add_argument(
+        "task",
+        help="What you want the agent to accomplish",
+    )
     parser.add_argument(
         "--provider",
         choices=["openai", "anthropic"],
@@ -33,18 +36,12 @@ def main() -> None:
         default=None,
         help="Model name override",
     )
-    parser.add_argument(
-        "--with-phone",
-        action="store_true",
-        help="Provision a phone number for the agent",
-    )
     args = parser.parse_args()
 
     run_agent(
         task=args.task,
         provider=args.provider,
         model=args.model,
-        with_phone=args.with_phone,
     )
 
 

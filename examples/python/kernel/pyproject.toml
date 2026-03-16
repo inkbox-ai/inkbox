@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "inkbox-kernel"
 version = "0.0.1"
-description = " Give your agent an email, phone number, and browser. Everything it needs to use the internet like you do."
+description = "Give your agent an email and browser. Everything it needs to use the internet like you do."
 readme = "README.md"
 requires-python = ">=3.13.1,<3.14"  # pinning to 3.13.x
 license = "MIT"
@@ -25,7 +25,7 @@ keywords = [
     "email-api",
     "headless-chrome",
     "ai-agents",
-    "voice-api",
+
     "agent-identity",
     "agent-infrastructure",
     "kernel",

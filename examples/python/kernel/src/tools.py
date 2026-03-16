@@ -1,7 +1,7 @@
 """
 kernel/src/tools.py
 
-Tool definitions and executor for browser, email, and phone actions.
+Tool definitions and executor for browser and email actions.
 """
 
 from __future__ import annotations
@@ -119,40 +119,12 @@ TOOLS: list[ToolDefinition] = [
             "required": ["message_id"],
         },
     },
-    # phone
-    {
-        "name": "place_call",
-        "description": "Place an outbound phone call. Real-time voice interaction requires a WebSocket handler.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "to_number": {"type": "string", "description": "Phone number in E.164 format (e.g. +15551234567)"},
-            },
-            "required": ["to_number"],
-        },
-    },
-    {
-        "name": "list_calls",
-        "description": "List recent phone calls.",
-        "parameters": {"type": "object", "properties": {}},
-    },
-    {
-        "name": "get_transcript",
-        "description": "Get the transcript of a phone call.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "call_id": {"type": "string", "description": "The call ID"},
-            },
-            "required": ["call_id"],
-        },
-    },
 ]
 
 
 class ToolExecutor:
     """
-    Executes tool calls using Kernel (browser) and Inkbox (email/phone).
+    Executes tool calls using Kernel (browser) and Inkbox (email).
     """
 
     def __init__(
@@ -270,38 +242,3 @@ class ToolExecutor:
                 })
         return f"Email '{message_id}' not found"
 
-    ## phone tools (via Inkbox)
-
-    def _tool_place_call(self, to_number: str) -> str:
-        call = self.identity.place_call(to_number=to_number)
-        return json.dumps({
-            "call_id": str(call.id),
-            "status": call.status,
-            "from": call.local_phone_number,
-            "to": call.remote_phone_number,
-        })
-
-    def _tool_list_calls(self) -> str:
-        calls = self.identity.list_calls(limit=10)
-        if not calls:
-            return "No calls"
-        return json.dumps([
-            {
-                "id": str(c.id),
-                "direction": c.direction,
-                "status": c.status,
-                "to": c.remote_phone_number,
-            }  for c in calls
-        ])
-
-    def _tool_get_transcript(self, call_id: str) -> str:
-        transcripts = self.identity.list_transcripts(call_id)
-        if not transcripts:
-            return "No transcript available"
-        return json.dumps([
-                {
-                    "party": t.party,
-                    "text": t.text,
-                    "ts_ms": t.ts_ms,
-                } for t in transcripts
-        ])

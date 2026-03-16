@@ -2,7 +2,7 @@
 
 Inkbox integration with [Kernel](https://www.kernel.sh) browsers.
 
-Give your agent an email, phone number, and browser. Everything it needs to use the internet like you do.
+Give your agent an email and browser. Everything it needs to use the internet like you do.
 
 ## Setup
 
@@ -32,16 +32,13 @@ uv run inkbox-kernel "Sign up for a free account on example.com using my email"
 
 # using Anthropic
 uv run inkbox-kernel --provider anthropic "Find the pricing page on example.com and email me a summary"
-
-# with a phone number
-uv run inkbox-kernel --with-phone "Call +15551234567 and ask about their business hours"
 ```
 
 ## What happens
 
-1. The agent creates a fresh identity with a real email address (and optionally a phone number) via [Inkbox](https://inkbox.ai)
+1. The agent creates a fresh identity with a real email address via [Inkbox](https://inkbox.ai)
 2. A cloud browser session spins up via [Kernel](https://kernel.sh)
-3. The LLM uses tools (browse, email, call) to accomplish your task
+3. The LLM uses tools (browse, email) to accomplish your task
 4. Identity and browser are cleaned up when done
 
 ## Tools
@@ -57,9 +54,6 @@ uv run inkbox-kernel --with-phone "Call +15551234567 and ask about their busines
 | Email | `send_email` | Send or reply to an email |
 | Email | `check_inbox` | List recent emails |
 | Email | `read_email` | Read a specific email |
-| Phone | `place_call` | Place an outbound call |
-| Phone | `list_calls` | List recent calls |
-| Phone | `get_transcript` | Get a call transcript |
 
 ## API Keys
 
