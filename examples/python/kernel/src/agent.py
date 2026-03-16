@@ -1,67 +1,52 @@
 """
 kernel/src/agent.py
 
-Orchestrates identity creation, browser setup, and the tool-use agent loop.
+Orchestrates browser setup and the tool-use agent loop.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import sys
-from textwrap import dedent
+import re
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-from inkbox import Inkbox
 from kernel import Kernel
 
 from src.config import Config
-from src.identity import create_agent_identity
 from src.llm import LLMClient
 from src.tools import TOOLS, ToolExecutor
+
+if TYPE_CHECKING:
+    from inkbox.agent_identity import AgentIdentity
 
 logger = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 25
 
-SYSTEM_PROMPT = dedent("""\
-    You are an AI agent with real tools for browsing the web and sending/receiving email.
-
-    Your identity:
-    - Handle: {handle}
-    - Email: {email}
-
-    You have a live cloud browser session. Use your tools to accomplish the given task.
-    Think step by step. When done, respond with a summary of what you accomplished.""")
+SKILL_PATH = Path(__file__).resolve().parent.parent / "SKILL.md"
 
 
 def run_agent(
     task: str,
     provider: str,
     model: str | None,
+    identity: AgentIdentity,
+    cleanup_identity: bool = True,
 ) -> None:
     """
-    Run the agent loop: create an identity and browser, then execute tools until the task is complete.
+    Run the agent loop: set up a browser, then execute tools until the task is complete.
 
     Args:
         task: Natural-language description of what the agent should accomplish.
         provider: LLM provider to use ("openai" or "anthropic").
         model: Optional model name override (e.g. "gpt-4o", "claude-sonnet-4-20250514").
+        identity: The Inkbox agent identity to use.
+        cleanup_identity: If True, delete the identity when the agent finishes.
     """
-    # validate config
-    try:
-        Config.validate()
-    except ValueError as e:
-        logger.error(str(e))
-        sys.exit(1)
-
-    # init clients
-    logger.debug("Initializing Inkbox and Kernel clients")
-    inkbox_client = Inkbox(api_key=Config.INKBOX_API_KEY)
     kernel_client = Kernel(api_key=Config.KERNEL_API_KEY)
 
-    # create identity
-    logger.info("Creating agent identity...")
-    identity = create_agent_identity(inkbox_client)
     email = identity.mailbox.email_address if identity.mailbox else "N/A"
     logger.info("%s | email: %s", identity.agent_handle, email)
 
@@ -72,8 +57,10 @@ def run_agent(
     if browser.browser_live_view_url:
         logger.info("Live view: %s", browser.browser_live_view_url)
 
-    # build system prompt
-    system = SYSTEM_PROMPT.format(
+    # build system prompt from SKILL.md (strip YAML frontmatter)
+    skill_raw = SKILL_PATH.read_text()
+    skill_body = re.sub(r"^---\n.*?^---\n", "", skill_raw, count=1, flags=re.DOTALL | re.MULTILINE).lstrip()
+    system = skill_body.format(
         handle=identity.agent_handle,
         email=email,
     )
@@ -114,12 +101,14 @@ def run_agent(
             logger.warning("Reached max iterations, stopping.")
 
     finally:
-        logger.info("Cleaning up browser session and agent identity...")
+        logger.info("Cleaning up browser session...")
         try:
             kernel_client.browsers.delete_by_id(browser.session_id)
         except Exception:
             pass
-        try:
-            identity.delete()
-        except Exception:
-            pass
+        if cleanup_identity:
+            logger.info("Deleting agent identity '%s'...", identity.agent_handle)
+            try:
+                identity.delete()
+            except Exception:
+                pass
