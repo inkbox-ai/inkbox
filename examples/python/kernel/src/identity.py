@@ -6,10 +6,13 @@ Identity selection and creation for the agent CLI.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from inkbox import Inkbox
 from inkbox.agent_identity import AgentIdentity
+
+logger = logging.getLogger(__name__)
 
 
 def create_agent_identity(client: Inkbox) -> AgentIdentity:
@@ -39,15 +42,15 @@ def select_or_create_identity(client: Inkbox) -> tuple[AgentIdentity, bool]:
     summaries = client.list_identities()
 
     if not summaries:
-        print("No existing identities found, creating a new one...")
+        logger.info("No existing identities found, creating a new one...")
         return create_agent_identity(client), True
 
-    print("\nAgent identities:")
+    logger.info("\nAgent identities:")
     for i, s in enumerate(summaries, 1):
         email = getattr(s, "email_address", None) or "no mailbox"
-        print(f"  {i}. {s.agent_handle}  ({email})")
+        logger.info("  %d. %s  (%s)", i, s.agent_handle, email)
     create_idx = len(summaries) + 1
-    print(f"  {create_idx}. Create new")
+    logger.info("  %d. Create new", create_idx)
 
     while True:
         choice = input(f"\nSelect [1-{create_idx}]: ").strip()
@@ -61,6 +64,6 @@ def select_or_create_identity(client: Inkbox) -> tuple[AgentIdentity, bool]:
             handle = summaries[idx - 1].agent_handle
             identity = client.get_identity(handle)
             if not identity.mailbox:
-                print(f"  '{handle}' has no mailbox — creating one...")
+                logger.info("  '%s' has no mailbox — creating one...", handle)
                 identity.create_mailbox(display_name="inkbox-kernel Agent")
             return identity, False
