@@ -59,7 +59,7 @@ async def run_agent(
     )
 
     # set up controller with email tools
-    controller = build_controller(inkbox_client, identity)
+    controller = build_controller(identity)
 
     # set up browser session
     chrome_process: subprocess.Popen | None = None

@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 from browser_use import ActionResult, Controller
 
 if TYPE_CHECKING:
-    from inkbox import Inkbox
     from inkbox.agent_identity import AgentIdentity
 
 logger = logging.getLogger(__name__)
@@ -79,12 +78,11 @@ def _format_json(data: Any) -> str:
 
 # ── Controller builder ────────────────────────────────────────────────────
 
-def build_controller(inkbox_client: Inkbox, identity: AgentIdentity) -> Controller:
+def build_controller(identity: AgentIdentity) -> Controller:
     """
     Build a Browser Use Controller with Inkbox email tools registered.
 
     Args:
-        inkbox_client: Authenticated Inkbox client.
         identity: The agent identity (with mailbox) to use for email tools.
 
     Returns:
@@ -147,8 +145,7 @@ def build_controller(inkbox_client: Inkbox, identity: AgentIdentity) -> Controll
             return ActionResult(error="No mailbox linked to this agent identity.")
 
         msg = await asyncio.to_thread(
-            inkbox_client._messages.get,
-            identity.mailbox.email_address,
+            identity.get_message,
             params.message_id,
         )
         return ActionResult(extracted_content=_format_json(_sdk_to_dict(msg)))
