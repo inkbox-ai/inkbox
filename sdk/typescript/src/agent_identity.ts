@@ -10,7 +10,7 @@
  */
 
 import { InkboxAPIError } from "./_http.js";
-import type { Message, ThreadDetail } from "./mail/types.js";
+import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
 import type { PhoneCall, PhoneCallWithRateLimit, PhoneTranscript } from "./phone/types.js";
 import type {
   AgentIdentitySummary,
@@ -208,6 +208,17 @@ export class AgentIdentity {
     for (const id of messageIds) {
       await this._inkbox._messages.markRead(this._mailbox!.emailAddress, id);
     }
+  }
+
+  /**
+   * Get a single message with full body content.
+   *
+   * @param messageId - UUID of the message to fetch. Obtain via `msg.id`
+   *   on any {@link Message}.
+   */
+  async getMessage(messageId: string): Promise<MessageDetail> {
+    this._requireMailbox();
+    return this._inkbox._messages.get(this._mailbox!.emailAddress, messageId);
   }
 
   /**
