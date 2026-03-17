@@ -34,7 +34,7 @@ jobs:
         run: ruff check .
 
       - name: Run Python tests
-        run: pytest
+        run: pytest --cov --cov-report=term-missing --cov-fail-under=75
 
   typescript-tests:
     name: TypeScript Tests
@@ -60,4 +60,4 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Run TypeScript tests
-        run: npm test
+        run: npx vitest run --coverage --coverage.thresholds.lines=75
