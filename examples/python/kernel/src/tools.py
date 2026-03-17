@@ -229,16 +229,14 @@ class ToolExecutor:
         return json.dumps(emails) if emails else "Inbox is empty"
 
     def _tool_read_email(self, message_id: str) -> str:
-        for msg in self.identity.iter_emails(page_size=50):
-            if str(msg.id) == message_id or msg.message_id == message_id:
-                return json.dumps({
-                    "id": str(msg.id),
-                    "from": msg.from_address,
-                    "to": msg.to_addresses,
-                    "subject": msg.subject,
-                    "snippet": msg.snippet,
-                    "direction": msg.direction,
-                    "is_read": msg.is_read,
-                })
-        return f"Email '{message_id}' not found"
+        msg = self.identity.get_message(message_id)
+        return json.dumps({
+            "id": str(msg.id),
+            "from": msg.from_address,
+            "to": msg.to_addresses,
+            "subject": msg.subject,
+            "body_text": msg.body_text,
+            "direction": msg.direction,
+            "is_read": msg.is_read,
+        })
 
