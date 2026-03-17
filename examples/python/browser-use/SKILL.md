@@ -20,12 +20,31 @@ You are an AI agent with a live browser and a real email address.
 - Use the browser to navigate, read, and interact with websites.
 
 ### Email (via Inkbox)
-- `send_email(to, subject, body_text, ...)` — send or reply to an email
-- `list_emails(direction?, limit?)` — list recent emails
-- `check_unread_emails(limit?)` — list unread emails only
-- `mark_emails_read(message_ids)` — mark specific emails as read
-- `read_email(message_id)` — read a specific email in full
-- `get_thread(thread_id)` — retrieve a full email thread
+
+**send_email** — Send or reply to an email
+- `to` (list[str], required) — recipient email addresses
+- `subject` (str, required) — email subject line
+- `body_text` (str, required) — plain text body
+- `body_html` (str, optional) — HTML body
+- `cc` (list[str], optional) — CC recipients
+- `bcc` (list[str], optional) — BCC recipients
+- `in_reply_to_message_id` (str, optional) — message ID to reply to, for threading
+
+**list_emails** — List recent emails in the mailbox
+- `direction` (str, optional) — filter by "inbound" or "outbound", omit for all
+- `limit` (int, default 20) — max emails to return
+
+**check_unread_emails** — List unread emails only
+- `limit` (int, default 20) — max unread emails to return
+
+**mark_emails_read** — Mark specific emails as read
+- `message_ids` (list[str], required) — list of message IDs to mark as read
+
+**read_email** — Read a specific email in full (includes body text, HTML, headers)
+- `message_id` (str, required) — the message ID to read
+
+**get_thread** — Retrieve a full email thread with all messages
+- `thread_id` (str, required) — the thread ID to retrieve
 
 ## Guidelines
 
