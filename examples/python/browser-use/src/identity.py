@@ -1,5 +1,5 @@
 """
-kernel/src/identity.py
+browser-use/src/identity.py
 
 Identity selection and creation for the agent CLI.
 """
@@ -31,7 +31,7 @@ def create_agent_identity(client: Inkbox, handle: str | None = None) -> AgentIde
         handle = f"agent-{uuid.uuid4().hex[:8]}"
     identity = client.create_identity(handle)
 
-    identity.create_mailbox(display_name="inkbox-kernel Agent")
+    identity.create_mailbox(display_name="inkbox-browser-use Agent")
     return identity
 
 
@@ -76,5 +76,5 @@ def select_or_create_identity(client: Inkbox) -> tuple[AgentIdentity, bool]:
     identity = client.get_identity(handle)
     if not identity.mailbox:
         logger.info("'%s' has no mailbox — creating one...", handle)
-        identity.create_mailbox(display_name="inkbox-kernel Agent")
+        identity.create_mailbox(display_name="inkbox-browser-use Agent")
     return identity, False

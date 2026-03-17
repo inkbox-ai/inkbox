@@ -1,0 +1,48 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inkbox-browser-use"
+version = "0.0.1"
+description = "Give your agent an email and browser. Everything it needs to use the internet like you do."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+dependencies = [
+    "browser-use>=0.12.2",
+    "inkbox>=0.1.1",
+    "python-dotenv>=1.0",
+    "questionary>=2.0",
+    "requests>=2.28",
+]
+keywords = [
+    "inkbox",
+    "browser-use",
+    "browser-automation",
+    "email-api",
+    "ai-agents",
+    "agent-identity",
+    "agent-infrastructure",
+]
+
+[project.urls]
+Homepage = "https://inkbox.ai"
+
+## enable package discovery from project root
+[tool.setuptools.packages.find]
+where = ["."]
+
+## CLI entry point
+[project.scripts]
+inkbox-browser-use = "src.cli:main"
+
+## override browser-use's pinned python-dotenv to resolve with inkbox
+[tool.uv]
+override-dependencies = ["python-dotenv>=1.2.2"]
+
+## ruff setup
+[tool.ruff]
+line-length = 125
