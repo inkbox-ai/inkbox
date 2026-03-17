@@ -138,12 +138,6 @@ const call = await identity.placeCall({
 console.log(call.status);
 console.log(call.rateLimit.callsRemaining);   // rolling 24h budget
 
-// Or receive events via webhook
-const call = await identity.placeCall({
-  toNumber: "+15167251294",
-  webhookUrl: "https://your-agent.example.com/call-events",
-});
-
 // List calls (offset pagination)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
 for (const c of calls) {
