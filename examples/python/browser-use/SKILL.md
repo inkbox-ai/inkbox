@@ -14,21 +14,9 @@ This example gives a Browser Use agent a real email address via Inkbox. The agen
 3. The Controller is passed to the Browser Use `Agent` alongside a system prompt that tells the agent about its email capabilities
 4. The agent runs with both browser and email tools available
 
-## Project structure
-
-```
-src/
-├── cli.py        — CLI entry point: parses args, validates config, selects identity, calls run_agent()
-├── config.py     — Config class with env vars (INKBOX_API_KEY, BROWSER_USE_API_KEY)
-├── identity.py   — Interactive identity picker via questionary, or auto-create with mailbox
-├── agent.py      — System prompt (inline), BrowserSession setup, Agent creation and run loop
-├── tools.py      — build_controller(): registers 6 Inkbox email tools on a Browser Use Controller
-├── chrome.py     — Auto-detect, launch, and verify Chrome in debug mode (cross-platform)
-```
-
 ## Key integration points
 
-### Identity setup (identity.py)
+### Identity setup
 
 ```python
 from inkbox import Inkbox
