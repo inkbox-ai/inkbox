@@ -54,14 +54,12 @@ export class CallsResource {
    * @param options.fromNumber - E.164 number to call from. Must belong to your org and be active.
    * @param options.toNumber - E.164 number to call.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
-   * @param options.webhookUrl - Custom webhook URL for call lifecycle events.
    * @returns The created call record with current rate limit info.
    */
   async place(options: {
     fromNumber: string;
     toNumber: string;
     clientWebsocketUrl?: string;
-    webhookUrl?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const body: Record<string, unknown> = {
       from_number: options.fromNumber,
@@ -69,9 +67,6 @@ export class CallsResource {
     };
     if (options.clientWebsocketUrl !== undefined) {
       body["client_websocket_url"] = options.clientWebsocketUrl;
-    }
-    if (options.webhookUrl !== undefined) {
-      body["webhook_url"] = options.webhookUrl;
     }
     const data = await this.http.post<RawPhoneCallWithRateLimit>("/place-call", body);
     return parsePhoneCallWithRateLimit(data);

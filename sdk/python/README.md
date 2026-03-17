@@ -165,12 +165,6 @@ call = identity.place_call(
 )
 print(call.status, call.rate_limit.calls_remaining)
 
-# Or receive call events via webhook instead
-call = identity.place_call(
-    to_number="+15167251294",
-    webhook_url="https://your-agent.example.com/call-events",
-)
-
 # List calls (paginated)
 calls = identity.list_calls(limit=10, offset=0)
 for call in calls:
@@ -299,12 +293,6 @@ inkbox.phone_numbers.update(
     incoming_call_action="webhook",
     incoming_call_webhook_url="https://example.com/calls",
 )
-```
-
-You can also supply a per-call webhook URL when placing a call:
-
-```python
-identity.place_call(to_number="+15005550006", webhook_url="https://example.com/call-events")
 ```
 
 ---

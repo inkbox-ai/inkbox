@@ -79,12 +79,10 @@ describe("CallsResource.place", () => {
       fromNumber: "+18335794607",
       toNumber: "+15167251294",
       clientWebsocketUrl: "wss://agent.example.com/ws",
-      webhookUrl: "https://example.com/hook",
     });
 
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["client_websocket_url"]).toBe("wss://agent.example.com/ws");
-    expect(body["webhook_url"]).toBe("https://example.com/hook");
   });
 
   it("omits optional fields when not provided", async () => {
@@ -96,6 +94,5 @@ describe("CallsResource.place", () => {
 
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["client_websocket_url"]).toBeUndefined();
-    expect(body["webhook_url"]).toBeUndefined();
   });
 });

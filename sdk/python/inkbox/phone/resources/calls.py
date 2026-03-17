@@ -59,7 +59,6 @@ class CallsResource:
         from_number: str,
         to_number: str,
         client_websocket_url: str | None = None,
-        webhook_url: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call.
 
@@ -67,7 +66,6 @@ class CallsResource:
             from_number: E.164 number to call from. Must belong to your org and be active.
             to_number: E.164 number to call.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
-            webhook_url: Custom webhook URL for call lifecycle events.
 
         Returns:
             The created call record with current rate limit info.
@@ -78,7 +76,5 @@ class CallsResource:
         }
         if client_websocket_url is not None:
             body["client_websocket_url"] = client_websocket_url
-        if webhook_url is not None:
-            body["webhook_url"] = webhook_url
         data = self._http.post("/place-call", json=body)
         return PhoneCallWithRateLimit._from_dict(data)
