@@ -170,12 +170,6 @@ const call = await identity.placeCall({
 });
 console.log(call.status, call.rateLimit.callsRemaining);
 
-// Or receive call events via webhook instead
-const call2 = await identity.placeCall({
-  toNumber: "+15167251294",
-  webhookUrl: "https://your-agent.example.com/call-events",
-});
-
 // List calls (paginated)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
 for (const c of calls) {
@@ -307,12 +301,6 @@ await inkbox.phoneNumbers.update(number.id, {
   incomingCallAction: "webhook",
   incomingCallWebhookUrl: "https://example.com/calls",
 });
-```
-
-You can also supply a per-call webhook URL when placing a call:
-
-```ts
-await identity.placeCall({ toNumber: "+15005550006", webhookUrl: "https://example.com/call-events" });
 ```
 
 ---

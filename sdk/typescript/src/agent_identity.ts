@@ -241,19 +241,16 @@ export class AgentIdentity {
    *
    * @param options.toNumber - E.164 destination number.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
-   * @param options.webhookUrl - Custom webhook URL for call lifecycle events.
    */
   async placeCall(options: {
     toNumber: string;
     clientWebsocketUrl?: string;
-    webhookUrl?: string;
   }): Promise<PhoneCallWithRateLimit> {
     this._requirePhone();
     return this._inkbox._calls.place({
       fromNumber:          this._phoneNumber!.number,
       toNumber:            options.toNumber,
       clientWebsocketUrl:  options.clientWebsocketUrl,
-      webhookUrl:          options.webhookUrl,
     });
   }
 

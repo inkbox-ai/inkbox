@@ -293,21 +293,18 @@ class AgentIdentity:
         *,
         to_number: str,
         client_websocket_url: str | None = None,
-        webhook_url: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call from this identity's phone number.
 
         Args:
             to_number: E.164 destination number.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
-            webhook_url: Custom webhook URL for call lifecycle events.
         """
         self._require_phone()
         return self._inkbox._calls.place(
             from_number=self._phone_number.number,  # type: ignore[union-attr]
             to_number=to_number,
             client_websocket_url=client_websocket_url,
-            webhook_url=webhook_url,
         )
 
     def list_calls(self, *, limit: int = 50, offset: int = 0) -> list[PhoneCall]:

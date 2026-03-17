@@ -134,12 +134,6 @@ call = identity.place_call(
 print(call.status)
 print(call.rate_limit.calls_remaining)   # rolling 24h budget
 
-# Or receive events via webhook
-call = identity.place_call(
-    to_number="+15167251294",
-    webhook_url="https://your-agent.example.com/call-events",
-)
-
 # List calls (offset pagination)
 calls = identity.list_calls(limit=10, offset=0)
 for c in calls:

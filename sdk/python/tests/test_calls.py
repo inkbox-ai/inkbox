@@ -83,20 +83,6 @@ class TestCallsPlace:
         )
         assert call.status == "ringing"
 
-    def test_place_with_websocket_and_webhook(self, client, transport):
-        transport.post.return_value = PHONE_CALL_DICT
-
-        client._calls.place(
-            from_number="+18335794607",
-            to_number="+15167251294",
-            client_websocket_url="wss://agent.example.com/ws",
-            webhook_url="https://example.com/hook",
-        )
-
-        _, kwargs = transport.post.call_args
-        assert kwargs["json"]["client_websocket_url"] == "wss://agent.example.com/ws"
-        assert kwargs["json"]["webhook_url"] == "https://example.com/hook"
-
     def test_optional_fields_omitted_when_none(self, client, transport):
         transport.post.return_value = PHONE_CALL_DICT
 
@@ -107,4 +93,3 @@ class TestCallsPlace:
 
         _, kwargs = transport.post.call_args
         assert "client_websocket_url" not in kwargs["json"]
-        assert "webhook_url" not in kwargs["json"]
