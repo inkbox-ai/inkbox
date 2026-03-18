@@ -18,7 +18,6 @@ Once installed, your OpenClaw agent can:
 
 - Node.js ≥ 18
 - An [Inkbox](https://www.inkbox.ai) account with an API key
-- An agent identity provisioned in Inkbox (with a mailbox and/or phone number as needed)
 
 ## Setup
 
@@ -26,21 +25,7 @@ Once installed, your OpenClaw agent can:
 
 Sign in at [console.inkbox.ai](https://console.inkbox.ai) and create an API key.
 
-### 2. Create an agent identity (if you haven't already)
-
-You can create an identity in the [Inkbox console](https://console.inkbox.ai), or programmatically:
-
-```ts
-import { Inkbox } from "@inkbox/sdk";
-
-const inkbox = new Inkbox({ apiKey: "ApiKey_..." });
-const identity = await inkbox.createIdentity("my-agent");
-await identity.createMailbox({ displayName: "My Agent" });
-
-console.log(identity.mailbox?.emailAddress); // e.g. abc-xyz@inkboxmail.com
-```
-
-### 3. Install the skill
+### 2. Install the skill
 
 ```bash
 cd inkbox/examples/typescript/openclaw
@@ -48,9 +33,9 @@ npm install
 cp -r . ~/.openclaw/skills/inkbox
 ```
 
-### 4. Configure env vars in OpenClaw
+### 3. Configure env vars in OpenClaw
 
-Add both vars to `~/.openclaw/openclaw.json` under `skills.entries.inkbox.env`:
+Add `INKBOX_API_KEY` to `~/.openclaw/openclaw.json` under `skills.entries.inkbox.env`:
 
 ```json
 {
@@ -59,8 +44,7 @@ Add both vars to `~/.openclaw/openclaw.json` under `skills.entries.inkbox.env`:
       "inkbox": {
         "enabled": true,
         "env": {
-          "INKBOX_API_KEY": "ApiKey_...",
-          "INKBOX_AGENT_HANDLE": "my-agent"
+          "INKBOX_API_KEY": "ApiKey_..."
         }
       }
     }
@@ -74,10 +58,13 @@ Then restart the gateway:
 openclaw gateway restart
 ```
 
+> **Note:** `INKBOX_AGENT_HANDLE` is optional at install time. If not set, the agent will walk you through creating one on first use. You can add it to the env config later to skip that step.
+
 ## Usage
 
 Once installed, just talk to your OpenClaw agent naturally:
 
+> "Set up my Inkbox identity"
 > "Check my inbox"
 > "Send an email to alice@example.com with subject 'Hello' and say hi"
 > "Search my email for invoices"
@@ -101,16 +88,6 @@ const ib = new Inkbox({ apiKey: process.env.INKBOX_API_KEY });
 const id = await ib.getIdentity(process.env.INKBOX_AGENT_HANDLE);
 const msgs = [];
 for await (const m of id.iterEmails()) { msgs.push(m); if (msgs.length >= 10) break; }
-console.log(JSON.stringify(msgs, null, 2));
-"
-
-# List unread only
-npx tsx --eval "
-import { Inkbox } from '@inkbox/sdk';
-const ib = new Inkbox({ apiKey: process.env.INKBOX_API_KEY });
-const id = await ib.getIdentity(process.env.INKBOX_AGENT_HANDLE);
-const msgs = [];
-for await (const m of id.iterUnreadEmails()) { msgs.push(m); if (msgs.length >= 10) break; }
 console.log(JSON.stringify(msgs, null, 2));
 "
 

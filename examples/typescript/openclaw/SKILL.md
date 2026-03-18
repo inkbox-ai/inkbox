@@ -8,7 +8,6 @@ metadata:
     requires:
       env:
         - INKBOX_API_KEY
-        - INKBOX_AGENT_HANDLE
       bins:
         - node
     primaryEnv: INKBOX_API_KEY
@@ -16,14 +15,31 @@ metadata:
 
 # Inkbox Skill
 
-Use this skill when the user wants to send an email, read their inbox, view an email thread, search through emails, place a phone call, list call history, or read call transcripts. All operations go through the Inkbox agent identity specified by `INKBOX_AGENT_HANDLE`.
+Use this skill when the user wants to send an email, read their inbox, view an email thread, search through emails, place a phone call, list call history, or read call transcripts. All operations go through an Inkbox agent identity.
 
 ## Requirements
 
 - `INKBOX_API_KEY` — your Inkbox API key (from console.inkbox.ai)
-- `INKBOX_AGENT_HANDLE` — the handle of the agent identity to use (e.g. `my-agent`)
+- `INKBOX_AGENT_HANDLE` — the handle of the agent identity to use (optional — if not set, create one first; see below)
 - `node` must be installed (Node.js ≥ 18)
 - `@inkbox/sdk` must be installed — run `npm install @inkbox/sdk` in the skill directory if not already present
+
+## Getting started: create an agent identity
+
+If `INKBOX_AGENT_HANDLE` is not set, you need to create an Inkbox agent identity first. Ask the user what handle they'd like (e.g. `my-agent`), then run:
+
+```ts
+import { Inkbox } from "@inkbox/sdk";
+const inkbox = new Inkbox({ apiKey: process.env.INKBOX_API_KEY! });
+const identity = await inkbox.createIdentity("my-agent");  // replace with chosen handle
+await identity.createMailbox({ displayName: "My Agent" }); // provision email; adjust display name as needed
+console.log(JSON.stringify({
+  handle: identity.handle,
+  emailAddress: identity.mailbox?.emailAddress,
+}, null, 2));
+```
+
+Once created, save the handle as `INKBOX_AGENT_HANDLE` in the skill's env config so it's used automatically in future sessions.
 
 ## How to invoke
 
