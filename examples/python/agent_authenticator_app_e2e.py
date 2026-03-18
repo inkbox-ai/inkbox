@@ -1,5 +1,7 @@
 """
-End-to-end test: authenticator app lifecycle via the Inkbox SDK.
+examples/python/agent_authenticator_app_e2e.py
+
+End-to-end example: authenticator app lifecycle via the Inkbox SDK.
 
 Requires INKBOX_API_KEY in the environment.
 """
@@ -26,7 +28,7 @@ for summary in identities:
         break
 
 if agent_identity is None:
-    print("   ERROR: No identity without an authenticator app found!")
+    print("   ERROR: No identity without an authenticator app found! Start by creating an agent identity.")
     raise SystemExit(1)
 
 print(f"   Using identity: {agent_identity.agent_handle} (id={agent_identity.id})")
