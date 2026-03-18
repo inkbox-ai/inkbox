@@ -79,7 +79,74 @@ Fields: `id` (UUID), `authenticator_app_id` (UUID), `otp_type` ("totp"|"hotp"), 
 Fields: `otp_code` (str), `valid_for_seconds` (int|null), `otp_type`, `algorithm`, `digits`, `period` (int|null)
 
 ### `IdentityAuthenticatorApp` (in identities/types)
-Fields: `id` (UUID), `status` (str), `created_at`, `updated_at`
+
+Embedded in the `AgentIdentityDetailResponse` when an authenticator app is linked. Matches the full `AuthenticatorAppResponse` from the server:
+
+Fields: `id` (UUID), `organization_id` (str), `identity_id` (UUID|null), `status` (str), `created_at`, `updated_at`
+
+---
+
+## AgentIdentity Changes (Detailed)
+
+The `AgentIdentity` domain object (Python: `agent_identity.py`, TS: `agent_identity.ts`) needs a new channel for authenticator apps, following the exact same pattern as mailbox and phone_number.
+
+### New Fields & Properties
+
+```
+_authenticator_app: IdentityAuthenticatorApp | None  (set from data.authenticator_app in __init__)
+
+@property authenticator_app -> IdentityAuthenticatorApp | None
+```
+
+### New Guard
+
+```python
+# Python
+def _require_authenticator_app(self) -> None:
+    if not self._authenticator_app:
+        raise InkboxError(
+            f"Identity '{self.agent_handle}' has no authenticator app assigned. "
+            "Call identity.create_authenticator_app() or identity.assign_authenticator_app() first."
+        )
+
+# TypeScript
+private _requireAuthenticatorApp(): void {
+    if (!this._authenticatorApp) throw new InkboxAPIError(0, `Identity '${this.agentHandle}' has no authenticator app assigned. ...`);
+}
+```
+
+### Channel Management Methods
+
+| Method | Description | Delegates To |
+|--------|-------------|-------------|
+| `create_authenticator_app()` | Create a new authenticator app linked to this identity | `_inkbox._auth_apps.create(agent_handle=self.agent_handle)` → sets `_authenticator_app` from response |
+| `assign_authenticator_app(authenticator_app_id)` | Link an existing unlinked app to this identity | `_inkbox._ids_resource.assign_authenticator_app(handle, app_id)` → sets `_authenticator_app` and `_data` from response |
+| `unlink_authenticator_app()` | Unlink app from identity (does NOT delete the app) | Guard → `_inkbox._ids_resource.unlink_authenticator_app(handle)` → sets `_authenticator_app = None` |
+
+### Authenticator Convenience Methods
+
+These all call `_require_authenticator_app()` first, then delegate to the accounts resource using `self._authenticator_app.id` as the app ID.
+
+| Method | Signature (Python) | Delegates To |
+|--------|-------------------|-------------|
+| `create_authenticator_account` | `(*, otpauth_uri: str, display_name: str \| None = None, description: str \| None = None) -> AuthenticatorAccount` | `_inkbox._auth_accounts.create(app_id, ...)` |
+| `list_authenticator_accounts` | `() -> list[AuthenticatorAccount]` | `_inkbox._auth_accounts.list(app_id)` |
+| `get_authenticator_account` | `(account_id: str) -> AuthenticatorAccount` | `_inkbox._auth_accounts.get(app_id, account_id)` |
+| `update_authenticator_account` | `(account_id: str, *, display_name: str \| None = None, description: str \| None = None) -> AuthenticatorAccount` | `_inkbox._auth_accounts.update(app_id, account_id, ...)` |
+| `delete_authenticator_account` | `(account_id: str) -> None` | `_inkbox._auth_accounts.delete(app_id, account_id)` |
+| `generate_otp` | `(account_id: str) -> OTPCode` | `_inkbox._auth_accounts.generate_otp(app_id, account_id)` |
+
+### Updates to Existing Methods
+
+| Method | Change |
+|--------|--------|
+| `refresh()` | Add `self._authenticator_app = data.authenticator_app` |
+| `update()` | Include `authenticator_app=self._authenticator_app` when reconstructing `_AgentIdentityData` |
+| `__repr__` (Python) | Include authenticator app ID |
+
+### TypeScript Equivalents
+
+All methods above use camelCase naming (`createAuthenticatorApp`, `assignAuthenticatorApp`, `unlinkAuthenticatorApp`, `createAuthenticatorAccount`, `listAuthenticatorAccounts`, `getAuthenticatorAccount`, `updateAuthenticatorAccount`, `deleteAuthenticatorAccount`, `generateOtp`). All are `async` and return `Promise<T>`.
 
 ---
 
