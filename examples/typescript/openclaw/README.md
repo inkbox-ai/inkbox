@@ -25,17 +25,20 @@ Once installed, your OpenClaw agent can:
 
 Sign in at [console.inkbox.ai](https://console.inkbox.ai) and create an API key.
 
-### 2. Install the skill
+### 2. Set the `INKBOX_API_KEY` environment variable in the environment where OpenClaw runs
 
 ```bash
-cd inkbox/examples/typescript/openclaw
-npm install
-cp -r . ~/.openclaw/skills/inkbox
+export INKBOX_API_KEY=your_api_key_here
 ```
 
-### 3. Configure env vars in OpenClaw
+### 3. Install the Inkbox skill via `clawhub` (run inside your OpenClaw workspace)
 
-Add `INKBOX_API_KEY` to `~/.openclaw/openclaw.json` under `skills.entries.inkbox.env`:
+```bash
+npm i -g clawhub
+clawhub install inkbox
+```
+
+### 4. Add this config snippet to `~/.openclaw/openclaw.json`
 
 ```json
 {
@@ -43,8 +46,10 @@ Add `INKBOX_API_KEY` to `~/.openclaw/openclaw.json` under `skills.entries.inkbox
     "entries": {
       "inkbox": {
         "enabled": true,
-        "env": {
-          "INKBOX_API_KEY": "ApiKey_..."
+        "apiKey": {
+          "source": "env",
+          "provider": "default",
+          "id": "INKBOX_API_KEY"
         }
       }
     }
@@ -52,13 +57,9 @@ Add `INKBOX_API_KEY` to `~/.openclaw/openclaw.json` under `skills.entries.inkbox
 }
 ```
 
-Then restart the gateway:
+### 5. Start a new OpenClaw session (and restart the gateway if needed)
 
-```bash
-openclaw gateway restart
-```
-
-> **Note:** `INKBOX_AGENT_HANDLE` is optional at install time. If not set, the agent will walk you through creating one on first use. You can add it to the env config later to skip that step.
+> **Note:** `INKBOX_AGENT_HANDLE` is optional at install time. If not set, the agent will walk you through creating one on first use.
 
 ## Usage
 
