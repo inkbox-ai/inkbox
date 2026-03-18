@@ -9,9 +9,11 @@ build/
 .venv/
 *.egg
 .eggs/
+.coverage
 
 # TypeScript / JavaScript
 node_modules/
+coverage/
 *.tsbuildinfo
 
 # Python testing and linting
