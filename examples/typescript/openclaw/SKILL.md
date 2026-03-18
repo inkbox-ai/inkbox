@@ -67,7 +67,7 @@ const inkbox = new Inkbox({ apiKey: process.env.INKBOX_API_KEY });
 const identity = await inkbox.createIdentity("my-agent");
 await identity.createMailbox({ displayName: "My Agent" });
 console.log(JSON.stringify({
-  handle: identity.handle,
+  handle: identity.agentHandle,
   emailAddress: identity.mailbox?.emailAddress,
 }, null, 2));
 ```
