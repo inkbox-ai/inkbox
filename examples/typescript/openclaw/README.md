@@ -32,10 +32,19 @@ Sign in at [console.inkbox.ai](https://console.inkbox.ai) and create an API key.
 export INKBOX_API_KEY=your_api_key_here
 ```
 
-### 3. Install the Inkbox skill via `clawhub` (run inside your OpenClaw workspace)
+### 3. Install the Inkbox skill via ClawHub
+
+Recommended: run this inside your OpenClaw workspace.
+
+If you have not installed clawhub yet:
 
 ```bash
-npm i -g clawhub
+sudo npm i -g clawhub
+```
+
+Then install the skill:
+
+```bash
 clawhub install inkbox
 ```
 
