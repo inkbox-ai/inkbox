@@ -6,13 +6,14 @@ An [OpenClaw](https://openclaw.ai) skill for email and phone via [Inkbox](https:
 
 Once installed, your OpenClaw agent can:
 
-- **Send emails** — compose and send from an Inkbox agent mailbox
-- **Read inbox** — list recent or unread messages
-- **View threads** — fetch full email conversations
+- **Send emails** — compose and send from an Inkbox agent mailbox, with optional CC/BCC
+- **Reply to emails** — thread replies using a message ID
+- **Read inbox** — list recent messages or unread messages only
+- **View threads** — fetch a full email conversation with all messages inlined
 - **Search email** — full-text search across a mailbox
-- **Place calls** — make outbound phone calls (with optional WebSocket audio bridge)
-- **List call history** — review past calls
-- **Get transcripts** — retrieve call transcripts
+- **Place calls** — make outbound phone calls from an Inkbox phone number (with optional WebSocket audio bridge)
+- **List call history** — review past inbound and outbound calls
+- **Get transcripts** — retrieve per-segment call transcripts
 
 ## Requirements
 
@@ -74,41 +75,6 @@ Once installed, just talk to your OpenClaw agent naturally:
 > "Show me my recent calls"
 > "Get the transcript for that last call"
 
-## Testing
-
-You can test operations directly using `npx tsx --eval`:
-
-```bash
-export INKBOX_API_KEY=ApiKey_...
-export INKBOX_AGENT_HANDLE=my-agent
-
-# List last 10 emails
-npx tsx --eval "
-import { Inkbox } from '@inkbox/sdk';
-const ib = new Inkbox({ apiKey: process.env.INKBOX_API_KEY });
-const id = await ib.getIdentity(process.env.INKBOX_AGENT_HANDLE);
-const msgs = [];
-for await (const m of id.iterEmails()) { msgs.push(m); if (msgs.length >= 10) break; }
-console.log(JSON.stringify(msgs, null, 2));
-"
-
-# Send an email
-npx tsx --eval "
-import { Inkbox } from '@inkbox/sdk';
-const ib = new Inkbox({ apiKey: process.env.INKBOX_API_KEY });
-const id = await ib.getIdentity(process.env.INKBOX_AGENT_HANDLE);
-console.log(JSON.stringify(await id.sendEmail({ to: ['alice@example.com'], subject: 'Hello', bodyText: 'Hi Alice!' }), null, 2));
-"
-
-# Place a call
-npx tsx --eval "
-import { Inkbox } from '@inkbox/sdk';
-const ib = new Inkbox({ apiKey: process.env.INKBOX_API_KEY });
-const id = await ib.getIdentity(process.env.INKBOX_AGENT_HANDLE);
-console.log(JSON.stringify(await id.placeCall({ toNumber: '+15551234567' }), null, 2));
-"
-```
-
 ## Extending
 
 The `@inkbox/sdk` supports additional capabilities you can use inline:
@@ -116,5 +82,8 @@ The `@inkbox/sdk` supports additional capabilities you can use inline:
 - **HTML emails**: pass `bodyHtml` alongside or instead of `bodyText` in `sendEmail()`
 - **Attachments**: pass `attachments: [{ filename, contentType, contentBase64 }]` to `sendEmail()`
 - **Mark as read**: use `identity.markEmailsRead(messageIds)`
-- **Call webhooks**: pass `webhookUrl` to `placeCall()` for call lifecycle events
-- **WebSocket audio bridge**: pass `clientWebsocketUrl` to `placeCall()` for real-time audio
+- **Star/unstar messages**: use `inkbox._messages.star()` / `inkbox._messages.unstar()`
+- **Delete messages or threads**: use `inkbox._messages.delete()` / `inkbox._threads.delete()`
+- **Search call transcripts**: use `inkbox.phoneNumbers.searchTranscripts(phoneNumberId, { q })` for full-text transcript search
+- **Inbound call handling**: configure `incomingCallAction` (`auto_accept`, `auto_reject`, or `webhook`) and `incomingCallWebhookUrl` via `inkbox.phoneNumbers.update()`
+- **WebSocket audio bridge**: pass `clientWebsocketUrl` to `identity.placeCall()` for real-time audio
