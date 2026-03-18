@@ -16,7 +16,7 @@ node_modules/
 coverage/
 *.tsbuildinfo
 *.js.map
-
+*.ts.map
 # Python testing and linting
 .pytest_cache/
 .ruff_cache/
