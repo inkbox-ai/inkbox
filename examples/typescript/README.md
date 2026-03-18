@@ -14,7 +14,12 @@ Install it into OpenClaw to give your agents an Inkbox identity.
 export INKBOX_API_KEY=your_api_key_here
 ```
 
-3. Make sure the Inkbox skill is installed.
+3. Install the Inkbox skill via `clawhub` (run this inside your OpenClaw workspace):
+
+```bash
+npm i -g clawhub
+clawhub install inkbox
+```
 4. Add this config snippet to `~/.openclaw/openclaw.json`:
 
 ```json
