@@ -15,6 +15,7 @@ build/
 node_modules/
 coverage/
 *.tsbuildinfo
+*.js.map
 
 # Python testing and linting
 .pytest_cache/
