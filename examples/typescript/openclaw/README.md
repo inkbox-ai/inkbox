@@ -26,11 +26,18 @@ Once installed, your OpenClaw agent can:
 
 Sign in at [console.inkbox.ai](https://console.inkbox.ai) and create an API key.
 
-### 2. Set the `INKBOX_API_KEY` environment variable in the environment where OpenClaw runs
+### 2. Store the Inkbox API key in a protected env file
 
 ```bash
-export INKBOX_API_KEY=your_api_key_here
+mkdir -p ~/.openclaw
+chmod 700 ~/.openclaw
+printf 'INKBOX_API_KEY=%s\n' 'YOUR_REAL_KEY_HERE' > ~/.openclaw/.env
+chmod 600 ~/.openclaw/.env
 ```
+
+If OpenClaw Gateway runs as a background service, storing the key in `~/.openclaw/.env` is not enough by itself. The service must be configured to read that file, then the gateway must be restarted.
+
+> **Security note:** This is still plaintext on disk, just with good file permissions. Compared to other options: better than putting the key directly in `openclaw.json`, fine for a personal machine, not encrypted.
 
 ### 3. Install the Inkbox skill via ClawHub
 
@@ -67,7 +74,7 @@ clawhub install inkbox
 }
 ```
 
-### 5. Start a new OpenClaw session (and restart the gateway if needed)
+### 5. Restart OpenClaw Gateway, then start a new OpenClaw session
 
 > **Note:** `INKBOX_AGENT_HANDLE` is optional at install time. If not set, the agent will walk you through creating one on first use.
 
