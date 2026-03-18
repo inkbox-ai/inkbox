@@ -73,7 +73,8 @@ const call = await identity.placeCall({ toNumber: "+15551234567" });
 | [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
 | [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
 | [`skills/`](./skills/) | Agent skills for Claude Code and other coding agents |
-| [`examples/typescript/`](./examples/typescript/) | Runnable TypeScript examples |
+| [`examples/python/`](./examples/python/) | Runnable Python examples |
+| [`examples/typescript/openclaw/`](./examples/typescript/openclaw/) | OpenClaw skill for email and phone |
 
 ---
 
