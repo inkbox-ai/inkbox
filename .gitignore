@@ -9,7 +9,6 @@ build/
 .venv/
 *.egg
 .eggs/
-.coverage
 
 # TypeScript / JavaScript
 node_modules/
@@ -21,6 +20,7 @@ coverage/
 .pytest_cache/
 .ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 
 # uv lock file
