@@ -28,6 +28,11 @@ npx tsx search-emails.ts
 npx tsx place-call.ts
 npx tsx list-calls.ts
 npx tsx get-transcript.ts
+
+# Authenticator
+npx tsx create-authenticator.ts
+npx tsx list-authenticator-accounts.ts
+npx tsx generate-otp.ts
 ```
 
 Edit the `// --- Configuration ---` block at the top of each file to set your inputs before running.
