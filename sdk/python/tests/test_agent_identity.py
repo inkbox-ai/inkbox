@@ -65,3 +65,113 @@ class TestAgentIdentityGetThread:
 
         with pytest.raises(InkboxError, match="no mailbox assigned"):
             identity.get_thread("eeee5555-0000-0000-0000-000000000001")
+
+
+def _identity_with_authenticator_app():
+    """Return an AgentIdentity backed by a mock Inkbox client, with authenticator app."""
+    data = _AgentIdentityData._from_dict(IDENTITY_DETAIL_DICT)
+    inkbox = MagicMock()
+    return AgentIdentity(data, inkbox), inkbox
+
+
+def _identity_without_authenticator_app():
+    """Return an AgentIdentity with no authenticator app assigned."""
+    detail = {**IDENTITY_DETAIL_DICT, "authenticator_app": None}
+    data = _AgentIdentityData._from_dict(detail)
+    inkbox = MagicMock()
+    return AgentIdentity(data, inkbox), inkbox
+
+
+class TestAgentIdentityCreateAuthenticatorApp:
+    def test_creates_and_links_app(self):
+        from inkbox.authenticator.types import AuthenticatorApp
+
+        identity, inkbox = _identity_without_authenticator_app()
+        app_data = AuthenticatorApp._from_dict({
+            "id": "cccc3333-0000-0000-0000-000000000001",
+            "organization_id": "org-abc123",
+            "identity_id": "eeee5555-0000-0000-0000-000000000001",
+            "status": "active",
+            "created_at": "2026-03-18T12:00:00Z",
+            "updated_at": "2026-03-18T12:00:00Z",
+        })
+        inkbox._auth_apps.create.return_value = app_data
+
+        result = identity.create_authenticator_app()
+
+        inkbox._auth_apps.create.assert_called_once_with(agent_handle="sales-agent")
+        assert result is app_data
+        assert identity.authenticator_app is not None
+
+
+class TestAgentIdentityAssignAuthenticatorApp:
+    def test_assigns_app(self):
+        identity, inkbox = _identity_without_authenticator_app()
+        detail_data = _AgentIdentityData._from_dict(IDENTITY_DETAIL_DICT)
+        inkbox._ids_resource.assign_authenticator_app.return_value = detail_data
+
+        result = identity.assign_authenticator_app("cccc3333-0000-0000-0000-000000000001")
+
+        inkbox._ids_resource.assign_authenticator_app.assert_called_once_with(
+            "sales-agent",
+            authenticator_app_id="cccc3333-0000-0000-0000-000000000001",
+        )
+        assert result is not None
+
+
+class TestAgentIdentityUnlinkAuthenticatorApp:
+    def test_unlinks_app(self):
+        identity, inkbox = _identity_with_authenticator_app()
+
+        identity.unlink_authenticator_app()
+
+        inkbox._ids_resource.unlink_authenticator_app.assert_called_once_with("sales-agent")
+        assert identity.authenticator_app is None
+
+    def test_requires_authenticator_app(self):
+        identity, _ = _identity_without_authenticator_app()
+
+        with pytest.raises(InkboxError, match="no authenticator app assigned"):
+            identity.unlink_authenticator_app()
+
+
+class TestAgentIdentityGenerateOTP:
+    def test_generates_otp(self):
+        from inkbox.authenticator.types import OTPCode
+
+        identity, inkbox = _identity_with_authenticator_app()
+        otp = OTPCode._from_dict({
+            "otp_code": "123456",
+            "valid_for_seconds": 17,
+            "otp_type": "totp",
+            "algorithm": "sha1",
+            "digits": 6,
+            "period": 30,
+        })
+        inkbox._auth_accounts.generate_otp.return_value = otp
+
+        result = identity.generate_otp("dddd4444-0000-0000-0000-000000000001")
+
+        assert result.otp_code == "123456"
+
+    def test_requires_authenticator_app(self):
+        identity, _ = _identity_without_authenticator_app()
+
+        with pytest.raises(InkboxError, match="no authenticator app assigned"):
+            identity.generate_otp("dddd4444-0000-0000-0000-000000000001")
+
+
+class TestAgentIdentityListAuthenticatorAccounts:
+    def test_lists_accounts(self):
+        identity, inkbox = _identity_with_authenticator_app()
+        inkbox._auth_accounts.list.return_value = []
+
+        result = identity.list_authenticator_accounts()
+
+        assert result == []
+
+    def test_requires_authenticator_app(self):
+        identity, _ = _identity_without_authenticator_app()
+
+        with pytest.raises(InkboxError, match="no authenticator app assigned"):
+            identity.list_authenticator_accounts()

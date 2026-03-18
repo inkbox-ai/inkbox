@@ -142,3 +142,27 @@ class TestIdentitiesUnlinkPhoneNumber:
         res.unlink_phone_number(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/phone_number")
+
+
+class TestIdentitiesAssignAuthenticatorApp:
+    def test_assigns_authenticator_app(self):
+        res, http = _resource()
+        app_id = "cccc3333-0000-0000-0000-000000000001"
+        http.post.return_value = IDENTITY_DETAIL_DICT
+
+        detail = res.assign_authenticator_app(HANDLE, authenticator_app_id=app_id)
+
+        http.post.assert_called_once_with(
+            f"/{HANDLE}/authenticator_app", json={"authenticator_app_id": app_id}
+        )
+        assert isinstance(detail, _AgentIdentityData)
+        assert detail.authenticator_app is not None
+
+
+class TestIdentitiesUnlinkAuthenticatorApp:
+    def test_unlinks_authenticator_app(self):
+        res, http = _resource()
+
+        res.unlink_authenticator_app(HANDLE)
+
+        http.delete.assert_called_once_with(f"/{HANDLE}/authenticator_app")

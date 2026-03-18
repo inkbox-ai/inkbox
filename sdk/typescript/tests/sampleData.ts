@@ -127,6 +127,57 @@ export const RAW_PHONE_TRANSCRIPT = {
   created_at: "2026-03-09T00:01:01Z",
 };
 
+// ---- Authenticator ----
+
+export const RAW_AUTHENTICATOR_APP = {
+  id: "cccc3333-0000-0000-0000-000000000001",
+  organization_id: "org-abc123",
+  identity_id: "eeee5555-0000-0000-0000-000000000001",
+  status: "active",
+  created_at: "2026-03-18T12:00:00Z",
+  updated_at: "2026-03-18T12:00:00Z",
+};
+
+export const RAW_AUTHENTICATOR_APP_UNLINKED = {
+  ...RAW_AUTHENTICATOR_APP,
+  identity_id: null,
+};
+
+export const RAW_AUTHENTICATOR_ACCOUNT = {
+  id: "dddd4444-0000-0000-0000-000000000001",
+  authenticator_app_id: "cccc3333-0000-0000-0000-000000000001",
+  otp_type: "totp",
+  issuer: "GitHub",
+  account_name: "alice@example.com",
+  display_name: "GitHub Work",
+  description: "Primary engineering account",
+  algorithm: "sha1",
+  digits: 6,
+  period: 30,
+  counter: null,
+  status: "active",
+  created_at: "2026-03-18T12:00:00Z",
+  updated_at: "2026-03-18T12:00:00Z",
+};
+
+export const RAW_OTP_CODE = {
+  otp_code: "123456",
+  valid_for_seconds: 17,
+  otp_type: "totp",
+  algorithm: "sha1",
+  digits: 6,
+  period: 30,
+};
+
+export const RAW_IDENTITY_AUTHENTICATOR_APP = {
+  id: "cccc3333-0000-0000-0000-000000000001",
+  organization_id: "org-abc123",
+  identity_id: "eeee5555-0000-0000-0000-000000000001",
+  status: "active",
+  created_at: "2026-03-09T00:00:00Z",
+  updated_at: "2026-03-09T00:00:00Z",
+};
+
 // ---- Identities ----
 
 export const RAW_IDENTITY_MAILBOX = {
@@ -162,6 +213,7 @@ export const RAW_IDENTITY_DETAIL = {
   ...RAW_IDENTITY,
   mailbox: RAW_IDENTITY_MAILBOX,
   phone_number: RAW_IDENTITY_PHONE,
+  authenticator_app: RAW_IDENTITY_AUTHENTICATOR_APP,
 };
 
 // ---- Signing Keys ----

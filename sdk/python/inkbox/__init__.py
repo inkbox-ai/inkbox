@@ -29,8 +29,16 @@ from inkbox.phone.types import (
 # Identity types
 from inkbox.identities.types import (
     AgentIdentitySummary,
+    IdentityAuthenticatorApp,
     IdentityMailbox,
     IdentityPhoneNumber,
+)
+
+# Authenticator types
+from inkbox.authenticator.types import (
+    AuthenticatorAccount,
+    AuthenticatorApp,
+    OTPCode,
 )
 
 # Signing key + webhook verification
@@ -57,8 +65,13 @@ __all__ = [
     "RateLimitInfo",
     # Identity types
     "AgentIdentitySummary",
+    "IdentityAuthenticatorApp",
     "IdentityMailbox",
     "IdentityPhoneNumber",
+    # Authenticator types
+    "AuthenticatorApp",
+    "AuthenticatorAccount",
+    "OTPCode",
     # Signing key + webhook verification
     "SigningKey",
     "verify_webhook",
