@@ -1,12 +1,12 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, authenticator app, or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
 # Inkbox Python SDK
 
-API-first communication infrastructure for AI agents — email, phone, and identities.
+API-first communication infrastructure for AI agents — email, phone, authenticator apps, and identities.
 
 ## Install & Init
 
@@ -34,16 +34,19 @@ Inkbox (org-level client)
 ├── .list_identities()       → list[AgentIdentitySummary]
 ├── .mailboxes               → MailboxesResource
 ├── .phone_numbers           → PhoneNumbersResource
+├── .authenticator_apps      → AuthenticatorAppsResource
 └── .create_signing_key()    → SigningKey
 
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                 → IdentityMailbox | None
 ├── .phone_number            → IdentityPhoneNumber | None
+├── .authenticator_app       → IdentityAuthenticatorApp | None
 ├── mail methods             (requires assigned mailbox)
-└── phone methods            (requires assigned phone number)
+├── phone methods            (requires assigned phone number)
+└── authenticator methods    (requires assigned authenticator app)
 ```
 
-An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxError` is raised with a clear message.
+An identity must have a channel assigned before you can use mail/phone/authenticator methods. If not assigned, an `InkboxError` is raised with a clear message.
 
 ## Identities
 
@@ -64,6 +67,7 @@ identity.delete()                        # soft-delete; unlinks channels
 # Create and auto-link new channels
 mailbox = identity.create_mailbox(display_name="Sales Agent")
 phone   = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
+auth_app = identity.create_authenticator_app()
 
 print(mailbox.email_address)   # e.g. "abc-xyz@inkboxmail.com"
 print(phone.number)            # e.g. "+18005551234"
@@ -71,10 +75,12 @@ print(phone.number)            # e.g. "+18005551234"
 # Link existing channels
 identity.assign_mailbox("mailbox-uuid")
 identity.assign_phone_number("phone-number-uuid")
+identity.assign_authenticator_app("authenticator-app-uuid")
 
 # Unlink without deleting
 identity.unlink_mailbox()
 identity.unlink_phone_number()
+identity.unlink_authenticator_app()
 ```
 
 ## Mail
@@ -144,6 +150,38 @@ for t in identity.list_transcripts(calls[0].id):
     print(f"[{t.party}] {t.text}")   # party: "local" or "remote"
 ```
 
+## Authenticator
+
+```python
+# Create an authenticator app and link it to an identity
+app = identity.create_authenticator_app()
+
+# Add an OTP account from an otpauth:// URI
+account = identity.create_authenticator_account(
+    otpauth_uri="otpauth://totp/Example:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example",
+    display_name="My OTP Account",      # optional (max 255 chars)
+    description="Login MFA for Example", # optional
+)
+
+# List all accounts in this identity's authenticator app
+accounts = identity.list_authenticator_accounts()
+
+# Get a single account
+account = identity.get_authenticator_account("account-uuid")
+
+# Update account metadata (pass None to clear a field)
+identity.update_authenticator_account("account-uuid", display_name="New Label")
+
+# Generate an OTP code
+otp = identity.generate_otp("account-uuid")
+print(otp.otp_code)            # e.g. "482901"
+print(otp.valid_for_seconds)   # seconds until expiry (None for HOTP)
+print(otp.otp_type)            # "totp" or "hotp"
+
+# Delete an account
+identity.delete_authenticator_account("account-uuid")
+```
+
 ## Org-level Resources
 
 ### Mailboxes (`inkbox.mailboxes`)
@@ -182,6 +220,16 @@ inkbox.phone_numbers.update(
 
 hits = inkbox.phone_numbers.search_transcripts(number.id, q="refund", party="remote", limit=50)
 inkbox.phone_numbers.release(number=number.number)
+```
+
+### Authenticator Apps (`inkbox.authenticator_apps`)
+
+```python
+apps = inkbox.authenticator_apps.list()
+app  = inkbox.authenticator_apps.get("app-uuid")
+app  = inkbox.authenticator_apps.create(agent_handle="support")   # linked to identity
+app  = inkbox.authenticator_apps.create()                         # unbound
+inkbox.authenticator_apps.delete("app-uuid")                      # soft-deletes app + all accounts
 ```
 
 ## Webhooks & Signature Verification
