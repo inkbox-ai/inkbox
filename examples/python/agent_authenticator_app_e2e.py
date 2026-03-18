@@ -127,6 +127,20 @@ print(f"    Authenticator app: {agent_identity.authenticator_app}")
 assert agent_identity.authenticator_app is None
 print("    Confirmed: identity no longer has an authenticator app")
 
+# ── 12. Delete the authenticator app itself (cleanup) ──
+print("\n" + "=" * 60)
+print("12. Deleting authenticator app (cleanup)...")
+inkbox.authenticator_apps.delete(str(app.id))
+print(f"    Deleted app {app.id}")
+
+# ── 13. List apps — confirm it's gone ──
+print("\n" + "=" * 60)
+print("13. Listing authenticator apps (should not contain deleted app)...")
+apps = inkbox.authenticator_apps.list()
+app_ids = [str(a.id) for a in apps]
+assert str(app.id) not in app_ids, f"Deleted app {app.id} still in list!"
+print(f"    Confirmed: app {app.id} no longer in list")
+
 # ── Done ──
 print("\n" + "=" * 60)
 print("ALL CHECKS PASSED")
