@@ -18,28 +18,28 @@ print("1. Listing agent identities...")
 identities = inkbox.list_identities()
 print(f"   Found {len(identities)} identities")
 
-target = None
+agent_identity = None
 for summary in identities:
     identity = inkbox.get_identity(summary.agent_handle)
     if identity.authenticator_app is None:
-        target = identity
+        agent_identity = identity
         break
 
-if target is None:
+if agent_identity is None:
     print("   ERROR: No identity without an authenticator app found!")
     raise SystemExit(1)
 
-print(f"   Using identity: {target.agent_handle} (id={target.id})")
-print(f"   Authenticator app: {target.authenticator_app}")
-assert target.authenticator_app is None
+print(f"   Using identity: {agent_identity.agent_handle} (id={agent_identity.id})")
+print(f"   Authenticator app: {agent_identity.authenticator_app}")
+assert agent_identity.authenticator_app is None
 
 # ── 2. Create authenticator app ──
 print("\n" + "=" * 60)
 print("2. Creating authenticator app...")
-app = target.create_authenticator_app()
+app = agent_identity.create_authenticator_app()
 print(f"   App created: id={app.id}, status={app.status}")
-assert target.authenticator_app is not None
-print(f"   Identity now has app: id={target.authenticator_app.id}")
+assert agent_identity.authenticator_app is not None
+print(f"   Identity now has app: id={agent_identity.authenticator_app.id}")
 
 # ── 3. List authenticator apps to verify it's attached ──
 print("\n" + "=" * 60)
@@ -53,7 +53,7 @@ print(f"   Confirmed: app {app.id} exists in org app list")
 # ── 4. List accounts — should be empty ──
 print("\n" + "=" * 60)
 print("4. Listing authenticator accounts (should be 0)...")
-accounts = target.list_authenticator_accounts()
+accounts = agent_identity.list_authenticator_accounts()
 print(f"   Found {len(accounts)} accounts")
 assert len(accounts) == 0, f"Expected 0 accounts, got {len(accounts)}"
 
@@ -61,7 +61,7 @@ assert len(accounts) == 0, f"Expected 0 accounts, got {len(accounts)}"
 print("\n" + "=" * 60)
 print("5. Creating authenticator account...")
 otpauth_uri = "otpauth://totp/totp@authenticationtest.com?secret=I65VU7K5ZQL7WB4E"
-account = target.create_authenticator_account(
+account = agent_identity.create_authenticator_account(
     otpauth_uri=otpauth_uri,
     display_name="TOTP MFA Authentication Challenge",
     description="The challenge is to use a TOTP API to complete the automated authentication to this page.",
@@ -76,7 +76,7 @@ print(f"   Period: {account.period}s")
 # ── 6. List accounts — should be 1 ──
 print("\n" + "=" * 60)
 print("6. Listing accounts (should be 1)...")
-accounts = target.list_authenticator_accounts()
+accounts = agent_identity.list_authenticator_accounts()
 print(f"   Found {len(accounts)} account(s)")
 assert len(accounts) == 1, f"Expected 1 account, got {len(accounts)}"
 assert str(accounts[0].id) == str(account.id)
@@ -86,7 +86,7 @@ print(f"   Confirmed: account {account.id} exists")
 print("\n" + "=" * 60)
 print("7. Generating OTP codes (5 rounds, 10s apart)...")
 for i in range(5):
-    otp = target.generate_otp(str(account.id))
+    otp = agent_identity.generate_otp(str(account.id))
     print(f"   [{i+1}/5] Code: {otp.otp_code} | "
           f"Valid for: {otp.valid_for_seconds}s | "
           f"Type: {otp.otp_type} | "
@@ -99,13 +99,13 @@ for i in range(5):
 # ── 8. Delete the account ──
 print("\n" + "=" * 60)
 print("8. Deleting authenticator account...")
-target.delete_authenticator_account(str(account.id))
+agent_identity.delete_authenticator_account(str(account.id))
 print(f"   Deleted account {account.id}")
 
 # ── 9. List accounts — should be 0 again ──
 print("\n" + "=" * 60)
 print("9. Listing accounts (should be 0 again)...")
-accounts = target.list_authenticator_accounts()
+accounts = agent_identity.list_authenticator_accounts()
 print(f"   Found {len(accounts)} accounts")
 assert len(accounts) == 0, f"Expected 0 accounts, got {len(accounts)}"
 print("   Confirmed: no accounts remain")
@@ -113,16 +113,16 @@ print("   Confirmed: no accounts remain")
 # ── 10. Unlink authenticator app from identity ──
 print("\n" + "=" * 60)
 print("10. Unlinking authenticator app from identity...")
-target.unlink_authenticator_app()
-print(f"    Local authenticator_app: {target.authenticator_app}")
-assert target.authenticator_app is None
+agent_identity.unlink_authenticator_app()
+print(f"    Local authenticator_app: {agent_identity.authenticator_app}")
+assert agent_identity.authenticator_app is None
 
 # ── 11. Refresh identity and confirm app is gone ──
 print("\n" + "=" * 60)
 print("11. Refreshing identity to confirm app is detached...")
-target.refresh()
-print(f"    Authenticator app: {target.authenticator_app}")
-assert target.authenticator_app is None
+agent_identity.refresh()
+print(f"    Authenticator app: {agent_identity.authenticator_app}")
+assert agent_identity.authenticator_app is None
 print("    Confirmed: identity no longer has an authenticator app")
 
 # ── Done ──
