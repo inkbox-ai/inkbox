@@ -245,9 +245,7 @@ key = inkbox.create_signing_key()
 # Verify an incoming webhook request
 is_valid = verify_webhook(
     payload=raw_body,                                    # bytes
-    signature=request.headers["X-Inkbox-Signature"],
-    request_id=request.headers["X-Inkbox-Request-ID"],
-    timestamp=request.headers["X-Inkbox-Timestamp"],
+    headers=request.headers,
     secret="whsec_...",
 )
 ```
