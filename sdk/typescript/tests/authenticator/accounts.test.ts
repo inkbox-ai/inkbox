@@ -14,7 +14,7 @@ function mockHttp() {
 
 const APP_ID = "cccc3333-0000-0000-0000-000000000001";
 const ACCOUNT_ID = "dddd4444-0000-0000-0000-000000000001";
-const OTPAUTH_URI = "otpauth://totp/GitHub:alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub";
+const OTPAUTH_URI = "otpauth://totp/GitHub:alice@example.com?secret=EXAMPLESECRET&issuer=GitHub";
 
 describe("AuthenticatorAccountsResource.create", () => {
   it("creates account with all fields", async () => {

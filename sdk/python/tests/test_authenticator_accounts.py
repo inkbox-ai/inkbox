@@ -14,7 +14,7 @@ def _resource():
 
 APP_ID = "cccc3333-0000-0000-0000-000000000001"
 ACCOUNT_ID = "dddd4444-0000-0000-0000-000000000001"
-OTPAUTH_URI = "otpauth://totp/GitHub:alice@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"
+OTPAUTH_URI = "otpauth://totp/GitHub:alice@example.com?secret=EXAMPLESECRET&issuer=GitHub"
 
 
 class TestAuthenticatorAccountsCreate:
