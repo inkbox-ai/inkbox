@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-API-first communication infrastructure for AI agents — email, phone, identities, and authenticator (OTP).
+API-first communication infrastructure for AI agents — email, phone, authenticator (OTP), and identities.
 
 | Package | Language | Install |
 |---|---|---|

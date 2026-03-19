@@ -1,6 +1,6 @@
 # @inkbox/sdk
 
-TypeScript SDK for the [Inkbox API](https://www.inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, identities, authenticator/OTP).
+TypeScript SDK for the [Inkbox API](https://www.inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, authenticator/OTP, identities).
 
 ## Install
 
