@@ -1,6 +1,6 @@
 {
   "name": "@inkbox/sdk",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "TypeScript SDK for the Inkbox API",
   "license": "MIT",
   "type": "module",
@@ -13,7 +13,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
