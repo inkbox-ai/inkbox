@@ -211,8 +211,8 @@ await inkbox.mailboxes.delete(mb.emailAddress);
 ```typescript
 const numbers = await inkbox.phoneNumbers.list();
 const number  = await inkbox.phoneNumbers.get("phone-number-uuid");
-const num     = await inkbox.phoneNumbers.provision({ type: "toll_free" });
-const local   = await inkbox.phoneNumbers.provision({ type: "local", state: "NY" });
+const num     = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "toll_free" });
+const local   = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "local", state: "NY" });
 
 await inkbox.phoneNumbers.update(num.id, {
   incomingCallAction: "webhook",               // "webhook", "auto_accept", or "auto_reject"
