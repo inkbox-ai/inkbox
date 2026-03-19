@@ -158,7 +158,7 @@ app = identity.create_authenticator_app()
 
 # Add an OTP account from an otpauth:// URI
 account = identity.create_authenticator_account(
-    otpauth_uri="otpauth://totp/Example:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example",
+    otpauth_uri="otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
     display_name="My OTP Account",      # optional (max 255 chars)
     description="Login MFA for Example", # optional
 )

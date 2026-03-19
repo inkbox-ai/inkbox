@@ -165,7 +165,7 @@ const auth_app = await identity.createAuthenticatorApp();
 
 // Add an OTP account from an otpauth:// URI
 const account = await identity.createAuthenticatorAccount({
-  otpauthUri: "otpauth://totp/Example:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example",
+  otpauthUri: "otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
   displayName: "My OTP Account",        // optional (max 255 chars)
   description: "Login MFA for Example",  // optional
 });
