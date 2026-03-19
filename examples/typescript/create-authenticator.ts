@@ -1,7 +1,7 @@
 import { Inkbox } from "@inkbox/sdk";
 
 // --- Configuration ---
-const otpauthUri = "otpauth://totp/Example:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Example";
+const otpauthUri = "otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example";
 const displayName = "My OTP Account";  // optional
 // ---------------------
 
