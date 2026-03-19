@@ -16,6 +16,7 @@ coverage/
 *.tsbuildinfo
 *.js.map
 *.ts.map
+package-lock.json
 # Python testing and linting
 .pytest_cache/
 .ruff_cache/
