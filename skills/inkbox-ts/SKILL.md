@@ -1,12 +1,12 @@
 ---
 name: inkbox-ts
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, or agent identity features using the Inkbox TypeScript SDK.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, authenticator app, or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: false
 ---
 
 # Inkbox TypeScript SDK
 
-API-first communication infrastructure for AI agents — email, phone, and identities.
+API-first communication infrastructure for AI agents — email, phone, authenticator apps, and identities.
 
 ## Install & Init
 
@@ -33,16 +33,19 @@ Inkbox (org-level client)
 ├── .listIdentities()       → Promise<AgentIdentitySummary[]>
 ├── .mailboxes              → MailboxesResource
 ├── .phoneNumbers           → PhoneNumbersResource
+├── .authenticatorApps      → AuthenticatorAppsResource
 └── .createSigningKey()     → Promise<SigningKey>
 
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                → IdentityMailbox | null
 ├── .phoneNumber            → IdentityPhoneNumber | null
+├── .authenticatorApp       → IdentityAuthenticatorApp | null
 ├── mail methods            (requires assigned mailbox)
-└── phone methods           (requires assigned phone number)
+├── phone methods           (requires assigned phone number)
+└── authenticator methods   (requires assigned authenticator app)
 ```
 
-An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxAPIError` is thrown.
+An identity must have a channel assigned before you can use mail/phone/authenticator methods. If not assigned, an `InkboxAPIError` is thrown.
 
 ## Identities
 
@@ -61,8 +64,9 @@ await identity.delete();                             // soft-delete; unlinks cha
 
 ```typescript
 // Create and auto-link new channels
-const mailbox = await identity.createMailbox({ displayName: "Sales Agent" });
-const phone   = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
+const mailbox  = await identity.createMailbox({ displayName: "Sales Agent" });
+const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
+const auth_app = await identity.createAuthenticatorApp();
 
 console.log(mailbox.emailAddress);   // e.g. "abc-xyz@inkboxmail.com"
 console.log(phone.number);           // e.g. "+18005551234"
@@ -70,10 +74,12 @@ console.log(phone.number);           // e.g. "+18005551234"
 // Link existing channels
 await identity.assignMailbox("mailbox-uuid");
 await identity.assignPhoneNumber("phone-number-uuid");
+await identity.assignAuthenticatorApp("authenticator-app-uuid");
 
 // Unlink without deleting
 await identity.unlinkMailbox();
 await identity.unlinkPhoneNumber();
+await identity.unlinkAuthenticatorApp();
 ```
 
 ## Mail
@@ -151,6 +157,38 @@ for (const t of segments) {
 }
 ```
 
+## Authenticator
+
+```typescript
+// Create an authenticator app and link it to an identity
+const auth_app = await identity.createAuthenticatorApp();
+
+// Add an OTP account from an otpauth:// URI
+const account = await identity.createAuthenticatorAccount({
+  otpauthUri: "otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
+  displayName: "My OTP Account",        // optional (max 255 chars)
+  description: "Login MFA for Example",  // optional
+});
+
+// List all accounts in this identity's authenticator app
+const accounts = await identity.listAuthenticatorAccounts();
+
+// Get a single account
+const account = await identity.getAuthenticatorAccount("account-uuid");
+
+// Update account metadata (pass null to clear a field)
+await identity.updateAuthenticatorAccount("account-uuid", { displayName: "New Label" });
+
+// Generate an OTP code
+const otp = await identity.generateOtp("account-uuid");
+console.log(otp.otpCode);            // e.g. "482901"
+console.log(otp.validForSeconds);    // seconds until expiry (null for HOTP)
+console.log(otp.otpType);            // "totp" or "hotp"
+
+// Delete an account
+await identity.deleteAuthenticatorAccount("account-uuid");
+```
+
 ## Org-level Resources
 
 ### Mailboxes (`inkbox.mailboxes`)
@@ -173,8 +211,8 @@ await inkbox.mailboxes.delete(mb.emailAddress);
 ```typescript
 const numbers = await inkbox.phoneNumbers.list();
 const number  = await inkbox.phoneNumbers.get("phone-number-uuid");
-const num     = await inkbox.phoneNumbers.provision({ type: "toll_free" });
-const local   = await inkbox.phoneNumbers.provision({ type: "local", state: "NY" });
+const num     = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "toll_free" });
+const local   = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "local", state: "NY" });
 
 await inkbox.phoneNumbers.update(num.id, {
   incomingCallAction: "webhook",               // "webhook", "auto_accept", or "auto_reject"
@@ -187,6 +225,16 @@ await inkbox.phoneNumbers.update(num.id, {
 
 const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", party: "remote", limit: 50 });
 await inkbox.phoneNumbers.release(num.id);
+```
+
+### Authenticator Apps (`inkbox.authenticatorApps`)
+
+```typescript
+const apps = await inkbox.authenticatorApps.list();
+const app  = await inkbox.authenticatorApps.get("app-uuid");
+const app  = await inkbox.authenticatorApps.create({ agentHandle: "support" });   // linked to identity
+const app  = await inkbox.authenticatorApps.create();                              // unbound
+await inkbox.authenticatorApps.delete("app-uuid");                                 // soft-deletes app + all accounts
 ```
 
 ## Webhooks & Signature Verification

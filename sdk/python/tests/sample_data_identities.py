@@ -29,8 +29,18 @@ IDENTITY_PHONE_DICT = {
     "updated_at": "2026-03-09T00:00:00Z",
 }
 
+IDENTITY_AUTHENTICATOR_APP_DICT = {
+    "id": "cccc3333-0000-0000-0000-000000000001",
+    "organization_id": "org-abc123",
+    "identity_id": "eeee5555-0000-0000-0000-000000000001",
+    "status": "active",
+    "created_at": "2026-03-09T00:00:00Z",
+    "updated_at": "2026-03-09T00:00:00Z",
+}
+
 IDENTITY_DETAIL_DICT = {
     **IDENTITY_DICT,
     "mailbox": IDENTITY_MAILBOX_DICT,
     "phone_number": IDENTITY_PHONE_DICT,
+    "authenticator_app": IDENTITY_AUTHENTICATOR_APP_DICT,
 }

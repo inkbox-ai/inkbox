@@ -128,4 +128,30 @@ export class IdentitiesResource {
   async unlinkPhoneNumber(agentHandle: string): Promise<void> {
     await this.http.delete(`/${agentHandle}/phone_number`);
   }
+
+  /**
+   * Assign an authenticator app to an identity.
+   *
+   * @param agentHandle - Handle of the identity.
+   * @param options.authenticatorAppId - UUID of the authenticator app to assign.
+   */
+  async assignAuthenticatorApp(
+    agentHandle: string,
+    options: { authenticatorAppId: string },
+  ): Promise<_AgentIdentityData> {
+    const data = await this.http.post<RawAgentIdentityData>(
+      `/${agentHandle}/authenticator_app`,
+      { authenticator_app_id: options.authenticatorAppId },
+    );
+    return parseAgentIdentityData(data);
+  }
+
+  /**
+   * Unlink the authenticator app from an identity (does not delete the app).
+   *
+   * @param agentHandle - Handle of the identity.
+   */
+  async unlinkAuthenticatorApp(agentHandle: string): Promise<void> {
+    await this.http.delete(`/${agentHandle}/authenticator_app`);
+  }
 }

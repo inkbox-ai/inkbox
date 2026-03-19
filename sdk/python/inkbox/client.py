@@ -16,6 +16,9 @@ from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.identities._http import HttpTransport as IdsHttpTransport
 from inkbox.identities.resources.identities import IdentitiesResource
+from inkbox.authenticator._http import HttpTransport as AuthHttpTransport
+from inkbox.authenticator.resources.apps import AuthenticatorAppsResource
+from inkbox.authenticator.resources.accounts import AuthenticatorAccountsResource
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import AgentIdentitySummary
 from inkbox.signing_keys import SigningKey, SigningKeysResource
@@ -63,6 +66,9 @@ class Inkbox:
         self._ids_http = IdsHttpTransport(
             api_key=api_key, base_url=f"{_api_root}/identities", timeout=timeout
         )
+        self._auth_http = AuthHttpTransport(
+            api_key=api_key, base_url=f"{_api_root}/authenticator", timeout=timeout
+        )
         self._api_http = MailHttpTransport(
             api_key=api_key, base_url=_api_root, timeout=timeout
         )
@@ -74,6 +80,9 @@ class Inkbox:
         self._calls = CallsResource(self._phone_http)
         self._numbers = PhoneNumbersResource(self._phone_http)
         self._transcripts = TranscriptsResource(self._phone_http)
+
+        self._auth_apps = AuthenticatorAppsResource(self._auth_http)
+        self._auth_accounts = AuthenticatorAccountsResource(self._auth_http)
 
         self._signing_keys = SigningKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
@@ -91,6 +100,11 @@ class Inkbox:
     def phone_numbers(self) -> PhoneNumbersResource:
         """Access org-level phone number operations (list, get, provision, release)."""
         return self._numbers
+
+    @property
+    def authenticator_apps(self) -> AuthenticatorAppsResource:
+        """Access org-level authenticator app operations (list, get, create, delete)."""
+        return self._auth_apps
 
     # ------------------------------------------------------------------
     # Org-level operations
@@ -144,6 +158,7 @@ class Inkbox:
         self._mail_http.close()
         self._phone_http.close()
         self._ids_http.close()
+        self._auth_http.close()
         self._api_http.close()
 
     def __enter__(self) -> Inkbox:

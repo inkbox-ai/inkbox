@@ -37,12 +37,24 @@ export interface AgentIdentitySummary {
   updatedAt: Date;
 }
 
+export interface IdentityAuthenticatorApp {
+  id: string;
+  organizationId: string;
+  identityId: string | null;
+  /** "active" | "paused" | "deleted" */
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /** @internal Full identity data with channels — users interact with AgentIdentity (the class) instead. */
 export interface _AgentIdentityData extends AgentIdentitySummary {
   /** Mailbox assigned to this identity, or null if unlinked. */
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
+  /** Authenticator app assigned to this identity, or null if unlinked. */
+  authenticatorApp: IdentityAuthenticatorApp | null;
 }
 
 // ---- internal raw API shapes (snake_case from JSON) ----
@@ -76,9 +88,19 @@ export interface RawAgentIdentitySummary {
   updated_at: string;
 }
 
+export interface RawIdentityAuthenticatorApp {
+  id: string;
+  organization_id: string;
+  identity_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RawAgentIdentityData extends RawAgentIdentitySummary {
   mailbox: RawIdentityMailbox | null;
   phone_number: RawIdentityPhoneNumber | null;
+  authenticator_app: RawIdentityAuthenticatorApp | null;
 }
 
 // ---- parsers ----
@@ -118,10 +140,22 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
   };
 }
 
+export function parseIdentityAuthenticatorApp(r: RawIdentityAuthenticatorApp): IdentityAuthenticatorApp {
+  return {
+    id: r.id,
+    organizationId: r.organization_id,
+    identityId: r.identity_id,
+    status: r.status,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
 export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityData {
   return {
     ...parseAgentIdentitySummary(r),
     mailbox: r.mailbox ? parseIdentityMailbox(r.mailbox) : null,
     phoneNumber: r.phone_number ? parseIdentityPhoneNumber(r.phone_number) : null,
+    authenticatorApp: r.authenticator_app ? parseIdentityAuthenticatorApp(r.authenticator_app) : null,
   };
 }

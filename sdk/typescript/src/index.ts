@@ -20,6 +20,12 @@ export type {
 } from "./phone/types.js";
 export type {
   AgentIdentitySummary,
+  IdentityAuthenticatorApp,
   IdentityMailbox,
   IdentityPhoneNumber,
 } from "./identities/types.js";
+export type {
+  AuthenticatorApp,
+  AuthenticatorAccount,
+  OTPCode,
+} from "./authenticator/types.js";
