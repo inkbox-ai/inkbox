@@ -204,8 +204,8 @@ inkbox.mailboxes.delete(mailbox.email_address)
 ```python
 numbers = inkbox.phone_numbers.list()
 number  = inkbox.phone_numbers.get("phone-number-uuid")
-number  = inkbox.phone_numbers.provision(type="toll_free")
-local   = inkbox.phone_numbers.provision(type="local", state="NY")
+number  = inkbox.phone_numbers.provision(agent_handle="my-agent", type="toll_free")
+local   = inkbox.phone_numbers.provision(agent_handle="my-agent", type="local", state="NY")
 
 inkbox.phone_numbers.update(
     number.id,
@@ -219,7 +219,7 @@ inkbox.phone_numbers.update(
 )
 
 hits = inkbox.phone_numbers.search_transcripts(number.id, q="refund", party="remote", limit=50)
-inkbox.phone_numbers.release(number=number.number)
+inkbox.phone_numbers.release(number.id)
 ```
 
 ### Authenticator Apps (`inkbox.authenticator_apps`)
