@@ -3,6 +3,9 @@
  *
  * End-to-end example: authenticator app lifecycle via the Inkbox SDK.
  *
+ * Uses the public TOTP challenge at https://authenticationtest.com/totpChallenge/
+ * (secret: I65VU7K5ZQL7WB4E).
+ *
  * Requires INKBOX_API_KEY in the environment.
  */
 
