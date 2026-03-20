@@ -1,7 +1,7 @@
 """
-inkbox/phone/_http.py
+inkbox/vault/_http.py
 
-Sync HTTP transport (internal).
+Sync HTTP transport (internal). Includes PUT for vault secret updates.
 """
 
 from __future__ import annotations
@@ -39,8 +39,8 @@ class HttpTransport:
             return None
         return resp.json()
 
-    def patch(self, path: str, *, json: dict[str, Any]) -> Any:
-        resp = self._client.patch(path, json=json)
+    def put(self, path: str, *, json: dict[str, Any]) -> Any:
+        resp = self._client.put(path, json=json)
         _raise_for_status(resp)
         return resp.json()
 

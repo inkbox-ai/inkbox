@@ -1,0 +1,296 @@
+/**
+ * inkbox-vault/resources/vault.ts
+ *
+ * VaultResource   — org-level vault operations.
+ * UnlockedVault   — crypto-enabled wrapper for secret CRUD after unlock.
+ */
+
+import { HttpTransport } from "../../_http.js";
+import {
+  computeAuthHash,
+  decryptPayload,
+  deriveMasterKey,
+  deriveSalt,
+  encryptPayload,
+  unwrapOrgKey,
+} from "../crypto.js";
+import type {
+  DecryptedVaultSecret,
+  SecretPayload,
+  VaultInfo,
+  VaultKey,
+  VaultSecret,
+  VaultSecretDetail,
+} from "../types.js";
+import {
+  inferSecretType,
+  parsePayload,
+  parseVaultInfo,
+  parseVaultKey,
+  parseVaultSecret,
+  parseVaultSecretDetail,
+  serializePayload,
+} from "../types.js";
+import type {
+  RawVaultInfo,
+  RawVaultKey,
+  RawVaultSecret,
+  RawVaultSecretDetail,
+  RawVaultUnlockResponse,
+} from "../types.js";
+
+export class VaultResource {
+  private readonly http: HttpTransport;
+
+  constructor(http: HttpTransport) {
+    this.http = http;
+  }
+
+  // ------------------------------------------------------------------
+  // Vault metadata
+  // ------------------------------------------------------------------
+
+  /** Get vault metadata for the caller's organisation. */
+  async info(): Promise<VaultInfo> {
+    const data = await this.http.get<RawVaultInfo>("/info");
+    return parseVaultInfo(data);
+  }
+
+  // ------------------------------------------------------------------
+  // Keys (read-only via API key)
+  // ------------------------------------------------------------------
+
+  /**
+   * List vault keys (metadata only — no wrapped key material).
+   *
+   * @param options.keyType - Optional filter: `"primary"` or `"recovery"`.
+   */
+  async listKeys(options: { keyType?: string } = {}): Promise<VaultKey[]> {
+    const params: Record<string, string> = {};
+    if (options.keyType !== undefined) params["type"] = options.keyType;
+    const data = await this.http.get<RawVaultKey[]>("/keys", params);
+    return data.map(parseVaultKey);
+  }
+
+  // ------------------------------------------------------------------
+  // Secrets (metadata-only operations)
+  // ------------------------------------------------------------------
+
+  /**
+   * List vault secrets (metadata only, no encrypted payload).
+   *
+   * @param options.secretType - Optional filter: `"login"`, `"card"`,
+   *   `"note"`, `"ssh_key"`, or `"api_key"`.
+   */
+  async listSecrets(options: { secretType?: string } = {}): Promise<VaultSecret[]> {
+    const params: Record<string, string> = {};
+    if (options.secretType !== undefined) params["secret_type"] = options.secretType;
+    const data = await this.http.get<RawVaultSecret[]>("/secrets", params);
+    return data.map(parseVaultSecret);
+  }
+
+  /**
+   * Delete a vault secret.
+   *
+   * @param secretId - UUID of the secret to delete.
+   */
+  async deleteSecret(secretId: string): Promise<void> {
+    await this.http.delete(`/secrets/${secretId}`);
+  }
+
+  // ------------------------------------------------------------------
+  // Unlock
+  // ------------------------------------------------------------------
+
+  /**
+   * Unlock the vault with a password.
+   *
+   * Derives the encryption key from the provided password, fetches
+   * and decrypts all vault secrets.
+   *
+   * @param password - Vault password or recovery code.
+   * @returns {@link UnlockedVault} with decrypted secrets and methods for
+   *   secret CRUD.
+   * @throws If the password is incorrect or the vault key has been deleted.
+   */
+  async unlock(password: string): Promise<UnlockedVault> {
+    // Step 1: get org_id for salt derivation
+    const vaultInfo = await this.info();
+    const salt = deriveSalt(vaultInfo.organizationId);
+
+    // Step 2: derive master key → auth hash
+    const masterKey = await deriveMasterKey(password, salt);
+    const authHash = computeAuthHash(masterKey);
+
+    // Step 3: fetch wrapped key + encrypted secrets
+    // We always send auth_hash, so the server returns the singular
+    // wrapped_org_encryption_key for the matching vault key.  The
+    // plural wrapped_org_encryption_keys is only returned when
+    // auth_hash is omitted (a recovery flow this SDK does not use,
+    // since recovery codes are derived the same way as passwords).
+    const data = await this.http.get<RawVaultUnlockResponse>("/unlock", {
+      auth_hash: authHash,
+    });
+
+    const wrapped = data.wrapped_org_encryption_key;
+    if (!wrapped) {
+      throw new Error(
+        "No vault key matched this password. " +
+          "Check that the password is correct and the key has not been deleted.",
+      );
+    }
+
+    // Step 4: unwrap the org encryption key
+    const orgKey = unwrapOrgKey(masterKey, wrapped);
+
+    // Step 5: decrypt all secrets from the unlock bundle
+    const decrypted: DecryptedVaultSecret[] = [];
+    for (const raw of data.encrypted_secrets ?? []) {
+      const detail = parseVaultSecretDetail(raw);
+      const payloadDict = decryptPayload(orgKey, detail.encryptedPayload);
+      const payload = parsePayload(
+        detail.secretType,
+        payloadDict as Record<string, unknown>,
+      );
+      decrypted.push({
+        id: detail.id,
+        label: detail.label,
+        secretType: detail.secretType,
+        status: detail.status,
+        createdAt: detail.createdAt,
+        updatedAt: detail.updatedAt,
+        payload,
+      });
+    }
+
+    return new UnlockedVault(this.http, orgKey, decrypted);
+  }
+}
+
+/**
+ * A vault unlocked with a valid password.
+ *
+ * Provides transparent encrypt/decrypt for secret CRUD operations.
+ *
+ * Obtain via {@link VaultResource.unlock}.
+ */
+export class UnlockedVault {
+  private readonly http: HttpTransport;
+  private readonly orgKey: Uint8Array;
+  private readonly secretsCache: DecryptedVaultSecret[];
+
+  constructor(
+    http: HttpTransport,
+    orgKey: Uint8Array,
+    secretsCache: DecryptedVaultSecret[],
+  ) {
+    this.http = http;
+    this.orgKey = orgKey;
+    this.secretsCache = secretsCache;
+  }
+
+  /** All vault secrets decrypted from the unlock response. */
+  get secrets(): DecryptedVaultSecret[] {
+    return [...this.secretsCache];
+  }
+
+  // ------------------------------------------------------------------
+  // Encrypted CRUD
+  // ------------------------------------------------------------------
+
+  /**
+   * Fetch and decrypt a single vault secret.
+   *
+   * @param secretId - UUID of the secret.
+   */
+  async getSecret(secretId: string): Promise<DecryptedVaultSecret> {
+    const data = await this.http.get<RawVaultSecretDetail>(
+      `/secrets/${secretId}`,
+    );
+    const detail = parseVaultSecretDetail(data);
+    const payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload);
+    const payload = parsePayload(
+      detail.secretType,
+      payloadDict as Record<string, unknown>,
+    );
+    return {
+      id: detail.id,
+      label: detail.label,
+      secretType: detail.secretType,
+      status: detail.status,
+      createdAt: detail.createdAt,
+      updatedAt: detail.updatedAt,
+      payload,
+    };
+  }
+
+  /**
+   * Encrypt and store a new secret.
+   *
+   * The `secretType` is inferred from the payload shape.
+   *
+   * @param options.label - Display name (max 255 characters).
+   * @param options.payload - One of {@link LoginPayload}, {@link CardPayload},
+   *   {@link NotePayload}, {@link SSHKeyPayload}, or {@link APIKeyPayload}.
+   */
+  async createSecret(options: {
+    label: string;
+    payload: SecretPayload;
+  }): Promise<VaultSecret> {
+    const secretType = inferSecretType(options.payload);
+    const serialized = serializePayload(secretType, options.payload);
+    const encrypted = encryptPayload(this.orgKey, serialized);
+    const body = {
+      label: options.label,
+      secret_type: secretType,
+      encrypted_payload: encrypted,
+    };
+    const data = await this.http.post<RawVaultSecret>("/secrets", body);
+    return parseVaultSecret(data);
+  }
+
+  /**
+   * Update a vault secret's label and/or encrypted payload.
+   *
+   * Only provided fields are sent to the server.
+   *
+   * **Note:** The `secretType` is immutable after creation.  If a payload
+   * is provided it must be the **same type** as the original (e.g. update
+   * a `login` secret with a new {@link LoginPayload}).  To change the
+   * type, delete the secret and create a new one.
+   *
+   * @param secretId - UUID of the secret to update.
+   * @param options.label - New display name.
+   * @param options.payload - New payload of the **same type** as the
+   *   original (will be re-encrypted).
+   */
+  async updateSecret(
+    secretId: string,
+    options: {
+      label?: string;
+      payload?: SecretPayload;
+    },
+  ): Promise<VaultSecret> {
+    const body: Record<string, unknown> = {};
+    if ("label" in options) body["label"] = options.label;
+    if (options.payload !== undefined) {
+      const sType = inferSecretType(options.payload);
+      const serialized = serializePayload(sType, options.payload);
+      body["encrypted_payload"] = encryptPayload(this.orgKey, serialized);
+    }
+    const data = await this.http.put<RawVaultSecret>(
+      `/secrets/${secretId}`,
+      body,
+    );
+    return parseVaultSecret(data);
+  }
+
+  /**
+   * Delete a vault secret.
+   *
+   * @param secretId - UUID of the secret to delete.
+   */
+  async deleteSecret(secretId: string): Promise<void> {
+    await this.http.delete(`/secrets/${secretId}`);
+  }
+}

@@ -453,7 +453,7 @@ class AgentIdentity:
         )
 
     def delete_authenticator_account(self, account_id: str) -> None:
-        """Soft-delete an authenticator account.
+        """Delete an authenticator account.
 
         Args:
             account_id: UUID of the authenticator account to delete.
@@ -524,7 +524,7 @@ class AgentIdentity:
         return self
 
     def delete(self) -> None:
-        """Soft-delete this identity (unlinks channels without deleting them)."""
+        """Delete this identity (unlinks channels without deleting them)."""
         self._inkbox._ids_resource.delete(self.agent_handle)
 
     # ------------------------------------------------------------------

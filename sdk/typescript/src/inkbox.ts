@@ -16,6 +16,7 @@ import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { AuthenticatorAppsResource } from "./authenticator/resources/apps.js";
 import { AuthenticatorAccountsResource } from "./authenticator/resources/accounts.js";
+import { VaultResource } from "./vault/resources/vault.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type { AgentIdentitySummary } from "./identities/types.js";
 
@@ -65,6 +66,7 @@ export class Inkbox {
   readonly _idsResource: IdentitiesResource;
   readonly _authApps: AuthenticatorAppsResource;
   readonly _authAccounts: AuthenticatorAccountsResource;
+  readonly _vaultResource: VaultResource;
 
   constructor(options: InkboxOptions) {
     const apiRoot = `${(options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "")}/api/v1`;
@@ -74,6 +76,7 @@ export class Inkbox {
     const phoneHttp = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms);
     const idsHttp   = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms);
     const authHttp  = new HttpTransport(options.apiKey, `${apiRoot}/authenticator`, ms);
+    const vaultHttp = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms);
     const apiHttp   = new HttpTransport(options.apiKey, apiRoot, ms);
 
     this._mailboxes   = new MailboxesResource(mailHttp);
@@ -89,6 +92,8 @@ export class Inkbox {
 
     this._authApps     = new AuthenticatorAppsResource(authHttp);
     this._authAccounts = new AuthenticatorAccountsResource(authHttp);
+
+    this._vaultResource = new VaultResource(vaultHttp);
   }
 
   // ------------------------------------------------------------------
@@ -103,6 +108,9 @@ export class Inkbox {
 
   /** Org-level authenticator app operations (list, get, create, delete). */
   get authenticatorApps(): AuthenticatorAppsResource { return this._authApps; }
+
+  /** Encrypted vault (info, unlock, secrets). */
+  get vault(): VaultResource { return this._vaultResource; }
 
   // ------------------------------------------------------------------
   // Org-level operations

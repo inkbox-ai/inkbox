@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from inkbox.authenticator.exceptions import InkboxAPIError
+from inkbox.mail.exceptions import InkboxAPIError
 
 _DEFAULT_TIMEOUT = 30.0
 

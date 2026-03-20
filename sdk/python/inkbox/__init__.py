@@ -41,6 +41,26 @@ from inkbox.authenticator.types import (
     OTPCode,
 )
 
+# Vault types
+from inkbox.vault.types import (
+    APIKeyPayload,
+    CardPayload,
+    DecryptedVaultSecret,
+    LoginPayload,
+    NotePayload,
+    SSHKeyPayload,
+    VaultInfo,
+    VaultKey,
+    VaultSecret,
+    VaultSecretDetail,
+)
+from inkbox.vault.crypto import (
+    VaultKeyMaterial,
+    generate_org_encryption_key,
+    generate_recovery_code,
+    generate_vault_key_material,
+)
+
 # Signing key + webhook verification
 from inkbox.signing_keys import SigningKey, verify_webhook
 
@@ -72,6 +92,21 @@ __all__ = [
     "AuthenticatorApp",
     "AuthenticatorAccount",
     "OTPCode",
+    # Vault types
+    "VaultInfo",
+    "VaultKey",
+    "VaultSecret",
+    "VaultSecretDetail",
+    "DecryptedVaultSecret",
+    "LoginPayload",
+    "CardPayload",
+    "NotePayload",
+    "SSHKeyPayload",
+    "APIKeyPayload",
+    "VaultKeyMaterial",
+    "generate_org_encryption_key",
+    "generate_vault_key_material",
+    "generate_recovery_code",
     # Signing key + webhook verification
     "SigningKey",
     "verify_webhook",
