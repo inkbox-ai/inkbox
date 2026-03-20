@@ -243,7 +243,10 @@ class UnlockedVault:
             "secret_type": secret_type,
             "encrypted_payload": encrypted,
         }
-        data = self._http.post("/secrets", json=body)
+        data = self._http.post(
+            path="/secrets",
+            json=body,
+        )
         return VaultSecret._from_dict(data)
 
     def update_secret(
@@ -253,7 +256,8 @@ class UnlockedVault:
         label: str | None = _UNSET,  # type: ignore[assignment]
         payload: SecretPayload | None = _UNSET,  # type: ignore[assignment]
     ) -> VaultSecret:
-        """Update a vault secret's label and/or encrypted payload.
+        """
+        Update a vault secret's label and/or encrypted payload.
 
         Only provided arguments are sent to the server.
 
@@ -278,9 +282,13 @@ class UnlockedVault:
             body["label"] = label
         if payload is not _UNSET and payload is not None:
             body["encrypted_payload"] = encrypt_payload(
-                self._org_key, payload._to_dict()
+                self._org_key,
+                payload._to_dict()
             )
-        data = self._http.put(f"/secrets/{secret_id}", json=body)
+        data = self._http.patch(
+            f"/secrets/{secret_id}",
+            json=body,
+        )
         return VaultSecret._from_dict(data)
 
     def delete_secret(self, secret_id: UUID | str) -> None:

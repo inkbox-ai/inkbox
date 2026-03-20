@@ -13,9 +13,7 @@ from typing import Any, Union
 from uuid import UUID
 
 
-# ---------------------------------------------------------------------------
-# API response types
-# ---------------------------------------------------------------------------
+## API response types
 
 @dataclass
 class VaultInfo:
@@ -111,13 +109,12 @@ class VaultSecretDetail(VaultSecret):
         )
 
 
-# ---------------------------------------------------------------------------
-# Client-side structured secret payloads
-# ---------------------------------------------------------------------------
+## Client-side structured secret payloads
 
 @dataclass
 class LoginPayload:
-    """Structured payload for ``login`` secrets.
+    """
+    Structured payload for ``login`` secrets.
 
     Attributes:
         username: Login username or email.
@@ -132,7 +129,10 @@ class LoginPayload:
     notes: str | None = None
 
     def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {"username": self.username, "password": self.password}
+        d: dict[str, Any] = {
+            "username": self.username,
+            "password": self.password,
+        }
         if self.url is not None:
             d["url"] = self.url
         if self.notes is not None:
@@ -151,7 +151,8 @@ class LoginPayload:
 
 @dataclass
 class CardPayload:
-    """Structured payload for ``card`` secrets.
+    """
+    Structured payload for ``card`` secrets.
 
     Attributes:
         cardholder_name: Name on the card.
@@ -195,7 +196,8 @@ class CardPayload:
 
 @dataclass
 class NotePayload:
-    """Structured payload for ``note`` secrets.
+    """
+    Structured payload for ``note`` secrets.
 
     Attributes:
         content: Free-form text content.
@@ -204,16 +206,21 @@ class NotePayload:
     content: str
 
     def _to_dict(self) -> dict[str, Any]:
-        return {"content": self.content}
+        return {
+            "content": self.content,
+        }
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> NotePayload:
-        return cls(content=d["content"])
+        return cls(
+            content=d["content"],
+        )
 
 
 @dataclass
 class SSHKeyPayload:
-    """Structured payload for ``ssh_key`` secrets.
+    """
+    Structured payload for ``ssh_key`` secrets.
 
     Attributes:
         private_key: The SSH private key (PEM or OpenSSH format).
@@ -230,7 +237,9 @@ class SSHKeyPayload:
     notes: str | None = None
 
     def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {"private_key": self.private_key}
+        d: dict[str, Any] = {
+            "private_key": self.private_key,
+        }
         if self.public_key is not None:
             d["public_key"] = self.public_key
         if self.fingerprint is not None:
@@ -254,7 +263,8 @@ class SSHKeyPayload:
 
 @dataclass
 class APIKeyPayload:
-    """Structured payload for ``api_key`` secrets.
+    """
+    Structured payload for ``api_key`` secrets.
 
     Attributes:
         key: The API key or access key.
@@ -269,7 +279,9 @@ class APIKeyPayload:
     notes: str | None = None
 
     def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {"key": self.key}
+        d: dict[str, Any] = {
+            "key": self.key,
+        }
         if self.secret is not None:
             d["secret"] = self.secret
         if self.endpoint is not None:

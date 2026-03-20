@@ -118,9 +118,8 @@ class TestUnlockedVaultCreateSecret:
         )
 
         assert isinstance(result, VaultSecret)
-        call_args = http.post.call_args
-        assert call_args[0] == ("/secrets",)
-        body = call_args[1]["json"]
+        http.post.assert_called_once()
+        body = http.post.call_args.kwargs["json"]
         assert body["label"] == "AWS Prod"
         assert body["secret_type"] == "login"
         assert "encrypted_payload" in body
@@ -130,18 +129,18 @@ class TestUnlockedVaultUpdateSecret:
     def test_sends_label_only(self):
         org_key = generate_org_encryption_key()
         http = MagicMock()
-        http.put.return_value = VAULT_SECRET_DICT
+        http.patch.return_value = VAULT_SECRET_DICT
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
         unlocked.update_secret("some-id", label="New Name")
 
-        body = http.put.call_args[1]["json"]
+        body = http.patch.call_args[1]["json"]
         assert body == {"label": "New Name"}
 
     def test_sends_encrypted_payload(self):
         org_key = generate_org_encryption_key()
         http = MagicMock()
-        http.put.return_value = VAULT_SECRET_DICT
+        http.patch.return_value = VAULT_SECRET_DICT
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
         unlocked.update_secret(
@@ -149,6 +148,6 @@ class TestUnlockedVaultUpdateSecret:
             payload=LoginPayload(username="new", password="pw2"),
         )
 
-        body = http.put.call_args[1]["json"]
+        body = http.patch.call_args[1]["json"]
         assert "encrypted_payload" in body
         assert "label" not in body

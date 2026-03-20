@@ -169,12 +169,12 @@ describe("UnlockedVault.updateSecret", () => {
   it("sends only label when no payload", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
-    vi.mocked(http.put).mockResolvedValue(RAW_SECRET);
+    vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
     const unlocked = new UnlockedVault(http, orgKey, []);
 
     await unlocked.updateSecret("some-id", { label: "New Name" });
 
-    const call = vi.mocked(http.put).mock.calls[0];
+    const call = vi.mocked(http.patch).mock.calls[0];
     const body = call[1] as Record<string, unknown>;
     expect(body).toEqual({ label: "New Name" });
   });
@@ -182,14 +182,14 @@ describe("UnlockedVault.updateSecret", () => {
   it("sends encrypted payload when provided", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
-    vi.mocked(http.put).mockResolvedValue(RAW_SECRET);
+    vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
     const unlocked = new UnlockedVault(http, orgKey, []);
 
     await unlocked.updateSecret("some-id", {
       payload: { username: "new", password: "pw2" },
     });
 
-    const call = vi.mocked(http.put).mock.calls[0];
+    const call = vi.mocked(http.patch).mock.calls[0];
     const body = call[1] as Record<string, unknown>;
     expect(typeof body.encrypted_payload).toBe("string");
     expect(body).not.toHaveProperty("label");

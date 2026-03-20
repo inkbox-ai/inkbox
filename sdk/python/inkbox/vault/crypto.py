@@ -30,12 +30,11 @@ from argon2.low_level import Type as Argon2Type
 from argon2.low_level import hash_secret_raw
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+
+## Constants
 
 ARGON2_TIME_COST = 3
-ARGON2_MEMORY_COST = 65536  # 64 MiB
+ARGON2_MEMORY_COST = 65_536  # 64 MiB
 ARGON2_PARALLELISM = 4
 ARGON2_HASH_LEN = 32  # 256-bit master key
 
@@ -50,9 +49,7 @@ _RC_GROUP_LEN = 4
 _RC_GROUPS = 8  # 8 groups × 4 chars ≈ 120 bits of entropy
 
 
-# ---------------------------------------------------------------------------
-# Salt derivation
-# ---------------------------------------------------------------------------
+## Salt derivation
 
 def derive_salt(organization_id: str) -> bytes:
     """Derive a 16-byte Argon2id salt from the organisation ID.
@@ -61,15 +58,16 @@ def derive_salt(organization_id: str) -> bytes:
     deterministic so both vault init and vault unlock can reach the same
     master key from the same password.
     """
-    return hashlib.sha256(_SALT_PREFIX + organization_id.encode()).digest()[:16]
+    return hashlib.sha256(
+        _SALT_PREFIX + organization_id.encode()
+    ).digest()[:16]
 
 
-# ---------------------------------------------------------------------------
-# Key derivation
-# ---------------------------------------------------------------------------
+## Key derivation
 
 def derive_master_key(password: str, salt: bytes) -> bytes:
-    """Derive a 256-bit master key from a password using Argon2id.
+    """
+    Derive a 256-bit master key from a password using Argon2id.
 
     Args:
         password: User-provided vault password or recovery code.
@@ -94,14 +92,16 @@ def compute_auth_hash(master_key: bytes) -> str:
     return hashlib.sha256(master_key).hexdigest()
 
 
-# ---------------------------------------------------------------------------
-# AES-256-GCM wrapping / unwrapping
-# ---------------------------------------------------------------------------
+## AES-256-GCM wrapping / unwrapping
 
 def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:
     """Encrypt with AES-256-GCM.  Returns ``iv || ciphertext_with_tag``."""
     iv = os.urandom(AES_IV_BYTES)
-    ct = AESGCM(key).encrypt(iv, plaintext, None)
+    ct = AESGCM(key).encrypt(
+        nonce=iv,
+        data=plaintext,
+        associated_data=None,
+    )
     return iv + ct
 
 
@@ -109,20 +109,31 @@ def _aes_gcm_decrypt(key: bytes, blob: bytes) -> bytes:
     """Decrypt AES-256-GCM blob formatted as ``iv || ciphertext_with_tag``."""
     iv = blob[:AES_IV_BYTES]
     ct = blob[AES_IV_BYTES:]
-    return AESGCM(key).decrypt(iv, ct, None)
+    return AESGCM(key).decrypt(
+        nonce=iv,
+        data=ct,
+        associated_data=None,
+    )
 
 
 def wrap_org_key(master_key: bytes, org_key: bytes) -> str:
-    """Wrap the org encryption key with a master key.
+    """
+    Wrap the org encryption key with a master key.
 
     Returns:
         Base64-encoded blob ``(iv || ciphertext || tag)``.
     """
-    return base64.b64encode(_aes_gcm_encrypt(master_key, org_key)).decode()
+    return base64.b64encode(
+        s=_aes_gcm_encrypt(
+            key=master_key,
+            plaintext=org_key,
+        )
+    ).decode()
 
 
 def unwrap_org_key(master_key: bytes, wrapped_b64: str) -> bytes:
-    """Unwrap the org encryption key using a master key.
+    """
+    Unwrap the org encryption key using a master key.
 
     Args:
         master_key: 32-byte master key derived from password.
@@ -132,37 +143,49 @@ def unwrap_org_key(master_key: bytes, wrapped_b64: str) -> bytes:
         32-byte org encryption key.
     """
     blob = base64.b64decode(wrapped_b64)
-    return _aes_gcm_decrypt(master_key, blob)
+    return _aes_gcm_decrypt(
+        key=master_key,
+        blob=blob,
+    )
 
 
-# ---------------------------------------------------------------------------
-# Secret payload encryption / decryption
-# ---------------------------------------------------------------------------
+## Secret payload encryption / decryption
 
 def encrypt_payload(org_key: bytes, payload: dict[str, Any]) -> str:
-    """Serialize a payload dict to JSON and encrypt with the org key.
+    """
+    Serialize a payload dict to JSON and encrypt with the org key.
 
     Returns:
         Base64-encoded ciphertext blob.
     """
-    plaintext = json.dumps(payload, separators=(",", ":")).encode()
-    return base64.b64encode(_aes_gcm_encrypt(org_key, plaintext)).decode()
+    plaintext = json.dumps(
+        obj=payload,
+        separators=(",", ":"),
+    ).encode()
+    return base64.b64encode(
+        s=_aes_gcm_encrypt(
+            key=org_key,
+            plaintext=plaintext,
+        )
+    ).decode()
 
 
 def decrypt_payload(org_key: bytes, encrypted_b64: str) -> dict[str, Any]:
-    """Decrypt a base64 ciphertext blob and parse the JSON payload.
+    """
+    Decrypt a base64 ciphertext blob and parse the JSON payload.
 
     Returns:
         The decrypted payload as a dict.
     """
     blob = base64.b64decode(encrypted_b64)
-    plaintext = _aes_gcm_decrypt(org_key, blob)
+    plaintext = _aes_gcm_decrypt(
+        key=org_key,
+        blob=blob,
+    )
     return json.loads(plaintext)
 
 
-# ---------------------------------------------------------------------------
-# Vault key material generation (used by dashboard / init code)
-# ---------------------------------------------------------------------------
+## Vault key material generation (used by dashboard / init code)
 
 def generate_org_encryption_key() -> bytes:
     """Generate a random 256-bit org encryption key."""
@@ -171,7 +194,8 @@ def generate_org_encryption_key() -> bytes:
 
 @dataclass
 class VaultKeyMaterial:
-    """Cryptographic material for registering a vault key with the server.
+    """
+    Cryptographic material for registering a vault key with the server.
 
     Pass these fields to ``POST /vault/initialize`` or ``POST /vault/keys``.
 
@@ -182,7 +206,6 @@ class VaultKeyMaterial:
         key_type: ``"primary"`` or ``"recovery"``.
         label: Optional human-readable name.
     """
-
     id: UUID
     wrapped_org_encryption_key: str
     auth_hash: str
@@ -198,7 +221,8 @@ def generate_vault_key_material(
     key_type: str = "primary",
     label: str | None = None,
 ) -> VaultKeyMaterial:
-    """Generate vault key material from a password.
+    """
+    Generate vault key material from a password.
 
     Derives a master key via Argon2id and wraps the org encryption key.
 
@@ -230,7 +254,8 @@ def generate_recovery_code(
     organization_id: str,
     org_encryption_key: bytes,
 ) -> tuple[str, VaultKeyMaterial]:
-    """Generate a random recovery code and its vault key material.
+    """
+    Generate a random recovery code and its vault key material.
 
     The recovery code is a human-readable string of the form
     ``XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX`` (~120 bits of entropy).
@@ -243,8 +268,11 @@ def generate_recovery_code(
         A ``(code_string, VaultKeyMaterial)`` tuple.  The code string must
         be stored securely by the user — it cannot be recovered.
     """
-    groups = [
-        "".join(secrets.choice(_RC_ALPHABET) for _ in range(_RC_GROUP_LEN))
+    groups: list[str] = [
+        "".join(
+            secrets.choice(_RC_ALPHABET)
+            for _ in range(_RC_GROUP_LEN)
+        )
         for _ in range(_RC_GROUPS)
     ]
     code = "-".join(groups)

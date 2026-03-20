@@ -278,7 +278,7 @@ export class UnlockedVault {
       const serialized = serializePayload(sType, options.payload);
       body["encrypted_payload"] = encryptPayload(this.orgKey, serialized);
     }
-    const data = await this.http.put<RawVaultSecret>(
+    const data = await this.http.patch<RawVaultSecret>(
       `/secrets/${secretId}`,
       body,
     );
