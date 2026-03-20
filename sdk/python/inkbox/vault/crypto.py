@@ -286,7 +286,7 @@ def generate_recovery_code(
         organization_id=organization_id,
         org_encryption_key=org_encryption_key,
         key_type="recovery",
-        name=f"Recovery code",
+        name="Recovery code",
         description=None,
     )
     return code, material
