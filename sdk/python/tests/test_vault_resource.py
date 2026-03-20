@@ -6,7 +6,6 @@ from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT
 from inkbox.vault.crypto import (
     derive_master_key,
     derive_salt,
-    compute_auth_hash,
     encrypt_payload,
     generate_org_encryption_key,
     wrap_org_key,
@@ -77,7 +76,6 @@ class TestVaultResourceUnlock:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(password, salt)
-        auth_hash = compute_auth_hash(mk)
         wrapped = wrap_org_key(mk, org_key)
 
         login_payload = {"username": "admin", "password": "s3cret"}
