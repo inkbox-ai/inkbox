@@ -109,11 +109,17 @@ export class VaultResource {
    * and decrypts all vault secrets.
    *
    * @param password - Vault password or recovery code.
+   * @param options.identityId - Optional agent identity UUID. When
+   *   provided, only secrets that this identity has been granted access
+   *   to are included in {@link UnlockedVault.secrets}.
    * @returns {@link UnlockedVault} with decrypted secrets and methods for
    *   secret CRUD.
    * @throws If the password is incorrect or the vault key has been deleted.
    */
-  async unlock(password: string): Promise<UnlockedVault> {
+  async unlock(
+    password: string,
+    options: { identityId?: string } = {},
+  ): Promise<UnlockedVault> {
     // Step 1: get org_id for salt derivation
     const vaultInfo = await this.info();
     const salt = deriveSalt(vaultInfo.organizationId);
@@ -162,6 +168,21 @@ export class VaultResource {
         updatedAt: detail.updatedAt,
         payload,
       });
+    }
+
+    // Step 6 (optional): filter by identity access rules
+    if (options.identityId !== undefined) {
+      const idStr = options.identityId;
+      const filtered: DecryptedVaultSecret[] = [];
+      for (const secret of decrypted) {
+        const rules = await this.http.get<
+          Array<{ id: string; vault_secret_id: string; identity_id: string; created_at: string }>
+        >(`/secrets/${secret.id}/access`);
+        if (rules.some((r) => r.identity_id === idStr)) {
+          filtered.push(secret);
+        }
+      }
+      return new UnlockedVault(this.http, orgKey, filtered);
     }
 
     return new UnlockedVault(this.http, orgKey, decrypted);

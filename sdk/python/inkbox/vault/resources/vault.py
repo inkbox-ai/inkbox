@@ -104,7 +104,12 @@ class VaultResource:
     # Unlock
     # ------------------------------------------------------------------
 
-    def unlock(self, password: str) -> UnlockedVault:
+    def unlock(
+        self,
+        password: str,
+        *,
+        identity_id: UUID | str | None = None,
+    ) -> UnlockedVault:
         """Unlock the vault with a password.
 
         Derives the encryption key from the provided password, fetches
@@ -112,6 +117,9 @@ class VaultResource:
 
         Args:
             password: Vault password or recovery code.
+            identity_id: Optional agent identity UUID.  When provided,
+                only secrets that this identity has been granted access
+                to are included in :attr:`UnlockedVault.secrets`.
 
         Returns:
             :class:`UnlockedVault` with decrypted secrets and methods for
@@ -165,6 +173,18 @@ class VaultResource:
                     description=detail.description,
                 )
             )
+
+        # Step 6 (optional): filter by identity access rules
+        if identity_id is not None:
+            id_str = str(identity_id)
+            filtered: list[DecryptedVaultSecret] = []
+            for secret in decrypted:
+                access_rules = self._http.get(
+                    f"/secrets/{secret.id}/access",
+                )
+                if any(r["identity_id"] == id_str for r in access_rules):
+                    filtered.append(secret)
+            decrypted = filtered
 
         return UnlockedVault(http=self._http, org_key=org_key, secrets_cache=decrypted)
 
