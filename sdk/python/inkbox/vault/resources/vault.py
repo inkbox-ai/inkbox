@@ -156,12 +156,13 @@ class VaultResource:
             decrypted.append(
                 DecryptedVaultSecret(
                     id=detail.id,
-                    label=detail.label,
+                    name=detail.name,
                     secret_type=detail.secret_type,
                     status=detail.status,
                     created_at=detail.created_at,
                     updated_at=detail.updated_at,
                     payload=payload,
+                    description=detail.description,
                 )
             )
 
@@ -210,28 +211,32 @@ class UnlockedVault:
         payload = _parse_payload(detail.secret_type, payload_dict)
         return DecryptedVaultSecret(
             id=detail.id,
-            label=detail.label,
+            name=detail.name,
             secret_type=detail.secret_type,
             status=detail.status,
             created_at=detail.created_at,
             updated_at=detail.updated_at,
             payload=payload,
+            description=detail.description,
         )
 
     def create_secret(
         self,
-        label: str,
+        name: str,
         payload: SecretPayload,
+        *,
+        description: str | None = None,
     ) -> VaultSecret:
         """Encrypt and store a new secret.
 
         The ``secret_type`` is inferred from the payload type.
 
         Args:
-            label: Display name (max 255 characters).
+            name: Display name (max 255 characters).
             payload: One of :class:`LoginPayload`, :class:`CardPayload`,
                 :class:`NotePayload`, :class:`SSHKeyPayload`, or
                 :class:`APIKeyPayload`.
+            description: Optional description.
 
         Returns:
             :class:`~inkbox.vault.types.VaultSecret` metadata (no payload).
@@ -239,10 +244,12 @@ class UnlockedVault:
         secret_type = _infer_secret_type(payload)
         encrypted = encrypt_payload(self._org_key, payload._to_dict())
         body: dict[str, Any] = {
-            "label": label,
+            "name": name,
             "secret_type": secret_type,
             "encrypted_payload": encrypted,
         }
+        if description is not None:
+            body["description"] = description
         data = self._http.post(
             path="/secrets",
             json=body,
@@ -253,11 +260,12 @@ class UnlockedVault:
         self,
         secret_id: UUID | str,
         *,
-        label: str | None = _UNSET,  # type: ignore[assignment]
+        name: str | None = _UNSET,  # type: ignore[assignment]
+        description: str | None = _UNSET,  # type: ignore[assignment]
         payload: SecretPayload | None = _UNSET,  # type: ignore[assignment]
     ) -> VaultSecret:
         """
-        Update a vault secret's label and/or encrypted payload.
+        Update a vault secret's name, description, and/or encrypted payload.
 
         Only provided arguments are sent to the server.
 
@@ -270,7 +278,8 @@ class UnlockedVault:
 
         Args:
             secret_id: UUID of the secret to update.
-            label: New display name.
+            name: New display name.
+            description: New description.
             payload: New payload of the **same type** as the original
                 (will be re-encrypted).
 
@@ -278,8 +287,10 @@ class UnlockedVault:
             :class:`~inkbox.vault.types.VaultSecret` metadata.
         """
         body: dict[str, Any] = {}
-        if label is not _UNSET:
-            body["label"] = label
+        if name is not _UNSET:
+            body["name"] = name
+        if description is not _UNSET:
+            body["description"] = description
         if payload is not _UNSET and payload is not None:
             body["encrypted_payload"] = encrypt_payload(
                 self._org_key,

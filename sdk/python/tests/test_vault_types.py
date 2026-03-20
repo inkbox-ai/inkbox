@@ -33,14 +33,16 @@ class TestVaultKey:
         key = VaultKey._from_dict(VAULT_KEY_DICT)
         assert isinstance(key.id, UUID)
         assert key.key_type == "primary"
-        assert key.label == "Admin Key"
+        assert key.name == "Admin Key"
+        assert key.description is None
 
 
 class TestVaultSecret:
     def test_from_dict(self):
         s = VaultSecret._from_dict(VAULT_SECRET_DICT)
         assert isinstance(s.id, UUID)
-        assert s.label == "AWS Production"
+        assert s.name == "AWS Production"
+        assert s.description == "Production AWS credentials"
         assert s.secret_type == "login"
 
 
@@ -49,7 +51,8 @@ class TestVaultSecretDetail:
         d = {**VAULT_SECRET_DETAIL_DICT, "encrypted_payload": "abc123"}
         s = VaultSecretDetail._from_dict(d)
         assert s.encrypted_payload == "abc123"
-        assert s.label == "AWS Production"
+        assert s.name == "AWS Production"
+        assert s.description == "Production AWS credentials"
 
 
 class TestPayloadParsers:

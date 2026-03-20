@@ -14,40 +14,41 @@ import {
 
 describe("deriveSalt", () => {
   it("is deterministic", () => {
-    expect(deriveSalt("org_123")).toEqual(deriveSalt("org_123"));
+    expect(deriveSalt("org_test_123")).toEqual(deriveSalt("org_test_123"));
   });
 
   it("differs for different orgs", () => {
     expect(deriveSalt("org_a")).not.toEqual(deriveSalt("org_b"));
   });
 
-  it("returns 16 bytes", () => {
-    expect(deriveSalt("org_123").length).toBe(16);
+  it("returns UTF-8 encoded org ID", () => {
+    const salt = deriveSalt("org_test_123");
+    expect(new TextDecoder().decode(salt)).toBe("org_test_123");
   });
 });
 
 describe("deriveMasterKey + computeAuthHash", () => {
   it("same password and salt produce same key", async () => {
-    const salt = deriveSalt("org_123");
+    const salt = deriveSalt("org_test_123");
     const k1 = await deriveMasterKey("password", salt);
     const k2 = await deriveMasterKey("password", salt);
     expect(k1).toEqual(k2);
   });
 
   it("different passwords produce different keys", async () => {
-    const salt = deriveSalt("org_123");
+    const salt = deriveSalt("org_test_123");
     const k1 = await deriveMasterKey("pw_a", salt);
     const k2 = await deriveMasterKey("pw_b", salt);
     expect(k1).not.toEqual(k2);
   });
 
   it("master key is 32 bytes", async () => {
-    const mk = await deriveMasterKey("pw", deriveSalt("org"));
+    const mk = await deriveMasterKey("pw", deriveSalt("org_test_123"));
     expect(mk.length).toBe(32);
   });
 
   it("auth hash is 64-char hex", async () => {
-    const mk = await deriveMasterKey("pw", deriveSalt("org"));
+    const mk = await deriveMasterKey("pw", deriveSalt("org_test_123"));
     const h = computeAuthHash(mk);
     expect(h.length).toBe(64);
     expect(/^[0-9a-f]{64}$/.test(h)).toBe(true);
@@ -56,7 +57,7 @@ describe("deriveMasterKey + computeAuthHash", () => {
 
 describe("wrapOrgKey / unwrapOrgKey", () => {
   it("roundtrips correctly", async () => {
-    const mk = await deriveMasterKey("pw", deriveSalt("org"));
+    const mk = await deriveMasterKey("pw", deriveSalt("org_test_wrap"));
     const orgKey = generateOrgEncryptionKey();
     const wrapped = wrapOrgKey(mk, orgKey);
     expect(typeof wrapped).toBe("string");
@@ -65,7 +66,7 @@ describe("wrapOrgKey / unwrapOrgKey", () => {
   });
 
   it("wrong key fails", async () => {
-    const salt = deriveSalt("org");
+    const salt = deriveSalt("org_test_wrap");
     const mk1 = await deriveMasterKey("right", salt);
     const mk2 = await deriveMasterKey("wrong", salt);
     const orgKey = generateOrgEncryptionKey();
@@ -95,42 +96,45 @@ describe("encryptPayload / decryptPayload", () => {
 describe("generateVaultKeyMaterial", () => {
   it("roundtrips with re-derived master key", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const mat = await generateVaultKeyMaterial("pw", "org_123", orgKey);
+    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey, "My Key");
     expect(mat.keyType).toBe("primary");
-    expect(mat.label).toBeNull();
+    expect(mat.name).toBe("My Key");
+    expect(mat.description).toBeNull();
 
-    const salt = deriveSalt("org_123");
+    const salt = deriveSalt("org_test_123");
     const mk = await deriveMasterKey("pw", salt);
     expect(computeAuthHash(mk)).toBe(mat.authHash);
     const recovered = unwrapOrgKey(mk, mat.wrappedOrgEncryptionKey);
     expect(Buffer.from(recovered)).toEqual(Buffer.from(orgKey));
   });
 
-  it("accepts label and type options", async () => {
+  it("accepts description and type options", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const mat = await generateVaultKeyMaterial("pw", "org", orgKey, {
+    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey, "Backup", {
       keyType: "recovery",
-      label: "Backup",
+      description: "Recovery backup key",
     });
     expect(mat.keyType).toBe("recovery");
-    expect(mat.label).toBe("Backup");
+    expect(mat.name).toBe("Backup");
+    expect(mat.description).toBe("Recovery backup key");
   });
 });
 
 describe("generateRecoveryCode", () => {
   it("produces XXXX-XXXX-... format", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const [code, mat] = await generateRecoveryCode("org_123", orgKey);
+    const [code, mat] = await generateRecoveryCode("Recovery 1", "org_test_123", orgKey);
     const parts = code.split("-");
     expect(parts.length).toBe(8);
     parts.forEach((p) => expect(p.length).toBe(4));
     expect(mat.keyType).toBe("recovery");
+    expect(mat.name).toBe("Recovery 1");
   });
 
   it("roundtrips with re-derived master key", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const [code, mat] = await generateRecoveryCode("org_123", orgKey);
-    const salt = deriveSalt("org_123");
+    const [code, mat] = await generateRecoveryCode("Recovery 1", "org_test_123", orgKey);
+    const salt = deriveSalt("org_test_123");
     const mk = await deriveMasterKey(code, salt);
     expect(computeAuthHash(mk)).toBe(mat.authHash);
     const recovered = unwrapOrgKey(mk, mat.wrappedOrgEncryptionKey);
@@ -139,8 +143,8 @@ describe("generateRecoveryCode", () => {
 
   it("generates unique codes", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const [c1] = await generateRecoveryCode("org_123", orgKey);
-    const [c2] = await generateRecoveryCode("org_123", orgKey);
+    const [c1] = await generateRecoveryCode("Recovery 1", "org_test_123", orgKey);
+    const [c2] = await generateRecoveryCode("Recovery 2", "org_test_123", orgKey);
     expect(c1).not.toBe(c2);
   });
 });
@@ -148,9 +152,9 @@ describe("generateRecoveryCode", () => {
 describe("cross-SDK compatibility", () => {
   it("produces matching auth_hash for known inputs", async () => {
     // This value was verified against the Python SDK
-    const salt = deriveSalt("org_123");
+    const salt = deriveSalt("org_test_123");
     const mk = await deriveMasterKey("test-password", salt);
     const hash = computeAuthHash(mk);
-    expect(hash.startsWith("188670a206426edc")).toBe(true);
+    expect(hash.startsWith("056863c98cd0759f")).toBe(true);
   });
 });

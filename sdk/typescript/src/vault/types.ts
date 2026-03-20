@@ -23,7 +23,8 @@ export interface VaultKey {
   id: string;
   /** "primary" | "recovery" */
   keyType: string;
-  label: string | null;
+  name: string;
+  description: string | null;
   createdBy: string | null;
   /** "active" | "deleted" */
   status: string;
@@ -33,7 +34,8 @@ export interface VaultKey {
 
 export interface VaultSecret {
   id: string;
-  label: string;
+  name: string;
+  description: string | null;
   /** "login" | "card" | "note" | "ssh_key" | "api_key" */
   secretType: string;
   /** "active" | "deleted" */
@@ -93,7 +95,8 @@ export type SecretPayload =
 
 export interface DecryptedVaultSecret {
   id: string;
-  label: string;
+  name: string;
+  description: string | null;
   /** "login" | "card" | "note" | "ssh_key" | "api_key" */
   secretType: string;
   /** "active" | "deleted" */
@@ -119,7 +122,8 @@ export interface RawVaultInfo {
 export interface RawVaultKey {
   id: string;
   key_type: string;
-  label: string | null;
+  name: string;
+  description: string | null;
   created_by: string | null;
   status: string;
   created_at: string;
@@ -128,7 +132,8 @@ export interface RawVaultKey {
 
 export interface RawVaultSecret {
   id: string;
-  label: string;
+  name: string;
+  description: string | null;
   secret_type: string;
   status: string;
   created_at: string;
@@ -166,7 +171,8 @@ export function parseVaultKey(r: RawVaultKey): VaultKey {
   return {
     id: r.id,
     keyType: r.key_type,
-    label: r.label,
+    name: r.name,
+    description: r.description,
     createdBy: r.created_by,
     status: r.status,
     createdAt: new Date(r.created_at),
@@ -177,7 +183,8 @@ export function parseVaultKey(r: RawVaultKey): VaultKey {
 export function parseVaultSecret(r: RawVaultSecret): VaultSecret {
   return {
     id: r.id,
-    label: r.label,
+    name: r.name,
+    description: r.description,
     secretType: r.secret_type,
     status: r.status,
     createdAt: new Date(r.created_at),

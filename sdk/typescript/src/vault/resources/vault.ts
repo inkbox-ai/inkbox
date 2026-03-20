@@ -154,7 +154,8 @@ export class VaultResource {
       );
       decrypted.push({
         id: detail.id,
-        label: detail.label,
+        name: detail.name,
+        description: detail.description,
         secretType: detail.secretType,
         status: detail.status,
         createdAt: detail.createdAt,
@@ -215,7 +216,8 @@ export class UnlockedVault {
     );
     return {
       id: detail.id,
-      label: detail.label,
+      name: detail.name,
+      description: detail.description,
       secretType: detail.secretType,
       status: detail.status,
       createdAt: detail.createdAt,
@@ -229,28 +231,31 @@ export class UnlockedVault {
    *
    * The `secretType` is inferred from the payload shape.
    *
-   * @param options.label - Display name (max 255 characters).
+   * @param options.name - Display name (max 255 characters).
+   * @param options.description - Optional description.
    * @param options.payload - One of {@link LoginPayload}, {@link CardPayload},
    *   {@link NotePayload}, {@link SSHKeyPayload}, or {@link APIKeyPayload}.
    */
   async createSecret(options: {
-    label: string;
+    name: string;
+    description?: string;
     payload: SecretPayload;
   }): Promise<VaultSecret> {
     const secretType = inferSecretType(options.payload);
     const serialized = serializePayload(secretType, options.payload);
     const encrypted = encryptPayload(this.orgKey, serialized);
-    const body = {
-      label: options.label,
+    const body: Record<string, unknown> = {
+      name: options.name,
       secret_type: secretType,
       encrypted_payload: encrypted,
     };
+    if (options.description !== undefined) body["description"] = options.description;
     const data = await this.http.post<RawVaultSecret>("/secrets", body);
     return parseVaultSecret(data);
   }
 
   /**
-   * Update a vault secret's label and/or encrypted payload.
+   * Update a vault secret's name, description, and/or encrypted payload.
    *
    * Only provided fields are sent to the server.
    *
@@ -260,19 +265,22 @@ export class UnlockedVault {
    * type, delete the secret and create a new one.
    *
    * @param secretId - UUID of the secret to update.
-   * @param options.label - New display name.
+   * @param options.name - New display name.
+   * @param options.description - New description.
    * @param options.payload - New payload of the **same type** as the
    *   original (will be re-encrypted).
    */
   async updateSecret(
     secretId: string,
     options: {
-      label?: string;
+      name?: string;
+      description?: string;
       payload?: SecretPayload;
     },
   ): Promise<VaultSecret> {
     const body: Record<string, unknown> = {};
-    if ("label" in options) body["label"] = options.label;
+    if ("name" in options) body["name"] = options.name;
+    if ("description" in options) body["description"] = options.description;
     if (options.payload !== undefined) {
       const sType = inferSecretType(options.payload);
       const serialized = serializePayload(sType, options.payload);

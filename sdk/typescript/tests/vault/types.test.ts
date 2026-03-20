@@ -34,7 +34,8 @@ const RAW_INFO: RawVaultInfo = {
 const RAW_KEY: RawVaultKey = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   key_type: "primary",
-  label: "Admin Key",
+  name: "Admin Key",
+  description: "Primary admin key",
   created_by: "user_abc",
   status: "active",
   created_at: "2026-03-18T12:00:00Z",
@@ -43,7 +44,8 @@ const RAW_KEY: RawVaultKey = {
 
 const RAW_SECRET: RawVaultSecret = {
   id: "cccc3333-0000-0000-0000-000000000001",
-  label: "AWS Production",
+  name: "AWS Production",
+  description: null,
   secret_type: "login",
   status: "active",
   created_at: "2026-03-18T12:00:00Z",
@@ -66,7 +68,8 @@ describe("parseVaultKey", () => {
   it("parses all fields", () => {
     const key = parseVaultKey(RAW_KEY);
     expect(key.keyType).toBe("primary");
-    expect(key.label).toBe("Admin Key");
+    expect(key.name).toBe("Admin Key");
+    expect(key.description).toBe("Primary admin key");
     expect(key.createdBy).toBe("user_abc");
   });
 });
@@ -74,7 +77,8 @@ describe("parseVaultKey", () => {
 describe("parseVaultSecret", () => {
   it("parses all fields", () => {
     const s = parseVaultSecret(RAW_SECRET);
-    expect(s.label).toBe("AWS Production");
+    expect(s.name).toBe("AWS Production");
+    expect(s.description).toBeNull();
     expect(s.secretType).toBe("login");
     expect(s.createdAt).toBeInstanceOf(Date);
   });
@@ -85,7 +89,8 @@ describe("parseVaultSecretDetail", () => {
     const raw: RawVaultSecretDetail = { ...RAW_SECRET, encrypted_payload: "abc123" };
     const s = parseVaultSecretDetail(raw);
     expect(s.encryptedPayload).toBe("abc123");
-    expect(s.label).toBe("AWS Production");
+    expect(s.name).toBe("AWS Production");
+    expect(s.description).toBeNull();
   });
 });
 

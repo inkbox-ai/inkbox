@@ -35,7 +35,8 @@ const RAW_INFO: RawVaultInfo = {
 const RAW_KEY: RawVaultKey = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   key_type: "primary",
-  label: "Admin Key",
+  name: "Admin Key",
+  description: "Primary admin key",
   created_by: "user_abc",
   status: "active",
   created_at: "2026-03-18T12:00:00Z",
@@ -44,7 +45,8 @@ const RAW_KEY: RawVaultKey = {
 
 const RAW_SECRET: RawVaultSecret = {
   id: "cccc3333-0000-0000-0000-000000000001",
-  label: "AWS Production",
+  name: "AWS Production",
+  description: null,
   secret_type: "login",
   status: "active",
   created_at: "2026-03-18T12:00:00Z",
@@ -138,7 +140,7 @@ describe("VaultResource.unlock", () => {
 
     expect(unlocked.secrets).toHaveLength(1);
     const s = unlocked.secrets[0];
-    expect(s.label).toBe("AWS Production");
+    expect(s.name).toBe("AWS Production");
     expect((s.payload as { username: string }).username).toBe("admin");
   });
 });
@@ -151,32 +153,32 @@ describe("UnlockedVault.createSecret", () => {
     const unlocked = new UnlockedVault(http, orgKey, []);
 
     const result = await unlocked.createSecret({
-      label: "AWS Prod",
+      name: "AWS Prod",
       payload: { username: "admin", password: "pw" },
     });
 
-    expect(result.label).toBe("AWS Production");
+    expect(result.name).toBe("AWS Production");
     const call = vi.mocked(http.post).mock.calls[0];
     expect(call[0]).toBe("/secrets");
     const body = call[1] as Record<string, unknown>;
-    expect(body.label).toBe("AWS Prod");
+    expect(body.name).toBe("AWS Prod");
     expect(body.secret_type).toBe("login");
     expect(typeof body.encrypted_payload).toBe("string");
   });
 });
 
 describe("UnlockedVault.updateSecret", () => {
-  it("sends only label when no payload", async () => {
+  it("sends only name when no payload", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
     vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
     const unlocked = new UnlockedVault(http, orgKey, []);
 
-    await unlocked.updateSecret("some-id", { label: "New Name" });
+    await unlocked.updateSecret("some-id", { name: "New Name" });
 
     const call = vi.mocked(http.patch).mock.calls[0];
     const body = call[1] as Record<string, unknown>;
-    expect(body).toEqual({ label: "New Name" });
+    expect(body).toEqual({ name: "New Name" });
   });
 
   it("sends encrypted payload when provided", async () => {
@@ -192,6 +194,6 @@ describe("UnlockedVault.updateSecret", () => {
     const call = vi.mocked(http.patch).mock.calls[0];
     const body = call[1] as Record<string, unknown>;
     expect(typeof body.encrypted_payload).toBe("string");
-    expect(body).not.toHaveProperty("label");
+    expect(body).not.toHaveProperty("name");
   });
 });

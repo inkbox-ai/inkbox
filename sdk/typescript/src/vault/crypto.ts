@@ -12,7 +12,7 @@
  *   so that both the dashboard (vault init) and the SDK (vault unlock) can
  *   compute the same master key from the same password:
  *
- *     salt = SHA-256("inkbox-vault:" + orgId).slice(0, 16)
+ *     salt = TextEncoder.encode(orgId)
  */
 
 import { argon2id } from "hash-wasm";
@@ -30,14 +30,12 @@ import {
 
 const ARGON2_TIME_COST = 3;
 const ARGON2_MEMORY_COST = 65536; // 64 MiB
-const ARGON2_PARALLELISM = 4;
+const ARGON2_PARALLELISM = 1;
 const ARGON2_HASH_LEN = 32;
 
 const AES_KEY_BYTES = 32;
 const AES_IV_BYTES = 12;
 const AES_TAG_BYTES = 16;
-
-const SALT_PREFIX = "inkbox-vault:";
 
 // Recovery code alphabet (unambiguous uppercase + digits, no 0/O/1/I/L)
 const RC_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -49,15 +47,12 @@ const RC_GROUPS = 8; // 8 groups × 4 chars ≈ 120 bits of entropy
 // ---------------------------------------------------------------------------
 
 /**
- * Derive a 16-byte Argon2id salt from the organisation ID.
+ * Derive the Argon2id salt from the organisation ID.
  *
- * `SHA-256("inkbox-vault:" + orgId).slice(0, 16)`.
+ * The salt is the raw UTF-8 encoding of the organisation ID.
  */
 export function deriveSalt(organizationId: string): Uint8Array {
-  const hash = createHash("sha256")
-    .update(SALT_PREFIX + organizationId)
-    .digest();
-  return new Uint8Array(hash.buffer, hash.byteOffset, 16);
+  return new TextEncoder().encode(organizationId);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,23 +93,22 @@ function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array): Uint8Array {
   const encrypted = cipher.update(plaintext);
   const final = cipher.final();
   const tag = cipher.getAuthTag();
-  // iv || ciphertext || tag
+  // ciphertext || nonce || tag
   const result = new Uint8Array(
-    iv.length + encrypted.length + final.length + tag.length,
+    encrypted.length + final.length + iv.length + tag.length,
   );
-  result.set(iv, 0);
-  result.set(encrypted, iv.length);
-  result.set(final, iv.length + encrypted.length);
-  result.set(tag, iv.length + encrypted.length + final.length);
+  result.set(encrypted, 0);
+  result.set(final, encrypted.length);
+  result.set(iv, encrypted.length + final.length);
+  result.set(tag, encrypted.length + final.length + iv.length);
   return result;
 }
 
 function aesGcmDecrypt(key: Uint8Array, blob: Uint8Array): Uint8Array {
-  const iv = blob.slice(0, AES_IV_BYTES);
-  const tagStart = blob.length - AES_TAG_BYTES;
-  const ct = blob.slice(AES_IV_BYTES, tagStart);
-  const tag = blob.slice(tagStart);
-  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  const tag = blob.slice(-AES_TAG_BYTES);
+  const nonce = blob.slice(-(AES_IV_BYTES + AES_TAG_BYTES), -AES_TAG_BYTES);
+  const ct = blob.slice(0, -(AES_IV_BYTES + AES_TAG_BYTES));
+  const decipher = createDecipheriv("aes-256-gcm", key, nonce);
   decipher.setAuthTag(tag);
   const decrypted = decipher.update(ct);
   const final = decipher.final();
@@ -184,8 +178,10 @@ export interface VaultKeyMaterial {
   authHash: string;
   /** "primary" | "recovery" */
   keyType: string;
-  /** Optional human-readable name. */
-  label: string | null;
+  /** Human-readable name. */
+  name: string;
+  /** Optional description. */
+  description: string | null;
 }
 
 /**
@@ -197,7 +193,8 @@ export async function generateVaultKeyMaterial(
   password: string,
   organizationId: string,
   orgEncryptionKey: Uint8Array,
-  options: { keyType?: string; label?: string } = {},
+  name: string,
+  options: { keyType?: string; description?: string } = {},
 ): Promise<VaultKeyMaterial> {
   const salt = deriveSalt(organizationId);
   const masterKey = await deriveMasterKey(password, salt);
@@ -209,7 +206,8 @@ export async function generateVaultKeyMaterial(
     wrappedOrgEncryptionKey: wrapped,
     authHash,
     keyType: options.keyType ?? "primary",
-    label: options.label ?? null,
+    name,
+    description: options.description ?? null,
   };
 }
 
@@ -223,6 +221,7 @@ export async function generateVaultKeyMaterial(
  *   securely by the user — it cannot be recovered.
  */
 export async function generateRecoveryCode(
+  name: string,
   organizationId: string,
   orgEncryptionKey: Uint8Array,
 ): Promise<[string, VaultKeyMaterial]> {
@@ -241,6 +240,7 @@ export async function generateRecoveryCode(
     code,
     organizationId,
     orgEncryptionKey,
+    name,
     { keyType: "recovery" },
   );
   return [code, material];

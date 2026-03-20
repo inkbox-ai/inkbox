@@ -48,7 +48,8 @@ class VaultKey:
 
     id: UUID
     key_type: str
-    label: str | None
+    name: str
+    description: str | None
     created_by: str | None
     status: str
     created_at: datetime
@@ -59,7 +60,8 @@ class VaultKey:
         return cls(
             id=UUID(d["id"]),
             key_type=d["key_type"],
-            label=d.get("label"),
+            name=d["name"],
+            description=d.get("description"),
             created_by=d.get("created_by"),
             status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
@@ -72,21 +74,23 @@ class VaultSecret:
     """Vault secret metadata (no encrypted payload)."""
 
     id: UUID
-    label: str
+    name: str
     secret_type: str
     status: str
     created_at: datetime
     updated_at: datetime
+    description: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> VaultSecret:
         return cls(
             id=UUID(d["id"]),
-            label=d["label"],
+            name=d["name"],
             secret_type=d["secret_type"],
             status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            description=d.get("description"),
         )
 
 
@@ -100,11 +104,12 @@ class VaultSecretDetail(VaultSecret):
     def _from_dict(cls, d: dict[str, Any]) -> VaultSecretDetail:
         return cls(
             id=UUID(d["id"]),
-            label=d["label"],
+            name=d["name"],
             secret_type=d["secret_type"],
             status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            description=d.get("description"),
             encrypted_payload=d["encrypted_payload"],
         )
 
@@ -342,7 +347,8 @@ class DecryptedVaultSecret:
 
     Attributes:
         id: Secret UUID.
-        label: Display name.
+        name: Display name.
+        description: Optional description.
         secret_type: Credential category (``login``, ``card``, ``note``,
             ``ssh_key``, ``api_key``).
         status: Lifecycle status.
@@ -352,9 +358,10 @@ class DecryptedVaultSecret:
     """
 
     id: UUID
-    label: str
+    name: str
     secret_type: str
     status: str
     created_at: datetime
     updated_at: datetime
     payload: SecretPayload
+    description: str | None = None

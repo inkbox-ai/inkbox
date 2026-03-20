@@ -8,11 +8,11 @@ Encryption:     AES-256-GCM
 Hashing:        SHA-256
 
 Salt derivation:
-    The Argon2id salt is derived deterministically from the organisation ID
+    The Argon2id salt is the raw UTF-8 encoding of the organisation ID,
     so that both the dashboard (vault init) and the SDK (vault unlock) can
     compute the same master key from the same password without a round-trip::
 
-        salt = SHA-256(b"inkbox-vault:" + org_id.encode())[:16]
+        salt = org_id.encode()
 """
 
 from __future__ import annotations
@@ -35,13 +35,11 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 ARGON2_TIME_COST = 3
 ARGON2_MEMORY_COST = 65_536  # 64 MiB
-ARGON2_PARALLELISM = 4
+ARGON2_PARALLELISM = 1
 ARGON2_HASH_LEN = 32  # 256-bit master key
 
 AES_KEY_BYTES = 32
 AES_IV_BYTES = 12
-
-_SALT_PREFIX = b"inkbox-vault:"
 
 # Recovery code alphabet (unambiguous uppercase + digits, no 0/O/1/I/L)
 _RC_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
@@ -52,15 +50,13 @@ _RC_GROUPS = 8  # 8 groups × 4 chars ≈ 120 bits of entropy
 ## Salt derivation
 
 def derive_salt(organization_id: str) -> bytes:
-    """Derive a 16-byte Argon2id salt from the organisation ID.
+    """Derive the Argon2id salt from the organisation ID.
 
-    The salt is ``SHA-256(b"inkbox-vault:" + org_id)[:16]``.  This is
+    The salt is the raw UTF-8 encoding of the organisation ID.  This is
     deterministic so both vault init and vault unlock can reach the same
     master key from the same password.
     """
-    return hashlib.sha256(
-        _SALT_PREFIX + organization_id.encode()
-    ).digest()[:16]
+    return organization_id.encode()
 
 
 ## Key derivation
@@ -95,23 +91,26 @@ def compute_auth_hash(master_key: bytes) -> str:
 ## AES-256-GCM wrapping / unwrapping
 
 def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:
-    """Encrypt with AES-256-GCM.  Returns ``iv || ciphertext_with_tag``."""
+    """Encrypt with AES-256-GCM.  Returns ``ciphertext || nonce || tag``."""
     iv = os.urandom(AES_IV_BYTES)
-    ct = AESGCM(key).encrypt(
+    ct_and_tag = AESGCM(key).encrypt(
         nonce=iv,
         data=plaintext,
         associated_data=None,
     )
-    return iv + ct
+    ct = ct_and_tag[:-16]
+    tag = ct_and_tag[-16:]
+    return ct + iv + tag
 
 
 def _aes_gcm_decrypt(key: bytes, blob: bytes) -> bytes:
-    """Decrypt AES-256-GCM blob formatted as ``iv || ciphertext_with_tag``."""
-    iv = blob[:AES_IV_BYTES]
-    ct = blob[AES_IV_BYTES:]
+    """Decrypt AES-256-GCM blob formatted as ``ciphertext || nonce || tag``."""
+    ct = blob[:-28]
+    nonce = blob[-28:-16]
+    tag = blob[-16:]
     return AESGCM(key).decrypt(
-        nonce=iv,
-        data=ct,
+        nonce=nonce,
+        data=ct + tag,
         associated_data=None,
     )
 
@@ -204,13 +203,15 @@ class VaultKeyMaterial:
         wrapped_org_encryption_key: Base64-encoded AES-256-GCM ciphertext.
         auth_hash: SHA-256(masterKey) hex digest.
         key_type: ``"primary"`` or ``"recovery"``.
-        label: Optional human-readable name.
+        name: Human-readable name.
+        description: Optional description.
     """
     id: UUID
     wrapped_org_encryption_key: str
     auth_hash: str
     key_type: str
-    label: str | None
+    name: str
+    description: str | None
 
 
 def generate_vault_key_material(
@@ -219,7 +220,8 @@ def generate_vault_key_material(
     org_encryption_key: bytes,
     *,
     key_type: str = "primary",
-    label: str | None = None,
+    name: str = "",
+    description: str | None = None,
 ) -> VaultKeyMaterial:
     """
     Generate vault key material from a password.
@@ -231,7 +233,8 @@ def generate_vault_key_material(
         organization_id: Organisation ID (used as salt basis).
         org_encryption_key: 32-byte org encryption key to wrap.
         key_type: ``"primary"`` or ``"recovery"``.
-        label: Optional human-readable label.
+        name: Human-readable name.
+        description: Optional description.
 
     Returns:
         :class:`VaultKeyMaterial` ready to send to the server.
@@ -246,7 +249,8 @@ def generate_vault_key_material(
         wrapped_org_encryption_key=wrapped,
         auth_hash=auth_hash,
         key_type=key_type,
-        label=label,
+        name=name,
+        description=description,
     )
 
 
@@ -282,6 +286,7 @@ def generate_recovery_code(
         organization_id=organization_id,
         org_encryption_key=org_encryption_key,
         key_type="recovery",
-        label=None,
+        name=f"Recovery code",
+        description=None,
     )
     return code, material

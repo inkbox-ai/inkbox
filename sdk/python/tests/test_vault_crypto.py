@@ -16,34 +16,34 @@ from inkbox.vault.crypto import (
 
 class TestDeriveSalt:
     def test_deterministic(self):
-        assert derive_salt("org_123") == derive_salt("org_123")
+        assert derive_salt("org_test_123") == derive_salt("org_test_123")
 
     def test_different_orgs_different_salts(self):
         assert derive_salt("org_a") != derive_salt("org_b")
 
-    def test_length_is_16(self):
-        assert len(derive_salt("org_123")) == 16
+    def test_length_matches_org_id(self):
+        assert derive_salt("org_test_123") == b"org_test_123"
 
 
 class TestDeriveAndHash:
     def test_same_password_same_salt_same_key(self):
-        salt = derive_salt("org_123")
+        salt = derive_salt("org_test_123")
         k1 = derive_master_key("password", salt)
         k2 = derive_master_key("password", salt)
         assert k1 == k2
 
     def test_different_passwords_different_keys(self):
-        salt = derive_salt("org_123")
+        salt = derive_salt("org_test_123")
         k1 = derive_master_key("password_a", salt)
         k2 = derive_master_key("password_b", salt)
         assert k1 != k2
 
     def test_master_key_length(self):
-        salt = derive_salt("org_123")
+        salt = derive_salt("org_test_123")
         assert len(derive_master_key("pw", salt)) == 32
 
     def test_auth_hash_is_hex_64(self):
-        salt = derive_salt("org_123")
+        salt = derive_salt("org_test_123")
         mk = derive_master_key("pw", salt)
         h = compute_auth_hash(mk)
         assert len(h) == 64
@@ -52,7 +52,7 @@ class TestDeriveAndHash:
 
 class TestWrapUnwrapOrgKey:
     def test_roundtrip(self):
-        mk = derive_master_key("pw", derive_salt("org"))
+        mk = derive_master_key("pw", derive_salt("org_test_wrap"))
         org_key = generate_org_encryption_key()
         wrapped = wrap_org_key(mk, org_key)
         assert isinstance(wrapped, str)
@@ -60,7 +60,7 @@ class TestWrapUnwrapOrgKey:
         assert recovered == org_key
 
     def test_wrong_key_fails(self):
-        salt = derive_salt("org")
+        salt = derive_salt("org_test_wrap")
         mk1 = derive_master_key("right", salt)
         mk2 = derive_master_key("wrong", salt)
         org_key = generate_org_encryption_key()
@@ -95,28 +95,30 @@ class TestEncryptDecryptPayload:
 class TestGenerateVaultKeyMaterial:
     def test_roundtrip(self):
         org_key = generate_org_encryption_key()
-        mat = generate_vault_key_material("pw", "org_123", org_key)
+        mat = generate_vault_key_material("pw", "org_test_123", org_key, name="Primary")
         assert mat.key_type == "primary"
-        assert mat.label is None
+        assert mat.name == "Primary"
+        assert mat.description is None
         # Re-derive and verify
-        salt = derive_salt("org_123")
+        salt = derive_salt("org_test_123")
         mk = derive_master_key("pw", salt)
         assert compute_auth_hash(mk) == mat.auth_hash
         assert unwrap_org_key(mk, mat.wrapped_org_encryption_key) == org_key
 
-    def test_label_and_type(self):
+    def test_name_and_type(self):
         org_key = generate_org_encryption_key()
         mat = generate_vault_key_material(
-            "pw", "org_123", org_key, key_type="recovery", label="Backup"
+            "pw", "org_test_123", org_key, key_type="recovery", name="Backup", description="Backup key"
         )
         assert mat.key_type == "recovery"
-        assert mat.label == "Backup"
+        assert mat.name == "Backup"
+        assert mat.description == "Backup key"
 
 
 class TestGenerateRecoveryCode:
     def test_format(self):
         org_key = generate_org_encryption_key()
-        code, mat = generate_recovery_code("org_123", org_key)
+        code, mat = generate_recovery_code("org_test_123", org_key)
         parts = code.split("-")
         assert len(parts) == 8
         assert all(len(p) == 4 for p in parts)
@@ -124,14 +126,14 @@ class TestGenerateRecoveryCode:
 
     def test_roundtrip(self):
         org_key = generate_org_encryption_key()
-        code, mat = generate_recovery_code("org_123", org_key)
-        salt = derive_salt("org_123")
+        code, mat = generate_recovery_code("org_test_123", org_key)
+        salt = derive_salt("org_test_123")
         mk = derive_master_key(code, salt)
         assert compute_auth_hash(mk) == mat.auth_hash
         assert unwrap_org_key(mk, mat.wrapped_org_encryption_key) == org_key
 
     def test_codes_are_unique(self):
         org_key = generate_org_encryption_key()
-        c1, _ = generate_recovery_code("org_123", org_key)
-        c2, _ = generate_recovery_code("org_123", org_key)
+        c1, _ = generate_recovery_code("org_test_123", org_key)
+        c2, _ = generate_recovery_code("org_test_123", org_key)
         assert c1 != c2
