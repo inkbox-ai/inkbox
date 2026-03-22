@@ -4,7 +4,7 @@ description: Send and receive emails and phone calls via Inkbox agent identities
 metadata:
   openclaw:
     emoji: "📬"
-    homepage: "https://www.inkbox.ai"
+    homepage: "https://inkbox.ai"
     requires:
       env:
         - INKBOX_API_KEY

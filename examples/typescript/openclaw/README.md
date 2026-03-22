@@ -1,6 +1,6 @@
 # inkbox — OpenClaw Skill
 
-An [OpenClaw](https://openclaw.ai) skill for email and phone via [Inkbox](https://www.inkbox.ai) agent identities.
+An [OpenClaw](https://openclaw.ai) skill for email and phone via [Inkbox](https://inkbox.ai) agent identities.
 
 ## What it does
 
@@ -18,7 +18,7 @@ Once installed, your OpenClaw agent can:
 ## Requirements
 
 - Node.js ≥ 18
-- An [Inkbox](https://www.inkbox.ai) account with an API key
+- An [Inkbox](https://inkbox.ai) account with an API key
 
 ## Setup
 
