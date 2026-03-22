@@ -1,4 +1,8 @@
-"""Tests for Inkbox unified client — mail resources."""
+"""
+sdk/python/tests/test_mail_client.py
+
+Tests for Inkbox unified client — mail resources.
+"""
 
 from inkbox import Inkbox
 from inkbox.mail.resources.mailboxes import MailboxesResource

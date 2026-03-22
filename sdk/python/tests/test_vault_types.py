@@ -1,4 +1,8 @@
-"""Tests for vault type parsing."""
+"""
+sdk/python/tests/test_vault_types.py
+
+Tests for vault type parsing.
+"""
 
 from uuid import UUID
 

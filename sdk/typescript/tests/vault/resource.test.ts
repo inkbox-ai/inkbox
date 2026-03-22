@@ -1,3 +1,4 @@
+// sdk/typescript/tests/vault/resource.test.ts
 import { describe, it, expect, vi } from "vitest";
 import type { HttpTransport } from "../../src/_http.js";
 import { VaultResource, UnlockedVault } from "../../src/vault/resources/vault.js";

@@ -1,4 +1,8 @@
-"""Tests for VaultResource and UnlockedVault."""
+"""
+sdk/python/tests/test_vault_resource.py
+
+Tests for VaultResource and UnlockedVault.
+"""
 
 from unittest.mock import MagicMock
 

@@ -1,3 +1,4 @@
+// sdk/typescript/tests/vault/crypto.test.ts
 import { describe, it, expect } from "vitest";
 import {
   deriveSalt,

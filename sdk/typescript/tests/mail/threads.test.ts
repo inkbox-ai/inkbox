@@ -1,3 +1,4 @@
+// sdk/typescript/tests/mail/threads.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { ThreadsResource } from "../../src/mail/resources/threads.js";
 import type { HttpTransport } from "../../src/_http.js";

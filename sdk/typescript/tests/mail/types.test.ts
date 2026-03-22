@@ -1,3 +1,4 @@
+// sdk/typescript/tests/mail/types.test.ts
 import { describe, it, expect } from "vitest";
 import {
   parseMailbox,
