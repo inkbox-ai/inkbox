@@ -20,7 +20,7 @@ from inkbox.identities.types import (
     IdentityMailbox,
     IdentityPhoneNumber,
 )
-from inkbox.mail.exceptions import InkboxError
+from inkbox.exceptions import InkboxError
 from inkbox.mail.types import Message, MessageDetail, ThreadDetail
 from inkbox.phone.types import PhoneCall, PhoneCallWithRateLimit, PhoneTranscript
 

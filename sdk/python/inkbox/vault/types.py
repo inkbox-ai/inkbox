@@ -36,6 +36,19 @@ class VaultSecretType(StrEnum):
     OTHER = "other"
 
 
+class VaultKeyType(StrEnum):
+    """
+    Discriminator for vault key records.
+
+    Attributes:
+        PRIMARY: A standard vault key issued to users or agents.
+        RECOVERY: A recovery code generated at vault initialization,
+            intended for offline backup.
+    """
+    PRIMARY = "primary"
+    RECOVERY = "recovery"
+
+
 ## API response types
 
 @dataclass

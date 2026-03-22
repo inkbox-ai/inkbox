@@ -10,8 +10,10 @@ from inkbox.vault.types import (
     SSHKeyPayload,
     VaultInfo,
     VaultKey,
+    VaultKeyType,
     VaultSecret,
     VaultSecretDetail,
+    VaultSecretType,
     _infer_secret_type,
     _parse_payload,
 )
@@ -88,3 +90,45 @@ class TestInferSecretType:
 
     def test_api_key(self):
         assert _infer_secret_type(APIKeyPayload(key="k")) == "api_key"
+
+
+# Test VaultSecretType and VaultKeyType enums
+class TestEnums:
+    def test_secret_type_values(self):
+        assert VaultSecretType.LOGIN == "login"
+        assert VaultSecretType.SSH_KEY == "ssh_key"
+        assert VaultSecretType.API_KEY == "api_key"
+        assert VaultSecretType.OTHER == "other"
+
+    def test_key_type_values(self):
+        assert VaultKeyType.PRIMARY == "primary"
+        assert VaultKeyType.RECOVERY == "recovery"
+
+# Test notes field on payloads
+class TestPayloadNotes:
+    def test_login_with_notes(self):
+        p = LoginPayload(username="a", password="b", notes="test note")
+        d = p._to_dict()
+        assert d["notes"] == "test note"
+        roundtripped = LoginPayload._from_dict(d)
+        assert roundtripped.notes == "test note"
+
+    def test_other_with_notes(self):
+        p = OtherPayload(data="stuff", notes="context")
+        d = p._to_dict()
+        assert d["notes"] == "context"
+        roundtripped = OtherPayload._from_dict(d)
+        assert roundtripped.notes == "context"
+
+    def test_notes_default_none(self):
+        p = LoginPayload(username="a", password="b")
+        assert p.notes is None
+        d = p._to_dict()
+        assert "notes" not in d
+
+# Test unknown secret type error
+class TestUnknownSecretType:
+    def test_parse_payload_unknown_raises(self):
+        import pytest
+        with pytest.raises(ValueError, match="is not a valid VaultSecretType"):
+            _parse_payload("nonexistent", {"foo": "bar"})

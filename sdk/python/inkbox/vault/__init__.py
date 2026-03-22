@@ -2,7 +2,6 @@
 inkbox.vault — encrypted vault types and exceptions.
 """
 
-from inkbox.vault.exceptions import InkboxAPIError, InkboxError
 from inkbox.vault.types import (
     APIKeyPayload,
     DecryptedVaultSecret,
@@ -11,6 +10,7 @@ from inkbox.vault.types import (
     SSHKeyPayload,
     VaultInfo,
     VaultKey,
+    VaultKeyType,
     VaultSecret,
     VaultSecretDetail,
     VaultSecretType,
@@ -23,8 +23,6 @@ from inkbox.vault.crypto import (
 )
 
 __all__ = [
-    "InkboxError",
-    "InkboxAPIError",
     # API response types
     "VaultInfo",
     "VaultKey",
@@ -33,6 +31,7 @@ __all__ = [
     "DecryptedVaultSecret",
     # Enums
     "VaultSecretType",
+    "VaultKeyType",
     # Structured payloads
     "LoginPayload",
     "SSHKeyPayload",

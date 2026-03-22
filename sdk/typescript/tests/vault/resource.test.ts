@@ -195,3 +195,52 @@ describe("UnlockedVault.updateSecret", () => {
     expect(body).not.toHaveProperty("name");
   });
 });
+
+describe("UnlockedVault.getSecret", () => {
+  it("fetches and decrypts", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    const encrypted = encryptPayload(orgKey, { username: "admin", password: "s3cret" });
+    vi.mocked(http.get).mockResolvedValue({
+      ...RAW_SECRET,
+      encrypted_payload: encrypted,
+    });
+    const unlocked = new UnlockedVault(http, orgKey, []);
+
+    const secret = await unlocked.getSecret("some-uuid");
+    expect(http.get).toHaveBeenCalledWith("/secrets/some-uuid");
+    expect(secret.name).toBe("AWS Production");
+    expect((secret.payload as { username: string }).username).toBe("admin");
+  });
+});
+
+describe("UnlockedVault.deleteSecret", () => {
+  it("calls delete on correct path", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    vi.mocked(http.delete).mockResolvedValue(undefined);
+    const unlocked = new UnlockedVault(http, orgKey, []);
+
+    await unlocked.deleteSecret("some-uuid");
+    expect(http.delete).toHaveBeenCalledWith("/secrets/some-uuid");
+  });
+});
+
+describe("UnlockedVault.updateSecret", () => {
+  it("sends name and payload together", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
+    const unlocked = new UnlockedVault(http, orgKey, []);
+
+    await unlocked.updateSecret("some-id", {
+      name: "Updated",
+      payload: { username: "new", password: "pw2" },
+    });
+
+    const call = vi.mocked(http.patch).mock.calls[0];
+    const body = call[1] as Record<string, unknown>;
+    expect(body.name).toBe("Updated");
+    expect(typeof body.encrypted_payload).toBe("string");
+  });
+});

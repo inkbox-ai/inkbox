@@ -19,6 +19,7 @@ import { argon2id } from "hash-wasm";
 import {
   randomUUID,
   randomBytes,
+  randomInt,
   createHash,
   createCipheriv,
   createDecipheriv,
@@ -221,7 +222,7 @@ export async function generateRecoveryCode(
   for (let g = 0; g < RC_GROUPS; g++) {
     let group = "";
     for (let c = 0; c < RC_GROUP_LEN; c++) {
-      const idx = randomBytes(1)[0] % RC_ALPHABET.length;
+      const idx = randomInt(RC_ALPHABET.length);
       group += RC_ALPHABET[idx];
     }
     groups.push(group);

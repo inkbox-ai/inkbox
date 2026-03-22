@@ -83,8 +83,8 @@ class VaultResource:
         """List vault secrets (metadata only, no encrypted payload).
 
         Args:
-            secret_type: Optional filter: ``"login"``, ``"card"``,
-                ``"note"``, ``"ssh_key"``, or ``"api_key"``.
+            secret_type: Optional filter: ``"login"``, ``"ssh_key"``,
+                ``"api_key"``, or ``"other"``.
         """
         params: dict[str, Any] = {}
         if secret_type is not None:
@@ -253,9 +253,8 @@ class UnlockedVault:
 
         Args:
             name: Display name (max 255 characters).
-            payload: One of :class:`LoginPayload`, :class:`CardPayload`,
-                :class:`NotePayload`, :class:`SSHKeyPayload`, or
-                :class:`APIKeyPayload`.
+            payload: One of :class:`LoginPayload`, :class:`SSHKeyPayload`,
+                :class:`APIKeyPayload`, or :class:`OtherPayload`.
             description: Optional description.
 
         Returns:

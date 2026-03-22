@@ -153,3 +153,51 @@ class TestUnlockedVaultUpdateSecret:
         body = http.patch.call_args[1]["json"]
         assert "encrypted_payload" in body
         assert "name" not in body
+
+
+class TestUnlockedVaultGetSecret:
+    def test_fetches_and_decrypts(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+
+        login_payload = {"username": "admin", "password": "s3cret"}
+        encrypted = encrypt_payload(org_key, login_payload)
+
+        http.get.return_value = {
+            **VAULT_SECRET_DICT,
+            "encrypted_payload": encrypted,
+        }
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        secret = unlocked.get_secret("some-uuid")
+        http.get.assert_called_once_with("/secrets/some-uuid")
+        assert secret.name == "AWS Production"
+        assert secret.payload.username == "admin"
+
+
+class TestUnlockedVaultDeleteSecret:
+    def test_calls_delete(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        unlocked.delete_secret("some-uuid")
+        http.delete.assert_called_once_with("/secrets/some-uuid")
+
+
+class TestUnlockedVaultUpdateBoth:
+    def test_sends_name_and_payload(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        http.patch.return_value = VAULT_SECRET_DICT
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        unlocked.update_secret(
+            "some-id",
+            name="Updated",
+            payload=LoginPayload(username="new", password="pw2"),
+        )
+
+        body = http.patch.call_args[1]["json"]
+        assert body["name"] == "Updated"
+        assert "encrypted_payload" in body

@@ -41,6 +41,7 @@ export type {
   APIKeyPayload,
   SecretPayload,
 } from "./vault/types.js";
+export { VaultSecretType, VaultKeyType } from "./vault/types.js";
 export type { VaultKeyMaterial } from "./vault/crypto.js";
 export { UnlockedVault } from "./vault/resources/vault.js";
 export {

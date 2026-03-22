@@ -5,8 +5,8 @@ inkbox — Python SDK for the Inkbox APIs.
 from inkbox.client import Inkbox
 from inkbox.agent_identity import AgentIdentity
 
-# Exceptions (canonical source: mail; identical in all submodules)
-from inkbox.mail.exceptions import InkboxAPIError, InkboxError
+# Exceptions (canonical source)
+from inkbox.exceptions import InkboxAPIError, InkboxError
 
 # Mail types
 from inkbox.mail.types import (
@@ -50,6 +50,7 @@ from inkbox.vault.types import (
     SSHKeyPayload,
     VaultInfo,
     VaultKey,
+    VaultKeyType,
     VaultSecret,
     VaultSecretDetail,
     VaultSecretType,
@@ -94,6 +95,7 @@ __all__ = [
     "OTPCode",
     # Vault types
     "VaultSecretType",
+    "VaultKeyType",
     "VaultInfo",
     "VaultKey",
     "VaultSecret",

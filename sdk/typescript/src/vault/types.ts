@@ -5,6 +5,22 @@
  * and client-side structured secret payloads.
  */
 
+// ---- Enums ----
+
+export const VaultSecretType = {
+  API_KEY: "api_key",
+  LOGIN: "login",
+  SSH_KEY: "ssh_key",
+  OTHER: "other",
+} as const;
+export type VaultSecretType = (typeof VaultSecretType)[keyof typeof VaultSecretType];
+
+export const VaultKeyType = {
+  PRIMARY: "primary",
+  RECOVERY: "recovery",
+} as const;
+export type VaultKeyType = (typeof VaultKeyType)[keyof typeof VaultKeyType];
+
 // ---- API response types (camelCase) ----
 
 export interface VaultInfo {
@@ -58,6 +74,7 @@ export interface LoginPayload {
 
 export interface OtherPayload {
   data: string;
+  notes?: string;
 }
 
 export interface SSHKeyPayload {
@@ -202,7 +219,9 @@ export function serializePayload(
     }
     case "other": {
       const p = payload as OtherPayload;
-      return { data: p.data };
+      const d: Record<string, unknown> = { data: p.data };
+      if (p.notes !== undefined) d.notes = p.notes;
+      return d;
     }
     case "ssh_key": {
       const p = payload as SSHKeyPayload;
@@ -239,7 +258,7 @@ export function parsePayload(
         notes: raw.notes as string | undefined,
       } satisfies LoginPayload;
     case "other":
-      return { data: raw.data as string } satisfies OtherPayload;
+      return { data: raw.data as string, notes: raw.notes as string | undefined } satisfies OtherPayload;
     case "ssh_key":
       return {
         privateKey: raw.private_key as string,

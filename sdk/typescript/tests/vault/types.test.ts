@@ -7,6 +7,8 @@ import {
   inferSecretType,
   parsePayload,
   serializePayload,
+  VaultSecretType,
+  VaultKeyType,
 } from "../../src/vault/types.js";
 import type {
   RawVaultInfo,
@@ -102,6 +104,9 @@ describe("inferSecretType", () => {
   it("api_key", () => {
     expect(inferSecretType({ key: "k" })).toBe("api_key");
   });
+  it("throws on unknown shape", () => {
+    expect(() => inferSecretType({} as any)).toThrow("Cannot infer");
+  });
 });
 
 describe("parsePayload", () => {
@@ -123,6 +128,26 @@ describe("parsePayload", () => {
     expect(p.key).toBe("k");
     expect(p.secret).toBe("s");
   });
+  it("other with notes", () => {
+    const p = parsePayload("other", { data: "stuff", notes: "ctx" });
+    expect((p as OtherPayload).notes).toBe("ctx");
+  });
+});
+
+describe("VaultSecretType", () => {
+  it("has correct values", () => {
+    expect(VaultSecretType.LOGIN).toBe("login");
+    expect(VaultSecretType.SSH_KEY).toBe("ssh_key");
+    expect(VaultSecretType.API_KEY).toBe("api_key");
+    expect(VaultSecretType.OTHER).toBe("other");
+  });
+});
+
+describe("VaultKeyType", () => {
+  it("has correct values", () => {
+    expect(VaultKeyType.PRIMARY).toBe("primary");
+    expect(VaultKeyType.RECOVERY).toBe("recovery");
+  });
 });
 
 describe("serializePayload", () => {
@@ -134,5 +159,16 @@ describe("serializePayload", () => {
     const s = serializePayload("ssh_key", { privateKey: "---", publicKey: "pub" });
     expect(s.private_key).toBe("---");
     expect(s.public_key).toBe("pub");
+  });
+  it("api_key uses snake_case", () => {
+    const s = serializePayload("api_key", { key: "k", secret: "s", endpoint: "https://x" });
+    expect(s.key).toBe("k");
+    expect(s.secret).toBe("s");
+    expect(s.endpoint).toBe("https://x");
+  });
+  it("other includes notes", () => {
+    const s = serializePayload("other", { data: "stuff", notes: "ctx" });
+    expect(s.data).toBe("stuff");
+    expect(s.notes).toBe("ctx");
   });
 });

@@ -79,8 +79,8 @@ export class VaultResource {
   /**
    * List vault secrets (metadata only, no encrypted payload).
    *
-   * @param options.secretType - Optional filter: `"login"`, `"card"`,
-   *   `"note"`, `"ssh_key"`, or `"api_key"`.
+   * @param options.secretType - Optional filter: `"login"`, `"ssh_key"`,
+   *   `"api_key"`, or `"other"`.
    */
   async listSecrets(options: { secretType?: string } = {}): Promise<VaultSecret[]> {
     const params: Record<string, string> = {};
@@ -254,8 +254,8 @@ export class UnlockedVault {
    *
    * @param options.name - Display name (max 255 characters).
    * @param options.description - Optional description.
-   * @param options.payload - One of {@link LoginPayload}, {@link CardPayload},
-   *   {@link NotePayload}, {@link SSHKeyPayload}, or {@link APIKeyPayload}.
+   * @param options.payload - One of {@link LoginPayload}, {@link SSHKeyPayload},
+   *   {@link APIKeyPayload}, or {@link OtherPayload}.
    */
   async createSecret(options: {
     name: string;

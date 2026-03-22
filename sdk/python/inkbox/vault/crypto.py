@@ -120,7 +120,7 @@ def wrap_org_key(master_key: bytes, org_key: bytes) -> str:
     Wrap the org encryption key with a master key.
 
     Returns:
-        Base64-encoded blob ``(iv || ciphertext || tag)``.
+        Base64-encoded blob ``(ciphertext || nonce || tag)``.
     """
     return base64.b64encode(
         s=_aes_gcm_encrypt(
