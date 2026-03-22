@@ -250,7 +250,7 @@ export async function generateRecoveryCode(
   const code = groups.join("-");
 
   // Recovery codes bypass validateVaultKey — they are auto-generated
-  // and don't follow password rules.  Derive directly.
+  // and don't follow vault key rules.  Derive directly.
   const salt = deriveSalt(organizationId);
   const masterKey = await deriveMasterKey(code, salt);
   const authHash = computeAuthHash(masterKey);

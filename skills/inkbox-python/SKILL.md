@@ -192,11 +192,11 @@ Encrypted credential vault with client-side Argon2id key derivation and AES-256-
 ```python
 from inkbox import LoginPayload, APIKeyPayload, SSHKeyPayload, OtherPayload
 
-# Unlock with a password — derives key via Argon2id, decrypts all secrets
-unlocked = inkbox.vault.unlock("my-vault-password")
+# Unlock with a vault key — derives key via Argon2id, decrypts all secrets
+unlocked = inkbox.vault.unlock("my-Vault-key-01!")
 
 # Optionally filter to secrets an agent identity has access to
-unlocked = inkbox.vault.unlock("my-vault-password", identity_id="agent-uuid")
+unlocked = inkbox.vault.unlock("my-Vault-key-01!", identity_id="agent-uuid")
 
 # All decrypted secrets from the unlock bundle
 for secret in unlocked.secrets:

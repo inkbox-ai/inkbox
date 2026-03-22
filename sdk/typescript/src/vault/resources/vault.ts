@@ -136,7 +136,7 @@ export class VaultResource {
     // wrapped_org_encryption_key for the matching vault key.  The
     // plural wrapped_org_encryption_keys is only returned when
     // auth_hash is omitted (a recovery flow this SDK does not use,
-    // since recovery codes are derived the same way as passwords).
+    // since recovery codes are derived the same way as vault keys).
     const data = await this.http.get<RawVaultUnlockResponse>("/unlock", {
       auth_hash: authHash,
     });
@@ -144,8 +144,8 @@ export class VaultResource {
     const wrapped = data.wrapped_org_encryption_key;
     if (!wrapped) {
       throw new Error(
-        "No vault key matched this vault key. " +
-          "Check that the vault key is correct and the key has not been deleted.",
+        "No vault key matched. " +
+          "Check that the vault key is correct and has not been deleted.",
       );
     }
 

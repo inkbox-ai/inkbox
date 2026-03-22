@@ -145,14 +145,14 @@ class VaultResource:
         # wrapped_org_encryption_key for the matching vault key.  The
         # plural wrapped_org_encryption_keys is only returned when
         # auth_hash is omitted (a recovery flow this SDK does not use,
-        # since recovery codes are derived the same way as passwords).
+        # since recovery codes are derived the same way as vault keys).
         data = self._http.get("/unlock", params={"auth_hash": auth_hash})
 
         wrapped = data.get("wrapped_org_encryption_key")
         if wrapped is None:
             raise ValueError(
-                "No vault key matched this vault key. "
-                "Check that the vault key is correct and the key has not been deleted."
+                "No vault key matched. "
+                "Check that the vault key is correct and has not been deleted."
             )
 
         # Step 4: unwrap the org encryption key

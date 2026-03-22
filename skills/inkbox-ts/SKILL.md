@@ -199,11 +199,11 @@ Encrypted credential vault with client-side Argon2id key derivation and AES-256-
 ```typescript
 import type { LoginPayload, APIKeyPayload, SSHKeyPayload, OtherPayload } from "@inkbox/sdk";
 
-// Unlock with a password — derives key via Argon2id, decrypts all secrets
-const unlocked = await inkbox.vault.unlock("my-vault-password");
+// Unlock with a vault key — derives key via Argon2id, decrypts all secrets
+const unlocked = await inkbox.vault.unlock("my-Vault-key-01!");
 
 // Optionally filter to secrets an agent identity has access to
-const unlocked = await inkbox.vault.unlock("my-vault-password", { identityId: "agent-uuid" });
+const unlocked = await inkbox.vault.unlock("my-Vault-key-01!", { identityId: "agent-uuid" });
 
 // All decrypted secrets from the unlock bundle
 for (const secret of unlocked.secrets) {

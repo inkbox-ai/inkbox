@@ -176,7 +176,7 @@ def unwrap_org_key(master_key: bytes, wrapped_b64: str) -> bytes:
     Unwrap the org encryption key using a master key.
 
     Args:
-        master_key: 32-byte master key derived from password.
+        master_key: 32-byte master key derived from the vault key.
         wrapped_b64: Base64-encoded wrapped blob from the server.
 
     Returns:
@@ -314,7 +314,7 @@ def generate_recovery_code(
     code = "-".join(groups)
 
     # Recovery codes bypass _validate_vault_key — they are auto-generated
-    # and don't follow password rules.  Derive directly.
+    # and don't follow vault key rules.  Derive directly.
     salt = derive_salt(organization_id)
     master_key = derive_master_key(code, salt)
     auth_hash = compute_auth_hash(master_key)
