@@ -23,8 +23,6 @@ export interface VaultKey {
   id: string;
   /** "primary" | "recovery" */
   keyType: string;
-  name: string;
-  description: string | null;
   createdBy: string | null;
   /** "active" | "deleted" */
   status: string;
@@ -36,7 +34,7 @@ export interface VaultSecret {
   id: string;
   name: string;
   description: string | null;
-  /** "login" | "card" | "note" | "ssh_key" | "api_key" */
+  /** "login" | "ssh_key" | "api_key" | "other" */
   secretType: string;
   /** "active" | "deleted" */
   status: string;
@@ -58,17 +56,8 @@ export interface LoginPayload {
   notes?: string;
 }
 
-export interface CardPayload {
-  cardholderName: string;
-  cardNumber: string;
-  expiryMonth: string;
-  expiryYear: string;
-  cvv: string;
-  notes?: string;
-}
-
-export interface NotePayload {
-  content: string;
+export interface OtherPayload {
+  data: string;
 }
 
 export interface SSHKeyPayload {
@@ -88,8 +77,7 @@ export interface APIKeyPayload {
 
 export type SecretPayload =
   | LoginPayload
-  | CardPayload
-  | NotePayload
+  | OtherPayload
   | SSHKeyPayload
   | APIKeyPayload;
 
@@ -97,7 +85,7 @@ export interface DecryptedVaultSecret {
   id: string;
   name: string;
   description: string | null;
-  /** "login" | "card" | "note" | "ssh_key" | "api_key" */
+  /** "login" | "ssh_key" | "api_key" | "other" */
   secretType: string;
   /** "active" | "deleted" */
   status: string;
@@ -122,8 +110,6 @@ export interface RawVaultInfo {
 export interface RawVaultKey {
   id: string;
   key_type: string;
-  name: string;
-  description: string | null;
   created_by: string | null;
   status: string;
   created_at: string;
@@ -171,8 +157,6 @@ export function parseVaultKey(r: RawVaultKey): VaultKey {
   return {
     id: r.id,
     keyType: r.key_type,
-    name: r.name,
-    description: r.description,
     createdBy: r.created_by,
     status: r.status,
     createdAt: new Date(r.created_at),
@@ -216,21 +200,9 @@ export function serializePayload(
       if (p.notes !== undefined) d.notes = p.notes;
       return d;
     }
-    case "card": {
-      const p = payload as CardPayload;
-      const d: Record<string, unknown> = {
-        cardholder_name: p.cardholderName,
-        card_number: p.cardNumber,
-        expiry_month: p.expiryMonth,
-        expiry_year: p.expiryYear,
-        cvv: p.cvv,
-      };
-      if (p.notes !== undefined) d.notes = p.notes;
-      return d;
-    }
-    case "note": {
-      const p = payload as NotePayload;
-      return { content: p.content };
+    case "other": {
+      const p = payload as OtherPayload;
+      return { data: p.data };
     }
     case "ssh_key": {
       const p = payload as SSHKeyPayload;
@@ -266,17 +238,8 @@ export function parsePayload(
         url: raw.url as string | undefined,
         notes: raw.notes as string | undefined,
       } satisfies LoginPayload;
-    case "card":
-      return {
-        cardholderName: raw.cardholder_name as string,
-        cardNumber: raw.card_number as string,
-        expiryMonth: raw.expiry_month as string,
-        expiryYear: raw.expiry_year as string,
-        cvv: raw.cvv as string,
-        notes: raw.notes as string | undefined,
-      } satisfies CardPayload;
-    case "note":
-      return { content: raw.content as string } satisfies NotePayload;
+    case "other":
+      return { data: raw.data as string } satisfies OtherPayload;
     case "ssh_key":
       return {
         privateKey: raw.private_key as string,
@@ -299,9 +262,8 @@ export function parsePayload(
 
 export function inferSecretType(payload: SecretPayload): string {
   if ("username" in payload && "password" in payload) return "login";
-  if ("cardholderName" in payload && "cardNumber" in payload) return "card";
-  if ("content" in payload && !("key" in payload)) return "note";
   if ("privateKey" in payload) return "ssh_key";
   if ("key" in payload) return "api_key";
+  if ("data" in payload) return "other";
   throw new Error("Cannot infer secret_type from payload shape");
 }

@@ -203,15 +203,11 @@ class VaultKeyMaterial:
         wrapped_org_encryption_key: Base64-encoded AES-256-GCM ciphertext.
         auth_hash: SHA-256(masterKey) hex digest.
         key_type: ``"primary"`` or ``"recovery"``.
-        name: Human-readable name.
-        description: Optional description.
     """
     id: UUID
     wrapped_org_encryption_key: str
     auth_hash: str
     key_type: str
-    name: str
-    description: str | None
 
 
 def generate_vault_key_material(
@@ -220,8 +216,6 @@ def generate_vault_key_material(
     org_encryption_key: bytes,
     *,
     key_type: str = "primary",
-    name: str = "",
-    description: str | None = None,
 ) -> VaultKeyMaterial:
     """
     Generate vault key material from a password.
@@ -233,8 +227,6 @@ def generate_vault_key_material(
         organization_id: Organisation ID (used as salt basis).
         org_encryption_key: 32-byte org encryption key to wrap.
         key_type: ``"primary"`` or ``"recovery"``.
-        name: Human-readable name.
-        description: Optional description.
 
     Returns:
         :class:`VaultKeyMaterial` ready to send to the server.
@@ -249,8 +241,6 @@ def generate_vault_key_material(
         wrapped_org_encryption_key=wrapped,
         auth_hash=auth_hash,
         key_type=key_type,
-        name=name,
-        description=description,
     )
 
 
@@ -286,7 +276,5 @@ def generate_recovery_code(
         organization_id=organization_id,
         org_encryption_key=org_encryption_key,
         key_type="recovery",
-        name="Recovery code",
-        description=None,
     )
     return code, material

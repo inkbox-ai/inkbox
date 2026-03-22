@@ -48,8 +48,6 @@ class VaultKey:
 
     id: UUID
     key_type: str
-    name: str
-    description: str | None
     created_by: str | None
     status: str
     created_at: datetime
@@ -60,8 +58,6 @@ class VaultKey:
         return cls(
             id=UUID(d["id"]),
             key_type=d["key_type"],
-            name=d["name"],
-            description=d.get("description"),
             created_by=d.get("created_by"),
             status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
@@ -155,74 +151,6 @@ class LoginPayload:
 
 
 @dataclass
-class CardPayload:
-    """
-    Structured payload for ``card`` secrets.
-
-    Attributes:
-        cardholder_name: Name on the card.
-        card_number: Card number (digits only or formatted).
-        expiry_month: Two-digit expiry month (e.g. ``"03"``).
-        expiry_year: Two- or four-digit expiry year (e.g. ``"27"`` or ``"2027"``).
-        cvv: Card verification value.
-        notes: Optional free-form notes.
-    """
-
-    cardholder_name: str
-    card_number: str
-    expiry_month: str
-    expiry_year: str
-    cvv: str
-    notes: str | None = None
-
-    def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {
-            "cardholder_name": self.cardholder_name,
-            "card_number": self.card_number,
-            "expiry_month": self.expiry_month,
-            "expiry_year": self.expiry_year,
-            "cvv": self.cvv,
-        }
-        if self.notes is not None:
-            d["notes"] = self.notes
-        return d
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> CardPayload:
-        return cls(
-            cardholder_name=d["cardholder_name"],
-            card_number=d["card_number"],
-            expiry_month=d["expiry_month"],
-            expiry_year=d["expiry_year"],
-            cvv=d["cvv"],
-            notes=d.get("notes"),
-        )
-
-
-@dataclass
-class NotePayload:
-    """
-    Structured payload for ``note`` secrets.
-
-    Attributes:
-        content: Free-form text content.
-    """
-
-    content: str
-
-    def _to_dict(self) -> dict[str, Any]:
-        return {
-            "content": self.content,
-        }
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> NotePayload:
-        return cls(
-            content=d["content"],
-        )
-
-
-@dataclass
 class SSHKeyPayload:
     """
     Structured payload for ``ssh_key`` secrets.
@@ -305,16 +233,38 @@ class APIKeyPayload:
         )
 
 
+@dataclass
+class OtherPayload:
+    """
+    Structured payload for ``other`` secrets.
+
+    Attributes:
+        data: Any freeform content.
+    """
+
+    data: str
+
+    def _to_dict(self) -> dict[str, Any]:
+        return {
+            "data": self.data,
+        }
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> OtherPayload:
+        return cls(
+            data=d["data"],
+        )
+
+
 # Union of all payload types
-SecretPayload = Union[LoginPayload, CardPayload, NotePayload, SSHKeyPayload, APIKeyPayload]
+SecretPayload = Union[LoginPayload, SSHKeyPayload, APIKeyPayload, OtherPayload]
 
 # Map secret_type string → payload class
 _PAYLOAD_PARSERS: dict[str, type] = {
     "login": LoginPayload,
-    "card": CardPayload,
-    "note": NotePayload,
     "ssh_key": SSHKeyPayload,
     "api_key": APIKeyPayload,
+    "other": OtherPayload,
 }
 
 
@@ -330,10 +280,9 @@ def _infer_secret_type(payload: SecretPayload) -> str:
     """Infer the ``secret_type`` string from a payload instance."""
     _TYPE_MAP: dict[type, str] = {
         LoginPayload: "login",
-        CardPayload: "card",
-        NotePayload: "note",
         SSHKeyPayload: "ssh_key",
         APIKeyPayload: "api_key",
+        OtherPayload: "other",
     }
     t = _TYPE_MAP.get(type(payload))
     if t is None:
@@ -349,8 +298,8 @@ class DecryptedVaultSecret:
         id: Secret UUID.
         name: Display name.
         description: Optional description.
-        secret_type: Credential category (``login``, ``card``, ``note``,
-            ``ssh_key``, ``api_key``).
+        secret_type: Credential category (``login``, ``ssh_key``,
+            ``api_key``, ``other``).
         status: Lifecycle status.
         created_at: Creation timestamp.
         updated_at: Last modification timestamp.

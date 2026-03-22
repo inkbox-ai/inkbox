@@ -14,8 +14,7 @@ import type {
   RawVaultSecret,
   RawVaultSecretDetail,
   LoginPayload,
-  CardPayload,
-  NotePayload,
+  OtherPayload,
   SSHKeyPayload,
   APIKeyPayload,
 } from "../../src/vault/types.js";
@@ -34,8 +33,6 @@ const RAW_INFO: RawVaultInfo = {
 const RAW_KEY: RawVaultKey = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   key_type: "primary",
-  name: "Admin Key",
-  description: "Primary admin key",
   created_by: "user_abc",
   status: "active",
   created_at: "2026-03-18T12:00:00Z",
@@ -68,8 +65,6 @@ describe("parseVaultKey", () => {
   it("parses all fields", () => {
     const key = parseVaultKey(RAW_KEY);
     expect(key.keyType).toBe("primary");
-    expect(key.name).toBe("Admin Key");
-    expect(key.description).toBe("Primary admin key");
     expect(key.createdBy).toBe("user_abc");
   });
 });
@@ -98,19 +93,8 @@ describe("inferSecretType", () => {
   it("login", () => {
     expect(inferSecretType({ username: "a", password: "b" })).toBe("login");
   });
-  it("card", () => {
-    expect(
-      inferSecretType({
-        cardholderName: "A",
-        cardNumber: "4111",
-        expiryMonth: "01",
-        expiryYear: "27",
-        cvv: "123",
-      }),
-    ).toBe("card");
-  });
-  it("note", () => {
-    expect(inferSecretType({ content: "x" })).toBe("note");
+  it("other", () => {
+    expect(inferSecretType({ data: "freeform content" })).toBe("other");
   });
   it("ssh_key", () => {
     expect(inferSecretType({ privateKey: "..." })).toBe("ssh_key");
@@ -126,19 +110,9 @@ describe("parsePayload", () => {
     expect(p.username).toBe("a");
     expect(p.url).toBe("https://x");
   });
-  it("card", () => {
-    const p = parsePayload("card", {
-      cardholder_name: "A",
-      card_number: "4111",
-      expiry_month: "01",
-      expiry_year: "27",
-      cvv: "123",
-    }) as CardPayload;
-    expect(p.cardholderName).toBe("A");
-  });
-  it("note", () => {
-    const p = parsePayload("note", { content: "hello" }) as NotePayload;
-    expect(p.content).toBe("hello");
+  it("other", () => {
+    const p = parsePayload("other", { data: "freeform content" }) as OtherPayload;
+    expect(p.data).toBe("freeform content");
   });
   it("ssh_key", () => {
     const p = parsePayload("ssh_key", { private_key: "---" }) as SSHKeyPayload;
@@ -155,17 +129,6 @@ describe("serializePayload", () => {
   it("login uses snake_case", () => {
     const s = serializePayload("login", { username: "a", password: "b" });
     expect(s).toEqual({ username: "a", password: "b" });
-  });
-  it("card uses snake_case", () => {
-    const s = serializePayload("card", {
-      cardholderName: "A",
-      cardNumber: "4111",
-      expiryMonth: "01",
-      expiryYear: "27",
-      cvv: "123",
-    });
-    expect(s.cardholder_name).toBe("A");
-    expect(s.card_number).toBe("4111");
   });
   it("ssh_key uses snake_case", () => {
     const s = serializePayload("ssh_key", { privateKey: "---", publicKey: "pub" });

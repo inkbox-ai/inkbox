@@ -44,10 +44,9 @@ from inkbox.authenticator.types import (
 # Vault types
 from inkbox.vault.types import (
     APIKeyPayload,
-    CardPayload,
     DecryptedVaultSecret,
     LoginPayload,
-    NotePayload,
+    OtherPayload,
     SSHKeyPayload,
     VaultInfo,
     VaultKey,
@@ -99,10 +98,9 @@ __all__ = [
     "VaultSecretDetail",
     "DecryptedVaultSecret",
     "LoginPayload",
-    "CardPayload",
-    "NotePayload",
     "SSHKeyPayload",
     "APIKeyPayload",
+    "OtherPayload",
     "VaultKeyMaterial",
     "generate_org_encryption_key",
     "generate_vault_key_material",

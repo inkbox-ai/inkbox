@@ -96,10 +96,8 @@ describe("encryptPayload / decryptPayload", () => {
 describe("generateVaultKeyMaterial", () => {
   it("roundtrips with re-derived master key", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey, "My Key");
+    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey);
     expect(mat.keyType).toBe("primary");
-    expect(mat.name).toBe("My Key");
-    expect(mat.description).toBeNull();
 
     const salt = deriveSalt("org_test_123");
     const mk = await deriveMasterKey("pw", salt);
@@ -108,32 +106,28 @@ describe("generateVaultKeyMaterial", () => {
     expect(Buffer.from(recovered)).toEqual(Buffer.from(orgKey));
   });
 
-  it("accepts description and type options", async () => {
+  it("accepts type option", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey, "Backup", {
+    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey, {
       keyType: "recovery",
-      description: "Recovery backup key",
     });
     expect(mat.keyType).toBe("recovery");
-    expect(mat.name).toBe("Backup");
-    expect(mat.description).toBe("Recovery backup key");
   });
 });
 
 describe("generateRecoveryCode", () => {
   it("produces XXXX-XXXX-... format", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const [code, mat] = await generateRecoveryCode("Recovery 1", "org_test_123", orgKey);
+    const [code, mat] = await generateRecoveryCode("org_test_123", orgKey);
     const parts = code.split("-");
     expect(parts.length).toBe(8);
     parts.forEach((p) => expect(p.length).toBe(4));
     expect(mat.keyType).toBe("recovery");
-    expect(mat.name).toBe("Recovery 1");
   });
 
   it("roundtrips with re-derived master key", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const [code, mat] = await generateRecoveryCode("Recovery 1", "org_test_123", orgKey);
+    const [code, mat] = await generateRecoveryCode("org_test_123", orgKey);
     const salt = deriveSalt("org_test_123");
     const mk = await deriveMasterKey(code, salt);
     expect(computeAuthHash(mk)).toBe(mat.authHash);
@@ -143,8 +137,8 @@ describe("generateRecoveryCode", () => {
 
   it("generates unique codes", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const [c1] = await generateRecoveryCode("Recovery 1", "org_test_123", orgKey);
-    const [c2] = await generateRecoveryCode("Recovery 2", "org_test_123", orgKey);
+    const [c1] = await generateRecoveryCode("org_test_123", orgKey);
+    const [c2] = await generateRecoveryCode("org_test_123", orgKey);
     expect(c1).not.toBe(c2);
   });
 });

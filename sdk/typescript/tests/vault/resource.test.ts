@@ -35,8 +35,6 @@ const RAW_INFO: RawVaultInfo = {
 const RAW_KEY: RawVaultKey = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   key_type: "primary",
-  name: "Admin Key",
-  description: "Primary admin key",
   created_by: "user_abc",
   status: "active",
   created_at: "2026-03-18T12:00:00Z",

@@ -5,9 +5,8 @@ from uuid import UUID
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT, VAULT_SECRET_DETAIL_DICT
 from inkbox.vault.types import (
     APIKeyPayload,
-    CardPayload,
     LoginPayload,
-    NotePayload,
+    OtherPayload,
     SSHKeyPayload,
     VaultInfo,
     VaultKey,
@@ -33,8 +32,6 @@ class TestVaultKey:
         key = VaultKey._from_dict(VAULT_KEY_DICT)
         assert isinstance(key.id, UUID)
         assert key.key_type == "primary"
-        assert key.name == "Admin Key"
-        assert key.description is None
 
 
 class TestVaultSecret:
@@ -63,22 +60,10 @@ class TestPayloadParsers:
         assert p.username == "admin"
         assert p.url == "https://x.com"
 
-    def test_card(self):
-        raw = {
-            "cardholder_name": "Alice",
-            "card_number": "4111111111111111",
-            "expiry_month": "03",
-            "expiry_year": "27",
-            "cvv": "123",
-        }
-        p = _parse_payload("card", raw)
-        assert isinstance(p, CardPayload)
-        assert p.cardholder_name == "Alice"
-
-    def test_note(self):
-        p = _parse_payload("note", {"content": "hello"})
-        assert isinstance(p, NotePayload)
-        assert p.content == "hello"
+    def test_other(self):
+        p = _parse_payload("other", {"data": "freeform content"})
+        assert isinstance(p, OtherPayload)
+        assert p.data == "freeform content"
 
     def test_ssh_key(self):
         p = _parse_payload("ssh_key", {"private_key": "-----BEGIN..."})
@@ -95,16 +80,8 @@ class TestInferSecretType:
     def test_login(self):
         assert _infer_secret_type(LoginPayload(username="a", password="b")) == "login"
 
-    def test_card(self):
-        assert _infer_secret_type(
-            CardPayload(
-                cardholder_name="A", card_number="4111", expiry_month="01",
-                expiry_year="27", cvv="123"
-            )
-        ) == "card"
-
-    def test_note(self):
-        assert _infer_secret_type(NotePayload(content="x")) == "note"
+    def test_other(self):
+        assert _infer_secret_type(OtherPayload(data="x")) == "other"
 
     def test_ssh_key(self):
         assert _infer_secret_type(SSHKeyPayload(private_key="...")) == "ssh_key"

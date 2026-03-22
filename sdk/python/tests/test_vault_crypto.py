@@ -95,24 +95,20 @@ class TestEncryptDecryptPayload:
 class TestGenerateVaultKeyMaterial:
     def test_roundtrip(self):
         org_key = generate_org_encryption_key()
-        mat = generate_vault_key_material("pw", "org_test_123", org_key, name="Primary")
+        mat = generate_vault_key_material("pw", "org_test_123", org_key)
         assert mat.key_type == "primary"
-        assert mat.name == "Primary"
-        assert mat.description is None
         # Re-derive and verify
         salt = derive_salt("org_test_123")
         mk = derive_master_key("pw", salt)
         assert compute_auth_hash(mk) == mat.auth_hash
         assert unwrap_org_key(mk, mat.wrapped_org_encryption_key) == org_key
 
-    def test_name_and_type(self):
+    def test_type_override(self):
         org_key = generate_org_encryption_key()
         mat = generate_vault_key_material(
-            "pw", "org_test_123", org_key, key_type="recovery", name="Backup", description="Backup key"
+            "pw", "org_test_123", org_key, key_type="recovery"
         )
         assert mat.key_type == "recovery"
-        assert mat.name == "Backup"
-        assert mat.description == "Backup key"
 
 
 class TestGenerateRecoveryCode:

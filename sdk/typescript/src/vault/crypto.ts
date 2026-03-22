@@ -178,10 +178,6 @@ export interface VaultKeyMaterial {
   authHash: string;
   /** "primary" | "recovery" */
   keyType: string;
-  /** Human-readable name. */
-  name: string;
-  /** Optional description. */
-  description: string | null;
 }
 
 /**
@@ -193,8 +189,7 @@ export async function generateVaultKeyMaterial(
   password: string,
   organizationId: string,
   orgEncryptionKey: Uint8Array,
-  name: string,
-  options: { keyType?: string; description?: string } = {},
+  options: { keyType?: string } = {},
 ): Promise<VaultKeyMaterial> {
   const salt = deriveSalt(organizationId);
   const masterKey = await deriveMasterKey(password, salt);
@@ -206,8 +201,6 @@ export async function generateVaultKeyMaterial(
     wrappedOrgEncryptionKey: wrapped,
     authHash,
     keyType: options.keyType ?? "primary",
-    name,
-    description: options.description ?? null,
   };
 }
 
@@ -221,7 +214,6 @@ export async function generateVaultKeyMaterial(
  *   securely by the user — it cannot be recovered.
  */
 export async function generateRecoveryCode(
-  name: string,
   organizationId: string,
   orgEncryptionKey: Uint8Array,
 ): Promise<[string, VaultKeyMaterial]> {
@@ -240,7 +232,6 @@ export async function generateRecoveryCode(
     code,
     organizationId,
     orgEncryptionKey,
-    name,
     { keyType: "recovery" },
   );
   return [code, material];

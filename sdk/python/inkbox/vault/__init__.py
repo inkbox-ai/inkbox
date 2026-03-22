@@ -5,10 +5,9 @@ inkbox.vault — encrypted vault types and exceptions.
 from inkbox.vault.exceptions import InkboxAPIError, InkboxError
 from inkbox.vault.types import (
     APIKeyPayload,
-    CardPayload,
     DecryptedVaultSecret,
     LoginPayload,
-    NotePayload,
+    OtherPayload,
     SSHKeyPayload,
     VaultInfo,
     VaultKey,
@@ -33,10 +32,9 @@ __all__ = [
     "DecryptedVaultSecret",
     # Structured payloads
     "LoginPayload",
-    "CardPayload",
-    "NotePayload",
     "SSHKeyPayload",
     "APIKeyPayload",
+    "OtherPayload",
     # Key generation helpers
     "VaultKeyMaterial",
     "generate_org_encryption_key",
