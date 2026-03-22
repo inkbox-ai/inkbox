@@ -8,7 +8,7 @@ client-side structured secret payloads.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, ClassVar
@@ -163,9 +163,10 @@ class AbstractSecretPayload(ABC):
     secret_type: ClassVar[VaultSecretType]  # discriminator
     notes: str | None = field(default=None, kw_only=True)
 
-    @abstractmethod
     def _to_dict(self) -> dict[str, Any]:
-        ...
+        return {
+            k: v for k, v in asdict(self).items() if v is not None
+        }
 
     @classmethod
     @abstractmethod
@@ -190,17 +191,6 @@ class LoginPayload(AbstractSecretPayload):
     password: str
     url: str | None = None
     # TODO: store TOTP data structure here
-
-    def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {
-            "username": self.username,
-            "password": self.password,
-        }
-        if self.url is not None:
-            d["url"] = self.url
-        if self.notes is not None:
-            d["notes"] = self.notes
-        return d
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> LoginPayload:
@@ -231,20 +221,6 @@ class SSHKeyPayload(AbstractSecretPayload):
     fingerprint: str | None = None
     passphrase: str | None = None
 
-    def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {
-            "private_key": self.private_key,
-        }
-        if self.public_key is not None:
-            d["public_key"] = self.public_key
-        if self.fingerprint is not None:
-            d["fingerprint"] = self.fingerprint
-        if self.passphrase is not None:
-            d["passphrase"] = self.passphrase
-        if self.notes is not None:
-            d["notes"] = self.notes
-        return d
-
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> SSHKeyPayload:
         return cls(
@@ -273,18 +249,6 @@ class APIKeyPayload(AbstractSecretPayload):
     secret: str | None = None
     endpoint: str | None = None
 
-    def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {
-            "key": self.key,
-        }
-        if self.secret is not None:
-            d["secret"] = self.secret
-        if self.endpoint is not None:
-            d["endpoint"] = self.endpoint
-        if self.notes is not None:
-            d["notes"] = self.notes
-        return d
-
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> APIKeyPayload:
         return cls(
@@ -307,12 +271,6 @@ class OtherPayload(AbstractSecretPayload):
     secret_type: ClassVar[VaultSecretType] = VaultSecretType.OTHER
 
     data: str
-
-    def _to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {"data": self.data}
-        if self.notes is not None:
-            d["notes"] = self.notes
-        return d
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> OtherPayload:
