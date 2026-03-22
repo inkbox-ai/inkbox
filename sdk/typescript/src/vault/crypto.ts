@@ -3,7 +3,7 @@
  *
  * Client-side cryptography for the encrypted vault.
  *
- * Key derivation: Argon2id  (vault_key → master key, via hash-wasm)
+ * Key derivation: Argon2id  (vault key → master key, via hash-wasm)
  * Encryption:     AES-256-GCM (via Node.js crypto)
  * Hashing:        SHA-256     (via Node.js crypto)
  *
@@ -49,6 +49,15 @@ const RC_GROUPS = 8; // 8 groups × 4 chars ≈ 120 bits of entropy
 // Vault key validation
 // ---------------------------------------------------------------------------
 
+/**
+ * Validate that a vault key meets minimum strength requirements.
+ *
+ * Requirements: at least 16 characters, one uppercase letter, one
+ * lowercase letter, one digit, and one special character.
+ *
+ * @param vaultKey - The vault key string to validate.
+ * @throws {@link InkboxVaultKeyError} If the vault key does not meet requirements.
+ */
 export function validateVaultKey(vaultKey: string): void {
   if (vaultKey.length < 16)
     throw new InkboxVaultKeyError("Vault key must be at least 16 characters");
@@ -69,7 +78,8 @@ export function validateVaultKey(vaultKey: string): void {
 /**
  * Derive the Argon2id salt from the organisation ID.
  *
- * The salt is the raw UTF-8 encoding of the organisation ID.
+ * @param organizationId - The organisation ID string.
+ * @returns The raw UTF-8 bytes of the organisation ID.
  */
 export function deriveSalt(organizationId: string): Uint8Array {
   return new TextEncoder().encode(organizationId);
@@ -81,6 +91,10 @@ export function deriveSalt(organizationId: string): Uint8Array {
 
 /**
  * Derive a 256-bit master key from a vault key using Argon2id.
+ *
+ * @param vaultKey - The vault key or recovery code string.
+ * @param salt - Salt bytes from {@link deriveSalt}.
+ * @returns 32-byte master key.
  */
 export async function deriveMasterKey(
   vaultKey: string,
@@ -98,7 +112,12 @@ export async function deriveMasterKey(
   return new Uint8Array(hash);
 }
 
-/** Compute `SHA-256(masterKey)` as a hex digest. */
+/**
+ * Compute `SHA-256(masterKey)` as a hex digest.
+ *
+ * @param masterKey - The 32-byte master key.
+ * @returns 64-character hex string.
+ */
 export function computeAuthHash(masterKey: Uint8Array): string {
   return createHash("sha256").update(masterKey).digest("hex");
 }
@@ -138,7 +157,13 @@ function aesGcmDecrypt(key: Uint8Array, blob: Uint8Array): Uint8Array {
   return result;
 }
 
-/** Wrap the org encryption key with a master key. Returns base64. */
+/**
+ * Wrap the org encryption key with a master key.
+ *
+ * @param masterKey - 32-byte master key.
+ * @param orgKey - 32-byte org encryption key to wrap.
+ * @returns Base64-encoded ciphertext blob.
+ */
 export function wrapOrgKey(
   masterKey: Uint8Array,
   orgKey: Uint8Array,
@@ -147,7 +172,13 @@ export function wrapOrgKey(
   return Buffer.from(blob).toString("base64");
 }
 
-/** Unwrap the org encryption key. Returns raw 32 bytes. */
+/**
+ * Unwrap the org encryption key using a master key.
+ *
+ * @param masterKey - 32-byte master key.
+ * @param wrappedB64 - Base64-encoded ciphertext blob from the server.
+ * @returns 32-byte org encryption key.
+ */
 export function unwrapOrgKey(
   masterKey: Uint8Array,
   wrappedB64: string,
@@ -160,7 +191,13 @@ export function unwrapOrgKey(
 // Secret payload encryption / decryption
 // ---------------------------------------------------------------------------
 
-/** Serialize a payload to JSON and encrypt with the org key. Returns base64. */
+/**
+ * Serialize a payload to JSON and encrypt it with the org encryption key.
+ *
+ * @param orgKey - 32-byte org encryption key.
+ * @param payload - Plain object to encrypt.
+ * @returns Base64-encoded ciphertext blob.
+ */
 export function encryptPayload(
   orgKey: Uint8Array,
   payload: Record<string, unknown>,
@@ -170,7 +207,13 @@ export function encryptPayload(
   return Buffer.from(blob).toString("base64");
 }
 
-/** Decrypt a base64 ciphertext blob and parse the JSON payload. */
+/**
+ * Decrypt a base64 ciphertext blob and parse the JSON payload.
+ *
+ * @param orgKey - 32-byte org encryption key.
+ * @param encryptedB64 - Base64-encoded ciphertext blob.
+ * @returns The decrypted payload as a plain object.
+ */
 export function decryptPayload(
   orgKey: Uint8Array,
   encryptedB64: string,
@@ -184,19 +227,28 @@ export function decryptPayload(
 // Vault key material generation (used by dashboard / init code)
 // ---------------------------------------------------------------------------
 
-/** Generate a random 256-bit org encryption key. */
+/**
+ * Generate a random 256-bit org encryption key.
+ *
+ * @returns 32 cryptographically random bytes.
+ */
 export function generateOrgEncryptionKey(): Uint8Array {
   return randomBytes(AES_KEY_BYTES);
 }
 
+/**
+ * Cryptographic material for registering a vault key with the server.
+ *
+ * Pass these fields to `POST /vault/initialize` or `POST /vault/keys`.
+ */
 export interface VaultKeyMaterial {
   /** Client-generated UUID (database primary key). */
   id: string;
-  /** Base64-encoded AES-256-GCM ciphertext. */
+  /** Base64-encoded AES-256-GCM ciphertext wrapping the org encryption key. */
   wrappedOrgEncryptionKey: string;
-  /** SHA-256(masterKey) hex digest. */
+  /** `SHA-256(masterKey)` hex digest. */
   authHash: string;
-  /** "primary" | "recovery" */
+  /** `"primary"` or `"recovery"`. */
   keyType: VaultKeyType;
 }
 
@@ -204,6 +256,13 @@ export interface VaultKeyMaterial {
  * Generate vault key material from a vault key.
  *
  * Derives a master key via Argon2id and wraps the org encryption key.
+ *
+ * @param vaultKey - The vault key string.
+ * @param organizationId - Organisation ID (used as Argon2id salt).
+ * @param orgEncryptionKey - 32-byte org encryption key to wrap.
+ * @param options.keyType - `"primary"` (default) or `"recovery"`.
+ * @returns Material ready to send to the server.
+ * @throws {@link InkboxVaultKeyError} If the vault key fails validation.
  */
 export async function generateVaultKeyMaterial(
   vaultKey: string,
@@ -231,8 +290,10 @@ export async function generateVaultKeyMaterial(
  * The recovery code is a human-readable string of the form
  * `XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX` (~120 bits of entropy).
  *
+ * @param organizationId - Organisation ID (used as Argon2id salt).
+ * @param orgEncryptionKey - 32-byte org encryption key to wrap.
  * @returns `[codeString, material]` tuple. The code string must be stored
- *   securely by the user — it cannot be recovered.
+ *   securely — it cannot be recovered.
  */
 export async function generateRecoveryCode(
   organizationId: string,

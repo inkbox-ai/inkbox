@@ -40,9 +40,17 @@ import type {
   RawVaultUnlockResponse,
 } from "../types.js";
 
+/**
+ * Org-level vault operations.
+ *
+ * Access via `inkbox.vault`. Most read-only operations work without
+ * unlocking. To create, read, or update secret payloads, call
+ * {@link unlock} first.
+ */
 export class VaultResource {
   private readonly http: HttpTransport;
 
+  /** @internal */
   constructor(http: HttpTransport) {
     this.http = http;
   }

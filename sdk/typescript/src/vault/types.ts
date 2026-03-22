@@ -7,6 +7,12 @@
 
 // ---- Enums ----
 
+/**
+ * Category of credential stored in a vault secret.
+ *
+ * Used as a client-side hint for which form to render. The server
+ * does not validate or enforce payload structure (it's opaque ciphertext).
+ */
 export const VaultSecretType = {
   API_KEY: "api_key",
   LOGIN: "login",
@@ -15,6 +21,12 @@ export const VaultSecretType = {
 } as const;
 export type VaultSecretType = (typeof VaultSecretType)[keyof typeof VaultSecretType];
 
+/**
+ * Discriminator for vault key records.
+ *
+ * - `PRIMARY` — a standard vault key issued to users or agents.
+ * - `RECOVERY` — a recovery code generated at vault initialization.
+ */
 export const VaultKeyType = {
   PRIMARY: "primary",
   RECOVERY: "recovery",
@@ -23,41 +35,49 @@ export type VaultKeyType = (typeof VaultKeyType)[keyof typeof VaultKeyType];
 
 // ---- API response types (camelCase) ----
 
+/** Vault metadata returned by the info endpoint. */
 export interface VaultInfo {
   id: string;
   organizationId: string;
-  /** "active" | "paused" | "deleted" */
+  /** @example "active" */
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Number of active primary vault keys. */
   keyCount: number;
+  /** Number of active vault secrets. */
   secretCount: number;
+  /** Number of active recovery keys. */
   recoveryKeyCount: number;
 }
 
+/** Vault key metadata (no wrapped key material). */
 export interface VaultKey {
   id: string;
-  /** "primary" | "recovery" */
+  /** `"primary"` or `"recovery"` */
   keyType: string;
+  /** Clerk user ID of the creator, or `null`. */
   createdBy: string | null;
-  /** "active" | "deleted" */
   status: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
+/** Vault secret metadata (no encrypted payload). */
 export interface VaultSecret {
   id: string;
+  /** Display name. */
   name: string;
+  /** Optional description. */
   description: string | null;
-  /** "login" | "ssh_key" | "api_key" | "other" */
+  /** `"login"` | `"ssh_key"` | `"api_key"` | `"other"` */
   secretType: string;
-  /** "active" | "deleted" */
   status: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
+/** Vault secret including the encrypted payload. */
 export interface VaultSecretDetail extends VaultSecret {
   /** Base64-encoded AES-256-GCM ciphertext. */
   encryptedPayload: string;
@@ -65,54 +85,69 @@ export interface VaultSecretDetail extends VaultSecret {
 
 // ---- Structured secret payloads (client-side) ----
 
+/** Payload for `login` secrets. */
 export interface LoginPayload {
   username: string;
   password: string;
+  /** URL of the service. */
   url?: string;
   notes?: string;
 }
 
+/** Payload for `other` (freeform catch-all) secrets. */
 export interface OtherPayload {
+  /** Freeform content. */
   data: string;
   notes?: string;
 }
 
+/** Payload for `ssh_key` secrets. */
 export interface SSHKeyPayload {
+  /** SSH private key (PEM or OpenSSH format). */
   privateKey: string;
   publicKey?: string;
   fingerprint?: string;
+  /** Passphrase protecting the private key, if any. */
   passphrase?: string;
   notes?: string;
 }
 
+/** Payload for `api_key` secrets. */
 export interface APIKeyPayload {
+  /** API key or access key. */
   key: string;
+  /** API secret or secret key. */
   secret?: string;
+  /** API endpoint URL. */
   endpoint?: string;
   notes?: string;
 }
 
+/** Union of all secret payload types. */
 export type SecretPayload =
   | LoginPayload
   | OtherPayload
   | SSHKeyPayload
   | APIKeyPayload;
 
+/** A vault secret with its payload decrypted into a structured type. */
 export interface DecryptedVaultSecret {
   id: string;
+  /** Display name. */
   name: string;
   description: string | null;
-  /** "login" | "ssh_key" | "api_key" | "other" */
+  /** `"login"` | `"ssh_key"` | `"api_key"` | `"other"` */
   secretType: string;
-  /** "active" | "deleted" */
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  /** The decrypted, structured payload. */
   payload: SecretPayload;
 }
 
 // ---- Raw API shapes (snake_case from JSON) ----
 
+/** @internal */
 export interface RawVaultInfo {
   id: string;
   organization_id: string;
@@ -124,6 +159,7 @@ export interface RawVaultInfo {
   recovery_key_count: number;
 }
 
+/** @internal */
 export interface RawVaultKey {
   id: string;
   key_type: string;
@@ -133,6 +169,7 @@ export interface RawVaultKey {
   updated_at: string;
 }
 
+/** @internal */
 export interface RawVaultSecret {
   id: string;
   name: string;
@@ -143,10 +180,12 @@ export interface RawVaultSecret {
   updated_at: string;
 }
 
+/** @internal */
 export interface RawVaultSecretDetail extends RawVaultSecret {
   encrypted_payload: string;
 }
 
+/** @internal */
 export interface RawVaultUnlockResponse {
   wrapped_org_encryption_key: string | null;
   wrapped_org_encryption_keys:
@@ -157,6 +196,7 @@ export interface RawVaultUnlockResponse {
 
 // ---- Parsers ----
 
+/** Parse a raw vault info response into a {@link VaultInfo}. @internal */
 export function parseVaultInfo(r: RawVaultInfo): VaultInfo {
   return {
     id: r.id,
@@ -170,6 +210,7 @@ export function parseVaultInfo(r: RawVaultInfo): VaultInfo {
   };
 }
 
+/** Parse a raw vault key response into a {@link VaultKey}. @internal */
 export function parseVaultKey(r: RawVaultKey): VaultKey {
   return {
     id: r.id,
@@ -181,6 +222,7 @@ export function parseVaultKey(r: RawVaultKey): VaultKey {
   };
 }
 
+/** Parse a raw vault secret response into a {@link VaultSecret}. @internal */
 export function parseVaultSecret(r: RawVaultSecret): VaultSecret {
   return {
     id: r.id,
@@ -193,6 +235,7 @@ export function parseVaultSecret(r: RawVaultSecret): VaultSecret {
   };
 }
 
+/** Parse a raw vault secret detail response into a {@link VaultSecretDetail}. @internal */
 export function parseVaultSecretDetail(r: RawVaultSecretDetail): VaultSecretDetail {
   return {
     ...parseVaultSecret(r),
@@ -202,6 +245,18 @@ export function parseVaultSecretDetail(r: RawVaultSecretDetail): VaultSecretDeta
 
 // ---- Payload serialization (camelCase ↔ snake_case for JSON encryption) ----
 
+/**
+ * Serialize a payload into a plain object for encryption.
+ *
+ * Converts camelCase payload fields to the snake_case wire format
+ * stored inside the encrypted blob.
+ *
+ * @param secretType - The secret type string.
+ * @param payload - The structured payload to serialize.
+ * @returns A plain object ready for JSON stringification.
+ * @throws If `secretType` is unknown.
+ * @internal
+ */
 export function serializePayload(
   secretType: string,
   payload: SecretPayload,
@@ -245,6 +300,17 @@ export function serializePayload(
   }
 }
 
+/**
+ * Parse a decrypted plain object into the correct payload type.
+ *
+ * Converts snake_case wire-format fields back to camelCase.
+ *
+ * @param secretType - The secret type string.
+ * @param raw - The decrypted plain object.
+ * @returns The typed payload.
+ * @throws If `secretType` is unknown.
+ * @internal
+ */
 export function parsePayload(
   secretType: string,
   raw: Record<string, unknown>,
@@ -279,6 +345,13 @@ export function parsePayload(
   }
 }
 
+/**
+ * Infer the `secretType` string from a payload's shape.
+ *
+ * @param payload - A secret payload object.
+ * @returns The inferred secret type string.
+ * @throws If the payload shape doesn't match any known type.
+ */
 export function inferSecretType(payload: SecretPayload): string {
   if ("username" in payload && "password" in payload) return "login";
   if ("privateKey" in payload) return "ssh_key";
