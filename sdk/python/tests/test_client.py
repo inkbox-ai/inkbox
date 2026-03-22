@@ -1,4 +1,8 @@
-"""Tests for Inkbox unified client — phone resources."""
+"""
+sdk/python/tests/test_client.py
+
+Tests for Inkbox unified client — phone resources.
+"""
 
 from inkbox import Inkbox
 from inkbox.phone.resources.numbers import PhoneNumbersResource

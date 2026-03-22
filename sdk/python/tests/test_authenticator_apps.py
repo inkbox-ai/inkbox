@@ -1,4 +1,8 @@
-"""Tests for AuthenticatorAppsResource."""
+"""
+sdk/python/tests/test_authenticator_apps.py
+
+Tests for AuthenticatorAppsResource.
+"""
 
 from unittest.mock import MagicMock
 

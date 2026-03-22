@@ -1,3 +1,4 @@
+// sdk/typescript/tests/agent_identity.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AgentIdentity } from "../src/agent_identity.js";
 import { InkboxAPIError } from "../src/_http.js";

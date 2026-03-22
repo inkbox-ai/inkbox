@@ -71,7 +71,7 @@ class IdentitiesResource:
         return AgentIdentitySummary._from_dict(data)
 
     def delete(self, agent_handle: str) -> None:
-        """Soft-delete an identity.
+        """Delete an identity.
 
         Unlinks any assigned channels without deleting them.
 

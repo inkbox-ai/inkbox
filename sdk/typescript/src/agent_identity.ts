@@ -377,7 +377,7 @@ export class AgentIdentity {
   }
 
   /**
-   * Soft-delete an authenticator account.
+   * Delete an authenticator account.
    *
    * @param accountId - UUID of the authenticator account to delete.
    */
@@ -431,7 +431,7 @@ export class AgentIdentity {
     return this;
   }
 
-  /** Soft-delete this identity (unlinks channels without deleting them). */
+  /** Delete this identity (unlinks channels without deleting them). */
   async delete(): Promise<void> {
     await this._inkbox._idsResource.delete(this.agentHandle);
   }

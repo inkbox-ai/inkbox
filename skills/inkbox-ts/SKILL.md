@@ -1,12 +1,12 @@
 ---
 name: inkbox-ts
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, authenticator app, or agent identity features using the Inkbox TypeScript SDK.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, authenticator app, vault, or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: false
 ---
 
 # Inkbox TypeScript SDK
 
-API-first communication infrastructure for AI agents — email, phone, authenticator apps, and identities.
+API-first communication infrastructure for AI agents — email, phone, authenticator apps, encrypted vault, and identities.
 
 ## Install & Init
 
@@ -34,6 +34,7 @@ Inkbox (org-level client)
 ├── .mailboxes              → MailboxesResource
 ├── .phoneNumbers           → PhoneNumbersResource
 ├── .authenticatorApps      → AuthenticatorAppsResource
+├── .vault                  → VaultResource
 └── .createSigningKey()     → Promise<SigningKey>
 
 AgentIdentity (identity-scoped helper)
@@ -57,7 +58,7 @@ const identities = await inkbox.listIdentities();   // AgentIdentitySummary[]
 await identity.update({ newHandle: "new-name" });   // rename
 await identity.update({ status: "paused" });         // or "active"
 await identity.refresh();                            // re-fetch from API, updates cached channels
-await identity.delete();                             // soft-delete; unlinks channels
+await identity.delete();                             // unlinks channels
 ```
 
 ## Channel Management
@@ -189,6 +190,93 @@ console.log(otp.otpType);            // "totp" or "hotp"
 await identity.deleteAuthenticatorAccount("account-uuid");
 ```
 
+## Vault
+
+Encrypted credential vault with client-side Argon2id key derivation and AES-256-GCM encryption. The server never sees plaintext secrets. Requires `hash-wasm` (included as a dependency).
+
+### Unlock & Read
+
+```typescript
+import type { LoginPayload, APIKeyPayload, SSHKeyPayload, OtherPayload } from "@inkbox/sdk";
+
+// Unlock with a vault key — derives key via Argon2id, decrypts all secrets
+const unlocked = await inkbox.vault.unlock("my-Vault-key-01!");
+
+// Optionally filter to secrets an agent identity has access to
+const unlocked = await inkbox.vault.unlock("my-Vault-key-01!", { identityId: "agent-uuid" });
+
+// All decrypted secrets from the unlock bundle
+for (const secret of unlocked.secrets) {
+  console.log(secret.name, secret.secretType);
+  console.log(secret.payload);   // LoginPayload, APIKeyPayload, SSHKeyPayload, or OtherPayload
+}
+
+// Fetch and decrypt a single secret by ID
+const secret = await unlocked.getSecret("secret-uuid");
+const login = secret.payload as LoginPayload;
+console.log(login.username, login.password);
+```
+
+### Create & Update
+
+```typescript
+// Create a login secret (secretType inferred from payload shape)
+await unlocked.createSecret({
+  name: "AWS Production",
+  description: "Production IAM user",
+  payload: { username: "admin", password: "s3cret", url: "https://aws.amazon.com" },
+});
+
+// Create an API key secret
+await unlocked.createSecret({
+  name: "GitHub PAT",
+  payload: { key: "ghp_xxx", secret: "ghs_xxx" },
+});
+
+// Create an SSH key secret
+await unlocked.createSecret({
+  name: "Deploy Key",
+  payload: { privateKey: "-----BEGIN OPENSSH PRIVATE KEY-----..." },
+});
+
+// Create a freeform secret
+await unlocked.createSecret({
+  name: "Misc",
+  payload: { data: "any freeform content" },
+});
+
+// Update name/description and/or re-encrypt payload
+await unlocked.updateSecret("secret-uuid", { name: "New Name" });
+await unlocked.updateSecret("secret-uuid", {
+  payload: { username: "new", password: "new" },
+});
+
+// Delete
+await unlocked.deleteSecret("secret-uuid");
+```
+
+### Metadata (no unlock needed)
+
+```typescript
+const info    = await inkbox.vault.info();                                  // VaultInfo
+const keys    = await inkbox.vault.listKeys();                              // VaultKey[]
+const keys    = await inkbox.vault.listKeys({ keyType: "recovery" });       // filter by type
+const secrets = await inkbox.vault.listSecrets();                           // VaultSecret[] (metadata only)
+const secrets = await inkbox.vault.listSecrets({ secretType: "login" });    // filter by type
+await inkbox.vault.deleteSecret("secret-uuid");                             // delete without unlocking
+```
+
+### Payload Types
+
+| Type | Interface | Fields |
+|------|-----------|--------|
+| `login` | `LoginPayload` | `username`, `password`, `url?`, `notes?` |
+| `api_key` | `APIKeyPayload` | `key`, `secret?`, `endpoint?`, `notes?` |
+| `ssh_key` | `SSHKeyPayload` | `privateKey`, `publicKey?`, `fingerprint?`, `passphrase?`, `notes?` |
+| `other` | `OtherPayload` | `data` |
+
+`secretType` is immutable after creation. To change it, delete and recreate.
+
 ## Org-level Resources
 
 ### Mailboxes (`inkbox.mailboxes`)
@@ -234,7 +322,7 @@ const apps = await inkbox.authenticatorApps.list();
 const app  = await inkbox.authenticatorApps.get("app-uuid");
 const app  = await inkbox.authenticatorApps.create({ agentHandle: "support" });   // linked to identity
 const app  = await inkbox.authenticatorApps.create();                              // unbound
-await inkbox.authenticatorApps.delete("app-uuid");                                 // soft-deletes app + all accounts
+await inkbox.authenticatorApps.delete("app-uuid");                                 // deletes app + all accounts
 ```
 
 ## Webhooks & Signature Verification

@@ -45,8 +45,8 @@ Once the skills are installed, your coding agent will automatically know how to 
 
 ## Documentation
 
-- [Inkbox Docs](https://www.inkbox.ai/docs)
-- [API Reference](https://www.inkbox.ai/docs/api-reference)
+- [Inkbox Docs](https://inkbox.ai/docs)
+- [API Reference](https://inkbox.ai/docs/api-reference)
 - [Console](https://console.inkbox.ai/)
 
 ## License

@@ -46,10 +46,10 @@ export class AuthenticatorAppsResource {
   }
 
   /**
-   * Soft-delete an authenticator app.
+   * Delete an authenticator app.
    *
    * This also unlinks the app from its identity (if any) and
-   * soft-deletes all child authenticator accounts.
+   * deletes all child authenticator accounts.
    *
    * @param authenticatorAppId - UUID of the authenticator app to delete.
    */

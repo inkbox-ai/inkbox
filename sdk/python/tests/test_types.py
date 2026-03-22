@@ -1,4 +1,8 @@
-"""Tests for type parsing."""
+"""
+sdk/python/tests/test_types.py
+
+Tests for type parsing.
+"""
 
 from datetime import datetime
 from uuid import UUID

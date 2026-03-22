@@ -1,3 +1,4 @@
+// sdk/typescript/tests/inkbox.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { Inkbox } from "../src/inkbox.js";
 import { MailboxesResource } from "../src/mail/resources/mailboxes.js";

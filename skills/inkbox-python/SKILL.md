@@ -1,12 +1,12 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, authenticator app, or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, authenticator app, vault, or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
 # Inkbox Python SDK
 
-API-first communication infrastructure for AI agents — email, phone, authenticator apps, and identities.
+API-first communication infrastructure for AI agents — email, phone, authenticator apps, encrypted vault, and identities.
 
 ## Install & Init
 
@@ -35,6 +35,7 @@ Inkbox (org-level client)
 ├── .mailboxes               → MailboxesResource
 ├── .phone_numbers           → PhoneNumbersResource
 ├── .authenticator_apps      → AuthenticatorAppsResource
+├── .vault                   → VaultResource
 └── .create_signing_key()    → SigningKey
 
 AgentIdentity (identity-scoped helper)
@@ -58,7 +59,7 @@ identities = inkbox.list_identities()  # → list[AgentIdentitySummary]
 identity.update(new_handle="new-name")   # rename
 identity.update(status="paused")         # or "active"
 identity.refresh()                       # re-fetch from API, updates cached channels
-identity.delete()                        # soft-delete; unlinks channels
+identity.delete()                        # unlinks channels
 ```
 
 ## Channel Management
@@ -182,6 +183,86 @@ print(otp.otp_type)            # "totp" or "hotp"
 identity.delete_authenticator_account("account-uuid")
 ```
 
+## Vault
+
+Encrypted credential vault with client-side Argon2id key derivation and AES-256-GCM encryption. The server never sees plaintext secrets. Requires `argon2-cffi` and `cryptography` (included as dependencies).
+
+### Unlock & Read
+
+```python
+from inkbox import LoginPayload, APIKeyPayload, SSHKeyPayload, OtherPayload
+
+# Unlock with a vault key — derives key via Argon2id, decrypts all secrets
+unlocked = inkbox.vault.unlock("my-Vault-key-01!")
+
+# Optionally filter to secrets an agent identity has access to
+unlocked = inkbox.vault.unlock("my-Vault-key-01!", identity_id="agent-uuid")
+
+# All decrypted secrets from the unlock bundle
+for secret in unlocked.secrets:
+    print(secret.name, secret.secret_type)
+    print(secret.payload)   # LoginPayload, APIKeyPayload, SSHKeyPayload, or OtherPayload
+
+# Fetch and decrypt a single secret by ID
+secret = unlocked.get_secret("secret-uuid")
+print(secret.payload.username, secret.payload.password)   # for login type
+```
+
+### Create & Update
+
+```python
+# Create a login secret (secret_type inferred from payload type)
+unlocked.create_secret(
+    "AWS Production",
+    LoginPayload(username="admin", password="s3cret", url="https://aws.amazon.com"),
+    description="Production IAM user",
+)
+
+# Create an API key secret
+unlocked.create_secret(
+    "GitHub PAT",
+    APIKeyPayload(key="ghp_xxx", secret="ghs_xxx"),
+)
+
+# Create an SSH key secret
+unlocked.create_secret(
+    "Deploy Key",
+    SSHKeyPayload(private_key="-----BEGIN OPENSSH PRIVATE KEY-----..."),
+)
+
+# Create a freeform secret
+unlocked.create_secret("Misc", OtherPayload(data="any freeform content"))
+
+# Update name/description and/or re-encrypt payload
+unlocked.update_secret("secret-uuid", name="New Name")
+unlocked.update_secret("secret-uuid", payload=LoginPayload(username="new", password="new"))
+
+# Delete
+unlocked.delete_secret("secret-uuid")
+```
+
+### Metadata (no unlock needed)
+
+```python
+info = inkbox.vault.info()                                   # VaultInfo
+keys = inkbox.vault.list_keys()                              # list[VaultKey]
+keys = inkbox.vault.list_keys(key_type="recovery")           # filter by type
+secrets = inkbox.vault.list_secrets()                         # list[VaultSecret] (metadata only)
+secrets = inkbox.vault.list_secrets(secret_type="login")     # filter by type
+inkbox.vault.delete_secret("secret-uuid")                    # delete without unlocking
+```
+
+### Payload Types
+
+| Type | Class | Fields |
+|------|-------|--------|
+| `login` | `LoginPayload` | `username`, `password`, `url?`, `notes?` |
+| `api_key` | `APIKeyPayload` | `key`, `secret?`, `endpoint?`, `notes?` |
+| `ssh_key` | `SSHKeyPayload` | `private_key`, `public_key?`, `fingerprint?`, `passphrase?`, `notes?` |
+| `other` | `OtherPayload` | `data` |
+
+`secret_type` is immutable after creation. To change it, delete and recreate.
+
 ## Org-level Resources
 
 ### Mailboxes (`inkbox.mailboxes`)
@@ -229,7 +310,7 @@ apps = inkbox.authenticator_apps.list()
 app  = inkbox.authenticator_apps.get("app-uuid")
 app  = inkbox.authenticator_apps.create(agent_handle="support")   # linked to identity
 app  = inkbox.authenticator_apps.create()                         # unbound
-inkbox.authenticator_apps.delete("app-uuid")                      # soft-deletes app + all accounts
+inkbox.authenticator_apps.delete("app-uuid")                      # deletes app + all accounts
 ```
 
 ## Webhooks & Signature Verification

@@ -1,4 +1,8 @@
-"""Tests for Inkbox unified client — identities."""
+"""
+sdk/python/tests/test_identities_client.py
+
+Tests for Inkbox unified client — identities.
+"""
 
 from inkbox import Inkbox
 from inkbox.identities.resources.identities import IdentitiesResource

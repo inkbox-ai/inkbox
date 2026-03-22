@@ -1,3 +1,4 @@
+// sdk/typescript/tests/errors.test.ts
 import { describe, it, expect } from "vitest";
 import { InkboxAPIError } from "../src/_http.js";
 

@@ -100,7 +100,7 @@ export class AuthenticatorAccountsResource {
   }
 
   /**
-   * Soft-delete an authenticator account.
+   * Delete an authenticator account.
    *
    * @param authenticatorAppId - UUID of the parent authenticator app.
    * @param accountId - UUID of the authenticator account to delete.
