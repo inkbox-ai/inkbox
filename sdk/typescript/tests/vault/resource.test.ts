@@ -145,11 +145,15 @@ describe("VaultResource.unlock", () => {
     expect((s.payload as { username: string }).username).toBe("admin");
   });
 
-  it("rejects weak vault key", async () => {
+  it("does not validate key strength client-side", async () => {
     const http = mockHttp();
     const res = new VaultResource(http);
+    // info() then unlock() — server rejects via missing wrapped key
+    (http.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({});
     await expect(res.unlock("short")).rejects.toThrow(
-      "at least 16 characters",
+      "No vault key matched",
     );
   });
 });

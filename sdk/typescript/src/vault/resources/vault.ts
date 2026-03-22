@@ -13,7 +13,6 @@ import {
   deriveSalt,
   encryptPayload,
   unwrapOrgKey,
-  validateVaultKey,
 } from "../crypto.js";
 import type {
   DecryptedVaultSecret,
@@ -129,8 +128,6 @@ export class VaultResource {
     vaultKey: string,
     options: { identityId?: string } = {},
   ): Promise<UnlockedVault> {
-    validateVaultKey(vaultKey);
-
     // Step 1: get org_id for salt derivation
     const vaultInfo = await this.info();
     const salt = deriveSalt(vaultInfo.organizationId);

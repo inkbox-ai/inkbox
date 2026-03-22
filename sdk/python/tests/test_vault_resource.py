@@ -7,7 +7,6 @@ Tests for VaultResource and UnlockedVault.
 from unittest.mock import MagicMock
 
 import pytest
-from inkbox.exceptions import InkboxVaultKeyError
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT
 from inkbox.vault.crypto import (
     derive_master_key,
@@ -112,9 +111,15 @@ class TestVaultResourceUnlock:
         assert s.payload.username == "admin"
         assert s.payload.password == "s3cret"
 
-    def test_unlock_rejects_weak_key(self):
+    def test_unlock_does_not_validate_key_strength(self):
+        """unlock() should not reject recovery codes or short keys client-side;
+        the server rejects bad auth hashes."""
         res, http = _resource()
-        with pytest.raises(InkboxVaultKeyError, match="at least 16 characters"):
+        http.get.side_effect = [
+            VAULT_INFO_DICT,  # info()
+            {},  # unlock() — no wrapped key ⇒ server rejected
+        ]
+        with pytest.raises(ValueError, match="No vault key matched"):
             res.unlock("short")
 
 

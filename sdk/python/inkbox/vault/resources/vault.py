@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from inkbox.vault.crypto import (
-    _validate_vault_key,
     compute_auth_hash,
     decrypt_payload,
     derive_master_key,
@@ -130,8 +129,6 @@ class VaultResource:
             ValueError: If the vault key is incorrect or the vault key
                 has been deleted.
         """
-        _validate_vault_key(vault_key)
-
         # Step 1: get org_id for salt derivation
         vault_info = self.info()
         salt = derive_salt(vault_info.organization_id)
