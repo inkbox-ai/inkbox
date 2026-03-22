@@ -10,7 +10,6 @@ import pytest
 from inkbox.exceptions import InkboxVaultKeyError
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT
 from inkbox.vault.crypto import (
-    _validate_vault_key,
     derive_master_key,
     derive_salt,
     encrypt_payload,
