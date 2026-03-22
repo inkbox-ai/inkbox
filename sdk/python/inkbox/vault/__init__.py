@@ -21,6 +21,7 @@ from inkbox.vault.crypto import (
     generate_recovery_code,
     generate_vault_key_material,
 )
+from inkbox.vault.exceptions import InkboxVaultKeyError
 
 __all__ = [
     # API response types
@@ -42,4 +43,6 @@ __all__ = [
     "generate_org_encryption_key",
     "generate_vault_key_material",
     "generate_recovery_code",
+    # Exceptions
+    "InkboxVaultKeyError",
 ]

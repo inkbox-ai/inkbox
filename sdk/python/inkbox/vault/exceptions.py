@@ -5,6 +5,6 @@ Re-exports from the canonical ``inkbox.exceptions`` module for
 backward compatibility.
 """
 
-from inkbox.exceptions import InkboxAPIError, InkboxError
+from inkbox.exceptions import InkboxAPIError, InkboxError, InkboxVaultKeyError
 
-__all__ = ["InkboxError", "InkboxAPIError"]
+__all__ = ["InkboxError", "InkboxAPIError", "InkboxVaultKeyError"]
