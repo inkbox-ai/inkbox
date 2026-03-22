@@ -324,7 +324,7 @@ class OtherPayload(AbstractSecretPayload):
 # Type alias — use the abstract base directly; all concrete payloads inherit from it.
 SecretPayload = AbstractSecretPayload
 
-# Registry: VaultSecretType → payload class (auto-discovered via __subclasses__)
+# Registry: VaultSecretType → payload class (built from subclasses defined above)
 _PAYLOAD_REGISTRY: dict[VaultSecretType, type[AbstractSecretPayload]] = {
     cls.secret_type: cls
     for cls in AbstractSecretPayload.__subclasses__()
