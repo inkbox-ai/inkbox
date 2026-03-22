@@ -237,7 +237,8 @@ class VaultKeyMaterial:
     """
     Cryptographic material for registering a vault key with the server.
 
-    Pass these fields to ``POST /vault/initialize`` or ``POST /vault/keys``.
+    Call :meth:`to_wire` to get a JSON-serializable dict suitable for
+    ``POST /vault/initialize`` or ``POST /vault/keys``.
 
     Attributes:
         id: Client-generated UUID (database primary key).
@@ -249,6 +250,15 @@ class VaultKeyMaterial:
     wrapped_org_encryption_key: str
     auth_hash: str
     key_type: VaultKeyType
+
+    def to_wire(self) -> dict[str, str]:
+        """Return a JSON-serializable dict matching the API's expected schema."""
+        return {
+            "id": str(self.id),
+            "wrapped_org_encryption_key": self.wrapped_org_encryption_key,
+            "auth_hash": self.auth_hash,
+            "key_type": self.key_type.value,
+        }
 
 
 def generate_vault_key_material(

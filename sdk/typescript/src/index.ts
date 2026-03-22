@@ -48,4 +48,5 @@ export {
   generateOrgEncryptionKey,
   generateVaultKeyMaterial,
   generateRecoveryCode,
+  vaultKeyMaterialToWire,
 } from "./vault/crypto.js";

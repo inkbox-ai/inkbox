@@ -252,7 +252,7 @@ class OtherPayload(AbstractSecretPayload):
     data: str
 
 
-# Type alias — use the abstract base directly; all concrete payloads inherit from it.
+# Type alias; use the abstract base directly; all concrete payloads inherit from it.
 SecretPayload = AbstractSecretPayload
 
 # Registry: VaultSecretType → payload class (built from subclasses defined above)

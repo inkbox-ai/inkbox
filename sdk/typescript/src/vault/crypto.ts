@@ -239,7 +239,8 @@ export function generateOrgEncryptionKey(): Uint8Array {
 /**
  * Cryptographic material for registering a vault key with the server.
  *
- * Pass these fields to `POST /vault/initialize` or `POST /vault/keys`.
+ * Call {@link vaultKeyMaterialToWire} to get a JSON-ready object with
+ * snake_case keys matching `POST /vault/initialize` or `POST /vault/keys`.
  */
 export interface VaultKeyMaterial {
   /** Client-generated UUID (database primary key). */
@@ -250,6 +251,19 @@ export interface VaultKeyMaterial {
   authHash: string;
   /** `"primary"` or `"recovery"`. */
   keyType: VaultKeyType;
+}
+
+/**
+ * Convert {@link VaultKeyMaterial} to a JSON-ready object matching the API's
+ * expected snake_case schema.
+ */
+export function vaultKeyMaterialToWire(m: VaultKeyMaterial): Record<string, string> {
+  return {
+    id: m.id,
+    wrapped_org_encryption_key: m.wrappedOrgEncryptionKey,
+    auth_hash: m.authHash,
+    key_type: m.keyType,
+  };
 }
 
 /**
