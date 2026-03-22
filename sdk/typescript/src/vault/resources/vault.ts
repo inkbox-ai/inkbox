@@ -311,8 +311,18 @@ export class UnlockedVault {
     if ("name" in options) body["name"] = options.name;
     if ("description" in options) body["description"] = options.description;
     if (options.payload !== undefined) {
-      const sType = inferSecretType(options.payload);
-      const serialized = serializePayload(sType, options.payload);
+      // Enforce secret_type immutability — the server treats the
+      // payload as opaque ciphertext and cannot check this itself.
+      const current = parseVaultSecret(
+        await this.http.get<RawVaultSecret>(`/secrets/${secretId}`),
+      );
+      const newType = inferSecretType(options.payload);
+      if (newType !== current.secretType) {
+        throw new TypeError(
+          `Cannot update a '${current.secretType}' secret with a '${newType}' payload. Delete and recreate instead.`,
+        );
+      }
+      const serialized = serializePayload(newType, options.payload);
       body["encrypted_payload"] = encryptPayload(this.orgKey, serialized);
     }
     const data = await this.http.patch<RawVaultSecret>(

@@ -16,7 +16,7 @@ from inkbox.vault.crypto import (
     wrap_org_key,
 )
 from inkbox.vault.resources.vault import VaultResource, UnlockedVault
-from inkbox.vault.types import LoginPayload, VaultInfo, VaultKey, VaultSecret
+from inkbox.vault.types import LoginPayload, OtherPayload, VaultInfo, VaultKey, VaultSecret
 
 VALID_VAULT_KEY = "Test-Passw0rd!xy"
 
@@ -160,6 +160,7 @@ class TestUnlockedVaultUpdateSecret:
     def test_sends_encrypted_payload(self):
         org_key = generate_org_encryption_key()
         http = MagicMock()
+        http.get.return_value = VAULT_SECRET_DICT  # type check fetch
         http.patch.return_value = VAULT_SECRET_DICT
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
@@ -171,6 +172,18 @@ class TestUnlockedVaultUpdateSecret:
         body = http.patch.call_args[1]["json"]
         assert "encrypted_payload" in body
         assert "name" not in body
+
+    def test_rejects_mismatched_payload_type(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        http.get.return_value = VAULT_SECRET_DICT  # secret_type == "login"
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        with pytest.raises(TypeError, match="Cannot update a 'login' secret"):
+            unlocked.update_secret(
+                "some-id",
+                payload=OtherPayload(data="wrong type"),
+            )
 
 
 class TestUnlockedVaultGetSecret:
@@ -207,6 +220,7 @@ class TestUnlockedVaultUpdateBoth:
     def test_sends_name_and_payload(self):
         org_key = generate_org_encryption_key()
         http = MagicMock()
+        http.get.return_value = VAULT_SECRET_DICT  # type check fetch
         http.patch.return_value = VAULT_SECRET_DICT
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 

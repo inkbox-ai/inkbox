@@ -197,6 +197,7 @@ describe("UnlockedVault.updateSecret", () => {
   it("sends encrypted payload when provided", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue(RAW_SECRET); // type check fetch
     vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
     const unlocked = new UnlockedVault(http, orgKey, []);
 
@@ -208,6 +209,19 @@ describe("UnlockedVault.updateSecret", () => {
     const body = call[1] as Record<string, unknown>;
     expect(typeof body.encrypted_payload).toBe("string");
     expect(body).not.toHaveProperty("name");
+  });
+
+  it("rejects mismatched payload type", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue(RAW_SECRET); // secret_type == "login"
+    const unlocked = new UnlockedVault(http, orgKey, []);
+
+    await expect(
+      unlocked.updateSecret("some-id", {
+        payload: { data: "wrong type" },
+      }),
+    ).rejects.toThrow("Cannot update a 'login' secret");
   });
 });
 
@@ -245,6 +259,7 @@ describe("UnlockedVault.updateSecret", () => {
   it("sends name and payload together", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue(RAW_SECRET); // type check fetch
     vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
     const unlocked = new UnlockedVault(http, orgKey, []);
 

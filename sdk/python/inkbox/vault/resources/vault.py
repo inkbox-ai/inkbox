@@ -311,6 +311,17 @@ class UnlockedVault:
         if description is not _UNSET:
             body["description"] = description
         if payload is not _UNSET and payload is not None:
+            # enforce secret_type immutability; the server treats the
+            # payload as opaque ciphertext and cannot check this itself
+            current = VaultSecret._from_dict(
+                self._http.get(f"/secrets/{secret_id}")
+            )
+            new_type = _infer_secret_type(payload)
+            if new_type != current.secret_type:
+                raise TypeError(
+                    f"Cannot update a {current.secret_type!r} secret with "
+                    f"a {new_type!r} payload. Delete and recreate instead."
+                )
             body["encrypted_payload"] = encrypt_payload(
                 self._org_key,
                 payload._to_dict()
