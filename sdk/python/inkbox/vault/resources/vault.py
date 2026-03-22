@@ -327,13 +327,14 @@ class UnlockedVault:
                 payload._to_dict()
             )
         data = self._http.patch(
-            f"/secrets/{secret_id}",
+            path=f"/secrets/{secret_id}",
             json=body,
         )
         return VaultSecret._from_dict(data)
 
     def delete_secret(self, secret_id: UUID | str) -> None:
-        """Delete a vault secret.
+        """
+        Delete a vault secret.
 
         Args:
             secret_id: UUID of the secret to delete.

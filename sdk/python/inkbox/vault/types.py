@@ -7,8 +7,8 @@ client-side structured secret payloads.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass, field
+from abc import ABC
+from dataclasses import MISSING, asdict, dataclass, field, fields
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, ClassVar
@@ -164,14 +164,21 @@ class AbstractSecretPayload(ABC):
     notes: str | None = field(default=None, kw_only=True)
 
     def _to_dict(self) -> dict[str, Any]:
+        """Serialize to a dict, omitting ``None``-valued fields."""
         return {
             k: v for k, v in asdict(self).items() if v is not None
         }
 
     @classmethod
-    @abstractmethod
     def _from_dict(cls, d: dict[str, Any]) -> AbstractSecretPayload:
-        ...
+        """Construct from a dict, using ``d.get`` for optional fields."""
+        kwargs: dict[str, Any] = {}
+        for f in fields(cls):
+            if f.default is not MISSING or f.default_factory is not MISSING:
+                kwargs[f.name] = d.get(f.name)
+            else:
+                kwargs[f.name] = d[f.name]
+        return cls(**kwargs)
 
 
 @dataclass
@@ -191,15 +198,6 @@ class LoginPayload(AbstractSecretPayload):
     password: str
     url: str | None = None
     # TODO: store TOTP data structure here
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> LoginPayload:
-        return cls(
-            username=d["username"],
-            password=d["password"],
-            url=d.get("url"),
-            notes=d.get("notes"),
-        )
 
 
 @dataclass
@@ -221,16 +219,6 @@ class SSHKeyPayload(AbstractSecretPayload):
     fingerprint: str | None = None
     passphrase: str | None = None
 
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> SSHKeyPayload:
-        return cls(
-            private_key=d["private_key"],
-            public_key=d.get("public_key"),
-            fingerprint=d.get("fingerprint"),
-            passphrase=d.get("passphrase"),
-            notes=d.get("notes"),
-        )
-
 
 @dataclass
 class APIKeyPayload(AbstractSecretPayload):
@@ -249,15 +237,6 @@ class APIKeyPayload(AbstractSecretPayload):
     secret: str | None = None
     endpoint: str | None = None
 
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> APIKeyPayload:
-        return cls(
-            key=d["key"],
-            secret=d.get("secret"),
-            endpoint=d.get("endpoint"),
-            notes=d.get("notes"),
-        )
-
 
 @dataclass
 class OtherPayload(AbstractSecretPayload):
@@ -271,13 +250,6 @@ class OtherPayload(AbstractSecretPayload):
     secret_type: ClassVar[VaultSecretType] = VaultSecretType.OTHER
 
     data: str
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> OtherPayload:
-        return cls(
-            data=d["data"],
-            notes=d.get("notes"),
-        )
 
 
 # Type alias — use the abstract base directly; all concrete payloads inherit from it.
