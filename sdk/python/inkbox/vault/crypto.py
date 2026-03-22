@@ -53,7 +53,11 @@ _RC_GROUPS = 8  # 8 groups × 4 chars ≈ 120 bits of entropy
 ## Vault key validation
 
 def _validate_vault_key(vault_key: str) -> None:
-    """Enforce minimum vault key requirements.
+    """
+    Enforce minimum vault key requirements.
+
+    Args:
+        vault_key: The vault key string to validate.
 
     Raises:
         ValueError: If the vault key does not meet requirements.
