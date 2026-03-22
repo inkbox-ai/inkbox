@@ -52,6 +52,7 @@ from inkbox.vault.types import (
     VaultKey,
     VaultSecret,
     VaultSecretDetail,
+    VaultSecretType,
 )
 from inkbox.vault.crypto import (
     VaultKeyMaterial,
@@ -92,6 +93,7 @@ __all__ = [
     "AuthenticatorAccount",
     "OTPCode",
     # Vault types
+    "VaultSecretType",
     "VaultInfo",
     "VaultKey",
     "VaultSecret",

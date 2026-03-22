@@ -13,6 +13,7 @@ from inkbox.vault.types import (
     VaultKey,
     VaultSecret,
     VaultSecretDetail,
+    VaultSecretType,
 )
 from inkbox.vault.crypto import (
     VaultKeyMaterial,
@@ -30,6 +31,8 @@ __all__ = [
     "VaultSecret",
     "VaultSecretDetail",
     "DecryptedVaultSecret",
+    # Enums
+    "VaultSecretType",
     # Structured payloads
     "LoginPayload",
     "SSHKeyPayload",
