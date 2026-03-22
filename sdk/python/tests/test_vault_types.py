@@ -136,3 +136,122 @@ class TestUnknownSecretType:
         import pytest
         with pytest.raises(ValueError, match="is not a valid VaultSecretType"):
             _parse_payload("nonexistent", {"foo": "bar"})
+
+    def test_parse_payload_valid_enum_but_no_registry_entry(self):
+        """Cover types.py line 338: valid VaultSecretType but missing from registry."""
+        import pytest
+        from unittest.mock import patch
+        from inkbox.vault.types import _PAYLOAD_REGISTRY, VaultSecretType
+
+        # Remove "login" from the registry temporarily
+        patched = {k: v for k, v in _PAYLOAD_REGISTRY.items() if k != VaultSecretType.LOGIN}
+        with patch("inkbox.vault.types._PAYLOAD_REGISTRY", patched):
+            with pytest.raises(ValueError, match="Unknown secret_type: 'login'"):
+                _parse_payload("login", {"username": "a", "password": "b"})
+
+
+class TestSSHKeyPayloadRoundtrip:
+    """Cover SSHKeyPayload._to_dict and _from_dict with all optional fields."""
+
+    def test_all_optional_fields(self):
+        p = SSHKeyPayload(
+            private_key="-----BEGIN OPENSSH PRIVATE KEY-----",
+            public_key="ssh-ed25519 AAAA...",
+            fingerprint="SHA256:abc123",
+            passphrase="my-passphrase",
+            notes="production bastion key",
+        )
+        d = p._to_dict()
+        assert d == {
+            "private_key": "-----BEGIN OPENSSH PRIVATE KEY-----",
+            "public_key": "ssh-ed25519 AAAA...",
+            "fingerprint": "SHA256:abc123",
+            "passphrase": "my-passphrase",
+            "notes": "production bastion key",
+        }
+        roundtripped = SSHKeyPayload._from_dict(d)
+        assert roundtripped.private_key == p.private_key
+        assert roundtripped.public_key == p.public_key
+        assert roundtripped.fingerprint == p.fingerprint
+        assert roundtripped.passphrase == p.passphrase
+        assert roundtripped.notes == p.notes
+
+    def test_no_optional_fields(self):
+        p = SSHKeyPayload(private_key="-----BEGIN...")
+        d = p._to_dict()
+        assert d == {"private_key": "-----BEGIN..."}
+        assert "public_key" not in d
+        assert "fingerprint" not in d
+        assert "passphrase" not in d
+        assert "notes" not in d
+
+
+class TestAPIKeyPayloadRoundtrip:
+    """Cover APIKeyPayload._to_dict and _from_dict with all optional fields."""
+
+    def test_all_optional_fields(self):
+        p = APIKeyPayload(
+            key="ak_prod_123",
+            secret="sk_prod_456",
+            endpoint="https://api.example.com/v1",
+            notes="rate-limited to 1000 req/min",
+        )
+        d = p._to_dict()
+        assert d == {
+            "key": "ak_prod_123",
+            "secret": "sk_prod_456",
+            "endpoint": "https://api.example.com/v1",
+            "notes": "rate-limited to 1000 req/min",
+        }
+        roundtripped = APIKeyPayload._from_dict(d)
+        assert roundtripped.key == p.key
+        assert roundtripped.secret == p.secret
+        assert roundtripped.endpoint == p.endpoint
+        assert roundtripped.notes == p.notes
+
+    def test_no_optional_fields(self):
+        p = APIKeyPayload(key="ak_123")
+        d = p._to_dict()
+        assert d == {"key": "ak_123"}
+        assert "secret" not in d
+        assert "endpoint" not in d
+        assert "notes" not in d
+
+
+class TestLoginPayloadToDict:
+    """Cover LoginPayload._to_dict url and notes branches."""
+
+    def test_with_url_and_notes(self):
+        p = LoginPayload(
+            username="admin",
+            password="hunter2",
+            url="https://app.example.com",
+            notes="shared team login",
+        )
+        d = p._to_dict()
+        assert d["url"] == "https://app.example.com"
+        assert d["notes"] == "shared team login"
+        assert d["username"] == "admin"
+        assert d["password"] == "hunter2"
+
+    def test_no_optional_fields(self):
+        p = LoginPayload(username="user", password="pass")
+        d = p._to_dict()
+        assert d == {"username": "user", "password": "pass"}
+        assert "url" not in d
+        assert "notes" not in d
+
+
+class TestOtherPayloadToDict:
+    """Cover OtherPayload._to_dict notes branch."""
+
+    def test_with_notes(self):
+        p = OtherPayload(data="some secret blob", notes="expires 2026-12-31")
+        d = p._to_dict()
+        assert d == {"data": "some secret blob", "notes": "expires 2026-12-31"}
+
+    def test_no_notes(self):
+        p = OtherPayload(data="blob")
+        d = p._to_dict()
+        assert d == {"data": "blob"}
+        assert "notes" not in d

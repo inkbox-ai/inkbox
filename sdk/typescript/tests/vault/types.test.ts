@@ -172,4 +172,75 @@ describe("serializePayload", () => {
     expect(s.data).toBe("stuff");
     expect(s.notes).toBe("ctx");
   });
+  it("throws on unknown type", () => {
+    expect(() => serializePayload("unknown_type", { data: "x" } as any)).toThrow(
+      "Unknown secret_type: unknown_type",
+    );
+  });
+});
+
+describe("parsePayload throws on unknown type", () => {
+  it("throws on unknown type", () => {
+    expect(() => parsePayload("unknown_type", { foo: "bar" })).toThrow(
+      "Unknown secret_type: unknown_type",
+    );
+  });
+});
+
+describe("SSHKeyPayload roundtrip with all optional fields", () => {
+  it("serializePayload then parsePayload preserves all fields", () => {
+    const original: SSHKeyPayload = {
+      privateKey: "-----BEGIN OPENSSH PRIVATE KEY-----",
+      publicKey: "ssh-ed25519 AAAA...",
+      fingerprint: "SHA256:abc123",
+      passphrase: "my-passphrase",
+      notes: "production bastion host key",
+    };
+    const serialized = serializePayload("ssh_key", original);
+    expect(serialized).toEqual({
+      private_key: "-----BEGIN OPENSSH PRIVATE KEY-----",
+      public_key: "ssh-ed25519 AAAA...",
+      fingerprint: "SHA256:abc123",
+      passphrase: "my-passphrase",
+      notes: "production bastion host key",
+    });
+    const parsed = parsePayload("ssh_key", serialized) as SSHKeyPayload;
+    expect(parsed).toEqual(original);
+  });
+});
+
+describe("APIKeyPayload roundtrip with all optional fields", () => {
+  it("serializePayload then parsePayload preserves all fields", () => {
+    const original: APIKeyPayload = {
+      key: "AKIAIOSFODNN7EXAMPLE",
+      secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      endpoint: "https://api.example.com/v2",
+      notes: "AWS production access key",
+    };
+    const serialized = serializePayload("api_key", original);
+    expect(serialized).toEqual({
+      key: "AKIAIOSFODNN7EXAMPLE",
+      secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      endpoint: "https://api.example.com/v2",
+      notes: "AWS production access key",
+    });
+    const parsed = parsePayload("api_key", serialized) as APIKeyPayload;
+    expect(parsed).toEqual(original);
+  });
+});
+
+describe("OtherPayload roundtrip with notes", () => {
+  it("serializePayload then parsePayload preserves data and notes", () => {
+    const original: OtherPayload = {
+      data: "some freeform secret content\nwith newlines",
+      notes: "important context about this secret",
+    };
+    const serialized = serializePayload("other", original);
+    expect(serialized).toEqual({
+      data: "some freeform secret content\nwith newlines",
+      notes: "important context about this secret",
+    });
+    const parsed = parsePayload("other", serialized) as OtherPayload;
+    expect(parsed).toEqual(original);
+  });
 });

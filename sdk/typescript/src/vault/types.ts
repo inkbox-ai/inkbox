@@ -92,6 +92,7 @@ export interface LoginPayload {
   /** URL of the service. */
   url?: string;
   notes?: string;
+  // TODO: store TOTP data structure here
 }
 
 /** Payload for `other` (freeform catch-all) secrets. */

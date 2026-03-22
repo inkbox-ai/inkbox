@@ -189,6 +189,7 @@ class LoginPayload(AbstractSecretPayload):
     username: str
     password: str
     url: str | None = None
+    # TODO: store TOTP data structure here
 
     def _to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {

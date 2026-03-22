@@ -255,3 +255,70 @@ describe("UnlockedVault.updateSecret", () => {
     expect(typeof body.encrypted_payload).toBe("string");
   });
 });
+
+describe("VaultResource.unlock error when no wrapped key", () => {
+  it("throws when server returns null wrapped key", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO) // info()
+      .mockResolvedValueOnce({         // unlock()
+        wrapped_org_encryption_key: null,
+        encrypted_secrets: [],
+      });
+
+    const res = new VaultResource(http);
+    await expect(res.unlock(VALID_VAULT_KEY)).rejects.toThrow(
+      "No vault key matched",
+    );
+  });
+});
+
+describe("VaultResource.unlock with identityId filtering", () => {
+  it("returns only secrets accessible by the given identity", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const vaultKey = VALID_VAULT_KEY;
+    const orgId = "org_test_123";
+
+    const salt = deriveSalt(orgId);
+    const mk = await deriveMasterKey(vaultKey, salt);
+    const wrapped = wrapOrgKey(mk, orgKey);
+
+    // Create two encrypted secrets
+    const encrypted1 = encryptPayload(orgKey, { username: "admin", password: "s3cret" });
+    const encrypted2 = encryptPayload(orgKey, { username: "user2", password: "pass2" });
+
+    const secret1Id = "cccc3333-0000-0000-0000-000000000001";
+    const secret2Id = "cccc3333-0000-0000-0000-000000000002";
+    const identityId = "identity-uuid-1234";
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO) // info()
+      .mockResolvedValueOnce({         // unlock()
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [
+          { ...RAW_SECRET, id: secret1Id, encrypted_payload: encrypted1 },
+          { ...RAW_SECRET, id: secret2Id, name: "Second Secret", encrypted_payload: encrypted2 },
+        ],
+      })
+      // access endpoint for secret1 — identity has access
+      .mockResolvedValueOnce([
+        { id: "rule-1", vault_secret_id: secret1Id, identity_id: identityId, created_at: "2026-03-18T12:00:00Z" },
+      ])
+      // access endpoint for secret2 — identity does NOT have access
+      .mockResolvedValueOnce([
+        { id: "rule-2", vault_secret_id: secret2Id, identity_id: "other-identity", created_at: "2026-03-18T12:00:00Z" },
+      ]);
+
+    const res = new VaultResource(http);
+    const unlocked = await res.unlock(vaultKey, { identityId });
+
+    expect(unlocked.secrets).toHaveLength(1);
+    expect(unlocked.secrets[0].id).toBe(secret1Id);
+    expect((unlocked.secrets[0].payload as { username: string }).username).toBe("admin");
+
+    // Verify access endpoint was called for both secrets
+    expect(http.get).toHaveBeenCalledWith(`/secrets/${secret1Id}/access`);
+    expect(http.get).toHaveBeenCalledWith(`/secrets/${secret2Id}/access`);
+  });
+});

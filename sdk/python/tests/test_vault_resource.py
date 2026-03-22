@@ -214,3 +214,145 @@ class TestUnlockedVaultUpdateBoth:
         body = http.patch.call_args[1]["json"]
         assert body["name"] == "Updated"
         assert "encrypted_payload" in body
+
+
+class TestUnlockedVaultUpdateDescription:
+    """Cover vault.py line 315: description branch in update_secret."""
+
+    def test_sends_description(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        http.patch.return_value = VAULT_SECRET_DICT
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        unlocked.update_secret("some-id", description="new description")
+
+        body = http.patch.call_args[1]["json"]
+        assert body == {"description": "new description"}
+
+    def test_sends_description_none(self):
+        """Explicitly setting description=None should send null."""
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        http.patch.return_value = VAULT_SECRET_DICT
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        unlocked.update_secret("some-id", description=None)
+
+        body = http.patch.call_args[1]["json"]
+        assert body == {"description": None}
+
+
+class TestUnlockWrongKey:
+    """Cover vault.py line 153: error when wrapped_org_encryption_key is None."""
+
+    def test_raises_when_no_wrapped_key(self):
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,  # info()
+            {  # unlock() returns no wrapped key
+                "wrapped_org_encryption_key": None,
+                "encrypted_secrets": [],
+            },
+        ]
+
+        with pytest.raises(ValueError, match="No vault key matched"):
+            res.unlock(VALID_VAULT_KEY)
+
+    def test_raises_when_wrapped_key_missing(self):
+        """Key not present at all in the response dict."""
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,  # info()
+            {  # unlock() returns no wrapped key field
+                "encrypted_secrets": [],
+            },
+        ]
+
+        with pytest.raises(ValueError, match="No vault key matched"):
+            res.unlock(VALID_VAULT_KEY)
+
+
+class TestUnlockIdentityFiltering:
+    """Cover vault.py lines 182-190: identity_id filtering path."""
+
+    def test_filters_secrets_by_identity_access(self):
+        org_key = generate_org_encryption_key()
+        org_id = "org_test_123"
+        vault_key = VALID_VAULT_KEY
+
+        salt = derive_salt(org_id)
+        mk = derive_master_key(vault_key, salt)
+        wrapped = wrap_org_key(mk, org_key)
+
+        # Create two secrets with different IDs
+        secret1_dict = {
+            **VAULT_SECRET_DICT,
+            "id": "cccc3333-0000-0000-0000-000000000001",
+            "encrypted_payload": encrypt_payload(
+                org_key, {"username": "admin1", "password": "pw1"}
+            ),
+        }
+        secret2_dict = {
+            **VAULT_SECRET_DICT,
+            "id": "cccc3333-0000-0000-0000-000000000002",
+            "name": "AWS Staging",
+            "encrypted_payload": encrypt_payload(
+                org_key, {"username": "admin2", "password": "pw2"}
+            ),
+        }
+
+        identity = "dddd4444-0000-0000-0000-000000000001"
+
+        res, http = _resource()
+
+        # info() -> unlock() -> access for secret1 -> access for secret2
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {
+                "wrapped_org_encryption_key": wrapped,
+                "encrypted_secrets": [secret1_dict, secret2_dict],
+            },
+            # Access rules for secret1: this identity HAS access
+            [{"identity_id": identity, "secret_id": "cccc3333-0000-0000-0000-000000000001"}],
+            # Access rules for secret2: different identity, no match
+            [{"identity_id": "eeee5555-0000-0000-0000-000000000099", "secret_id": "cccc3333-0000-0000-0000-000000000002"}],
+        ]
+
+        unlocked = res.unlock(vault_key, identity_id=identity)
+
+        # Only secret1 should be in the result
+        assert len(unlocked.secrets) == 1
+        assert unlocked.secrets[0].payload.username == "admin1"
+
+    def test_identity_filter_removes_all_when_no_access(self):
+        org_key = generate_org_encryption_key()
+        org_id = "org_test_123"
+        vault_key = VALID_VAULT_KEY
+
+        salt = derive_salt(org_id)
+        mk = derive_master_key(vault_key, salt)
+        wrapped = wrap_org_key(mk, org_key)
+
+        secret_dict = {
+            **VAULT_SECRET_DICT,
+            "encrypted_payload": encrypt_payload(
+                org_key, {"username": "admin", "password": "pw"}
+            ),
+        }
+
+        identity = "dddd4444-0000-0000-0000-000000000001"
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {
+                "wrapped_org_encryption_key": wrapped,
+                "encrypted_secrets": [secret_dict],
+            },
+            # No matching access rules
+            [{"identity_id": "other-identity", "secret_id": "cccc3333-0000-0000-0000-000000000001"}],
+        ]
+
+        unlocked = res.unlock(vault_key, identity_id=identity)
+        assert len(unlocked.secrets) == 0
