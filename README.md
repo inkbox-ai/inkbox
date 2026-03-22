@@ -1,5 +1,7 @@
 # Inkbox
 
+https://inkbox.ai
+
 [![PyPI](https://img.shields.io/pypi/v/inkbox)](https://pypi.org/project/inkbox/)
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -109,8 +111,8 @@ See [`skills/README.md`](./skills/README.md) for details.
 
 ## Documentation
 
-- [Inkbox Docs](https://www.inkbox.ai/docs)
-- [API Reference](https://www.inkbox.ai/docs/api-reference)
+- [Inkbox Docs](https://inkbox.ai/docs)
+- [API Reference](https://inkbox.ai/docs/api-reference)
 - [Console](https://console.inkbox.ai/)
 
 ## License

@@ -31,6 +31,7 @@ from argon2.low_level import Type as Argon2Type
 from argon2.low_level import hash_secret_raw
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+from inkbox.exceptions import InkboxVaultKeyError
 from inkbox.vault.types import VaultKeyType
 
 
@@ -60,30 +61,30 @@ def _validate_vault_key(vault_key: str) -> None:
         vault_key: The vault key string to validate.
 
     Raises:
-        ValueError: If the vault key does not meet requirements.
+        InkboxVaultKeyError: If the vault key does not meet requirements.
     """
     if len(vault_key) < 16:
-        raise ValueError("Vault key must be at least 16 characters")
+        raise InkboxVaultKeyError("Vault key must be at least 16 characters")
     if not re.search(
         pattern=r"[A-Z]",
         string=vault_key,
     ):
-        raise ValueError("Vault key must contain at least one uppercase letter")
+        raise InkboxVaultKeyError("Vault key must contain at least one uppercase letter")
     if not re.search(
         pattern=r"[a-z]",
         string=vault_key,
     ):
-        raise ValueError("Vault key must contain at least one lowercase letter")
+        raise InkboxVaultKeyError("Vault key must contain at least one lowercase letter")
     if not re.search(
         pattern=r"[0-9]",
         string=vault_key,
     ):
-        raise ValueError("Vault key must contain at least one digit")
+        raise InkboxVaultKeyError("Vault key must contain at least one digit")
     if not re.search(
         pattern=r"[^A-Za-z0-9]",
         string=vault_key,
     ):
-        raise ValueError("Vault key must contain at least one special character")
+        raise InkboxVaultKeyError("Vault key must contain at least one special character")
 
 
 ## Salt derivation

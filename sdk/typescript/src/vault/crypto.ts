@@ -15,6 +15,7 @@
  *     salt = TextEncoder.encode(orgId)
  */
 
+import { InkboxVaultKeyError } from "../_http.js";
 import { argon2id } from "hash-wasm";
 import {
   randomUUID,
@@ -50,15 +51,15 @@ const RC_GROUPS = 8; // 8 groups × 4 chars ≈ 120 bits of entropy
 
 export function validateVaultKey(vaultKey: string): void {
   if (vaultKey.length < 16)
-    throw new Error("Vault key must be at least 16 characters");
+    throw new InkboxVaultKeyError("Vault key must be at least 16 characters");
   if (!/[A-Z]/.test(vaultKey))
-    throw new Error("Vault key must contain at least one uppercase letter");
+    throw new InkboxVaultKeyError("Vault key must contain at least one uppercase letter");
   if (!/[a-z]/.test(vaultKey))
-    throw new Error("Vault key must contain at least one lowercase letter");
+    throw new InkboxVaultKeyError("Vault key must contain at least one lowercase letter");
   if (!/[0-9]/.test(vaultKey))
-    throw new Error("Vault key must contain at least one digit");
+    throw new InkboxVaultKeyError("Vault key must contain at least one digit");
   if (!/[^A-Za-z0-9]/.test(vaultKey))
-    throw new Error("Vault key must contain at least one special character");
+    throw new InkboxVaultKeyError("Vault key must contain at least one special character");
 }
 
 // ---------------------------------------------------------------------------

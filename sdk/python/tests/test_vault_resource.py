@@ -7,6 +7,7 @@ Tests for VaultResource and UnlockedVault.
 from unittest.mock import MagicMock
 
 import pytest
+from inkbox.exceptions import InkboxVaultKeyError
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT
 from inkbox.vault.crypto import (
     _validate_vault_key,
@@ -114,7 +115,7 @@ class TestVaultResourceUnlock:
 
     def test_unlock_rejects_weak_key(self):
         res, http = _resource()
-        with pytest.raises(ValueError, match="at least 16 characters"):
+        with pytest.raises(InkboxVaultKeyError, match="at least 16 characters"):
             res.unlock("short")
 
 

@@ -6,7 +6,7 @@ from inkbox.client import Inkbox
 from inkbox.agent_identity import AgentIdentity
 
 # Exceptions (canonical source)
-from inkbox.exceptions import InkboxAPIError, InkboxError
+from inkbox.exceptions import InkboxAPIError, InkboxError, InkboxVaultKeyError
 
 # Mail types
 from inkbox.mail.types import (
@@ -72,6 +72,7 @@ __all__ = [
     # Exceptions
     "InkboxError",
     "InkboxAPIError",
+    "InkboxVaultKeyError",
     # Mail types
     "Mailbox",
     "Message",

@@ -5,6 +5,7 @@ Tests for vault crypto module.
 """
 
 import pytest
+from inkbox.exceptions import InkboxVaultKeyError
 from inkbox.vault.crypto import (
     _validate_vault_key,
     compute_auth_hash,
@@ -28,23 +29,23 @@ class TestValidateVaultKey:
         _validate_vault_key(VALID_VAULT_KEY)
 
     def test_too_short(self):
-        with pytest.raises(ValueError, match="at least 16 characters"):
+        with pytest.raises(InkboxVaultKeyError, match="at least 16 characters"):
             _validate_vault_key("Short-Pass0rd!")
 
     def test_no_uppercase(self):
-        with pytest.raises(ValueError, match="uppercase letter"):
+        with pytest.raises(InkboxVaultKeyError, match="uppercase letter"):
             _validate_vault_key("test-passw0rd!xy")
 
     def test_no_lowercase(self):
-        with pytest.raises(ValueError, match="lowercase letter"):
+        with pytest.raises(InkboxVaultKeyError, match="lowercase letter"):
             _validate_vault_key("TEST-PASSW0RD!XY")
 
     def test_no_digit(self):
-        with pytest.raises(ValueError, match="digit"):
+        with pytest.raises(InkboxVaultKeyError, match="digit"):
             _validate_vault_key("Test-Password!xy")
 
     def test_no_special(self):
-        with pytest.raises(ValueError, match="special character"):
+        with pytest.raises(InkboxVaultKeyError, match="special character"):
             _validate_vault_key("TestPassw0rdxyxy")
 
 
@@ -146,7 +147,7 @@ class TestGenerateVaultKeyMaterial:
 
     def test_rejects_weak_key(self):
         org_key = generate_org_encryption_key()
-        with pytest.raises(ValueError, match="at least 16 characters"):
+        with pytest.raises(InkboxVaultKeyError, match="at least 16 characters"):
             generate_vault_key_material("short", "org_test_123", org_key)
 
 

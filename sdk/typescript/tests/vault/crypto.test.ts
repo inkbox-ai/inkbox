@@ -13,6 +13,7 @@ import {
   generateRecoveryCode,
   validateVaultKey,
 } from "../../src/vault/crypto.js";
+import { InkboxVaultKeyError } from "../../src/_http.js";
 import { VaultKeyType } from "../../src/vault/types.js";
 
 const VALID_VAULT_KEY = "Test-Passw0rd!xy";
@@ -22,10 +23,9 @@ describe("validateVaultKey", () => {
     expect(() => validateVaultKey(VALID_VAULT_KEY)).not.toThrow();
   });
 
-  it("rejects too-short key", () => {
-    expect(() => validateVaultKey("Short-Pass0rd!")).toThrow(
-      "at least 16 characters",
-    );
+  it("rejects too-short key with InkboxVaultKeyError", () => {
+    expect(() => validateVaultKey("Short-Pass0rd!")).toThrow(InkboxVaultKeyError);
+    expect(() => validateVaultKey("Short-Pass0rd!")).toThrow("at least 16 characters");
   });
 
   it("rejects key without uppercase", () => {

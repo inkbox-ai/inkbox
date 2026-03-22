@@ -4,6 +4,13 @@
  * Async HTTP transport (internal). Zero runtime dependencies — uses native fetch.
  */
 
+export class InkboxVaultKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InkboxVaultKeyError";
+  }
+}
+
 export class InkboxAPIError extends Error {
   readonly statusCode: number;
   readonly detail: string;

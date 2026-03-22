@@ -13,6 +13,12 @@ class InkboxError(Exception):
     """
 
 
+class InkboxVaultKeyError(InkboxError):
+    """
+    Raised when a vault key does not meet requirements.
+    """
+
+
 class InkboxAPIError(InkboxError):
     """
     Raised when the API returns a 4xx or 5xx response.
