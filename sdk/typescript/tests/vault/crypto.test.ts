@@ -10,7 +10,45 @@ import {
   generateOrgEncryptionKey,
   generateVaultKeyMaterial,
   generateRecoveryCode,
+  validateVaultKey,
 } from "../../src/vault/crypto.js";
+import { VaultKeyType } from "../../src/vault/types.js";
+
+const VALID_VAULT_KEY = "Test-Passw0rd!xy";
+
+describe("validateVaultKey", () => {
+  it("accepts a valid key", () => {
+    expect(() => validateVaultKey(VALID_VAULT_KEY)).not.toThrow();
+  });
+
+  it("rejects too-short key", () => {
+    expect(() => validateVaultKey("Short-Pass0rd!")).toThrow(
+      "at least 16 characters",
+    );
+  });
+
+  it("rejects key without uppercase", () => {
+    expect(() => validateVaultKey("test-passw0rd!xy")).toThrow(
+      "uppercase letter",
+    );
+  });
+
+  it("rejects key without lowercase", () => {
+    expect(() => validateVaultKey("TEST-PASSW0RD!XY")).toThrow(
+      "lowercase letter",
+    );
+  });
+
+  it("rejects key without digit", () => {
+    expect(() => validateVaultKey("Test-Password!xy")).toThrow("digit");
+  });
+
+  it("rejects key without special character", () => {
+    expect(() => validateVaultKey("TestPassw0rdxyxy")).toThrow(
+      "special character",
+    );
+  });
+});
 
 describe("deriveSalt", () => {
   it("is deterministic", () => {
@@ -96,11 +134,15 @@ describe("encryptPayload / decryptPayload", () => {
 describe("generateVaultKeyMaterial", () => {
   it("roundtrips with re-derived master key", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey);
-    expect(mat.keyType).toBe("primary");
+    const mat = await generateVaultKeyMaterial(
+      VALID_VAULT_KEY,
+      "org_test_123",
+      orgKey,
+    );
+    expect(mat.keyType).toBe(VaultKeyType.PRIMARY);
 
     const salt = deriveSalt("org_test_123");
-    const mk = await deriveMasterKey("pw", salt);
+    const mk = await deriveMasterKey(VALID_VAULT_KEY, salt);
     expect(computeAuthHash(mk)).toBe(mat.authHash);
     const recovered = unwrapOrgKey(mk, mat.wrappedOrgEncryptionKey);
     expect(Buffer.from(recovered)).toEqual(Buffer.from(orgKey));
@@ -108,10 +150,22 @@ describe("generateVaultKeyMaterial", () => {
 
   it("accepts type option", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const mat = await generateVaultKeyMaterial("pw", "org_test_123", orgKey, {
-      keyType: "recovery",
-    });
-    expect(mat.keyType).toBe("recovery");
+    const mat = await generateVaultKeyMaterial(
+      VALID_VAULT_KEY,
+      "org_test_123",
+      orgKey,
+      {
+        keyType: VaultKeyType.RECOVERY,
+      },
+    );
+    expect(mat.keyType).toBe(VaultKeyType.RECOVERY);
+  });
+
+  it("rejects weak key", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    await expect(
+      generateVaultKeyMaterial("short", "org_test_123", orgKey),
+    ).rejects.toThrow("at least 16 characters");
   });
 });
 
@@ -122,7 +176,7 @@ describe("generateRecoveryCode", () => {
     const parts = code.split("-");
     expect(parts.length).toBe(8);
     parts.forEach((p) => expect(p.length).toBe(4));
-    expect(mat.keyType).toBe("recovery");
+    expect(mat.keyType).toBe(VaultKeyType.RECOVERY);
   });
 
   it("roundtrips with re-derived master key", async () => {

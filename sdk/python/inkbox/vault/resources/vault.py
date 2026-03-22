@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from inkbox.vault.crypto import (
+    _validate_vault_key,
     compute_auth_hash,
     decrypt_payload,
     derive_master_key,
@@ -106,17 +107,17 @@ class VaultResource:
 
     def unlock(
         self,
-        password: str,
+        vault_key: str,
         *,
         identity_id: UUID | str | None = None,
     ) -> UnlockedVault:
-        """Unlock the vault with a password.
+        """Unlock the vault with a vault key.
 
-        Derives the encryption key from the provided password, fetches
+        Derives the encryption key from the provided vault key, fetches
         and decrypts all vault secrets.
 
         Args:
-            password: Vault password or recovery code.
+            vault_key: Vault key or recovery code.
             identity_id: Optional agent identity UUID.  When provided,
                 only secrets that this identity has been granted access
                 to are included in :attr:`UnlockedVault.secrets`.
@@ -126,15 +127,17 @@ class VaultResource:
             secret CRUD.
 
         Raises:
-            ValueError: If the password is incorrect or the vault key
+            ValueError: If the vault key is incorrect or the vault key
                 has been deleted.
         """
+        _validate_vault_key(vault_key)
+
         # Step 1: get org_id for salt derivation
         vault_info = self.info()
         salt = derive_salt(vault_info.organization_id)
 
         # Step 2: derive master key → auth hash
-        master_key = derive_master_key(password, salt)
+        master_key = derive_master_key(vault_key, salt)
         auth_hash = compute_auth_hash(master_key)
 
         # Step 3: fetch wrapped key + encrypted secrets
@@ -148,8 +151,8 @@ class VaultResource:
         wrapped = data.get("wrapped_org_encryption_key")
         if wrapped is None:
             raise ValueError(
-                "No vault key matched this password. "
-                "Check that the password is correct and the key has not been deleted."
+                "No vault key matched this vault key. "
+                "Check that the vault key is correct and the key has not been deleted."
             )
 
         # Step 4: unwrap the org encryption key
@@ -190,7 +193,7 @@ class VaultResource:
 
 
 class UnlockedVault:
-    """A vault unlocked with a valid password.
+    """A vault unlocked with a valid vault key.
 
     Provides transparent encrypt/decrypt for secret CRUD operations.
 

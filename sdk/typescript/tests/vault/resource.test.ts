@@ -11,6 +11,8 @@ import {
 } from "../../src/vault/crypto.js";
 import type { RawVaultInfo, RawVaultKey, RawVaultSecret } from "../../src/vault/types.js";
 
+const VALID_VAULT_KEY = "Test-Passw0rd!xy";
+
 function mockHttp() {
   return {
     get: vi.fn(),
@@ -115,11 +117,11 @@ describe("VaultResource.deleteSecret", () => {
 describe("VaultResource.unlock", () => {
   it("decrypts secrets from unlock bundle", async () => {
     const orgKey = generateOrgEncryptionKey();
-    const password = "test-password";
+    const vaultKey = VALID_VAULT_KEY;
     const orgId = "org_test_123";
 
     const salt = deriveSalt(orgId);
-    const mk = await deriveMasterKey(password, salt);
+    const mk = await deriveMasterKey(vaultKey, salt);
     const wrapped = wrapOrgKey(mk, orgKey);
     const encrypted = encryptPayload(orgKey, { username: "admin", password: "s3cret" });
 
@@ -134,12 +136,20 @@ describe("VaultResource.unlock", () => {
       });
 
     const res = new VaultResource(http);
-    const unlocked = await res.unlock(password);
+    const unlocked = await res.unlock(vaultKey);
 
     expect(unlocked.secrets).toHaveLength(1);
     const s = unlocked.secrets[0];
     expect(s.name).toBe("AWS Production");
     expect((s.payload as { username: string }).username).toBe("admin");
+  });
+
+  it("rejects weak vault key", async () => {
+    const http = mockHttp();
+    const res = new VaultResource(http);
+    await expect(res.unlock("short")).rejects.toThrow(
+      "at least 16 characters",
+    );
   });
 });
 

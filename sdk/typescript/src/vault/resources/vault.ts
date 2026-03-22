@@ -13,6 +13,7 @@ import {
   deriveSalt,
   encryptPayload,
   unwrapOrgKey,
+  validateVaultKey,
 } from "../crypto.js";
 import type {
   DecryptedVaultSecret,
@@ -103,29 +104,31 @@ export class VaultResource {
   // ------------------------------------------------------------------
 
   /**
-   * Unlock the vault with a password.
+   * Unlock the vault with a vault key.
    *
-   * Derives the encryption key from the provided password, fetches
+   * Derives the encryption key from the provided vault key, fetches
    * and decrypts all vault secrets.
    *
-   * @param password - Vault password or recovery code.
+   * @param vaultKey - Vault key or recovery code.
    * @param options.identityId - Optional agent identity UUID. When
    *   provided, only secrets that this identity has been granted access
    *   to are included in {@link UnlockedVault.secrets}.
    * @returns {@link UnlockedVault} with decrypted secrets and methods for
    *   secret CRUD.
-   * @throws If the password is incorrect or the vault key has been deleted.
+   * @throws If the vault key is incorrect or the vault key has been deleted.
    */
   async unlock(
-    password: string,
+    vaultKey: string,
     options: { identityId?: string } = {},
   ): Promise<UnlockedVault> {
+    validateVaultKey(vaultKey);
+
     // Step 1: get org_id for salt derivation
     const vaultInfo = await this.info();
     const salt = deriveSalt(vaultInfo.organizationId);
 
     // Step 2: derive master key → auth hash
-    const masterKey = await deriveMasterKey(password, salt);
+    const masterKey = await deriveMasterKey(vaultKey, salt);
     const authHash = computeAuthHash(masterKey);
 
     // Step 3: fetch wrapped key + encrypted secrets
@@ -141,8 +144,8 @@ export class VaultResource {
     const wrapped = data.wrapped_org_encryption_key;
     if (!wrapped) {
       throw new Error(
-        "No vault key matched this password. " +
-          "Check that the password is correct and the key has not been deleted.",
+        "No vault key matched this vault key. " +
+          "Check that the vault key is correct and the key has not been deleted.",
       );
     }
 
@@ -190,7 +193,7 @@ export class VaultResource {
 }
 
 /**
- * A vault unlocked with a valid password.
+ * A vault unlocked with a valid vault key.
  *
  * Provides transparent encrypt/decrypt for secret CRUD operations.
  *

@@ -2,8 +2,10 @@
 
 from unittest.mock import MagicMock
 
+import pytest
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT
 from inkbox.vault.crypto import (
+    _validate_vault_key,
     derive_master_key,
     derive_salt,
     encrypt_payload,
@@ -12,6 +14,8 @@ from inkbox.vault.crypto import (
 )
 from inkbox.vault.resources.vault import VaultResource, UnlockedVault
 from inkbox.vault.types import LoginPayload, VaultInfo, VaultKey, VaultSecret
+
+VALID_VAULT_KEY = "Test-Passw0rd!xy"
 
 
 def _resource():
@@ -72,10 +76,10 @@ class TestVaultResourceUnlock:
     def test_unlock_decrypts_secrets(self):
         org_key = generate_org_encryption_key()
         org_id = "org_test_123"
-        password = "test-password"
+        vault_key = VALID_VAULT_KEY
 
         salt = derive_salt(org_id)
-        mk = derive_master_key(password, salt)
+        mk = derive_master_key(vault_key, salt)
         wrapped = wrap_org_key(mk, org_key)
 
         login_payload = {"username": "admin", "password": "s3cret"}
@@ -96,13 +100,18 @@ class TestVaultResourceUnlock:
             },
         ]
 
-        unlocked = res.unlock(password)
+        unlocked = res.unlock(vault_key)
         assert isinstance(unlocked, UnlockedVault)
         assert len(unlocked.secrets) == 1
         s = unlocked.secrets[0]
         assert s.name == "AWS Production"
         assert s.payload.username == "admin"
         assert s.payload.password == "s3cret"
+
+    def test_unlock_rejects_weak_key(self):
+        res, http = _resource()
+        with pytest.raises(ValueError, match="at least 16 characters"):
+            res.unlock("short")
 
 
 class TestUnlockedVaultCreateSecret:

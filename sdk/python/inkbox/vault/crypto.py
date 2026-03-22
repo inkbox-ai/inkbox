@@ -3,14 +3,14 @@ inkbox/vault/crypto.py
 
 Client-side cryptography for the encrypted vault.
 
-Key derivation: Argon2id (password → master key)
+Key derivation: Argon2id (vault_key → master key)
 Encryption:     AES-256-GCM
 Hashing:        SHA-256
 
 Salt derivation:
     The Argon2id salt is the raw UTF-8 encoding of the organisation ID,
     so that both the dashboard (vault init) and the SDK (vault unlock) can
-    compute the same master key from the same password without a round-trip::
+    compute the same master key from the same vault key without a round-trip::
 
         salt = org_id.encode()
 """
@@ -21,6 +21,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import secrets
 from dataclasses import dataclass
 from typing import Any
@@ -29,6 +30,8 @@ from uuid import UUID, uuid4
 from argon2.low_level import Type as Argon2Type
 from argon2.low_level import hash_secret_raw
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from inkbox.vault.types import VaultKeyType
 
 
 ## Constants
@@ -47,33 +50,66 @@ _RC_GROUP_LEN = 4
 _RC_GROUPS = 8  # 8 groups × 4 chars ≈ 120 bits of entropy
 
 
+## Vault key validation
+
+def _validate_vault_key(vault_key: str) -> None:
+    """Enforce minimum vault key requirements.
+
+    Raises:
+        ValueError: If the vault key does not meet requirements.
+    """
+    if len(vault_key) < 16:
+        raise ValueError("Vault key must be at least 16 characters")
+    if not re.search(
+        pattern=r"[A-Z]",
+        string=vault_key,
+    ):
+        raise ValueError("Vault key must contain at least one uppercase letter")
+    if not re.search(
+        pattern=r"[a-z]",
+        string=vault_key,
+    ):
+        raise ValueError("Vault key must contain at least one lowercase letter")
+    if not re.search(
+        pattern=r"[0-9]",
+        string=vault_key,
+    ):
+        raise ValueError("Vault key must contain at least one digit")
+    if not re.search(
+        pattern=r"[^A-Za-z0-9]",
+        string=vault_key,
+    ):
+        raise ValueError("Vault key must contain at least one special character")
+
+
 ## Salt derivation
 
 def derive_salt(organization_id: str) -> bytes:
-    """Derive the Argon2id salt from the organisation ID.
+    """
+    Derive the Argon2id salt from the organisation ID.
 
     The salt is the raw UTF-8 encoding of the organisation ID.  This is
     deterministic so both vault init and vault unlock can reach the same
-    master key from the same password.
+    master key from the same vault key.
     """
     return organization_id.encode()
 
 
 ## Key derivation
 
-def derive_master_key(password: str, salt: bytes) -> bytes:
+def derive_master_key(vault_key: str, salt: bytes) -> bytes:
     """
-    Derive a 256-bit master key from a password using Argon2id.
+    Derive a 256-bit master key from a vault key using Argon2id.
 
     Args:
-        password: User-provided vault password or recovery code.
+        vault_key: User-provided vault key or recovery code.
         salt: 16-byte salt from :func:`derive_salt`.
 
     Returns:
         32-byte master key.
     """
     return hash_secret_raw(
-        secret=password.encode(),
+        secret=vault_key.encode(),
         salt=salt,
         time_cost=ARGON2_TIME_COST,
         memory_cost=ARGON2_MEMORY_COST,
@@ -207,32 +243,33 @@ class VaultKeyMaterial:
     id: UUID
     wrapped_org_encryption_key: str
     auth_hash: str
-    key_type: str
+    key_type: VaultKeyType
 
 
 def generate_vault_key_material(
-    password: str,
+    vault_key: str,
     organization_id: str,
     org_encryption_key: bytes,
     *,
-    key_type: str = "primary",
+    key_type: VaultKeyType = VaultKeyType.PRIMARY,
 ) -> VaultKeyMaterial:
     """
-    Generate vault key material from a password.
+    Generate vault key material from a vault key.
 
     Derives a master key via Argon2id and wraps the org encryption key.
 
     Args:
-        password: User-chosen password or recovery code string.
+        vault_key: User-chosen vault key or recovery code string.
         organization_id: Organisation ID (used as salt basis).
         org_encryption_key: 32-byte org encryption key to wrap.
-        key_type: ``"primary"`` or ``"recovery"``.
+        key_type: ``VaultKeyType.PRIMARY`` or ``VaultKeyType.RECOVERY``.
 
     Returns:
         :class:`VaultKeyMaterial` ready to send to the server.
     """
+    _validate_vault_key(vault_key)
     salt = derive_salt(organization_id)
-    master_key = derive_master_key(password, salt)
+    master_key = derive_master_key(vault_key, salt)
     auth_hash = compute_auth_hash(master_key)
     wrapped = wrap_org_key(master_key, org_encryption_key)
 
@@ -271,10 +308,17 @@ def generate_recovery_code(
     ]
     code = "-".join(groups)
 
-    material = generate_vault_key_material(
-        password=code,
-        organization_id=organization_id,
-        org_encryption_key=org_encryption_key,
-        key_type="recovery",
+    # Recovery codes bypass _validate_vault_key — they are auto-generated
+    # and don't follow password rules.  Derive directly.
+    salt = derive_salt(organization_id)
+    master_key = derive_master_key(code, salt)
+    auth_hash = compute_auth_hash(master_key)
+    wrapped = wrap_org_key(master_key, org_encryption_key)
+
+    material = VaultKeyMaterial(
+        id=uuid4(),
+        wrapped_org_encryption_key=wrapped,
+        auth_hash=auth_hash,
+        key_type=VaultKeyType.RECOVERY,
     )
     return code, material

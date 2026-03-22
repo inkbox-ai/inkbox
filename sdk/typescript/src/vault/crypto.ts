@@ -3,14 +3,14 @@
  *
  * Client-side cryptography for the encrypted vault.
  *
- * Key derivation: Argon2id  (password → master key, via hash-wasm)
+ * Key derivation: Argon2id  (vault_key → master key, via hash-wasm)
  * Encryption:     AES-256-GCM (via Node.js crypto)
  * Hashing:        SHA-256     (via Node.js crypto)
  *
  * Salt derivation:
  *   The Argon2id salt is derived deterministically from the organisation ID
  *   so that both the dashboard (vault init) and the SDK (vault unlock) can
- *   compute the same master key from the same password:
+ *   compute the same master key from the same vault key:
  *
  *     salt = TextEncoder.encode(orgId)
  */
@@ -24,6 +24,7 @@ import {
   createCipheriv,
   createDecipheriv,
 } from "node:crypto";
+import { VaultKeyType } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -44,6 +45,23 @@ const RC_GROUP_LEN = 4;
 const RC_GROUPS = 8; // 8 groups × 4 chars ≈ 120 bits of entropy
 
 // ---------------------------------------------------------------------------
+// Vault key validation
+// ---------------------------------------------------------------------------
+
+export function validateVaultKey(vaultKey: string): void {
+  if (vaultKey.length < 16)
+    throw new Error("Vault key must be at least 16 characters");
+  if (!/[A-Z]/.test(vaultKey))
+    throw new Error("Vault key must contain at least one uppercase letter");
+  if (!/[a-z]/.test(vaultKey))
+    throw new Error("Vault key must contain at least one lowercase letter");
+  if (!/[0-9]/.test(vaultKey))
+    throw new Error("Vault key must contain at least one digit");
+  if (!/[^A-Za-z0-9]/.test(vaultKey))
+    throw new Error("Vault key must contain at least one special character");
+}
+
+// ---------------------------------------------------------------------------
 // Salt derivation
 // ---------------------------------------------------------------------------
 
@@ -61,14 +79,14 @@ export function deriveSalt(organizationId: string): Uint8Array {
 // ---------------------------------------------------------------------------
 
 /**
- * Derive a 256-bit master key from a password using Argon2id.
+ * Derive a 256-bit master key from a vault key using Argon2id.
  */
 export async function deriveMasterKey(
-  password: string,
+  vaultKey: string,
   salt: Uint8Array,
 ): Promise<Uint8Array> {
   const hash = await argon2id({
-    password,
+    password: vaultKey,
     salt,
     iterations: ARGON2_TIME_COST,
     memorySize: ARGON2_MEMORY_COST,
@@ -178,22 +196,23 @@ export interface VaultKeyMaterial {
   /** SHA-256(masterKey) hex digest. */
   authHash: string;
   /** "primary" | "recovery" */
-  keyType: string;
+  keyType: VaultKeyType;
 }
 
 /**
- * Generate vault key material from a password.
+ * Generate vault key material from a vault key.
  *
  * Derives a master key via Argon2id and wraps the org encryption key.
  */
 export async function generateVaultKeyMaterial(
-  password: string,
+  vaultKey: string,
   organizationId: string,
   orgEncryptionKey: Uint8Array,
-  options: { keyType?: string } = {},
+  options: { keyType?: VaultKeyType } = {},
 ): Promise<VaultKeyMaterial> {
+  validateVaultKey(vaultKey);
   const salt = deriveSalt(organizationId);
-  const masterKey = await deriveMasterKey(password, salt);
+  const masterKey = await deriveMasterKey(vaultKey, salt);
   const authHash = computeAuthHash(masterKey);
   const wrapped = wrapOrgKey(masterKey, orgEncryptionKey);
 
@@ -201,7 +220,7 @@ export async function generateVaultKeyMaterial(
     id: randomUUID(),
     wrappedOrgEncryptionKey: wrapped,
     authHash,
-    keyType: options.keyType ?? "primary",
+    keyType: options.keyType ?? VaultKeyType.PRIMARY,
   };
 }
 
@@ -229,11 +248,18 @@ export async function generateRecoveryCode(
   }
   const code = groups.join("-");
 
-  const material = await generateVaultKeyMaterial(
-    code,
-    organizationId,
-    orgEncryptionKey,
-    { keyType: "recovery" },
-  );
+  // Recovery codes bypass validateVaultKey — they are auto-generated
+  // and don't follow password rules.  Derive directly.
+  const salt = deriveSalt(organizationId);
+  const masterKey = await deriveMasterKey(code, salt);
+  const authHash = computeAuthHash(masterKey);
+  const wrapped = wrapOrgKey(masterKey, orgEncryptionKey);
+
+  const material: VaultKeyMaterial = {
+    id: randomUUID(),
+    wrappedOrgEncryptionKey: wrapped,
+    authHash,
+    keyType: VaultKeyType.RECOVERY,
+  };
   return [code, material];
 }

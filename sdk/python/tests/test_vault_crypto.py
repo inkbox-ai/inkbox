@@ -1,6 +1,8 @@
 """Tests for vault crypto module."""
 
+import pytest
 from inkbox.vault.crypto import (
+    _validate_vault_key,
     compute_auth_hash,
     decrypt_payload,
     derive_master_key,
@@ -12,6 +14,34 @@ from inkbox.vault.crypto import (
     unwrap_org_key,
     wrap_org_key,
 )
+from inkbox.vault.types import VaultKeyType
+
+VALID_VAULT_KEY = "Test-Passw0rd!xy"
+
+
+class TestValidateVaultKey:
+    def test_valid_key_passes(self):
+        _validate_vault_key(VALID_VAULT_KEY)
+
+    def test_too_short(self):
+        with pytest.raises(ValueError, match="at least 16 characters"):
+            _validate_vault_key("Short-Pass0rd!")
+
+    def test_no_uppercase(self):
+        with pytest.raises(ValueError, match="uppercase letter"):
+            _validate_vault_key("test-passw0rd!xy")
+
+    def test_no_lowercase(self):
+        with pytest.raises(ValueError, match="lowercase letter"):
+            _validate_vault_key("TEST-PASSW0RD!XY")
+
+    def test_no_digit(self):
+        with pytest.raises(ValueError, match="digit"):
+            _validate_vault_key("Test-Password!xy")
+
+    def test_no_special(self):
+        with pytest.raises(ValueError, match="special character"):
+            _validate_vault_key("TestPassw0rdxyxy")
 
 
 class TestDeriveSalt:
@@ -95,20 +125,25 @@ class TestEncryptDecryptPayload:
 class TestGenerateVaultKeyMaterial:
     def test_roundtrip(self):
         org_key = generate_org_encryption_key()
-        mat = generate_vault_key_material("pw", "org_test_123", org_key)
-        assert mat.key_type == "primary"
+        mat = generate_vault_key_material(VALID_VAULT_KEY, "org_test_123", org_key)
+        assert mat.key_type == VaultKeyType.PRIMARY
         # Re-derive and verify
         salt = derive_salt("org_test_123")
-        mk = derive_master_key("pw", salt)
+        mk = derive_master_key(VALID_VAULT_KEY, salt)
         assert compute_auth_hash(mk) == mat.auth_hash
         assert unwrap_org_key(mk, mat.wrapped_org_encryption_key) == org_key
 
     def test_type_override(self):
         org_key = generate_org_encryption_key()
         mat = generate_vault_key_material(
-            "pw", "org_test_123", org_key, key_type="recovery"
+            VALID_VAULT_KEY, "org_test_123", org_key, key_type=VaultKeyType.RECOVERY
         )
-        assert mat.key_type == "recovery"
+        assert mat.key_type == VaultKeyType.RECOVERY
+
+    def test_rejects_weak_key(self):
+        org_key = generate_org_encryption_key()
+        with pytest.raises(ValueError, match="at least 16 characters"):
+            generate_vault_key_material("short", "org_test_123", org_key)
 
 
 class TestGenerateRecoveryCode:
@@ -118,7 +153,7 @@ class TestGenerateRecoveryCode:
         parts = code.split("-")
         assert len(parts) == 8
         assert all(len(p) == 4 for p in parts)
-        assert mat.key_type == "recovery"
+        assert mat.key_type == VaultKeyType.RECOVERY
 
     def test_roundtrip(self):
         org_key = generate_org_encryption_key()
