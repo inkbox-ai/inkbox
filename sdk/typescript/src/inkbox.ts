@@ -67,7 +67,14 @@ export class Inkbox {
   readonly _authAccounts: AuthenticatorAccountsResource;
 
   constructor(options: InkboxOptions) {
-    const apiRoot = `${(options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "")}/api/v1`;
+    const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+    if (!baseUrl.startsWith("https://")) {
+      throw new Error(
+        "Only HTTPS base URLs are permitted. " +
+        "Received a baseUrl that does not start with 'https://'.",
+      );
+    }
+    const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;
 
     const mailHttp  = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms);

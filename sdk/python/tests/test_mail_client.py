@@ -23,6 +23,6 @@ class TestInkboxMailResources:
             assert isinstance(client, Inkbox)
 
     def test_mail_http_base_url(self):
-        client = Inkbox(api_key="sk-test", base_url="http://localhost:8000")
-        assert str(client._mail_http._client.base_url) == "http://localhost:8000/api/v1/mail/"
+        client = Inkbox(api_key="sk-test", base_url="https://localhost:8000")
+        assert str(client._mail_http._client.base_url) == "https://localhost:8000/api/v1/mail/"
         client.close()

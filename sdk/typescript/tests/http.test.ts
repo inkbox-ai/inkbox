@@ -131,7 +131,7 @@ describe("HttpTransport", () => {
     await expect(http.get("/bad")).rejects.toThrow("HTTP 422: Validation error");
   });
 
-  it("falls back to statusText when JSON has no detail", async () => {
+  it("falls back to generic message when JSON has no detail", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
       status: 500,
@@ -140,10 +140,10 @@ describe("HttpTransport", () => {
     } as Response);
     const http = makeTransport();
 
-    await expect(http.get("/fail")).rejects.toThrow("HTTP 500: Internal Server Error");
+    await expect(http.get("/fail")).rejects.toThrow("HTTP 500: Request failed with status 500");
   });
 
-  it("falls back to statusText when JSON parsing fails", async () => {
+  it("falls back to generic message when JSON parsing fails", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
       status: 502,
@@ -152,7 +152,7 @@ describe("HttpTransport", () => {
     } as Response);
     const http = makeTransport();
 
-    await expect(http.get("/fail")).rejects.toThrow("HTTP 502: Bad Gateway");
+    await expect(http.get("/fail")).rejects.toThrow("HTTP 502: Request failed with status 502");
   });
 
   // --- Timeout ---

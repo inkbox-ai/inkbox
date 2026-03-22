@@ -55,6 +55,11 @@ class Inkbox:
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
     ) -> None:
+        if not base_url.startswith("https://"):
+            raise ValueError(
+                "Only HTTPS base URLs are permitted. "
+                "Received a base_url that does not start with 'https://'."
+            )
         _api_root = f"{base_url.rstrip('/')}/api/v1"
 
         self._mail_http = MailHttpTransport(

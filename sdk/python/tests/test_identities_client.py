@@ -13,6 +13,6 @@ class TestInkboxIdentitiesResources:
         client.close()
 
     def test_ids_http_base_url(self):
-        client = Inkbox(api_key="sk-test", base_url="http://localhost:8000")
-        assert str(client._ids_http._client.base_url) == "http://localhost:8000/api/v1/identities/"
+        client = Inkbox(api_key="sk-test", base_url="https://localhost:8000")
+        assert str(client._ids_http._client.base_url) == "https://localhost:8000/api/v1/identities/"
         client.close()

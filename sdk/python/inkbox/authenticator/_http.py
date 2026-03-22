@@ -62,7 +62,7 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code < 400:
         return
     try:
-        detail = resp.json().get("detail", resp.text)
+        detail = resp.json().get("detail", f"Request failed with status {resp.status_code}")
     except Exception:
-        detail = resp.text
+        detail = f"Request failed with status {resp.status_code}"
     raise InkboxAPIError(status_code=resp.status_code, detail=str(detail))
