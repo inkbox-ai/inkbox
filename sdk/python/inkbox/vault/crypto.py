@@ -323,10 +323,13 @@ def generate_recovery_code(
     ]
     code = "-".join(groups)
 
-    # Recovery codes bypass _validate_vault_key — they are auto-generated
+    # Recovery codes bypass _validate_vault_key; they are auto-generated
     # and don't follow vault key rules.  Derive directly.
     salt = derive_salt(organization_id)
-    master_key = derive_master_key(code, salt)
+    master_key = derive_master_key(
+        vault_key=code,
+        salt=salt,
+    )
     auth_hash = compute_auth_hash(master_key)
     wrapped = wrap_org_key(master_key, org_encryption_key)
 
