@@ -258,6 +258,58 @@ secret = identity.credentials.get("secret-uuid")
 - Cached after first access; call `identity.refresh()` to clear the cache
 - `get_*` raises `KeyError` if not found, `TypeError` if wrong secret type
 
+## One-Time Passwords (TOTP)
+
+TOTP secrets are stored inside `LoginPayload.totp` in the encrypted vault. Codes are generated client-side — no server call needed.
+
+### From an agent identity (recommended)
+
+```python
+from inkbox.vault.totp import parse_totp_uri
+from inkbox.vault.types import LoginPayload
+
+# Create a login with TOTP
+secret = identity.create_secret(
+    name="GitHub",
+    payload=LoginPayload(
+        username="user@example.com",
+        password="s3cret",
+        totp=parse_totp_uri("otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"),
+    ),
+)
+
+# Generate TOTP code
+code = identity.get_totp_code(str(secret.id))
+print(code.code)              # e.g. "482901"
+print(code.seconds_remaining) # e.g. 17
+
+# Add/replace TOTP on existing login
+identity.set_totp(secret_id, "otpauth://totp/...?secret=...")
+
+# Remove TOTP
+identity.remove_totp(secret_id)
+```
+
+### From the unlocked vault (org-level)
+
+```python
+unlocked = inkbox.vault.unlock("my-Vault-key-01!")
+
+# Same methods available on UnlockedVault
+unlocked.set_totp(secret_id, totp_config_or_uri)
+unlocked.remove_totp(secret_id)
+code = unlocked.get_totp_code(secret_id)
+```
+
+### TOTPCode fields
+
+| Field | Type | Description |
+|---|---|---|
+| `code` | `str` | The OTP code (e.g. `"482901"`) |
+| `period_start` | `int` | Unix timestamp when the code became valid |
+| `period_end` | `int` | Unix timestamp when the code expires |
+| `seconds_remaining` | `int` | Seconds until expiry |
+
 ## Org-level Resources
 
 ### Mailboxes (`inkbox.mailboxes`)

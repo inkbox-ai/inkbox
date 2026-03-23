@@ -287,7 +287,7 @@ await inkbox.vault.deleteSecret("secret-uuid");                             // d
 
 | Type | Interface | Fields |
 |------|-----------|--------|
-| `login` | `LoginPayload` | `password`, `username?`, `email?`, `url?`, `notes?` |
+| `login` | `LoginPayload` | `password`, `username?`, `email?`, `url?`, `notes?`, `totp?` |
 | `api_key` | `APIKeyPayload` | `apiKey`, `endpoint?`, `notes?` |
 | `key_pair` | `KeyPairPayload` | `accessKey`, `secretKey`, `endpoint?`, `notes?` |
 | `ssh_key` | `SSHKeyPayload` | `privateKey`, `publicKey?`, `fingerprint?`, `passphrase?`, `notes?` |
@@ -327,6 +327,58 @@ const secret = creds.get("secret-uuid");
 - Results are filtered to secrets the identity has access to (via access rules)
 - Cached after first call; call `identity.refresh()` to clear the cache
 - `get*` throws `Error` if not found, `TypeError` if wrong secret type
+
+### One-Time Passwords (TOTP)
+
+TOTP secrets are stored inside `LoginPayload.totp` in the encrypted vault. Codes are generated client-side — no server call needed.
+
+#### From an agent identity (recommended)
+
+```js
+import { parseTotpUri } from "@inkbox/sdk";
+import type { LoginPayload } from "@inkbox/sdk";
+
+// Create a login with TOTP
+const secret = await identity.createSecret({
+  name: "GitHub",
+  payload: {
+    username: "user@example.com",
+    password: "s3cret",
+    totp: parseTotpUri("otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"),
+  } satisfies LoginPayload,
+});
+
+// Generate TOTP code
+const code = await identity.getTotpCode(secret.id);
+console.log(code.code);              // e.g. "482901"
+console.log(code.secondsRemaining);  // e.g. 17
+
+// Add/replace TOTP on existing login
+await identity.setTotp(secretId, "otpauth://totp/...?secret=...");
+
+// Remove TOTP
+await identity.removeTotp(secretId);
+```
+
+#### From the unlocked vault (org-level)
+
+```js
+const unlocked = await inkbox.vault.unlock("my-Vault-key-01!");
+
+// Same methods available on UnlockedVault
+await unlocked.setTotp(secretId, totpConfigOrUri);
+await unlocked.removeTotp(secretId);
+const code = await unlocked.getTotpCode(secretId);
+```
+
+#### TOTPCode fields
+
+| Field | Type | Description |
+|---|---|---|
+| `code` | `string` | The OTP code (e.g. `"482901"`) |
+| `periodStart` | `number` | Unix timestamp when the code became valid |
+| `periodEnd` | `number` | Unix timestamp when the code expires |
+| `secondsRemaining` | `number` | Seconds until expiry |
 
 ## Org-level Resources
 

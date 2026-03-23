@@ -29,7 +29,7 @@ API surface:
 
 ## Part 1: Add TOTP Support
 
-### [ ] 1a. New file: `sdk/python/inkbox/vault/totp.py`
+### [x] 1a. New file: `sdk/python/inkbox/vault/totp.py`
 
 **`TOTPAlgorithm` enum (lowercase values, matching servers `OTPAlgorithm` and otpauth URI convention):**
 ```python
@@ -91,7 +91,7 @@ The servers repo already had a working implementation at `servers/src/utils/otp.
 - `generate_totp(config) -> TOTPCode` — Port of `generate_hotp()` + `generate_totp()` from servers. Always uses current time. Same RFC 6238 algorithm: b32decode secret, pack time step as big-endian u64, HMAC with `config.algorithm.hash_func`, dynamic truncation (RFC 4226 §5.4), modulo 10^digits, zero-pad. Returns a `TOTPCode` with the code string and timing metadata.
 - `parse_totp_uri(uri) -> TOTPConfig` — Port of `parse_otpauth_uri()` from servers. Same `urlparse` + `parse_qs` approach. Key difference: **rejects HOTP** (`ValueError`) instead of supporting both types. Maps parsed params into `TOTPConfig` instead of `OTPAuthParams`.
 
-### [ ] 1b. New file: `sdk/typescript/src/vault/totp.ts`
+### [x] 1b. New file: `sdk/typescript/src/vault/totp.ts`
 
 Mirror of Python. Uses `node:crypto` for HMAC (already used in vault/crypto.ts). Same interfaces/functions in camelCase:
 
@@ -145,33 +145,33 @@ interface TOTPCode {
 - `generateTotp(config) -> TOTPCode` — same RFC 6238 logic using `node:crypto` HMAC + `Buffer` for byte ops. Always uses current time.
 - `parseTotpUri(uri)` — same parsing logic using `URL` constructor, rejects HOTP
 
-### [ ] 1c. Modify: `sdk/python/inkbox/vault/types.py`
+### [x] 1c. Modify: `sdk/python/inkbox/vault/types.py`
 
 - Import `TOTPConfig` from `inkbox.vault.totp`
 - Add `totp: TOTPConfig | None = None` to `LoginPayload`
 - Override `_to_dict()` to call `self.totp._to_dict()` for the nested object (avoid `asdict()` leaving None values in nested dict)
 - Override `_from_dict()` to reconstruct `TOTPConfig` from raw dict
 
-### [ ] 1d. Modify: `sdk/typescript/src/vault/types.ts`
+### [x] 1d. Modify: `sdk/typescript/src/vault/types.ts`
 
 - Import `TOTPConfig` from `./totp.js`
 - Add `totp?: TOTPConfig` to `LoginPayload` interface
 - Update `serializePayload` login case: serialize `totp` with `accountName` -> `account_name`
 - Update `parsePayload` login case: parse `totp` with `account_name` -> `accountName`
 
-### [ ] 1e. Modify: `sdk/python/inkbox/vault/resources/vault.py`
+### [x] 1e. Modify: `sdk/python/inkbox/vault/resources/vault.py`
 
 Add to `UnlockedVault`:
 - `set_totp(secret_id, totp: TOTPConfig | str) -> VaultSecret` — if str, parse as URI. Fetch secret, set totp, re-encrypt, patch.
 - `remove_totp(secret_id) -> VaultSecret` — fetch, clear totp, re-encrypt, patch.
 - `get_totp_code(secret_id) -> TOTPCode` — fetch+decrypt, extract TOTPConfig, generate code. Raises `TypeError` if not login, `ValueError` if no TOTP configured.
 
-### [ ] 1f. Modify: `sdk/typescript/src/vault/resources/vault.ts`
+### [x] 1f. Modify: `sdk/typescript/src/vault/resources/vault.ts`
 
 Mirror 1e on `UnlockedVault`:
 - `setTotp(secretId, totp)`, `removeTotp(secretId)`, `getTotpCode(secretId) -> TOTPCode`
 
-### [ ] 1g. Modify: `sdk/python/inkbox/credentials.py`
+### [x] 1g. Modify: `sdk/python/inkbox/credentials.py`
 
 Add to `Credentials`:
 - `get_totp_code(secret_id) -> TOTPCode` — returns the current TOTP code with timing metadata. Uses the cached decrypted `LoginPayload.totp` config — agent never needs to handle `TOTPConfig` directly, just passes a secret ID they got from `list_logins()`.
@@ -184,14 +184,14 @@ identity.credentials.get_totp_code("secret-uuid")
 # TOTPCode(code="482901", period_start=1711843200, period_end=1711843230, seconds_remaining=17)
 ```
 
-### [ ] 1h. Modify: `sdk/typescript/src/credentials.ts`
+### [x] 1h. Modify: `sdk/typescript/src/credentials.ts`
 
 Add to `Credentials`:
 - `getTotpCode(secretId) -> TOTPCode`
 
 Same pattern — agent just passes a secret ID, never touches `TOTPConfig`.
 
-### [ ] 1i. Modify: `sdk/python/inkbox/vault/__init__.py`
+### [x] 1i. Modify: `sdk/python/inkbox/vault/__init__.py`
 
 Export: `TOTPAlgorithm`, `TOTPConfig`, `TOTPCode`, `generate_totp`, `parse_totp_uri`
 
@@ -281,12 +281,12 @@ Same removals as 2f in TypeScript:
 
 ## Part 3: Export Updates
 
-### [ ] 3a. Modify: `sdk/python/inkbox/__init__.py`
+### [x] 3a. Modify: `sdk/python/inkbox/__init__.py`
 
 Add vault TOTP exports:
 - `TOTPAlgorithm`, `TOTPConfig`, `TOTPCode`, `generate_totp`, `parse_totp_uri`
 
-### [ ] 3b. Modify: `sdk/typescript/src/index.ts`
+### [x] 3b. Modify: `sdk/typescript/src/index.ts`
 
 Add vault TOTP exports:
 - `TOTPAlgorithm`, `TOTPConfig` (type), `TOTPCode` (type), `generateTotp`, `parseTotpUri`
@@ -295,14 +295,14 @@ Add vault TOTP exports:
 
 ## Part 4: Tests
 
-### [ ] 4a. New: `sdk/python/tests/test_vault_totp.py`
+### [x] 4a. New: `sdk/python/tests/test_vault_totp.py`
 
 - `TOTPConfig` construction, serialization roundtrip
 - `generate_totp` with RFC 6238 test vectors (SHA1 secret `12345678901234567890`, known timestamps)
 - `parse_totp_uri` — valid URIs, minimal URI, issuer in label, reject HOTP, reject missing secret, reject bad algorithm/digits
 - `LoginPayload` with totp field — roundtrip serialization, backward compat (old payloads without totp parse with `totp=None`)
 
-### [ ] 4b. New: `sdk/typescript/tests/vault/totp.test.ts`
+### [x] 4b. New: `sdk/typescript/tests/vault/totp.test.ts`
 
 Mirror all Python test cases using vitest.
 
@@ -312,18 +312,18 @@ Mirror all Python test cases using vitest.
 
 ### [x] 5a. Clean up authenticator references in `sdk/python/tests/test_agent_identity.py`
 
-### [ ] 5b. Clean up authenticator sections in `sdk/python/README.md`
+### [x] 5b. Clean up authenticator sections in `sdk/python/README.md`
 
-### [ ] 5c. Clean up authenticator sections in `sdk/typescript/README.md`
+### [x] 5c. Clean up authenticator sections in `sdk/typescript/README.md`
 
-### [ ] 5d. Clean up authenticator references in `README.md` (root)
+### [x] 5d. Clean up authenticator references in `README.md` (root)
 
 ---
 
 ## Verification
 
-- [ ] **Python tests:** `cd sdk/python && uv run pytest` — all existing + new tests pass
-- [ ] **TypeScript tests:** `cd sdk/typescript && npx vitest run` — all existing + new tests pass
-- [ ] **TypeScript build:** `cd sdk/typescript && npm run build` — compiles without errors
-- [ ] **Python lint:** `cd sdk/python && uv run ruff check .`
-- [ ] **Manual check:** ensure no remaining imports of `inkbox.authenticator` or `./authenticator/` in either SDK
+- [x] **Python tests:** `cd sdk/python && uv run pytest` — all existing + new tests pass
+- [x] **TypeScript tests:** `cd sdk/typescript && npx vitest run` — all existing + new tests pass
+- [x] **TypeScript build:** `cd sdk/typescript && npm run build` — compiles without errors
+- [x] **Python lint:** `cd sdk/python && uv run ruff check .`
+- [x] **Manual check:** ensure no remaining imports of `inkbox.authenticator` or `./authenticator/` in either SDK
