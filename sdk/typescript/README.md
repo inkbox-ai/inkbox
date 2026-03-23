@@ -19,7 +19,10 @@ You'll need an API key to use this SDK. Get one at [console.inkbox.ai](https://c
 ```ts
 import { Inkbox } from "@inkbox/sdk";
 
-const inkbox = new Inkbox({ apiKey: process.env.INKBOX_API_KEY! });
+const inkbox = new Inkbox({
+  apiKey: process.env.INKBOX_API_KEY!,
+  vaultKey: process.env.INKBOX_VAULT_KEY,
+});
 
 // Create an agent identity
 const identity = await inkbox.createIdentity("support-bot");
@@ -49,8 +52,7 @@ for await (const message of identity.iterEmails()) {
 // List calls
 const calls = await identity.listCalls();
 
-// Access credentials (vault must be unlocked first)
-await inkbox.vault.unlock("my-Vault-key-01!");
+// Access credentials (vault unlocked at construction)
 const creds = await identity.getCredentials();
 for (const login of creds.listLogins()) {
   console.log(login.name);

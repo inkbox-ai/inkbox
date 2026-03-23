@@ -20,7 +20,10 @@ You'll need an API key to use this SDK. Get one at [console.inkbox.ai](https://c
 import os
 from inkbox import Inkbox
 
-with Inkbox(api_key=os.environ["INKBOX_API_KEY"]) as inkbox:
+with Inkbox(
+    api_key=os.environ["INKBOX_API_KEY"],
+    vault_key=os.environ.get("INKBOX_VAULT_KEY"),
+) as inkbox:
     # Create an agent identity
     identity = inkbox.create_identity("support-bot")
 
@@ -48,8 +51,7 @@ with Inkbox(api_key=os.environ["INKBOX_API_KEY"]) as inkbox:
     # List calls
     calls = identity.list_calls()
 
-    # Access credentials (vault must be unlocked first)
-    inkbox.vault.unlock("my-Vault-key-01!")
+    # Access credentials (vault unlocked at construction)
     for login in identity.credentials.list_logins():
         print(login.name, login.payload.username)
 ```
