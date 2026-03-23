@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
-from inkbox.mail.types import Message, MessageDetail
+from inkbox.mail.types import Message, MessageDetail, MessageDirection
 
 if TYPE_CHECKING:
     from inkbox.mail._http import HttpTransport
@@ -26,16 +26,16 @@ class MessagesResource:
         email_address: str,
         *,
         page_size: int = _DEFAULT_PAGE_SIZE,
-        direction: str | None = None,
+        direction: MessageDirection | None = None,
     ) -> Iterator[Message]:
         """Iterator over all messages in a mailbox, newest first.
 
-        Pagination is handled automatically — just iterate.
+        Pagination is handled automatically -- just iterate.
 
         Args:
             email_address: Full email address of the mailbox.
-            page_size: Number of messages fetched per API call (1–100).
-            direction: Filter by direction: ``"inbound"`` or ``"outbound"``.
+            page_size: Number of messages fetched per API call (1-100).
+            direction: Filter by direction.
 
         Example::
 
@@ -49,7 +49,7 @@ class MessagesResource:
         email_address: str,
         *,
         page_size: int,
-        direction: str | None = None,
+        direction: MessageDirection | None = None,
     ) -> Iterator[Message]:
         cursor: str | None = None
         while True:

@@ -12,6 +12,7 @@
 import { InkboxAPIError, InkboxError } from "./_http.js";
 import type { AuthenticatorAccount, AuthenticatorApp, OTPCode } from "./authenticator/types.js";
 import { Credentials } from "./credentials.js";
+import { MessageDirection } from "./mail/types.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
 import type { PhoneCall, PhoneCallWithRateLimit, PhoneTranscript } from "./phone/types.js";
 import type {
@@ -270,7 +271,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  iterEmails(options: { pageSize?: number; direction?: "inbound" | "outbound" } = {}): AsyncGenerator<Message> {
+  iterEmails(options: { pageSize?: number; direction?: MessageDirection } = {}): AsyncGenerator<Message> {
     this._requireMailbox();
     return this._inkbox._messages.list(this._mailbox!.emailAddress, options);
   }
@@ -283,7 +284,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  async *iterUnreadEmails(options: { pageSize?: number; direction?: "inbound" | "outbound" } = {}): AsyncGenerator<Message> {
+  async *iterUnreadEmails(options: { pageSize?: number; direction?: MessageDirection } = {}): AsyncGenerator<Message> {
     for await (const msg of this.iterEmails(options)) {
       if (!msg.isRead) yield msg;
     }

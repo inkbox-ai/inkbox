@@ -14,6 +14,7 @@ from inkbox.mail.types import (
     Mailbox,
     Message,
     MessageDetail,
+    MessageDirection,
     Thread,
     ThreadDetail,
 )
@@ -79,6 +80,7 @@ __all__ = [
     "Mailbox",
     "Message",
     "MessageDetail",
+    "MessageDirection",
     "Thread",
     "ThreadDetail",
     # Phone types

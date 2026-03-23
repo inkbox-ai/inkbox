@@ -22,7 +22,7 @@ from inkbox.identities.types import (
     IdentityPhoneNumber,
 )
 from inkbox.exceptions import InkboxError
-from inkbox.mail.types import Message, MessageDetail, ThreadDetail
+from inkbox.mail.types import Message, MessageDetail, MessageDirection, ThreadDetail
 from inkbox.phone.types import PhoneCall, PhoneCallWithRateLimit, PhoneTranscript
 
 if TYPE_CHECKING:
@@ -293,15 +293,15 @@ class AgentIdentity:
         self,
         *,
         page_size: int = 50,
-        direction: str | None = None,
+        direction: MessageDirection | None = None,
     ) -> Iterator[Message]:
         """Iterate over emails in this identity's inbox, newest first.
 
         Pagination is handled automatically.
 
         Args:
-            page_size: Messages fetched per API call (1–100).
-            direction: Filter by ``"inbound"`` or ``"outbound"``.
+            page_size: Messages fetched per API call (1-100).
+            direction: Filter by direction.
         """
         self._require_mailbox()
         return self._inkbox._messages.list(
@@ -314,7 +314,7 @@ class AgentIdentity:
         self,
         *,
         page_size: int = 50,
-        direction: str | None = None,
+        direction: MessageDirection | None = None,
     ) -> Iterator[Message]:
         """Iterate over unread emails in this identity's inbox, newest first.
 
@@ -322,8 +322,8 @@ class AgentIdentity:
         automatically.
 
         Args:
-            page_size: Messages fetched per API call (1–100).
-            direction: Filter by ``"inbound"`` or ``"outbound"``.
+            page_size: Messages fetched per API call (1-100).
+            direction: Filter by direction.
         """
         return (
             msg for msg in self.iter_emails(

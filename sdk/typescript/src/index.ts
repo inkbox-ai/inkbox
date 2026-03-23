@@ -5,6 +5,7 @@ export type { InkboxOptions } from "./inkbox.js";
 export { InkboxError, InkboxAPIError, InkboxVaultKeyError } from "./_http.js";
 export type { SigningKey } from "./signing_keys.js";
 export { verifyWebhook } from "./signing_keys.js";
+export { MessageDirection } from "./mail/types.js";
 export type {
   Mailbox,
   Message,

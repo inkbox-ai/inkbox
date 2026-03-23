@@ -8,6 +8,7 @@ import { HttpTransport } from "../../_http.js";
 import {
   Message,
   MessageDetail,
+  MessageDirection,
   RawCursorPage,
   RawMessage,
   parseMessage,
@@ -33,7 +34,7 @@ export class MessagesResource {
    */
   async *list(
     emailAddress: string,
-    options?: { pageSize?: number; direction?: "inbound" | "outbound" },
+    options?: { pageSize?: number; direction?: MessageDirection },
   ): AsyncGenerator<Message> {
     const limit = options?.pageSize ?? DEFAULT_PAGE_SIZE;
     let cursor: string | undefined;

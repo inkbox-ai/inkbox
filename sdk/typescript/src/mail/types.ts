@@ -2,6 +2,14 @@
  * inkbox-mail TypeScript SDK — public types.
  */
 
+/** Whether a message was received by or sent from a mailbox. */
+export enum MessageDirection {
+  /** Email received from an external sender. */
+  INBOUND = "inbound",
+  /** Email sent by the mailbox via SES. */
+  OUTBOUND = "outbound",
+}
+
 export interface Mailbox {
   id: string;
   emailAddress: string;
@@ -25,7 +33,7 @@ export interface Message {
   subject: string | null;
   /** First ~200 characters of the plain-text body */
   snippet: string | null;
-  direction: "inbound" | "outbound";
+  direction: MessageDirection;
   status: string;
   isRead: boolean;
   isStarred: boolean;
@@ -143,7 +151,7 @@ export function parseMessage(r: RawMessage): Message {
     ccAddresses: r.cc_addresses ?? null,
     subject: r.subject,
     snippet: r.snippet,
-    direction: r.direction as "inbound" | "outbound",
+    direction: r.direction as MessageDirection,
     status: r.status,
     isRead: r.is_read,
     isStarred: r.is_starred,
