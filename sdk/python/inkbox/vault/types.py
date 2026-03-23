@@ -161,7 +161,8 @@ class AbstractSecretPayload(ABC):
     """
 
     secret_type: ClassVar[VaultSecretType]  # discriminator
-    notes: str | None = field(default=None, kw_only=True)
+
+    notes: str | None = field(default=None, kw_only=True)  # catch-all
 
     def _to_dict(self) -> dict[str, Any]:
         """Serialize to a dict, omitting ``None``-valued fields."""
@@ -226,15 +227,15 @@ class APIKeyPayload(AbstractSecretPayload):
     Structured payload for ``api_key`` secrets.
 
     Attributes:
-        key: The API key or access key.
-        secret: Optional API secret or secret key.
+        access_key: The API key or access key identifier.
+        secret_key: Optional API secret or secret key. Used for keypairs.
         endpoint: Optional API endpoint URL.
     """
 
     secret_type: ClassVar[VaultSecretType] = VaultSecretType.API_KEY
 
-    key: str
-    secret: str | None = None
+    access_key: str
+    secret_key: str | None = None
     endpoint: str | None = None
 
 

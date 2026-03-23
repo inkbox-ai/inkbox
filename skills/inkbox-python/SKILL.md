@@ -222,7 +222,7 @@ unlocked.create_secret(
 # Create an API key secret
 unlocked.create_secret(
     "GitHub PAT",
-    APIKeyPayload(key="ghp_xxx", secret="ghs_xxx"),
+    APIKeyPayload(access_key="ghp_xxx", secret_key="ghs_xxx"),
 )
 
 # Create an SSH key secret
@@ -258,7 +258,7 @@ inkbox.vault.delete_secret("secret-uuid")                    # delete without un
 | Type | Class | Fields |
 |------|-------|--------|
 | `login` | `LoginPayload` | `username`, `password`, `url?`, `notes?` |
-| `api_key` | `APIKeyPayload` | `key`, `secret?`, `endpoint?`, `notes?` |
+| `api_key` | `APIKeyPayload` | `access_key`, `secret_key?`, `endpoint?`, `notes?` |
 | `ssh_key` | `SSHKeyPayload` | `private_key`, `public_key?`, `fingerprint?`, `passphrase?`, `notes?` |
 | `other` | `OtherPayload` | `data` |
 

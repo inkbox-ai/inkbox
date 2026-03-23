@@ -103,7 +103,7 @@ describe("inferSecretType", () => {
     expect(inferSecretType({ privateKey: "..." })).toBe("ssh_key");
   });
   it("api_key", () => {
-    expect(inferSecretType({ key: "k" })).toBe("api_key");
+    expect(inferSecretType({ accessKey: "k" })).toBe("api_key");
   });
   it("throws on unknown shape", () => {
     expect(() => inferSecretType({} as any)).toThrow("Cannot infer");
@@ -125,9 +125,9 @@ describe("parsePayload", () => {
     expect(p.privateKey).toBe("---");
   });
   it("api_key", () => {
-    const p = parsePayload("api_key", { key: "k", secret: "s" }) as APIKeyPayload;
-    expect(p.key).toBe("k");
-    expect(p.secret).toBe("s");
+    const p = parsePayload("api_key", { access_key: "k", secret_key: "s" }) as APIKeyPayload;
+    expect(p.accessKey).toBe("k");
+    expect(p.secretKey).toBe("s");
   });
   it("other with notes", () => {
     const p = parsePayload("other", { data: "stuff", notes: "ctx" });
@@ -162,9 +162,9 @@ describe("serializePayload", () => {
     expect(s.public_key).toBe("pub");
   });
   it("api_key uses snake_case", () => {
-    const s = serializePayload("api_key", { key: "k", secret: "s", endpoint: "https://x" });
-    expect(s.key).toBe("k");
-    expect(s.secret).toBe("s");
+    const s = serializePayload("api_key", { accessKey: "k", secretKey: "s", endpoint: "https://x" });
+    expect(s.access_key).toBe("k");
+    expect(s.secret_key).toBe("s");
     expect(s.endpoint).toBe("https://x");
   });
   it("other includes notes", () => {
@@ -212,15 +212,15 @@ describe("SSHKeyPayload roundtrip with all optional fields", () => {
 describe("APIKeyPayload roundtrip with all optional fields", () => {
   it("serializePayload then parsePayload preserves all fields", () => {
     const original: APIKeyPayload = {
-      key: "AKIAIOSFODNN7EXAMPLE",
-      secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      accessKey: "AKIAIOSFODNN7EXAMPLE",
+      secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
       endpoint: "https://api.example.com/v2",
       notes: "AWS production access key",
     };
     const serialized = serializePayload("api_key", original);
     expect(serialized).toEqual({
-      key: "AKIAIOSFODNN7EXAMPLE",
-      secret: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      access_key: "AKIAIOSFODNN7EXAMPLE",
+      secret_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
       endpoint: "https://api.example.com/v2",
       notes: "AWS production access key",
     });

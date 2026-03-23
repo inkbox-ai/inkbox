@@ -1,7 +1,7 @@
 """
 inkbox/signing_keys.py
 
-Org-level webhook signing key management — shared across all Inkbox clients.
+Org-level webhook signing key management, shared across all Inkbox clients.
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ from typing import Any, Mapping
 
 @dataclass
 class SigningKey:
-    """Org-level webhook signing key.
+    """
+    Org-level webhook signing key.
 
     Returned once on creation/rotation — store ``signing_key`` securely.
     """
@@ -37,7 +38,8 @@ def verify_webhook(
     headers: Mapping[str, str],
     secret: str,
 ) -> bool:
-    """Verify that an incoming webhook request was sent by Inkbox.
+    """
+    Verify that an incoming webhook request was sent by Inkbox.
 
     Args:
         payload: Raw request body bytes (do not parse/re-serialize).
@@ -55,17 +57,23 @@ def verify_webhook(
         return False
     key = secret.removeprefix("whsec_")
     message = f"{request_id}.{timestamp}.".encode() + payload
-    expected = hmac.new(key.encode(), message, hashlib.sha256).hexdigest()
+    expected = hmac.new(
+        key=key.encode(),
+        msg=message,
+        digestmod=hashlib.sha256,
+    ).hexdigest()
     received = signature.removeprefix("sha256=")
     return hmac.compare_digest(expected, received)
 
 
 class SigningKeysResource:
+
     def __init__(self, http: Any) -> None:
         self._http = http
 
     def create_or_rotate(self) -> SigningKey:
-        """Create or rotate the webhook signing key for your organisation.
+        """
+        Create or rotate the webhook signing key for your organisation.
 
         The first call creates a new key; subsequent calls rotate (replace) the
         existing key. The plaintext ``signing_key`` is returned **once** —

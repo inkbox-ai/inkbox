@@ -37,7 +37,7 @@ const API_KEY_SECRET: DecryptedVaultSecret = {
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
   description: null,
-  payload: { key: "sk-abc123", endpoint: "https://api.openai.com" } as APIKeyPayload,
+  payload: { accessKey: "sk-abc123", endpoint: "https://api.openai.com" } as APIKeyPayload,
 };
 
 const SSH_KEY_SECRET: DecryptedVaultSecret = {
@@ -134,7 +134,7 @@ describe("Credentials.getLogin", () => {
 describe("Credentials.getApiKey", () => {
   it("returns typed APIKeyPayload", () => {
     const payload = makeCreds().getApiKey("bbbb0000-0000-0000-0000-000000000002");
-    expect((payload as APIKeyPayload).key).toBe("sk-abc123");
+    expect((payload as APIKeyPayload).accessKey).toBe("sk-abc123");
   });
 
   it("throws TypeError on wrong type", () => {

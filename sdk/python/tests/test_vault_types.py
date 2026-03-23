@@ -77,9 +77,9 @@ class TestPayloadParsers:
         assert p.public_key is None
 
     def test_api_key(self):
-        p = _parse_payload("api_key", {"key": "ak_123", "secret": "sk_456"})
+        p = _parse_payload("api_key", {"access_key": "ak_123", "secret_key": "sk_456"})
         assert isinstance(p, APIKeyPayload)
-        assert p.secret == "sk_456"
+        assert p.secret_key == "sk_456"
 
 
 class TestInferSecretType:
@@ -93,7 +93,7 @@ class TestInferSecretType:
         assert _infer_secret_type(SSHKeyPayload(private_key="...")) == "ssh_key"
 
     def test_api_key(self):
-        assert _infer_secret_type(APIKeyPayload(key="k")) == "api_key"
+        assert _infer_secret_type(APIKeyPayload(access_key="k")) == "api_key"
 
 
 # Test VaultSecretType and VaultKeyType enums
@@ -191,29 +191,29 @@ class TestAPIKeyPayloadRoundtrip:
 
     def test_all_optional_fields(self):
         p = APIKeyPayload(
-            key="ak_prod_123",
-            secret="sk_prod_456",
+            access_key="ak_prod_123",
+            secret_key="sk_prod_456",
             endpoint="https://api.example.com/v1",
             notes="rate-limited to 1000 req/min",
         )
         d = p._to_dict()
         assert d == {
-            "key": "ak_prod_123",
-            "secret": "sk_prod_456",
+            "access_key": "ak_prod_123",
+            "secret_key": "sk_prod_456",
             "endpoint": "https://api.example.com/v1",
             "notes": "rate-limited to 1000 req/min",
         }
         roundtripped = APIKeyPayload._from_dict(d)
-        assert roundtripped.key == p.key
-        assert roundtripped.secret == p.secret
+        assert roundtripped.access_key == p.access_key
+        assert roundtripped.secret_key == p.secret_key
         assert roundtripped.endpoint == p.endpoint
         assert roundtripped.notes == p.notes
 
     def test_no_optional_fields(self):
-        p = APIKeyPayload(key="ak_123")
+        p = APIKeyPayload(access_key="ak_123")
         d = p._to_dict()
-        assert d == {"key": "ak_123"}
-        assert "secret" not in d
+        assert d == {"access_key": "ak_123"}
+        assert "secret_key" not in d
         assert "endpoint" not in d
         assert "notes" not in d
 

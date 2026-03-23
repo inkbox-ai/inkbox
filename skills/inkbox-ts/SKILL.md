@@ -231,7 +231,7 @@ await unlocked.createSecret({
 // Create an API key secret
 await unlocked.createSecret({
   name: "GitHub PAT",
-  payload: { key: "ghp_xxx", secret: "ghs_xxx" },
+  payload: { accessKey: "ghp_xxx", secretKey: "ghs_xxx" },
 });
 
 // Create an SSH key secret
@@ -272,7 +272,7 @@ await inkbox.vault.deleteSecret("secret-uuid");                             // d
 | Type | Interface | Fields |
 |------|-----------|--------|
 | `login` | `LoginPayload` | `username`, `password`, `url?`, `notes?` |
-| `api_key` | `APIKeyPayload` | `key`, `secret?`, `endpoint?`, `notes?` |
+| `api_key` | `APIKeyPayload` | `accessKey`, `secretKey?`, `endpoint?`, `notes?` |
 | `ssh_key` | `SSHKeyPayload` | `privateKey`, `publicKey?`, `fingerprint?`, `passphrase?`, `notes?` |
 | `other` | `OtherPayload` | `data` |
 

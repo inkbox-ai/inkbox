@@ -115,10 +115,10 @@ export interface SSHKeyPayload {
 
 /** Payload for `api_key` secrets. */
 export interface APIKeyPayload {
-  /** API key or access key. */
-  key: string;
+  /** API key or access key identifier. */
+  accessKey: string;
   /** API secret or secret key. */
-  secret?: string;
+  secretKey?: string;
   /** API endpoint URL. */
   endpoint?: string;
   notes?: string;
@@ -290,8 +290,8 @@ export function serializePayload(
     }
     case "api_key": {
       const p = payload as APIKeyPayload;
-      const d: Record<string, unknown> = { key: p.key };
-      if (p.secret !== undefined) d.secret = p.secret;
+      const d: Record<string, unknown> = { access_key: p.accessKey };
+      if (p.secretKey !== undefined) d.secret_key = p.secretKey;
       if (p.endpoint !== undefined) d.endpoint = p.endpoint;
       if (p.notes !== undefined) d.notes = p.notes;
       return d;
@@ -336,8 +336,8 @@ export function parsePayload(
       } satisfies SSHKeyPayload;
     case "api_key":
       return {
-        key: raw.key as string,
-        secret: raw.secret as string | undefined,
+        accessKey: raw.access_key as string,
+        secretKey: raw.secret_key as string | undefined,
         endpoint: raw.endpoint as string | undefined,
         notes: raw.notes as string | undefined,
       } satisfies APIKeyPayload;
@@ -356,7 +356,7 @@ export function parsePayload(
 export function inferSecretType(payload: SecretPayload): string {
   if ("username" in payload && "password" in payload) return "login";
   if ("privateKey" in payload) return "ssh_key";
-  if ("key" in payload) return "api_key";
+  if ("accessKey" in payload) return "api_key";
   if ("data" in payload) return "other";
   throw new Error("Cannot infer secret_type from payload shape");
 }
