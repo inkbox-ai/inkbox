@@ -166,7 +166,7 @@ describe("VaultResource.unlock", () => {
     expect(res._unlocked).toBe(unlocked);
   });
 
-  it("does not store _unlocked when identity_id provided", async () => {
+  it("stores unfiltered _unlocked when identity_id provided", async () => {
     const orgKey = generateOrgEncryptionKey();
     const vaultKey = VALID_VAULT_KEY;
     const orgId = "org_test_123";
@@ -182,8 +182,11 @@ describe("VaultResource.unlock", () => {
         wrapped_org_encryption_key: wrapped,
         encrypted_secrets: [],
       });
-    await res.unlock(vaultKey, { identityId: "some-identity" });
-    expect(res._unlocked).toBeNull();
+    const returned = await res.unlock(vaultKey, { identityId: "some-identity" });
+    // _unlocked is always populated (unfiltered) so identity.getCredentials() works
+    expect(res._unlocked).not.toBeNull();
+    // But the returned vault is a separate filtered instance
+    expect(returned).not.toBe(res._unlocked);
   });
 
   it("does not validate key strength client-side", async () => {

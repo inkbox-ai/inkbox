@@ -182,6 +182,10 @@ export class VaultResource {
       });
     }
 
+    // Always store the unfiltered vault so identity.getCredentials()
+    // has the full set to filter from, even when identityId is provided.
+    this._unlocked = new UnlockedVault(this.http, orgKey, [...decrypted]);
+
     // Step 6 (optional): filter by identity access rules
     if (options.identityId !== undefined) {
       const idStr = options.identityId;
@@ -197,9 +201,7 @@ export class VaultResource {
       return new UnlockedVault(this.http, orgKey, filtered);
     }
 
-    const unlocked = new UnlockedVault(this.http, orgKey, decrypted);
-    this._unlocked = unlocked;
-    return unlocked;
+    return this._unlocked;
   }
 }
 

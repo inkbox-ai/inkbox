@@ -132,7 +132,7 @@ class TestVaultResourceUnlock:
         unlocked = res.unlock(vault_key)
         assert res._unlocked is unlocked
 
-    def test_unlock_with_identity_id_does_not_store_state(self):
+    def test_unlock_with_identity_id_stores_unfiltered_state(self):
         org_key = generate_org_encryption_key()
         org_id = "org_test_123"
         vault_key = VALID_VAULT_KEY
@@ -149,8 +149,11 @@ class TestVaultResourceUnlock:
                 "encrypted_secrets": [],
             },
         ]
-        res.unlock(vault_key, identity_id="some-identity")
-        assert res._unlocked is None
+        returned = res.unlock(vault_key, identity_id="some-identity")
+        # _unlocked is always populated (unfiltered) so identity.credentials works
+        assert res._unlocked is not None
+        # But the returned vault is a separate filtered instance
+        assert returned is not res._unlocked
 
     def test_unlock_does_not_validate_key_strength(self):
         """unlock() should not reject recovery codes or short keys client-side;

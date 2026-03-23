@@ -1,8 +1,8 @@
 """
 inkbox/vault/resources/vault.py
 
-VaultResource — org-level vault operations.
-UnlockedVault — crypto-enabled wrapper for secret CRUD after unlock.
+VaultResource: org-level vault operations.
+UnlockedVault: crypto-enabled wrapper for secret CRUD after unlock.
 """
 
 from __future__ import annotations
@@ -36,7 +36,8 @@ _UNSET = object()
 
 
 class VaultResource:
-    """Org-level vault operations.
+    """
+    Org-level vault operations.
 
     Obtain via ``inkbox.vault``.  Most read-only operations work without
     unlocking.  To create, read, or update secret *payloads* call
@@ -47,12 +48,11 @@ class VaultResource:
         self._http = http
         self._unlocked: UnlockedVault | None = None
 
-    # ------------------------------------------------------------------
-    # Vault metadata
-    # ------------------------------------------------------------------
+    ## Vault metadata
 
     def info(self) -> VaultInfo:
-        """Get vault metadata for the caller's organisation.
+        """
+        Get vault metadata for the caller's organisation.
 
         Returns:
             :class:`~inkbox.vault.types.VaultInfo` with counts and status.
@@ -60,12 +60,11 @@ class VaultResource:
         data = self._http.get("/info")
         return VaultInfo._from_dict(data)
 
-    # ------------------------------------------------------------------
-    # Keys (read-only via API key)
-    # ------------------------------------------------------------------
+    ## Keys (read-only via API key)
 
     def list_keys(self, *, key_type: str | None = None) -> list[VaultKey]:
-        """List vault keys (metadata only — no wrapped key material).
+        """
+        List vault keys (metadata only, no wrapped key material).
 
         Args:
             key_type: Optional filter: ``"primary"`` or ``"recovery"``.
@@ -76,12 +75,11 @@ class VaultResource:
         data = self._http.get("/keys", params=params)
         return [VaultKey._from_dict(k) for k in data]
 
-    # ------------------------------------------------------------------
-    # Secrets (metadata-only operations)
-    # ------------------------------------------------------------------
+    ## Secrets (metadata-only operations)
 
     def list_secrets(self, *, secret_type: str | None = None) -> list[VaultSecret]:
-        """List vault secrets (metadata only, no encrypted payload).
+        """
+        List vault secrets (metadata only, no encrypted payload).
 
         Args:
             secret_type: Optional filter: ``"login"``, ``"ssh_key"``,
@@ -94,16 +92,15 @@ class VaultResource:
         return [VaultSecret._from_dict(s) for s in data]
 
     def delete_secret(self, secret_id: UUID | str) -> None:
-        """Delete a vault secret.
+        """
+        Delete a vault secret.
 
         Args:
             secret_id: UUID of the secret to delete.
         """
         self._http.delete(f"/secrets/{secret_id}")
 
-    # ------------------------------------------------------------------
-    # Unlock
-    # ------------------------------------------------------------------
+    ## Unlock
 
     def unlock(
         self,
@@ -111,7 +108,8 @@ class VaultResource:
         *,
         identity_id: UUID | str | None = None,
     ) -> UnlockedVault:
-        """Unlock the vault with a vault key.
+        """
+        Unlock the vault with a vault key.
 
         Derives the encryption key from the provided vault key, fetches
         and decrypts all vault secrets.
@@ -175,6 +173,14 @@ class VaultResource:
                 )
             )
 
+        # Always store the unfiltered vault so identity.credentials
+        # has the full set to filter from, even when identity_id is provided.
+        self._unlocked = UnlockedVault(
+            http=self._http,
+            org_key=org_key,
+            secrets_cache=list(decrypted),
+        )
+
         # Step 6 (optional): filter by identity access rules
         if identity_id is not None:
             id_str = str(identity_id)
@@ -185,16 +191,18 @@ class VaultResource:
                 )
                 if any(r["identity_id"] == id_str for r in access_rules):
                     filtered.append(secret)
-            decrypted = filtered
+            return UnlockedVault(
+                http=self._http,
+                org_key=org_key,
+                secrets_cache=filtered,
+            )
 
-        unlocked = UnlockedVault(http=self._http, org_key=org_key, secrets_cache=decrypted)
-        if identity_id is None:
-            self._unlocked = unlocked
-        return unlocked
+        return self._unlocked
 
 
 class UnlockedVault:
-    """A vault unlocked with a valid vault key.
+    """
+    A vault unlocked with a valid vault key.
 
     Provides transparent encrypt/decrypt for secret CRUD operations.
 
@@ -216,12 +224,11 @@ class UnlockedVault:
         """All vault secrets decrypted from the unlock response."""
         return list(self._secrets_cache)
 
-    # ------------------------------------------------------------------
-    # Encrypted CRUD
-    # ------------------------------------------------------------------
+    ## Encrypted CRUD
 
     def get_secret(self, secret_id: UUID | str) -> DecryptedVaultSecret:
-        """Fetch and decrypt a single vault secret.
+        """
+        Fetch and decrypt a single vault secret.
 
         Args:
             secret_id: UUID of the secret.
@@ -232,7 +239,10 @@ class UnlockedVault:
         data = self._http.get(f"/secrets/{secret_id}")
         detail = VaultSecretDetail._from_dict(data)
         payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload)
-        payload = _parse_payload(detail.secret_type, payload_dict)
+        payload = _parse_payload(
+            secret_type=detail.secret_type,
+            raw=payload_dict,
+        )
         return DecryptedVaultSecret(
             id=detail.id,
             name=detail.name,
@@ -251,7 +261,8 @@ class UnlockedVault:
         *,
         description: str | None = None,
     ) -> VaultSecret:
-        """Encrypt and store a new secret.
+        """
+        Encrypt and store a new secret.
 
         The ``secret_type`` is inferred from the payload type.
 
