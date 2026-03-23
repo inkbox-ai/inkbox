@@ -31,6 +31,8 @@ SECRET_DESCRIPTION = (
 
 sep = lambda: print("=" * 60)
 
+
+
 with Inkbox(api_key=api_key, vault_key=vault_key) as inkbox:
     unlocked = inkbox.vault._unlocked
     assert unlocked is not None, "Vault must be unlocked"

@@ -11,6 +11,8 @@
 
 import { InkboxAPIError, InkboxError } from "./_http.js";
 import { Credentials } from "./credentials.js";
+import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
+import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
 import { MessageDirection } from "./mail/types.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
 import type { PhoneCall, PhoneCallWithRateLimit, PhoneTranscript } from "./phone/types.js";
@@ -103,6 +105,94 @@ export class AgentIdentity {
    */
   async revokeCredentialAccess(secretId: string): Promise<void> {
     await this._inkbox._vaultResource.revokeAccess(secretId, this.id);
+    this._credentials = null;
+  }
+
+  // ------------------------------------------------------------------
+  // Vault secret management
+  // ------------------------------------------------------------------
+
+  /**
+   * Create a vault secret and grant this identity access to it.
+   *
+   * The vault must be unlocked first.
+   *
+   * @param options.name - Display name (max 255 characters).
+   * @param options.payload - The secret payload.
+   * @param options.description - Optional description.
+   * @returns {@link VaultSecret} metadata.
+   */
+  async createSecret(options: {
+    name: string;
+    payload: SecretPayload;
+    description?: string;
+  }): Promise<VaultSecret> {
+    this._requireVaultUnlocked();
+    const unlocked = this._inkbox._vaultResource._unlocked!;
+    const secret = await unlocked.createSecret(options);
+    await this._inkbox._vaultResource.grantAccess(secret.id, this.id);
+    this._credentials = null;
+    return secret;
+  }
+
+  /**
+   * Fetch and decrypt a vault secret this identity has access to.
+   *
+   * @param secretId - UUID of the secret.
+   */
+  async getSecret(secretId: string): Promise<DecryptedVaultSecret> {
+    this._requireVaultUnlocked();
+    return this._inkbox._vaultResource._unlocked!.getSecret(secretId);
+  }
+
+  /**
+   * Add or replace TOTP on a login secret this identity has access to.
+   *
+   * @param secretId - UUID of the login secret.
+   * @param totp - A {@link TOTPConfig} or an `otpauth://totp/...` URI string.
+   * @returns Updated {@link VaultSecret} metadata.
+   */
+  async setTotp(secretId: string, totp: TOTPConfig | string): Promise<VaultSecret> {
+    this._requireVaultUnlocked();
+    const result = await this._inkbox._vaultResource._unlocked!.setTotp(secretId, totp);
+    this._credentials = null;
+    return result;
+  }
+
+  /**
+   * Remove TOTP from a login secret this identity has access to.
+   *
+   * @param secretId - UUID of the login secret.
+   * @returns Updated {@link VaultSecret} metadata.
+   */
+  async removeTotp(secretId: string): Promise<VaultSecret> {
+    this._requireVaultUnlocked();
+    const result = await this._inkbox._vaultResource._unlocked!.removeTotp(secretId);
+    this._credentials = null;
+    return result;
+  }
+
+  /**
+   * Generate the current TOTP code for a login secret.
+   *
+   * Uses cached credentials if available, otherwise fetches fresh.
+   *
+   * @param secretId - UUID of the login secret.
+   * @returns A {@link TOTPCode}.
+   */
+  async getTotpCode(secretId: string): Promise<TOTPCode> {
+    this._requireVaultUnlocked();
+    return this._inkbox._vaultResource._unlocked!.getTotpCode(secretId);
+  }
+
+  /**
+   * Delete a vault secret.
+   *
+   * @param secretId - UUID of the secret to delete.
+   */
+  async deleteSecret(secretId: string): Promise<void> {
+    this._requireVaultUnlocked();
+    await this._inkbox._vaultResource._unlocked!.deleteSecret(secretId);
     this._credentials = null;
   }
 

@@ -15,6 +15,8 @@ from typing import TYPE_CHECKING, Iterator
 from uuid import UUID
 
 from inkbox.credentials import Credentials
+from inkbox.vault.totp import TOTPCode, TOTPConfig
+from inkbox.vault.types import DecryptedVaultSecret, SecretPayload, VaultSecret
 from inkbox.identities.types import (
     _AgentIdentityData,
     IdentityMailbox,
@@ -126,6 +128,110 @@ class AgentIdentity:
             secret_id,
             identity_id=self.id,
         )
+        self._credentials = None
+
+    ## Vault secret management
+
+    def create_secret(
+        self,
+        name: str,
+        payload: SecretPayload,
+        *,
+        description: str | None = None,
+    ) -> VaultSecret:
+        """Create a vault secret and grant this identity access to it.
+
+        The vault must be unlocked first.
+
+        Args:
+            name: Display name (max 255 characters).
+            payload: One of :class:`LoginPayload`, :class:`SSHKeyPayload`,
+                :class:`APIKeyPayload`, or :class:`OtherPayload`.
+            description: Optional description.
+
+        Returns:
+            :class:`~inkbox.vault.types.VaultSecret` metadata.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        secret = unlocked.create_secret(name, payload, description=description)  # type: ignore[union-attr]
+        self._inkbox._vault_resource.grant_access(
+            str(secret.id), identity_id=str(self.id),
+        )
+        self._credentials = None  # invalidate cache
+        return secret
+
+    def get_secret(self, secret_id: UUID | str) -> DecryptedVaultSecret:
+        """Fetch and decrypt a vault secret this identity has access to.
+
+        Args:
+            secret_id: UUID of the secret.
+
+        Returns:
+            :class:`~inkbox.vault.types.DecryptedVaultSecret`.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        return unlocked.get_secret(secret_id)  # type: ignore[union-attr]
+
+    def set_totp(
+        self,
+        secret_id: UUID | str,
+        totp: TOTPConfig | str,
+    ) -> VaultSecret:
+        """Add or replace TOTP on a login secret this identity has access to.
+
+        Args:
+            secret_id: UUID of the login secret.
+            totp: A :class:`~inkbox.vault.totp.TOTPConfig` or an
+                ``otpauth://totp/...`` URI string.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        result = unlocked.set_totp(secret_id, totp)  # type: ignore[union-attr]
+        self._credentials = None
+        return result
+
+    def remove_totp(self, secret_id: UUID | str) -> VaultSecret:
+        """Remove TOTP from a login secret this identity has access to.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        result = unlocked.remove_totp(secret_id)  # type: ignore[union-attr]
+        self._credentials = None
+        return result
+
+    def get_totp_code(self, secret_id: UUID | str) -> TOTPCode:
+        """Generate the current TOTP code for a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            A :class:`~inkbox.vault.totp.TOTPCode`.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        return unlocked.get_totp_code(secret_id)  # type: ignore[union-attr]
+
+    def delete_secret(self, secret_id: UUID | str) -> None:
+        """Delete a vault secret and revoke this identity's access.
+
+        Args:
+            secret_id: UUID of the secret to delete.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        unlocked.delete_secret(secret_id)  # type: ignore[union-attr]
         self._credentials = None
 
     ## Channel management
