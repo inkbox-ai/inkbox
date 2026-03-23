@@ -1,7 +1,7 @@
 """
 inkbox/agent_identity.py
 
-AgentIdentity — a domain object representing one agent identity.
+AgentIdentity: a domain object representing one agent identity.
 Returned by inkbox.create_identity() and inkbox.get_identity().
 
 Convenience methods (send_email, place_call, etc.) are scoped to this
@@ -94,7 +94,10 @@ class AgentIdentity:
         to the secrets this identity has been granted access to.  The vault
         must be unlocked first via ``inkbox.vault.unlock(vault_key)``.
 
-        The result is cached; call :meth:`refresh` to clear the cache.
+        The result is cached; call :meth:`refresh` to clear the
+        identity-scoped filter cache.  To pick up secrets created or
+        rotated after the initial unlock, call
+        ``inkbox.vault.unlock(vault_key)`` again.
 
         Raises:
             InkboxError: If the vault has not been unlocked.
@@ -543,6 +546,12 @@ class AgentIdentity:
 
     def refresh(self) -> AgentIdentity:
         """Re-fetch this identity from the API and update cached channels.
+
+        Also clears the credentials filter cache so the next access to
+        :attr:`credentials` re-evaluates access rules.  Note that the
+        underlying vault secret set is still from the last
+        ``inkbox.vault.unlock()`` call; to pick up new or rotated
+        secrets, unlock the vault again.
 
         Returns:
             ``self`` for chaining.

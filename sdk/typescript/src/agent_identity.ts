@@ -63,7 +63,9 @@ export class AgentIdentity {
    * identity has been granted access to. The vault must be unlocked
    * first via `inkbox.vault.unlock(vaultKey)`.
    *
-   * The result is cached; call {@link refresh} to clear the cache.
+   * The result is cached; call {@link refresh} to clear the identity-scoped
+   * filter cache.  To pick up secrets created or rotated after the initial
+   * unlock, call `inkbox.vault.unlock(vaultKey)` again.
    *
    * @throws Error if the vault has not been unlocked.
    */
@@ -453,6 +455,11 @@ export class AgentIdentity {
 
   /**
    * Re-fetch this identity from the API and update cached channels.
+   *
+   * Also clears the credentials filter cache so the next call to
+   * {@link getCredentials} re-evaluates access rules.  The underlying
+   * vault secret set is still from the last `inkbox.vault.unlock()` call;
+   * to pick up new or rotated secrets, unlock the vault again.
    *
    * @returns `this` for chaining.
    */
