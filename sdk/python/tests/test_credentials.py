@@ -16,8 +16,6 @@ from inkbox.vault.types import (
     OtherPayload,
     SSHKeyPayload,
 )
-from inkbox.vault.resources.vault import VaultResource, UnlockedVault
-from inkbox.vault.crypto import generate_org_encryption_key
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
 from inkbox.exceptions import InkboxError
