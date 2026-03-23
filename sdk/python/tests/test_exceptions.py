@@ -1,4 +1,8 @@
-"""Tests for SDK exception classes."""
+"""
+sdk/python/tests/test_exceptions.py
+
+Tests for SDK exception classes.
+"""
 
 from inkbox.phone.exceptions import InkboxAPIError as PhoneAPIError
 from inkbox.mail.exceptions import InkboxAPIError as MailAPIError

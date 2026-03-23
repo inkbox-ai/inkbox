@@ -1,4 +1,8 @@
-"""Tests for AgentIdentity convenience methods."""
+"""
+sdk/python/tests/test_agent_identity.py
+
+Tests for AgentIdentity convenience methods.
+"""
 
 import pytest
 from unittest.mock import MagicMock

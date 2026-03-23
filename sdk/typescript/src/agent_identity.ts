@@ -9,8 +9,10 @@
  * address or phone number ID explicitly.
  */
 
-import { InkboxAPIError } from "./_http.js";
+import { InkboxAPIError, InkboxError } from "./_http.js";
 import type { AuthenticatorAccount, AuthenticatorApp, OTPCode } from "./authenticator/types.js";
+import { Credentials } from "./credentials.js";
+import { MessageDirection } from "./mail/types.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
 import type { PhoneCall, PhoneCallWithRateLimit, PhoneTranscript } from "./phone/types.js";
 import type {
@@ -28,6 +30,8 @@ export class AgentIdentity {
   private _mailbox: IdentityMailbox | null;
   private _phoneNumber: IdentityPhoneNumber | null;
   private _authenticatorApp: IdentityAuthenticatorApp | null;
+  private _credentials: Credentials | null = null;
+  private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
   constructor(data: _AgentIdentityData, inkbox: Inkbox) {
     this._data              = data;
@@ -53,6 +57,61 @@ export class AgentIdentity {
 
   /** The authenticator app currently assigned to this identity, or `null` if none. */
   get authenticatorApp(): IdentityAuthenticatorApp | null { return this._authenticatorApp; }
+
+  /**
+   * Identity-scoped credential access.
+   *
+   * Returns a {@link Credentials} object filtered to the secrets this
+   * identity has been granted access to. The vault must be unlocked
+   * first via `inkbox.vault.unlock(vaultKey)`.
+   *
+   * The result is cached and automatically invalidated when the
+   * vault is re-unlocked.  Call {@link refresh} to manually clear
+   * the cache (e.g. after access-rule changes).
+   *
+   * @throws Error if the vault has not been unlocked.
+   */
+  async getCredentials(): Promise<Credentials> {
+    // If the vault was unlocked via constructor vaultKey, wait for it.
+    if (this._inkbox._vaultUnlockPromise !== null) {
+      await this._inkbox._vaultUnlockPromise;
+    }
+    const vault = this._inkbox._vaultResource;
+    // Invalidate cache if the vault was re-unlocked since we last built it.
+    if (this._credentials !== null && vault._unlocked === this._credentialsVaultRef) {
+      return this._credentials;
+    }
+    this._requireVaultUnlocked();
+    const unlocked = vault._unlocked!;
+    // Filter secrets by identity access rules (same logic as
+    // VaultResource.unlock with identityId).
+    const idStr = this.id;
+    const filtered = [];
+    for (const secret of unlocked.secrets) {
+      const rules = await vault.http.get<
+        Array<{ id: string; vault_secret_id: string; identity_id: string; created_at: string }>
+      >(`/secrets/${secret.id}/access`);
+      if (rules.some((r) => r.identity_id === idStr)) {
+        filtered.push(secret);
+      }
+    }
+    this._credentials = new Credentials(filtered);
+    this._credentialsVaultRef = unlocked;
+    return this._credentials;
+  }
+
+  /**
+   * Revoke this identity's access to a vault secret.
+   *
+   * Also clears the credentials cache so the next call to
+   * {@link getCredentials} reflects the change.
+   *
+   * @param secretId - UUID of the secret to revoke access from.
+   */
+  async revokeCredentialAccess(secretId: string): Promise<void> {
+    await this._inkbox._vaultResource.revokeAccess(secretId, this.id);
+    this._credentials = null;
+  }
 
   // ------------------------------------------------------------------
   // Channel management
@@ -229,7 +288,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  iterEmails(options: { pageSize?: number; direction?: "inbound" | "outbound" } = {}): AsyncGenerator<Message> {
+  iterEmails(options: { pageSize?: number; direction?: MessageDirection } = {}): AsyncGenerator<Message> {
     this._requireMailbox();
     return this._inkbox._messages.list(this._mailbox!.emailAddress, options);
   }
@@ -242,7 +301,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  async *iterUnreadEmails(options: { pageSize?: number; direction?: "inbound" | "outbound" } = {}): AsyncGenerator<Message> {
+  async *iterUnreadEmails(options: { pageSize?: number; direction?: MessageDirection } = {}): AsyncGenerator<Message> {
     for await (const msg of this.iterEmails(options)) {
       if (!msg.isRead) yield msg;
     }
@@ -377,7 +436,7 @@ export class AgentIdentity {
   }
 
   /**
-   * Soft-delete an authenticator account.
+   * Delete an authenticator account.
    *
    * @param accountId - UUID of the authenticator account to delete.
    */
@@ -420,6 +479,10 @@ export class AgentIdentity {
   /**
    * Re-fetch this identity from the API and update cached channels.
    *
+   * Also clears the credentials filter cache so the next call to
+   * {@link getCredentials} re-evaluates access rules.  (The cache is
+   * also automatically invalidated when the vault is re-unlocked.)
+   *
    * @returns `this` for chaining.
    */
   async refresh(): Promise<AgentIdentity> {
@@ -428,10 +491,11 @@ export class AgentIdentity {
     this._mailbox          = data.mailbox;
     this._phoneNumber      = data.phoneNumber;
     this._authenticatorApp = data.authenticatorApp;
+    this._credentials      = null;
     return this;
   }
 
-  /** Soft-delete this identity (unlinks channels without deleting them). */
+  /** Delete this identity (unlinks channels without deleting them). */
   async delete(): Promise<void> {
     await this._inkbox._idsResource.delete(this.agentHandle);
   }
@@ -440,10 +504,17 @@ export class AgentIdentity {
   // Internal guards
   // ------------------------------------------------------------------
 
+  private _requireVaultUnlocked(): void {
+    if (this._inkbox._vaultResource._unlocked === null) {
+      throw new InkboxError(
+        "Vault must be unlocked before accessing credentials. Call inkbox.vault.unlock(vaultKey) first.",
+      );
+    }
+  }
+
   private _requireMailbox(): void {
     if (!this._mailbox) {
-      throw new InkboxAPIError(
-        0,
+      throw new InkboxError(
         `Identity '${this.agentHandle}' has no mailbox assigned. Call identity.createMailbox() or identity.assignMailbox() first.`,
       );
     }
@@ -451,8 +522,7 @@ export class AgentIdentity {
 
   private _requirePhone(): void {
     if (!this._phoneNumber) {
-      throw new InkboxAPIError(
-        0,
+      throw new InkboxError(
         `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() or identity.assignPhoneNumber() first.`,
       );
     }
@@ -460,8 +530,7 @@ export class AgentIdentity {
 
   private _requireAuthenticatorApp(): void {
     if (!this._authenticatorApp) {
-      throw new InkboxAPIError(
-        0,
+      throw new InkboxError(
         `Identity '${this.agentHandle}' has no authenticator app assigned. Call identity.createAuthenticatorApp() or identity.assignAuthenticatorApp() first.`,
       );
     }

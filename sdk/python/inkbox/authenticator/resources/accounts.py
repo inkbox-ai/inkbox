@@ -113,7 +113,7 @@ class AuthenticatorAccountsResource:
         authenticator_app_id: UUID | str,
         account_id: UUID | str,
     ) -> None:
-        """Soft-delete an authenticator account.
+        """Delete an authenticator account.
 
         Args:
             authenticator_app_id: UUID of the parent authenticator app.

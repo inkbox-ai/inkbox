@@ -1,4 +1,8 @@
-"""Tests for identities type parsing."""
+"""
+sdk/python/tests/test_identities_types.py
+
+Tests for identities type parsing.
+"""
 
 from datetime import datetime
 from uuid import UUID

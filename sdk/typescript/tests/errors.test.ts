@@ -1,5 +1,18 @@
+// sdk/typescript/tests/errors.test.ts
 import { describe, it, expect } from "vitest";
-import { InkboxAPIError } from "../src/_http.js";
+import { InkboxError, InkboxAPIError, InkboxVaultKeyError } from "../src/_http.js";
+
+describe("InkboxError", () => {
+  it("sets message and name", () => {
+    const err = new InkboxError("something went wrong");
+    expect(err.message).toBe("something went wrong");
+    expect(err.name).toBe("InkboxError");
+  });
+
+  it("is an instance of Error", () => {
+    expect(new InkboxError("x")).toBeInstanceOf(Error);
+  });
+});
 
 describe("InkboxAPIError", () => {
   it("formats the message correctly", () => {
@@ -18,8 +31,18 @@ describe("InkboxAPIError", () => {
     expect(err.name).toBe("InkboxAPIError");
   });
 
-  it("is an instance of Error", () => {
+  it("is an instance of InkboxError", () => {
     const err = new InkboxAPIError(403, "forbidden");
+    expect(err).toBeInstanceOf(InkboxError);
     expect(err).toBeInstanceOf(Error);
+  });
+});
+
+describe("InkboxVaultKeyError", () => {
+  it("is an instance of InkboxError", () => {
+    const err = new InkboxVaultKeyError("bad key");
+    expect(err).toBeInstanceOf(InkboxError);
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("InkboxVaultKeyError");
   });
 });

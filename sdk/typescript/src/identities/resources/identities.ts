@@ -67,7 +67,7 @@ export class IdentitiesResource {
   }
 
   /**
-   * Soft-delete an identity.
+   * Delete an identity.
    *
    * Unlinks any assigned channels without deleting them.
    *

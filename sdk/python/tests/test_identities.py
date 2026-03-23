@@ -1,4 +1,8 @@
-"""Tests for IdentitiesResource."""
+"""
+sdk/python/tests/test_identities.py
+
+Tests for IdentitiesResource.
+"""
 
 from unittest.mock import MagicMock
 

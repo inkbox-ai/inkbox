@@ -1,4 +1,8 @@
-"""Tests for SigningKeysResource and verify_webhook."""
+"""
+sdk/python/tests/test_signing_keys.py
+
+Tests for SigningKeysResource and verify_webhook.
+"""
 
 import hashlib
 import hmac

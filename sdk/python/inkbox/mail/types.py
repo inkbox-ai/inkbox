@@ -8,8 +8,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
+
+
+class MessageDirection(StrEnum):
+    """
+    Whether a message was received by or sent from a mailbox.
+
+    Attributes:
+        INBOUND: Email received from an external sender.
+        OUTBOUND: Email sent by the mailbox via SES.
+    """
+    INBOUND = "inbound"
+    OUTBOUND = "outbound"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -43,7 +56,8 @@ class Mailbox:
 
 @dataclass
 class Message:
-    """Email message metadata.
+    """
+    Email message metadata.
 
     Body content is excluded from list responses.
     Call ``client.messages.get()`` to retrieve the full message with body.
@@ -58,7 +72,7 @@ class Message:
     cc_addresses: list[str] | None
     subject: str | None
     snippet: str | None
-    direction: str
+    direction: MessageDirection
     status: str
     is_read: bool
     is_starred: bool
@@ -77,7 +91,7 @@ class Message:
             cc_addresses=d.get("cc_addresses"),
             subject=d.get("subject"),
             snippet=d.get("snippet"),
-            direction=d["direction"],
+            direction=MessageDirection(d["direction"]),
             status=d["status"],
             is_read=d["is_read"],
             is_starred=d["is_starred"],

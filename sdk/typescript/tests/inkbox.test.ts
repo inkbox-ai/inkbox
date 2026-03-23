@@ -1,9 +1,11 @@
+// sdk/typescript/tests/inkbox.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { Inkbox } from "../src/inkbox.js";
 import { MailboxesResource } from "../src/mail/resources/mailboxes.js";
 import { PhoneNumbersResource } from "../src/phone/resources/numbers.js";
 import { IdentitiesResource } from "../src/identities/resources/identities.js";
 import { AgentIdentity } from "../src/agent_identity.js";
+import { VaultResource } from "../src/vault/resources/vault.js";
 import { RAW_IDENTITY, RAW_IDENTITY_DETAIL, RAW_SIGNING_KEY } from "./sampleData.js";
 
 function makeInkbox() {
@@ -114,6 +116,21 @@ describe("Inkbox.listIdentities", () => {
     const result = await ink.listIdentities();
 
     expect(result).toEqual(summaries);
+  });
+});
+
+describe("Inkbox vaultKey option", () => {
+  it("triggers vault.unlock when provided", () => {
+    const spy = vi.spyOn(VaultResource.prototype, "unlock").mockResolvedValue({} as any);
+    const ink = new Inkbox({ apiKey: "test-key", baseUrl: "https://test.inkbox.ai", vaultKey: "my-Vault-key-01!" });
+    expect(spy).toHaveBeenCalledWith("my-Vault-key-01!");
+    expect(ink._vaultUnlockPromise).not.toBeNull();
+    spy.mockRestore();
+  });
+
+  it("does not trigger unlock when omitted", () => {
+    const ink = makeInkbox();
+    expect(ink._vaultUnlockPromise).toBeNull();
   });
 });
 

@@ -1,4 +1,8 @@
-"""Tests for mail type parsing."""
+"""
+sdk/python/tests/test_mail_types.py
+
+Tests for mail type parsing.
+"""
 
 from datetime import datetime
 from uuid import UUID

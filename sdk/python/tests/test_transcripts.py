@@ -1,4 +1,8 @@
-"""Tests for TranscriptsResource."""
+"""
+sdk/python/tests/test_transcripts.py
+
+Tests for TranscriptsResource.
+"""
 
 from uuid import UUID
 

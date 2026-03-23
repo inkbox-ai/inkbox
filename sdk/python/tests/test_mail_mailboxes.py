@@ -1,4 +1,8 @@
-"""Tests for MailboxesResource."""
+"""
+sdk/python/tests/test_mail_mailboxes.py
+
+Tests for MailboxesResource.
+"""
 
 from unittest.mock import MagicMock
 from uuid import UUID
