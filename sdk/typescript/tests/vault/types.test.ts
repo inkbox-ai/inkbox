@@ -94,7 +94,7 @@ describe("parseVaultSecretDetail", () => {
 
 describe("inferSecretType", () => {
   it("login", () => {
-    expect(inferSecretType({ username: "a", password: "b" })).toBe("login");
+    expect(inferSecretType({ password: "b" })).toBe("login");
   });
   it("other", () => {
     expect(inferSecretType({ data: "freeform content" })).toBe("other");
@@ -112,8 +112,9 @@ describe("inferSecretType", () => {
 
 describe("parsePayload", () => {
   it("login", () => {
-    const p = parsePayload("login", { username: "a", password: "b", url: "https://x" }) as LoginPayload;
+    const p = parsePayload("login", { password: "b", username: "a", email: "a@x.com", url: "https://x" }) as LoginPayload;
     expect(p.username).toBe("a");
+    expect(p.email).toBe("a@x.com");
     expect(p.url).toBe("https://x");
   });
   it("other", () => {
@@ -153,8 +154,8 @@ describe("VaultKeyType", () => {
 
 describe("serializePayload", () => {
   it("login uses snake_case", () => {
-    const s = serializePayload("login", { username: "a", password: "b" });
-    expect(s).toEqual({ username: "a", password: "b" });
+    const s = serializePayload("login", { password: "b", username: "a", email: "a@x.com" });
+    expect(s).toEqual({ password: "b", username: "a", email: "a@x.com" });
   });
   it("ssh_key uses snake_case", () => {
     const s = serializePayload("ssh_key", { privateKey: "---", publicKey: "pub" });

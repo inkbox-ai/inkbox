@@ -31,7 +31,7 @@ LOGIN_SECRET = DecryptedVaultSecret(
     status="active",
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
-    payload=LoginPayload(username="admin", password="s3cret", url="https://github.com"),
+    payload=LoginPayload(password="s3cret", username="admin", url="https://github.com"),
 )
 
 API_KEY_SECRET = DecryptedVaultSecret(

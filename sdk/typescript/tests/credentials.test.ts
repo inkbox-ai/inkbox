@@ -26,7 +26,7 @@ const LOGIN_SECRET: DecryptedVaultSecret = {
   createdAt: new Date("2026-01-01"),
   updatedAt: new Date("2026-01-01"),
   description: null,
-  payload: { username: "admin", password: "s3cret", url: "https://github.com" } as LoginPayload,
+  payload: { password: "s3cret", username: "admin", url: "https://github.com" } as LoginPayload,
 };
 
 const API_KEY_SECRET: DecryptedVaultSecret = {

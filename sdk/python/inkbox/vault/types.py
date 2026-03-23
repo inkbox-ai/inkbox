@@ -187,18 +187,21 @@ class LoginPayload(AbstractSecretPayload):
     """
     Structured payload for ``login`` secrets.
 
+    At least one of ``username`` or ``email`` should be provided.
+
     Attributes:
-        username: Login username or email.
         password: Login password.
+        username: Optional login username.
+        email: Optional login email address.
         url: Optional URL of the service.
     """
 
     secret_type: ClassVar[VaultSecretType] = VaultSecretType.LOGIN
 
-    username: str
     password: str
+    username: str | None = None
+    email: str | None = None
     url: str | None = None
-    # TODO: store TOTP data structure here
 
 
 @dataclass
@@ -253,7 +256,7 @@ class OtherPayload(AbstractSecretPayload):
     data: str
 
 
-# Type alias; use the abstract base directly; all concrete payloads inherit from it.
+# Type alias; use the abstract base directly; all concrete payloads inherit from it
 SecretPayload = AbstractSecretPayload
 
 # Registry: VaultSecretType → payload class (built from subclasses defined above)

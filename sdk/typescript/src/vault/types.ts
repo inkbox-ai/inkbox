@@ -85,14 +85,14 @@ export interface VaultSecretDetail extends VaultSecret {
 
 // ---- Structured secret payloads (client-side) ----
 
-/** Payload for `login` secrets. */
+/** Payload for `login` secrets. At least one of `username` or `email` should be provided. */
 export interface LoginPayload {
-  username: string;
   password: string;
+  username?: string;
+  email?: string;
   /** URL of the service. */
   url?: string;
   notes?: string;
-  // TODO: store TOTP data structure here
 }
 
 /** Payload for `other` (freeform catch-all) secrets. */
@@ -265,10 +265,9 @@ export function serializePayload(
   switch (secretType) {
     case "login": {
       const p = payload as LoginPayload;
-      const d: Record<string, unknown> = {
-        username: p.username,
-        password: p.password,
-      };
+      const d: Record<string, unknown> = { password: p.password };
+      if (p.username !== undefined) d.username = p.username;
+      if (p.email !== undefined) d.email = p.email;
       if (p.url !== undefined) d.url = p.url;
       if (p.notes !== undefined) d.notes = p.notes;
       return d;
@@ -319,8 +318,9 @@ export function parsePayload(
   switch (secretType) {
     case "login":
       return {
-        username: raw.username as string,
         password: raw.password as string,
+        username: raw.username as string | undefined,
+        email: raw.email as string | undefined,
         url: raw.url as string | undefined,
         notes: raw.notes as string | undefined,
       } satisfies LoginPayload;
@@ -354,7 +354,7 @@ export function parsePayload(
  * @throws If the payload shape doesn't match any known type.
  */
 export function inferSecretType(payload: SecretPayload): string {
-  if ("username" in payload && "password" in payload) return "login";
+  if ("password" in payload) return "login";
   if ("privateKey" in payload) return "ssh_key";
   if ("accessKey" in payload) return "api_key";
   if ("data" in payload) return "other";

@@ -84,7 +84,7 @@ class TestPayloadParsers:
 
 class TestInferSecretType:
     def test_login(self):
-        assert _infer_secret_type(LoginPayload(username="a", password="b")) == "login"
+        assert _infer_secret_type(LoginPayload(password="b", username="a")) == "login"
 
     def test_other(self):
         assert _infer_secret_type(OtherPayload(data="x")) == "other"
@@ -111,7 +111,7 @@ class TestEnums:
 # Test notes field on payloads
 class TestPayloadNotes:
     def test_login_with_notes(self):
-        p = LoginPayload(username="a", password="b", notes="test note")
+        p = LoginPayload(password="b", username="a", notes="test note")
         d = p._to_dict()
         assert d["notes"] == "test note"
         roundtripped = LoginPayload._from_dict(d)
@@ -125,7 +125,7 @@ class TestPayloadNotes:
         assert roundtripped.notes == "context"
 
     def test_notes_default_none(self):
-        p = LoginPayload(username="a", password="b")
+        p = LoginPayload(password="b", username="a")
         assert p.notes is None
         d = p._to_dict()
         assert "notes" not in d
@@ -223,8 +223,9 @@ class TestLoginPayloadToDict:
 
     def test_with_url_and_notes(self):
         p = LoginPayload(
-            username="admin",
             password="hunter2",
+            username="admin",
+            email="admin@example.com",
             url="https://app.example.com",
             notes="shared team login",
         )
@@ -232,12 +233,15 @@ class TestLoginPayloadToDict:
         assert d["url"] == "https://app.example.com"
         assert d["notes"] == "shared team login"
         assert d["username"] == "admin"
+        assert d["email"] == "admin@example.com"
         assert d["password"] == "hunter2"
 
     def test_no_optional_fields(self):
-        p = LoginPayload(username="user", password="pass")
+        p = LoginPayload(password="pass")
         d = p._to_dict()
-        assert d == {"username": "user", "password": "pass"}
+        assert d == {"password": "pass"}
+        assert "username" not in d
+        assert "email" not in d
         assert "url" not in d
         assert "notes" not in d
 

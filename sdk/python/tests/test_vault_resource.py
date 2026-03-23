@@ -176,7 +176,7 @@ class TestUnlockedVaultCreateSecret:
 
         result = unlocked.create_secret(
             "AWS Prod",
-            LoginPayload(username="admin", password="pw"),
+            LoginPayload(password="pw", username="admin"),
             description="Prod creds",
         )
 
@@ -210,7 +210,7 @@ class TestUnlockedVaultUpdateSecret:
 
         unlocked.update_secret(
             "some-id",
-            payload=LoginPayload(username="new", password="pw2"),
+            payload=LoginPayload(password="pw2", username="new"),
         )
 
         body = http.patch.call_args[1]["json"]
@@ -271,7 +271,7 @@ class TestUnlockedVaultUpdateBoth:
         unlocked.update_secret(
             "some-id",
             name="Updated",
-            payload=LoginPayload(username="new", password="pw2"),
+            payload=LoginPayload(password="pw2", username="new"),
         )
 
         body = http.patch.call_args[1]["json"]

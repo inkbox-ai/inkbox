@@ -225,7 +225,7 @@ console.log(login.username, login.password);
 await unlocked.createSecret({
   name: "AWS Production",
   description: "Production IAM user",
-  payload: { username: "admin", password: "s3cret", url: "https://aws.amazon.com" },
+  payload: { password: "s3cret", username: "admin", url: "https://aws.amazon.com" },
 });
 
 // Create an API key secret
@@ -249,7 +249,7 @@ await unlocked.createSecret({
 // Update name/description and/or re-encrypt payload
 await unlocked.updateSecret("secret-uuid", { name: "New Name" });
 await unlocked.updateSecret("secret-uuid", {
-  payload: { username: "new", password: "new" },
+  payload: { password: "new", username: "new" },
 });
 
 // Delete
@@ -271,7 +271,7 @@ await inkbox.vault.deleteSecret("secret-uuid");                             // d
 
 | Type | Interface | Fields |
 |------|-----------|--------|
-| `login` | `LoginPayload` | `username`, `password`, `url?`, `notes?` |
+| `login` | `LoginPayload` | `password`, `username?`, `email?`, `url?`, `notes?` |
 | `api_key` | `APIKeyPayload` | `accessKey`, `secretKey?`, `endpoint?`, `notes?` |
 | `ssh_key` | `SSHKeyPayload` | `privateKey`, `publicKey?`, `fingerprint?`, `passphrase?`, `notes?` |
 | `other` | `OtherPayload` | `data` |

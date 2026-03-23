@@ -215,7 +215,7 @@ print(secret.payload.username, secret.payload.password)   # for login type
 # Create a login secret (secret_type inferred from payload type)
 unlocked.create_secret(
     "AWS Production",
-    LoginPayload(username="admin", password="s3cret", url="https://aws.amazon.com"),
+    LoginPayload(password="s3cret", username="admin", url="https://aws.amazon.com"),
     description="Production IAM user",
 )
 
@@ -236,7 +236,7 @@ unlocked.create_secret("Misc", OtherPayload(data="any freeform content"))
 
 # Update name/description and/or re-encrypt payload
 unlocked.update_secret("secret-uuid", name="New Name")
-unlocked.update_secret("secret-uuid", payload=LoginPayload(username="new", password="new"))
+unlocked.update_secret("secret-uuid", payload=LoginPayload(password="new", username="new"))
 
 # Delete
 unlocked.delete_secret("secret-uuid")
@@ -257,7 +257,7 @@ inkbox.vault.delete_secret("secret-uuid")                    # delete without un
 
 | Type | Class | Fields |
 |------|-------|--------|
-| `login` | `LoginPayload` | `username`, `password`, `url?`, `notes?` |
+| `login` | `LoginPayload` | `password`, `username?`, `email?`, `url?`, `notes?` |
 | `api_key` | `APIKeyPayload` | `access_key`, `secret_key?`, `endpoint?`, `notes?` |
 | `ssh_key` | `SSHKeyPayload` | `private_key`, `public_key?`, `fingerprint?`, `passphrase?`, `notes?` |
 | `other` | `OtherPayload` | `data` |
