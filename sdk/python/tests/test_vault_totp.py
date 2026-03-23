@@ -5,7 +5,6 @@ Comprehensive tests for TOTP support: TOTPConfig, TOTPCode, generate_totp,
 parse_totp_uri, and LoginPayload integration.
 """
 
-import time
 from unittest.mock import patch
 
 import pytest

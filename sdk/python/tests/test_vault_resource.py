@@ -484,7 +484,6 @@ def _unlocked_with_login(*, totp_config=None):
     http.patch.return_value = VAULT_SECRET_DICT
 
     from inkbox.vault.types import DecryptedVaultSecret, _parse_payload
-    from inkbox.vault.crypto import decrypt_payload as dp
     payload = _parse_payload("login", login_dict)
     from uuid import UUID
     from datetime import datetime
