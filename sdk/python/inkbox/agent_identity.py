@@ -326,7 +326,10 @@ class AgentIdentity:
             direction: Filter by ``"inbound"`` or ``"outbound"``.
         """
         return (
-            msg for msg in self.iter_emails(page_size=page_size, direction=direction) if not msg.is_read
+            msg for msg in self.iter_emails(
+                page_size=page_size,
+                direction=direction,
+            ) if not msg.is_read
         )
 
     def mark_emails_read(self, message_ids: list[str]) -> None:
