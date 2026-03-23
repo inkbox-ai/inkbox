@@ -136,7 +136,7 @@ class TestGenerateVaultKeyMaterial:
         salt = derive_salt("org_test_123")
         mk = derive_master_key(VALID_VAULT_KEY, salt)
         assert compute_auth_hash(mk) == mat.auth_hash
-        assert unwrap_org_key(mk, mat.wrapped_org_encryption_key) == org_key
+        assert unwrap_org_key(mk, mat.wrapped_org_encryption_key, vault_key_id=str(mat.id)) == org_key
 
     def test_type_override(self):
         org_key = generate_org_encryption_key()
@@ -166,7 +166,7 @@ class TestGenerateRecoveryCode:
         salt = derive_salt("org_test_123")
         mk = derive_master_key(code, salt)
         assert compute_auth_hash(mk) == mat.auth_hash
-        assert unwrap_org_key(mk, mat.wrapped_org_encryption_key) == org_key
+        assert unwrap_org_key(mk, mat.wrapped_org_encryption_key, vault_key_id=str(mat.id)) == org_key
 
     def test_codes_are_unique(self):
         org_key = generate_org_encryption_key()

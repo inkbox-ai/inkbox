@@ -191,14 +191,47 @@ class VaultResource:
                 "Check that the vault key is correct and has not been deleted."
             )
 
-        # Step 4: unwrap the org encryption key
-        org_key = unwrap_org_key(master_key, wrapped)
+        # Step 4: unwrap the org encryption key.
+        # The wrapped key was encrypted with the vault key UUID as AAD.
+        # Fetch all key IDs and try each as AAD until one works.
+        keys_data = self._http.get("/keys")
+        primary_key_ids = [
+            k["id"] for k in keys_data
+            if k.get("key_type") == "primary" and k.get("status") == "active"
+        ]
+        recovery_key_ids = [
+            k["id"] for k in keys_data
+            if k.get("key_type") == "recovery" and k.get("status") == "active"
+        ]
+        all_key_ids = primary_key_ids + recovery_key_ids
+
+        org_key: bytes | None = None
+        for key_id in all_key_ids:
+            try:
+                org_key = unwrap_org_key(master_key, wrapped, vault_key_id=key_id)
+                break
+            except Exception:
+                continue
+
+        if org_key is None:
+            # Fallback: try without AAD (for vaults initialized by older SDK versions)
+            try:
+                org_key = unwrap_org_key(master_key, wrapped, vault_key_id="")
+            except Exception:
+                raise ValueError(
+                    "Failed to unwrap org encryption key. "
+                    "Check that the vault key is correct."
+                ) from None
 
         # Step 5: decrypt all secrets from the unlock bundle
         decrypted: list[DecryptedVaultSecret] = []
         for raw in data.get("encrypted_secrets", []):
             detail = VaultSecretDetail._from_dict(raw)
-            payload_dict = decrypt_payload(org_key, detail.encrypted_payload)
+            # Try with secret ID as AAD, fall back to empty AAD
+            try:
+                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
+            except Exception:
+                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id="")
             payload = _parse_payload(detail.secret_type, payload_dict)
             decrypted.append(
                 DecryptedVaultSecret(
@@ -294,7 +327,10 @@ class UnlockedVault:
         """
         data = self._http.get(f"/secrets/{secret_id}")
         detail = VaultSecretDetail._from_dict(data)
-        payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload)
+        try:
+            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
+        except Exception:
+            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id="")
         payload = _parse_payload(
             secret_type=detail.secret_type,
             raw=payload_dict,
@@ -395,7 +431,8 @@ class UnlockedVault:
                 )
             body["encrypted_payload"] = encrypt_payload(
                 self._org_key,
-                payload._to_dict()
+                payload._to_dict(),
+                secret_id=str(secret_id),
             )
         data = self._http.patch(
             path=f"/secrets/{secret_id}",

@@ -131,34 +131,53 @@ def compute_auth_hash(master_key: bytes) -> str:
 
 ## AES-256-GCM wrapping / unwrapping
 
-def _aes_gcm_encrypt(key: bytes, plaintext: bytes) -> bytes:
-    """Encrypt with AES-256-GCM.  Returns ``ciphertext || nonce || tag``."""
+def _aes_gcm_encrypt(key: bytes, plaintext: bytes, aad: str = "") -> bytes:
+    """Encrypt with AES-256-GCM.  Returns ``ciphertext || nonce || tag``.
+
+    Args:
+        key: 32-byte AES key.
+        plaintext: Data to encrypt.
+        aad: Additional authenticated data (e.g. vault key ID or secret ID).
+    """
     iv = os.urandom(AES_IV_BYTES)
+    associated_data = aad.encode() if aad else None
     ct_and_tag = AESGCM(key).encrypt(
         nonce=iv,
         data=plaintext,
-        associated_data=None,
+        associated_data=associated_data,
     )
     ct = ct_and_tag[:-16]
     tag = ct_and_tag[-16:]
     return ct + iv + tag
 
 
-def _aes_gcm_decrypt(key: bytes, blob: bytes) -> bytes:
-    """Decrypt AES-256-GCM blob formatted as ``ciphertext || nonce || tag``."""
+def _aes_gcm_decrypt(key: bytes, blob: bytes, aad: str = "") -> bytes:
+    """Decrypt AES-256-GCM blob formatted as ``ciphertext || nonce || tag``.
+
+    Args:
+        key: 32-byte AES key.
+        blob: Ciphertext blob.
+        aad: Additional authenticated data (must match what was used during encryption).
+    """
     ct = blob[:-28]
     nonce = blob[-28:-16]
     tag = blob[-16:]
+    associated_data = aad.encode() if aad else None
     return AESGCM(key).decrypt(
         nonce=nonce,
         data=ct + tag,
-        associated_data=None,
+        associated_data=associated_data,
     )
 
 
-def wrap_org_key(master_key: bytes, org_key: bytes) -> str:
+def wrap_org_key(master_key: bytes, org_key: bytes, vault_key_id: str = "") -> str:
     """
     Wrap the org encryption key with a master key.
+
+    Args:
+        master_key: 32-byte master key.
+        org_key: 32-byte org encryption key.
+        vault_key_id: Vault key UUID used as AAD.
 
     Returns:
         Base64-encoded blob ``(ciphertext || nonce || tag)``.
@@ -167,17 +186,19 @@ def wrap_org_key(master_key: bytes, org_key: bytes) -> str:
         s=_aes_gcm_encrypt(
             key=master_key,
             plaintext=org_key,
+            aad=vault_key_id,
         )
     ).decode()
 
 
-def unwrap_org_key(master_key: bytes, wrapped_b64: str) -> bytes:
+def unwrap_org_key(master_key: bytes, wrapped_b64: str, vault_key_id: str = "") -> bytes:
     """
     Unwrap the org encryption key using a master key.
 
     Args:
         master_key: 32-byte master key derived from the vault key.
         wrapped_b64: Base64-encoded wrapped blob from the server.
+        vault_key_id: Vault key UUID used as AAD during wrapping.
 
     Returns:
         32-byte org encryption key.
@@ -186,14 +207,20 @@ def unwrap_org_key(master_key: bytes, wrapped_b64: str) -> bytes:
     return _aes_gcm_decrypt(
         key=master_key,
         blob=blob,
+        aad=vault_key_id,
     )
 
 
 ## Secret payload encryption / decryption
 
-def encrypt_payload(org_key: bytes, payload: dict[str, Any]) -> str:
+def encrypt_payload(org_key: bytes, payload: dict[str, Any], secret_id: str = "") -> str:
     """
     Serialize a payload dict to JSON and encrypt with the org key.
+
+    Args:
+        org_key: 32-byte org encryption key.
+        payload: Payload dict to serialize and encrypt.
+        secret_id: Vault secret UUID used as AAD.
 
     Returns:
         Base64-encoded ciphertext blob.
@@ -206,13 +233,19 @@ def encrypt_payload(org_key: bytes, payload: dict[str, Any]) -> str:
         s=_aes_gcm_encrypt(
             key=org_key,
             plaintext=plaintext,
+            aad=secret_id,
         )
     ).decode()
 
 
-def decrypt_payload(org_key: bytes, encrypted_b64: str) -> dict[str, Any]:
+def decrypt_payload(org_key: bytes, encrypted_b64: str, secret_id: str = "") -> dict[str, Any]:
     """
     Decrypt a base64 ciphertext blob and parse the JSON payload.
+
+    Args:
+        org_key: 32-byte org encryption key.
+        encrypted_b64: Base64-encoded ciphertext.
+        secret_id: Vault secret UUID used as AAD during encryption.
 
     Returns:
         The decrypted payload as a dict.
@@ -221,6 +254,7 @@ def decrypt_payload(org_key: bytes, encrypted_b64: str) -> dict[str, Any]:
     plaintext = _aes_gcm_decrypt(
         key=org_key,
         blob=blob,
+        aad=secret_id,
     )
     return json.loads(plaintext)
 
@@ -286,10 +320,11 @@ def generate_vault_key_material(
     salt = derive_salt(organization_id)
     master_key = derive_master_key(vault_key, salt)
     auth_hash = compute_auth_hash(master_key)
-    wrapped = wrap_org_key(master_key, org_encryption_key)
+    key_id = uuid4()
+    wrapped = wrap_org_key(master_key, org_encryption_key, vault_key_id=str(key_id))
 
     return VaultKeyMaterial(
-        id=uuid4(),
+        id=key_id,
         wrapped_org_encryption_key=wrapped,
         auth_hash=auth_hash,
         key_type=key_type,
@@ -331,10 +366,11 @@ def generate_recovery_code(
         salt=salt,
     )
     auth_hash = compute_auth_hash(master_key)
-    wrapped = wrap_org_key(master_key, org_encryption_key)
+    key_id = uuid4()
+    wrapped = wrap_org_key(master_key, org_encryption_key, vault_key_id=str(key_id))
 
     material = VaultKeyMaterial(
-        id=uuid4(),
+        id=key_id,
         wrapped_org_encryption_key=wrapped,
         auth_hash=auth_hash,
         key_type=VaultKeyType.RECOVERY,

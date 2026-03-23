@@ -137,6 +137,7 @@ class TestVaultResourceUnlock:
                     }
                 ],
             },
+            [VAULT_KEY_DICT],  # /keys
         ]
 
         unlocked = res.unlock(vault_key)
@@ -164,6 +165,7 @@ class TestVaultResourceUnlock:
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [],
             },
+            [VAULT_KEY_DICT],  # /keys
         ]
         unlocked = res.unlock(vault_key)
         assert res._unlocked is unlocked
@@ -184,6 +186,7 @@ class TestVaultResourceUnlock:
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [],
             },
+            [VAULT_KEY_DICT],  # /keys
         ]
         returned = res.unlock(vault_key, identity_id="some-identity")
         # _unlocked is always populated (unfiltered) so identity.credentials works
@@ -405,13 +408,14 @@ class TestUnlockIdentityFiltering:
 
         res, http = _resource()
 
-        # info() -> unlock() -> access for secret1 -> access for secret2
+        # info() -> unlock() -> keys -> access for secret1 -> access for secret2
         http.get.side_effect = [
             VAULT_INFO_DICT,
             {
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [secret1_dict, secret2_dict],
             },
+            [VAULT_KEY_DICT],  # /keys
             # Access rules for secret1: this identity HAS access
             [{"identity_id": identity, "secret_id": "cccc3333-0000-0000-0000-000000000001"}],
             # Access rules for secret2: different identity, no match
@@ -449,6 +453,7 @@ class TestUnlockIdentityFiltering:
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [secret_dict],
             },
+            [VAULT_KEY_DICT],  # /keys
             # No matching access rules
             [{"identity_id": "other-identity", "secret_id": "cccc3333-0000-0000-0000-000000000001"}],
         ]
