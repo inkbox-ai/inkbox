@@ -1,6 +1,6 @@
 # inkbox
 
-Python SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, authenticator/OTP, identities).
+Python SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, identities, vault).
 
 ## Install
 
@@ -204,46 +204,6 @@ for t in hits:
 
 ---
 
-## Authenticator
-
-```python
-# Create an authenticator app and link it to an identity
-app = identity.create_authenticator_app()
-
-# Add an OTP account from an otpauth:// URI
-account = identity.create_authenticator_account(
-    otpauth_uri="otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
-    display_name="My OTP Account",      # optional (max 255 chars)
-    description="Login MFA for Example", # optional
-)
-
-# List all accounts in this identity's authenticator app
-accounts = identity.list_authenticator_accounts()
-
-# Get a single account
-account = identity.get_authenticator_account("account-uuid")
-
-# Update account metadata (pass None to clear a field)
-identity.update_authenticator_account("account-uuid", display_name="New Label")
-
-# Generate an OTP code
-otp = identity.generate_otp("account-uuid")
-print(otp.otp_code)            # e.g. "482901"
-print(otp.valid_for_seconds)   # seconds until expiry (None for HOTP)
-print(otp.otp_type)            # "totp" or "hotp"
-
-# Delete an account
-identity.delete_authenticator_account("account-uuid")
-
-# Unlink authenticator app from identity
-identity.unlink_authenticator_app()
-
-# Delete the authenticator app (org-level)
-inkbox.authenticator_apps.delete("app-uuid")
-```
-
----
-
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
@@ -431,7 +391,6 @@ Runnable example scripts are available in the [examples/python](https://github.c
 | `read_agent_calls.py` | List calls and print transcripts |
 | `receive_agent_email_webhook.py` | Register and delete a mailbox webhook |
 | `receive_agent_call_webhook.py` | Register, update, and delete a phone webhook |
-| `agent_authenticator_app_e2e.py` | Full authenticator app lifecycle (create, OTP, cleanup) |
 
 ## License
 

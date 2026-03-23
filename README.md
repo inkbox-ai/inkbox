@@ -6,7 +6,7 @@ https://inkbox.ai
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-API-first communication infrastructure for AI agents — email, phone, authenticator (OTP), and identities.
+API-first communication infrastructure for AI agents — email, phone, identities, and vault.
 
 | Package | Language | Install |
 |---|---|---|
@@ -40,14 +40,6 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
 
     # Place a phone call
     call = identity.place_call(to_number="+15551234567")
-
-    # Generate an OTP code
-    app = identity.create_authenticator_app()
-    account = identity.create_authenticator_account(
-        otpauth_uri="otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
-    )
-    otp = identity.generate_otp(str(account.id))
-    print(otp.otp_code)
 ```
 
 ### TypeScript
@@ -72,14 +64,6 @@ for await (const msg of identity.iterEmails()) {
 
 // Place a phone call
 const call = await identity.placeCall({ toNumber: "+15551234567" });
-
-// Generate an OTP code
-const app = await identity.createAuthenticatorApp();
-const account = await identity.createAuthenticatorAccount({
-  otpauthUri: "otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
-});
-const otp = await identity.generateOtp(account.id);
-console.log(otp.otpCode);
 ```
 
 ---
