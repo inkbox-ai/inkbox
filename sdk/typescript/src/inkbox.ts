@@ -90,7 +90,18 @@ export class Inkbox {
   _vaultUnlockPromise: Promise<unknown> | null = null;
 
   constructor(options: InkboxOptions) {
-    const apiRoot = `${(options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "")}/api/v1`;
+    const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+    if (!baseUrl.startsWith("https://")) {
+      const parsed = new URL(baseUrl);
+      if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+        throw new Error(
+          "Only HTTPS base URLs are permitted (HTTP is allowed for " +
+          "localhost and 127.0.0.1). " +
+          "Received a baseUrl that does not start with 'https://'.",
+        );
+      }
+    }
+    const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;
 
     const mailHttp  = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms);

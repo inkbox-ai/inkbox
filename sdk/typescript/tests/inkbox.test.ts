@@ -32,6 +32,20 @@ describe("Inkbox constructor", () => {
     const ink = new Inkbox({ apiKey: "key" });
     expect(ink.mailboxes).toBeInstanceOf(MailboxesResource);
   });
+
+  it("rejects non-HTTPS baseUrl", () => {
+    expect(() => new Inkbox({ apiKey: "key", baseUrl: "http://example.com" })).toThrow(
+      "Only HTTPS base URLs are permitted",
+    );
+  });
+
+  it("allows HTTP for localhost", () => {
+    expect(() => new Inkbox({ apiKey: "key", baseUrl: "http://localhost:8000" })).not.toThrow();
+  });
+
+  it("allows HTTP for 127.0.0.1", () => {
+    expect(() => new Inkbox({ apiKey: "key", baseUrl: "http://127.0.0.1:8000" })).not.toThrow();
+  });
 });
 
 describe("Inkbox.createIdentity", () => {
