@@ -457,3 +457,165 @@ describe("VaultResource.unlock with identityId filtering", () => {
     expect(http.get).toHaveBeenCalledWith(`/secrets/${secret2Id}/access`);
   });
 });
+
+// ---- TOTP integration tests ----
+
+const SECRET_ID = "cccc3333-0000-0000-0000-000000000001";
+const TOTP_SECRET = "JBSWY3DPEHPK3PXP";
+
+function unlockedWithLogin(opts: { totpConfig?: Record<string, unknown> } = {}) {
+  const orgKey = generateOrgEncryptionKey();
+  const http = mockHttp();
+  const loginDict: Record<string, unknown> = { password: "s3cret", username: "admin" };
+  if (opts.totpConfig) loginDict.totp = opts.totpConfig;
+  const encrypted = encryptPayload(orgKey, loginDict);
+  // get_secret returns this when fetching
+  vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
+  vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
+  // Build a cached secret
+  const cached = {
+    id: RAW_SECRET.id,
+    name: RAW_SECRET.name,
+    description: RAW_SECRET.description,
+    secretType: RAW_SECRET.secret_type,
+    status: RAW_SECRET.status,
+    createdAt: new Date(RAW_SECRET.created_at),
+    updatedAt: new Date(RAW_SECRET.updated_at),
+    payload: { password: "s3cret", username: "admin", ...(opts.totpConfig ? { totp: opts.totpConfig } : {}) },
+  };
+  const unlocked = new UnlockedVault(http, orgKey, [cached]);
+  return { unlocked, http, orgKey };
+}
+
+describe("UnlockedVault.setTotp", () => {
+  it("sets TOTP with config object", async () => {
+    const { unlocked, http } = unlockedWithLogin();
+    const result = await unlocked.setTotp(SECRET_ID, { secret: TOTP_SECRET });
+    expect(result.name).toBe("AWS Production");
+    expect(vi.mocked(http.patch)).toHaveBeenCalled();
+  });
+
+  it("sets TOTP with URI string", async () => {
+    const { unlocked, http } = unlockedWithLogin();
+    const result = await unlocked.setTotp(SECRET_ID, `otpauth://totp/Test?secret=${TOTP_SECRET}&issuer=Test`);
+    expect(result.name).toBe("AWS Production");
+    expect(vi.mocked(http.patch)).toHaveBeenCalled();
+  });
+
+  it("rejects non-login secret", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    const encrypted = encryptPayload(orgKey, { data: "freeform" });
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, secret_type: "other", encrypted_payload: encrypted });
+    const unlocked = new UnlockedVault(http, orgKey, []);
+    await expect(unlocked.setTotp(SECRET_ID, { secret: TOTP_SECRET })).rejects.toThrow("only login secrets support TOTP");
+  });
+});
+
+describe("UnlockedVault.removeTotp", () => {
+  it("removes TOTP from login", async () => {
+    const totpConfig = { secret: TOTP_SECRET, algorithm: "sha1", digits: 6, period: 30 };
+    const { unlocked, http } = unlockedWithLogin({ totpConfig });
+    const result = await unlocked.removeTotp(SECRET_ID);
+    expect(result.name).toBe("AWS Production");
+    expect(vi.mocked(http.patch)).toHaveBeenCalled();
+  });
+
+  it("rejects non-login secret", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    const encrypted = encryptPayload(orgKey, { data: "freeform" });
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, secret_type: "other", encrypted_payload: encrypted });
+    const unlocked = new UnlockedVault(http, orgKey, []);
+    await expect(unlocked.removeTotp(SECRET_ID)).rejects.toThrow("only login secrets support TOTP");
+  });
+});
+
+describe("UnlockedVault.getTotpCode", () => {
+  it("generates a valid code", async () => {
+    const totpConfig = { secret: TOTP_SECRET, algorithm: "sha1", digits: 6, period: 30 };
+    const { unlocked } = unlockedWithLogin({ totpConfig });
+    const code = await unlocked.getTotpCode(SECRET_ID);
+    expect(code.code).toHaveLength(6);
+    expect(code.code).toMatch(/^\d{6}$/);
+    expect(code.secondsRemaining).toBeGreaterThan(0);
+    expect(code.periodEnd - code.periodStart).toBe(30);
+  });
+
+  it("throws when no TOTP configured", async () => {
+    const { unlocked } = unlockedWithLogin();
+    await expect(unlocked.getTotpCode(SECRET_ID)).rejects.toThrow("no TOTP configured");
+  });
+
+  it("throws for non-login secret", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    const encrypted = encryptPayload(orgKey, { data: "freeform" });
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, secret_type: "other", encrypted_payload: encrypted });
+    const unlocked = new UnlockedVault(http, orgKey, []);
+    await expect(unlocked.getTotpCode(SECRET_ID)).rejects.toThrow("only login secrets support TOTP");
+  });
+});
+
+describe("UnlockedVault cache consistency", () => {
+  it("set_totp updates cache", async () => {
+    const { unlocked, http, orgKey } = unlockedWithLogin();
+    expect(unlocked.secrets[0].payload).not.toHaveProperty("totp");
+
+    // After setTotp, the refresh mock returns a secret with TOTP
+    const totpDict = { secret: TOTP_SECRET, algorithm: "sha1", digits: 6, period: 30 };
+    const loginWithTotp = { password: "s3cret", username: "admin", totp: totpDict };
+    const encryptedWithTotp = encryptPayload(orgKey, loginWithTotp);
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encryptedWithTotp });
+
+    await unlocked.setTotp(SECRET_ID, { secret: TOTP_SECRET });
+
+    const cached = unlocked.secrets[0].payload as { totp?: { secret: string } };
+    expect(cached.totp).toBeDefined();
+    expect(cached.totp!.secret).toBe(TOTP_SECRET);
+  });
+
+  it("delete_secret removes from cache", async () => {
+    const { unlocked, http } = unlockedWithLogin();
+    expect(unlocked.secrets).toHaveLength(1);
+    vi.mocked(http.delete).mockResolvedValue(undefined);
+    await unlocked.deleteSecret(SECRET_ID);
+    expect(unlocked.secrets).toHaveLength(0);
+  });
+});
+
+describe("VaultResource.unlock with AAD happy path", () => {
+  it("unwraps org key using vault key ID as AAD", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const vaultKey = VALID_VAULT_KEY;
+    const orgId = "org_test_123";
+
+    const salt = deriveSalt(orgId);
+    const masterKey = await deriveMasterKey(vaultKey, salt);
+    const authHash = computeAuthHash(masterKey);
+
+    // Wrap with vault key ID as AAD (matching console behavior)
+    const vaultKeyId = RAW_KEY.id;
+    const wrapped = wrapOrgKey(masterKey, orgKey, vaultKeyId);
+
+    // Encrypt a payload with secret ID as AAD
+    const secretId = RAW_SECRET.id;
+    const loginPayload = { username: "admin", password: "s3cret" };
+    const encrypted = encryptPayload(orgKey, loginPayload, secretId);
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)  // info()
+      .mockResolvedValueOnce({          // unlock()
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [{ ...RAW_SECRET, encrypted_payload: encrypted }],
+      })
+      .mockResolvedValueOnce([RAW_KEY]); // keys()
+
+    const res = new VaultResource(http);
+    const unlocked = await res.unlock(vaultKey);
+
+    expect(unlocked.secrets).toHaveLength(1);
+    expect((unlocked.secrets[0].payload as { username: string }).username).toBe("admin");
+  });
+});

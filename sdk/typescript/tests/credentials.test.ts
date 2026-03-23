@@ -275,3 +275,58 @@ describe("AgentIdentity.getCredentials", () => {
     expect(identity._credentials).toBeNull();
   });
 });
+
+// ---- Credentials.getTotpCode tests ----
+
+const TOTP_SECRET = "JBSWY3DPEHPK3PXP";
+
+const LOGIN_WITH_TOTP: DecryptedVaultSecret = {
+  id: "ffff0000-0000-0000-0000-000000000006",
+  name: "GitHub with 2FA",
+  secretType: VaultSecretType.LOGIN,
+  status: "active",
+  createdAt: new Date("2026-01-01"),
+  updatedAt: new Date("2026-01-01"),
+  description: null,
+  payload: {
+    password: "s3cret",
+    username: "admin",
+    totp: { secret: TOTP_SECRET, algorithm: "sha1", digits: 6, period: 30 },
+  } as LoginPayload,
+};
+
+const LOGIN_WITHOUT_TOTP: DecryptedVaultSecret = {
+  id: "ffff0000-0000-0000-0000-000000000007",
+  name: "GitHub no 2FA",
+  secretType: VaultSecretType.LOGIN,
+  status: "active",
+  createdAt: new Date("2026-01-01"),
+  updatedAt: new Date("2026-01-01"),
+  description: null,
+  payload: { password: "s3cret", username: "admin" } as LoginPayload,
+};
+
+describe("Credentials.getTotpCode", () => {
+  it("generates a valid code", () => {
+    const creds = new Credentials([LOGIN_WITH_TOTP]);
+    const code = creds.getTotpCode("ffff0000-0000-0000-0000-000000000006");
+    expect(code.code).toHaveLength(6);
+    expect(code.code).toMatch(/^\d{6}$/);
+    expect(code.secondsRemaining).toBeGreaterThan(0);
+  });
+
+  it("throws when no TOTP configured", () => {
+    const creds = new Credentials([LOGIN_WITHOUT_TOTP]);
+    expect(() => creds.getTotpCode("ffff0000-0000-0000-0000-000000000007")).toThrow("no TOTP configured");
+  });
+
+  it("throws for non-login secret", () => {
+    const creds = new Credentials([API_KEY_SECRET]);
+    expect(() => creds.getTotpCode(API_KEY_SECRET.id)).toThrow(/not.*login/);
+  });
+
+  it("throws when not found", () => {
+    const creds = new Credentials([LOGIN_WITH_TOTP]);
+    expect(() => creds.getTotpCode("00000000-0000-0000-0000-000000000000")).toThrow("No credential with id");
+  });
+});
