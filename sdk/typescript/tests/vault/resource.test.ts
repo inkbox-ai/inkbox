@@ -179,7 +179,8 @@ describe("VaultResource.unlock", () => {
         encrypted_secrets: [
           { ...RAW_SECRET, encrypted_payload: encrypted },
         ],
-      });
+      })
+      .mockResolvedValueOnce([RAW_KEY]); // keys()
 
     const res = new VaultResource(http);
     const unlocked = await res.unlock(vaultKey);
@@ -206,7 +207,8 @@ describe("VaultResource.unlock", () => {
       .mockResolvedValueOnce({
         wrapped_org_encryption_key: wrapped,
         encrypted_secrets: [],
-      });
+      })
+      .mockResolvedValueOnce([RAW_KEY]); // keys()
     const unlocked = await res.unlock(vaultKey);
     expect(res._unlocked).toBe(unlocked);
   });
@@ -226,7 +228,8 @@ describe("VaultResource.unlock", () => {
       .mockResolvedValueOnce({
         wrapped_org_encryption_key: wrapped,
         encrypted_secrets: [],
-      });
+      })
+      .mockResolvedValueOnce([RAW_KEY]); // keys()
     const returned = await res.unlock(vaultKey, { identityId: "some-identity" });
     // _unlocked is always populated (unfiltered) so identity.getCredentials() works
     expect(res._unlocked).not.toBeNull();
@@ -409,6 +412,7 @@ describe("VaultResource.unlock with identityId filtering", () => {
           { ...RAW_SECRET, id: secret2Id, name: "Second Secret", encrypted_payload: encrypted2 },
         ],
       })
+      .mockResolvedValueOnce([RAW_KEY]) // keys()
       // access endpoint for secret1 — identity has access
       .mockResolvedValueOnce([
         { id: "rule-1", vault_secret_id: secret1Id, identity_id: identityId, created_at: "2026-03-18T12:00:00Z" },

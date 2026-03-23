@@ -203,14 +203,45 @@ export class VaultResource {
       );
     }
 
-    // Step 4: unwrap the org encryption key
-    const orgKey = unwrapOrgKey(masterKey, wrapped);
+    // Step 4: unwrap the org encryption key.
+    // The wrapped key was encrypted with the vault key UUID as AAD.
+    // Fetch all key IDs and try each as AAD until one works.
+    const keysData = await this.http.get<RawVaultKey[]>("/keys");
+    const allKeyIds = keysData
+      .filter((k) => k.status === "active")
+      .map((k) => k.id);
+
+    let orgKey: Uint8Array | null = null;
+    for (const keyId of allKeyIds) {
+      try {
+        orgKey = unwrapOrgKey(masterKey, wrapped, keyId);
+        break;
+      } catch {
+        continue;
+      }
+    }
+    if (!orgKey) {
+      // Fallback: try without AAD (for vaults initialized by older SDK versions)
+      try {
+        orgKey = unwrapOrgKey(masterKey, wrapped, "");
+      } catch {
+        throw new Error(
+          "Failed to unwrap org encryption key. Check that the vault key is correct.",
+        );
+      }
+    }
 
     // Step 5: decrypt all secrets from the unlock bundle
     const decrypted: DecryptedVaultSecret[] = [];
     for (const raw of data.encrypted_secrets ?? []) {
       const detail = parseVaultSecretDetail(raw);
-      const payloadDict = decryptPayload(orgKey, detail.encryptedPayload);
+      // Try with secret ID as AAD, fall back to empty AAD
+      let payloadDict: Record<string, unknown>;
+      try {
+        payloadDict = decryptPayload(orgKey, detail.encryptedPayload, detail.id);
+      } catch {
+        payloadDict = decryptPayload(orgKey, detail.encryptedPayload, "");
+      }
       const payload = parsePayload(
         detail.secretType,
         payloadDict as Record<string, unknown>,
@@ -307,7 +338,12 @@ export class UnlockedVault {
       `/secrets/${secretId}`,
     );
     const detail = parseVaultSecretDetail(data);
-    const payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload);
+    let payloadDict: Record<string, unknown>;
+    try {
+      payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, detail.id);
+    } catch {
+      payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, "");
+    }
     const payload = parsePayload(
       detail.secretType,
       payloadDict as Record<string, unknown>,
@@ -392,7 +428,7 @@ export class UnlockedVault {
         );
       }
       const serialized = serializePayload(newType, options.payload);
-      body["encrypted_payload"] = encryptPayload(this.orgKey, serialized);
+      body["encrypted_payload"] = encryptPayload(this.orgKey, serialized, secretId);
     }
     const data = await this.http.patch<RawVaultSecret>(
       `/secrets/${secretId}`,
