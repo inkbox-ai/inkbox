@@ -380,7 +380,14 @@ class UnlockedVault:
             path="/secrets",
             json=body,
         )
-        return VaultSecret._from_dict(data)
+        result = VaultSecret._from_dict(data)
+        # Append the new secret to the cache so it's immediately visible.
+        try:
+            decrypted = self.get_secret(str(result.id))
+            self._secrets_cache.append(decrypted)
+        except Exception:
+            pass  # best-effort
+        return result
 
     def update_secret(
         self,

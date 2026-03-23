@@ -211,6 +211,10 @@ class TestUnlockedVaultCreateSecret:
         org_key = generate_org_encryption_key()
         http = MagicMock()
         http.post.return_value = VAULT_SECRET_DICT
+        # get_secret is called after create to populate cache
+        login_payload = {"password": "pw", "username": "admin"}
+        encrypted = encrypt_payload(org_key, login_payload)
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
         result = unlocked.create_secret(
@@ -226,6 +230,23 @@ class TestUnlockedVaultCreateSecret:
         assert body["description"] == "Prod creds"
         assert body["secret_type"] == "login"
         assert "encrypted_payload" in body
+
+    def test_create_appends_to_cache(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        http.post.return_value = VAULT_SECRET_DICT
+        login_payload = {"password": "pw", "username": "admin"}
+        encrypted = encrypt_payload(org_key, login_payload)
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        assert len(unlocked.secrets) == 0
+
+        unlocked.create_secret("Test", LoginPayload(password="pw", username="admin"))
+
+        assert len(unlocked.secrets) == 1
+        assert unlocked.secrets[0].name == "AWS Production"
+        assert unlocked.secrets[0].payload.username == "admin"
 
 
 class TestUnlockedVaultUpdateSecret:

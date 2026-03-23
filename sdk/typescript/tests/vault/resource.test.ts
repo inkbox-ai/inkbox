@@ -255,6 +255,9 @@ describe("UnlockedVault.createSecret", () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_SECRET);
+    // get_secret is called after create to populate cache
+    const encrypted = encryptPayload(orgKey, { username: "admin", password: "pw" });
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
     const unlocked = new UnlockedVault(http, orgKey, []);
 
     const result = await unlocked.createSecret({
@@ -269,6 +272,26 @@ describe("UnlockedVault.createSecret", () => {
     expect(body.name).toBe("AWS Prod");
     expect(body.secret_type).toBe("login");
     expect(typeof body.encrypted_payload).toBe("string");
+  });
+
+  it("appends created secret to cache", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_SECRET);
+    const encrypted = encryptPayload(orgKey, { username: "admin", password: "pw" });
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
+    const unlocked = new UnlockedVault(http, orgKey, []);
+
+    expect(unlocked.secrets).toHaveLength(0);
+
+    await unlocked.createSecret({
+      name: "Test",
+      payload: { username: "admin", password: "pw" },
+    });
+
+    expect(unlocked.secrets).toHaveLength(1);
+    expect(unlocked.secrets[0].name).toBe("AWS Production");
+    expect((unlocked.secrets[0].payload as { username: string }).username).toBe("admin");
   });
 });
 

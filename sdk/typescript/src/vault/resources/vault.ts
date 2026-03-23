@@ -385,7 +385,15 @@ export class UnlockedVault {
     };
     if (options.description !== undefined) body["description"] = options.description;
     const data = await this.http.post<RawVaultSecret>("/secrets", body);
-    return parseVaultSecret(data);
+    const result = parseVaultSecret(data);
+    // Append the new secret to the cache so it's immediately visible.
+    try {
+      const decrypted = await this.getSecret(result.id);
+      this.secretsCache.push(decrypted);
+    } catch {
+      // best-effort
+    }
+    return result;
   }
 
   /**
