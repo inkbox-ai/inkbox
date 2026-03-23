@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterator
 
 from inkbox.authenticator.types import AuthenticatorAccount, AuthenticatorApp, OTPCode
+from inkbox.credentials import Credentials
 from inkbox.identities.types import (
     _AgentIdentityData,
     IdentityAuthenticatorApp,
@@ -55,6 +56,7 @@ class AgentIdentity:
         self._mailbox: IdentityMailbox | None = data.mailbox
         self._phone_number: IdentityPhoneNumber | None = data.phone_number
         self._authenticator_app: IdentityAuthenticatorApp | None = data.authenticator_app
+        self._credentials: Credentials | None = None
 
     # ------------------------------------------------------------------
     # Identity properties
@@ -83,6 +85,35 @@ class AgentIdentity:
     @property
     def authenticator_app(self) -> IdentityAuthenticatorApp | None:
         return self._authenticator_app
+
+    @property
+    def credentials(self) -> Credentials:
+        """Identity-scoped credential access.
+
+        Returns a :class:`~inkbox.credentials.Credentials` object filtered
+        to the secrets this identity has been granted access to.  The vault
+        must be unlocked first via ``inkbox.vault.unlock(vault_key)``.
+
+        The result is cached; call :meth:`refresh` to clear the cache.
+
+        Raises:
+            InkboxError: If the vault has not been unlocked.
+        """
+        if self._credentials is not None:
+            return self._credentials
+        self._require_vault_unlocked()
+        vault = self._inkbox._vault_resource
+        unlocked = vault._unlocked
+        # Filter secrets by identity access rules (same logic as
+        # VaultResource.unlock with identity_id).
+        id_str = str(self.id)
+        filtered = []
+        for secret in unlocked.secrets:  # type: ignore[union-attr]
+            access_rules = vault._http.get(f"/secrets/{secret.id}/access")
+            if any(r["identity_id"] == id_str for r in access_rules):
+                filtered.append(secret)
+        self._credentials = Credentials(filtered)
+        return self._credentials
 
     # ------------------------------------------------------------------
     # Channel management
@@ -521,6 +552,7 @@ class AgentIdentity:
         self._mailbox = data.mailbox
         self._phone_number = data.phone_number
         self._authenticator_app = data.authenticator_app
+        self._credentials = None
         return self
 
     def delete(self) -> None:
@@ -543,6 +575,13 @@ class AgentIdentity:
             raise InkboxError(
                 f"Identity '{self.agent_handle}' has no phone number assigned. "
                 "Call identity.provision_phone_number() or identity.assign_phone_number() first."
+            )
+
+    def _require_vault_unlocked(self) -> None:
+        if self._inkbox._vault_resource._unlocked is None:
+            raise InkboxError(
+                "Vault must be unlocked before accessing credentials. "
+                "Call inkbox.vault.unlock(vault_key) first."
             )
 
     def _require_authenticator_app(self) -> None:

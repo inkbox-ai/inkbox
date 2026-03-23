@@ -145,6 +145,47 @@ describe("VaultResource.unlock", () => {
     expect((s.payload as { username: string }).username).toBe("admin");
   });
 
+  it("stores _unlocked state after unlock", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const vaultKey = VALID_VAULT_KEY;
+    const orgId = "org_test_123";
+    const salt = deriveSalt(orgId);
+    const masterKey = await deriveMasterKey(vaultKey, salt);
+    const wrapped = wrapOrgKey(masterKey, orgKey);
+
+    const http = mockHttp();
+    const res = new VaultResource(http);
+    expect(res._unlocked).toBeNull();
+    (http.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [],
+      });
+    const unlocked = await res.unlock(vaultKey);
+    expect(res._unlocked).toBe(unlocked);
+  });
+
+  it("does not store _unlocked when identity_id provided", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const vaultKey = VALID_VAULT_KEY;
+    const orgId = "org_test_123";
+    const salt = deriveSalt(orgId);
+    const masterKey = await deriveMasterKey(vaultKey, salt);
+    const wrapped = wrapOrgKey(masterKey, orgKey);
+
+    const http = mockHttp();
+    const res = new VaultResource(http);
+    (http.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [],
+      });
+    await res.unlock(vaultKey, { identityId: "some-identity" });
+    expect(res._unlocked).toBeNull();
+  });
+
   it("does not validate key strength client-side", async () => {
     const http = mockHttp();
     const res = new VaultResource(http);

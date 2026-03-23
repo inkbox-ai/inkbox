@@ -11,6 +11,7 @@
 
 import { InkboxAPIError } from "./_http.js";
 import type { AuthenticatorAccount, AuthenticatorApp, OTPCode } from "./authenticator/types.js";
+import { Credentials } from "./credentials.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
 import type { PhoneCall, PhoneCallWithRateLimit, PhoneTranscript } from "./phone/types.js";
 import type {
@@ -28,6 +29,7 @@ export class AgentIdentity {
   private _mailbox: IdentityMailbox | null;
   private _phoneNumber: IdentityPhoneNumber | null;
   private _authenticatorApp: IdentityAuthenticatorApp | null;
+  private _credentials: Credentials | null = null;
 
   constructor(data: _AgentIdentityData, inkbox: Inkbox) {
     this._data              = data;
@@ -53,6 +55,38 @@ export class AgentIdentity {
 
   /** The authenticator app currently assigned to this identity, or `null` if none. */
   get authenticatorApp(): IdentityAuthenticatorApp | null { return this._authenticatorApp; }
+
+  /**
+   * Identity-scoped credential access.
+   *
+   * Returns a {@link Credentials} object filtered to the secrets this
+   * identity has been granted access to. The vault must be unlocked
+   * first via `inkbox.vault.unlock(vaultKey)`.
+   *
+   * The result is cached; call {@link refresh} to clear the cache.
+   *
+   * @throws Error if the vault has not been unlocked.
+   */
+  async getCredentials(): Promise<Credentials> {
+    if (this._credentials !== null) return this._credentials;
+    this._requireVaultUnlocked();
+    const vault = this._inkbox._vaultResource;
+    const unlocked = vault._unlocked!;
+    // Filter secrets by identity access rules (same logic as
+    // VaultResource.unlock with identityId).
+    const idStr = this.id;
+    const filtered = [];
+    for (const secret of unlocked.secrets) {
+      const rules = await vault.http.get<
+        Array<{ id: string; vault_secret_id: string; identity_id: string; created_at: string }>
+      >(`/secrets/${secret.id}/access`);
+      if (rules.some((r) => r.identity_id === idStr)) {
+        filtered.push(secret);
+      }
+    }
+    this._credentials = new Credentials(filtered);
+    return this._credentials;
+  }
 
   // ------------------------------------------------------------------
   // Channel management
@@ -428,6 +462,7 @@ export class AgentIdentity {
     this._mailbox          = data.mailbox;
     this._phoneNumber      = data.phoneNumber;
     this._authenticatorApp = data.authenticatorApp;
+    this._credentials      = null;
     return this;
   }
 
@@ -439,6 +474,15 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
   // Internal guards
   // ------------------------------------------------------------------
+
+  private _requireVaultUnlocked(): void {
+    if (this._inkbox._vaultResource._unlocked === null) {
+      throw new InkboxAPIError(
+        0,
+        "Vault must be unlocked before accessing credentials. Call inkbox.vault.unlock(vaultKey) first.",
+      );
+    }
+  }
 
   private _requireMailbox(): void {
     if (!this._mailbox) {

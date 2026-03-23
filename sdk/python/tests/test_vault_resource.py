@@ -111,6 +111,47 @@ class TestVaultResourceUnlock:
         assert s.payload.username == "admin"
         assert s.payload.password == "s3cret"
 
+    def test_unlock_stores_unlocked_state(self):
+        org_key = generate_org_encryption_key()
+        org_id = "org_test_123"
+        vault_key = VALID_VAULT_KEY
+
+        salt = derive_salt(org_id)
+        mk = derive_master_key(vault_key, salt)
+        wrapped = wrap_org_key(mk, org_key)
+
+        res, http = _resource()
+        assert res._unlocked is None
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {
+                "wrapped_org_encryption_key": wrapped,
+                "encrypted_secrets": [],
+            },
+        ]
+        unlocked = res.unlock(vault_key)
+        assert res._unlocked is unlocked
+
+    def test_unlock_with_identity_id_does_not_store_state(self):
+        org_key = generate_org_encryption_key()
+        org_id = "org_test_123"
+        vault_key = VALID_VAULT_KEY
+
+        salt = derive_salt(org_id)
+        mk = derive_master_key(vault_key, salt)
+        wrapped = wrap_org_key(mk, org_key)
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {
+                "wrapped_org_encryption_key": wrapped,
+                "encrypted_secrets": [],
+            },
+        ]
+        res.unlock(vault_key, identity_id="some-identity")
+        assert res._unlocked is None
+
     def test_unlock_does_not_validate_key_strength(self):
         """unlock() should not reject recovery codes or short keys client-side;
         the server rejects bad auth hashes."""

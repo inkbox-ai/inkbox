@@ -4,6 +4,7 @@ inkbox — Python SDK for the Inkbox APIs.
 
 from inkbox.client import Inkbox
 from inkbox.agent_identity import AgentIdentity
+from inkbox.credentials import Credentials
 
 # Exceptions (canonical source)
 from inkbox.exceptions import InkboxAPIError, InkboxError, InkboxVaultKeyError
@@ -69,6 +70,7 @@ __all__ = [
     # Entry points
     "Inkbox",
     "AgentIdentity",
+    "Credentials",
     # Exceptions
     "InkboxError",
     "InkboxAPIError",

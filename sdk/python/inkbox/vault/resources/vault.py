@@ -45,6 +45,7 @@ class VaultResource:
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+        self._unlocked: UnlockedVault | None = None
 
     # ------------------------------------------------------------------
     # Vault metadata
@@ -186,7 +187,10 @@ class VaultResource:
                     filtered.append(secret)
             decrypted = filtered
 
-        return UnlockedVault(http=self._http, org_key=org_key, secrets_cache=decrypted)
+        unlocked = UnlockedVault(http=self._http, org_key=org_key, secrets_cache=decrypted)
+        if identity_id is None:
+            self._unlocked = unlocked
+        return unlocked
 
 
 class UnlockedVault:

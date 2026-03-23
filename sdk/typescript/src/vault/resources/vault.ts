@@ -47,7 +47,11 @@ import type {
  * {@link unlock} first.
  */
 export class VaultResource {
-  private readonly http: HttpTransport;
+  /** @internal */
+  readonly http: HttpTransport;
+
+  /** @internal */
+  _unlocked: UnlockedVault | null = null;
 
   /** @internal */
   constructor(http: HttpTransport) {
@@ -193,7 +197,9 @@ export class VaultResource {
       return new UnlockedVault(this.http, orgKey, filtered);
     }
 
-    return new UnlockedVault(this.http, orgKey, decrypted);
+    const unlocked = new UnlockedVault(this.http, orgKey, decrypted);
+    this._unlocked = unlocked;
+    return unlocked;
   }
 }
 
