@@ -6,7 +6,7 @@ https://inkbox.ai
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-API-first communication infrastructure for AI agents — email, phone, identities, and vault.
+API-first communication infrastructure for AI agents — email, phone, identities, and encrypted vault (login credentials, API keys, key pairs, SSH keys, OTP, etc.).
 
 | Package | Language | Install |
 |---|---|---|
