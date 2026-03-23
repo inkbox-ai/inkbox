@@ -42,6 +42,7 @@ AgentIdentity (identity-scoped helper)
 ├── .mailbox                 → IdentityMailbox | None
 ├── .phone_number            → IdentityPhoneNumber | None
 ├── .authenticator_app       → IdentityAuthenticatorApp | None
+├── .credentials             → Credentials  (requires vault unlocked)
 ├── mail methods             (requires assigned mailbox)
 ├── phone methods            (requires assigned phone number)
 └── authenticator methods    (requires assigned authenticator app)
@@ -262,6 +263,38 @@ inkbox.vault.delete_secret("secret-uuid")                    # delete without un
 | `other` | `OtherPayload` | `data` |
 
 `secret_type` is immutable after creation. To change it, delete and recreate.
+
+### Agent Credentials (identity-scoped)
+
+Agent-facing credential access — typed, identity-scoped. The vault stays as the admin surface; `identity.credentials` is the agent runtime surface.
+
+```python
+from inkbox import Credentials
+
+# Unlock the vault first (stores state on the client)
+inkbox.vault.unlock("my-Vault-key-01!")
+
+identity = inkbox.get_identity("support-bot")
+
+# Discovery — returns list[DecryptedVaultSecret] with name/metadata
+all_creds = identity.credentials.list()
+logins    = identity.credentials.list_logins()
+api_keys  = identity.credentials.list_api_keys()
+ssh_keys  = identity.credentials.list_ssh_keys()
+
+# Access by UUID — returns typed payload directly
+login   = identity.credentials.get_login("secret-uuid")      # → LoginPayload
+api_key = identity.credentials.get_api_key("secret-uuid")    # → APIKeyPayload
+ssh_key = identity.credentials.get_ssh_key("secret-uuid")    # → SSHKeyPayload
+
+# Generic access — returns DecryptedVaultSecret
+secret = identity.credentials.get("secret-uuid")
+```
+
+- Requires `inkbox.vault.unlock()` first — raises `InkboxError` if vault is not unlocked
+- Results are filtered to secrets the identity has access to (via access rules)
+- Cached after first access; call `identity.refresh()` to clear the cache
+- `get_*` raises `KeyError` if not found, `TypeError` if wrong secret type
 
 ## Org-level Resources
 

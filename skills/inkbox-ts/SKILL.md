@@ -41,6 +41,7 @@ AgentIdentity (identity-scoped helper)
 ├── .mailbox                → IdentityMailbox | null
 ├── .phoneNumber            → IdentityPhoneNumber | null
 ├── .authenticatorApp       → IdentityAuthenticatorApp | null
+├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── mail methods            (requires assigned mailbox)
 ├── phone methods           (requires assigned phone number)
 └── authenticator methods   (requires assigned authenticator app)
@@ -276,6 +277,39 @@ await inkbox.vault.deleteSecret("secret-uuid");                             // d
 | `other` | `OtherPayload` | `data` |
 
 `secretType` is immutable after creation. To change it, delete and recreate.
+
+### Agent Credentials (identity-scoped)
+
+Agent-facing credential access — typed, identity-scoped. The vault stays as the admin surface; `identity.getCredentials()` is the agent runtime surface.
+
+```typescript
+import type { Credentials } from "@inkbox/sdk";
+
+// Unlock the vault first (stores state on the client)
+await inkbox.vault.unlock("my-Vault-key-01!");
+
+const identity = await inkbox.getIdentity("support-bot");
+const creds = await identity.getCredentials();
+
+// Discovery — returns DecryptedVaultSecret[] with name/metadata
+const allCreds = creds.list();
+const logins   = creds.listLogins();
+const apiKeys  = creds.listApiKeys();
+const sshKeys  = creds.listSshKeys();
+
+// Access by UUID — returns typed payload directly
+const login  = creds.getLogin("secret-uuid");    // → LoginPayload
+const apiKey = creds.getApiKey("secret-uuid");    // → APIKeyPayload
+const sshKey = creds.getSshKey("secret-uuid");    // → SSHKeyPayload
+
+// Generic access — returns DecryptedVaultSecret
+const secret = creds.get("secret-uuid");
+```
+
+- Requires `inkbox.vault.unlock()` first — throws `InkboxAPIError` if vault is not unlocked
+- Results are filtered to secrets the identity has access to (via access rules)
+- Cached after first call; call `identity.refresh()` to clear the cache
+- `get*` throws `Error` if not found, `TypeError` if wrong secret type
 
 ## Org-level Resources
 
