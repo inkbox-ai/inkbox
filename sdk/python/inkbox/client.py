@@ -44,7 +44,16 @@ class Inkbox:
                 subject="Hello!",
                 body_text="Hi there",
             )
+
+    With vault credentials::
+
+        with Inkbox(api_key="ApiKey_...", vault_key="my-Vault-key-01!") as inkbox:
+            identity = inkbox.get_identity("my-agent")
+            for login in identity.credentials.list_logins():
+                print(login.name, login.payload.username)
     """
+
+    ## Magic methods
 
     def __init__(
         self,
@@ -118,9 +127,24 @@ class Inkbox:
         if vault_key is not None:
             self._vault_resource.unlock(vault_key)
 
-    # ------------------------------------------------------------------
-    # Public resource accessors
-    # ------------------------------------------------------------------
+    def __enter__(self) -> Inkbox:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.close()
+
+    ## Lifecycle
+
+    def close(self) -> None:
+        """Close all underlying HTTP connection pools."""
+        self._mail_http.close()
+        self._phone_http.close()
+        self._ids_http.close()
+        self._auth_http.close()
+        self._vault_http.close()
+        self._api_http.close()
+
+    ## Public resource accessors
 
     @property
     def mailboxes(self) -> MailboxesResource:
@@ -154,8 +178,6 @@ class Inkbox:
         Returns:
             The created :class:`AgentIdentity`.
         """
-        from inkbox.agent_identity import AgentIdentity
-
         self._ids_resource.create(agent_handle=agent_handle)
         data = self._ids_resource.get(agent_handle)
         return AgentIdentity(data, self)
@@ -170,11 +192,9 @@ class Inkbox:
         Returns:
             The :class:`AgentIdentity`.
         """
-        from inkbox.agent_identity import AgentIdentity
-
         return AgentIdentity(
-            self._ids_resource.get(agent_handle),
-            self,
+            data=self._ids_resource.get(agent_handle),
+            inkbox=self,
         )
 
     def list_identities(self) -> list[AgentIdentitySummary]:
@@ -188,20 +208,3 @@ class Inkbox:
         The plaintext key is returned once — save it immediately.
         """
         return self._signing_keys.create_or_rotate()
-
-    ## Lifecycle
-
-    def close(self) -> None:
-        """Close all underlying HTTP connection pools."""
-        self._mail_http.close()
-        self._phone_http.close()
-        self._ids_http.close()
-        self._auth_http.close()
-        self._vault_http.close()
-        self._api_http.close()
-
-    def __enter__(self) -> Inkbox:
-        return self
-
-    def __exit__(self, *_: object) -> None:
-        self.close()

@@ -60,6 +60,19 @@ export interface InkboxOptions {
  *   bodyText: "Tracking number: 1Z999AA10123456784",
  * });
  * ```
+ *
+ * @example With vault credentials:
+ * ```ts
+ * const inkbox = new Inkbox({
+ *   apiKey: process.env.INKBOX_API_KEY!,
+ *   vaultKey: "my-Vault-key-01!",
+ * });
+ * const identity = await inkbox.getIdentity("my-agent");
+ * const creds = await identity.getCredentials();
+ * for (const login of creds.listLogins()) {
+ *   console.log(login.name);
+ * }
+ * ```
  */
 export class Inkbox {
   readonly _mailboxes: MailboxesResource;
