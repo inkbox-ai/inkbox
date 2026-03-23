@@ -16,6 +16,7 @@ import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { AuthenticatorAppsResource } from "./authenticator/resources/apps.js";
 import { AuthenticatorAccountsResource } from "./authenticator/resources/accounts.js";
+import { VaultResource } from "./vault/resources/vault.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type { AgentIdentitySummary } from "./identities/types.js";
 
@@ -28,6 +29,12 @@ export interface InkboxOptions {
   baseUrl?: string;
   /** Request timeout in milliseconds. Defaults to 30 000. */
   timeoutMs?: number;
+  /**
+   * Optional vault key or recovery code.  When provided, the vault is
+   * unlocked automatically at construction so `identity.getCredentials()`
+   * is immediately available.
+   */
+  vaultKey?: string;
 }
 
 /**
@@ -53,6 +60,19 @@ export interface InkboxOptions {
  *   bodyText: "Tracking number: 1Z999AA10123456784",
  * });
  * ```
+ *
+ * @example With vault credentials:
+ * ```ts
+ * const inkbox = new Inkbox({
+ *   apiKey: process.env.INKBOX_API_KEY!,
+ *   vaultKey: "my-Vault-key-01!",
+ * });
+ * const identity = await inkbox.getIdentity("my-agent");
+ * const creds = await identity.getCredentials();
+ * for (const login of creds.listLogins()) {
+ *   console.log(login.name);
+ * }
+ * ```
  */
 export class Inkbox {
   readonly _mailboxes: MailboxesResource;
@@ -65,6 +85,9 @@ export class Inkbox {
   readonly _idsResource: IdentitiesResource;
   readonly _authApps: AuthenticatorAppsResource;
   readonly _authAccounts: AuthenticatorAccountsResource;
+  readonly _vaultResource: VaultResource;
+  /** @internal */
+  _vaultUnlockPromise: Promise<unknown> | null = null;
 
   constructor(options: InkboxOptions) {
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
@@ -81,6 +104,7 @@ export class Inkbox {
     const phoneHttp = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms);
     const idsHttp   = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms);
     const authHttp  = new HttpTransport(options.apiKey, `${apiRoot}/authenticator`, ms);
+    const vaultHttp = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms);
     const apiHttp   = new HttpTransport(options.apiKey, apiRoot, ms);
 
     this._mailboxes   = new MailboxesResource(mailHttp);
@@ -96,6 +120,12 @@ export class Inkbox {
 
     this._authApps     = new AuthenticatorAppsResource(authHttp);
     this._authAccounts = new AuthenticatorAccountsResource(authHttp);
+
+    this._vaultResource = new VaultResource(vaultHttp);
+
+    if (options.vaultKey !== undefined) {
+      this._vaultUnlockPromise = this._vaultResource.unlock(options.vaultKey);
+    }
   }
 
   // ------------------------------------------------------------------
@@ -110,6 +140,9 @@ export class Inkbox {
 
   /** Org-level authenticator app operations (list, get, create, delete). */
   get authenticatorApps(): AuthenticatorAppsResource { return this._authApps; }
+
+  /** Encrypted vault (info, unlock, secrets). */
+  get vault(): VaultResource { return this._vaultResource; }
 
   // ------------------------------------------------------------------
   // Org-level operations

@@ -1,9 +1,11 @@
 export { Inkbox } from "./inkbox.js";
 export { AgentIdentity } from "./agent_identity.js";
+export { Credentials } from "./credentials.js";
 export type { InkboxOptions } from "./inkbox.js";
-export { InkboxAPIError } from "./_http.js";
+export { InkboxError, InkboxAPIError, InkboxVaultKeyError } from "./_http.js";
 export type { SigningKey } from "./signing_keys.js";
 export { verifyWebhook } from "./signing_keys.js";
+export { MessageDirection } from "./mail/types.js";
 export type {
   Mailbox,
   Message,
@@ -29,3 +31,26 @@ export type {
   AuthenticatorAccount,
   OTPCode,
 } from "./authenticator/types.js";
+export type {
+  AccessRule,
+  VaultInfo,
+  VaultKey,
+  VaultSecret,
+  VaultSecretDetail,
+  DecryptedVaultSecret,
+  LoginPayload,
+  OtherPayload,
+  SSHKeyPayload,
+  APIKeyPayload,
+  KeyPairPayload,
+  SecretPayload,
+} from "./vault/types.js";
+export { VaultSecretType, VaultKeyType } from "./vault/types.js";
+export type { VaultKeyMaterial } from "./vault/crypto.js";
+export { UnlockedVault } from "./vault/resources/vault.js";
+export {
+  generateOrgEncryptionKey,
+  generateVaultKeyMaterial,
+  generateRecoveryCode,
+  vaultKeyMaterialToWire,
+} from "./vault/crypto.js";

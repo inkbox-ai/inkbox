@@ -1,3 +1,4 @@
+// sdk/typescript/tests/mail/messages.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { MessagesResource } from "../../src/mail/resources/messages.js";
 import type { HttpTransport } from "../../src/_http.js";

@@ -1,3 +1,4 @@
+// sdk/typescript/tests/authenticator/accounts.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AuthenticatorAccountsResource } from "../../src/authenticator/resources/accounts.js";
 import type { HttpTransport } from "../../src/_http.js";

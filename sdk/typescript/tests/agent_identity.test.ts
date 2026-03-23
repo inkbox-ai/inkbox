@@ -1,6 +1,7 @@
+// sdk/typescript/tests/agent_identity.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AgentIdentity } from "../src/agent_identity.js";
-import { InkboxAPIError } from "../src/_http.js";
+import { InkboxError } from "../src/_http.js";
 import type { Inkbox } from "../src/inkbox.js";
 import type { _AgentIdentityData } from "../src/identities/types.js";
 import {
@@ -168,7 +169,7 @@ describe("AgentIdentity channel management", () => {
 
   it("unlinkMailbox throws when no mailbox", async () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
-    await expect(identity.unlinkMailbox()).rejects.toThrow(InkboxAPIError);
+    await expect(identity.unlinkMailbox()).rejects.toThrow(InkboxError);
   });
 
   it("provisionPhoneNumber provisions and links", async () => {
@@ -210,7 +211,7 @@ describe("AgentIdentity channel management", () => {
 
   it("unlinkPhoneNumber throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
-    await expect(identity.unlinkPhoneNumber()).rejects.toThrow(InkboxAPIError);
+    await expect(identity.unlinkPhoneNumber()).rejects.toThrow(InkboxError);
   });
 });
 
@@ -229,7 +230,7 @@ describe("AgentIdentity mail helpers", () => {
 
   it("sendEmail throws when no mailbox", async () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
-    await expect(identity.sendEmail({ to: ["x"], subject: "y" })).rejects.toThrow(InkboxAPIError);
+    await expect(identity.sendEmail({ to: ["x"], subject: "y" })).rejects.toThrow(InkboxError);
   });
 
   it("iterEmails returns async generator", () => {
@@ -244,7 +245,7 @@ describe("AgentIdentity mail helpers", () => {
 
   it("iterEmails throws when no mailbox", () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
-    expect(() => identity.iterEmails()).toThrow(InkboxAPIError);
+    expect(() => identity.iterEmails()).toThrow(InkboxError);
   });
 
   it("iterUnreadEmails filters read messages", async () => {
@@ -278,7 +279,7 @@ describe("AgentIdentity mail helpers", () => {
 
   it("markEmailsRead throws when no mailbox", async () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
-    await expect(identity.markEmailsRead(["msg-1"])).rejects.toThrow(InkboxAPIError);
+    await expect(identity.markEmailsRead(["msg-1"])).rejects.toThrow(InkboxError);
   });
 
   it("getMessage delegates to messages resource", async () => {
@@ -293,7 +294,7 @@ describe("AgentIdentity mail helpers", () => {
 
   it("getMessage throws when no mailbox", async () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
-    await expect(identity.getMessage("msg-1")).rejects.toThrow(InkboxAPIError);
+    await expect(identity.getMessage("msg-1")).rejects.toThrow(InkboxError);
   });
 
   it("getThread delegates to threads resource", async () => {
@@ -308,7 +309,7 @@ describe("AgentIdentity mail helpers", () => {
 
   it("getThread throws when no mailbox", async () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
-    await expect(identity.getThread("thread-1")).rejects.toThrow(InkboxAPIError);
+    await expect(identity.getThread("thread-1")).rejects.toThrow(InkboxError);
   });
 });
 
@@ -329,7 +330,7 @@ describe("AgentIdentity phone helpers", () => {
 
   it("placeCall throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
-    await expect(identity.placeCall({ toNumber: "+1" })).rejects.toThrow(InkboxAPIError);
+    await expect(identity.placeCall({ toNumber: "+1" })).rejects.toThrow(InkboxError);
   });
 
   it("listCalls delegates to calls resource", async () => {
@@ -344,7 +345,7 @@ describe("AgentIdentity phone helpers", () => {
 
   it("listCalls throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
-    await expect(identity.listCalls()).rejects.toThrow(InkboxAPIError);
+    await expect(identity.listCalls()).rejects.toThrow(InkboxError);
   });
 
   it("listTranscripts delegates to transcripts resource", async () => {
@@ -359,7 +360,7 @@ describe("AgentIdentity phone helpers", () => {
 
   it("listTranscripts throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
-    await expect(identity.listTranscripts("call-1")).rejects.toThrow(InkboxAPIError);
+    await expect(identity.listTranscripts("call-1")).rejects.toThrow(InkboxError);
   });
 });
 
@@ -453,7 +454,7 @@ describe("AgentIdentity authenticator channel management", () => {
 
   it("unlinkAuthenticatorApp throws when no app", async () => {
     const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.unlinkAuthenticatorApp()).rejects.toThrow(InkboxAPIError);
+    await expect(identity.unlinkAuthenticatorApp()).rejects.toThrow(InkboxError);
   });
 });
 
@@ -478,7 +479,7 @@ describe("AgentIdentity authenticator helpers", () => {
 
   it("generateOtp throws when no authenticator app", async () => {
     const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.generateOtp("account-1")).rejects.toThrow(InkboxAPIError);
+    await expect(identity.generateOtp("account-1")).rejects.toThrow(InkboxError);
   });
 
   it("listAuthenticatorAccounts delegates to authAccounts resource", async () => {
@@ -494,7 +495,7 @@ describe("AgentIdentity authenticator helpers", () => {
 
   it("listAuthenticatorAccounts throws when no authenticator app", async () => {
     const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.listAuthenticatorAccounts()).rejects.toThrow(InkboxAPIError);
+    await expect(identity.listAuthenticatorAccounts()).rejects.toThrow(InkboxError);
   });
 
   it("createAuthenticatorAccount delegates to authAccounts resource", async () => {
@@ -512,7 +513,7 @@ describe("AgentIdentity authenticator helpers", () => {
     const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
     await expect(
       identity.createAuthenticatorAccount({ otpauthUri: "otpauth://totp/Test?secret=ABC" }),
-    ).rejects.toThrow(InkboxAPIError);
+    ).rejects.toThrow(InkboxError);
   });
 
   it("deleteAuthenticatorAccount delegates to authAccounts resource", async () => {
@@ -527,6 +528,6 @@ describe("AgentIdentity authenticator helpers", () => {
 
   it("deleteAuthenticatorAccount throws when no authenticator app", async () => {
     const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.deleteAuthenticatorAccount("acc-1")).rejects.toThrow(InkboxAPIError);
+    await expect(identity.deleteAuthenticatorAccount("acc-1")).rejects.toThrow(InkboxError);
   });
 });

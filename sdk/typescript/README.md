@@ -1,6 +1,6 @@
 # @inkbox/sdk
 
-TypeScript SDK for the [Inkbox API](https://www.inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, authenticator/OTP, identities).
+TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, authenticator/OTP, identities).
 
 ## Install
 
@@ -19,7 +19,10 @@ You'll need an API key to use this SDK. Get one at [console.inkbox.ai](https://c
 ```ts
 import { Inkbox } from "@inkbox/sdk";
 
-const inkbox = new Inkbox({ apiKey: process.env.INKBOX_API_KEY! });
+const inkbox = new Inkbox({
+  apiKey: process.env.INKBOX_API_KEY!,
+  vaultKey: process.env.INKBOX_VAULT_KEY,
+});
 
 // Create an agent identity
 const identity = await inkbox.createIdentity("support-bot");
@@ -48,6 +51,12 @@ for await (const message of identity.iterEmails()) {
 
 // List calls
 const calls = await identity.listCalls();
+
+// Access credentials (vault unlocked at construction)
+const creds = await identity.getCredentials();
+for (const login of creds.listLogins()) {
+  console.log(login.name);
+}
 ```
 
 ## Authentication
@@ -242,6 +251,37 @@ await identity.unlinkAuthenticatorApp();
 
 // Delete the authenticator app (org-level)
 await inkbox.authenticatorApps.delete("app-uuid");
+```
+
+---
+
+## Credentials
+
+Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
+
+```ts
+// Unlock the vault (once per session)
+await inkbox.vault.unlock("my-Vault-key-01!");
+
+const identity = await inkbox.getIdentity("my-agent");
+const creds = await identity.getCredentials();
+
+// Discovery — list credentials this identity has access to
+for (const login of creds.listLogins()) {
+  console.log(login.name, (login.payload as LoginPayload).username);
+}
+
+for (const key of creds.listApiKeys()) {
+  console.log(key.name, (key.payload as APIKeyPayload).accessKey);
+}
+
+// Access by UUID — returns the typed payload directly
+const login  = creds.getLogin("secret-uuid");    // → LoginPayload
+const apiKey = creds.getApiKey("secret-uuid");    // → APIKeyPayload
+const sshKey = creds.getSshKey("secret-uuid");    // → SSHKeyPayload
+
+// Generic access
+const secret = creds.get("secret-uuid");          // → DecryptedVaultSecret
 ```
 
 ---

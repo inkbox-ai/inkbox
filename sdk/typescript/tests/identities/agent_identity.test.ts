@@ -1,9 +1,10 @@
+// sdk/typescript/tests/identities/agent_identity.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AgentIdentity } from "../../src/agent_identity.js";
 import { parseAgentIdentityData } from "../../src/identities/types.js";
 import { parseMessageDetail, parseThreadDetail } from "../../src/mail/types.js";
 import type { Inkbox } from "../../src/inkbox.js";
-import { InkboxAPIError } from "../../src/_http.js";
+import { InkboxError } from "../../src/_http.js";
 import { RAW_IDENTITY_DETAIL, RAW_MESSAGE_DETAIL, RAW_THREAD_DETAIL } from "../sampleData.js";
 
 const THREAD_ID = RAW_THREAD_DETAIL.id;
@@ -44,7 +45,7 @@ describe("AgentIdentity.getMessage", () => {
   it("throws when no mailbox is assigned", async () => {
     const { identity } = identityWithoutMailbox();
 
-    await expect(identity.getMessage(MESSAGE_ID)).rejects.toThrow(InkboxAPIError);
+    await expect(identity.getMessage(MESSAGE_ID)).rejects.toThrow(InkboxError);
   });
 });
 
@@ -64,6 +65,6 @@ describe("AgentIdentity.getThread", () => {
   it("throws when no mailbox is assigned", async () => {
     const { identity } = identityWithoutMailbox();
 
-    await expect(identity.getThread(THREAD_ID)).rejects.toThrow(InkboxAPIError);
+    await expect(identity.getThread(THREAD_ID)).rejects.toThrow(InkboxError);
   });
 });

@@ -1,4 +1,8 @@
-"""Tests for ThreadsResource."""
+"""
+sdk/python/tests/test_mail_threads.py
+
+Tests for ThreadsResource.
+"""
 
 from unittest.mock import MagicMock
 

@@ -52,10 +52,10 @@ class AuthenticatorAppsResource:
         return AuthenticatorApp._from_dict(data)
 
     def delete(self, authenticator_app_id: UUID | str) -> None:
-        """Soft-delete an authenticator app.
+        """Delete an authenticator app.
 
         This also unlinks the app from its identity (if any) and
-        soft-deletes all child authenticator accounts.
+        deletes all child authenticator accounts.
 
         Args:
             authenticator_app_id: UUID of the authenticator app to delete.
