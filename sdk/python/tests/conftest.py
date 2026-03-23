@@ -34,6 +34,4 @@ def client(transport: FakeHttpTransport) -> Inkbox:
     c._calls._http = transport
     c._transcripts._http = transport
     c._signing_keys._http = transport
-    c._auth_apps._http = transport
-    c._auth_accounts._http = transport
     return c
