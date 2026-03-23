@@ -64,6 +64,10 @@ const VALID_PERIODS = new Set([30, 60]);
  * @throws Error if any field is invalid.
  */
 export function validateTotpConfig(config: TOTPConfig): void {
+  if (!config.secret || !config.secret.trim()) {
+    throw new Error("secret must be a non-empty base32 string");
+  }
+  b32decode(config.secret); // validate base32
   const digits = config.digits ?? 6;
   if (!VALID_DIGITS.has(digits)) {
     throw new Error(`digits must be 6 or 8, got ${digits}`);

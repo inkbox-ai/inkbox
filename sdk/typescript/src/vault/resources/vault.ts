@@ -260,7 +260,7 @@ export class VaultResource {
 export class UnlockedVault {
   private readonly http: HttpTransport;
   private readonly orgKey: Uint8Array;
-  private readonly secretsCache: DecryptedVaultSecret[];
+  private secretsCache: DecryptedVaultSecret[];
 
   constructor(
     http: HttpTransport,
@@ -275,6 +275,14 @@ export class UnlockedVault {
   /** All vault secrets decrypted from the unlock response. */
   get secrets(): DecryptedVaultSecret[] {
     return [...this.secretsCache];
+  }
+
+  /** Re-fetch, decrypt, and update a single secret in the cache. */
+  private async refreshCachedSecret(secretId: string): Promise<void> {
+    const updated = await this.getSecret(secretId);
+    this.secretsCache = this.secretsCache.map((s) =>
+      s.id === secretId ? updated : s,
+    );
   }
 
   // ------------------------------------------------------------------
@@ -382,6 +390,8 @@ export class UnlockedVault {
       `/secrets/${secretId}`,
       body,
     );
+    // Refresh the cache so subsequent reads are consistent.
+    await this.refreshCachedSecret(secretId);
     return parseVaultSecret(data);
   }
 
@@ -392,6 +402,7 @@ export class UnlockedVault {
    */
   async deleteSecret(secretId: string): Promise<void> {
     await this.http.delete(`/secrets/${secretId}`);
+    this.secretsCache = this.secretsCache.filter((s) => s.id !== secretId);
   }
 
   // ------------------------------------------------------------------

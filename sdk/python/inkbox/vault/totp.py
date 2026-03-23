@@ -80,6 +80,9 @@ class TOTPConfig:
     account_name: str | None = None
 
     def __post_init__(self) -> None:
+        if not self.secret or not self.secret.strip():
+            raise ValueError("secret must be a non-empty base32 string")
+        _b32decode(self.secret)  # validate base32
         if self.digits not in (6, 8):
             raise ValueError(f"digits must be 6 or 8, got {self.digits}")
         if self.period not in (30, 60):

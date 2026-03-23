@@ -264,6 +264,15 @@ class UnlockedVault:
         """All vault secrets decrypted from the unlock response."""
         return list(self._secrets_cache)
 
+    def _refresh_cached_secret(self, secret_id: UUID | str) -> None:
+        """Re-fetch, decrypt, and update a single secret in the cache."""
+        updated = self.get_secret(secret_id)
+        sid = str(secret_id)
+        self._secrets_cache = [
+            updated if str(s.id) == sid else s
+            for s in self._secrets_cache
+        ]
+
     ## Encrypted CRUD
 
     def get_secret(self, secret_id: UUID | str) -> DecryptedVaultSecret:
@@ -385,6 +394,8 @@ class UnlockedVault:
             path=f"/secrets/{secret_id}",
             json=body,
         )
+        # Refresh the cache so subsequent reads are consistent.
+        self._refresh_cached_secret(secret_id)
         return VaultSecret._from_dict(data)
 
     def delete_secret(self, secret_id: UUID | str) -> None:
@@ -395,6 +406,10 @@ class UnlockedVault:
             secret_id: UUID of the secret to delete.
         """
         self._http.delete(f"/secrets/{secret_id}")
+        sid = str(secret_id)
+        self._secrets_cache = [
+            s for s in self._secrets_cache if str(s.id) != sid
+        ]
 
     ## TOTP helpers
 
