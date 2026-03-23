@@ -91,9 +91,9 @@ console.log(otp.otpCode);
 | [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
 | [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
 | [`skills/`](./skills/) | Agent skills for Claude Code and other coding agents |
-| [`examples/python/browser-use/`](./examples/python/browser-use/) | Inkbox + Browser Use — give your agent an email and browser |
-| [`examples/python/kernel/`](./examples/python/kernel/) | Inkbox + Kernel — give your agent an email and browser |
-| [`examples/typescript/openclaw/`](./examples/typescript/openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
+| [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email and browser |
+| [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
+| [`skills/inkbox-openclaw/`](./skills/inkbox-openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
 
 ---
 
