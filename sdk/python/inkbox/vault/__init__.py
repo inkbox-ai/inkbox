@@ -6,6 +6,7 @@ from inkbox.vault.types import (
     AccessRule,
     APIKeyPayload,
     DecryptedVaultSecret,
+    KeyPairPayload,
     LoginPayload,
     OtherPayload,
     SSHKeyPayload,
@@ -39,6 +40,7 @@ __all__ = [
     "LoginPayload",
     "SSHKeyPayload",
     "APIKeyPayload",
+    "KeyPairPayload",
     "OtherPayload",
     # Key generation helpers
     "VaultKeyMaterial",

@@ -9,6 +9,7 @@ from uuid import UUID
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT, VAULT_SECRET_DETAIL_DICT
 from inkbox.vault.types import (
     APIKeyPayload,
+    KeyPairPayload,
     LoginPayload,
     OtherPayload,
     SSHKeyPayload,
@@ -77,8 +78,14 @@ class TestPayloadParsers:
         assert p.public_key is None
 
     def test_api_key(self):
-        p = _parse_payload("api_key", {"access_key": "ak_123", "secret_key": "sk_456"})
+        p = _parse_payload("api_key", {"api_key": "ak_123"})
         assert isinstance(p, APIKeyPayload)
+        assert p.api_key == "ak_123"
+
+    def test_key_pair(self):
+        p = _parse_payload("key_pair", {"access_key": "ak_123", "secret_key": "sk_456"})
+        assert isinstance(p, KeyPairPayload)
+        assert p.access_key == "ak_123"
         assert p.secret_key == "sk_456"
 
 
@@ -93,7 +100,10 @@ class TestInferSecretType:
         assert _infer_secret_type(SSHKeyPayload(private_key="...")) == "ssh_key"
 
     def test_api_key(self):
-        assert _infer_secret_type(APIKeyPayload(access_key="k")) == "api_key"
+        assert _infer_secret_type(APIKeyPayload(api_key="k")) == "api_key"
+
+    def test_key_pair(self):
+        assert _infer_secret_type(KeyPairPayload(access_key="a", secret_key="s")) == "key_pair"
 
 
 # Test VaultSecretType and VaultKeyType enums
@@ -191,29 +201,54 @@ class TestAPIKeyPayloadRoundtrip:
 
     def test_all_optional_fields(self):
         p = APIKeyPayload(
-            access_key="ak_prod_123",
-            secret_key="sk_prod_456",
+            api_key="sk-prod-123",
             endpoint="https://api.example.com/v1",
             notes="rate-limited to 1000 req/min",
         )
         d = p._to_dict()
         assert d == {
-            "access_key": "ak_prod_123",
-            "secret_key": "sk_prod_456",
+            "api_key": "sk-prod-123",
             "endpoint": "https://api.example.com/v1",
             "notes": "rate-limited to 1000 req/min",
         }
         roundtripped = APIKeyPayload._from_dict(d)
-        assert roundtripped.access_key == p.access_key
-        assert roundtripped.secret_key == p.secret_key
+        assert roundtripped.api_key == p.api_key
         assert roundtripped.endpoint == p.endpoint
         assert roundtripped.notes == p.notes
 
     def test_no_optional_fields(self):
-        p = APIKeyPayload(access_key="ak_123")
+        p = APIKeyPayload(api_key="sk-123")
         d = p._to_dict()
-        assert d == {"access_key": "ak_123"}
-        assert "secret_key" not in d
+        assert d == {"api_key": "sk-123"}
+        assert "endpoint" not in d
+        assert "notes" not in d
+
+
+class TestKeyPairPayloadRoundtrip:
+    """Cover KeyPairPayload._to_dict and _from_dict."""
+
+    def test_all_optional_fields(self):
+        p = KeyPairPayload(
+            access_key="AKIAIOSFODNN7EXAMPLE",
+            secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            endpoint="https://s3.amazonaws.com",
+            notes="AWS prod",
+        )
+        d = p._to_dict()
+        assert d == {
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "endpoint": "https://s3.amazonaws.com",
+            "notes": "AWS prod",
+        }
+        roundtripped = KeyPairPayload._from_dict(d)
+        assert roundtripped.access_key == p.access_key
+        assert roundtripped.secret_key == p.secret_key
+
+    def test_no_optional_fields(self):
+        p = KeyPairPayload(access_key="ak", secret_key="sk")
+        d = p._to_dict()
+        assert d == {"access_key": "ak", "secret_key": "sk"}
         assert "endpoint" not in d
         assert "notes" not in d
 

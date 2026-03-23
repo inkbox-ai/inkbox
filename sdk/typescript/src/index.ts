@@ -44,6 +44,7 @@ export type {
   OtherPayload,
   SSHKeyPayload,
   APIKeyPayload,
+  KeyPairPayload,
   SecretPayload,
 } from "./vault/types.js";
 export { VaultSecretType, VaultKeyType } from "./vault/types.js";

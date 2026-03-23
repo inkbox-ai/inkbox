@@ -121,14 +121,11 @@ describe("Inkbox.listIdentities", () => {
 
 describe("Inkbox vaultKey option", () => {
   it("triggers vault.unlock when provided", () => {
-    const ink = makeInkbox();
-    const unlockSpy = vi.spyOn(ink._vaultResource, "unlock").mockResolvedValue({} as any);
-    // Reconstruct with vaultKey to test the constructor path
-    const ink2 = new Inkbox({ apiKey: "test-key", baseUrl: "https://test.inkbox.ai", vaultKey: "my-Vault-key-01!" });
-    const spy2 = vi.spyOn(VaultResource.prototype, "unlock");
-    // The unlock was already called during construction, check the promise
-    expect(ink2._vaultUnlockPromise).not.toBeNull();
-    spy2.mockRestore();
+    const spy = vi.spyOn(VaultResource.prototype, "unlock").mockResolvedValue({} as any);
+    const ink = new Inkbox({ apiKey: "test-key", baseUrl: "https://test.inkbox.ai", vaultKey: "my-Vault-key-01!" });
+    expect(spy).toHaveBeenCalledWith("my-Vault-key-01!");
+    expect(ink._vaultUnlockPromise).not.toBeNull();
+    spy.mockRestore();
   });
 
   it("does not trigger unlock when omitted", () => {

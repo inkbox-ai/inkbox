@@ -20,6 +20,7 @@ import type {
   OtherPayload,
   SSHKeyPayload,
   APIKeyPayload,
+  KeyPairPayload,
 } from "../../src/vault/types.js";
 
 const RAW_INFO: RawVaultInfo = {
@@ -103,7 +104,10 @@ describe("inferSecretType", () => {
     expect(inferSecretType({ privateKey: "..." })).toBe("ssh_key");
   });
   it("api_key", () => {
-    expect(inferSecretType({ accessKey: "k" })).toBe("api_key");
+    expect(inferSecretType({ apiKey: "k" })).toBe("api_key");
+  });
+  it("key_pair", () => {
+    expect(inferSecretType({ accessKey: "a", secretKey: "s" })).toBe("key_pair");
   });
   it("throws on unknown shape", () => {
     expect(() => inferSecretType({} as any)).toThrow("Cannot infer");
@@ -126,8 +130,12 @@ describe("parsePayload", () => {
     expect(p.privateKey).toBe("---");
   });
   it("api_key", () => {
-    const p = parsePayload("api_key", { access_key: "k", secret_key: "s" }) as APIKeyPayload;
-    expect(p.accessKey).toBe("k");
+    const p = parsePayload("api_key", { api_key: "k" }) as APIKeyPayload;
+    expect(p.apiKey).toBe("k");
+  });
+  it("key_pair", () => {
+    const p = parsePayload("key_pair", { access_key: "a", secret_key: "s" }) as KeyPairPayload;
+    expect(p.accessKey).toBe("a");
     expect(p.secretKey).toBe("s");
   });
   it("other with notes", () => {
@@ -163,8 +171,13 @@ describe("serializePayload", () => {
     expect(s.public_key).toBe("pub");
   });
   it("api_key uses snake_case", () => {
-    const s = serializePayload("api_key", { accessKey: "k", secretKey: "s", endpoint: "https://x" });
-    expect(s.access_key).toBe("k");
+    const s = serializePayload("api_key", { apiKey: "k", endpoint: "https://x" });
+    expect(s.api_key).toBe("k");
+    expect(s.endpoint).toBe("https://x");
+  });
+  it("key_pair uses snake_case", () => {
+    const s = serializePayload("key_pair", { accessKey: "a", secretKey: "s", endpoint: "https://x" });
+    expect(s.access_key).toBe("a");
     expect(s.secret_key).toBe("s");
     expect(s.endpoint).toBe("https://x");
   });
@@ -213,19 +226,37 @@ describe("SSHKeyPayload roundtrip with all optional fields", () => {
 describe("APIKeyPayload roundtrip with all optional fields", () => {
   it("serializePayload then parsePayload preserves all fields", () => {
     const original: APIKeyPayload = {
-      accessKey: "AKIAIOSFODNN7EXAMPLE",
-      secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      apiKey: "sk-prod-123",
       endpoint: "https://api.example.com/v2",
-      notes: "AWS production access key",
+      notes: "OpenAI production key",
     };
     const serialized = serializePayload("api_key", original);
     expect(serialized).toEqual({
-      access_key: "AKIAIOSFODNN7EXAMPLE",
-      secret_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      api_key: "sk-prod-123",
       endpoint: "https://api.example.com/v2",
-      notes: "AWS production access key",
+      notes: "OpenAI production key",
     });
     const parsed = parsePayload("api_key", serialized) as APIKeyPayload;
+    expect(parsed).toEqual(original);
+  });
+});
+
+describe("KeyPairPayload roundtrip with all optional fields", () => {
+  it("serializePayload then parsePayload preserves all fields", () => {
+    const original: KeyPairPayload = {
+      accessKey: "AKIAIOSFODNN7EXAMPLE",
+      secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      endpoint: "https://s3.amazonaws.com",
+      notes: "AWS production",
+    };
+    const serialized = serializePayload("key_pair", original);
+    expect(serialized).toEqual({
+      access_key: "AKIAIOSFODNN7EXAMPLE",
+      secret_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      endpoint: "https://s3.amazonaws.com",
+      notes: "AWS production",
+    });
+    const parsed = parsePayload("key_pair", serialized) as KeyPairPayload;
     expect(parsed).toEqual(original);
   });
 });

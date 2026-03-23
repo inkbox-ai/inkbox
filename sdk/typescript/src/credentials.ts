@@ -11,6 +11,7 @@
 import type {
   APIKeyPayload,
   DecryptedVaultSecret,
+  KeyPairPayload,
   LoginPayload,
   SSHKeyPayload,
 } from "./vault/types.js";
@@ -63,6 +64,12 @@ export class Credentials {
   }
 
   /** List SSH key credentials. */
+  /** List key pair credentials (access key + secret key). */
+  listKeyPairs(): DecryptedVaultSecret[] {
+    return this._secrets.filter((s) => s.secretType === VaultSecretType.KEY_PAIR);
+  }
+
+  /** List SSH key credentials. */
   listSshKeys(): DecryptedVaultSecret[] {
     return this._secrets.filter((s) => s.secretType === VaultSecretType.SSH_KEY);
   }
@@ -107,6 +114,17 @@ export class Credentials {
    */
   getApiKey(secretId: string): APIKeyPayload {
     return this._getTyped(secretId, VaultSecretType.API_KEY) as APIKeyPayload;
+  }
+
+  /**
+   * Get a key pair credential's payload by UUID.
+   *
+   * @param secretId - UUID of the secret.
+   * @throws Error if not found.
+   * @throws TypeError if the credential is not a key_pair type.
+   */
+  getKeyPair(secretId: string): KeyPairPayload {
+    return this._getTyped(secretId, VaultSecretType.KEY_PAIR) as KeyPairPayload;
   }
 
   /**

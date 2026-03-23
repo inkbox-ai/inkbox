@@ -25,12 +25,14 @@ class VaultSecretType(StrEnum):
     does not validate or enforce payload structure (it's opaque ciphertext).
 
     Attributes:
-        API_KEY: API key or access-key/secret-key pair.
+        API_KEY: Single API token (e.g. OpenAI, Anthropic).
+        KEY_PAIR: Access key + secret key pair (e.g. AWS, Stripe).
         LOGIN: Username/password combination, optionally with URL.
         SSH_KEY: SSH private key, optionally with public key/fingerprint.
         OTHER: Freeform encrypted catch-all.
     """
     API_KEY = "api_key"
+    KEY_PAIR = "key_pair"
     LOGIN = "login"
     SSH_KEY = "ssh_key"
     OTHER = "other"
@@ -254,18 +256,34 @@ class SSHKeyPayload(AbstractSecretPayload):
 @dataclass
 class APIKeyPayload(AbstractSecretPayload):
     """
-    Structured payload for ``api_key`` secrets.
+    Structured payload for ``api_key`` secrets (single token).
 
     Attributes:
-        access_key: The API key or access key identifier.
-        secret_key: Optional API secret or secret key. Used for keypairs.
+        api_key: The API key or token.
         endpoint: Optional API endpoint URL.
     """
 
     secret_type: ClassVar[VaultSecretType] = VaultSecretType.API_KEY
 
+    api_key: str
+    endpoint: str | None = None
+
+
+@dataclass
+class KeyPairPayload(AbstractSecretPayload):
+    """
+    Structured payload for ``key_pair`` secrets (access key + secret key).
+
+    Attributes:
+        access_key: The access key identifier.
+        secret_key: The secret key.
+        endpoint: Optional API endpoint URL.
+    """
+
+    secret_type: ClassVar[VaultSecretType] = VaultSecretType.KEY_PAIR
+
     access_key: str
-    secret_key: str | None = None
+    secret_key: str
     endpoint: str | None = None
 
 

@@ -41,7 +41,7 @@ API_KEY_SECRET = DecryptedVaultSecret(
     status="active",
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
-    payload=APIKeyPayload(access_key="sk-abc123", endpoint="https://api.openai.com"),
+    payload=APIKeyPayload(api_key="sk-abc123", endpoint="https://api.openai.com"),
 )
 
 SSH_KEY_SECRET = DecryptedVaultSecret(
@@ -130,7 +130,7 @@ class TestCredentialsGetTyped:
     def test_get_api_key(self):
         payload = _creds().get_api_key("bbbb0000-0000-0000-0000-000000000002")
         assert isinstance(payload, APIKeyPayload)
-        assert payload.access_key == "sk-abc123"
+        assert payload.api_key == "sk-abc123"
 
     def test_get_ssh_key(self):
         payload = _creds().get_ssh_key("cccc0000-0000-0000-0000-000000000003")

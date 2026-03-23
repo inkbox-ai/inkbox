@@ -15,6 +15,7 @@
  */
 export const VaultSecretType = {
   API_KEY: "api_key",
+  KEY_PAIR: "key_pair",
   LOGIN: "login",
   SSH_KEY: "ssh_key",
   OTHER: "other",
@@ -139,12 +140,21 @@ export interface SSHKeyPayload {
   notes?: string;
 }
 
-/** Payload for `api_key` secrets. */
+/** Payload for `api_key` secrets (single token). */
 export interface APIKeyPayload {
-  /** API key or access key identifier. */
+  /** The API key or token. */
+  apiKey: string;
+  /** API endpoint URL. */
+  endpoint?: string;
+  notes?: string;
+}
+
+/** Payload for `key_pair` secrets (access key + secret key). */
+export interface KeyPairPayload {
+  /** The access key identifier. */
   accessKey: string;
-  /** API secret or secret key. */
-  secretKey?: string;
+  /** The secret key. */
+  secretKey: string;
   /** API endpoint URL. */
   endpoint?: string;
   notes?: string;
@@ -155,7 +165,8 @@ export type SecretPayload =
   | LoginPayload
   | OtherPayload
   | SSHKeyPayload
-  | APIKeyPayload;
+  | APIKeyPayload
+  | KeyPairPayload;
 
 /** A vault secret with its payload decrypted into a structured type. */
 export interface DecryptedVaultSecret {
@@ -315,8 +326,17 @@ export function serializePayload(
     }
     case "api_key": {
       const p = payload as APIKeyPayload;
-      const d: Record<string, unknown> = { access_key: p.accessKey };
-      if (p.secretKey !== undefined) d.secret_key = p.secretKey;
+      const d: Record<string, unknown> = { api_key: p.apiKey };
+      if (p.endpoint !== undefined) d.endpoint = p.endpoint;
+      if (p.notes !== undefined) d.notes = p.notes;
+      return d;
+    }
+    case "key_pair": {
+      const p = payload as KeyPairPayload;
+      const d: Record<string, unknown> = {
+        access_key: p.accessKey,
+        secret_key: p.secretKey,
+      };
       if (p.endpoint !== undefined) d.endpoint = p.endpoint;
       if (p.notes !== undefined) d.notes = p.notes;
       return d;
@@ -362,11 +382,17 @@ export function parsePayload(
       } satisfies SSHKeyPayload;
     case "api_key":
       return {
-        accessKey: raw.access_key as string,
-        secretKey: raw.secret_key as string | undefined,
+        apiKey: raw.api_key as string,
         endpoint: raw.endpoint as string | undefined,
         notes: raw.notes as string | undefined,
       } satisfies APIKeyPayload;
+    case "key_pair":
+      return {
+        accessKey: raw.access_key as string,
+        secretKey: raw.secret_key as string,
+        endpoint: raw.endpoint as string | undefined,
+        notes: raw.notes as string | undefined,
+      } satisfies KeyPairPayload;
     default:
       throw new Error(`Unknown secret_type: ${secretType}`);
   }
@@ -382,7 +408,8 @@ export function parsePayload(
 export function inferSecretType(payload: SecretPayload): string {
   if ("password" in payload) return "login";
   if ("privateKey" in payload) return "ssh_key";
-  if ("accessKey" in payload) return "api_key";
+  if ("apiKey" in payload) return "api_key";
+  if ("accessKey" in payload && "secretKey" in payload) return "key_pair";
   if ("data" in payload) return "other";
   throw new Error("Cannot infer secret_type from payload shape");
 }

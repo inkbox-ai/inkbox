@@ -15,6 +15,7 @@ from uuid import UUID
 from inkbox.vault.types import (
     APIKeyPayload,
     DecryptedVaultSecret,
+    KeyPairPayload,
     LoginPayload,
     SSHKeyPayload,
     SecretPayload,
@@ -83,6 +84,10 @@ class Credentials:
         """List API key credentials."""
         return [s for s in self._secrets if s.secret_type == VaultSecretType.API_KEY]
 
+    def list_key_pairs(self) -> list[DecryptedVaultSecret]:
+        """List key pair credentials (access key + secret key)."""
+        return [s for s in self._secrets if s.secret_type == VaultSecretType.KEY_PAIR]
+
     def list_ssh_keys(self) -> list[DecryptedVaultSecret]:
         """List SSH key credentials."""
         return [s for s in self._secrets if s.secret_type == VaultSecretType.SSH_KEY]
@@ -129,6 +134,18 @@ class Credentials:
             TypeError: If the credential is not an api_key type.
         """
         return self._get_typed(secret_id, VaultSecretType.API_KEY)  # type: ignore[return-value]
+
+    def get_key_pair(self, secret_id: UUID | str) -> KeyPairPayload:
+        """Get a key pair credential's payload by UUID.
+
+        Args:
+            secret_id: UUID of the secret.
+
+        Raises:
+            KeyError: If no credential with this UUID is accessible.
+            TypeError: If the credential is not a key_pair type.
+        """
+        return self._get_typed(secret_id, VaultSecretType.KEY_PAIR)  # type: ignore[return-value]
 
     def get_ssh_key(self, secret_id: UUID | str) -> SSHKeyPayload:
         """Get an SSH key credential's payload by UUID.
