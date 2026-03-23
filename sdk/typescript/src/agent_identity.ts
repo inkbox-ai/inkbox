@@ -30,6 +30,7 @@ export class AgentIdentity {
   private _phoneNumber: IdentityPhoneNumber | null;
   private _authenticatorApp: IdentityAuthenticatorApp | null;
   private _credentials: Credentials | null = null;
+  private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
   constructor(data: _AgentIdentityData, inkbox: Inkbox) {
     this._data              = data;
@@ -63,16 +64,19 @@ export class AgentIdentity {
    * identity has been granted access to. The vault must be unlocked
    * first via `inkbox.vault.unlock(vaultKey)`.
    *
-   * The result is cached; call {@link refresh} to clear the identity-scoped
-   * filter cache.  To pick up secrets created or rotated after the initial
-   * unlock, call `inkbox.vault.unlock(vaultKey)` again.
+   * The result is cached and automatically invalidated when the
+   * vault is re-unlocked.  Call {@link refresh} to manually clear
+   * the cache (e.g. after access-rule changes).
    *
    * @throws Error if the vault has not been unlocked.
    */
   async getCredentials(): Promise<Credentials> {
-    if (this._credentials !== null) return this._credentials;
-    this._requireVaultUnlocked();
     const vault = this._inkbox._vaultResource;
+    // Invalidate cache if the vault was re-unlocked since we last built it.
+    if (this._credentials !== null && vault._unlocked === this._credentialsVaultRef) {
+      return this._credentials;
+    }
+    this._requireVaultUnlocked();
     const unlocked = vault._unlocked!;
     // Filter secrets by identity access rules (same logic as
     // VaultResource.unlock with identityId).
@@ -87,6 +91,7 @@ export class AgentIdentity {
       }
     }
     this._credentials = new Credentials(filtered);
+    this._credentialsVaultRef = unlocked;
     return this._credentials;
   }
 
@@ -457,9 +462,8 @@ export class AgentIdentity {
    * Re-fetch this identity from the API and update cached channels.
    *
    * Also clears the credentials filter cache so the next call to
-   * {@link getCredentials} re-evaluates access rules.  The underlying
-   * vault secret set is still from the last `inkbox.vault.unlock()` call;
-   * to pick up new or rotated secrets, unlock the vault again.
+   * {@link getCredentials} re-evaluates access rules.  (The cache is
+   * also automatically invalidated when the vault is re-unlocked.)
    *
    * @returns `this` for chaining.
    */

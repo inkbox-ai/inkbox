@@ -57,10 +57,9 @@ class AgentIdentity:
         self._phone_number: IdentityPhoneNumber | None = data.phone_number
         self._authenticator_app: IdentityAuthenticatorApp | None = data.authenticator_app
         self._credentials: Credentials | None = None
+        self._credentials_vault_ref: object | None = None  # tracks which _unlocked built the cache
 
-    # ------------------------------------------------------------------
-    # Identity properties
-    # ------------------------------------------------------------------
+    ## Identity properties
 
     @property
     def agent_handle(self) -> str:
@@ -94,18 +93,18 @@ class AgentIdentity:
         to the secrets this identity has been granted access to.  The vault
         must be unlocked first via ``inkbox.vault.unlock(vault_key)``.
 
-        The result is cached; call :meth:`refresh` to clear the
-        identity-scoped filter cache.  To pick up secrets created or
-        rotated after the initial unlock, call
-        ``inkbox.vault.unlock(vault_key)`` again.
+        The result is cached and automatically invalidated when the
+        vault is re-unlocked.  Call :meth:`refresh` to manually clear
+        the cache (e.g. after access-rule changes).
 
         Raises:
             InkboxError: If the vault has not been unlocked.
         """
-        if self._credentials is not None:
+        vault = self._inkbox._vault_resource
+        # Invalidate cache if the vault was re-unlocked since we last built it.
+        if self._credentials is not None and vault._unlocked is self._credentials_vault_ref:
             return self._credentials
         self._require_vault_unlocked()
-        vault = self._inkbox._vault_resource
         unlocked = vault._unlocked
         # Filter secrets by identity access rules (same logic as
         # VaultResource.unlock with identity_id).
@@ -116,11 +115,10 @@ class AgentIdentity:
             if any(r["identity_id"] == id_str for r in access_rules):
                 filtered.append(secret)
         self._credentials = Credentials(filtered)
+        self._credentials_vault_ref = unlocked
         return self._credentials
 
-    # ------------------------------------------------------------------
-    # Channel management
-    # ------------------------------------------------------------------
+    ## Channel management
 
     def create_mailbox(self, *, display_name: str | None = None) -> IdentityMailbox:
         """Create a new mailbox and link it to this identity.
@@ -251,9 +249,7 @@ class AgentIdentity:
         self._inkbox._ids_resource.unlink_authenticator_app(self.agent_handle)
         self._authenticator_app = None
 
-    # ------------------------------------------------------------------
-    # Mail helpers
-    # ------------------------------------------------------------------
+    ## Mail helpers
 
     def send_email(
         self,
@@ -329,7 +325,9 @@ class AgentIdentity:
             page_size: Messages fetched per API call (1–100).
             direction: Filter by ``"inbound"`` or ``"outbound"``.
         """
-        return (msg for msg in self.iter_emails(page_size=page_size, direction=direction) if not msg.is_read)
+        return (
+            msg for msg in self.iter_emails(page_size=page_size, direction=direction) if not msg.is_read
+        )
 
     def mark_emails_read(self, message_ids: list[str]) -> None:
         """Mark a list of messages as read.
@@ -370,9 +368,7 @@ class AgentIdentity:
             thread_id,
         )
 
-    # ------------------------------------------------------------------
-    # Phone helpers
-    # ------------------------------------------------------------------
+    ## Phone helpers
 
     def place_call(
         self,
@@ -419,9 +415,7 @@ class AgentIdentity:
             call_id,
         )
 
-    # ------------------------------------------------------------------
-    # Authenticator helpers
-    # ------------------------------------------------------------------
+    ## Authenticator helpers
 
     def create_authenticator_account(
         self,
@@ -513,9 +507,7 @@ class AgentIdentity:
             account_id,
         )
 
-    # ------------------------------------------------------------------
-    # Identity management
-    # ------------------------------------------------------------------
+    ## Identity management
 
     def update(
         self,
@@ -548,10 +540,8 @@ class AgentIdentity:
         """Re-fetch this identity from the API and update cached channels.
 
         Also clears the credentials filter cache so the next access to
-        :attr:`credentials` re-evaluates access rules.  Note that the
-        underlying vault secret set is still from the last
-        ``inkbox.vault.unlock()`` call; to pick up new or rotated
-        secrets, unlock the vault again.
+        :attr:`credentials` re-evaluates access rules.  (The cache is
+        also automatically invalidated when the vault is re-unlocked.)
 
         Returns:
             ``self`` for chaining.
@@ -568,9 +558,7 @@ class AgentIdentity:
         """Delete this identity (unlinks channels without deleting them)."""
         self._inkbox._ids_resource.delete(self.agent_handle)
 
-    # ------------------------------------------------------------------
-    # Internal guards
-    # ------------------------------------------------------------------
+    ## Internal guards
 
     def _require_mailbox(self) -> None:
         if not self._mailbox:
