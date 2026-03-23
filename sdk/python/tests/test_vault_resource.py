@@ -455,3 +455,164 @@ class TestUnlockIdentityFiltering:
 
         unlocked = res.unlock(vault_key, identity_id=identity)
         assert len(unlocked.secrets) == 0
+
+
+# ---- TOTP integration tests ----
+
+SECRET_ID = "cccc3333-0000-0000-0000-000000000001"
+TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+
+
+def _unlocked_with_login(*, totp_config=None):
+    """Build an UnlockedVault with a login secret in the cache."""
+    org_key = generate_org_encryption_key()
+    http = MagicMock()
+    login_dict = {"password": "s3cret", "username": "admin"}
+    if totp_config is not None:
+        login_dict["totp"] = totp_config
+    encrypted = encrypt_payload(org_key, login_dict)
+    # get_secret will return this when fetching the secret
+    http.get.return_value = {
+        **VAULT_SECRET_DICT,
+        "encrypted_payload": encrypted,
+    }
+    http.patch.return_value = VAULT_SECRET_DICT
+
+    from inkbox.vault.types import DecryptedVaultSecret, _parse_payload
+    from inkbox.vault.crypto import decrypt_payload as dp
+    payload = _parse_payload("login", login_dict)
+    from uuid import UUID
+    from datetime import datetime
+    cached_secret = DecryptedVaultSecret(
+        id=UUID(VAULT_SECRET_DICT["id"]),
+        name=VAULT_SECRET_DICT["name"],
+        secret_type="login",
+        status="active",
+        created_at=datetime.fromisoformat(VAULT_SECRET_DICT["created_at"]),
+        updated_at=datetime.fromisoformat(VAULT_SECRET_DICT["updated_at"]),
+        payload=payload,
+        description=VAULT_SECRET_DICT["description"],
+    )
+    unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[cached_secret])
+    return unlocked, http
+
+
+class TestUnlockedVaultSetTotp:
+    def test_set_totp_with_config(self):
+        from inkbox.vault.totp import TOTPConfig
+        unlocked, http = _unlocked_with_login()
+        config = TOTPConfig(secret=TOTP_SECRET)
+
+        result = unlocked.set_totp(SECRET_ID, config)
+
+        assert isinstance(result, VaultSecret)
+        # Should have called patch with encrypted payload
+        http.patch.assert_called_once()
+        body = http.patch.call_args[1]["json"]
+        assert "encrypted_payload" in body
+
+    def test_set_totp_with_uri(self):
+        unlocked, http = _unlocked_with_login()
+        uri = f"otpauth://totp/Test?secret={TOTP_SECRET}&issuer=Test"
+
+        result = unlocked.set_totp(SECRET_ID, uri)
+
+        assert isinstance(result, VaultSecret)
+        http.patch.assert_called_once()
+
+    def test_set_totp_rejects_non_login(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        other_dict = {"data": "freeform"}
+        encrypted = encrypt_payload(org_key, other_dict)
+        other_secret_dict = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
+        http.get.return_value = other_secret_dict
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        from inkbox.vault.totp import TOTPConfig
+        with pytest.raises(TypeError, match="only login secrets support TOTP"):
+            unlocked.set_totp(SECRET_ID, TOTPConfig(secret=TOTP_SECRET))
+
+
+class TestUnlockedVaultRemoveTotp:
+    def test_remove_totp(self):
+        totp_dict = {"secret": TOTP_SECRET, "algorithm": "sha1", "digits": 6, "period": 30}
+        unlocked, http = _unlocked_with_login(totp_config=totp_dict)
+
+        result = unlocked.remove_totp(SECRET_ID)
+
+        assert isinstance(result, VaultSecret)
+        http.patch.assert_called_once()
+
+    def test_remove_totp_rejects_non_login(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        other_dict = {"data": "freeform"}
+        encrypted = encrypt_payload(org_key, other_dict)
+        http.get.return_value = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        with pytest.raises(TypeError, match="only login secrets support TOTP"):
+            unlocked.remove_totp(SECRET_ID)
+
+
+class TestUnlockedVaultGetTotpCode:
+    def test_generates_code(self):
+        totp_dict = {"secret": TOTP_SECRET, "algorithm": "sha1", "digits": 6, "period": 30}
+        unlocked, http = _unlocked_with_login(totp_config=totp_dict)
+
+        from inkbox.vault.totp import TOTPCode
+        code = unlocked.get_totp_code(SECRET_ID)
+
+        assert isinstance(code, TOTPCode)
+        assert len(code.code) == 6
+        assert code.code.isdigit()
+        assert code.seconds_remaining > 0
+
+    def test_raises_when_no_totp(self):
+        unlocked, http = _unlocked_with_login()
+
+        with pytest.raises(ValueError, match="no TOTP configured"):
+            unlocked.get_totp_code(SECRET_ID)
+
+    def test_raises_for_non_login(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        other_dict = {"data": "freeform"}
+        encrypted = encrypt_payload(org_key, other_dict)
+        http.get.return_value = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        with pytest.raises(TypeError, match="only login secrets support TOTP"):
+            unlocked.get_totp_code(SECRET_ID)
+
+
+class TestUnlockedVaultCacheConsistency:
+    def test_set_totp_updates_cache(self):
+        """After set_totp, the secrets cache should reflect the new TOTP config."""
+        from inkbox.vault.totp import TOTPConfig
+        totp_dict = {"secret": TOTP_SECRET, "algorithm": "sha1", "digits": 6, "period": 30}
+        unlocked, http = _unlocked_with_login()
+
+        # Before: no TOTP in cache
+        assert unlocked.secrets[0].payload.totp is None
+
+        # set_totp triggers update_secret which calls _refresh_cached_secret
+        # The mock http.get returns a secret with TOTP after the PATCH
+        login_with_totp = {"password": "s3cret", "username": "admin", "totp": totp_dict}
+        encrypted_with_totp = encrypt_payload(unlocked._org_key, login_with_totp)
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted_with_totp}
+
+        unlocked.set_totp(SECRET_ID, TOTPConfig(secret=TOTP_SECRET))
+
+        # After: cache should have the TOTP config
+        assert unlocked.secrets[0].payload.totp is not None
+        assert unlocked.secrets[0].payload.totp.secret == TOTP_SECRET
+
+    def test_delete_secret_removes_from_cache(self):
+        unlocked, http = _unlocked_with_login()
+        assert len(unlocked.secrets) == 1
+
+        unlocked.delete_secret(SECRET_ID)
+
+        assert len(unlocked.secrets) == 0

@@ -277,12 +277,20 @@ export class UnlockedVault {
     return [...this.secretsCache];
   }
 
-  /** Re-fetch, decrypt, and update a single secret in the cache. */
+  /**
+   * Re-fetch, decrypt, and update a single secret in the cache.
+   *
+   * Best-effort — if the re-fetch fails the cache is left unchanged.
+   */
   private async refreshCachedSecret(secretId: string): Promise<void> {
-    const updated = await this.getSecret(secretId);
-    this.secretsCache = this.secretsCache.map((s) =>
-      s.id === secretId ? updated : s,
-    );
+    try {
+      const updated = await this.getSecret(secretId);
+      this.secretsCache = this.secretsCache.map((s) =>
+        s.id === secretId ? updated : s,
+      );
+    } catch {
+      // Cache refresh is best-effort.
+    }
   }
 
   // ------------------------------------------------------------------

@@ -265,8 +265,15 @@ class UnlockedVault:
         return list(self._secrets_cache)
 
     def _refresh_cached_secret(self, secret_id: UUID | str) -> None:
-        """Re-fetch, decrypt, and update a single secret in the cache."""
-        updated = self.get_secret(secret_id)
+        """Re-fetch, decrypt, and update a single secret in the cache.
+
+        Best-effort — if the re-fetch fails (e.g. the secret was just
+        deleted or the server is unreachable), the cache is left unchanged.
+        """
+        try:
+            updated = self.get_secret(secret_id)
+        except Exception:
+            return
         sid = str(secret_id)
         self._secrets_cache = [
             updated if str(s.id) == sid else s
