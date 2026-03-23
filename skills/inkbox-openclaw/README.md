@@ -6,6 +6,7 @@ An [OpenClaw](https://openclaw.ai) skill for email, phone, and vault via [Inkbox
 
 Once installed, your OpenClaw agent can:
 
+- **Manage identities** — create, list, rename, pause, and delete agent identities; assign and unlink channels
 - **Send emails** — compose and send from an Inkbox agent mailbox, with optional CC/BCC
 - **Reply to emails** — thread replies using a message ID
 - **Read inbox** — list recent messages or unread messages only
@@ -14,7 +15,6 @@ Once installed, your OpenClaw agent can:
 - **Place calls** — make outbound phone calls from an Inkbox phone number (with optional WebSocket audio bridge)
 - **List call history** — review past inbound and outbound calls
 - **Get transcripts** — retrieve per-segment call transcripts
-- **Manage identities** — create, list, rename, pause, and delete agent identities; assign and unlink channels
 - **Vault** — store and retrieve encrypted credentials (logins, API keys, key pairs, SSH keys) with per-identity access rules
 
 ## Requirements
