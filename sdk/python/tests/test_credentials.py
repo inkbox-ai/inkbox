@@ -179,7 +179,6 @@ def _identity(*, vault_unlocked=True, access_rules=None):
         updated_at=datetime(2026, 1, 1),
         mailbox=None,
         phone_number=None,
-        authenticator_app=None,
     )
 
     # Wire up VaultResource with stored unlocked vault
@@ -235,8 +234,7 @@ class TestAgentIdentityCredentials:
             updated_at=datetime(2026, 1, 1),
             mailbox=None,
             phone_number=None,
-            authenticator_app=None,
-        )
+            )
         identity.refresh()
         assert identity._credentials is None
 

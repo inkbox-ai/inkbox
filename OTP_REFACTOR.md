@@ -199,35 +199,35 @@ Export: `TOTPAlgorithm`, `TOTPConfig`, `TOTPCode`, `generate_totp`, `parse_totp_
 
 ## Part 2: Remove Old Authenticator Infrastructure
 
-### [ ] 2a. Delete: `sdk/python/inkbox/authenticator/` (entire directory)
+### [x] 2a. Delete: `sdk/python/inkbox/authenticator/` (entire directory)
 
 Files: `__init__.py`, `_http.py`, `types.py`, `exceptions.py`, `resources/apps.py`, `resources/accounts.py`, `resources/__init__.py`
 
-### [ ] 2b. Delete: `sdk/typescript/src/authenticator/` (entire directory)
+### [x] 2b. Delete: `sdk/typescript/src/authenticator/` (entire directory)
 
 Files: `types.ts`, `resources/apps.ts`, `resources/accounts.ts`
 
-### [ ] 2c. Delete: test files
+### [x] 2c. Delete: test files
 
 - `sdk/python/tests/test_authenticator_apps.py`
 - `sdk/python/tests/test_authenticator_accounts.py`
 - `sdk/python/tests/sample_data_authenticator.py`
 
-### [ ] 2d. Modify: `sdk/python/inkbox/client.py`
+### [x] 2d. Modify: `sdk/python/inkbox/client.py`
 
 - Remove imports: `AuthHttpTransport`, `AuthenticatorAppsResource`, `AuthenticatorAccountsResource`
 - Remove from `__init__`: `self._auth_http`, `self._auth_apps`, `self._auth_accounts`
 - Remove property: `authenticator_apps`
 - Remove from `close()`: `self._auth_http.close()`
 
-### [ ] 2e. Modify: `sdk/typescript/src/inkbox.ts`
+### [x] 2e. Modify: `sdk/typescript/src/inkbox.ts`
 
 - Remove imports: `AuthenticatorAppsResource`, `AuthenticatorAccountsResource`
 - Remove from constructor: `authHttp`, `this._authApps`, `this._authAccounts`
 - Remove fields: `_authApps`, `_authAccounts`
 - Remove getter: `authenticatorApps`
 
-### [ ] 2f. Modify: `sdk/python/inkbox/agent_identity.py`
+### [x] 2f. Modify: `sdk/python/inkbox/agent_identity.py`
 
 - Remove import of `AuthenticatorAccount`, `AuthenticatorApp`, `OTPCode`
 - Remove import of `IdentityAuthenticatorApp`
@@ -237,43 +237,43 @@ Files: `types.ts`, `resources/apps.ts`, `resources/accounts.ts`
 - Remove `_require_authenticator_app` guard
 - Remove authenticator_app from `update()`, `refresh()`, `__repr__`
 
-### [ ] 2g. Modify: `sdk/typescript/src/agent_identity.ts`
+### [x] 2g. Modify: `sdk/typescript/src/agent_identity.ts`
 
 Same removals as 2f in TypeScript:
 - Remove all authenticator imports, properties, methods, guards
 
-### [ ] 2h. Modify: `sdk/python/inkbox/__init__.py`
+### [x] 2h. Modify: `sdk/python/inkbox/__init__.py`
 
 - Remove `AuthenticatorAccount`, `AuthenticatorApp`, `OTPCode` imports and `__all__` entries
 - Remove `IdentityAuthenticatorApp` import and `__all__` entry
 
-### [ ] 2i. Modify: `sdk/typescript/src/index.ts`
+### [x] 2i. Modify: `sdk/typescript/src/index.ts`
 
 - Remove `AuthenticatorApp`, `AuthenticatorAccount`, `OTPCode` type exports
 - Remove `IdentityAuthenticatorApp` type export
 
-### [ ] 2j. Modify: `sdk/python/inkbox/identities/types.py`
+### [x] 2j. Modify: `sdk/python/inkbox/identities/types.py`
 
 - Remove `IdentityAuthenticatorApp` dataclass
 - Remove `authenticator_app` field from `_AgentIdentityData`
 - Update `_AgentIdentityData._from_dict()` to stop parsing `authenticator_app`
 
-### [ ] 2k. Modify: `sdk/typescript/src/identities/types.ts`
+### [x] 2k. Modify: `sdk/typescript/src/identities/types.ts`
 
 - Remove `IdentityAuthenticatorApp` interface and `RawIdentityAuthenticatorApp`
 - Remove `authenticatorApp` from `_AgentIdentityData`
 - Remove `parseIdentityAuthenticatorApp()` function
 - Update `parseAgentIdentityData()` to stop parsing `authenticator_app`
 
-### [ ] 2l. Modify: `sdk/python/inkbox/identities/resources/identities.py`
+### [x] 2l. Modify: `sdk/python/inkbox/identities/resources/identities.py`
 
 - Remove `assign_authenticator_app` and `unlink_authenticator_app` methods
 
-### [ ] 2m. Modify: `sdk/typescript/src/identities/resources/identities.ts`
+### [x] 2m. Modify: `sdk/typescript/src/identities/resources/identities.ts`
 
 - Remove `assignAuthenticatorApp` and `unlinkAuthenticatorApp` methods
 
-### [ ] 2n. Modify: `sdk/python/inkbox/identities/__init__.py`
+### [x] 2n. Modify: `sdk/python/inkbox/identities/__init__.py`
 
 - Remove `IdentityAuthenticatorApp` from exports
 
@@ -310,7 +310,7 @@ Mirror all Python test cases using vitest.
 
 ## Part 5: Cleanup (from review findings)
 
-### [ ] 5a. Clean up authenticator references in `sdk/python/tests/test_agent_identity.py`
+### [x] 5a. Clean up authenticator references in `sdk/python/tests/test_agent_identity.py`
 
 ### [ ] 5b. Clean up authenticator sections in `sdk/python/README.md`
 

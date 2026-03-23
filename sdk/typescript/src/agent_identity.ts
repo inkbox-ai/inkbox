@@ -10,7 +10,6 @@
  */
 
 import { InkboxAPIError, InkboxError } from "./_http.js";
-import type { AuthenticatorAccount, AuthenticatorApp, OTPCode } from "./authenticator/types.js";
 import { Credentials } from "./credentials.js";
 import { MessageDirection } from "./mail/types.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
@@ -18,7 +17,6 @@ import type { PhoneCall, PhoneCallWithRateLimit, PhoneTranscript } from "./phone
 import type {
   AgentIdentitySummary,
   _AgentIdentityData,
-  IdentityAuthenticatorApp,
   IdentityMailbox,
   IdentityPhoneNumber,
 } from "./identities/types.js";
@@ -29,7 +27,6 @@ export class AgentIdentity {
   private readonly _inkbox: Inkbox;
   private _mailbox: IdentityMailbox | null;
   private _phoneNumber: IdentityPhoneNumber | null;
-  private _authenticatorApp: IdentityAuthenticatorApp | null;
   private _credentials: Credentials | null = null;
   private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
@@ -38,7 +35,6 @@ export class AgentIdentity {
     this._inkbox            = inkbox;
     this._mailbox           = data.mailbox;
     this._phoneNumber       = data.phoneNumber;
-    this._authenticatorApp  = data.authenticatorApp;
   }
 
   // ------------------------------------------------------------------
@@ -54,9 +50,6 @@ export class AgentIdentity {
 
   /** The phone number currently assigned to this identity, or `null` if none. */
   get phoneNumber(): IdentityPhoneNumber | null { return this._phoneNumber; }
-
-  /** The authenticator app currently assigned to this identity, or `null` if none. */
-  get authenticatorApp(): IdentityAuthenticatorApp | null { return this._authenticatorApp; }
 
   /**
    * Identity-scoped credential access.
@@ -207,49 +200,6 @@ export class AgentIdentity {
     this._phoneNumber = null;
   }
 
-  /**
-   * Create a new authenticator app and link it to this identity.
-   *
-   * @returns The newly created {@link AuthenticatorApp}.
-   */
-  async createAuthenticatorApp(): Promise<AuthenticatorApp> {
-    const app = await this._inkbox._authApps.create({ agentHandle: this.agentHandle });
-    this._authenticatorApp = {
-      id: app.id,
-      organizationId: app.organizationId,
-      identityId: app.identityId,
-      status: app.status,
-      createdAt: app.createdAt,
-      updatedAt: app.updatedAt,
-    };
-    return app;
-  }
-
-  /**
-   * Link an existing authenticator app to this identity.
-   *
-   * @param authenticatorAppId - UUID of the authenticator app to link. Obtain via
-   *   `inkbox.authenticatorApps.list()` or `inkbox.authenticatorApps.get()`.
-   * @returns The linked {@link IdentityAuthenticatorApp}.
-   */
-  async assignAuthenticatorApp(authenticatorAppId: string): Promise<IdentityAuthenticatorApp> {
-    const data = await this._inkbox._idsResource.assignAuthenticatorApp(this.agentHandle, {
-      authenticatorAppId,
-    });
-    this._authenticatorApp = data.authenticatorApp;
-    this._data             = data;
-    return this._authenticatorApp!;
-  }
-
-  /**
-   * Unlink this identity's authenticator app (does not delete the app).
-   */
-  async unlinkAuthenticatorApp(): Promise<void> {
-    this._requireAuthenticatorApp();
-    await this._inkbox._idsResource.unlinkAuthenticatorApp(this.agentHandle);
-    this._authenticatorApp = null;
-  }
-
   // ------------------------------------------------------------------
   // Mail helpers
   // ------------------------------------------------------------------
@@ -385,78 +335,6 @@ export class AgentIdentity {
   }
 
   // ------------------------------------------------------------------
-  // Authenticator helpers
-  // ------------------------------------------------------------------
-
-  /**
-   * Create a new authenticator account from an `otpauth://` URI.
-   *
-   * @param options.otpauthUri - `otpauth://totp/...` or `otpauth://hotp/...` URI.
-   * @param options.displayName - Optional user-managed label (max 255 characters).
-   * @param options.description - Optional free-form notes.
-   */
-  async createAuthenticatorAccount(options: {
-    otpauthUri: string;
-    displayName?: string;
-    description?: string;
-  }): Promise<AuthenticatorAccount> {
-    this._requireAuthenticatorApp();
-    return this._inkbox._authAccounts.create(this._authenticatorApp!.id, options);
-  }
-
-  /** List all authenticator accounts in this identity's app. */
-  async listAuthenticatorAccounts(): Promise<AuthenticatorAccount[]> {
-    this._requireAuthenticatorApp();
-    return this._inkbox._authAccounts.list(this._authenticatorApp!.id);
-  }
-
-  /**
-   * Get a single authenticator account by ID.
-   *
-   * @param accountId - UUID of the authenticator account.
-   */
-  async getAuthenticatorAccount(accountId: string): Promise<AuthenticatorAccount> {
-    this._requireAuthenticatorApp();
-    return this._inkbox._authAccounts.get(this._authenticatorApp!.id, accountId);
-  }
-
-  /**
-   * Update user-managed metadata on an authenticator account.
-   *
-   * @param accountId - UUID of the authenticator account to update.
-   * @param options.displayName - New label (max 255 characters).
-   * @param options.description - New notes.
-   */
-  async updateAuthenticatorAccount(
-    accountId: string,
-    options: { displayName?: string | null; description?: string | null },
-  ): Promise<AuthenticatorAccount> {
-    this._requireAuthenticatorApp();
-    return this._inkbox._authAccounts.update(this._authenticatorApp!.id, accountId, options);
-  }
-
-  /**
-   * Delete an authenticator account.
-   *
-   * @param accountId - UUID of the authenticator account to delete.
-   */
-  async deleteAuthenticatorAccount(accountId: string): Promise<void> {
-    this._requireAuthenticatorApp();
-    await this._inkbox._authAccounts.delete(this._authenticatorApp!.id, accountId);
-  }
-
-  /**
-   * Generate the current OTP code for an authenticator account.
-   *
-   * @param accountId - UUID of the authenticator account.
-   * @returns The generated OTP code with metadata.
-   */
-  async generateOtp(accountId: string): Promise<OTPCode> {
-    this._requireAuthenticatorApp();
-    return this._inkbox._authAccounts.generateOtp(this._authenticatorApp!.id, accountId);
-  }
-
-  // ------------------------------------------------------------------
   // Identity management
   // ------------------------------------------------------------------
 
@@ -472,7 +350,6 @@ export class AgentIdentity {
       ...result,
       mailbox:          this._mailbox,
       phoneNumber:      this._phoneNumber,
-      authenticatorApp: this._authenticatorApp,
     };
   }
 
@@ -490,7 +367,6 @@ export class AgentIdentity {
     this._data             = data;
     this._mailbox          = data.mailbox;
     this._phoneNumber      = data.phoneNumber;
-    this._authenticatorApp = data.authenticatorApp;
     this._credentials      = null;
     return this;
   }
@@ -528,11 +404,4 @@ export class AgentIdentity {
     }
   }
 
-  private _requireAuthenticatorApp(): void {
-    if (!this._authenticatorApp) {
-      throw new InkboxError(
-        `Identity '${this.agentHandle}' has no authenticator app assigned. Call identity.createAuthenticatorApp() or identity.assignAuthenticatorApp() first.`,
-      );
-    }
-  }
 }

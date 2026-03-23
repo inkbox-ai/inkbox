@@ -14,8 +14,6 @@ import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
 import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
-import { AuthenticatorAppsResource } from "./authenticator/resources/apps.js";
-import { AuthenticatorAccountsResource } from "./authenticator/resources/accounts.js";
 import { VaultResource } from "./vault/resources/vault.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type { AgentIdentitySummary } from "./identities/types.js";
@@ -83,8 +81,6 @@ export class Inkbox {
   readonly _calls: CallsResource;
   readonly _transcripts: TranscriptsResource;
   readonly _idsResource: IdentitiesResource;
-  readonly _authApps: AuthenticatorAppsResource;
-  readonly _authAccounts: AuthenticatorAccountsResource;
   readonly _vaultResource: VaultResource;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
@@ -107,7 +103,6 @@ export class Inkbox {
     const mailHttp  = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms);
     const phoneHttp = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms);
     const idsHttp   = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms);
-    const authHttp  = new HttpTransport(options.apiKey, `${apiRoot}/authenticator`, ms);
     const vaultHttp = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms);
     const apiHttp   = new HttpTransport(options.apiKey, apiRoot, ms);
 
@@ -121,9 +116,6 @@ export class Inkbox {
     this._transcripts = new TranscriptsResource(phoneHttp);
 
     this._idsResource = new IdentitiesResource(idsHttp);
-
-    this._authApps     = new AuthenticatorAppsResource(authHttp);
-    this._authAccounts = new AuthenticatorAccountsResource(authHttp);
 
     this._vaultResource = new VaultResource(vaultHttp);
 
@@ -141,9 +133,6 @@ export class Inkbox {
 
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
-
-  /** Org-level authenticator app operations (list, get, create, delete). */
-  get authenticatorApps(): AuthenticatorAppsResource { return this._authApps; }
 
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }

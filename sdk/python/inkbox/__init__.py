@@ -31,16 +31,8 @@ from inkbox.phone.types import (
 # Identity types
 from inkbox.identities.types import (
     AgentIdentitySummary,
-    IdentityAuthenticatorApp,
     IdentityMailbox,
     IdentityPhoneNumber,
-)
-
-# Authenticator types
-from inkbox.authenticator.types import (
-    AuthenticatorAccount,
-    AuthenticatorApp,
-    OTPCode,
 )
 
 # Vault types
@@ -93,13 +85,8 @@ __all__ = [
     "RateLimitInfo",
     # Identity types
     "AgentIdentitySummary",
-    "IdentityAuthenticatorApp",
     "IdentityMailbox",
     "IdentityPhoneNumber",
-    # Authenticator types
-    "AuthenticatorApp",
-    "AuthenticatorAccount",
-    "OTPCode",
     # Vault types
     "AccessRule",
     "VaultSecretType",
