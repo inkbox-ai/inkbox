@@ -63,7 +63,6 @@ export class Credentials {
     return this._secrets.filter((s) => s.secretType === VaultSecretType.API_KEY);
   }
 
-  /** List SSH key credentials. */
   /** List key pair credentials (access key + secret key). */
   listKeyPairs(): DecryptedVaultSecret[] {
     return this._secrets.filter((s) => s.secretType === VaultSecretType.KEY_PAIR);
