@@ -1,6 +1,6 @@
 # inkbox — OpenClaw Skill
 
-An [OpenClaw](https://openclaw.ai) skill for email, phone, authenticator, and vault via [Inkbox](https://inkbox.ai) agent identities.
+An [OpenClaw](https://openclaw.ai) skill for email, phone, and vault via [Inkbox](https://inkbox.ai) agent identities.
 
 ## What it does
 
@@ -15,7 +15,6 @@ Once installed, your OpenClaw agent can:
 - **List call history** — review past inbound and outbound calls
 - **Get transcripts** — retrieve per-segment call transcripts
 - **Manage identities** — create, list, rename, pause, and delete agent identities; assign and unlink channels
-- **Authenticator apps** — create accounts from otpauth URIs, generate TOTP codes, list and manage accounts
 - **Vault** — store and retrieve encrypted credentials (logins, API keys, key pairs, SSH keys) with per-identity access rules
 
 ## Requirements
