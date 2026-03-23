@@ -1,3 +1,5 @@
+// sdk/typescript/src/index.ts
+
 export { Inkbox } from "./inkbox.js";
 export { AgentIdentity } from "./agent_identity.js";
 export { Credentials } from "./credentials.js";
@@ -32,6 +34,7 @@ export type {
   OTPCode,
 } from "./authenticator/types.js";
 export type {
+  AccessRule,
   VaultInfo,
   VaultKey,
   VaultSecret,

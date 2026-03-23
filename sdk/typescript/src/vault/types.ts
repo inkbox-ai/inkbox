@@ -83,6 +83,32 @@ export interface VaultSecretDetail extends VaultSecret {
   encryptedPayload: string;
 }
 
+/** A rule granting an identity access to a vault secret. */
+export interface AccessRule {
+  id: string;
+  vaultSecretId: string;
+  identityId: string;
+  createdAt: Date;
+}
+
+/** @internal */
+export interface RawAccessRule {
+  id: string;
+  vault_secret_id: string;
+  identity_id: string;
+  created_at: string;
+}
+
+/** @internal */
+export function parseAccessRule(r: RawAccessRule): AccessRule {
+  return {
+    id: r.id,
+    vaultSecretId: r.vault_secret_id,
+    identityId: r.identity_id,
+    createdAt: new Date(r.created_at),
+  };
+}
+
 // ---- Structured secret payloads (client-side) ----
 
 /** Payload for `login` secrets. At least one of `username` or `email` should be provided. */

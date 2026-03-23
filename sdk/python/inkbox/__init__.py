@@ -45,6 +45,7 @@ from inkbox.authenticator.types import (
 
 # Vault types
 from inkbox.vault.types import (
+    AccessRule,
     APIKeyPayload,
     DecryptedVaultSecret,
     LoginPayload,
@@ -99,6 +100,7 @@ __all__ = [
     "AuthenticatorAccount",
     "OTPCode",
     # Vault types
+    "AccessRule",
     "VaultSecretType",
     "VaultKeyType",
     "VaultInfo",

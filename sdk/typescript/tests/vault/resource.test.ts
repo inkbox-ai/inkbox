@@ -115,6 +115,51 @@ describe("VaultResource.deleteSecret", () => {
   });
 });
 
+const RAW_ACCESS_RULE = {
+  id: "aaaa0000-0000-0000-0000-000000000001",
+  vault_secret_id: "bbbb0000-0000-0000-0000-000000000002",
+  identity_id: "cccc0000-0000-0000-0000-000000000003",
+  created_at: "2026-03-18T12:00:00Z",
+};
+
+describe("VaultResource.listAccessRules", () => {
+  it("returns parsed access rules", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_ACCESS_RULE]);
+    const res = new VaultResource(http);
+    const rules = await res.listAccessRules("some-secret-id");
+    expect(http.get).toHaveBeenCalledWith("/secrets/some-secret-id/access");
+    expect(rules).toHaveLength(1);
+    expect(rules[0].identityId).toBe(RAW_ACCESS_RULE.identity_id);
+  });
+});
+
+describe("VaultResource.grantAccess", () => {
+  it("posts and returns parsed access rule", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_ACCESS_RULE);
+    const res = new VaultResource(http);
+    const rule = await res.grantAccess("some-secret-id", "some-identity-id");
+    expect(http.post).toHaveBeenCalledWith(
+      "/secrets/some-secret-id/access",
+      { identity_id: "some-identity-id" },
+    );
+    expect(rule.identityId).toBe(RAW_ACCESS_RULE.identity_id);
+  });
+});
+
+describe("VaultResource.revokeAccess", () => {
+  it("calls delete on correct path", async () => {
+    const http = mockHttp();
+    vi.mocked(http.delete).mockResolvedValue(undefined);
+    const res = new VaultResource(http);
+    await res.revokeAccess("some-secret-id", "some-identity-id");
+    expect(http.delete).toHaveBeenCalledWith(
+      "/secrets/some-secret-id/access/some-identity-id",
+    );
+  });
+});
+
 describe("VaultResource.unlock", () => {
   it("decrypts secrets from unlock bundle", async () => {
     const orgKey = generateOrgEncryptionKey();

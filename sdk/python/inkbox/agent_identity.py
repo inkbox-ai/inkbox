@@ -12,6 +12,7 @@ or phone number ID explicitly.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterator
+from uuid import UUID
 
 from inkbox.authenticator.types import AuthenticatorAccount, AuthenticatorApp, OTPCode
 from inkbox.credentials import Credentials
@@ -117,6 +118,22 @@ class AgentIdentity:
         self._credentials = Credentials(filtered)
         self._credentials_vault_ref = unlocked
         return self._credentials
+
+    def revoke_credential_access(self, secret_id: UUID | str) -> None:
+        """
+        Revoke this identity's access to a vault secret.
+
+        Also clears the credentials cache so the next access to
+        :attr:`credentials` reflects the change.
+
+        Args:
+            secret_id: UUID of the secret to revoke access from.
+        """
+        self._inkbox._vault_resource.revoke_access(
+            secret_id,
+            identity_id=self.id,
+        )
+        self._credentials = None
 
     ## Channel management
 

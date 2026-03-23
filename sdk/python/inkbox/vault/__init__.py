@@ -3,6 +3,7 @@ inkbox.vault — encrypted vault types and exceptions.
 """
 
 from inkbox.vault.types import (
+    AccessRule,
     APIKeyPayload,
     DecryptedVaultSecret,
     LoginPayload,
@@ -25,6 +26,7 @@ from inkbox.vault.exceptions import InkboxVaultKeyError
 
 __all__ = [
     # API response types
+    "AccessRule",
     "VaultInfo",
     "VaultKey",
     "VaultSecret",

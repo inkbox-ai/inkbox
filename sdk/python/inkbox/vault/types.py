@@ -146,6 +146,33 @@ class VaultSecretDetail(VaultSecret):
         )
 
 
+@dataclass
+class AccessRule:
+    """
+    A rule granting an identity access to a vault secret.
+
+    Attributes:
+        id: Access rule identifier.
+        vault_secret_id: The vault secret this rule grants access to.
+        identity_id: The agent identity granted access.
+        created_at: Timestamp of when access was granted.
+    """
+
+    id: UUID
+    vault_secret_id: UUID
+    identity_id: UUID
+    created_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> AccessRule:
+        return cls(
+            id=UUID(d["id"]),
+            vault_secret_id=UUID(d["vault_secret_id"]),
+            identity_id=UUID(d["identity_id"]),
+            created_at=datetime.fromisoformat(d["created_at"]),
+        )
+
+
 ## Client-side structured secret payloads
 
 @dataclass

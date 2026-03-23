@@ -19,6 +19,7 @@ from inkbox.vault.crypto import (
     unwrap_org_key,
 )
 from inkbox.vault.types import (
+    AccessRule,
     DecryptedVaultSecret,
     SecretPayload,
     VaultInfo,
@@ -99,6 +100,44 @@ class VaultResource:
             secret_id: UUID of the secret to delete.
         """
         self._http.delete(f"/secrets/{secret_id}")
+
+    ## Access rules
+
+    def list_access_rules(self, secret_id: UUID | str) -> list[AccessRule]:
+        """
+        List identity access rules for a vault secret.
+
+        Args:
+            secret_id: UUID of the secret.
+        """
+        data = self._http.get(f"/secrets/{secret_id}/access")
+        return [AccessRule._from_dict(r) for r in data]
+
+    def grant_access(self, secret_id: UUID | str, identity_id: UUID | str) -> AccessRule:
+        """
+        Grant an identity access to a vault secret.
+
+        Args:
+            secret_id: UUID of the secret.
+            identity_id: UUID of the identity to grant access to.
+        """
+        data = self._http.post(
+            f"/secrets/{secret_id}/access",
+            json={"identity_id": str(identity_id)},
+        )
+        return AccessRule._from_dict(data)
+
+    def revoke_access(self, secret_id: UUID | str, identity_id: UUID | str) -> None:
+        """
+        Revoke an identity's access to a vault secret.
+
+        Args:
+            secret_id: UUID of the secret.
+            identity_id: UUID of the identity to revoke access from.
+        """
+        self._http.delete(
+            f"/secrets/{secret_id}/access/{identity_id}",
+        )
 
     ## Unlock
 

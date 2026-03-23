@@ -15,6 +15,7 @@ import {
   unwrapOrgKey,
 } from "../crypto.js";
 import type {
+  AccessRule,
   DecryptedVaultSecret,
   SecretPayload,
   VaultInfo,
@@ -24,6 +25,7 @@ import type {
 } from "../types.js";
 import {
   inferSecretType,
+  parseAccessRule,
   parsePayload,
   parseVaultInfo,
   parseVaultKey,
@@ -32,6 +34,7 @@ import {
   serializePayload,
 } from "../types.js";
 import type {
+  RawAccessRule,
   RawVaultInfo,
   RawVaultKey,
   RawVaultSecret,
@@ -108,6 +111,46 @@ export class VaultResource {
    */
   async deleteSecret(secretId: string): Promise<void> {
     await this.http.delete(`/secrets/${secretId}`);
+  }
+
+  // ------------------------------------------------------------------
+  // Access rules
+  // ------------------------------------------------------------------
+
+  /**
+   * List identity access rules for a vault secret.
+   *
+   * @param secretId - UUID of the secret.
+   */
+  async listAccessRules(secretId: string): Promise<AccessRule[]> {
+    const data = await this.http.get<RawAccessRule[]>(
+      `/secrets/${secretId}/access`,
+    );
+    return data.map(parseAccessRule);
+  }
+
+  /**
+   * Grant an identity access to a vault secret.
+   *
+   * @param secretId - UUID of the secret.
+   * @param identityId - UUID of the identity to grant access to.
+   */
+  async grantAccess(secretId: string, identityId: string): Promise<AccessRule> {
+    const data = await this.http.post<RawAccessRule>(
+      `/secrets/${secretId}/access`,
+      { identity_id: identityId },
+    );
+    return parseAccessRule(data);
+  }
+
+  /**
+   * Revoke an identity's access to a vault secret.
+   *
+   * @param secretId - UUID of the secret.
+   * @param identityId - UUID of the identity to revoke access from.
+   */
+  async revokeAccess(secretId: string, identityId: string): Promise<void> {
+    await this.http.delete(`/secrets/${secretId}/access/${identityId}`);
   }
 
   // ------------------------------------------------------------------

@@ -239,3 +239,15 @@ class TestAgentIdentityCredentials:
         )
         identity.refresh()
         assert identity._credentials is None
+
+    def test_revoke_credential_access(self):
+        identity = _identity()
+        _ = identity.credentials
+        assert identity._credentials is not None
+        identity.revoke_credential_access("aaaa0000-0000-0000-0000-000000000001")
+        vault = identity._inkbox._vault_resource
+        vault.revoke_access.assert_called_once_with(
+            "aaaa0000-0000-0000-0000-000000000001",
+            identity_id=identity.id,
+        )
+        assert identity._credentials is None

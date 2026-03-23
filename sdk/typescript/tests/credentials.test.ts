@@ -259,4 +259,20 @@ describe("AgentIdentity.getCredentials", () => {
     // @ts-expect-error -- accessing private for test
     expect(identity._credentials).toBeNull();
   });
+
+  it("revokeCredentialAccess calls revoke and clears cache", async () => {
+    const inkbox = mockInkbox();
+    const identity = new AgentIdentity(mockIdentityData(), inkbox);
+    await identity.getCredentials();
+    // @ts-expect-error -- accessing private for test
+    expect(identity._credentials).not.toBeNull();
+    (inkbox._vaultResource as any).revokeAccess = vi.fn().mockResolvedValue(undefined);
+    await identity.revokeCredentialAccess("aaaa0000-0000-0000-0000-000000000001");
+    expect((inkbox._vaultResource as any).revokeAccess).toHaveBeenCalledWith(
+      "aaaa0000-0000-0000-0000-000000000001",
+      IDENTITY_ID,
+    );
+    // @ts-expect-error -- accessing private for test
+    expect(identity._credentials).toBeNull();
+  });
 });

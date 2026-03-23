@@ -100,6 +100,19 @@ export class AgentIdentity {
     return this._credentials;
   }
 
+  /**
+   * Revoke this identity's access to a vault secret.
+   *
+   * Also clears the credentials cache so the next call to
+   * {@link getCredentials} reflects the change.
+   *
+   * @param secretId - UUID of the secret to revoke access from.
+   */
+  async revokeCredentialAccess(secretId: string): Promise<void> {
+    await this._inkbox._vaultResource.revokeAccess(secretId, this.id);
+    this._credentials = null;
+  }
+
   // ------------------------------------------------------------------
   // Channel management
   // ------------------------------------------------------------------

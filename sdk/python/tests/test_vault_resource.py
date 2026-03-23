@@ -16,7 +16,7 @@ from inkbox.vault.crypto import (
     wrap_org_key,
 )
 from inkbox.vault.resources.vault import VaultResource, UnlockedVault
-from inkbox.vault.types import LoginPayload, OtherPayload, VaultInfo, VaultKey, VaultSecret
+from inkbox.vault.types import AccessRule, LoginPayload, OtherPayload, VaultInfo, VaultKey, VaultSecret
 
 VALID_VAULT_KEY = "Test-Passw0rd!xy"
 
@@ -73,6 +73,42 @@ class TestVaultResourceDeleteSecret:
         res, http = _resource()
         res.delete_secret("some-uuid")
         http.delete.assert_called_once_with("/secrets/some-uuid")
+
+
+ACCESS_RULE_DICT = {
+    "id": "aaaa0000-0000-0000-0000-000000000001",
+    "vault_secret_id": "bbbb0000-0000-0000-0000-000000000002",
+    "identity_id": "cccc0000-0000-0000-0000-000000000003",
+    "created_at": "2026-03-18T12:00:00Z",
+}
+
+
+class TestVaultResourceAccessRules:
+    def test_list_access_rules(self):
+        res, http = _resource()
+        http.get.return_value = [ACCESS_RULE_DICT]
+        rules = res.list_access_rules("some-secret-id")
+        http.get.assert_called_once_with("/secrets/some-secret-id/access")
+        assert len(rules) == 1
+        assert isinstance(rules[0], AccessRule)
+        assert str(rules[0].identity_id) == ACCESS_RULE_DICT["identity_id"]
+
+    def test_grant_access(self):
+        res, http = _resource()
+        http.post.return_value = ACCESS_RULE_DICT
+        rule = res.grant_access("some-secret-id", "some-identity-id")
+        http.post.assert_called_once_with(
+            "/secrets/some-secret-id/access",
+            json={"identity_id": "some-identity-id"},
+        )
+        assert isinstance(rule, AccessRule)
+
+    def test_revoke_access(self):
+        res, http = _resource()
+        res.revoke_access("some-secret-id", "some-identity-id")
+        http.delete.assert_called_once_with(
+            "/secrets/some-secret-id/access/some-identity-id",
+        )
 
 
 class TestVaultResourceUnlock:
