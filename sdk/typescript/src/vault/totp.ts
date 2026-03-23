@@ -89,13 +89,13 @@ export function validateTotpConfig(config: TOTPConfig): void {
  * @internal
  */
 function b32decode(secret: string): Buffer {
-  const upper = secret.toUpperCase();
-  const padded = upper + "=".repeat((8 - (upper.length % 8)) % 8);
-  // Node's Buffer does not have native base32; decode manually.
+  const upper = secret.toUpperCase().replace(/=+$/, "");
+  if (upper.length === 0) {
+    throw new Error(`Invalid base32 secret: '${secret}'`);
+  }
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   const bits: number[] = [];
-  for (const ch of padded) {
-    if (ch === "=") break;
+  for (const ch of upper) {
     const idx = alphabet.indexOf(ch);
     if (idx === -1) throw new Error(`Invalid base32 secret: '${secret}'`);
     for (let i = 4; i >= 0; i--) {
@@ -107,6 +107,9 @@ function b32decode(secret: string): Buffer {
     let byte = 0;
     for (let j = 0; j < 8; j++) byte = (byte << 1) | bits[i + j];
     bytes.push(byte);
+  }
+  if (bytes.length === 0) {
+    throw new Error(`Invalid base32 secret: '${secret}'`);
   }
   return Buffer.from(bytes);
 }
@@ -232,15 +235,21 @@ export function parseTotpUri(uri: string): TOTPConfig {
 
   // Digits
   const digitsStr = parsed.searchParams.get("digits") || "6";
-  const digits = parseInt(digitsStr, 10);
-  if (isNaN(digits) || !VALID_DIGITS.has(digits)) {
+  if (!/^\d+$/.test(digitsStr)) {
+    throw new Error(`Invalid digits: '${digitsStr}'. Must be 6 or 8`);
+  }
+  const digits = Number(digitsStr);
+  if (!VALID_DIGITS.has(digits)) {
     throw new Error(`Invalid digits: '${digitsStr}'. Must be 6 or 8`);
   }
 
   // Period
   const periodStr = parsed.searchParams.get("period") || "30";
-  const period = parseInt(periodStr, 10);
-  if (isNaN(period) || !VALID_PERIODS.has(period)) {
+  if (!/^\d+$/.test(periodStr)) {
+    throw new Error(`Invalid period: '${periodStr}'. Must be 30 or 60`);
+  }
+  const period = Number(periodStr);
+  if (!VALID_PERIODS.has(period)) {
     throw new Error(`Invalid period: '${periodStr}'. Must be 30 or 60`);
   }
 
