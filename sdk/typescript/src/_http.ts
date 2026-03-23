@@ -103,9 +103,9 @@ export class HttpTransport {
       let detail: string;
       try {
         const err = (await resp.json()) as { detail?: string };
-        detail = err.detail ?? `Request failed with status ${resp.status}`;
+        detail = err.detail ?? resp.statusText;
       } catch {
-        detail = `Request failed with status ${resp.status}`;
+        detail = resp.statusText;
       }
       throw new InkboxAPIError(resp.status, detail);
     }

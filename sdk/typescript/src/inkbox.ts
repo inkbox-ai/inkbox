@@ -92,10 +92,14 @@ export class Inkbox {
   constructor(options: InkboxOptions) {
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     if (!baseUrl.startsWith("https://")) {
-      throw new Error(
-        "Only HTTPS base URLs are permitted. " +
-        "Received a baseUrl that does not start with 'https://'.",
-      );
+      const parsed = new URL(baseUrl);
+      if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+        throw new Error(
+          "Only HTTPS base URLs are permitted (HTTP is allowed for " +
+          "localhost and 127.0.0.1). " +
+          "Received a baseUrl that does not start with 'https://'.",
+        );
+      }
     }
     const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;

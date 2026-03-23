@@ -76,10 +76,14 @@ class Inkbox:
                 ``identity.credentials`` is immediately available.
         """
         if not base_url.startswith("https://"):
-            raise ValueError(
-                "Only HTTPS base URLs are permitted. "
-                "Received a base_url that does not start with 'https://'."
-            )
+            from urllib.parse import urlparse
+            _parsed = urlparse(base_url)
+            if _parsed.hostname not in ("localhost", "127.0.0.1"):
+                raise ValueError(
+                    "Only HTTPS base URLs are permitted (HTTP is allowed for "
+                    "localhost and 127.0.0.1). "
+                    "Received a base_url that does not start with 'https://'."
+                )
         _api_root = f"{base_url.rstrip('/')}/api/v1"
 
         self._mail_http = MailHttpTransport(
