@@ -48,6 +48,13 @@ for await (const message of identity.iterEmails()) {
 
 // List calls
 const calls = await identity.listCalls();
+
+// Access credentials (vault must be unlocked first)
+await inkbox.vault.unlock("my-Vault-key-01!");
+const creds = await identity.getCredentials();
+for (const login of creds.listLogins()) {
+  console.log(login.name);
+}
 ```
 
 ## Authentication
@@ -242,6 +249,37 @@ await identity.unlinkAuthenticatorApp();
 
 // Delete the authenticator app (org-level)
 await inkbox.authenticatorApps.delete("app-uuid");
+```
+
+---
+
+## Credentials
+
+Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
+
+```ts
+// Unlock the vault (once per session)
+await inkbox.vault.unlock("my-Vault-key-01!");
+
+const identity = await inkbox.getIdentity("my-agent");
+const creds = await identity.getCredentials();
+
+// Discovery — list credentials this identity has access to
+for (const login of creds.listLogins()) {
+  console.log(login.name, (login.payload as LoginPayload).username);
+}
+
+for (const key of creds.listApiKeys()) {
+  console.log(key.name, (key.payload as APIKeyPayload).accessKey);
+}
+
+// Access by UUID — returns the typed payload directly
+const login  = creds.getLogin("secret-uuid");    // → LoginPayload
+const apiKey = creds.getApiKey("secret-uuid");    // → APIKeyPayload
+const sshKey = creds.getSshKey("secret-uuid");    // → SSHKeyPayload
+
+// Generic access
+const secret = creds.get("secret-uuid");          // → DecryptedVaultSecret
 ```
 
 ---

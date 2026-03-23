@@ -47,6 +47,11 @@ with Inkbox(api_key=os.environ["INKBOX_API_KEY"]) as inkbox:
 
     # List calls
     calls = identity.list_calls()
+
+    # Access credentials (vault must be unlocked first)
+    inkbox.vault.unlock("my-Vault-key-01!")
+    for login in identity.credentials.list_logins():
+        print(login.name, login.payload.username)
 ```
 
 ## Authentication
@@ -233,6 +238,34 @@ identity.unlink_authenticator_app()
 
 # Delete the authenticator app (org-level)
 inkbox.authenticator_apps.delete("app-uuid")
+```
+
+---
+
+## Credentials
+
+Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
+
+```python
+# Unlock the vault (once per session)
+inkbox.vault.unlock("my-Vault-key-01!")
+
+identity = inkbox.get_identity("my-agent")
+
+# Discovery — list credentials this identity has access to
+for login in identity.credentials.list_logins():
+    print(login.name, login.payload.username)
+
+for key in identity.credentials.list_api_keys():
+    print(key.name, key.payload.access_key)
+
+# Access by UUID — returns the typed payload directly
+login   = identity.credentials.get_login("secret-uuid")      # → LoginPayload
+api_key = identity.credentials.get_api_key("secret-uuid")    # → APIKeyPayload
+ssh_key = identity.credentials.get_ssh_key("secret-uuid")    # → SSHKeyPayload
+
+# Generic access
+secret = identity.credentials.get("secret-uuid")             # → DecryptedVaultSecret
 ```
 
 ---
