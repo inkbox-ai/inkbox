@@ -72,6 +72,10 @@ export class AgentIdentity {
    * @throws Error if the vault has not been unlocked.
    */
   async getCredentials(): Promise<Credentials> {
+    // If the vault was unlocked via constructor vaultKey, wait for it.
+    if (this._inkbox._vaultUnlockPromise !== null) {
+      await this._inkbox._vaultUnlockPromise;
+    }
     const vault = this._inkbox._vaultResource;
     // Invalidate cache if the vault was re-unlocked since we last built it.
     if (this._credentials !== null && vault._unlocked === this._credentialsVaultRef) {

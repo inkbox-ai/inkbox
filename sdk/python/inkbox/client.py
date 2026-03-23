@@ -29,12 +29,8 @@ _DEFAULT_BASE_URL = "https://api.inkbox.ai"
 
 
 class Inkbox:
-    """Org-level entry point for all Inkbox APIs.
-
-    Args:
-        api_key: Your Inkbox API key (``X-Service-Token``).
-        base_url: Override the API base URL (useful for self-hosting or testing).
-        timeout: Request timeout in seconds (default 30).
+    """
+    Org-level entry point for all Inkbox APIs.
 
     Example::
 
@@ -56,26 +52,51 @@ class Inkbox:
         *,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
+        vault_key: str | None = None,
     ) -> None:
+        """
+        Create an Inkbox client.
+
+        Args:
+            api_key: Your Inkbox API key (``X-Service-Token``).
+            base_url: Override the API base URL (useful for self-hosting
+                or testing).
+            timeout: Request timeout in seconds (default 30).
+            vault_key: Optional vault key or recovery code.  When provided,
+                the vault is unlocked automatically at construction so
+                ``identity.credentials`` is immediately available.
+        """
         _api_root = f"{base_url.rstrip('/')}/api/v1"
 
         self._mail_http = MailHttpTransport(
-            api_key=api_key, base_url=f"{_api_root}/mail", timeout=timeout
+            api_key=api_key,
+            base_url=f"{_api_root}/mail",
+            timeout=timeout,
         )
         self._phone_http = PhoneHttpTransport(
-            api_key=api_key, base_url=f"{_api_root}/phone", timeout=timeout
+            api_key=api_key,
+            base_url=f"{_api_root}/phone",
+            timeout=timeout,
         )
         self._ids_http = IdsHttpTransport(
-            api_key=api_key, base_url=f"{_api_root}/identities", timeout=timeout
+            api_key=api_key,
+            base_url=f"{_api_root}/identities",
+            timeout=timeout,
         )
         self._auth_http = AuthHttpTransport(
-            api_key=api_key, base_url=f"{_api_root}/authenticator", timeout=timeout
+            api_key=api_key,
+            base_url=f"{_api_root}/authenticator",
+            timeout=timeout,
         )
         self._vault_http = VaultHttpTransport(
-            api_key=api_key, base_url=f"{_api_root}/vault", timeout=timeout
+            api_key=api_key,
+            base_url=f"{_api_root}/vault",
+            timeout=timeout,
         )
         self._api_http = MailHttpTransport(
-            api_key=api_key, base_url=_api_root, timeout=timeout
+            api_key=api_key,
+            base_url=_api_root,
+            timeout=timeout,
         )
 
         self._mailboxes = MailboxesResource(self._mail_http)
@@ -93,6 +114,9 @@ class Inkbox:
 
         self._signing_keys = SigningKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
+
+        if vault_key is not None:
+            self._vault_resource.unlock(vault_key)
 
     # ------------------------------------------------------------------
     # Public resource accessors
@@ -118,12 +142,11 @@ class Inkbox:
         """Access the encrypted vault (info, unlock, secrets)."""
         return self._vault_resource
 
-    # ------------------------------------------------------------------
-    # Org-level operations
-    # ------------------------------------------------------------------
+    ## Org-level operations
 
     def create_identity(self, agent_handle: str) -> AgentIdentity:
-        """Create a new agent identity.
+        """
+        Create a new agent identity.
 
         Args:
             agent_handle: Unique handle for this identity (e.g. ``"sales-bot"``).
@@ -138,7 +161,8 @@ class Inkbox:
         return AgentIdentity(data, self)
 
     def get_identity(self, agent_handle: str) -> AgentIdentity:
-        """Get an agent identity by handle.
+        """
+        Get an agent identity by handle.
 
         Args:
             agent_handle: Handle of the identity to fetch.
@@ -148,22 +172,24 @@ class Inkbox:
         """
         from inkbox.agent_identity import AgentIdentity
 
-        return AgentIdentity(self._ids_resource.get(agent_handle), self)
+        return AgentIdentity(
+            self._ids_resource.get(agent_handle),
+            self,
+        )
 
     def list_identities(self) -> list[AgentIdentitySummary]:
         """List all agent identities for your organisation."""
         return self._ids_resource.list()
 
     def create_signing_key(self) -> SigningKey:
-        """Create or rotate the org-level webhook signing key.
+        """
+        Create or rotate the org-level webhook signing key.
 
         The plaintext key is returned once — save it immediately.
         """
         return self._signing_keys.create_or_rotate()
 
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
+    ## Lifecycle
 
     def close(self) -> None:
         """Close all underlying HTTP connection pools."""

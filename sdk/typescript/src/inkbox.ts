@@ -29,6 +29,12 @@ export interface InkboxOptions {
   baseUrl?: string;
   /** Request timeout in milliseconds. Defaults to 30 000. */
   timeoutMs?: number;
+  /**
+   * Optional vault key or recovery code.  When provided, the vault is
+   * unlocked automatically at construction so `identity.getCredentials()`
+   * is immediately available.
+   */
+  vaultKey?: string;
 }
 
 /**
@@ -67,6 +73,8 @@ export class Inkbox {
   readonly _authApps: AuthenticatorAppsResource;
   readonly _authAccounts: AuthenticatorAccountsResource;
   readonly _vaultResource: VaultResource;
+  /** @internal */
+  _vaultUnlockPromise: Promise<unknown> | null = null;
 
   constructor(options: InkboxOptions) {
     const apiRoot = `${(options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "")}/api/v1`;
@@ -94,6 +102,10 @@ export class Inkbox {
     this._authAccounts = new AuthenticatorAccountsResource(authHttp);
 
     this._vaultResource = new VaultResource(vaultHttp);
+
+    if (options.vaultKey !== undefined) {
+      this._vaultUnlockPromise = this._vaultResource.unlock(options.vaultKey);
+    }
   }
 
   // ------------------------------------------------------------------
