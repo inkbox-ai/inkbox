@@ -17,16 +17,17 @@ const TOTP_URI =
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const inkbox = new Inkbox({
-  apiKey: process.env.INKBOX_API_KEY!,
-  vaultKey: process.env.INKBOX_VAULT_KEY!,
-});
-await inkbox._vaultUnlockPromise;
-
-if (!inkbox.vault._unlocked) {
+let inkbox: InstanceType<typeof Inkbox>;
+try {
+  inkbox = await new Inkbox({
+    apiKey: process.env.INKBOX_API_KEY!,
+    vaultKey: process.env.INKBOX_VAULT_KEY!,
+  }).ready();
+} catch (e) {
   console.error(
-    "ERROR: Vault is not initialized. Initialize it from the Inkbox console first (console.inkbox.ai).",
+    "ERROR: Failed to unlock vault. Is the vault initialized? Check console.inkbox.ai.",
   );
+  console.error(e instanceof Error ? e.message : e);
   process.exit(1);
 }
 

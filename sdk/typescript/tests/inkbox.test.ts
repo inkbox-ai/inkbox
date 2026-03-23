@@ -148,6 +148,34 @@ describe("Inkbox vaultKey option", () => {
   });
 });
 
+describe("Inkbox.ready()", () => {
+  it("resolves to the Inkbox instance when vault unlock succeeds", async () => {
+    const spy = vi.spyOn(VaultResource.prototype, "unlock").mockResolvedValue({} as any);
+    const ink = new Inkbox({ apiKey: "test-key", baseUrl: "https://test.inkbox.ai", vaultKey: "my-Vault-key-01!" });
+
+    const result = await ink.ready();
+
+    expect(result).toBe(ink);
+    spy.mockRestore();
+  });
+
+  it("throws when vault unlock fails", async () => {
+    const spy = vi.spyOn(VaultResource.prototype, "unlock").mockRejectedValue(new Error("bad key"));
+    const ink = new Inkbox({ apiKey: "test-key", baseUrl: "https://test.inkbox.ai", vaultKey: "wrong-key" });
+
+    await expect(ink.ready()).rejects.toThrow("bad key");
+    spy.mockRestore();
+  });
+
+  it("resolves immediately when no vaultKey provided", async () => {
+    const ink = makeInkbox();
+
+    const result = await ink.ready();
+
+    expect(result).toBe(ink);
+  });
+});
+
 describe("Inkbox.createSigningKey", () => {
   it("delegates to SigningKeysResource", async () => {
     const ink = makeInkbox();

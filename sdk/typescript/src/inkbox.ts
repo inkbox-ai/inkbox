@@ -125,6 +125,33 @@ export class Inkbox {
   }
 
   // ------------------------------------------------------------------
+  // Lifecycle
+  // ------------------------------------------------------------------
+
+  /**
+   * Wait for any constructor-initiated async work (e.g. vault unlock) to
+   * complete. Returns `this` for chaining.
+   *
+   * If `vaultKey` was provided in the constructor options, this awaits the
+   * unlock and throws if it failed. If no async work was started, this is
+   * a no-op.
+   *
+   * @example
+   * ```ts
+   * const inkbox = await new Inkbox({
+   *   apiKey: process.env.INKBOX_API_KEY!,
+   *   vaultKey: process.env.INKBOX_VAULT_KEY!,
+   * }).ready();
+   * ```
+   */
+  async ready(): Promise<Inkbox> {
+    if (this._vaultUnlockPromise) {
+      await this._vaultUnlockPromise;
+    }
+    return this;
+  }
+
+  // ------------------------------------------------------------------
   // Public resource accessors
   // ------------------------------------------------------------------
 

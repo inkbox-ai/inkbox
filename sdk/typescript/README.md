@@ -19,10 +19,10 @@ You'll need an API key to use this SDK. Get one at [console.inkbox.ai](https://c
 ```ts
 import { Inkbox } from "@inkbox/sdk";
 
-const inkbox = new Inkbox({
+const inkbox = await new Inkbox({
   apiKey: process.env.INKBOX_API_KEY!,
   vaultKey: process.env.INKBOX_VAULT_KEY,
-});
+}).ready();
 
 // Create an agent identity
 const identity = await inkbox.createIdentity("support-bot");
