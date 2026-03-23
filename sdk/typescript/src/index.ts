@@ -40,6 +40,8 @@ export type {
   SecretPayload,
 } from "./vault/types.js";
 export { VaultSecretType, VaultKeyType } from "./vault/types.js";
+export type { TOTPConfig, TOTPCode } from "./vault/totp.js";
+export { TOTPAlgorithm, generateTotp, parseTotpUri } from "./vault/totp.js";
 export type { VaultKeyMaterial } from "./vault/crypto.js";
 export { UnlockedVault } from "./vault/resources/vault.js";
 export {

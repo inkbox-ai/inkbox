@@ -188,7 +188,6 @@ function mockIdentityData(): _AgentIdentityData {
     updatedAt: new Date("2026-01-01"),
     mailbox: null,
     phoneNumber: null,
-    authenticatorApp: null,
   };
 }
 

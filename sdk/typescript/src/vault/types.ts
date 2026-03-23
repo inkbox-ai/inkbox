@@ -5,6 +5,9 @@
  * and client-side structured secret payloads.
  */
 
+import type { TOTPConfig } from "./totp.js";
+import { serializeTotpConfig, parseTotpConfig } from "./totp.js";
+
 // ---- Enums ----
 
 /**
@@ -120,6 +123,8 @@ export interface LoginPayload {
   /** URL of the service. */
   url?: string;
   notes?: string;
+  /** Optional TOTP configuration for two-factor authentication. */
+  totp?: TOTPConfig;
 }
 
 /** Payload for `other` (freeform catch-all) secrets. */
@@ -307,6 +312,7 @@ export function serializePayload(
       if (p.email !== undefined) d.email = p.email;
       if (p.url !== undefined) d.url = p.url;
       if (p.notes !== undefined) d.notes = p.notes;
+      if (p.totp !== undefined) d.totp = serializeTotpConfig(p.totp);
       return d;
     }
     case "other": {
@@ -369,6 +375,7 @@ export function parsePayload(
         email: raw.email as string | undefined,
         url: raw.url as string | undefined,
         notes: raw.notes as string | undefined,
+        totp: raw.totp ? parseTotpConfig(raw.totp as Record<string, unknown>) : undefined,
       } satisfies LoginPayload;
     case "other":
       return { data: raw.data as string, notes: raw.notes as string | undefined } satisfies OtherPayload;

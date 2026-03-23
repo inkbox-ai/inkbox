@@ -51,6 +51,13 @@ from inkbox.vault.types import (
     VaultSecretDetail,
     VaultSecretType,
 )
+from inkbox.vault.totp import (
+    TOTPAlgorithm,
+    TOTPCode,
+    TOTPConfig,
+    generate_totp,
+    parse_totp_uri,
+)
 from inkbox.vault.crypto import (
     VaultKeyMaterial,
     generate_org_encryption_key,
@@ -105,6 +112,12 @@ __all__ = [
     "generate_org_encryption_key",
     "generate_vault_key_material",
     "generate_recovery_code",
+    # TOTP
+    "TOTPAlgorithm",
+    "TOTPCode",
+    "TOTPConfig",
+    "generate_totp",
+    "parse_totp_uri",
     # Signing key + webhook verification
     "SigningKey",
     "verify_webhook",

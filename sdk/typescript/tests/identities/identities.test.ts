@@ -163,30 +163,3 @@ describe("IdentitiesResource.unlinkPhoneNumber", () => {
   });
 });
 
-describe("IdentitiesResource.assignAuthenticatorApp", () => {
-  it("posts authenticator_app_id and returns detail", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_DETAIL);
-    const res = new IdentitiesResource(http);
-    const authenticatorAppId = "cccc3333-0000-0000-0000-000000000001";
-
-    const detail = await res.assignAuthenticatorApp(HANDLE, { authenticatorAppId });
-
-    expect(http.post).toHaveBeenCalledWith(`/${HANDLE}/authenticator_app`, {
-      authenticator_app_id: authenticatorAppId,
-    });
-    expect(detail.authenticatorApp).not.toBeNull();
-  });
-});
-
-describe("IdentitiesResource.unlinkAuthenticatorApp", () => {
-  it("deletes authenticator app link", async () => {
-    const http = mockHttp();
-    vi.mocked(http.delete).mockResolvedValue(undefined);
-    const res = new IdentitiesResource(http);
-
-    await res.unlinkAuthenticatorApp(HANDLE);
-
-    expect(http.delete).toHaveBeenCalledWith(`/${HANDLE}/authenticator_app`);
-  });
-});

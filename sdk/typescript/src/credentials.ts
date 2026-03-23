@@ -8,6 +8,8 @@
  * keys, and configuring access rules.
  */
 
+import type { TOTPCode } from "./vault/totp.js";
+import { generateTotp } from "./vault/totp.js";
 import type {
   APIKeyPayload,
   DecryptedVaultSecret,
@@ -149,6 +151,23 @@ export class Credentials {
       );
     }
     return secret.payload;
+  }
+
+  /**
+   * Generate the current TOTP code for a login credential.
+   *
+   * @param secretId - UUID of the login secret.
+   * @returns A {@link TOTPCode}.
+   * @throws Error if not found.
+   * @throws TypeError if the credential is not a login type.
+   * @throws Error if the login has no TOTP configured.
+   */
+  getTotpCode(secretId: string): TOTPCode {
+    const payload = this.getLogin(secretId);
+    if (!payload.totp) {
+      throw new Error(`Login '${secretId}' has no TOTP configured`);
+    }
+    return generateTotp(payload.totp);
   }
 
   /** Number of credentials accessible to this identity. */

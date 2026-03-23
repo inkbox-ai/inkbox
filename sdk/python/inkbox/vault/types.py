@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import MISSING, asdict, dataclass, field, fields
+
+from inkbox.vault.totp import TOTPConfig
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, ClassVar
@@ -223,6 +225,7 @@ class LoginPayload(AbstractSecretPayload):
         username: Optional login username.
         email: Optional login email address.
         url: Optional URL of the service.
+        totp: Optional TOTP configuration for two-factor authentication.
     """
 
     secret_type: ClassVar[VaultSecretType] = VaultSecretType.LOGIN
@@ -231,6 +234,29 @@ class LoginPayload(AbstractSecretPayload):
     username: str | None = None
     email: str | None = None
     url: str | None = None
+    totp: TOTPConfig | None = None
+
+    def _to_dict(self) -> dict[str, Any]:
+        d = {k: v for k, v in asdict(self).items() if v is not None}
+        # asdict() recursively converts nested dataclasses, but includes
+        # None-valued fields inside the nested dict.  Replace with our
+        # clean serializer.
+        if self.totp is not None:
+            d["totp"] = self.totp._to_dict()
+        return d
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> LoginPayload:
+        totp_raw = d.get("totp")
+        totp = TOTPConfig._from_dict(totp_raw) if totp_raw is not None else None
+        return cls(
+            password=d["password"],
+            username=d.get("username"),
+            email=d.get("email"),
+            url=d.get("url"),
+            totp=totp,
+            notes=d.get("notes"),
+        )
 
 
 @dataclass

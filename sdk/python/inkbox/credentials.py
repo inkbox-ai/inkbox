@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from inkbox.vault.totp import TOTPCode, generate_totp
 from inkbox.vault.types import (
     APIKeyPayload,
     DecryptedVaultSecret,
@@ -158,3 +159,24 @@ class Credentials:
             TypeError: If the credential is not an ssh_key type.
         """
         return self._get_typed(secret_id, VaultSecretType.SSH_KEY)  # type: ignore[return-value]
+
+    def get_totp_code(self, secret_id: UUID | str) -> TOTPCode:
+        """Generate the current TOTP code for a login credential.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            A :class:`~inkbox.vault.totp.TOTPCode`.
+
+        Raises:
+            KeyError: If the credential is not found.
+            TypeError: If the credential is not a login type.
+            ValueError: If the login has no TOTP configured.
+        """
+        payload = self.get_login(secret_id)
+        if payload.totp is None:
+            raise ValueError(
+                f"Login {str(secret_id)!r} has no TOTP configured"
+            )
+        return generate_totp(payload.totp)

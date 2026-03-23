@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from inkbox.vault.totp import TOTPCode, TOTPConfig, generate_totp, parse_totp_uri
 from inkbox.vault.crypto import (
     compute_auth_hash,
     decrypt_payload,
@@ -394,3 +395,84 @@ class UnlockedVault:
             secret_id: UUID of the secret to delete.
         """
         self._http.delete(f"/secrets/{secret_id}")
+
+    ## TOTP helpers
+
+    def set_totp(
+        self,
+        secret_id: UUID | str,
+        totp: TOTPConfig | str,
+    ) -> VaultSecret:
+        """Add or replace the TOTP configuration on a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+            totp: A :class:`~inkbox.vault.totp.TOTPConfig` or an
+                ``otpauth://totp/...`` URI string.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+
+        Raises:
+            TypeError: If the secret is not a login type.
+            ValueError: If a URI string is invalid or not TOTP.
+        """
+        if isinstance(totp, str):
+            totp = parse_totp_uri(totp)
+        secret = self.get_secret(secret_id)
+        if secret.secret_type != "login":
+            raise TypeError(
+                f"Cannot set TOTP on a {secret.secret_type!r} secret — "
+                f"only login secrets support TOTP"
+            )
+        payload = secret.payload
+        payload.totp = totp  # type: ignore[union-attr]
+        return self.update_secret(secret_id, payload=payload)
+
+    def remove_totp(self, secret_id: UUID | str) -> VaultSecret:
+        """Remove TOTP configuration from a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+
+        Raises:
+            TypeError: If the secret is not a login type.
+        """
+        secret = self.get_secret(secret_id)
+        if secret.secret_type != "login":
+            raise TypeError(
+                f"Cannot remove TOTP from a {secret.secret_type!r} secret — "
+                f"only login secrets support TOTP"
+            )
+        payload = secret.payload
+        payload.totp = None  # type: ignore[union-attr]
+        return self.update_secret(secret_id, payload=payload)
+
+    def get_totp_code(self, secret_id: UUID | str) -> TOTPCode:
+        """Generate the current TOTP code for a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            A :class:`~inkbox.vault.totp.TOTPCode`.
+
+        Raises:
+            TypeError: If the secret is not a login type.
+            ValueError: If the login has no TOTP configured.
+        """
+        secret = self.get_secret(secret_id)
+        if secret.secret_type != "login":
+            raise TypeError(
+                f"Cannot generate TOTP for a {secret.secret_type!r} secret — "
+                f"only login secrets support TOTP"
+            )
+        totp_config = secret.payload.totp  # type: ignore[union-attr]
+        if totp_config is None:
+            raise ValueError(
+                f"Login secret {secret_id!r} has no TOTP configured"
+            )
+        return generate_totp(totp_config)

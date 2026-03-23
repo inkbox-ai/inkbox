@@ -5,7 +5,9 @@
  * UnlockedVault   — crypto-enabled wrapper for secret CRUD after unlock.
  */
 
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, InkboxError } from "../../_http.js";
+import type { TOTPCode, TOTPConfig } from "../totp.js";
+import { generateTotp, parseTotpUri } from "../totp.js";
 import {
   computeAuthHash,
   decryptPayload,
@@ -390,5 +392,74 @@ export class UnlockedVault {
    */
   async deleteSecret(secretId: string): Promise<void> {
     await this.http.delete(`/secrets/${secretId}`);
+  }
+
+  // ------------------------------------------------------------------
+  // TOTP helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * Add or replace the TOTP configuration on a login secret.
+   *
+   * @param secretId - UUID of the login secret.
+   * @param totp - A {@link TOTPConfig} object or an `otpauth://totp/...` URI string.
+   * @returns Updated {@link VaultSecret} metadata.
+   * @throws TypeError if the secret is not a login type.
+   * @throws Error if a URI string is invalid or not TOTP.
+   */
+  async setTotp(
+    secretId: string,
+    totp: TOTPConfig | string,
+  ): Promise<VaultSecret> {
+    const config = typeof totp === "string" ? parseTotpUri(totp) : totp;
+    const secret = await this.getSecret(secretId);
+    if (secret.secretType !== "login") {
+      throw new TypeError(
+        `Cannot set TOTP on a '${secret.secretType}' secret — only login secrets support TOTP`,
+      );
+    }
+    const payload = { ...secret.payload, totp: config };
+    return this.updateSecret(secretId, { payload });
+  }
+
+  /**
+   * Remove TOTP configuration from a login secret.
+   *
+   * @param secretId - UUID of the login secret.
+   * @returns Updated {@link VaultSecret} metadata.
+   * @throws TypeError if the secret is not a login type.
+   */
+  async removeTotp(secretId: string): Promise<VaultSecret> {
+    const secret = await this.getSecret(secretId);
+    if (secret.secretType !== "login") {
+      throw new TypeError(
+        `Cannot remove TOTP from a '${secret.secretType}' secret — only login secrets support TOTP`,
+      );
+    }
+    const loginPayload = secret.payload as import("../types.js").LoginPayload;
+    const { totp: _, ...rest } = loginPayload;
+    return this.updateSecret(secretId, { payload: rest });
+  }
+
+  /**
+   * Generate the current TOTP code for a login secret.
+   *
+   * @param secretId - UUID of the login secret.
+   * @returns A {@link TOTPCode}.
+   * @throws TypeError if the secret is not a login type.
+   * @throws Error if the login has no TOTP configured.
+   */
+  async getTotpCode(secretId: string): Promise<TOTPCode> {
+    const secret = await this.getSecret(secretId);
+    if (secret.secretType !== "login") {
+      throw new TypeError(
+        `Cannot generate TOTP for a '${secret.secretType}' secret — only login secrets support TOTP`,
+      );
+    }
+    const loginPayload = secret.payload as import("../types.js").LoginPayload;
+    if (!loginPayload.totp) {
+      throw new Error(`Login secret '${secretId}' has no TOTP configured`);
+    }
+    return generateTotp(loginPayload.totp);
   }
 }
