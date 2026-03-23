@@ -1,7 +1,7 @@
 """
 inkbox/credentials.py
 
-Credentials — agent-facing credential access, typed and identity-scoped.
+Agent-facing credential access, typed and identity-scoped.
 
 This is the *runtime* surface for agents that need their credentials.
 The vault remains the *admin* surface for creating secrets, managing
@@ -24,7 +24,7 @@ from inkbox.vault.types import (
 
 class Credentials:
     """
-    Agent-facing credential access — typed, identity-scoped.
+    Agent-facing credential access; typed, identity-scoped.
 
     Wraps a pre-filtered list of :class:`~inkbox.vault.types.DecryptedVaultSecret`
     objects and provides typed accessors so agents can retrieve credentials
@@ -39,11 +39,35 @@ class Credentials:
         api_key = identity.credentials.get_api_key("cccc3333-...")
     """
 
+    ## Magic methods
+
     def __init__(self, secrets: list[DecryptedVaultSecret]) -> None:
         self._secrets = secrets
         self._by_id: dict[str, DecryptedVaultSecret] = {
             str(s.id): s for s in secrets
         }
+
+    def __len__(self) -> int:
+        return len(self._secrets)
+
+    def __repr__(self) -> str:
+        return f"Credentials({len(self._secrets)} secrets)"
+
+    ## Internal
+
+    def _get_typed(
+        self,
+        secret_id: UUID | str,
+        expected_type: VaultSecretType,
+    ) -> SecretPayload:
+        """Look up a secret by UUID and verify its type, returning the payload."""
+        secret = self.get(secret_id)
+        if secret.secret_type != expected_type:
+            raise TypeError(
+                f"Credential {str(secret_id)!r} is a {secret.secret_type!r} secret, "
+                f"not {expected_type.value!r}"
+            )
+        return secret.payload
 
     ## Discovery; return full DecryptedVaultSecret for name/metadata
 
@@ -117,20 +141,3 @@ class Credentials:
             TypeError: If the credential is not an ssh_key type.
         """
         return self._get_typed(secret_id, VaultSecretType.SSH_KEY)  # type: ignore[return-value]
-
-    ## Internal
-
-    def _get_typed(self, secret_id: UUID | str, expected_type: VaultSecretType) -> SecretPayload:
-        secret = self.get(secret_id)
-        if secret.secret_type != expected_type:
-            raise TypeError(
-                f"Credential {str(secret_id)!r} is a {secret.secret_type!r} secret, "
-                f"not {expected_type.value!r}"
-            )
-        return secret.payload
-
-    def __len__(self) -> int:
-        return len(self._secrets)
-
-    def __repr__(self) -> str:
-        return f"Credentials({len(self._secrets)} secrets)"

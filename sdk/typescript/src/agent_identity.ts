@@ -9,7 +9,7 @@
  * address or phone number ID explicitly.
  */
 
-import { InkboxAPIError } from "./_http.js";
+import { InkboxAPIError, InkboxError } from "./_http.js";
 import type { AuthenticatorAccount, AuthenticatorApp, OTPCode } from "./authenticator/types.js";
 import { Credentials } from "./credentials.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
@@ -477,8 +477,7 @@ export class AgentIdentity {
 
   private _requireVaultUnlocked(): void {
     if (this._inkbox._vaultResource._unlocked === null) {
-      throw new InkboxAPIError(
-        0,
+      throw new InkboxError(
         "Vault must be unlocked before accessing credentials. Call inkbox.vault.unlock(vaultKey) first.",
       );
     }
@@ -486,8 +485,7 @@ export class AgentIdentity {
 
   private _requireMailbox(): void {
     if (!this._mailbox) {
-      throw new InkboxAPIError(
-        0,
+      throw new InkboxError(
         `Identity '${this.agentHandle}' has no mailbox assigned. Call identity.createMailbox() or identity.assignMailbox() first.`,
       );
     }
@@ -495,8 +493,7 @@ export class AgentIdentity {
 
   private _requirePhone(): void {
     if (!this._phoneNumber) {
-      throw new InkboxAPIError(
-        0,
+      throw new InkboxError(
         `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() or identity.assignPhoneNumber() first.`,
       );
     }
@@ -504,8 +501,7 @@ export class AgentIdentity {
 
   private _requireAuthenticatorApp(): void {
     if (!this._authenticatorApp) {
-      throw new InkboxAPIError(
-        0,
+      throw new InkboxError(
         `Identity '${this.agentHandle}' has no authenticator app assigned. Call identity.createAuthenticatorApp() or identity.assignAuthenticatorApp() first.`,
       );
     }

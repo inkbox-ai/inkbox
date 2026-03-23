@@ -2,7 +2,7 @@ export { Inkbox } from "./inkbox.js";
 export { AgentIdentity } from "./agent_identity.js";
 export { Credentials } from "./credentials.js";
 export type { InkboxOptions } from "./inkbox.js";
-export { InkboxAPIError, InkboxVaultKeyError } from "./_http.js";
+export { InkboxError, InkboxAPIError, InkboxVaultKeyError } from "./_http.js";
 export type { SigningKey } from "./signing_keys.js";
 export { verifyWebhook } from "./signing_keys.js";
 export type {
