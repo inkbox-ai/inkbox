@@ -224,7 +224,12 @@ class VaultResource:
         decrypted: list[DecryptedVaultSecret] = []
         for raw in data.get("encrypted_secrets", []):
             detail = VaultSecretDetail._from_dict(raw)
-            payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
+            # Try with secret ID as AAD; fall back to empty AAD for secrets
+            # created before the re-encrypt-on-create fix was deployed.
+            try:
+                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
+            except Exception:
+                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id="")
             payload = _parse_payload(detail.secret_type, payload_dict)
             decrypted.append(
                 DecryptedVaultSecret(
@@ -320,7 +325,12 @@ class UnlockedVault:
         """
         data = self._http.get(f"/secrets/{secret_id}")
         detail = VaultSecretDetail._from_dict(data)
-        payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
+        # Try with secret ID as AAD; fall back to empty AAD for secrets
+        # created before the re-encrypt-on-create fix was deployed.
+        try:
+            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
+        except Exception:
+            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id="")
         payload = _parse_payload(
             secret_type=detail.secret_type,
             raw=payload_dict,
@@ -358,6 +368,7 @@ class UnlockedVault:
             :class:`~inkbox.vault.types.VaultSecret` metadata (no payload).
         """
         secret_type = _infer_secret_type(payload)
+        # Initial create uses empty AAD (secret ID doesn't exist yet).
         encrypted = encrypt_payload(self._org_key, payload._to_dict())
         body: dict[str, Any] = {
             "name": name,
@@ -371,6 +382,18 @@ class UnlockedVault:
             json=body,
         )
         result = VaultSecret._from_dict(data)
+        # Re-encrypt with the real secret ID as AAD so the tamper check
+        # is in place from the start (the initial POST used empty AAD
+        # because the server-generated ID wasn't known yet).
+        re_encrypted = encrypt_payload(
+            self._org_key,
+            payload._to_dict(),
+            secret_id=str(result.id),
+        )
+        self._http.patch(
+            path=f"/secrets/{result.id}",
+            json={"encrypted_payload": re_encrypted},
+        )
         # Append the new secret to the cache so it's immediately visible.
         try:
             decrypted = self.get_secret(str(result.id))
