@@ -320,10 +320,7 @@ class UnlockedVault:
         """
         data = self._http.get(f"/secrets/{secret_id}")
         detail = VaultSecretDetail._from_dict(data)
-        try:
-            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
-        except Exception:
-            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id="")
+        payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
         payload = _parse_payload(
             secret_type=detail.secret_type,
             raw=payload_dict,

@@ -119,10 +119,10 @@ class TestVaultResourceUnlock:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         login_payload = {"username": "admin", "password": "s3cret"}
-        encrypted = encrypt_payload(org_key, login_payload)
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
 
         res, http = _resource()
         # info() call
@@ -155,7 +155,7 @@ class TestVaultResourceUnlock:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         res, http = _resource()
         assert res._unlocked is None
@@ -177,7 +177,7 @@ class TestVaultResourceUnlock:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         res, http = _resource()
         http.get.side_effect = [
@@ -213,7 +213,7 @@ class TestUnlockedVaultCreateSecret:
         http.post.return_value = VAULT_SECRET_DICT
         # get_secret is called after create to populate cache
         login_payload = {"password": "pw", "username": "admin"}
-        encrypted = encrypt_payload(org_key, login_payload)
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
         http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
@@ -236,7 +236,7 @@ class TestUnlockedVaultCreateSecret:
         http = MagicMock()
         http.post.return_value = VAULT_SECRET_DICT
         login_payload = {"password": "pw", "username": "admin"}
-        encrypted = encrypt_payload(org_key, login_payload)
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
         http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
@@ -296,7 +296,7 @@ class TestUnlockedVaultGetSecret:
         http = MagicMock()
 
         login_payload = {"username": "admin", "password": "s3cret"}
-        encrypted = encrypt_payload(org_key, login_payload)
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
 
         http.get.return_value = {
             **VAULT_SECRET_DICT,
@@ -406,14 +406,15 @@ class TestUnlockIdentityFiltering:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         # Create two secrets with different IDs
         secret1_dict = {
             **VAULT_SECRET_DICT,
             "id": "cccc3333-0000-0000-0000-000000000001",
             "encrypted_payload": encrypt_payload(
-                org_key, {"username": "admin1", "password": "pw1"}
+                org_key, {"username": "admin1", "password": "pw1"},
+                secret_id="cccc3333-0000-0000-0000-000000000001",
             ),
         }
         secret2_dict = {
@@ -421,7 +422,8 @@ class TestUnlockIdentityFiltering:
             "id": "cccc3333-0000-0000-0000-000000000002",
             "name": "AWS Staging",
             "encrypted_payload": encrypt_payload(
-                org_key, {"username": "admin2", "password": "pw2"}
+                org_key, {"username": "admin2", "password": "pw2"},
+                secret_id="cccc3333-0000-0000-0000-000000000002",
             ),
         }
 
@@ -456,12 +458,13 @@ class TestUnlockIdentityFiltering:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         secret_dict = {
             **VAULT_SECRET_DICT,
             "encrypted_payload": encrypt_payload(
-                org_key, {"username": "admin", "password": "pw"}
+                org_key, {"username": "admin", "password": "pw"},
+                secret_id=VAULT_SECRET_DICT["id"],
             ),
         }
 
@@ -496,7 +499,7 @@ def _unlocked_with_login(*, totp_config=None):
     login_dict = {"password": "s3cret", "username": "admin"}
     if totp_config is not None:
         login_dict["totp"] = totp_config
-    encrypted = encrypt_payload(org_key, login_dict)
+    encrypted = encrypt_payload(org_key, login_dict, secret_id=VAULT_SECRET_DICT["id"])
     # get_secret will return this when fetching the secret
     http.get.return_value = {
         **VAULT_SECRET_DICT,
@@ -549,7 +552,7 @@ class TestUnlockedVaultSetTotp:
         org_key = generate_org_encryption_key()
         http = MagicMock()
         other_dict = {"data": "freeform"}
-        encrypted = encrypt_payload(org_key, other_dict)
+        encrypted = encrypt_payload(org_key, other_dict, secret_id=VAULT_SECRET_DICT["id"])
         other_secret_dict = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
         http.get.return_value = other_secret_dict
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
@@ -573,7 +576,7 @@ class TestUnlockedVaultRemoveTotp:
         org_key = generate_org_encryption_key()
         http = MagicMock()
         other_dict = {"data": "freeform"}
-        encrypted = encrypt_payload(org_key, other_dict)
+        encrypted = encrypt_payload(org_key, other_dict, secret_id=VAULT_SECRET_DICT["id"])
         http.get.return_value = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
@@ -604,7 +607,7 @@ class TestUnlockedVaultGetTotpCode:
         org_key = generate_org_encryption_key()
         http = MagicMock()
         other_dict = {"data": "freeform"}
-        encrypted = encrypt_payload(org_key, other_dict)
+        encrypted = encrypt_payload(org_key, other_dict, secret_id=VAULT_SECRET_DICT["id"])
         http.get.return_value = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
@@ -625,7 +628,7 @@ class TestUnlockedVaultCacheConsistency:
         # set_totp triggers update_secret which calls _refresh_cached_secret
         # The mock http.get returns a secret with TOTP after the PATCH
         login_with_totp = {"password": "s3cret", "username": "admin", "totp": totp_dict}
-        encrypted_with_totp = encrypt_payload(unlocked._org_key, login_with_totp)
+        encrypted_with_totp = encrypt_payload(unlocked._org_key, login_with_totp, secret_id=VAULT_SECRET_DICT["id"])
         http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted_with_totp}
 
         unlocked.set_totp(SECRET_ID, TOTPConfig(secret=TOTP_SECRET))
@@ -641,3 +644,14 @@ class TestUnlockedVaultCacheConsistency:
         unlocked.delete_secret(SECRET_ID)
 
         assert len(unlocked.secrets) == 0
+
+
+class TestStrictAADEnforcement:
+    def test_rejects_payload_encrypted_with_wrong_secret_id(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        encrypted = encrypt_payload(org_key, {"password": "pw", "username": "u"}, secret_id="wrong-id")
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+        with pytest.raises(Exception):
+            unlocked.get_secret("cccc3333-0000-0000-0000-000000000001")

@@ -222,27 +222,16 @@ export class VaultResource {
       }
     }
     if (!orgKey) {
-      // Fallback: try without AAD (for vaults initialized by older SDK versions)
-      try {
-        orgKey = unwrapOrgKey(masterKey, wrapped, "");
-      } catch {
-        throw new Error(
-          "Failed to unwrap org encryption key. Check that the vault key is correct.",
-        );
-      }
+      throw new Error(
+        "Failed to unwrap org encryption key. Check that the vault key is correct.",
+      );
     }
 
     // Step 5: decrypt all secrets from the unlock bundle
     const decrypted: DecryptedVaultSecret[] = [];
     for (const raw of data.encrypted_secrets ?? []) {
       const detail = parseVaultSecretDetail(raw);
-      // Try with secret ID as AAD, fall back to empty AAD
-      let payloadDict: Record<string, unknown>;
-      try {
-        payloadDict = decryptPayload(orgKey, detail.encryptedPayload, detail.id);
-      } catch {
-        payloadDict = decryptPayload(orgKey, detail.encryptedPayload, "");
-      }
+      const payloadDict = decryptPayload(orgKey, detail.encryptedPayload, detail.id);
       const payload = parsePayload(
         detail.secretType,
         payloadDict as Record<string, unknown>,
@@ -339,12 +328,7 @@ export class UnlockedVault {
       `/secrets/${secretId}`,
     );
     const detail = parseVaultSecretDetail(data);
-    let payloadDict: Record<string, unknown>;
-    try {
-      payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, detail.id);
-    } catch {
-      payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, "");
-    }
+    const payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, detail.id);
     const payload = parsePayload(
       detail.secretType,
       payloadDict as Record<string, unknown>,

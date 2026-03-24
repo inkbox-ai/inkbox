@@ -168,8 +168,8 @@ describe("VaultResource.unlock", () => {
 
     const salt = deriveSalt(orgId);
     const mk = await deriveMasterKey(vaultKey, salt);
-    const wrapped = wrapOrgKey(mk, orgKey);
-    const encrypted = encryptPayload(orgKey, { username: "admin", password: "s3cret" });
+    const wrapped = wrapOrgKey(mk, orgKey, RAW_KEY.id);
+    const encrypted = encryptPayload(orgKey, { username: "admin", password: "s3cret" }, RAW_SECRET.id);
 
     const http = mockHttp();
     vi.mocked(http.get)
@@ -197,7 +197,7 @@ describe("VaultResource.unlock", () => {
     const orgId = "org_test_123";
     const salt = deriveSalt(orgId);
     const masterKey = await deriveMasterKey(vaultKey, salt);
-    const wrapped = wrapOrgKey(masterKey, orgKey);
+    const wrapped = wrapOrgKey(masterKey, orgKey, RAW_KEY.id);
 
     const http = mockHttp();
     const res = new VaultResource(http);
@@ -219,7 +219,7 @@ describe("VaultResource.unlock", () => {
     const orgId = "org_test_123";
     const salt = deriveSalt(orgId);
     const masterKey = await deriveMasterKey(vaultKey, salt);
-    const wrapped = wrapOrgKey(masterKey, orgKey);
+    const wrapped = wrapOrgKey(masterKey, orgKey, RAW_KEY.id);
 
     const http = mockHttp();
     const res = new VaultResource(http);
@@ -256,7 +256,7 @@ describe("UnlockedVault.createSecret", () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_SECRET);
     // get_secret is called after create to populate cache
-    const encrypted = encryptPayload(orgKey, { username: "admin", password: "pw" });
+    const encrypted = encryptPayload(orgKey, { username: "admin", password: "pw" }, RAW_SECRET.id);
     vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
     const unlocked = new UnlockedVault(http, orgKey, []);
 
@@ -278,7 +278,7 @@ describe("UnlockedVault.createSecret", () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_SECRET);
-    const encrypted = encryptPayload(orgKey, { username: "admin", password: "pw" });
+    const encrypted = encryptPayload(orgKey, { username: "admin", password: "pw" }, RAW_SECRET.id);
     vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
     const unlocked = new UnlockedVault(http, orgKey, []);
 
@@ -344,9 +344,10 @@ describe("UnlockedVault.getSecret", () => {
   it("fetches and decrypts", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
-    const encrypted = encryptPayload(orgKey, { username: "admin", password: "s3cret" });
+    const encrypted = encryptPayload(orgKey, { username: "admin", password: "s3cret" }, "some-uuid");
     vi.mocked(http.get).mockResolvedValue({
       ...RAW_SECRET,
+      id: "some-uuid",
       encrypted_payload: encrypted,
     });
     const unlocked = new UnlockedVault(http, orgKey, []);
@@ -415,14 +416,13 @@ describe("VaultResource.unlock with identityId filtering", () => {
 
     const salt = deriveSalt(orgId);
     const mk = await deriveMasterKey(vaultKey, salt);
-    const wrapped = wrapOrgKey(mk, orgKey);
+    const wrapped = wrapOrgKey(mk, orgKey, RAW_KEY.id);
 
     // Create two encrypted secrets
-    const encrypted1 = encryptPayload(orgKey, { username: "admin", password: "s3cret" });
-    const encrypted2 = encryptPayload(orgKey, { username: "user2", password: "pass2" });
-
     const secret1Id = "cccc3333-0000-0000-0000-000000000001";
     const secret2Id = "cccc3333-0000-0000-0000-000000000002";
+    const encrypted1 = encryptPayload(orgKey, { username: "admin", password: "s3cret" }, secret1Id);
+    const encrypted2 = encryptPayload(orgKey, { username: "user2", password: "pass2" }, secret2Id);
     const identityId = "identity-uuid-1234";
 
     const http = mockHttp();
@@ -468,7 +468,7 @@ function unlockedWithLogin(opts: { totpConfig?: Record<string, unknown> } = {}) 
   const http = mockHttp();
   const loginDict: Record<string, unknown> = { password: "s3cret", username: "admin" };
   if (opts.totpConfig) loginDict.totp = opts.totpConfig;
-  const encrypted = encryptPayload(orgKey, loginDict);
+  const encrypted = encryptPayload(orgKey, loginDict, RAW_SECRET.id);
   // get_secret returns this when fetching
   vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
   vi.mocked(http.patch).mockResolvedValue(RAW_SECRET);
@@ -505,7 +505,7 @@ describe("UnlockedVault.setTotp", () => {
   it("rejects non-login secret", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
-    const encrypted = encryptPayload(orgKey, { data: "freeform" });
+    const encrypted = encryptPayload(orgKey, { data: "freeform" }, RAW_SECRET.id);
     vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, secret_type: "other", encrypted_payload: encrypted });
     const unlocked = new UnlockedVault(http, orgKey, []);
     await expect(unlocked.setTotp(SECRET_ID, { secret: TOTP_SECRET })).rejects.toThrow("only login secrets support TOTP");
@@ -524,7 +524,7 @@ describe("UnlockedVault.removeTotp", () => {
   it("rejects non-login secret", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
-    const encrypted = encryptPayload(orgKey, { data: "freeform" });
+    const encrypted = encryptPayload(orgKey, { data: "freeform" }, RAW_SECRET.id);
     vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, secret_type: "other", encrypted_payload: encrypted });
     const unlocked = new UnlockedVault(http, orgKey, []);
     await expect(unlocked.removeTotp(SECRET_ID)).rejects.toThrow("only login secrets support TOTP");
@@ -550,7 +550,7 @@ describe("UnlockedVault.getTotpCode", () => {
   it("throws for non-login secret", async () => {
     const orgKey = generateOrgEncryptionKey();
     const http = mockHttp();
-    const encrypted = encryptPayload(orgKey, { data: "freeform" });
+    const encrypted = encryptPayload(orgKey, { data: "freeform" }, RAW_SECRET.id);
     vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, secret_type: "other", encrypted_payload: encrypted });
     const unlocked = new UnlockedVault(http, orgKey, []);
     await expect(unlocked.getTotpCode(SECRET_ID)).rejects.toThrow("only login secrets support TOTP");
@@ -565,7 +565,7 @@ describe("UnlockedVault cache consistency", () => {
     // After setTotp, the refresh mock returns a secret with TOTP
     const totpDict = { secret: TOTP_SECRET, algorithm: "sha1", digits: 6, period: 30 };
     const loginWithTotp = { password: "s3cret", username: "admin", totp: totpDict };
-    const encryptedWithTotp = encryptPayload(orgKey, loginWithTotp);
+    const encryptedWithTotp = encryptPayload(orgKey, loginWithTotp, RAW_SECRET.id);
     vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encryptedWithTotp });
 
     await unlocked.setTotp(SECRET_ID, { secret: TOTP_SECRET });
@@ -617,5 +617,16 @@ describe("VaultResource.unlock with AAD happy path", () => {
 
     expect(unlocked.secrets).toHaveLength(1);
     expect((unlocked.secrets[0].payload as { username: string }).username).toBe("admin");
+  });
+});
+
+describe("strict AAD enforcement", () => {
+  it("rejects payload encrypted with wrong secret ID", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const http = mockHttp();
+    const encrypted = encryptPayload(orgKey, { password: "pw", username: "u" }, "wrong-id");
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
+    const unlocked = new UnlockedVault(http, orgKey, []);
+    await expect(unlocked.getSecret(RAW_SECRET.id)).rejects.toThrow();
   });
 });
