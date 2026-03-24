@@ -119,10 +119,10 @@ class TestVaultResourceUnlock:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         login_payload = {"username": "admin", "password": "s3cret"}
-        encrypted = encrypt_payload(org_key, login_payload)
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
 
         res, http = _resource()
         # info() call
@@ -137,6 +137,7 @@ class TestVaultResourceUnlock:
                     }
                 ],
             },
+            [VAULT_KEY_DICT],  # /keys
         ]
 
         unlocked = res.unlock(vault_key)
@@ -154,7 +155,7 @@ class TestVaultResourceUnlock:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         res, http = _resource()
         assert res._unlocked is None
@@ -164,6 +165,7 @@ class TestVaultResourceUnlock:
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [],
             },
+            [VAULT_KEY_DICT],  # /keys
         ]
         unlocked = res.unlock(vault_key)
         assert res._unlocked is unlocked
@@ -175,7 +177,7 @@ class TestVaultResourceUnlock:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         res, http = _resource()
         http.get.side_effect = [
@@ -184,6 +186,7 @@ class TestVaultResourceUnlock:
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [],
             },
+            [VAULT_KEY_DICT],  # /keys
         ]
         returned = res.unlock(vault_key, identity_id="some-identity")
         # _unlocked is always populated (unfiltered) so identity.credentials works
@@ -208,6 +211,10 @@ class TestUnlockedVaultCreateSecret:
         org_key = generate_org_encryption_key()
         http = MagicMock()
         http.post.return_value = VAULT_SECRET_DICT
+        # get_secret is called after create to populate cache
+        login_payload = {"password": "pw", "username": "admin"}
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
         result = unlocked.create_secret(
@@ -223,6 +230,23 @@ class TestUnlockedVaultCreateSecret:
         assert body["description"] == "Prod creds"
         assert body["secret_type"] == "login"
         assert "encrypted_payload" in body
+
+    def test_create_appends_to_cache(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        http.post.return_value = VAULT_SECRET_DICT
+        login_payload = {"password": "pw", "username": "admin"}
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        assert len(unlocked.secrets) == 0
+
+        unlocked.create_secret("Test", LoginPayload(password="pw", username="admin"))
+
+        assert len(unlocked.secrets) == 1
+        assert unlocked.secrets[0].name == "AWS Production"
+        assert unlocked.secrets[0].payload.username == "admin"
 
 
 class TestUnlockedVaultUpdateSecret:
@@ -272,7 +296,7 @@ class TestUnlockedVaultGetSecret:
         http = MagicMock()
 
         login_payload = {"username": "admin", "password": "s3cret"}
-        encrypted = encrypt_payload(org_key, login_payload)
+        encrypted = encrypt_payload(org_key, login_payload, secret_id=VAULT_SECRET_DICT["id"])
 
         http.get.return_value = {
             **VAULT_SECRET_DICT,
@@ -382,14 +406,15 @@ class TestUnlockIdentityFiltering:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         # Create two secrets with different IDs
         secret1_dict = {
             **VAULT_SECRET_DICT,
             "id": "cccc3333-0000-0000-0000-000000000001",
             "encrypted_payload": encrypt_payload(
-                org_key, {"username": "admin1", "password": "pw1"}
+                org_key, {"username": "admin1", "password": "pw1"},
+                secret_id="cccc3333-0000-0000-0000-000000000001",
             ),
         }
         secret2_dict = {
@@ -397,7 +422,8 @@ class TestUnlockIdentityFiltering:
             "id": "cccc3333-0000-0000-0000-000000000002",
             "name": "AWS Staging",
             "encrypted_payload": encrypt_payload(
-                org_key, {"username": "admin2", "password": "pw2"}
+                org_key, {"username": "admin2", "password": "pw2"},
+                secret_id="cccc3333-0000-0000-0000-000000000002",
             ),
         }
 
@@ -405,13 +431,14 @@ class TestUnlockIdentityFiltering:
 
         res, http = _resource()
 
-        # info() -> unlock() -> access for secret1 -> access for secret2
+        # info() -> unlock() -> keys -> access for secret1 -> access for secret2
         http.get.side_effect = [
             VAULT_INFO_DICT,
             {
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [secret1_dict, secret2_dict],
             },
+            [VAULT_KEY_DICT],  # /keys
             # Access rules for secret1: this identity HAS access
             [{"identity_id": identity, "secret_id": "cccc3333-0000-0000-0000-000000000001"}],
             # Access rules for secret2: different identity, no match
@@ -431,12 +458,13 @@ class TestUnlockIdentityFiltering:
 
         salt = derive_salt(org_id)
         mk = derive_master_key(vault_key, salt)
-        wrapped = wrap_org_key(mk, org_key)
+        wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
 
         secret_dict = {
             **VAULT_SECRET_DICT,
             "encrypted_payload": encrypt_payload(
-                org_key, {"username": "admin", "password": "pw"}
+                org_key, {"username": "admin", "password": "pw"},
+                secret_id=VAULT_SECRET_DICT["id"],
             ),
         }
 
@@ -449,9 +477,181 @@ class TestUnlockIdentityFiltering:
                 "wrapped_org_encryption_key": wrapped,
                 "encrypted_secrets": [secret_dict],
             },
+            [VAULT_KEY_DICT],  # /keys
             # No matching access rules
             [{"identity_id": "other-identity", "secret_id": "cccc3333-0000-0000-0000-000000000001"}],
         ]
 
         unlocked = res.unlock(vault_key, identity_id=identity)
         assert len(unlocked.secrets) == 0
+
+
+# ---- TOTP integration tests ----
+
+SECRET_ID = "cccc3333-0000-0000-0000-000000000001"
+TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+
+
+def _unlocked_with_login(*, totp_config=None):
+    """Build an UnlockedVault with a login secret in the cache."""
+    org_key = generate_org_encryption_key()
+    http = MagicMock()
+    login_dict = {"password": "s3cret", "username": "admin"}
+    if totp_config is not None:
+        login_dict["totp"] = totp_config
+    encrypted = encrypt_payload(org_key, login_dict, secret_id=VAULT_SECRET_DICT["id"])
+    # get_secret will return this when fetching the secret
+    http.get.return_value = {
+        **VAULT_SECRET_DICT,
+        "encrypted_payload": encrypted,
+    }
+    http.patch.return_value = VAULT_SECRET_DICT
+
+    from inkbox.vault.types import DecryptedVaultSecret, _parse_payload
+    payload = _parse_payload("login", login_dict)
+    from uuid import UUID
+    from datetime import datetime
+    cached_secret = DecryptedVaultSecret(
+        id=UUID(VAULT_SECRET_DICT["id"]),
+        name=VAULT_SECRET_DICT["name"],
+        secret_type="login",
+        status="active",
+        created_at=datetime.fromisoformat(VAULT_SECRET_DICT["created_at"]),
+        updated_at=datetime.fromisoformat(VAULT_SECRET_DICT["updated_at"]),
+        payload=payload,
+        description=VAULT_SECRET_DICT["description"],
+    )
+    unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[cached_secret])
+    return unlocked, http
+
+
+class TestUnlockedVaultSetTotp:
+    def test_set_totp_with_config(self):
+        from inkbox.vault.totp import TOTPConfig
+        unlocked, http = _unlocked_with_login()
+        config = TOTPConfig(secret=TOTP_SECRET)
+
+        result = unlocked.set_totp(SECRET_ID, config)
+
+        assert isinstance(result, VaultSecret)
+        # Should have called patch with encrypted payload
+        http.patch.assert_called_once()
+        body = http.patch.call_args[1]["json"]
+        assert "encrypted_payload" in body
+
+    def test_set_totp_with_uri(self):
+        unlocked, http = _unlocked_with_login()
+        uri = f"otpauth://totp/Test?secret={TOTP_SECRET}&issuer=Test"
+
+        result = unlocked.set_totp(SECRET_ID, uri)
+
+        assert isinstance(result, VaultSecret)
+        http.patch.assert_called_once()
+
+    def test_set_totp_rejects_non_login(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        other_dict = {"data": "freeform"}
+        encrypted = encrypt_payload(org_key, other_dict, secret_id=VAULT_SECRET_DICT["id"])
+        other_secret_dict = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
+        http.get.return_value = other_secret_dict
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        from inkbox.vault.totp import TOTPConfig
+        with pytest.raises(TypeError, match="only login secrets support TOTP"):
+            unlocked.set_totp(SECRET_ID, TOTPConfig(secret=TOTP_SECRET))
+
+
+class TestUnlockedVaultRemoveTotp:
+    def test_remove_totp(self):
+        totp_dict = {"secret": TOTP_SECRET, "algorithm": "sha1", "digits": 6, "period": 30}
+        unlocked, http = _unlocked_with_login(totp_config=totp_dict)
+
+        result = unlocked.remove_totp(SECRET_ID)
+
+        assert isinstance(result, VaultSecret)
+        http.patch.assert_called_once()
+
+    def test_remove_totp_rejects_non_login(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        other_dict = {"data": "freeform"}
+        encrypted = encrypt_payload(org_key, other_dict, secret_id=VAULT_SECRET_DICT["id"])
+        http.get.return_value = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        with pytest.raises(TypeError, match="only login secrets support TOTP"):
+            unlocked.remove_totp(SECRET_ID)
+
+
+class TestUnlockedVaultGetTotpCode:
+    def test_generates_code(self):
+        totp_dict = {"secret": TOTP_SECRET, "algorithm": "sha1", "digits": 6, "period": 30}
+        unlocked, http = _unlocked_with_login(totp_config=totp_dict)
+
+        from inkbox.vault.totp import TOTPCode
+        code = unlocked.get_totp_code(SECRET_ID)
+
+        assert isinstance(code, TOTPCode)
+        assert len(code.code) == 6
+        assert code.code.isdigit()
+        assert code.seconds_remaining > 0
+
+    def test_raises_when_no_totp(self):
+        unlocked, http = _unlocked_with_login()
+
+        with pytest.raises(ValueError, match="no TOTP configured"):
+            unlocked.get_totp_code(SECRET_ID)
+
+    def test_raises_for_non_login(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        other_dict = {"data": "freeform"}
+        encrypted = encrypt_payload(org_key, other_dict, secret_id=VAULT_SECRET_DICT["id"])
+        http.get.return_value = {**VAULT_SECRET_DICT, "secret_type": "other", "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+
+        with pytest.raises(TypeError, match="only login secrets support TOTP"):
+            unlocked.get_totp_code(SECRET_ID)
+
+
+class TestUnlockedVaultCacheConsistency:
+    def test_set_totp_updates_cache(self):
+        """After set_totp, the secrets cache should reflect the new TOTP config."""
+        from inkbox.vault.totp import TOTPConfig
+        totp_dict = {"secret": TOTP_SECRET, "algorithm": "sha1", "digits": 6, "period": 30}
+        unlocked, http = _unlocked_with_login()
+
+        # Before: no TOTP in cache
+        assert unlocked.secrets[0].payload.totp is None
+
+        # set_totp triggers update_secret which calls _refresh_cached_secret
+        # The mock http.get returns a secret with TOTP after the PATCH
+        login_with_totp = {"password": "s3cret", "username": "admin", "totp": totp_dict}
+        encrypted_with_totp = encrypt_payload(unlocked._org_key, login_with_totp, secret_id=VAULT_SECRET_DICT["id"])
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted_with_totp}
+
+        unlocked.set_totp(SECRET_ID, TOTPConfig(secret=TOTP_SECRET))
+
+        # After: cache should have the TOTP config
+        assert unlocked.secrets[0].payload.totp is not None
+        assert unlocked.secrets[0].payload.totp.secret == TOTP_SECRET
+
+    def test_delete_secret_removes_from_cache(self):
+        unlocked, http = _unlocked_with_login()
+        assert len(unlocked.secrets) == 1
+
+        unlocked.delete_secret(SECRET_ID)
+
+        assert len(unlocked.secrets) == 0
+
+
+class TestStrictAADEnforcement:
+    def test_rejects_payload_encrypted_with_wrong_secret_id(self):
+        org_key = generate_org_encryption_key()
+        http = MagicMock()
+        encrypted = encrypt_payload(org_key, {"password": "pw", "username": "u"}, secret_id="wrong-id")
+        http.get.return_value = {**VAULT_SECRET_DICT, "encrypted_payload": encrypted}
+        unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
+        with pytest.raises(Exception):
+            unlocked.get_secret("cccc3333-0000-0000-0000-000000000001")

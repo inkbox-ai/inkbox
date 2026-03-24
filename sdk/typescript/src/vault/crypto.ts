@@ -126,9 +126,10 @@ export function computeAuthHash(masterKey: Uint8Array): string {
 // AES-256-GCM
 // ---------------------------------------------------------------------------
 
-function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array): Uint8Array {
+function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array, aad: string = ""): Uint8Array {
   const iv = randomBytes(AES_IV_BYTES);
   const cipher = createCipheriv("aes-256-gcm", key, iv);
+  if (aad) cipher.setAAD(Buffer.from(aad, "utf-8"));
   const encrypted = cipher.update(plaintext);
   const final = cipher.final();
   const tag = cipher.getAuthTag();
@@ -143,12 +144,13 @@ function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array): Uint8Array {
   return result;
 }
 
-function aesGcmDecrypt(key: Uint8Array, blob: Uint8Array): Uint8Array {
+function aesGcmDecrypt(key: Uint8Array, blob: Uint8Array, aad: string = ""): Uint8Array {
   const tag = blob.slice(-AES_TAG_BYTES);
   const nonce = blob.slice(-(AES_IV_BYTES + AES_TAG_BYTES), -AES_TAG_BYTES);
   const ct = blob.slice(0, -(AES_IV_BYTES + AES_TAG_BYTES));
   const decipher = createDecipheriv("aes-256-gcm", key, nonce);
   decipher.setAuthTag(tag);
+  if (aad) decipher.setAAD(Buffer.from(aad, "utf-8"));
   const decrypted = decipher.update(ct);
   const final = decipher.final();
   const result = new Uint8Array(decrypted.length + final.length);
@@ -167,8 +169,9 @@ function aesGcmDecrypt(key: Uint8Array, blob: Uint8Array): Uint8Array {
 export function wrapOrgKey(
   masterKey: Uint8Array,
   orgKey: Uint8Array,
+  vaultKeyId: string = "",
 ): string {
-  const blob = aesGcmEncrypt(masterKey, orgKey);
+  const blob = aesGcmEncrypt(masterKey, orgKey, vaultKeyId);
   return Buffer.from(blob).toString("base64");
 }
 
@@ -177,14 +180,16 @@ export function wrapOrgKey(
  *
  * @param masterKey - 32-byte master key.
  * @param wrappedB64 - Base64-encoded ciphertext blob from the server.
+ * @param vaultKeyId - Vault key UUID used as AAD during wrapping.
  * @returns 32-byte org encryption key.
  */
 export function unwrapOrgKey(
   masterKey: Uint8Array,
   wrappedB64: string,
+  vaultKeyId: string = "",
 ): Uint8Array {
   const blob = new Uint8Array(Buffer.from(wrappedB64, "base64"));
-  return aesGcmDecrypt(masterKey, blob);
+  return aesGcmDecrypt(masterKey, blob, vaultKeyId);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,9 +206,10 @@ export function unwrapOrgKey(
 export function encryptPayload(
   orgKey: Uint8Array,
   payload: Record<string, unknown>,
+  secretId: string = "",
 ): string {
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
-  const blob = aesGcmEncrypt(orgKey, plaintext);
+  const blob = aesGcmEncrypt(orgKey, plaintext, secretId);
   return Buffer.from(blob).toString("base64");
 }
 
@@ -212,14 +218,16 @@ export function encryptPayload(
  *
  * @param orgKey - 32-byte org encryption key.
  * @param encryptedB64 - Base64-encoded ciphertext blob.
+ * @param secretId - Vault secret UUID used as AAD during encryption.
  * @returns The decrypted payload as a plain object.
  */
 export function decryptPayload(
   orgKey: Uint8Array,
   encryptedB64: string,
+  secretId: string = "",
 ): Record<string, unknown> {
   const blob = new Uint8Array(Buffer.from(encryptedB64, "base64"));
-  const plaintext = aesGcmDecrypt(orgKey, blob);
+  const plaintext = aesGcmDecrypt(orgKey, blob, secretId);
   return JSON.parse(new TextDecoder().decode(plaintext));
 }
 
@@ -288,10 +296,11 @@ export async function generateVaultKeyMaterial(
   const salt = deriveSalt(organizationId);
   const masterKey = await deriveMasterKey(vaultKey, salt);
   const authHash = computeAuthHash(masterKey);
-  const wrapped = wrapOrgKey(masterKey, orgEncryptionKey);
+  const keyId = randomUUID();
+  const wrapped = wrapOrgKey(masterKey, orgEncryptionKey, keyId);
 
   return {
-    id: randomUUID(),
+    id: keyId,
     wrappedOrgEncryptionKey: wrapped,
     authHash,
     keyType: options.keyType ?? VaultKeyType.PRIMARY,
@@ -329,10 +338,11 @@ export async function generateRecoveryCode(
   const salt = deriveSalt(organizationId);
   const masterKey = await deriveMasterKey(code, salt);
   const authHash = computeAuthHash(masterKey);
-  const wrapped = wrapOrgKey(masterKey, orgEncryptionKey);
+  const keyId = randomUUID();
+  const wrapped = wrapOrgKey(masterKey, orgEncryptionKey, keyId);
 
   const material: VaultKeyMaterial = {
-    id: randomUUID(),
+    id: keyId,
     wrappedOrgEncryptionKey: wrapped,
     authHash,
     keyType: VaultKeyType.RECOVERY,

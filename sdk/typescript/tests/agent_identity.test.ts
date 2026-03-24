@@ -8,7 +8,6 @@ import {
   RAW_IDENTITY_DETAIL,
   RAW_IDENTITY_MAILBOX,
   RAW_IDENTITY_PHONE,
-  RAW_IDENTITY_AUTHENTICATOR_APP,
   RAW_IDENTITY,
   RAW_MAILBOX,
   RAW_MESSAGE,
@@ -17,7 +16,6 @@ import {
   RAW_PHONE_CALL_WITH_RATE_LIMIT,
   RAW_PHONE_CALL,
   RAW_PHONE_TRANSCRIPT,
-  RAW_OTP_CODE,
 } from "./sampleData.js";
 
 const PARSED_MAILBOX = {
@@ -40,15 +38,6 @@ const PARSED_PHONE = {
   updatedAt: RAW_IDENTITY_PHONE.updated_at,
 };
 
-const PARSED_AUTH_APP = {
-  id: RAW_IDENTITY_AUTHENTICATOR_APP.id,
-  organizationId: RAW_IDENTITY_AUTHENTICATOR_APP.organization_id,
-  identityId: RAW_IDENTITY_AUTHENTICATOR_APP.identity_id,
-  status: RAW_IDENTITY_AUTHENTICATOR_APP.status,
-  createdAt: RAW_IDENTITY_AUTHENTICATOR_APP.created_at,
-  updatedAt: RAW_IDENTITY_AUTHENTICATOR_APP.updated_at,
-};
-
 function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityData {
   return {
     id: RAW_IDENTITY_DETAIL.id,
@@ -58,7 +47,6 @@ function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityDa
     updatedAt: RAW_IDENTITY_DETAIL.updated_at,
     mailbox: PARSED_MAILBOX,
     phoneNumber: PARSED_PHONE,
-    authenticatorApp: PARSED_AUTH_APP,
     ...overrides,
   };
 }
@@ -80,17 +68,6 @@ function mockInkbox() {
       unlinkMailbox: vi.fn(),
       assignPhoneNumber: vi.fn(),
       unlinkPhoneNumber: vi.fn(),
-      assignAuthenticatorApp: vi.fn(),
-      unlinkAuthenticatorApp: vi.fn(),
-    },
-    _authApps: { create: vi.fn(), list: vi.fn(), get: vi.fn(), delete: vi.fn() },
-    _authAccounts: {
-      create: vi.fn(),
-      list: vi.fn(),
-      get: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      generateOtp: vi.fn(),
     },
   } as unknown as Inkbox;
 }
@@ -109,16 +86,10 @@ describe("AgentIdentity properties", () => {
     expect(identity.phoneNumber).toEqual(PARSED_PHONE);
   });
 
-  it("exposes authenticatorApp", () => {
-    const identity = new AgentIdentity(makeData(), mockInkbox());
-    expect(identity.authenticatorApp).toEqual(PARSED_AUTH_APP);
-  });
-
   it("returns null for missing channels", () => {
-    const identity = new AgentIdentity(makeData({ mailbox: null, phoneNumber: null, authenticatorApp: null }), mockInkbox());
+    const identity = new AgentIdentity(makeData({ mailbox: null, phoneNumber: null }), mockInkbox());
     expect(identity.mailbox).toBeNull();
     expect(identity.phoneNumber).toBeNull();
-    expect(identity.authenticatorApp).toBeNull();
   });
 });
 
@@ -384,7 +355,7 @@ describe("AgentIdentity management", () => {
 
   it("refresh re-fetches identity data", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({ mailbox: null, phoneNumber: null, authenticatorApp: null }));
+    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({ mailbox: null, phoneNumber: null }));
     const identity = new AgentIdentity(makeData(), ink);
 
     const result = await identity.refresh();
@@ -393,7 +364,6 @@ describe("AgentIdentity management", () => {
     expect(result).toBe(identity);
     expect(identity.mailbox).toBeNull();
     expect(identity.phoneNumber).toBeNull();
-    expect(identity.authenticatorApp).toBeNull();
   });
 
   it("delete delegates to idsResource", async () => {
@@ -407,127 +377,3 @@ describe("AgentIdentity management", () => {
   });
 });
 
-describe("AgentIdentity authenticator channel management", () => {
-  it("createAuthenticatorApp creates and links", async () => {
-    const ink = mockInkbox();
-    const appResult = {
-      id: PARSED_AUTH_APP.id,
-      organizationId: PARSED_AUTH_APP.organizationId,
-      identityId: PARSED_AUTH_APP.identityId,
-      status: PARSED_AUTH_APP.status,
-      createdAt: PARSED_AUTH_APP.createdAt,
-      updatedAt: PARSED_AUTH_APP.updatedAt,
-    };
-    vi.mocked(ink._authApps.create).mockResolvedValue(appResult);
-    const identity = new AgentIdentity(makeData({ authenticatorApp: null }), ink);
-
-    const app = await identity.createAuthenticatorApp();
-
-    expect(ink._authApps.create).toHaveBeenCalledWith({ agentHandle: "sales-agent" });
-    expect(app.id).toBe(PARSED_AUTH_APP.id);
-    expect(identity.authenticatorApp).not.toBeNull();
-  });
-
-  it("assignAuthenticatorApp links existing app", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._idsResource.assignAuthenticatorApp).mockResolvedValue(makeData());
-    const identity = new AgentIdentity(makeData({ authenticatorApp: null }), ink);
-
-    const result = await identity.assignAuthenticatorApp("app-id");
-
-    expect(ink._idsResource.assignAuthenticatorApp).toHaveBeenCalledWith("sales-agent", {
-      authenticatorAppId: "app-id",
-    });
-    expect(result).toEqual(PARSED_AUTH_APP);
-  });
-
-  it("unlinkAuthenticatorApp removes app", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._idsResource.unlinkAuthenticatorApp).mockResolvedValue(undefined);
-    const identity = new AgentIdentity(makeData(), ink);
-
-    await identity.unlinkAuthenticatorApp();
-
-    expect(ink._idsResource.unlinkAuthenticatorApp).toHaveBeenCalledWith("sales-agent");
-    expect(identity.authenticatorApp).toBeNull();
-  });
-
-  it("unlinkAuthenticatorApp throws when no app", async () => {
-    const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.unlinkAuthenticatorApp()).rejects.toThrow(InkboxError);
-  });
-});
-
-describe("AgentIdentity authenticator helpers", () => {
-  it("generateOtp delegates to authAccounts resource", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._authAccounts.generateOtp).mockResolvedValue({
-      otpCode: "123456",
-      validForSeconds: 17,
-      otpType: "totp",
-      algorithm: "sha1",
-      digits: 6,
-      period: 30,
-    });
-    const identity = new AgentIdentity(makeData(), ink);
-
-    const otp = await identity.generateOtp("account-1");
-
-    expect(ink._authAccounts.generateOtp).toHaveBeenCalledWith(PARSED_AUTH_APP.id, "account-1");
-    expect(otp.otpCode).toBe("123456");
-  });
-
-  it("generateOtp throws when no authenticator app", async () => {
-    const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.generateOtp("account-1")).rejects.toThrow(InkboxError);
-  });
-
-  it("listAuthenticatorAccounts delegates to authAccounts resource", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._authAccounts.list).mockResolvedValue([]);
-    const identity = new AgentIdentity(makeData(), ink);
-
-    const accounts = await identity.listAuthenticatorAccounts();
-
-    expect(ink._authAccounts.list).toHaveBeenCalledWith(PARSED_AUTH_APP.id);
-    expect(accounts).toEqual([]);
-  });
-
-  it("listAuthenticatorAccounts throws when no authenticator app", async () => {
-    const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.listAuthenticatorAccounts()).rejects.toThrow(InkboxError);
-  });
-
-  it("createAuthenticatorAccount delegates to authAccounts resource", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._authAccounts.create).mockResolvedValue({ id: "acc-1" } as never);
-    const identity = new AgentIdentity(makeData(), ink);
-
-    const opts = { otpauthUri: "otpauth://totp/Test?secret=ABC" };
-    await identity.createAuthenticatorAccount(opts);
-
-    expect(ink._authAccounts.create).toHaveBeenCalledWith(PARSED_AUTH_APP.id, opts);
-  });
-
-  it("createAuthenticatorAccount throws when no authenticator app", async () => {
-    const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(
-      identity.createAuthenticatorAccount({ otpauthUri: "otpauth://totp/Test?secret=ABC" }),
-    ).rejects.toThrow(InkboxError);
-  });
-
-  it("deleteAuthenticatorAccount delegates to authAccounts resource", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._authAccounts.delete).mockResolvedValue(undefined);
-    const identity = new AgentIdentity(makeData(), ink);
-
-    await identity.deleteAuthenticatorAccount("acc-1");
-
-    expect(ink._authAccounts.delete).toHaveBeenCalledWith(PARSED_AUTH_APP.id, "acc-1");
-  });
-
-  it("deleteAuthenticatorAccount throws when no authenticator app", async () => {
-    const identity = new AgentIdentity(makeData({ authenticatorApp: null }), mockInkbox());
-    await expect(identity.deleteAuthenticatorAccount("acc-1")).rejects.toThrow(InkboxError);
-  });
-});

@@ -8,8 +8,9 @@ UnlockedVault: crypto-enabled wrapper for secret CRUD after unlock.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from inkbox.vault.totp import TOTPCode, TOTPConfig, generate_totp, parse_totp_uri
 from inkbox.vault.crypto import (
     compute_auth_hash,
     decrypt_payload,
@@ -26,6 +27,7 @@ from inkbox.vault.types import (
     VaultKey,
     VaultSecret,
     VaultSecretDetail,
+    VaultSecretType,
     _infer_secret_type,
     _parse_payload,
 )
@@ -190,14 +192,39 @@ class VaultResource:
                 "Check that the vault key is correct and has not been deleted."
             )
 
-        # Step 4: unwrap the org encryption key
-        org_key = unwrap_org_key(master_key, wrapped)
+        # Step 4: unwrap the org encryption key.
+        # The wrapped key was encrypted with the vault key UUID as AAD.
+        # Fetch all key IDs and try each as AAD until one works.
+        keys_data = self._http.get("/keys")
+        primary_key_ids = [
+            k["id"] for k in keys_data
+            if k.get("key_type") == "primary" and k.get("status") == "active"
+        ]
+        recovery_key_ids = [
+            k["id"] for k in keys_data
+            if k.get("key_type") == "recovery" and k.get("status") == "active"
+        ]
+        all_key_ids = primary_key_ids + recovery_key_ids
+
+        org_key: bytes | None = None
+        for key_id in all_key_ids:
+            try:
+                org_key = unwrap_org_key(master_key, wrapped, vault_key_id=key_id)
+                break
+            except Exception:
+                continue
+
+        if org_key is None:
+            raise ValueError(
+                "Failed to unwrap org encryption key. "
+                "Check that the vault key is correct."
+            )
 
         # Step 5: decrypt all secrets from the unlock bundle
         decrypted: list[DecryptedVaultSecret] = []
         for raw in data.get("encrypted_secrets", []):
             detail = VaultSecretDetail._from_dict(raw)
-            payload_dict = decrypt_payload(org_key, detail.encrypted_payload)
+            payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
             payload = _parse_payload(detail.secret_type, payload_dict)
             decrypted.append(
                 DecryptedVaultSecret(
@@ -263,6 +290,22 @@ class UnlockedVault:
         """All vault secrets decrypted from the unlock response."""
         return list(self._secrets_cache)
 
+    def _refresh_cached_secret(self, secret_id: UUID | str) -> None:
+        """Re-fetch, decrypt, and update a single secret in the cache.
+
+        Best-effort — if the re-fetch fails (e.g. the secret was just
+        deleted or the server is unreachable), the cache is left unchanged.
+        """
+        try:
+            updated = self.get_secret(secret_id)
+        except Exception:
+            return
+        sid = str(secret_id)
+        self._secrets_cache = [
+            updated if str(s.id) == sid else s
+            for s in self._secrets_cache
+        ]
+
     ## Encrypted CRUD
 
     def get_secret(self, secret_id: UUID | str) -> DecryptedVaultSecret:
@@ -277,7 +320,7 @@ class UnlockedVault:
         """
         data = self._http.get(f"/secrets/{secret_id}")
         detail = VaultSecretDetail._from_dict(data)
-        payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload)
+        payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
         payload = _parse_payload(
             secret_type=detail.secret_type,
             raw=payload_dict,
@@ -314,9 +357,16 @@ class UnlockedVault:
         Returns:
             :class:`~inkbox.vault.types.VaultSecret` metadata (no payload).
         """
+
         secret_type = _infer_secret_type(payload)
-        encrypted = encrypt_payload(self._org_key, payload._to_dict())
+        # Generate the UUID client-side so we can use it as AAD for
+        # encryption in the same request.
+        secret_id = str(uuid4())
+        encrypted = encrypt_payload(
+            self._org_key, payload._to_dict(), secret_id=secret_id,
+        )
         body: dict[str, Any] = {
+            "id": secret_id,
             "name": name,
             "secret_type": secret_type,
             "encrypted_payload": encrypted,
@@ -327,7 +377,14 @@ class UnlockedVault:
             path="/secrets",
             json=body,
         )
-        return VaultSecret._from_dict(data)
+        result = VaultSecret._from_dict(data)
+        # Append the new secret to the cache so it's immediately visible.
+        try:
+            decrypted = self.get_secret(str(result.id))
+            self._secrets_cache.append(decrypted)
+        except Exception:
+            pass  # best-effort
+        return result
 
     def update_secret(
         self,
@@ -378,12 +435,15 @@ class UnlockedVault:
                 )
             body["encrypted_payload"] = encrypt_payload(
                 self._org_key,
-                payload._to_dict()
+                payload._to_dict(),
+                secret_id=str(secret_id),
             )
         data = self._http.patch(
             path=f"/secrets/{secret_id}",
             json=body,
         )
+        # Refresh the cache so subsequent reads are consistent.
+        self._refresh_cached_secret(secret_id)
         return VaultSecret._from_dict(data)
 
     def delete_secret(self, secret_id: UUID | str) -> None:
@@ -394,3 +454,88 @@ class UnlockedVault:
             secret_id: UUID of the secret to delete.
         """
         self._http.delete(f"/secrets/{secret_id}")
+        sid = str(secret_id)
+        self._secrets_cache = [
+            s for s in self._secrets_cache if str(s.id) != sid
+        ]
+
+    ## TOTP helpers
+
+    def set_totp(
+        self,
+        secret_id: UUID | str,
+        totp: TOTPConfig | str,
+    ) -> VaultSecret:
+        """Add or replace the TOTP configuration on a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+            totp: A :class:`~inkbox.vault.totp.TOTPConfig` or an
+                ``otpauth://totp/...`` URI string.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+
+        Raises:
+            TypeError: If the secret is not a login type.
+            ValueError: If a URI string is invalid or not TOTP.
+        """
+        if isinstance(totp, str):
+            totp = parse_totp_uri(totp)
+        secret = self.get_secret(secret_id)
+        if secret.secret_type != VaultSecretType.LOGIN:
+            raise TypeError(
+                f"Cannot set TOTP on a {secret.secret_type!r} secret — "
+                f"only login secrets support TOTP"
+            )
+        payload = secret.payload
+        payload.totp = totp  # type: ignore[union-attr]
+        return self.update_secret(secret_id, payload=payload)
+
+    def remove_totp(self, secret_id: UUID | str) -> VaultSecret:
+        """Remove TOTP configuration from a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+
+        Raises:
+            TypeError: If the secret is not a login type.
+        """
+        secret = self.get_secret(secret_id)
+        if secret.secret_type != VaultSecretType.LOGIN:
+            raise TypeError(
+                f"Cannot remove TOTP from a {secret.secret_type!r} secret — "
+                f"only login secrets support TOTP"
+            )
+        payload = secret.payload
+        payload.totp = None  # type: ignore[union-attr]
+        return self.update_secret(secret_id, payload=payload)
+
+    def get_totp_code(self, secret_id: UUID | str) -> TOTPCode:
+        """Generate the current TOTP code for a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            A :class:`~inkbox.vault.totp.TOTPCode`.
+
+        Raises:
+            TypeError: If the secret is not a login type.
+            ValueError: If the login has no TOTP configured.
+        """
+        secret = self.get_secret(secret_id)
+        if secret.secret_type != VaultSecretType.LOGIN:
+            raise TypeError(
+                f"Cannot generate TOTP for a {secret.secret_type!r} secret — "
+                f"only login secrets support TOTP"
+            )
+        totp_config = secret.payload.totp  # type: ignore[union-attr]
+        if totp_config is None:
+            raise ValueError(
+                f"Login secret {secret_id!r} has no TOTP configured"
+            )
+        return generate_totp(totp_config)

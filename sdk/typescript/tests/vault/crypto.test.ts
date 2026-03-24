@@ -145,7 +145,7 @@ describe("generateVaultKeyMaterial", () => {
     const salt = deriveSalt("org_test_123");
     const mk = await deriveMasterKey(VALID_VAULT_KEY, salt);
     expect(computeAuthHash(mk)).toBe(mat.authHash);
-    const recovered = unwrapOrgKey(mk, mat.wrappedOrgEncryptionKey);
+    const recovered = unwrapOrgKey(mk, mat.wrappedOrgEncryptionKey, mat.id);
     expect(Buffer.from(recovered)).toEqual(Buffer.from(orgKey));
   });
 
@@ -186,7 +186,7 @@ describe("generateRecoveryCode", () => {
     const salt = deriveSalt("org_test_123");
     const mk = await deriveMasterKey(code, salt);
     expect(computeAuthHash(mk)).toBe(mat.authHash);
-    const recovered = unwrapOrgKey(mk, mat.wrappedOrgEncryptionKey);
+    const recovered = unwrapOrgKey(mk, mat.wrappedOrgEncryptionKey, mat.id);
     expect(Buffer.from(recovered)).toEqual(Buffer.from(orgKey));
   });
 

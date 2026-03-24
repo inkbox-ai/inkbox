@@ -22,15 +22,9 @@ export type {
 } from "./phone/types.js";
 export type {
   AgentIdentitySummary,
-  IdentityAuthenticatorApp,
   IdentityMailbox,
   IdentityPhoneNumber,
 } from "./identities/types.js";
-export type {
-  AuthenticatorApp,
-  AuthenticatorAccount,
-  OTPCode,
-} from "./authenticator/types.js";
 export type {
   AccessRule,
   VaultInfo,
@@ -46,6 +40,8 @@ export type {
   SecretPayload,
 } from "./vault/types.js";
 export { VaultSecretType, VaultKeyType } from "./vault/types.js";
+export type { TOTPConfig, TOTPCode } from "./vault/totp.js";
+export { TOTPAlgorithm, generateTotp, parseTotpUri } from "./vault/totp.js";
 export type { VaultKeyMaterial } from "./vault/crypto.js";
 export { UnlockedVault } from "./vault/resources/vault.js";
 export {

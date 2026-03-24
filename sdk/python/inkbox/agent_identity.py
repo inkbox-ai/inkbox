@@ -14,11 +14,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterator
 from uuid import UUID
 
-from inkbox.authenticator.types import AuthenticatorAccount, AuthenticatorApp, OTPCode
 from inkbox.credentials import Credentials
+from inkbox.vault.totp import TOTPCode, TOTPConfig
+from inkbox.vault.types import DecryptedVaultSecret, SecretPayload, VaultSecret
 from inkbox.identities.types import (
     _AgentIdentityData,
-    IdentityAuthenticatorApp,
     IdentityMailbox,
     IdentityPhoneNumber,
 )
@@ -56,7 +56,6 @@ class AgentIdentity:
         self._inkbox = inkbox
         self._mailbox: IdentityMailbox | None = data.mailbox
         self._phone_number: IdentityPhoneNumber | None = data.phone_number
-        self._authenticator_app: IdentityAuthenticatorApp | None = data.authenticator_app
         self._credentials: Credentials | None = None
         self._credentials_vault_ref: object | None = None  # tracks which _unlocked built the cache
 
@@ -81,10 +80,6 @@ class AgentIdentity:
     @property
     def phone_number(self) -> IdentityPhoneNumber | None:
         return self._phone_number
-
-    @property
-    def authenticator_app(self) -> IdentityAuthenticatorApp | None:
-        return self._authenticator_app
 
     @property
     def credentials(self) -> Credentials:
@@ -133,6 +128,110 @@ class AgentIdentity:
             secret_id,
             identity_id=self.id,
         )
+        self._credentials = None
+
+    ## Vault secret management
+
+    def create_secret(
+        self,
+        name: str,
+        payload: SecretPayload,
+        *,
+        description: str | None = None,
+    ) -> VaultSecret:
+        """Create a vault secret and grant this identity access to it.
+
+        The vault must be unlocked first.
+
+        Args:
+            name: Display name (max 255 characters).
+            payload: One of :class:`LoginPayload`, :class:`SSHKeyPayload`,
+                :class:`APIKeyPayload`, or :class:`OtherPayload`.
+            description: Optional description.
+
+        Returns:
+            :class:`~inkbox.vault.types.VaultSecret` metadata.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        secret = unlocked.create_secret(name, payload, description=description)  # type: ignore[union-attr]
+        self._inkbox._vault_resource.grant_access(
+            str(secret.id), identity_id=str(self.id),
+        )
+        self._credentials = None  # invalidate cache
+        return secret
+
+    def get_secret(self, secret_id: UUID | str) -> DecryptedVaultSecret:
+        """Fetch and decrypt a vault secret this identity has access to.
+
+        Args:
+            secret_id: UUID of the secret.
+
+        Returns:
+            :class:`~inkbox.vault.types.DecryptedVaultSecret`.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        return unlocked.get_secret(secret_id)  # type: ignore[union-attr]
+
+    def set_totp(
+        self,
+        secret_id: UUID | str,
+        totp: TOTPConfig | str,
+    ) -> VaultSecret:
+        """Add or replace TOTP on a login secret this identity has access to.
+
+        Args:
+            secret_id: UUID of the login secret.
+            totp: A :class:`~inkbox.vault.totp.TOTPConfig` or an
+                ``otpauth://totp/...`` URI string.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        result = unlocked.set_totp(secret_id, totp)  # type: ignore[union-attr]
+        self._credentials = None
+        return result
+
+    def remove_totp(self, secret_id: UUID | str) -> VaultSecret:
+        """Remove TOTP from a login secret this identity has access to.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            Updated :class:`~inkbox.vault.types.VaultSecret` metadata.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        result = unlocked.remove_totp(secret_id)  # type: ignore[union-attr]
+        self._credentials = None
+        return result
+
+    def get_totp_code(self, secret_id: UUID | str) -> TOTPCode:
+        """Generate the current TOTP code for a login secret.
+
+        Args:
+            secret_id: UUID of the login secret.
+
+        Returns:
+            A :class:`~inkbox.vault.totp.TOTPCode`.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        return unlocked.get_totp_code(secret_id)  # type: ignore[union-attr]
+
+    def delete_secret(self, secret_id: UUID | str) -> None:
+        """Delete a vault secret and revoke this identity's access.
+
+        Args:
+            secret_id: UUID of the secret to delete.
+        """
+        self._require_vault_unlocked()
+        unlocked = self._inkbox._vault_resource._unlocked
+        unlocked.delete_secret(secret_id)  # type: ignore[union-attr]
         self._credentials = None
 
     ## Channel management
@@ -224,47 +323,6 @@ class AgentIdentity:
         self._require_phone()
         self._inkbox._ids_resource.unlink_phone_number(self.agent_handle)
         self._phone_number = None
-
-    def create_authenticator_app(self) -> AuthenticatorApp:
-        """Create a new authenticator app and link it to this identity.
-
-        Returns:
-            The newly created authenticator app.
-        """
-        app = self._inkbox._auth_apps.create(agent_handle=self.agent_handle)
-        self._authenticator_app = IdentityAuthenticatorApp(
-            id=app.id,
-            organization_id=app.organization_id,
-            identity_id=app.identity_id,
-            status=app.status,
-            created_at=app.created_at,
-            updated_at=app.updated_at,
-        )
-        return app
-
-    def assign_authenticator_app(self, authenticator_app_id: str) -> IdentityAuthenticatorApp:
-        """Link an existing authenticator app to this identity.
-
-        Args:
-            authenticator_app_id: UUID of the authenticator app to link. Obtain
-                via ``inkbox.authenticator_apps.list()`` or
-                ``inkbox.authenticator_apps.get()``.
-
-        Returns:
-            The linked authenticator app.
-        """
-        data = self._inkbox._ids_resource.assign_authenticator_app(
-            self.agent_handle, authenticator_app_id=authenticator_app_id
-        )
-        self._authenticator_app = data.authenticator_app
-        self._data = data
-        return self._authenticator_app  # type: ignore[return-value]
-
-    def unlink_authenticator_app(self) -> None:
-        """Unlink this identity's authenticator app (does not delete the app)."""
-        self._require_authenticator_app()
-        self._inkbox._ids_resource.unlink_authenticator_app(self.agent_handle)
-        self._authenticator_app = None
 
     ## Mail helpers
 
@@ -435,98 +493,6 @@ class AgentIdentity:
             call_id,
         )
 
-    ## Authenticator helpers
-
-    def create_authenticator_account(
-        self,
-        *,
-        otpauth_uri: str,
-        display_name: str | None = None,
-        description: str | None = None,
-    ) -> AuthenticatorAccount:
-        """Create a new authenticator account from an ``otpauth://`` URI.
-
-        Args:
-            otpauth_uri: ``otpauth://totp/...`` or ``otpauth://hotp/...`` URI.
-            display_name: Optional user-managed label (max 255 characters).
-            description: Optional free-form notes.
-        """
-        self._require_authenticator_app()
-        return self._inkbox._auth_accounts.create(
-            self._authenticator_app.id,  # type: ignore[union-attr]
-            otpauth_uri=otpauth_uri,
-            display_name=display_name,
-            description=description,
-        )
-
-    def list_authenticator_accounts(self) -> list[AuthenticatorAccount]:
-        """List all authenticator accounts in this identity's app."""
-        self._require_authenticator_app()
-        return self._inkbox._auth_accounts.list(
-            self._authenticator_app.id,  # type: ignore[union-attr]
-        )
-
-    def get_authenticator_account(self, account_id: str) -> AuthenticatorAccount:
-        """Get a single authenticator account by ID.
-
-        Args:
-            account_id: UUID of the authenticator account.
-        """
-        self._require_authenticator_app()
-        return self._inkbox._auth_accounts.get(
-            self._authenticator_app.id,  # type: ignore[union-attr]
-            account_id,
-        )
-
-    def update_authenticator_account(
-        self,
-        account_id: str,
-        *,
-        display_name: str | None = None,
-        description: str | None = None,
-    ) -> AuthenticatorAccount:
-        """Update user-managed metadata on an authenticator account.
-
-        Args:
-            account_id: UUID of the authenticator account to update.
-            display_name: New label (max 255 characters).
-            description: New notes.
-        """
-        self._require_authenticator_app()
-        return self._inkbox._auth_accounts.update(
-            self._authenticator_app.id,  # type: ignore[union-attr]
-            account_id,
-            display_name=display_name,
-            description=description,
-        )
-
-    def delete_authenticator_account(self, account_id: str) -> None:
-        """Delete an authenticator account.
-
-        Args:
-            account_id: UUID of the authenticator account to delete.
-        """
-        self._require_authenticator_app()
-        self._inkbox._auth_accounts.delete(
-            self._authenticator_app.id,  # type: ignore[union-attr]
-            account_id,
-        )
-
-    def generate_otp(self, account_id: str) -> OTPCode:
-        """Generate the current OTP code for an authenticator account.
-
-        Args:
-            account_id: UUID of the authenticator account.
-
-        Returns:
-            The generated OTP code with metadata.
-        """
-        self._require_authenticator_app()
-        return self._inkbox._auth_accounts.generate_otp(
-            self._authenticator_app.id,  # type: ignore[union-attr]
-            account_id,
-        )
-
     ## Identity management
 
     def update(
@@ -553,7 +519,6 @@ class AgentIdentity:
             updated_at=result.updated_at,
             mailbox=self._mailbox,
             phone_number=self._phone_number,
-            authenticator_app=self._authenticator_app,
         )
 
     def refresh(self) -> AgentIdentity:
@@ -570,7 +535,6 @@ class AgentIdentity:
         self._data = data
         self._mailbox = data.mailbox
         self._phone_number = data.phone_number
-        self._authenticator_app = data.authenticator_app
         self._credentials = None
         return self
 
@@ -601,17 +565,9 @@ class AgentIdentity:
                 "Call inkbox.vault.unlock(vault_key) first."
             )
 
-    def _require_authenticator_app(self) -> None:
-        if not self._authenticator_app:
-            raise InkboxError(
-                f"Identity '{self.agent_handle}' has no authenticator app assigned. "
-                "Call identity.create_authenticator_app() or identity.assign_authenticator_app() first."
-            )
-
     def __repr__(self) -> str:
         return (
             f"AgentIdentity(agent_handle={self.agent_handle!r}, "
             f"mailbox={self._mailbox.email_address if self._mailbox else None!r}, "
-            f"phone={self._phone_number.number if self._phone_number else None!r}, "
-            f"authenticator_app={str(self._authenticator_app.id) if self._authenticator_app else None!r})"
+            f"phone={self._phone_number.number if self._phone_number else None!r})"
         )

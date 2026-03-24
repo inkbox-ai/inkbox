@@ -179,7 +179,6 @@ def _identity(*, vault_unlocked=True, access_rules=None):
         updated_at=datetime(2026, 1, 1),
         mailbox=None,
         phone_number=None,
-        authenticator_app=None,
     )
 
     # Wire up VaultResource with stored unlocked vault
@@ -235,8 +234,7 @@ class TestAgentIdentityCredentials:
             updated_at=datetime(2026, 1, 1),
             mailbox=None,
             phone_number=None,
-            authenticator_app=None,
-        )
+            )
         identity.refresh()
         assert identity._credentials is None
 
@@ -251,3 +249,59 @@ class TestAgentIdentityCredentials:
             identity_id=identity.id,
         )
         assert identity._credentials is None
+
+
+# ---- Credentials.get_totp_code tests ----
+
+TOTP_SECRET = "JBSWY3DPEHPK3PXP"
+
+LOGIN_WITH_TOTP = DecryptedVaultSecret(
+    id=UUID("ffff0000-0000-0000-0000-000000000006"),
+    name="GitHub with 2FA",
+    secret_type="login",
+    status="active",
+    created_at=datetime(2026, 1, 1),
+    updated_at=datetime(2026, 1, 1),
+    payload=LoginPayload(
+        password="s3cret",
+        username="admin",
+        totp=__import__("inkbox.vault.totp", fromlist=["TOTPConfig"]).TOTPConfig(
+            secret=TOTP_SECRET,
+        ),
+    ),
+)
+
+LOGIN_WITHOUT_TOTP = DecryptedVaultSecret(
+    id=UUID("ffff0000-0000-0000-0000-000000000007"),
+    name="GitHub no 2FA",
+    secret_type="login",
+    status="active",
+    created_at=datetime(2026, 1, 1),
+    updated_at=datetime(2026, 1, 1),
+    payload=LoginPayload(password="s3cret", username="admin"),
+)
+
+
+class TestCredentialsGetTotpCode:
+    def test_generates_code(self):
+        from inkbox.vault.totp import TOTPCode
+        creds = Credentials([LOGIN_WITH_TOTP])
+        code = creds.get_totp_code("ffff0000-0000-0000-0000-000000000006")
+        assert isinstance(code, TOTPCode)
+        assert len(code.code) == 6
+        assert code.code.isdigit()
+
+    def test_raises_when_no_totp(self):
+        creds = Credentials([LOGIN_WITHOUT_TOTP])
+        with pytest.raises(ValueError, match="no TOTP configured"):
+            creds.get_totp_code("ffff0000-0000-0000-0000-000000000007")
+
+    def test_raises_for_non_login(self):
+        creds = Credentials([API_KEY_SECRET])
+        with pytest.raises(TypeError, match="not.*login"):
+            creds.get_totp_code(str(API_KEY_SECRET.id))
+
+    def test_raises_when_not_found(self):
+        creds = Credentials([LOGIN_WITH_TOTP])
+        with pytest.raises(KeyError):
+            creds.get_totp_code("00000000-0000-0000-0000-000000000000")

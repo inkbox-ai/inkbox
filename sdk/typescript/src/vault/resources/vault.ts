@@ -5,7 +5,9 @@
  * UnlockedVault   — crypto-enabled wrapper for secret CRUD after unlock.
  */
 
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, InkboxError } from "../../_http.js";
+import type { TOTPCode, TOTPConfig } from "../totp.js";
+import { generateTotp, parseTotpUri } from "../totp.js";
 import {
   computeAuthHash,
   decryptPayload,
@@ -24,6 +26,7 @@ import type {
   VaultSecretDetail,
 } from "../types.js";
 import {
+  VaultSecretType,
   inferSecretType,
   parseAccessRule,
   parsePayload,
@@ -201,14 +204,34 @@ export class VaultResource {
       );
     }
 
-    // Step 4: unwrap the org encryption key
-    const orgKey = unwrapOrgKey(masterKey, wrapped);
+    // Step 4: unwrap the org encryption key.
+    // The wrapped key was encrypted with the vault key UUID as AAD.
+    // Fetch all key IDs and try each as AAD until one works.
+    const keysData = await this.http.get<RawVaultKey[]>("/keys");
+    const allKeyIds = keysData
+      .filter((k) => k.status === "active")
+      .map((k) => k.id);
+
+    let orgKey: Uint8Array | null = null;
+    for (const keyId of allKeyIds) {
+      try {
+        orgKey = unwrapOrgKey(masterKey, wrapped, keyId);
+        break;
+      } catch {
+        continue;
+      }
+    }
+    if (!orgKey) {
+      throw new Error(
+        "Failed to unwrap org encryption key. Check that the vault key is correct.",
+      );
+    }
 
     // Step 5: decrypt all secrets from the unlock bundle
     const decrypted: DecryptedVaultSecret[] = [];
     for (const raw of data.encrypted_secrets ?? []) {
       const detail = parseVaultSecretDetail(raw);
-      const payloadDict = decryptPayload(orgKey, detail.encryptedPayload);
+      const payloadDict = decryptPayload(orgKey, detail.encryptedPayload, detail.id);
       const payload = parsePayload(
         detail.secretType,
         payloadDict as Record<string, unknown>,
@@ -258,7 +281,7 @@ export class VaultResource {
 export class UnlockedVault {
   private readonly http: HttpTransport;
   private readonly orgKey: Uint8Array;
-  private readonly secretsCache: DecryptedVaultSecret[];
+  private secretsCache: DecryptedVaultSecret[];
 
   constructor(
     http: HttpTransport,
@@ -275,6 +298,22 @@ export class UnlockedVault {
     return [...this.secretsCache];
   }
 
+  /**
+   * Re-fetch, decrypt, and update a single secret in the cache.
+   *
+   * Best-effort — if the re-fetch fails the cache is left unchanged.
+   */
+  private async refreshCachedSecret(secretId: string): Promise<void> {
+    try {
+      const updated = await this.getSecret(secretId);
+      this.secretsCache = this.secretsCache.map((s) =>
+        s.id === secretId ? updated : s,
+      );
+    } catch {
+      // Cache refresh is best-effort.
+    }
+  }
+
   // ------------------------------------------------------------------
   // Encrypted CRUD
   // ------------------------------------------------------------------
@@ -289,7 +328,7 @@ export class UnlockedVault {
       `/secrets/${secretId}`,
     );
     const detail = parseVaultSecretDetail(data);
-    const payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload);
+    const payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, detail.id);
     const payload = parsePayload(
       detail.secretType,
       payloadDict as Record<string, unknown>,
@@ -323,15 +362,27 @@ export class UnlockedVault {
   }): Promise<VaultSecret> {
     const secretType = inferSecretType(options.payload);
     const serialized = serializePayload(secretType, options.payload);
-    const encrypted = encryptPayload(this.orgKey, serialized);
+    // Generate the UUID client-side so we can use it as AAD for
+    // encryption in the same request.
+    const secretId = crypto.randomUUID();
+    const encrypted = encryptPayload(this.orgKey, serialized, secretId);
     const body: Record<string, unknown> = {
+      id: secretId,
       name: options.name,
       secret_type: secretType,
       encrypted_payload: encrypted,
     };
     if (options.description !== undefined) body["description"] = options.description;
     const data = await this.http.post<RawVaultSecret>("/secrets", body);
-    return parseVaultSecret(data);
+    const result = parseVaultSecret(data);
+    // Append the new secret to the cache so it's immediately visible.
+    try {
+      const decrypted = await this.getSecret(result.id);
+      this.secretsCache.push(decrypted);
+    } catch {
+      // best-effort
+    }
+    return result;
   }
 
   /**
@@ -374,12 +425,14 @@ export class UnlockedVault {
         );
       }
       const serialized = serializePayload(newType, options.payload);
-      body["encrypted_payload"] = encryptPayload(this.orgKey, serialized);
+      body["encrypted_payload"] = encryptPayload(this.orgKey, serialized, secretId);
     }
     const data = await this.http.patch<RawVaultSecret>(
       `/secrets/${secretId}`,
       body,
     );
+    // Refresh the cache so subsequent reads are consistent.
+    await this.refreshCachedSecret(secretId);
     return parseVaultSecret(data);
   }
 
@@ -390,5 +443,75 @@ export class UnlockedVault {
    */
   async deleteSecret(secretId: string): Promise<void> {
     await this.http.delete(`/secrets/${secretId}`);
+    this.secretsCache = this.secretsCache.filter((s) => s.id !== secretId);
+  }
+
+  // ------------------------------------------------------------------
+  // TOTP helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * Add or replace the TOTP configuration on a login secret.
+   *
+   * @param secretId - UUID of the login secret.
+   * @param totp - A {@link TOTPConfig} object or an `otpauth://totp/...` URI string.
+   * @returns Updated {@link VaultSecret} metadata.
+   * @throws TypeError if the secret is not a login type.
+   * @throws Error if a URI string is invalid or not TOTP.
+   */
+  async setTotp(
+    secretId: string,
+    totp: TOTPConfig | string,
+  ): Promise<VaultSecret> {
+    const config = typeof totp === "string" ? parseTotpUri(totp) : totp;
+    const secret = await this.getSecret(secretId);
+    if (secret.secretType !== VaultSecretType.LOGIN) {
+      throw new TypeError(
+        `Cannot set TOTP on a '${secret.secretType}' secret — only login secrets support TOTP`,
+      );
+    }
+    const payload = { ...secret.payload, totp: config };
+    return this.updateSecret(secretId, { payload });
+  }
+
+  /**
+   * Remove TOTP configuration from a login secret.
+   *
+   * @param secretId - UUID of the login secret.
+   * @returns Updated {@link VaultSecret} metadata.
+   * @throws TypeError if the secret is not a login type.
+   */
+  async removeTotp(secretId: string): Promise<VaultSecret> {
+    const secret = await this.getSecret(secretId);
+    if (secret.secretType !== VaultSecretType.LOGIN) {
+      throw new TypeError(
+        `Cannot remove TOTP from a '${secret.secretType}' secret — only login secrets support TOTP`,
+      );
+    }
+    const loginPayload = secret.payload as import("../types.js").LoginPayload;
+    const { totp: _, ...rest } = loginPayload;
+    return this.updateSecret(secretId, { payload: rest });
+  }
+
+  /**
+   * Generate the current TOTP code for a login secret.
+   *
+   * @param secretId - UUID of the login secret.
+   * @returns A {@link TOTPCode}.
+   * @throws TypeError if the secret is not a login type.
+   * @throws Error if the login has no TOTP configured.
+   */
+  async getTotpCode(secretId: string): Promise<TOTPCode> {
+    const secret = await this.getSecret(secretId);
+    if (secret.secretType !== VaultSecretType.LOGIN) {
+      throw new TypeError(
+        `Cannot generate TOTP for a '${secret.secretType}' secret — only login secrets support TOTP`,
+      );
+    }
+    const loginPayload = secret.payload as import("../types.js").LoginPayload;
+    if (!loginPayload.totp) {
+      throw new Error(`Login secret '${secretId}' has no TOTP configured`);
+    }
+    return generateTotp(loginPayload.totp);
   }
 }

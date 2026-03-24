@@ -132,28 +132,3 @@ class IdentitiesResource:
         """
         self._http.delete(f"/{agent_handle}/phone_number")
 
-    def assign_authenticator_app(
-        self,
-        agent_handle: str,
-        *,
-        authenticator_app_id: UUID | str,
-    ) -> _AgentIdentityData:
-        """Assign an authenticator app to an identity.
-
-        Args:
-            agent_handle: Handle of the identity.
-            authenticator_app_id: UUID of the authenticator app to assign.
-        """
-        data = self._http.post(
-            f"/{agent_handle}/authenticator_app",
-            json={"authenticator_app_id": str(authenticator_app_id)},
-        )
-        return _AgentIdentityData._from_dict(data)
-
-    def unlink_authenticator_app(self, agent_handle: str) -> None:
-        """Unlink the authenticator app from an identity (does not delete the app).
-
-        Args:
-            agent_handle: Handle of the identity.
-        """
-        self._http.delete(f"/{agent_handle}/authenticator_app")

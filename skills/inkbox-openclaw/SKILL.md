@@ -1,6 +1,6 @@
 ---
 name: inkbox
-description: Send and receive emails and phone calls via Inkbox agent identities. Use when the user wants to check inbox messages, list unread email, view a thread, search mailbox contents, draft/send an email, place an outbound phone call, list call history, retrieve call transcripts, manage authenticator apps, access vault credentials, or create/set up an Inkbox identity.
+description: Send and receive emails and phone calls via Inkbox agent identities. Use when the user wants to check inbox messages, list unread email, view a thread, search mailbox contents, draft/send an email, place an outbound phone call, list call history, retrieve call transcripts, manage vault credentials, or create/set up an Inkbox identity.
 metadata:
   openclaw:
     emoji: "📬"
@@ -15,7 +15,7 @@ metadata:
 
 # Inkbox Skill
 
-API-first communication infrastructure for AI agents — email, phone, authenticator apps, encrypted vault, and identities.
+API-first communication infrastructure for AI agents — email, phone, encrypted vault, and identities.
 
 ## Requirements
 
@@ -64,21 +64,18 @@ Inkbox (org-level client)
 ├── .listIdentities()       → Promise<AgentIdentitySummary[]>
 ├── .mailboxes              → MailboxesResource
 ├── .phoneNumbers           → PhoneNumbersResource
-├── .authenticatorApps      → AuthenticatorAppsResource
 ├── .vault                  → VaultResource
 └── .createSigningKey()     → Promise<SigningKey>
 
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                → IdentityMailbox | null
 ├── .phoneNumber            → IdentityPhoneNumber | null
-├── .authenticatorApp       → IdentityAuthenticatorApp | null
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── mail methods            (requires assigned mailbox)
-├── phone methods           (requires assigned phone number)
-└── authenticator methods   (requires assigned authenticator app)
+└── phone methods           (requires assigned phone number)
 ```
 
-An identity must have a channel assigned before you can use mail/phone/authenticator methods. If not assigned, an `InkboxAPIError` is thrown.
+An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxAPIError` is thrown.
 
 ## Identities
 
@@ -106,7 +103,6 @@ After creating a new identity:
 // Create and auto-link new channels
 const mailbox  = await identity.createMailbox({ displayName: "Sales Agent" });
 const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
-const auth_app = await identity.createAuthenticatorApp();
 
 console.log(mailbox.emailAddress);   // e.g. "abc-xyz@inkboxmail.com"
 console.log(phone.number);           // e.g. "+18005551234"
@@ -114,12 +110,10 @@ console.log(phone.number);           // e.g. "+18005551234"
 // Link existing channels
 await identity.assignMailbox("mailbox-uuid");
 await identity.assignPhoneNumber("phone-number-uuid");
-await identity.assignAuthenticatorApp("authenticator-app-uuid");
 
 // Unlink without deleting
 await identity.unlinkMailbox();
 await identity.unlinkPhoneNumber();
-await identity.unlinkAuthenticatorApp();
 ```
 
 ## Mail
@@ -213,38 +207,6 @@ for (const t of segments) {
 
 Always confirm before placing a call.
 
-## Authenticator
-
-```js
-// Create an authenticator app and link it to an identity
-const auth_app = await identity.createAuthenticatorApp();
-
-// Add an OTP account from an otpauth:// URI
-const account = await identity.createAuthenticatorAccount({
-  otpauthUri: "otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
-  displayName: "My OTP Account",        // optional (max 255 chars)
-  description: "Login MFA for Example",  // optional
-});
-
-// List all accounts in this identity's authenticator app
-const accounts = await identity.listAuthenticatorAccounts();
-
-// Get a single account
-const account = await identity.getAuthenticatorAccount("account-uuid");
-
-// Update account metadata (pass null to clear a field)
-await identity.updateAuthenticatorAccount("account-uuid", { displayName: "New Label" });
-
-// Generate an OTP code
-const otp = await identity.generateOtp("account-uuid");
-console.log(otp.otpCode);            // e.g. "482901"
-console.log(otp.validForSeconds);    // seconds until expiry (null for HOTP)
-console.log(otp.otpType);            // "totp" or "hotp"
-
-// Delete an account
-await identity.deleteAuthenticatorAccount("account-uuid");
-```
-
 ## Vault
 
 Encrypted credential vault with client-side Argon2id key derivation and AES-256-GCM encryption. The server never sees plaintext secrets. Requires `hash-wasm` (included as a dependency).
@@ -325,7 +287,7 @@ await inkbox.vault.deleteSecret("secret-uuid");                             // d
 
 | Type | Interface | Fields |
 |------|-----------|--------|
-| `login` | `LoginPayload` | `password`, `username?`, `email?`, `url?`, `notes?` |
+| `login` | `LoginPayload` | `password`, `username?`, `email?`, `url?`, `notes?`, `totp?` |
 | `api_key` | `APIKeyPayload` | `apiKey`, `endpoint?`, `notes?` |
 | `key_pair` | `KeyPairPayload` | `accessKey`, `secretKey`, `endpoint?`, `notes?` |
 | `ssh_key` | `SSHKeyPayload` | `privateKey`, `publicKey?`, `fingerprint?`, `passphrase?`, `notes?` |
@@ -366,6 +328,58 @@ const secret = creds.get("secret-uuid");
 - Cached after first call; call `identity.refresh()` to clear the cache
 - `get*` throws `Error` if not found, `TypeError` if wrong secret type
 
+### One-Time Passwords (TOTP)
+
+TOTP secrets are stored inside `LoginPayload.totp` in the encrypted vault. Codes are generated client-side — no server call needed.
+
+#### From an agent identity (recommended)
+
+```js
+import { parseTotpUri } from "@inkbox/sdk";
+import type { LoginPayload } from "@inkbox/sdk";
+
+// Create a login with TOTP
+const secret = await identity.createSecret({
+  name: "GitHub",
+  payload: {
+    username: "user@example.com",
+    password: "s3cret",
+    totp: parseTotpUri("otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub"),
+  } satisfies LoginPayload,
+});
+
+// Generate TOTP code
+const code = await identity.getTotpCode(secret.id);
+console.log(code.code);              // e.g. "482901"
+console.log(code.secondsRemaining);  // e.g. 17
+
+// Add/replace TOTP on existing login
+await identity.setTotp(secretId, "otpauth://totp/...?secret=...");
+
+// Remove TOTP
+await identity.removeTotp(secretId);
+```
+
+#### From the unlocked vault (org-level)
+
+```js
+const unlocked = await inkbox.vault.unlock("my-Vault-key-01!");
+
+// Same methods available on UnlockedVault
+await unlocked.setTotp(secretId, totpConfigOrUri);
+await unlocked.removeTotp(secretId);
+const code = await unlocked.getTotpCode(secretId);
+```
+
+#### TOTPCode fields
+
+| Field | Type | Description |
+|---|---|---|
+| `code` | `string` | The OTP code (e.g. `"482901"`) |
+| `periodStart` | `number` | Unix timestamp when the code became valid |
+| `periodEnd` | `number` | Unix timestamp when the code expires |
+| `secondsRemaining` | `number` | Seconds until expiry |
+
 ## Org-level Resources
 
 ### Mailboxes (`inkbox.mailboxes`)
@@ -402,16 +416,6 @@ await inkbox.phoneNumbers.update(num.id, {
 
 const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", party: "remote", limit: 50 });
 await inkbox.phoneNumbers.release(num.id);
-```
-
-### Authenticator Apps (`inkbox.authenticatorApps`)
-
-```js
-const apps = await inkbox.authenticatorApps.list();
-const app  = await inkbox.authenticatorApps.get("app-uuid");
-const app  = await inkbox.authenticatorApps.create({ agentHandle: "support" });   // linked to identity
-const app  = await inkbox.authenticatorApps.create();                              // unbound
-await inkbox.authenticatorApps.delete("app-uuid");                                 // deletes app + all accounts
 ```
 
 ## Webhooks & Signature Verification

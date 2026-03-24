@@ -1,6 +1,6 @@
 # @inkbox/sdk
 
-TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, authenticator/OTP, identities).
+TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, identities, encrypted vault — login credentials, API keys, key pairs, SSH keys, OTP, etc.).
 
 ## Install
 
@@ -19,10 +19,10 @@ You'll need an API key to use this SDK. Get one at [console.inkbox.ai](https://c
 ```ts
 import { Inkbox } from "@inkbox/sdk";
 
-const inkbox = new Inkbox({
+const inkbox = await new Inkbox({
   apiKey: process.env.INKBOX_API_KEY!,
   vaultKey: process.env.INKBOX_VAULT_KEY,
-});
+}).ready();
 
 // Create an agent identity
 const identity = await inkbox.createIdentity("support-bot");
@@ -215,46 +215,6 @@ for (const t of hits) {
 
 ---
 
-## Authenticator
-
-```ts
-// Create an authenticator app and link it to an identity
-const app = await identity.createAuthenticatorApp();
-
-// Add an OTP account from an otpauth:// URI
-const account = await identity.createAuthenticatorAccount({
-  otpauthUri: "otpauth://totp/Example:user@example.com?secret=EXAMPLESECRET&issuer=Example",
-  displayName: "My OTP Account",        // optional (max 255 chars)
-  description: "Login MFA for Example",  // optional
-});
-
-// List all accounts in this identity's authenticator app
-const accounts = await identity.listAuthenticatorAccounts();
-
-// Get a single account
-const acct = await identity.getAuthenticatorAccount("account-uuid");
-
-// Update account metadata (pass null to clear a field)
-await identity.updateAuthenticatorAccount("account-uuid", { displayName: "New Label" });
-
-// Generate an OTP code
-const otp = await identity.generateOtp("account-uuid");
-console.log(otp.otpCode);            // e.g. "482901"
-console.log(otp.validForSeconds);    // seconds until expiry (null for HOTP)
-console.log(otp.otpType);            // "totp" or "hotp"
-
-// Delete an account
-await identity.deleteAuthenticatorAccount("account-uuid");
-
-// Unlink authenticator app from identity
-await identity.unlinkAuthenticatorApp();
-
-// Delete the authenticator app (org-level)
-await inkbox.authenticatorApps.delete("app-uuid");
-```
-
----
-
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
@@ -431,10 +391,6 @@ Runnable example scripts are available in the [examples/typescript](https://gith
 | `read-agent-calls.ts` | List calls and print transcripts |
 | `receive-agent-email-webhook.ts` | Register and delete a mailbox webhook |
 | `receive-agent-call-webhook.ts` | Register, update, and delete a phone webhook |
-| `agent-authenticator-app-e2e.ts` | Full authenticator app lifecycle (create, OTP, cleanup) |
-| `create-authenticator.ts` | Create an authenticator app and add an OTP account |
-| `generate-otp.ts` | Generate an OTP code for an account |
-| `list-authenticator-accounts.ts` | List authenticator accounts for an identity |
 
 ## License
 

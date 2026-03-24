@@ -31,16 +31,8 @@ from inkbox.phone.types import (
 # Identity types
 from inkbox.identities.types import (
     AgentIdentitySummary,
-    IdentityAuthenticatorApp,
     IdentityMailbox,
     IdentityPhoneNumber,
-)
-
-# Authenticator types
-from inkbox.authenticator.types import (
-    AuthenticatorAccount,
-    AuthenticatorApp,
-    OTPCode,
 )
 
 # Vault types
@@ -58,6 +50,13 @@ from inkbox.vault.types import (
     VaultSecret,
     VaultSecretDetail,
     VaultSecretType,
+)
+from inkbox.vault.totp import (
+    TOTPAlgorithm,
+    TOTPCode,
+    TOTPConfig,
+    generate_totp,
+    parse_totp_uri,
 )
 from inkbox.vault.crypto import (
     VaultKeyMaterial,
@@ -93,13 +92,8 @@ __all__ = [
     "RateLimitInfo",
     # Identity types
     "AgentIdentitySummary",
-    "IdentityAuthenticatorApp",
     "IdentityMailbox",
     "IdentityPhoneNumber",
-    # Authenticator types
-    "AuthenticatorApp",
-    "AuthenticatorAccount",
-    "OTPCode",
     # Vault types
     "AccessRule",
     "VaultSecretType",
@@ -118,6 +112,12 @@ __all__ = [
     "generate_org_encryption_key",
     "generate_vault_key_material",
     "generate_recovery_code",
+    # TOTP
+    "TOTPAlgorithm",
+    "TOTPCode",
+    "TOTPConfig",
+    "generate_totp",
+    "parse_totp_uri",
     # Signing key + webhook verification
     "SigningKey",
     "verify_webhook",
