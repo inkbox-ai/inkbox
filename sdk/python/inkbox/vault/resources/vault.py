@@ -27,6 +27,7 @@ from inkbox.vault.types import (
     VaultKey,
     VaultSecret,
     VaultSecretDetail,
+    VaultSecretType,
     _infer_secret_type,
     _parse_payload,
 )
@@ -486,7 +487,7 @@ class UnlockedVault:
         if isinstance(totp, str):
             totp = parse_totp_uri(totp)
         secret = self.get_secret(secret_id)
-        if secret.secret_type != "login":
+        if secret.secret_type != VaultSecretType.LOGIN:
             raise TypeError(
                 f"Cannot set TOTP on a {secret.secret_type!r} secret — "
                 f"only login secrets support TOTP"
@@ -508,7 +509,7 @@ class UnlockedVault:
             TypeError: If the secret is not a login type.
         """
         secret = self.get_secret(secret_id)
-        if secret.secret_type != "login":
+        if secret.secret_type != VaultSecretType.LOGIN:
             raise TypeError(
                 f"Cannot remove TOTP from a {secret.secret_type!r} secret — "
                 f"only login secrets support TOTP"
@@ -531,7 +532,7 @@ class UnlockedVault:
             ValueError: If the login has no TOTP configured.
         """
         secret = self.get_secret(secret_id)
-        if secret.secret_type != "login":
+        if secret.secret_type != VaultSecretType.LOGIN:
             raise TypeError(
                 f"Cannot generate TOTP for a {secret.secret_type!r} secret — "
                 f"only login secrets support TOTP"

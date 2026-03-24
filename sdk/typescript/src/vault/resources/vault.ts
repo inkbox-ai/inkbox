@@ -26,6 +26,7 @@ import type {
   VaultSecretDetail,
 } from "../types.js";
 import {
+  VaultSecretType,
   inferSecretType,
   parseAccessRule,
   parsePayload,
@@ -476,7 +477,7 @@ export class UnlockedVault {
   ): Promise<VaultSecret> {
     const config = typeof totp === "string" ? parseTotpUri(totp) : totp;
     const secret = await this.getSecret(secretId);
-    if (secret.secretType !== "login") {
+    if (secret.secretType !== VaultSecretType.LOGIN) {
       throw new TypeError(
         `Cannot set TOTP on a '${secret.secretType}' secret — only login secrets support TOTP`,
       );
@@ -494,7 +495,7 @@ export class UnlockedVault {
    */
   async removeTotp(secretId: string): Promise<VaultSecret> {
     const secret = await this.getSecret(secretId);
-    if (secret.secretType !== "login") {
+    if (secret.secretType !== VaultSecretType.LOGIN) {
       throw new TypeError(
         `Cannot remove TOTP from a '${secret.secretType}' secret — only login secrets support TOTP`,
       );
@@ -514,7 +515,7 @@ export class UnlockedVault {
    */
   async getTotpCode(secretId: string): Promise<TOTPCode> {
     const secret = await this.getSecret(secretId);
-    if (secret.secretType !== "login") {
+    if (secret.secretType !== VaultSecretType.LOGIN) {
       throw new TypeError(
         `Cannot generate TOTP for a '${secret.secretType}' secret — only login secrets support TOTP`,
       );
