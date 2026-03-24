@@ -231,14 +231,7 @@ export class VaultResource {
     const decrypted: DecryptedVaultSecret[] = [];
     for (const raw of data.encrypted_secrets ?? []) {
       const detail = parseVaultSecretDetail(raw);
-      // Try with secret ID as AAD; fall back to empty AAD for secrets
-      // created before the re-encrypt-on-create fix was deployed.
-      let payloadDict: Record<string, unknown>;
-      try {
-        payloadDict = decryptPayload(orgKey, detail.encryptedPayload, detail.id);
-      } catch {
-        payloadDict = decryptPayload(orgKey, detail.encryptedPayload, "");
-      }
+      const payloadDict = decryptPayload(orgKey, detail.encryptedPayload, detail.id);
       const payload = parsePayload(
         detail.secretType,
         payloadDict as Record<string, unknown>,
@@ -335,12 +328,7 @@ export class UnlockedVault {
       `/secrets/${secretId}`,
     );
     const detail = parseVaultSecretDetail(data);
-    let payloadDict: Record<string, unknown>;
-    try {
-      payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, detail.id);
-    } catch {
-      payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, "");
-    }
+    const payloadDict = decryptPayload(this.orgKey, detail.encryptedPayload, detail.id);
     const payload = parsePayload(
       detail.secretType,
       payloadDict as Record<string, unknown>,

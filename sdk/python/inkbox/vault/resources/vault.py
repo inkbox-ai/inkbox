@@ -8,7 +8,7 @@ UnlockedVault: crypto-enabled wrapper for secret CRUD after unlock.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from inkbox.vault.totp import TOTPCode, TOTPConfig, generate_totp, parse_totp_uri
 from inkbox.vault.crypto import (
@@ -224,12 +224,7 @@ class VaultResource:
         decrypted: list[DecryptedVaultSecret] = []
         for raw in data.get("encrypted_secrets", []):
             detail = VaultSecretDetail._from_dict(raw)
-            # Try with secret ID as AAD; fall back to empty AAD for secrets
-            # created before the re-encrypt-on-create fix was deployed.
-            try:
-                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
-            except Exception:
-                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id="")
+            payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
             payload = _parse_payload(detail.secret_type, payload_dict)
             decrypted.append(
                 DecryptedVaultSecret(
@@ -325,12 +320,7 @@ class UnlockedVault:
         """
         data = self._http.get(f"/secrets/{secret_id}")
         detail = VaultSecretDetail._from_dict(data)
-        # Try with secret ID as AAD; fall back to empty AAD for secrets
-        # created before the re-encrypt-on-create fix was deployed.
-        try:
-            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
-        except Exception:
-            payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id="")
+        payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
         payload = _parse_payload(
             secret_type=detail.secret_type,
             raw=payload_dict,
@@ -367,7 +357,6 @@ class UnlockedVault:
         Returns:
             :class:`~inkbox.vault.types.VaultSecret` metadata (no payload).
         """
-        from uuid import uuid4
 
         secret_type = _infer_secret_type(payload)
         # Generate the UUID client-side so we can use it as AAD for
