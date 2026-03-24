@@ -367,10 +367,17 @@ class UnlockedVault:
         Returns:
             :class:`~inkbox.vault.types.VaultSecret` metadata (no payload).
         """
+        from uuid import uuid4
+
         secret_type = _infer_secret_type(payload)
-        # Initial create uses empty AAD (secret ID doesn't exist yet).
-        encrypted = encrypt_payload(self._org_key, payload._to_dict())
+        # Generate the UUID client-side so we can use it as AAD for
+        # encryption in the same request.
+        secret_id = str(uuid4())
+        encrypted = encrypt_payload(
+            self._org_key, payload._to_dict(), secret_id=secret_id,
+        )
         body: dict[str, Any] = {
+            "id": secret_id,
             "name": name,
             "secret_type": secret_type,
             "encrypted_payload": encrypted,
@@ -382,18 +389,6 @@ class UnlockedVault:
             json=body,
         )
         result = VaultSecret._from_dict(data)
-        # Re-encrypt with the real secret ID as AAD so the tamper check
-        # is in place from the start (the initial POST used empty AAD
-        # because the server-generated ID wasn't known yet).
-        re_encrypted = encrypt_payload(
-            self._org_key,
-            payload._to_dict(),
-            secret_id=str(result.id),
-        )
-        self._http.patch(
-            path=f"/secrets/{result.id}",
-            json={"encrypted_payload": re_encrypted},
-        )
         # Append the new secret to the cache so it's immediately visible.
         try:
             decrypted = self.get_secret(str(result.id))

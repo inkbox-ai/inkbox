@@ -374,9 +374,12 @@ export class UnlockedVault {
   }): Promise<VaultSecret> {
     const secretType = inferSecretType(options.payload);
     const serialized = serializePayload(secretType, options.payload);
-    // Initial create uses empty AAD (secret ID doesn't exist yet).
-    const encrypted = encryptPayload(this.orgKey, serialized);
+    // Generate the UUID client-side so we can use it as AAD for
+    // encryption in the same request.
+    const secretId = crypto.randomUUID();
+    const encrypted = encryptPayload(this.orgKey, serialized, secretId);
     const body: Record<string, unknown> = {
+      id: secretId,
       name: options.name,
       secret_type: secretType,
       encrypted_payload: encrypted,
@@ -384,13 +387,6 @@ export class UnlockedVault {
     if (options.description !== undefined) body["description"] = options.description;
     const data = await this.http.post<RawVaultSecret>("/secrets", body);
     const result = parseVaultSecret(data);
-    // Re-encrypt with the real secret ID as AAD so the tamper check
-    // is in place from the start.
-    const reEncrypted = encryptPayload(this.orgKey, serialized, result.id);
-    await this.http.patch<RawVaultSecret>(
-      `/secrets/${result.id}`,
-      { encrypted_payload: reEncrypted },
-    );
     // Append the new secret to the cache so it's immediately visible.
     try {
       const decrypted = await this.getSecret(result.id);
