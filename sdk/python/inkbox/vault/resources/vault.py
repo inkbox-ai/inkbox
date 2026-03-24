@@ -215,24 +215,16 @@ class VaultResource:
                 continue
 
         if org_key is None:
-            # Fallback: try without AAD (for vaults initialized by older SDK versions)
-            try:
-                org_key = unwrap_org_key(master_key, wrapped, vault_key_id="")
-            except Exception:
-                raise ValueError(
-                    "Failed to unwrap org encryption key. "
-                    "Check that the vault key is correct."
-                ) from None
+            raise ValueError(
+                "Failed to unwrap org encryption key. "
+                "Check that the vault key is correct."
+            )
 
         # Step 5: decrypt all secrets from the unlock bundle
         decrypted: list[DecryptedVaultSecret] = []
         for raw in data.get("encrypted_secrets", []):
             detail = VaultSecretDetail._from_dict(raw)
-            # Try with secret ID as AAD, fall back to empty AAD
-            try:
-                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
-            except Exception:
-                payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id="")
+            payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
             payload = _parse_payload(detail.secret_type, payload_dict)
             decrypted.append(
                 DecryptedVaultSecret(
