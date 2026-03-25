@@ -13,15 +13,19 @@ export function registerPhoneCommands(program: Command): void {
     .description("Place an outbound call")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .requiredOption("--to <number>", "E.164 destination number")
+    .option("--ws-url <url>", "WebSocket URL (wss://) for audio bridging")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; to: string },
+        cmdOpts: { identity: string; to: string; wsUrl?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        const call = await identity.placeCall({ toNumber: cmdOpts.to });
+        const call = await identity.placeCall({
+          toNumber: cmdOpts.to,
+          clientWebsocketUrl: cmdOpts.wsUrl,
+        });
         output(
           {
             id: call.id,
@@ -40,16 +44,18 @@ export function registerPhoneCommands(program: Command): void {
     .description("List calls")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--limit <n>", "Max results", "50")
+    .option("--offset <n>", "Pagination offset", "0")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; limit: string },
+        cmdOpts: { identity: string; limit: string; offset: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const calls = await identity.listCalls({
           limit: parseInt(cmdOpts.limit, 10),
+          offset: parseInt(cmdOpts.offset, 10),
         });
         output(calls, {
           json: !!opts.json,

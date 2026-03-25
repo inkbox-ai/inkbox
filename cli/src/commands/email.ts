@@ -19,6 +19,7 @@ export function registerEmailCommands(program: Command): void {
     .option("--body-html <html>", "HTML body")
     .option("--cc <addresses>", "Comma-separated CC addresses")
     .option("--bcc <addresses>", "Comma-separated BCC addresses")
+    .option("--in-reply-to <message-id>", "Message ID to reply to")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -30,6 +31,7 @@ export function registerEmailCommands(program: Command): void {
           bodyHtml?: string;
           cc?: string;
           bcc?: string;
+          inReplyTo?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -42,6 +44,7 @@ export function registerEmailCommands(program: Command): void {
           bodyHtml: cmdOpts.bodyHtml,
           cc: cmdOpts.cc?.split(",").map((s) => s.trim()),
           bcc: cmdOpts.bcc?.split(",").map((s) => s.trim()),
+          inReplyToMessageId: cmdOpts.inReplyTo,
         });
         output(
           {

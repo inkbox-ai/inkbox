@@ -77,6 +77,7 @@ inkbox email send -i <handle>                # Send an email
   --body-html <html>                         #   HTML body
   --cc <addresses>                           #   Comma-separated CC
   --bcc <addresses>                          #   Comma-separated BCC
+  --in-reply-to <message-id>                 #   Message ID to reply to
 
 inkbox email list -i <handle>                # List emails
   --direction <dir>                          #   Filter: inbound or outbound
@@ -96,9 +97,11 @@ Phone operations, scoped to an identity. Requires `-i <handle>`.
 ```bash
 inkbox phone call -i <handle>                # Place an outbound call
   --to <number>                              #   E.164 phone number (required)
+  --ws-url <url>                             #   WebSocket URL (wss://) for audio bridging
 
 inkbox phone calls -i <handle>               # List calls
   --limit <n>                                #   Max results (default: 50)
+  --offset <n>                               #   Pagination offset (default: 0)
 
 inkbox phone transcripts <call-id> -i <handle>  # Get call transcripts
 ```
