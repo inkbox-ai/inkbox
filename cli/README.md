@@ -33,6 +33,9 @@ Get your API key at [console.inkbox.ai](https://console.inkbox.ai/).
 # Create an agent identity
 inkbox identity create support-bot
 
+# Create a mailbox for the identity
+inkbox mailbox create --handle support-bot
+
 # Send an email
 inkbox email send -i support-bot \
   --to customer@example.com \
