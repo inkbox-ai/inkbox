@@ -74,7 +74,7 @@ src/
 
 ### How it works
 
-The agent uses [Browser Use](https://browser-use.com) for browser automation (navigate, click, fill forms, extract data, vision) and [Inkbox](https://inkbox.ai) for email (send, receive, read, reply). These are wired together via a Browser Use `Controller` with custom Inkbox email actions registered on it.
+The Browser Use agent handles browser automation (navigate, click, fill forms, extract data, vision) with a full Inkbox identity — the agent gets its own email address and can sign up for services, log in, send/receive email, and interact with the web as itself. Inkbox tools are registered as custom actions on the Browser Use `Controller`.
 
 The system prompt is loaded from `SKILL.md` at runtime, with the agent's handle and email address interpolated, and appended to Browser Use's default system prompt via `extend_system_message`.
 
