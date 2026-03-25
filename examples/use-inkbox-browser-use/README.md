@@ -76,7 +76,7 @@ src/
 
 The agent uses [Browser Use](https://browser-use.com) for browser automation (navigate, click, fill forms, extract data, vision) and [Inkbox](https://inkbox.ai) for email (send, receive, read, reply). These are wired together via a Browser Use `Controller` with custom Inkbox email actions registered on it.
 
-The system prompt is loaded from `SKILL.md` at runtime, with the agent's handle and email address interpolated.
+The system prompt is loaded from `SKILL.md` at runtime, with the agent's handle and email address interpolated, and appended to Browser Use's default system prompt via `extend_system_message`.
 
 ## Email tools
 
