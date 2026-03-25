@@ -30,6 +30,7 @@ uv.lock
 # Environment
 .env
 .env.*
+!.env.example
 
 # IDEs
 .idea/
