@@ -58,6 +58,28 @@ def find_chrome_path() -> str | None:
     return None
 
 
+def close_default_tabs(port: int = DEFAULT_PORT) -> None:
+    """Close all tabs that Chrome opens by default (e.g. new tab page)."""
+    try:
+        resp = requests.get(f"http://127.0.0.1:{port}/json", timeout=2)
+        if resp.status_code != 200:
+            return
+        tabs = resp.json()
+        for tab in tabs:
+            tab_id = tab.get("id")
+            if tab_id:
+                try:
+                    requests.get(
+                        f"http://127.0.0.1:{port}/json/close/{tab_id}",
+                        timeout=2,
+                    )
+                    logger.info("Closed default tab: %s", tab.get("url", tab_id))
+                except requests.RequestException:
+                    pass
+    except requests.RequestException:
+        pass
+
+
 def launch_chrome(port: int = DEFAULT_PORT) -> subprocess.Popen | None:
     """
     Launch Chrome in debug mode.
@@ -104,6 +126,7 @@ def launch_chrome(port: int = DEFAULT_PORT) -> subprocess.Popen | None:
             if check_chrome_running(port):
                 logger.info("Chrome is ready on port %d", port)
                 time.sleep(0.5)
+                close_default_tabs(port)
                 return process
             time.sleep(1)
 
