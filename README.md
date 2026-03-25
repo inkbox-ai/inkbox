@@ -25,7 +25,12 @@ Get an API key from the [Inkbox Console](https://console.inkbox.ai/), then:
 from inkbox import Inkbox
 
 with Inkbox(api_key="ApiKey_...") as inkbox:
-    identity = inkbox.get_identity("my-agent")
+    # Create an agent identity
+    identity = inkbox.create_identity("my-agent")
+
+    # Create and link new channels
+    identity.create_mailbox(display_name="My Agent")
+    identity.provision_phone_number(type="toll_free")
 
     # Send an email
     identity.send_email(
@@ -48,7 +53,13 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
 import { Inkbox } from "@inkbox/sdk";
 
 const inkbox = new Inkbox({ apiKey: "ApiKey_..." });
-const identity = await inkbox.getIdentity("my-agent");
+
+// Create an agent identity
+const identity = await inkbox.createIdentity("my-agent");
+
+// Create and link new channels
+const mailbox = await identity.createMailbox({ displayName: "My Agent" });
+const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 
 // Send an email
 await identity.sendEmail({
