@@ -91,13 +91,13 @@ export function validateTotpConfig(config: TOTPConfig): void {
 function b32decode(secret: string): Buffer {
   const upper = secret.toUpperCase().replace(/=+$/, "");
   if (upper.length === 0) {
-    throw new Error(`Invalid base32 secret: '${secret}'`);
+    throw new Error(`Invalid base32 secret (length=${secret.length})`);
   }
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   const bits: number[] = [];
   for (const ch of upper) {
     const idx = alphabet.indexOf(ch);
-    if (idx === -1) throw new Error(`Invalid base32 secret: '${secret}'`);
+    if (idx === -1) throw new Error(`Invalid base32 secret (length=${secret.length})`);
     for (let i = 4; i >= 0; i--) {
       bits.push((idx >> i) & 1);
     }
@@ -109,7 +109,7 @@ function b32decode(secret: string): Buffer {
     bytes.push(byte);
   }
   if (bytes.length === 0) {
-    throw new Error(`Invalid base32 secret: '${secret}'`);
+    throw new Error(`Invalid base32 secret (length=${secret.length})`);
   }
   return Buffer.from(bytes);
 }

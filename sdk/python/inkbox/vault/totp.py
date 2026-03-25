@@ -136,7 +136,7 @@ def _b32decode(secret: str) -> bytes:
     try:
         return base64.b32decode(padded)
     except Exception:
-        raise ValueError(f"Invalid base32 secret: {secret!r}") from None
+        raise ValueError(f"Invalid base32 secret (length={len(secret)})") from None
 
 
 def _generate_hotp(
