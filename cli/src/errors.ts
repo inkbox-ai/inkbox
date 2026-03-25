@@ -3,9 +3,9 @@ import { InkboxAPIError, InkboxError, InkboxVaultKeyError } from "@inkbox/sdk";
 export function withErrorHandler<T extends unknown[]>(
   fn: (...args: T) => Promise<void>,
 ): (...args: T) => Promise<void> {
-  return async (...args: T) => {
+  return async function (this: unknown, ...args: T) {
     try {
-      await fn(...args);
+      await fn.call(this, ...args);
     } catch (err) {
       if (err instanceof InkboxAPIError) {
         console.error(`Error: HTTP ${err.statusCode}: ${err.detail}`);
