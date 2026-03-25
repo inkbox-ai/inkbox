@@ -2,7 +2,7 @@
 
 Inkbox integration with [Browser Use](https://browser-use.com).
 
-Give your agent an email and browser. Everything it needs to use the internet like you do.
+Give your `Browser Use` agent an email, phone number, and encrypted vault. Everything it needs to communicate and authenticate on the internet like you do.
 
 ## Setup
 
