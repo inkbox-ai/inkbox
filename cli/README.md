@@ -61,7 +61,7 @@ inkbox identity get <handle>                 # Get identity details
 inkbox identity create <handle>              # Create a new identity
 inkbox identity delete <handle>              # Delete an identity
 inkbox identity update <handle>              # Update an identity
-  --new-handle <name>                        #   New handle
+  --new-handle <handle>                      #   New handle
   --status <status>                          #   active or paused
 ```
 
@@ -161,7 +161,7 @@ inkbox number provision                      # Provision a new number
   --handle <handle>                          #   Agent handle (required)
   --type <type>                              #   toll_free or local (default: toll_free)
   --state <state>                            #   US state abbreviation (for local)
-inkbox number release <id>                   # Release a phone number
+inkbox number release <number-id>             # Release a phone number
 ```
 
 ## Global options
