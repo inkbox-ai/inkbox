@@ -164,19 +164,19 @@ Secret type flags:
 
 ```bash
 # login
-  --username <user> --password <pass> [--url <url>]
+  --password <pass> [--username <user>] [--email <email>] [--url <url>] [--totp-uri <uri>] [--notes <text>]
 
 # api_key
-  --key <key>
+  --key <key> [--endpoint <url>] [--notes <text>]
 
 # key_pair
-  --access-key <key> --secret-key <key>
+  --access-key <key> --secret-key <key> [--endpoint <url>] [--notes <text>]
 
 # ssh_key
-  --private-key <key> [--public-key <key>]
+  --private-key <key> [--public-key <key>] [--fingerprint <fp>] [--passphrase <pass>] [--notes <text>]
 
 # other
-  --data <json>
+  --data <json> [--notes <text>]
 ```
 
 ### mailbox

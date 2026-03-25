@@ -3,6 +3,7 @@ import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import type { SecretPayload, DecryptedVaultSecret } from "@inkbox/sdk";
+import { parseTotpUri } from "@inkbox/sdk";
 
 export function registerVaultCommands(program: Command): void {
   const vault = program
@@ -87,13 +88,19 @@ export function registerVaultCommands(program: Command): void {
     .option("--description <desc>", "Optional description")
     .option("--username <user>", "Username (for login type)")
     .option("--password <pass>", "Password (for login type)")
+    .option("--email <email>", "Email (for login type)")
     .option("--url <url>", "URL (for login type)")
+    .option("--totp-uri <uri>", "otpauth:// TOTP URI (for login type)")
     .option("--key <key>", "API key value (for api_key type)")
     .option("--access-key <key>", "Access key (for key_pair type)")
     .option("--secret-key <key>", "Secret key (for key_pair type)")
+    .option("--endpoint <url>", "Endpoint URL (for api_key and key_pair types)")
     .option("--private-key <key>", "Private key (for ssh_key type)")
     .option("--public-key <key>", "Public key (for ssh_key type)")
+    .option("--fingerprint <fp>", "Key fingerprint (for ssh_key type)")
+    .option("--passphrase <pass>", "Key passphrase (for ssh_key type)")
     .option("--data <json>", "JSON payload (for other type)")
+    .option("--notes <text>", "Optional notes")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -103,13 +110,19 @@ export function registerVaultCommands(program: Command): void {
           description?: string;
           username?: string;
           password?: string;
+          email?: string;
           url?: string;
+          totpUri?: string;
           key?: string;
           accessKey?: string;
           secretKey?: string;
+          endpoint?: string;
           privateKey?: string;
           publicKey?: string;
+          fingerprint?: string;
+          passphrase?: string;
           data?: string;
+          notes?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -127,16 +140,21 @@ export function registerVaultCommands(program: Command): void {
         let payload: SecretPayload;
         switch (cmdOpts.type) {
           case "login":
-            if (!cmdOpts.username || !cmdOpts.password) {
+            if (!cmdOpts.password) {
               console.error(
-                "Error: --username and --password are required for login secrets.",
+                "Error: --password is required for login secrets.",
               );
               process.exit(1);
             }
             payload = {
-              username: cmdOpts.username,
               password: cmdOpts.password,
+              username: cmdOpts.username,
+              email: cmdOpts.email,
               url: cmdOpts.url,
+              notes: cmdOpts.notes,
+              ...(cmdOpts.totpUri
+                ? { totp: parseTotpUri(cmdOpts.totpUri) }
+                : {}),
             };
             break;
           case "api_key":
@@ -146,7 +164,11 @@ export function registerVaultCommands(program: Command): void {
               );
               process.exit(1);
             }
-            payload = { apiKey: cmdOpts.key };
+            payload = {
+              apiKey: cmdOpts.key,
+              endpoint: cmdOpts.endpoint,
+              notes: cmdOpts.notes,
+            };
             break;
           case "key_pair":
             if (!cmdOpts.accessKey || !cmdOpts.secretKey) {
@@ -158,6 +180,8 @@ export function registerVaultCommands(program: Command): void {
             payload = {
               accessKey: cmdOpts.accessKey,
               secretKey: cmdOpts.secretKey,
+              endpoint: cmdOpts.endpoint,
+              notes: cmdOpts.notes,
             };
             break;
           case "ssh_key":
@@ -170,6 +194,9 @@ export function registerVaultCommands(program: Command): void {
             payload = {
               privateKey: cmdOpts.privateKey,
               publicKey: cmdOpts.publicKey,
+              fingerprint: cmdOpts.fingerprint,
+              passphrase: cmdOpts.passphrase,
+              notes: cmdOpts.notes,
             };
             break;
           case "other":
@@ -179,7 +206,10 @@ export function registerVaultCommands(program: Command): void {
               );
               process.exit(1);
             }
-            payload = JSON.parse(cmdOpts.data);
+            payload = {
+              data: cmdOpts.data,
+              notes: cmdOpts.notes,
+            };
             break;
           default:
             console.error(
