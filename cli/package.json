@@ -1,0 +1,40 @@
+{
+  "name": "@inkbox/cli",
+  "version": "0.1.0",
+  "description": "CLI for the Inkbox API",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "inkbox": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@inkbox/sdk": "^0.2.1",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inkbox-ai/inkbox",
+    "directory": "cli"
+  },
+  "homepage": "https://inkbox.ai",
+  "bugs": {
+    "url": "https://github.com/inkbox-ai/inkbox/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
