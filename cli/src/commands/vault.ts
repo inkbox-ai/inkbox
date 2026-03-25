@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
-import type { SecretPayload } from "@inkbox/sdk";
+import type { SecretPayload, DecryptedVaultSecret } from "@inkbox/sdk";
 
 export function registerVaultCommands(program: Command): void {
   const vault = program
@@ -202,6 +202,158 @@ export function registerVaultCommands(program: Command): void {
           },
           { json: !!opts.json },
         );
+      }),
+    );
+
+  vault
+    .command("delete <secret-id>")
+    .description("Delete a secret")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        secretId: string,
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        await inkbox.vault.deleteSecret(secretId);
+        console.log(`Deleted secret '${secretId}'.`);
+      }),
+    );
+
+  vault
+    .command("keys")
+    .description("List vault keys")
+    .option("--type <type>", "Filter by type: primary or recovery")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { type?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const keys = await inkbox.vault.listKeys({
+          keyType: cmdOpts.type,
+        });
+        output(keys, {
+          json: !!opts.json,
+          columns: ["id", "keyType", "status", "createdBy", "createdAt"],
+        });
+      }),
+    );
+
+  vault
+    .command("logins")
+    .description("List login credentials for an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        if (!vaultKey) {
+          console.error(
+            "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
+          );
+          process.exit(1);
+        }
+        const inkbox = createClient(opts);
+        await inkbox.ready();
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const creds = await identity.getCredentials();
+        const secrets = creds.listLogins();
+        output(secrets, {
+          json: !!opts.json,
+          columns: ["id", "name", "secretType", "status", "createdAt"],
+        });
+      }),
+    );
+
+  vault
+    .command("api-keys")
+    .description("List API key credentials for an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        if (!vaultKey) {
+          console.error(
+            "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
+          );
+          process.exit(1);
+        }
+        const inkbox = createClient(opts);
+        await inkbox.ready();
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const creds = await identity.getCredentials();
+        const secrets = creds.listApiKeys();
+        output(secrets, {
+          json: !!opts.json,
+          columns: ["id", "name", "secretType", "status", "createdAt"],
+        });
+      }),
+    );
+
+  vault
+    .command("ssh-keys")
+    .description("List SSH key credentials for an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        if (!vaultKey) {
+          console.error(
+            "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
+          );
+          process.exit(1);
+        }
+        const inkbox = createClient(opts);
+        await inkbox.ready();
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const creds = await identity.getCredentials();
+        const secrets = creds.listSshKeys();
+        output(secrets, {
+          json: !!opts.json,
+          columns: ["id", "name", "secretType", "status", "createdAt"],
+        });
+      }),
+    );
+
+  vault
+    .command("key-pairs")
+    .description("List key pair credentials for an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        if (!vaultKey) {
+          console.error(
+            "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
+          );
+          process.exit(1);
+        }
+        const inkbox = createClient(opts);
+        await inkbox.ready();
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const creds = await identity.getCredentials();
+        const secrets = creds.listKeyPairs();
+        output(secrets, {
+          json: !!opts.json,
+          columns: ["id", "name", "secretType", "status", "createdAt"],
+        });
       }),
     );
 }

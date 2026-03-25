@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
-import type { Message, MessageDirection } from "@inkbox/sdk";
+import type { Message, MessageDirection, ThreadDetail } from "@inkbox/sdk";
 
 export function registerEmailCommands(program: Command): void {
   const email = program
@@ -167,6 +167,100 @@ export function registerEmailCommands(program: Command): void {
             "createdAt",
           ],
         });
+      }),
+    );
+
+  email
+    .command("unread")
+    .description("List unread emails")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--direction <dir>", "Filter: inbound or outbound")
+    .option("--limit <n>", "Max messages to show", "50")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          identity: string;
+          direction?: string;
+          limit: string;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const limit = parseInt(cmdOpts.limit, 10);
+        const messages: Message[] = [];
+        for await (const msg of identity.iterUnreadEmails({
+          direction: cmdOpts.direction as MessageDirection | undefined,
+        })) {
+          messages.push(msg);
+          if (messages.length >= limit) break;
+        }
+        output(messages, {
+          json: !!opts.json,
+          columns: [
+            "id",
+            "direction",
+            "fromAddress",
+            "subject",
+            "createdAt",
+          ],
+        });
+      }),
+    );
+
+  email
+    .command("mark-read <message-ids...>")
+    .description("Mark messages as read")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageIds: string[],
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        await identity.markEmailsRead(messageIds);
+        console.log(`Marked ${messageIds.length} message(s) as read.`);
+      }),
+    );
+
+  email
+    .command("thread <thread-id>")
+    .description("Get an email thread with all messages")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        threadId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const thread = await identity.getThread(threadId);
+        if (opts.json) {
+          output(thread, { json: true });
+        } else {
+          output(
+            { id: thread.id, subject: thread.subject, messageCount: thread.messages.length },
+            { json: false },
+          );
+          console.log("");
+          output(thread.messages, {
+            json: false,
+            columns: [
+              "id",
+              "direction",
+              "fromAddress",
+              "subject",
+              "isRead",
+              "createdAt",
+            ],
+          });
+        }
       }),
     );
 }

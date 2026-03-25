@@ -63,6 +63,22 @@ inkbox identity delete <handle>              # Delete an identity
 inkbox identity update <handle>              # Update an identity
   --new-handle <handle>                      #   New handle
   --status <status>                          #   active or paused
+inkbox identity refresh <handle>             # Re-fetch identity from API
+
+inkbox identity create-secret <handle>       # Create a secret scoped to identity (vault key)
+  --name <name>                              #   Secret name (required)
+  --type <type>                              #   Secret type (required)
+  --description <desc>                       #   Optional description
+  (same secret type flags as vault create)
+
+inkbox identity get-secret <handle> <secret-id>     # Decrypt a secret (vault key)
+inkbox identity delete-secret <handle> <secret-id>  # Delete a secret (vault key)
+inkbox identity revoke-access <handle> <secret-id>  # Revoke credential access
+
+inkbox identity set-totp <handle> <secret-id>       # Add TOTP to login (vault key)
+  --uri <otpauth-uri>                        #   otpauth:// URI (required)
+inkbox identity remove-totp <handle> <secret-id>    # Remove TOTP (vault key)
+inkbox identity totp-code <handle> <secret-id>      # Generate TOTP code (vault key)
 ```
 
 ### email
@@ -88,6 +104,13 @@ inkbox email get <message-id> -i <handle>    # Get full message with body
 inkbox email search -i <handle>              # Search emails
   -q, --query <query>                        #   Search query (required)
   --limit <n>                                #   Max results (default: 50)
+
+inkbox email unread -i <handle>              # List unread emails
+  --direction <dir>                          #   Filter: inbound or outbound
+  --limit <n>                                #   Max messages (default: 50)
+
+inkbox email mark-read <ids...> -i <handle>  # Mark messages as read
+inkbox email thread <thread-id> -i <handle>  # Get thread with all messages
 ```
 
 ### phone
@@ -104,11 +127,16 @@ inkbox phone calls -i <handle>               # List calls
   --offset <n>                               #   Pagination offset (default: 0)
 
 inkbox phone transcripts <call-id> -i <handle>  # Get call transcripts
+
+inkbox phone search-transcripts -i <handle>  # Search transcripts
+  -q, --query <query>                        #   Search query (required)
+  --party <party>                            #   Filter: local or remote
+  --limit <n>                                #   Max results (default: 50)
 ```
 
 ### vault
 
-Encrypted vault operations. `get` and `create` require a vault key.
+Encrypted vault operations. `get`, `create`, and credential listing require a vault key.
 
 ```bash
 inkbox vault info                            # Show vault info
@@ -116,11 +144,20 @@ inkbox vault secrets                         # List secrets (metadata only)
   --type <type>                              #   Filter: login, api_key, ssh_key, key_pair, other
 
 inkbox vault get <secret-id>                 # Decrypt a secret (requires vault key)
+inkbox vault delete <secret-id>              # Delete a secret
 
 inkbox vault create                          # Create a secret (requires vault key)
   --name <name>                              #   Secret name (required)
   --type <type>                              #   Secret type (required)
   --description <desc>                       #   Optional description
+
+inkbox vault keys                            # List vault keys
+  --type <type>                              #   Filter: primary or recovery
+
+inkbox vault logins -i <handle>              # List login credentials (vault key)
+inkbox vault api-keys -i <handle>            # List API key credentials (vault key)
+inkbox vault ssh-keys -i <handle>            # List SSH key credentials (vault key)
+inkbox vault key-pairs -i <handle>           # List key pair credentials (vault key)
 ```
 
 Secret type flags:
@@ -148,9 +185,13 @@ Org-level mailbox management.
 
 ```bash
 inkbox mailbox list                          # List all mailboxes
+inkbox mailbox get <email-address>           # Get mailbox details
 inkbox mailbox create                        # Create a mailbox
   --handle <handle>                          #   Agent handle (required)
   --display-name <name>                      #   Display name
+inkbox mailbox update <email-address>        # Update a mailbox
+  --display-name <name>                      #   New display name
+  --webhook-url <url>                        #   Webhook URL ("" to clear)
 inkbox mailbox delete <email-address>        # Delete a mailbox
 ```
 
@@ -160,11 +201,35 @@ Org-level phone number management.
 
 ```bash
 inkbox number list                           # List all phone numbers
+inkbox number get <id>                       # Get phone number details
 inkbox number provision                      # Provision a new number
   --handle <handle>                          #   Agent handle (required)
   --type <type>                              #   toll_free or local (default: toll_free)
   --state <state>                            #   US state abbreviation (for local)
+inkbox number update <id>                    # Update phone number config
+  --incoming-call-action <action>            #   auto_accept, auto_reject, or webhook
+  --client-websocket-url <url>               #   WebSocket URL for audio bridging
+  --incoming-call-webhook-url <url>          #   Webhook URL for incoming calls
 inkbox number release <number-id>             # Release a phone number
+```
+
+### signing-key
+
+Webhook signing key management.
+
+```bash
+inkbox signing-key create                    # Create or rotate signing key
+```
+
+### webhook
+
+Webhook utilities.
+
+```bash
+inkbox webhook verify                        # Verify a webhook signature (local)
+  --payload <payload>                        #   Raw request body (required)
+  --secret <secret>                          #   Signing key (required)
+  -H, --header <header>                      #   Header in Key: Value format (repeatable)
 ```
 
 ## Global options
