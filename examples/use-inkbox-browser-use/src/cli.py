@@ -60,6 +60,11 @@ def main() -> None:
         sys.exit(1)
 
     inkbox_client = Inkbox(api_key=Config.INKBOX_API_KEY)
+
+    if Config.INKBOX_VAULT_KEY:
+        inkbox_client.vault.unlock(Config.INKBOX_VAULT_KEY)
+        logger.info("Vault unlocked")
+
     identity, _ = select_or_create_identity(inkbox_client)
 
     asyncio.run(

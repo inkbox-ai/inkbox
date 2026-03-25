@@ -27,6 +27,9 @@ class Config:
     INKBOX_API_KEY: str = os.environ.get("INKBOX_API_KEY", "")
     BROWSER_USE_API_KEY: str = os.environ.get("BROWSER_USE_API_KEY", "")
 
+    # env vars (optional)
+    INKBOX_VAULT_KEY: str = os.environ.get("INKBOX_VAULT_KEY", "")
+
     # hardcoded defaults
     BROWSER_MODEL: str = "bu-2-0"
     MAX_BROWSER_STEPS: int = 50

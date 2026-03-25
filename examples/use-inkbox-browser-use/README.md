@@ -2,7 +2,7 @@
 
 Inkbox integration with [Browser Use](https://browser-use.com).
 
-Give your agent an email and browser. Everything it needs to use the internet like you do.
+Give your `Browser Use` agent an email, phone number, and encrypted vault. Everything it needs to communicate and authenticate on the internet like you do.
 
 ## Setup
 
@@ -65,18 +65,18 @@ uv run inkbox-browser-use --chrome-debug-url http://127.0.0.1:9333 "Email alex@e
 ```
 src/
 ├── cli.py        # argparse CLI → config validation → identity selection → run_agent()
-├── config.py     # Config class: env vars (INKBOX_API_KEY, BROWSER_USE_API_KEY)
+├── config.py     # Config class: env vars (INKBOX_API_KEY, BROWSER_USE_API_KEY, INKBOX_VAULT_KEY)
 ├── identity.py   # Interactive identity picker (questionary) or auto-create
 ├── agent.py      # Loads SKILL.md system prompt, sets up BrowserSession + Agent, runs loop
-├── tools.py      # Inkbox email tools registered on a Browser Use Controller
+├── tools.py      # Inkbox email + vault tools registered on a Browser Use Controller
 └── chrome.py     # Auto-detect, launch, and verify Chrome in debug mode
 ```
 
 ### How it works
 
-The agent uses [Browser Use](https://browser-use.com) for browser automation (navigate, click, fill forms, extract data, vision) and [Inkbox](https://inkbox.ai) for email (send, receive, read, reply). These are wired together via a Browser Use `Controller` with custom Inkbox email actions registered on it.
+The Browser Use agent handles browser automation (navigate, click, fill forms, extract data, vision) with a full Inkbox identity — the agent gets its own email address and can sign up for services, log in, send/receive email, and interact with the web as itself. Inkbox tools are registered as custom actions on the Browser Use `Controller`.
 
-The system prompt is loaded from `SKILL.md` at runtime, with the agent's handle and email address interpolated.
+The system prompt is loaded from `SKILL.md` at runtime, with the agent's handle and email address interpolated, and appended to Browser Use's default system prompt via `extend_system_message`.
 
 ## Email tools
 
@@ -88,6 +88,16 @@ The system prompt is loaded from `SKILL.md` at runtime, with the agent's handle 
 | `mark_emails_read` | Mark specific emails as read |
 | `read_email` | Read a specific email in full (includes body text) |
 | `get_thread` | Get a full email thread by thread ID |
+
+## Vault tools
+
+When `INKBOX_VAULT_KEY` is set, the agent can access stored credentials:
+
+| Tool | Description |
+|------|-------------|
+| `list_credentials` | List credentials accessible to this identity (filter by login, api_key, key_pair, ssh_key) |
+| `get_credential` | Fetch a specific credential by ID (returns decrypted username, password, etc.) |
+| `get_totp_code` | Generate a TOTP (2FA) code for a login credential |
 
 Browser actions (navigate, click, fill, extract, screenshot) are handled automatically by Browser Use.
 
@@ -155,7 +165,8 @@ curl http://127.0.0.1:9222/json/version
 
 ## API Keys
 
-| Service | Get your key |
-|---------|-------------|
-| Inkbox | [console.inkbox.ai](https://console.inkbox.ai) |
-| Browser Use | [browser-use.com](https://browser-use.com) |
+| Variable | Required | Description | Get your key |
+|----------|----------|-------------|-------------|
+| `INKBOX_API_KEY` | Yes | Inkbox API key for identity + email | [console.inkbox.ai](https://console.inkbox.ai) |
+| `BROWSER_USE_API_KEY` | Yes | Browser Use API key | [browser-use.com](https://browser-use.com) |
+| `INKBOX_VAULT_KEY` | No | Vault key to unlock stored credentials and TOTP codes | Set in Inkbox console |

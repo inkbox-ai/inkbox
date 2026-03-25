@@ -54,6 +54,21 @@ class GetEmailArgs(BaseModel):
     message_id: str = Field(min_length=1, description="Message ID of the email to read in full.")
 
 
+class ListCredentialsArgs(BaseModel):
+    secret_type: str | None = Field(
+        default=None,
+        description='Filter by type: "login", "api_key", "key_pair", "ssh_key". Leave empty for all.',
+    )
+
+
+class GetCredentialArgs(BaseModel):
+    secret_id: str = Field(min_length=1, description="UUID of the credential/secret to retrieve.")
+
+
+class GetTOTPCodeArgs(BaseModel):
+    secret_id: str = Field(min_length=1, description="UUID of the login credential to generate a TOTP code for.")
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────
 
 def _sdk_to_dict(value: Any) -> Any:
@@ -149,5 +164,60 @@ def build_controller(identity: AgentIdentity) -> Controller:
             params.message_id,
         )
         return ActionResult(extracted_content=_format_json(_sdk_to_dict(msg)))
+
+    # ── Vault / Credential tools ─────────────────────────────────────────
+
+    @controller.registry.action(
+        "List credentials (passwords, API keys, etc.) accessible to this Inkbox identity",
+        param_model=ListCredentialsArgs,
+    )
+    async def list_credentials(params: ListCredentialsArgs) -> ActionResult:
+        def _collect() -> list[dict[str, Any]]:
+            creds = identity.credentials
+            type_map = {
+                "login": creds.list_logins,
+                "api_key": creds.list_api_keys,
+                "key_pair": creds.list_key_pairs,
+                "ssh_key": creds.list_ssh_keys,
+            }
+            if params.secret_type:
+                fn = type_map.get(params.secret_type)
+                if fn is None:
+                    return []
+                return [_sdk_to_dict(s) for s in fn()]
+            return [_sdk_to_dict(s) for s in creds.list()]
+
+        secrets = await asyncio.to_thread(_collect)
+        if not secrets:
+            return ActionResult(extracted_content="No credentials found.")
+        return ActionResult(extracted_content=_format_json(secrets))
+
+    @controller.registry.action(
+        "Get a specific credential from the Inkbox vault by its ID",
+        param_model=GetCredentialArgs,
+    )
+    async def get_credential(params: GetCredentialArgs) -> ActionResult:
+        secret = await asyncio.to_thread(identity.get_secret, params.secret_id)
+        return ActionResult(extracted_content=_format_json(_sdk_to_dict(secret)))
+
+    @controller.registry.action(
+        "Generate a TOTP (2FA) code for a login credential in the Inkbox vault",
+        param_model=GetTOTPCodeArgs,
+    )
+    async def get_totp_code(params: GetTOTPCodeArgs) -> ActionResult:
+        code = await asyncio.to_thread(identity.get_totp_code, params.secret_id)
+        code_dict = _sdk_to_dict(code)
+        totp_code = str(code_dict.get("code", ""))
+        seconds_remaining = code_dict.get("seconds_remaining", 0)
+        logger.info(
+            "🔑 TOTP code=%s | seconds_remaining=%s | period_start=%s | period_end=%s",
+            totp_code,
+            seconds_remaining,
+            code_dict.get("period_start"),
+            code_dict.get("period_end"),
+        )
+        return ActionResult(
+            extracted_content=f"TOTP code: {totp_code} (expires in {seconds_remaining}s). Type this EXACT code into the 2FA input field: {totp_code}",
+        )
 
     return controller
