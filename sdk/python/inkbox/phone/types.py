@@ -124,6 +124,83 @@ class PhoneCallWithRateLimit(PhoneCall):
 
 
 @dataclass
+class TextMediaItem:
+    """A single media attachment in an MMS message."""
+
+    content_type: str
+    size: int
+    url: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> TextMediaItem:
+        return cls(
+            content_type=d["content_type"],
+            size=d["size"],
+            url=d["url"],
+        )
+
+
+@dataclass
+class TextMessage:
+    """A text message (SMS or MMS)."""
+
+    id: UUID
+    direction: str
+    local_phone_number: str
+    remote_phone_number: str
+    text: str | None
+    type: str
+    media: list[TextMediaItem] | None
+    status: str
+    is_read: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> TextMessage:
+        raw_media = d.get("media")
+        media = [TextMediaItem._from_dict(m) for m in raw_media] if raw_media else None
+        return cls(
+            id=UUID(d["id"]),
+            direction=d["direction"],
+            local_phone_number=d["local_phone_number"],
+            remote_phone_number=d["remote_phone_number"],
+            text=d.get("text"),
+            type=d["type"],
+            media=media,
+            status=d["status"],
+            is_read=d["is_read"],
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )
+
+
+@dataclass
+class TextConversationSummary:
+    """One row per conversation — lightweight summary."""
+
+    remote_phone_number: str
+    latest_text: str | None
+    latest_direction: str
+    latest_type: str
+    latest_message_at: datetime
+    unread_count: int
+    total_count: int
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> TextConversationSummary:
+        return cls(
+            remote_phone_number=d["remote_phone_number"],
+            latest_text=d.get("latest_text"),
+            latest_direction=d["latest_direction"],
+            latest_type=d["latest_type"],
+            latest_message_at=datetime.fromisoformat(d["latest_message_at"]),
+            unread_count=d["unread_count"],
+            total_count=d["total_count"],
+        )
+
+
+@dataclass
 class PhoneTranscript:
     """A transcript segment from a phone call."""
 

@@ -9,6 +9,9 @@ from inkbox.phone.types import (
     PhoneNumber,
     PhoneTranscript,
     RateLimitInfo,
+    TextConversationSummary,
+    TextMediaItem,
+    TextMessage,
 )
 from inkbox.signing_keys import SigningKey
 
@@ -21,4 +24,7 @@ __all__ = [
     "PhoneTranscript",
     "RateLimitInfo",
     "SigningKey",
+    "TextConversationSummary",
+    "TextMediaItem",
+    "TextMessage",
 ]

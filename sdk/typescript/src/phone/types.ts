@@ -60,6 +60,39 @@ export interface PhoneTranscript {
   createdAt: Date;
 }
 
+export interface TextMediaItem {
+  contentType: string;
+  size: number;
+  url: string;
+}
+
+export interface TextMessage {
+  id: string;
+  /** "inbound" | "outbound" */
+  direction: string;
+  localPhoneNumber: string;
+  remotePhoneNumber: string;
+  text: string | null;
+  /** "sms" | "mms" */
+  type: string;
+  media: TextMediaItem[] | null;
+  /** "active" | "deleted" */
+  status: string;
+  isRead: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface TextConversationSummary {
+  remotePhoneNumber: string;
+  latestText: string | null;
+  latestDirection: string;
+  latestType: string;
+  latestMessageAt: Date;
+  unreadCount: number;
+  totalCount: number;
+}
+
 // ---- internal raw API shapes (snake_case from JSON) ----
 
 export interface RawPhoneNumber {
@@ -101,6 +134,36 @@ export interface RawRateLimitInfo {
 
 export interface RawPhoneCallWithRateLimit extends RawPhoneCall {
   rate_limit: RawRateLimitInfo;
+}
+
+export interface RawTextMediaItem {
+  content_type: string;
+  size: number;
+  url: string;
+}
+
+export interface RawTextMessage {
+  id: string;
+  direction: string;
+  local_phone_number: string;
+  remote_phone_number: string;
+  text: string | null;
+  type: string;
+  media: RawTextMediaItem[] | null;
+  status: string;
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RawTextConversationSummary {
+  remote_phone_number: string;
+  latest_text: string | null;
+  latest_direction: string;
+  latest_type: string;
+  latest_message_at: string;
+  unread_count: number;
+  total_count: number;
 }
 
 export interface RawPhoneTranscript {
@@ -176,6 +239,44 @@ export function parsePhoneTranscript(r: RawPhoneTranscript): PhoneTranscript {
     party: r.party,
     text: r.text,
     createdAt: new Date(r.created_at),
+  };
+}
+
+export function parseTextMediaItem(r: RawTextMediaItem): TextMediaItem {
+  return {
+    contentType: r.content_type,
+    size: r.size,
+    url: r.url,
+  };
+}
+
+export function parseTextMessage(r: RawTextMessage): TextMessage {
+  return {
+    id: r.id,
+    direction: r.direction,
+    localPhoneNumber: r.local_phone_number,
+    remotePhoneNumber: r.remote_phone_number,
+    text: r.text,
+    type: r.type,
+    media: r.media ? r.media.map(parseTextMediaItem) : null,
+    status: r.status,
+    isRead: r.is_read,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseTextConversationSummary(
+  r: RawTextConversationSummary,
+): TextConversationSummary {
+  return {
+    remotePhoneNumber: r.remote_phone_number,
+    latestText: r.latest_text,
+    latestDirection: r.latest_direction,
+    latestType: r.latest_type,
+    latestMessageAt: new Date(r.latest_message_at),
+    unreadCount: r.unread_count,
+    totalCount: r.total_count,
   };
 }
 

@@ -13,6 +13,7 @@ from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone._http import HttpTransport as PhoneHttpTransport
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.numbers import PhoneNumbersResource
+from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.identities._http import HttpTransport as IdsHttpTransport
 from inkbox.identities.resources.identities import IdentitiesResource
@@ -115,6 +116,7 @@ class Inkbox:
 
         self._calls = CallsResource(self._phone_http)
         self._numbers = PhoneNumbersResource(self._phone_http)
+        self._texts = TextsResource(self._phone_http)
         self._transcripts = TranscriptsResource(self._phone_http)
 
         self._vault_resource = VaultResource(self._vault_http)
@@ -152,6 +154,11 @@ class Inkbox:
     def phone_numbers(self) -> PhoneNumbersResource:
         """Access org-level phone number operations (list, get, provision, release)."""
         return self._numbers
+
+    @property
+    def texts(self) -> TextsResource:
+        """Access org-level text message operations (list, get, search, conversations)."""
+        return self._texts
 
     @property
     def vault(self) -> VaultResource:

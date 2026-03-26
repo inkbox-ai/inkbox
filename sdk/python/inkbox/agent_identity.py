@@ -24,7 +24,13 @@ from inkbox.identities.types import (
 )
 from inkbox.exceptions import InkboxError
 from inkbox.mail.types import Message, MessageDetail, MessageDirection, ThreadDetail
-from inkbox.phone.types import PhoneCall, PhoneCallWithRateLimit, PhoneTranscript
+from inkbox.phone.types import (
+    PhoneCall,
+    PhoneCallWithRateLimit,
+    PhoneTranscript,
+    TextConversationSummary,
+    TextMessage,
+)
 
 if TYPE_CHECKING:
     from inkbox.client import Inkbox
@@ -491,6 +497,72 @@ class AgentIdentity:
         return self._inkbox._transcripts.list(
             self._phone_number.id,  # type: ignore[union-attr]
             call_id,
+        )
+
+    ## Text message helpers
+
+    def list_texts(
+        self, *, limit: int = 50, offset: int = 0, is_read: bool | None = None
+    ) -> list[TextMessage]:
+        """List text messages for this identity's phone number.
+
+        Args:
+            limit: Maximum number of results (default 50).
+            offset: Pagination offset (default 0).
+            is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
+        """
+        self._require_phone()
+        return self._inkbox._texts.list(
+            self._phone_number.id,  # type: ignore[union-attr]
+            limit=limit,
+            offset=offset,
+            is_read=is_read,
+        )
+
+    def get_text(self, text_id: str) -> TextMessage:
+        """Get a single text message by ID.
+
+        Args:
+            text_id: UUID of the text message to fetch.
+        """
+        self._require_phone()
+        return self._inkbox._texts.get(
+            self._phone_number.id,  # type: ignore[union-attr]
+            text_id,
+        )
+
+    def list_text_conversations(
+        self, *, limit: int = 50, offset: int = 0
+    ) -> list[TextConversationSummary]:
+        """List text conversations (one row per remote number).
+
+        Args:
+            limit: Maximum number of results (default 50).
+            offset: Pagination offset (default 0).
+        """
+        self._require_phone()
+        return self._inkbox._texts.list_conversations(
+            self._phone_number.id,  # type: ignore[union-attr]
+            limit=limit,
+            offset=offset,
+        )
+
+    def get_text_conversation(
+        self, remote_number: str, *, limit: int = 50, offset: int = 0
+    ) -> list[TextMessage]:
+        """Get all messages with a specific remote number.
+
+        Args:
+            remote_number: E.164 remote phone number.
+            limit: Maximum number of results (default 50).
+            offset: Pagination offset (default 0).
+        """
+        self._require_phone()
+        return self._inkbox._texts.get_conversation(
+            self._phone_number.id,  # type: ignore[union-attr]
+            remote_number,
+            limit=limit,
+            offset=offset,
         )
 
     ## Identity management

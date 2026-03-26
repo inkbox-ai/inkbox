@@ -28,6 +28,50 @@ PHONE_CALL_DICT = {
     "updated_at": "2026-03-09T00:05:00Z",
 }
 
+TEXT_MESSAGE_DICT = {
+    "id": "dddd4444-0000-0000-0000-000000000001",
+    "direction": "inbound",
+    "local_phone_number": "+18335794607",
+    "remote_phone_number": "+15167251294",
+    "text": "Hello, is this support?",
+    "type": "sms",
+    "media": None,
+    "status": "active",
+    "is_read": False,
+    "created_at": "2026-03-09T00:10:00Z",
+    "updated_at": "2026-03-09T00:10:00Z",
+}
+
+TEXT_MESSAGE_MMS_DICT = {
+    "id": "dddd4444-0000-0000-0000-000000000002",
+    "direction": "inbound",
+    "local_phone_number": "+18335794607",
+    "remote_phone_number": "+15167251294",
+    "text": "Check this out",
+    "type": "mms",
+    "media": [
+        {
+            "content_type": "image/jpeg",
+            "size": 534972,
+            "url": "https://s3.example.com/media/photo.jpg?signed=1",
+        },
+    ],
+    "status": "active",
+    "is_read": True,
+    "created_at": "2026-03-09T00:12:00Z",
+    "updated_at": "2026-03-09T00:12:00Z",
+}
+
+TEXT_CONVERSATION_SUMMARY_DICT = {
+    "remote_phone_number": "+15167251294",
+    "latest_text": "Hello, is this support?",
+    "latest_direction": "inbound",
+    "latest_type": "sms",
+    "latest_message_at": "2026-03-09T00:10:00Z",
+    "unread_count": 3,
+    "total_count": 15,
+}
+
 PHONE_TRANSCRIPT_DICT = {
     "id": "cccc3333-0000-0000-0000-000000000001",
     "call_id": "bbbb2222-0000-0000-0000-000000000001",
