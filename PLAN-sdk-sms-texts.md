@@ -34,13 +34,11 @@ New `TextsResource(http)` class:
 - Expose as `inkbox.texts` property
 
 ### 4. AgentIdentity convenience — `agent_identity.py`
-Scoped to the identity's phone number (same pattern as `list_calls` / `list_transcripts`):
+Scoped to the identity's phone number:
 - `list_texts(limit, offset, is_read)` — like `list_calls(limit, offset)`
 - `get_text(text_id)` — like `get_message(message_id)`
-
-Everything else stays on the resource class for direct access (`inkbox.texts.*`):
-- `list_conversations`, `get_conversation`, `update_conversation`, `search`, `update`
-- Same pattern as `inkbox.mailboxes.search()` and `inkbox.phone_numbers.search_transcripts()`
+- `list_text_conversations(limit, offset)` — list conversation summaries
+- `get_text_conversation(remote_number, limit, offset)` — get messages in a conversation
 
 ### 5. Tests — `tests/test_texts.py`
 Mock HttpTransport, verify correct endpoint paths and param passing, verify type parsing.
@@ -63,6 +61,8 @@ Mock HttpTransport, verify correct endpoint paths and param passing, verify type
 ### 9. AgentIdentity convenience — `agent_identity.ts`
 - `listTexts(options?)` — like `listCalls(options?)`
 - `getText(textId)` — like `getMessage(messageId)`
+- `listTextConversations(options?)` — list conversation summaries
+- `getTextConversation(remoteNumber, options?)` — get messages in a conversation
 
 ### 10. Tests — `tests/phone/texts.test.ts`
 Vitest with mocked HttpTransport.
@@ -80,8 +80,8 @@ New `registerTextCommands(program)` under `inkbox text` subcommand. All commands
 |---------|-------------|-------|-------|
 | `inkbox text list` | List texts | `-i --identity`, `--limit`, `--offset`, `--unread-only` | `identity.listTexts(...)` |
 | `inkbox text get <text-id>` | Get a single text | `-i --identity` | `identity.getText(textId)` |
-| `inkbox text conversations` | List conversation summaries | `-i --identity`, `--limit`, `--offset` | `inkbox.texts.listConversations(phoneNumber.id, ...)` |
-| `inkbox text conversation <remote-number>` | Get messages in a conversation | `-i --identity`, `--limit`, `--offset` | `inkbox.texts.getConversation(phoneNumber.id, remote, ...)` |
+| `inkbox text conversations` | List conversation summaries | `-i --identity`, `--limit`, `--offset` | `identity.listTextConversations(...)` |
+| `inkbox text conversation <remote-number>` | Get messages in a conversation | `-i --identity`, `--limit`, `--offset` | `identity.getTextConversation(remote, ...)` |
 | `inkbox text search` | Full-text search | `-i --identity`, `-q --query`, `--limit` | `inkbox.texts.search(phoneNumber.id, ...)` |
 | `inkbox text mark-read <text-id>` | Mark a text as read | `-i --identity` | `inkbox.texts.update(phoneNumber.id, textId, { isRead: true })` |
 | `inkbox text mark-conversation-read <remote-number>` | Mark all in conversation as read | `-i --identity` | `inkbox.texts.updateConversation(phoneNumber.id, remote, { isRead: true })` |
