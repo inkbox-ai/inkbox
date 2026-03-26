@@ -71,17 +71,17 @@ Vitest with mocked HttpTransport.
 ## CLI (`cli/src/`)
 
 ### 11. Text command — `commands/text.ts`
-New `registerTextCommands(program)` under `inkbox text` subcommand:
+New `registerTextCommands(program)` under `inkbox text` subcommand. All commands go through `identity.*` convenience methods (same pattern as `email` and `phone` commands):
 
-| Command | Description | Flags |
-|---------|-------------|-------|
-| `inkbox text list` | List texts for an identity's phone number | `-i --identity`, `--limit`, `--offset`, `--unread-only` |
-| `inkbox text get <text-id>` | Get a single text message | `-i --identity` |
-| `inkbox text conversations` | List conversation summaries | `-i --identity`, `--limit`, `--offset` |
-| `inkbox text conversation <remote-number>` | Get messages in a conversation | `-i --identity`, `--limit`, `--offset` |
-| `inkbox text search` | Full-text search across texts | `-i --identity`, `--query`, `--limit` |
-| `inkbox text mark-read <text-id>` | Mark a text as read | `-i --identity` |
-| `inkbox text mark-conversation-read <remote-number>` | Mark all texts in a conversation as read | `-i --identity` |
+| Command | Description | Flags | Calls |
+|---------|-------------|-------|-------|
+| `inkbox text list` | List texts | `-i --identity`, `--limit`, `--offset`, `--unread-only` | `identity.listTexts(...)` |
+| `inkbox text get <text-id>` | Get a single text | `-i --identity` | `identity.getText(textId)` |
+| `inkbox text conversations` | List conversation summaries | `-i --identity`, `--limit`, `--offset` | `identity.listTextConversations(...)` |
+| `inkbox text conversation <remote-number>` | Get messages in a conversation | `-i --identity`, `--limit`, `--offset` | `identity.getTextConversation(remote, ...)` |
+| `inkbox text search` | Full-text search | `-i --identity`, `-q --query`, `--limit` | `inkbox.texts.search(phoneNumber.id, ...)` (like `email search`) |
+| `inkbox text mark-read <text-id>` | Mark a text as read | `-i --identity` | `inkbox.texts.update(phoneNumber.id, textId, { isRead: true })` |
+| `inkbox text mark-conversation-read <remote-number>` | Mark all in conversation as read | `-i --identity` | `inkbox.texts.updateConversation(phoneNumber.id, remote, { isRead: true })` |
 
 ### 12. Wire into index — `index.ts`
 - Import and call `registerTextCommands(program)`
