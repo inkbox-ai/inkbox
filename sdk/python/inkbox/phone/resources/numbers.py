@@ -71,6 +71,7 @@ class PhoneNumbersResource:
         agent_handle: str,
         type: str = "toll_free",
         state: str | None = None,
+        incoming_text_webhook_url: str | None = None,
     ) -> PhoneNumber:
         """Provision a new phone number and link it to an agent identity.
 
@@ -78,6 +79,7 @@ class PhoneNumbersResource:
             agent_handle: Handle of the agent identity to assign this number to.
             type: ``"toll_free"`` or ``"local"``. Defaults to ``"toll_free"``.
             state: US state abbreviation (e.g. ``"NY"``). Only valid for ``local`` numbers.
+            incoming_text_webhook_url: Webhook URL called for incoming text messages.
 
         Returns:
             The provisioned phone number.
@@ -85,6 +87,8 @@ class PhoneNumbersResource:
         body: dict[str, Any] = {"agent_handle": agent_handle, "type": type}
         if state is not None:
             body["state"] = state
+        if incoming_text_webhook_url is not None:
+            body["incoming_text_webhook_url"] = incoming_text_webhook_url
         data = self._http.post(_BASE, json=body)
         return PhoneNumber._from_dict(data)
 

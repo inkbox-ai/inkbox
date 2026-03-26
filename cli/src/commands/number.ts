@@ -29,10 +29,11 @@ export function registerNumberCommands(program: Command): void {
     .requiredOption("--handle <handle>", "Agent handle to provision for")
     .option("--type <type>", "Number type: toll_free or local", "toll_free")
     .option("--state <state>", "US state abbreviation (for local numbers)")
+    .option("--incoming-text-webhook-url <url>", "Webhook URL for incoming text messages")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { handle: string; type: string; state?: string },
+        cmdOpts: { handle: string; type: string; state?: string; incomingTextWebhookUrl?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
@@ -40,6 +41,7 @@ export function registerNumberCommands(program: Command): void {
           agentHandle: cmdOpts.handle,
           type: cmdOpts.type,
           state: cmdOpts.state,
+          incomingTextWebhookUrl: cmdOpts.incomingTextWebhookUrl,
         });
         output(
           {
