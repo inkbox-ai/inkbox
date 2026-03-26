@@ -207,6 +207,48 @@ for (const t of segments) {
 
 Always confirm before placing a call.
 
+## Text Messages (SMS/MMS)
+
+```typescript
+// List text messages (offset pagination)
+const texts = await identity.listTexts({ limit: 20, offset: 0 });
+for (const t of texts) {
+  console.log(t.id, t.direction, t.remotePhoneNumber, t.text, t.isRead);
+}
+
+// Filter by read state
+const unread = await identity.listTexts({ isRead: false });
+
+// Get a single text message
+const text = await identity.getText("text-uuid");
+console.log(text.type);   // "sms" or "mms"
+if (text.media) {          // MMS media attachments (presigned S3 URLs, 1hr expiry)
+  for (const m of text.media) {
+    console.log(m.contentType, m.size, m.url);
+  }
+}
+
+// List conversation summaries (one row per remote number)
+const convos = await identity.listTextConversations({ limit: 20 });
+for (const c of convos) {
+  console.log(c.remotePhoneNumber, c.latestText, c.unreadCount, c.totalCount);
+}
+
+// Get messages in a specific conversation
+const msgs = await identity.getTextConversation("+15167251294", { limit: 50 });
+
+// Mark a text as read (identity convenience method)
+await identity.markTextRead("text-uuid");
+
+// Mark all messages in a conversation as read
+const readResult = await identity.markTextConversationRead("+15167251294");
+console.log(readResult.updatedCount);
+
+// Org-level: search, update, soft-delete
+const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
+await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });   // soft-delete
+```
+
 ## Vault
 
 Encrypted credential vault with client-side Argon2id key derivation and AES-256-GCM encryption. The server never sees plaintext secrets. Requires `hash-wasm` (included as a dependency).

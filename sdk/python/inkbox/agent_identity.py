@@ -11,7 +11,7 @@ or phone number ID explicitly.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
 from inkbox.credentials import Credentials
@@ -563,6 +563,37 @@ class AgentIdentity:
             remote_number,
             limit=limit,
             offset=offset,
+        )
+
+    def mark_text_read(self, text_id: str) -> TextMessage:
+        """Mark a single text message as read.
+
+        Args:
+            text_id: UUID of the text message.
+        """
+        self._require_phone()
+        return self._inkbox._texts.update(
+            self._phone_number.id,  # type: ignore[union-attr]
+            text_id,
+            is_read=True,
+        )
+
+    def mark_text_conversation_read(
+        self, remote_number: str
+    ) -> dict[str, Any]:
+        """Mark all messages in a conversation as read.
+
+        Args:
+            remote_number: E.164 remote phone number.
+
+        Returns:
+            Dict with ``remote_phone_number``, ``is_read``, and ``updated_count``.
+        """
+        self._require_phone()
+        return self._inkbox._texts.update_conversation(
+            self._phone_number.id,  # type: ignore[union-attr]
+            remote_number,
+            is_read=True,
         )
 
     ## Identity management

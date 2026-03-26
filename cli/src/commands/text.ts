@@ -194,15 +194,7 @@ export function registerTextCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        if (!identity.phoneNumber) {
-          console.error(
-            `Identity '${cmdOpts.identity}' has no phone number assigned.`,
-          );
-          process.exit(1);
-        }
-        await inkbox.texts.update(identity.phoneNumber.id, textId, {
-          isRead: true,
-        });
+        await identity.markTextRead(textId);
         console.log(`Marked text ${textId} as read.`);
       }),
     );
@@ -220,17 +212,7 @@ export function registerTextCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        if (!identity.phoneNumber) {
-          console.error(
-            `Identity '${cmdOpts.identity}' has no phone number assigned.`,
-          );
-          process.exit(1);
-        }
-        const result = await inkbox.texts.updateConversation(
-          identity.phoneNumber.id,
-          remoteNumber,
-          { isRead: true },
-        );
+        const result = await identity.markTextConversationRead(remoteNumber);
         console.log(
           `Marked ${result.updatedCount} message(s) in conversation with ${remoteNumber} as read.`,
         );

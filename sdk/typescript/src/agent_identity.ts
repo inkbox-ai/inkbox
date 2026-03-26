@@ -486,6 +486,35 @@ export class AgentIdentity {
     return this._inkbox._texts.getConversation(this._phoneNumber!.id, remoteNumber, options);
   }
 
+  /**
+   * Mark a single text message as read.
+   *
+   * @param textId - UUID of the text message.
+   */
+  async markTextRead(textId: string): Promise<TextMessage> {
+    this._requirePhone();
+    return this._inkbox._texts.update(this._phoneNumber!.id, textId, {
+      isRead: true,
+    });
+  }
+
+  /**
+   * Mark all messages in a conversation as read.
+   *
+   * @param remoteNumber - E.164 remote phone number.
+   * @returns Object with `remotePhoneNumber`, `isRead`, and `updatedCount`.
+   */
+  async markTextConversationRead(
+    remoteNumber: string,
+  ): Promise<{ remotePhoneNumber: string; isRead: boolean; updatedCount: number }> {
+    this._requirePhone();
+    return this._inkbox._texts.updateConversation(
+      this._phoneNumber!.id,
+      remoteNumber,
+      { isRead: true },
+    );
+  }
+
   // ------------------------------------------------------------------
   // Identity management
   // ------------------------------------------------------------------

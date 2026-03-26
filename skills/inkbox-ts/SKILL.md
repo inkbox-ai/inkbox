@@ -185,11 +185,16 @@ for (const c of convos) {
 // Get messages in a specific conversation
 const msgs = await identity.getTextConversation("+15167251294", { limit: 50 });
 
-// Org-level: search, update, mark conversations read
+// Mark a text as read (identity convenience method)
+await identity.markTextRead("text-uuid");
+
+// Mark all messages in a conversation as read
+const readResult = await identity.markTextConversationRead("+15167251294");
+console.log(readResult.updatedCount);
+
+// Org-level: search, update, soft-delete
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
-await inkbox.texts.update(phone.id, "text-uuid", { isRead: true });
 await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });   // soft-delete
-await inkbox.texts.updateConversation(phone.id, "+15167251294", { isRead: true });
 ```
 
 ## Vault

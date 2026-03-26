@@ -40,6 +40,19 @@ describe("PhoneNumbersResource.get", () => {
     expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}`);
     expect(number.incomingCallAction).toBe("auto_reject");
   });
+
+  it("parses incomingTextWebhookUrl", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      ...RAW_PHONE_NUMBER,
+      incoming_text_webhook_url: "https://example.com/texts",
+    });
+    const res = new PhoneNumbersResource(http);
+
+    const number = await res.get(NUM_ID);
+
+    expect(number.incomingTextWebhookUrl).toBe("https://example.com/texts");
+  });
 });
 
 describe("PhoneNumbersResource.update", () => {
@@ -63,6 +76,24 @@ describe("PhoneNumbersResource.update", () => {
     await res.update(NUM_ID, {});
 
     expect(http.patch).toHaveBeenCalledWith(`/numbers/${NUM_ID}`, {});
+  });
+
+  it("sends incomingTextWebhookUrl", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue({
+      ...RAW_PHONE_NUMBER,
+      incoming_text_webhook_url: "https://example.com/texts",
+    });
+    const res = new PhoneNumbersResource(http);
+
+    const number = await res.update(NUM_ID, {
+      incomingTextWebhookUrl: "https://example.com/texts",
+    });
+
+    expect(http.patch).toHaveBeenCalledWith(`/numbers/${NUM_ID}`, {
+      incoming_text_webhook_url: "https://example.com/texts",
+    });
+    expect(number.incomingTextWebhookUrl).toBe("https://example.com/texts");
   });
 });
 
@@ -90,6 +121,27 @@ describe("PhoneNumbersResource.provision", () => {
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["state"]).toBe("NY");
     expect(number.type).toBe("local");
+  });
+
+  it("passes incomingTextWebhookUrl", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_PHONE_NUMBER,
+      incoming_text_webhook_url: "https://example.com/texts",
+    });
+    const res = new PhoneNumbersResource(http);
+
+    const number = await res.provision({
+      agentHandle: "sales-agent",
+      incomingTextWebhookUrl: "https://example.com/texts",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/numbers", {
+      agent_handle: "sales-agent",
+      type: "toll_free",
+      incoming_text_webhook_url: "https://example.com/texts",
+    });
+    expect(number.incomingTextWebhookUrl).toBe("https://example.com/texts");
   });
 });
 

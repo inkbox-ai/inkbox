@@ -173,11 +173,16 @@ for c in convos:
 # Get messages in a specific conversation
 msgs = identity.get_text_conversation("+15167251294", limit=50)
 
-# Org-level: search, update, mark conversations read
+# Mark a text as read (identity convenience method)
+identity.mark_text_read("text-uuid")
+
+# Mark all messages in a conversation as read
+result = identity.mark_text_conversation_read("+15167251294")
+print(result["updated_count"])
+
+# Org-level: search, update, soft-delete
 results = inkbox.texts.search(phone.id, q="invoice", limit=20)
-inkbox.texts.update(phone.id, "text-uuid", is_read=True)
 inkbox.texts.update(phone.id, "text-uuid", status="deleted")   # soft-delete
-inkbox.texts.update_conversation(phone.id, "+15167251294", is_read=True)
 ```
 
 ## Vault
