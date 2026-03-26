@@ -37,7 +37,6 @@ New `TextsResource(http)` class:
 Scoped to the identity's phone number:
 - `list_texts(limit, offset, is_read)`
 - `get_text(text_id)`
-- `search_texts(q, limit)`
 - `list_text_conversations(limit, offset)`
 - `get_text_conversation(remote_number, limit, offset)`
 
