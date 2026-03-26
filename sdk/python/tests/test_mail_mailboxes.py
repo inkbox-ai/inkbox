@@ -47,28 +47,6 @@ class TestMailboxesGet:
         assert mailbox.display_name == "Agent 01"
 
 
-class TestMailboxesCreate:
-    def test_create_with_display_name(self):
-        res, http = _resource()
-        http.post.return_value = MAILBOX_DICT
-
-        mailbox = res.create(agent_handle="support-agent", display_name="Agent 01")
-
-        http.post.assert_called_once_with(
-            "/mailboxes", json={"agent_handle": "support-agent", "display_name": "Agent 01"}
-        )
-        assert mailbox.display_name == "Agent 01"
-
-    def test_create_without_display_name(self):
-        res, http = _resource()
-        http.post.return_value = {**MAILBOX_DICT, "display_name": None}
-
-        mailbox = res.create(agent_handle="support-agent")
-
-        http.post.assert_called_once_with("/mailboxes", json={"agent_handle": "support-agent"})
-        assert mailbox.display_name is None
-
-
 class TestMailboxesUpdate:
     def test_update_display_name(self):
         res, http = _resource()

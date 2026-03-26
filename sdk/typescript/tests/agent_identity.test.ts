@@ -55,7 +55,7 @@ function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityDa
 
 function mockInkbox() {
   return {
-    _mailboxes: { create: vi.fn() },
+    _mailboxes: {},
     _messages: { send: vi.fn(), list: vi.fn(), markRead: vi.fn(), get: vi.fn() },
     _threads: { get: vi.fn() },
     _numbers: { provision: vi.fn() },

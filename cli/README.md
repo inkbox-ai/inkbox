@@ -30,11 +30,8 @@ Get your API key at [inkbox.ai/console](https://inkbox.ai/console).
 ## Quick start
 
 ```bash
-# Create an agent identity
+# Create an agent identity (mailbox is created automatically)
 inkbox identity create support-bot
-
-# Create a mailbox for the identity
-inkbox mailbox create --handle support-bot
 
 # Send an email
 inkbox email send -i support-bot \
@@ -186,9 +183,6 @@ Org-level mailbox management.
 ```bash
 inkbox mailbox list                          # List all mailboxes
 inkbox mailbox get <email-address>           # Get mailbox details
-inkbox mailbox create                        # Create a mailbox
-  --handle <handle>                          #   Agent handle (required)
-  --display-name <name>                      #   Display name
 inkbox mailbox update <email-address>        # Update a mailbox
   --display-name <name>                      #   New display name
   --webhook-url <url>                        #   Webhook URL ("" to clear)
