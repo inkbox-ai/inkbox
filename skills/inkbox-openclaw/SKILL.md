@@ -1,6 +1,6 @@
 ---
 name: inkbox
-description: Send and receive emails and phone calls via Inkbox agent identities. Use when the user wants to check inbox messages, list unread email, view a thread, search mailbox contents, draft/send an email, place an outbound phone call, list call history, retrieve call transcripts, manage vault credentials, or create/set up an Inkbox identity.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, vault, or agent identity features using the Inkbox TypeScript SDK.
 metadata:
   openclaw:
     emoji: "📬"
@@ -15,7 +15,7 @@ metadata:
 
 # Inkbox Skill
 
-API-first communication infrastructure for AI agents — email, phone, encrypted vault, and identities.
+API-first communication infrastructure for AI agents — email, phone, text/SMS, encrypted vault, and identities.
 
 ## Requirements
 
@@ -64,6 +64,7 @@ Inkbox (org-level client)
 ├── .listIdentities()       → Promise<AgentIdentitySummary[]>
 ├── .mailboxes              → MailboxesResource
 ├── .phoneNumbers           → PhoneNumbersResource
+├── .texts                  → TextsResource
 ├── .vault                  → VaultResource
 └── .createSigningKey()     → Promise<SigningKey>
 
@@ -72,10 +73,11 @@ AgentIdentity (identity-scoped helper)
 ├── .phoneNumber            → IdentityPhoneNumber | null
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── mail methods            (requires assigned mailbox)
-└── phone methods           (requires assigned phone number)
+├── phone methods           (requires assigned phone number)
+└── text methods            (requires assigned phone number)
 ```
 
-An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxAPIError` is thrown.
+An identity must have a channel assigned before you can use mail/phone/text methods. If not assigned, an `InkboxAPIError` is thrown.
 
 ## Identities
 
@@ -244,9 +246,9 @@ await identity.markTextRead("text-uuid");
 const readResult = await identity.markTextConversationRead("+15167251294");
 console.log(readResult.updatedCount);
 
-// Org-level: search, update, soft-delete
+// Org-level: search and delete
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
-await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });   // soft-delete
+await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 ```
 
 ## Vault
@@ -505,6 +507,7 @@ try {
 - All method and property names are **camelCase**
 - `iterEmails()` / `iterUnreadEmails()` return `AsyncGenerator<Message>` — use `for await...of`
 - `listCalls()` returns `Promise<PhoneCall[]>` — offset pagination, not a generator
+- `listTexts()` returns `Promise<TextMessage[]>` — offset pagination, not a generator
 - To clear a nullable field (e.g. webhook URL), pass `field: null`
 - No context manager needed — `new Inkbox({...})` is all that's required
 - All methods are `async` and return Promises — always `await` them
@@ -512,5 +515,5 @@ try {
 - Thread IDs come from message objects (`threadId`)
 - Message IDs can be used for `inReplyToMessageId`
 - Phone numbers must be in E.164 format (for example `+15551234567`)
-- The identity must have a phone number assigned for phone operations
+- The identity must have a phone number assigned for phone and text operations
 - Call IDs from `listCalls` can be passed to `listTranscripts`
