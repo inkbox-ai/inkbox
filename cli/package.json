@@ -17,7 +17,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@inkbox/sdk": "file:../sdk/typescript",
+    "@inkbox/sdk": "^0.2.2",
     "commander": "^13.0.0"
   },
   "devDependencies": {
