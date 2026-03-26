@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, vault, or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, vault, or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -34,6 +34,7 @@ Inkbox (org-level client)
 ├── .list_identities()       → list[AgentIdentitySummary]
 ├── .mailboxes               → MailboxesResource
 ├── .phone_numbers           → PhoneNumbersResource
+├── .texts                   → TextsResource
 ├── .vault                   → VaultResource
 └── .create_signing_key()    → SigningKey
 
@@ -42,7 +43,8 @@ AgentIdentity (identity-scoped helper)
 ├── .phone_number            → IdentityPhoneNumber | None
 ├── .credentials             → Credentials  (requires vault unlocked)
 ├── mail methods             (requires assigned mailbox)
-└── phone methods            (requires assigned phone number)
+├── phone methods            (requires assigned phone number)
+└── text methods             (requires assigned phone number)
 ```
 
 An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxError` is raised with a clear message.
@@ -143,6 +145,39 @@ for c in calls:
 # Transcript segments (ordered by seq)
 for t in identity.list_transcripts(calls[0].id):
     print(f"[{t.party}] {t.text}")   # party: "local" or "remote"
+```
+
+## Text Messages (SMS/MMS)
+
+```python
+# List text messages (offset pagination)
+texts = identity.list_texts(limit=20, offset=0)
+for t in texts:
+    print(t.id, t.direction, t.remote_phone_number, t.text, t.is_read)
+
+# Filter by read state
+unread = identity.list_texts(is_read=False)
+
+# Get a single text message
+text = identity.get_text("text-uuid")
+print(text.type)   # "sms" or "mms"
+if text.media:     # MMS media attachments (presigned S3 URLs, 1hr expiry)
+    for m in text.media:
+        print(m.content_type, m.size, m.url)
+
+# List conversation summaries (one row per remote number)
+convos = identity.list_text_conversations(limit=20)
+for c in convos:
+    print(c.remote_phone_number, c.latest_text, c.unread_count, c.total_count)
+
+# Get messages in a specific conversation
+msgs = identity.get_text_conversation("+15167251294", limit=50)
+
+# Org-level: search, update, mark conversations read
+results = inkbox.texts.search(phone_number.id, q="invoice", limit=20)
+inkbox.texts.update(phone_number.id, "text-uuid", is_read=True)
+inkbox.texts.update(phone_number.id, "text-uuid", status="deleted")   # soft-delete
+inkbox.texts.update_conversation(phone_number.id, "+15167251294", is_read=True)
 ```
 
 ## Vault
