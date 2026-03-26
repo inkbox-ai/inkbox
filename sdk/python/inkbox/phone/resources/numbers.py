@@ -39,6 +39,7 @@ class PhoneNumbersResource:
         incoming_call_action: str | None = _UNSET,  # type: ignore[assignment]
         client_websocket_url: str | None = _UNSET,  # type: ignore[assignment]
         incoming_call_webhook_url: str | None = _UNSET,  # type: ignore[assignment]
+        incoming_text_webhook_url: str | None = _UNSET,  # type: ignore[assignment]
     ) -> PhoneNumber:
         """Update phone number settings.
 
@@ -50,6 +51,7 @@ class PhoneNumbersResource:
             incoming_call_action: ``"auto_accept"``, ``"auto_reject"``, or ``"webhook"``.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             incoming_call_webhook_url: Webhook URL called for incoming calls when action is ``"webhook"``.
+            incoming_text_webhook_url: Webhook URL called for incoming text messages.
         """
         body: dict[str, Any] = {}
         if incoming_call_action is not _UNSET:
@@ -58,6 +60,8 @@ class PhoneNumbersResource:
             body["client_websocket_url"] = client_websocket_url
         if incoming_call_webhook_url is not _UNSET:
             body["incoming_call_webhook_url"] = incoming_call_webhook_url
+        if incoming_text_webhook_url is not _UNSET:
+            body["incoming_text_webhook_url"] = incoming_text_webhook_url
         data = self._http.patch(f"{_BASE}/{phone_number_id}", json=body)
         return PhoneNumber._from_dict(data)
 

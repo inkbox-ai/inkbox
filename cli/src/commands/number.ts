@@ -70,6 +70,7 @@ export function registerNumberCommands(program: Command): void {
             incomingCallAction: num.incomingCallAction ?? null,
             clientWebsocketUrl: num.clientWebsocketUrl ?? null,
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
+            incomingTextWebhookUrl: num.incomingTextWebhookUrl ?? null,
             createdAt: num.createdAt,
           },
           { json: !!opts.json },
@@ -86,6 +87,7 @@ export function registerNumberCommands(program: Command): void {
     )
     .option("--client-websocket-url <url>", "Client WebSocket URL for audio bridging")
     .option("--incoming-call-webhook-url <url>", "Webhook URL for incoming calls")
+    .option("--incoming-text-webhook-url <url>", "Webhook URL for incoming text messages")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -94,6 +96,7 @@ export function registerNumberCommands(program: Command): void {
           incomingCallAction?: string;
           clientWebsocketUrl?: string;
           incomingCallWebhookUrl?: string;
+          incomingTextWebhookUrl?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -102,6 +105,7 @@ export function registerNumberCommands(program: Command): void {
           incomingCallAction: cmdOpts.incomingCallAction,
           clientWebsocketUrl: cmdOpts.clientWebsocketUrl,
           incomingCallWebhookUrl: cmdOpts.incomingCallWebhookUrl,
+          incomingTextWebhookUrl: cmdOpts.incomingTextWebhookUrl,
         });
         output(
           {
@@ -112,6 +116,7 @@ export function registerNumberCommands(program: Command): void {
             incomingCallAction: num.incomingCallAction ?? null,
             clientWebsocketUrl: num.clientWebsocketUrl ?? null,
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
+            incomingTextWebhookUrl: num.incomingTextWebhookUrl ?? null,
           },
           { json: !!opts.json },
         );

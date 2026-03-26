@@ -8,6 +8,7 @@ PHONE_NUMBER_DICT = {
     "incoming_call_action": "auto_reject",
     "client_websocket_url": None,
     "incoming_call_webhook_url": None,
+    "incoming_text_webhook_url": None,
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:00:00Z",
 }

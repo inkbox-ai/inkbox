@@ -48,6 +48,7 @@ export class PhoneNumbersResource {
       incomingCallAction?: string;
       clientWebsocketUrl?: string | null;
       incomingCallWebhookUrl?: string | null;
+      incomingTextWebhookUrl?: string | null;
     },
   ): Promise<PhoneNumber> {
     const body: Record<string, unknown> = {};
@@ -59,6 +60,9 @@ export class PhoneNumbersResource {
     }
     if ("incomingCallWebhookUrl" in options) {
       body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
+    }
+    if ("incomingTextWebhookUrl" in options) {
+      body["incoming_text_webhook_url"] = options.incomingTextWebhookUrl;
     }
     const data = await this.http.patch<RawPhoneNumber>(
       `${BASE}/${phoneNumberId}`,

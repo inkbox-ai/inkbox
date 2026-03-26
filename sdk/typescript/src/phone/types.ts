@@ -13,6 +13,7 @@ export interface PhoneNumber {
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
+  incomingTextWebhookUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -103,6 +104,7 @@ export interface RawPhoneNumber {
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_call_webhook_url: string | null;
+  incoming_text_webhook_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -187,6 +189,7 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
+    incomingTextWebhookUrl: r.incoming_text_webhook_url,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
