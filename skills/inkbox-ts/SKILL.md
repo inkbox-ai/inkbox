@@ -186,10 +186,10 @@ for (const c of convos) {
 const msgs = await identity.getTextConversation("+15167251294", { limit: 50 });
 
 // Org-level: search, update, mark conversations read
-const results = await inkbox.texts.search(phoneNumber.id, { q: "invoice", limit: 20 });
-await inkbox.texts.update(phoneNumber.id, "text-uuid", { isRead: true });
-await inkbox.texts.update(phoneNumber.id, "text-uuid", { status: "deleted" });   // soft-delete
-await inkbox.texts.updateConversation(phoneNumber.id, "+15167251294", { isRead: true });
+const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
+await inkbox.texts.update(phone.id, "text-uuid", { isRead: true });
+await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });   // soft-delete
+await inkbox.texts.updateConversation(phone.id, "+15167251294", { isRead: true });
 ```
 
 ## Vault

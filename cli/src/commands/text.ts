@@ -66,8 +66,8 @@ export function registerTextCommands(program: Command): void {
           {
             id: msg.id,
             direction: msg.direction,
-            from: msg.localPhoneNumber,
-            to: msg.remotePhoneNumber,
+            local: msg.localPhoneNumber,
+            remote: msg.remotePhoneNumber,
             type: msg.type,
             text: msg.text,
             isRead: msg.isRead,
