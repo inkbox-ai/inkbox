@@ -21,6 +21,7 @@ from inkbox.identities.types import (
     _AgentIdentityData,
     IdentityMailbox,
     IdentityPhoneNumber,
+    ResourceStatus,
 )
 from inkbox.exceptions import InkboxError
 from inkbox.mail.types import Message, MessageDetail, MessageDirection, ThreadDetail
@@ -39,10 +40,7 @@ class AgentIdentity:
         # or
         identity = inkbox.get_identity("support-bot")
 
-    After assigning channels you can communicate directly::
-
-        identity.create_mailbox(display_name="Support Bot")
-        identity.provision_phone_number(type="toll_free")
+    The identity is created with an email address automatically::
 
         identity.send_email(to=["user@example.com"], subject="Hi", body_text="Hello")
         identity.place_call(to_number="+15555550100", client_websocket_url="wss://my-app.com/ws")
@@ -72,6 +70,14 @@ class AgentIdentity:
     @property
     def status(self) -> str:
         return self._data.status
+
+    @property
+    def email_address(self) -> str | None:
+        """The email address assigned to this identity at creation time.
+
+        Always trust this value — do not derive it from ``agent_handle``.
+        """
+        return self._data.email_address
 
     @property
     def mailbox(self) -> IdentityMailbox | None:
@@ -235,30 +241,6 @@ class AgentIdentity:
         self._credentials = None
 
     ## Channel management
-
-    def create_mailbox(self, *, display_name: str | None = None) -> IdentityMailbox:
-        """Create a new mailbox and link it to this identity.
-
-        Args:
-            display_name: Optional human-readable sender name.
-
-        Returns:
-            The newly created and linked mailbox.
-        """
-        mailbox = self._inkbox._mailboxes.create(
-            agent_handle=self.agent_handle,
-            display_name=display_name,
-        )
-        linked = IdentityMailbox(
-            id=mailbox.id,
-            email_address=mailbox.email_address,
-            display_name=mailbox.display_name,
-            status=mailbox.status,
-            created_at=mailbox.created_at,
-            updated_at=mailbox.updated_at,
-        )
-        self._mailbox = linked
-        return linked
 
     def assign_mailbox(self, mailbox_id: str) -> IdentityMailbox:
         """Link an existing mailbox to this identity.
@@ -499,7 +481,7 @@ class AgentIdentity:
         self,
         *,
         new_handle: str | None = None,
-        status: str | None = None,
+        status: ResourceStatus | None = None,
     ) -> None:
         """Update this identity's handle or status.
 
@@ -515,6 +497,7 @@ class AgentIdentity:
             organization_id=result.organization_id,
             agent_handle=result.agent_handle,
             status=result.status,
+            email_address=result.email_address,
             created_at=result.created_at,
             updated_at=result.updated_at,
             mailbox=self._mailbox,
@@ -548,7 +531,7 @@ class AgentIdentity:
         if not self._mailbox:
             raise InkboxError(
                 f"Identity '{self.agent_handle}' has no mailbox assigned. "
-                "Call identity.create_mailbox() or identity.assign_mailbox() first."
+                "Call identity.assign_mailbox() first."
             )
 
     def _require_phone(self) -> None:

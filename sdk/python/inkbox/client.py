@@ -22,7 +22,7 @@ from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import AgentIdentitySummary
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 
-_DEFAULT_BASE_URL = "https://api.inkbox.ai"
+_DEFAULT_BASE_URL = "https://inkbox.ai"
 
 
 class Inkbox:
@@ -35,7 +35,6 @@ class Inkbox:
 
         with Inkbox(api_key="ApiKey_...") as inkbox:
             identity = inkbox.create_identity("support-bot")
-            identity.create_mailbox(display_name="Support Bot")
             identity.send_email(
                 to=["customer@example.com"],
                 subject="Hello!",
@@ -145,7 +144,7 @@ class Inkbox:
 
     @property
     def mailboxes(self) -> MailboxesResource:
-        """Access org-level mailbox operations (list, get, create, update, delete)."""
+        """Access org-level mailbox operations (list, get, update, delete)."""
         return self._mailboxes
 
     @property
@@ -160,17 +159,30 @@ class Inkbox:
 
     ## Org-level operations
 
-    def create_identity(self, agent_handle: str) -> AgentIdentity:
+    def create_identity(
+        self,
+        agent_handle: str,
+        *,
+        display_name: str | None = None,
+    ) -> AgentIdentity:
         """
-        Create a new agent identity.
+        Create a new agent identity with an email address.
+
+        The server auto-creates a mailbox for the identity using the
+        ``agent_handle`` as the email local-part.
 
         Args:
             agent_handle: Unique handle for this identity (e.g. ``"sales-bot"``).
+            display_name: Optional human-readable name for the identity.
+                Defaults to ``agent_handle`` on the server if omitted.
 
         Returns:
-            The created :class:`AgentIdentity`.
+            The created :class:`AgentIdentity` (with ``email_address`` populated).
         """
-        self._ids_resource.create(agent_handle=agent_handle)
+        self._ids_resource.create(
+            agent_handle=agent_handle,
+            display_name=display_name,
+        )
         data = self._ids_resource.get(agent_handle)
         return AgentIdentity(data, self)
 

@@ -63,6 +63,15 @@ class VaultResource:
         data = self._http.get("/info")
         return VaultInfo._from_dict(data)
 
+    def delete(self) -> None:
+        """
+        Delete the vault, its keys, and all secrets.
+
+        The organisation can re-initialize the vault after deletion by
+        calling the initialize flow again.
+        """
+        self._http.delete("/")
+
     ## Keys (read-only via API key)
 
     def list_keys(self, *, key_type: str | None = None) -> list[VaultKey]:

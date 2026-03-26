@@ -47,6 +47,8 @@ export interface VaultInfo {
   status: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Timestamp when the vault was deleted, or `null` if active. */
+  deletedAt: Date | null;
   /** Number of active primary vault keys. */
   keyCount: number;
   /** Number of active vault secrets. */
@@ -197,6 +199,7 @@ export interface RawVaultInfo {
   status: string;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
   key_count: number;
   secret_count: number;
   recovery_key_count: number;
@@ -247,6 +250,7 @@ export function parseVaultInfo(r: RawVaultInfo): VaultInfo {
     status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+    deletedAt: r.deleted_at ? new Date(r.deleted_at) : null,
     keyCount: r.key_count,
     secretCount: r.secret_count,
     recoveryKeyCount: r.recovery_key_count,

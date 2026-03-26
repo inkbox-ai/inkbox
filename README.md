@@ -17,7 +17,7 @@ API-first communication infrastructure for AI agents — email, phone, identitie
 
 ## Quick Start
 
-Get an API key from the [Inkbox Console](https://console.inkbox.ai/), then:
+Get an API key from the [Inkbox Console](https://inkbox.ai/console), then:
 
 ### Python
 
@@ -25,11 +25,8 @@ Get an API key from the [Inkbox Console](https://console.inkbox.ai/), then:
 from inkbox import Inkbox
 
 with Inkbox(api_key="ApiKey_...") as inkbox:
-    # Create an agent identity
-    identity = inkbox.create_identity("my-agent")
-
-    # Create and link new channels
-    identity.create_mailbox(display_name="My Agent")
+    # Create an agent identity (mailbox is created automatically)
+    identity = inkbox.create_identity("my-agent", display_name="My Agent")
     identity.provision_phone_number(type="toll_free")
 
     # Send an email
@@ -54,11 +51,8 @@ import { Inkbox } from "@inkbox/sdk";
 
 const inkbox = new Inkbox({ apiKey: "ApiKey_..." });
 
-// Create an agent identity
-const identity = await inkbox.createIdentity("my-agent");
-
-// Create and link new channels
-const mailbox = await identity.createMailbox({ displayName: "My Agent" });
+// Create an agent identity (mailbox is created automatically)
+const identity = await inkbox.createIdentity("my-agent", { displayName: "My Agent" });
 const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 
 // Send an email
@@ -108,7 +102,7 @@ See [`skills/README.md`](./skills/README.md) for details.
 
 - [Inkbox Docs](https://inkbox.ai/docs)
 - [API Reference](https://inkbox.ai/docs/api-reference)
-- [Console](https://console.inkbox.ai/)
+- [Console](https://inkbox.ai/console)
 
 ## License
 

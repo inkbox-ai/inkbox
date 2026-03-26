@@ -12,7 +12,7 @@ Requires Python ≥ 3.11.
 
 ## Authentication
 
-You'll need an API key to use this SDK. Get one at [console.inkbox.ai](https://console.inkbox.ai/).
+You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://inkbox.ai/console).
 
 ## Quick start
 
@@ -24,11 +24,8 @@ with Inkbox(
     api_key=os.environ["INKBOX_API_KEY"],
     vault_key=os.environ.get("INKBOX_VAULT_KEY"),
 ) as inkbox:
-    # Create an agent identity
-    identity = inkbox.create_identity("support-bot")
-
-    # Create and link new channels
-    identity.create_mailbox(display_name="Support Bot")
+    # Create an agent identity (mailbox is created automatically)
+    identity = inkbox.create_identity("support-bot", display_name="Support Bot")
     identity.provision_phone_number(type="toll_free")
 
     # Send email directly from the identity
@@ -73,12 +70,11 @@ Use `with Inkbox(...) as inkbox:` (recommended) or call `inkbox.close()` manuall
 `inkbox.create_identity()` and `inkbox.get_identity()` return an `AgentIdentity` object that holds the identity's channels and exposes convenience methods scoped to those channels.
 
 ```python
-# Create and fully provision an identity
-identity = inkbox.create_identity("sales-bot")
-mailbox  = identity.create_mailbox(display_name="Sales Bot")      # creates + links
+# Create and fully provision an identity (mailbox is created automatically)
+identity = inkbox.create_identity("sales-bot", display_name="Sales Bot")
 phone    = identity.provision_phone_number(type="toll_free")      # provisions + links
 
-print(mailbox.email_address)
+print(identity.email_address)
 print(phone.number)
 
 # Link an existing mailbox or phone number instead of creating new ones
@@ -242,10 +238,6 @@ mailboxes = inkbox.mailboxes.list()
 
 # Get a specific mailbox
 mailbox = inkbox.mailboxes.get("abc-xyz@inkboxmail.com")
-
-# Create a mailbox linked to an agent identity
-mailbox = inkbox.mailboxes.create(agent_handle="support-agent", display_name="Support Inbox")
-print(mailbox.email_address)
 
 # Update display name or webhook URL
 inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")

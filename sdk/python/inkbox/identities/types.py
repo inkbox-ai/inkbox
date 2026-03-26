@@ -8,8 +8,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
+
+
+class ResourceStatus(StrEnum):
+    """Allowed lifecycle statuses for identity updates."""
+
+    ACTIVE = "active"
+    PAUSED = "paused"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -74,6 +82,7 @@ class AgentIdentitySummary:
     organization_id: str
     agent_handle: str
     status: str
+    email_address: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -84,6 +93,7 @@ class AgentIdentitySummary:
             organization_id=d["organization_id"],
             agent_handle=d["agent_handle"],
             status=d["status"],
+            email_address=d.get("email_address"),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
         )

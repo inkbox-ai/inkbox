@@ -23,7 +23,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     ...
 ```
 
-Constructor: `Inkbox(api_key, base_url="https://api.inkbox.ai", timeout=30.0)`
+Constructor: `Inkbox(api_key, base_url="https://inkbox.ai", timeout=30.0)`
 
 ## Core Model
 
@@ -63,10 +63,9 @@ identity.delete()                        # unlinks channels
 ## Channel Management
 
 ```python
-# Create and auto-link new channels
-mailbox = identity.create_mailbox(display_name="Sales Agent")
-phone   = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
-print(mailbox.email_address)   # e.g. "abc-xyz@inkboxmail.com"
+# Identity is created with a mailbox automatically — provision a phone number
+phone = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
+print(identity.email_address)  # e.g. "sales-agent@inkboxmail.com"
 print(phone.number)            # e.g. "+18005551234"
 
 # Link existing channels
@@ -317,7 +316,6 @@ code = unlocked.get_totp_code(secret_id)
 ```python
 mailboxes = inkbox.mailboxes.list()
 mailbox   = inkbox.mailboxes.get("abc@inkboxmail.com")
-mailbox   = inkbox.mailboxes.create(agent_handle="support", display_name="Support Inbox")
 
 inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")
 inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")

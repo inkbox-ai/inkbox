@@ -2,6 +2,15 @@
  * inkbox-identities TypeScript SDK — public types.
  */
 
+/**
+ * Allowed lifecycle statuses for identity updates.
+ */
+export const ResourceStatus = {
+  ACTIVE: "active",
+  PAUSED: "paused",
+} as const;
+export type ResourceStatus = (typeof ResourceStatus)[keyof typeof ResourceStatus];
+
 export interface IdentityMailbox {
   id: string;
   emailAddress: string;
@@ -33,6 +42,8 @@ export interface AgentIdentitySummary {
   agentHandle: string;
   /** "active" | "paused" | "deleted" */
   status: string;
+  /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
+  emailAddress: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -72,6 +83,7 @@ export interface RawAgentIdentitySummary {
   organization_id: string;
   agent_handle: string;
   status: string;
+  email_address: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -113,6 +125,7 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     organizationId: r.organization_id,
     agentHandle: r.agent_handle,
     status: r.status,
+    emailAddress: r.email_address,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

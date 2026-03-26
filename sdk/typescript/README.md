@@ -12,7 +12,7 @@ Requires Node.js ≥ 18.
 
 ## Authentication
 
-You'll need an API key to use this SDK. Get one at [console.inkbox.ai](https://console.inkbox.ai/).
+You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://inkbox.ai/console).
 
 ## Quick start
 
@@ -24,12 +24,9 @@ const inkbox = await new Inkbox({
   vaultKey: process.env.INKBOX_VAULT_KEY,
 }).ready();
 
-// Create an agent identity
-const identity = await inkbox.createIdentity("support-bot");
-
-// Create and link new channels
-const mailbox = await identity.createMailbox({ displayName: "Support Bot" });
-const phone   = await identity.provisionPhoneNumber({ type: "toll_free" });
+// Create an agent identity (mailbox is created automatically)
+const identity = await inkbox.createIdentity("support-bot", { displayName: "Support Bot" });
+const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 
 // Send email directly from the identity
 await identity.sendEmail({
@@ -74,12 +71,11 @@ for (const login of creds.listLogins()) {
 `inkbox.createIdentity()` and `inkbox.getIdentity()` return an `AgentIdentity` object that holds the identity's channels and exposes convenience methods scoped to those channels.
 
 ```ts
-// Create and fully provision an identity
-const identity = await inkbox.createIdentity("sales-bot");
-const mailbox  = await identity.createMailbox({ displayName: "Sales Bot" });      // creates + links
+// Create and fully provision an identity (mailbox is created automatically)
+const identity = await inkbox.createIdentity("sales-bot", { displayName: "Sales Bot" });
 const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });      // provisions + links
 
-console.log(mailbox.emailAddress);
+console.log(identity.emailAddress);
 console.log(phone.number);
 
 // Link an existing mailbox or phone number instead of creating new ones
@@ -257,12 +253,8 @@ const mailboxes = await inkbox.mailboxes.list();
 // Get a specific mailbox
 const mailbox = await inkbox.mailboxes.get("abc-xyz@inkboxmail.com");
 
-// Create a mailbox linked to an agent identity
-const mb = await inkbox.mailboxes.create({ agentHandle: "support-agent", displayName: "Support Inbox" });
-console.log(mb.emailAddress);
-
 // Update display name or webhook URL
-await inkbox.mailboxes.update(mb.emailAddress, { displayName: "New Name" });
+await inkbox.mailboxes.update("abc-xyz@inkboxmail.com", { displayName: "New Name" });
 await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: "https://example.com/hook" });
 await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: null }); // remove webhook
 

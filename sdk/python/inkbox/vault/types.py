@@ -64,18 +64,21 @@ class VaultInfo:
     status: str
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None
     key_count: int
     secret_count: int
     recovery_key_count: int
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> VaultInfo:
+        raw_deleted = d.get("deleted_at")
         return cls(
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
             status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            deleted_at=datetime.fromisoformat(raw_deleted) if raw_deleted else None,
             key_count=d["key_count"],
             secret_count=d["secret_count"],
             recovery_key_count=d["recovery_key_count"],

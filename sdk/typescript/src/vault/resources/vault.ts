@@ -74,6 +74,16 @@ export class VaultResource {
     return parseVaultInfo(data);
   }
 
+  /**
+   * Delete the vault, its keys, and all secrets.
+   *
+   * The organisation can re-initialize the vault after deletion by
+   * calling the initialize flow again.
+   */
+  async delete(): Promise<void> {
+    await this.http.delete("/");
+  }
+
   // ------------------------------------------------------------------
   // Keys (read-only via API key)
   // ------------------------------------------------------------------

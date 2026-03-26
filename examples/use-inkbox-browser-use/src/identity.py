@@ -29,9 +29,7 @@ def create_agent_identity(client: Inkbox, handle: str | None = None) -> AgentIde
     """
     if not handle:
         handle = f"agent-{uuid.uuid4().hex[:8]}"
-    identity = client.create_identity(handle)
-
-    identity.create_mailbox(display_name="inkbox-browser-use Agent")
+    identity = client.create_identity(handle, display_name="inkbox-browser-use Agent")
     return identity
 
 
@@ -74,7 +72,4 @@ def select_or_create_identity(client: Inkbox) -> tuple[AgentIdentity, bool]:
     idx = choices.index(picked)
     handle = summaries[idx].agent_handle
     identity = client.get_identity(handle)
-    if not identity.mailbox:
-        logger.info("'%s' has no mailbox — creating one...", handle)
-        identity.create_mailbox(display_name="inkbox-browser-use Agent")
     return identity, False

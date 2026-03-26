@@ -59,7 +59,7 @@ uv run inkbox-kernel --provider anthropic "Find the pricing page on example.com 
 
 | Service | Get your key |
 |---------|-------------|
-| Inkbox | [console.inkbox.ai](https://console.inkbox.ai) |
+| Inkbox | [inkbox.ai/console](https://inkbox.ai/console) |
 | Kernel | [kernel.sh](https://kernel.sh) |
 | OpenAI | [platform.openai.com](https://platform.openai.com) |
 | Anthropic | [console.anthropic.com](https://console.anthropic.com) |

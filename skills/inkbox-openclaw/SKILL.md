@@ -100,11 +100,10 @@ After creating a new identity:
 ## Channel Management
 
 ```js
-// Create and auto-link new channels
-const mailbox  = await identity.createMailbox({ displayName: "Sales Agent" });
-const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
+// Identity is created with a mailbox automatically — provision a phone number
+const phone = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
 
-console.log(mailbox.emailAddress);   // e.g. "abc-xyz@inkboxmail.com"
+console.log(identity.emailAddress);  // e.g. "sales-agent@inkboxmail.com"
 console.log(phone.number);           // e.g. "+18005551234"
 
 // Link existing channels
@@ -387,14 +386,13 @@ const code = await unlocked.getTotpCode(secretId);
 ```js
 const mailboxes = await inkbox.mailboxes.list();
 const mailbox   = await inkbox.mailboxes.get("abc@inkboxmail.com");
-const mb        = await inkbox.mailboxes.create({ agentHandle: "support", displayName: "Support Inbox" });
 
-await inkbox.mailboxes.update(mb.emailAddress, { displayName: "New Name" });
-await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: "https://example.com/hook" });
-await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: null });   // remove webhook
+await inkbox.mailboxes.update(mailbox.emailAddress, { displayName: "New Name" });
+await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: "https://example.com/hook" });
+await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: null });   // remove webhook
 
-const results = await inkbox.mailboxes.search(mb.emailAddress, { q: "invoice", limit: 20 });
-await inkbox.mailboxes.delete(mb.emailAddress);
+const results = await inkbox.mailboxes.search(mailbox.emailAddress, { q: "invoice", limit: 20 });
+await inkbox.mailboxes.delete(mailbox.emailAddress);
 ```
 
 ### Phone Numbers (`inkbox.phoneNumbers`)

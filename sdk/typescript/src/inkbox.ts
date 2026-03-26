@@ -18,7 +18,7 @@ import { VaultResource } from "./vault/resources/vault.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type { AgentIdentitySummary } from "./identities/types.js";
 
-const DEFAULT_BASE_URL = "https://api.inkbox.ai";
+const DEFAULT_BASE_URL = "https://inkbox.ai";
 
 export interface InkboxOptions {
   /** Your Inkbox API key (sent as `X-Service-Token`). */
@@ -47,9 +47,8 @@ export interface InkboxOptions {
  * // Create an agent identity
  * const identity = await inkbox.createIdentity("support-bot");
  *
- * // Create and link new channels
- * const mailbox = await identity.createMailbox({ displayName: "Support Bot" });
- * const phone   = await identity.provisionPhoneNumber({ type: "toll_free" });
+ * // Provision a phone number for the identity
+ * const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
  *
  * // Send email directly from the identity
  * await identity.sendEmail({
@@ -155,7 +154,7 @@ export class Inkbox {
   // Public resource accessors
   // ------------------------------------------------------------------
 
-  /** Org-level mailbox operations (list, get, create, update, delete). */
+  /** Org-level mailbox operations (list, get, update, delete). */
   get mailboxes(): MailboxesResource { return this._mailboxes; }
 
   /** Org-level phone number operations (list, get, provision, release). */
@@ -169,13 +168,21 @@ export class Inkbox {
   // ------------------------------------------------------------------
 
   /**
-   * Create a new agent identity.
+   * Create a new agent identity with an email address.
+   *
+   * The server auto-creates a mailbox for the identity using the
+   * `agentHandle` as the email local-part.
    *
    * @param agentHandle - Unique handle for this identity (e.g. `"sales-bot"`).
-   * @returns The created {@link AgentIdentity}.
+   * @param options.displayName - Optional human-readable name for the identity.
+   *   Defaults to `agentHandle` on the server if omitted.
+   * @returns The created {@link AgentIdentity} (with `emailAddress` populated).
    */
-  async createIdentity(agentHandle: string): Promise<AgentIdentity> {
-    await this._idsResource.create({ agentHandle });
+  async createIdentity(
+    agentHandle: string,
+    options: { displayName?: string } = {},
+  ): Promise<AgentIdentity> {
+    await this._idsResource.create({ agentHandle, ...options });
     // POST /identities returns summary (no channel fields); fetch detail so
     // AgentIdentity has a fully-populated _AgentIdentityData.
     const data = await this._idsResource.get(agentHandle);

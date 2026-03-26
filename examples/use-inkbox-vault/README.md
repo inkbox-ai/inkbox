@@ -7,7 +7,7 @@ Uses the public TOTP challenge at [authenticationtest.com/totpChallenge](https:/
 ## Prerequisites
 
 1. An Inkbox API key (`INKBOX_API_KEY`)
-2. A vault key (`INKBOX_VAULT_KEY`) — the vault must be initialized from the [console](https://console.inkbox.ai) first
+2. A vault key (`INKBOX_VAULT_KEY`) — the vault must be initialized from the [console](https://inkbox.ai/console) first
 
 ## Run (Python)
 

@@ -21,6 +21,7 @@ import type {
   _AgentIdentityData,
   IdentityMailbox,
   IdentityPhoneNumber,
+  ResourceStatus,
 } from "./identities/types.js";
 import type { Inkbox } from "./inkbox.js";
 
@@ -46,6 +47,9 @@ export class AgentIdentity {
   get agentHandle(): string { return this._data.agentHandle; }
   get id(): string           { return this._data.id; }
   get status(): string       { return this._data.status; }
+
+  /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
+  get emailAddress(): string | null { return this._data.emailAddress; }
 
   /** The mailbox currently assigned to this identity, or `null` if none. */
   get mailbox(): IdentityMailbox | null { return this._mailbox; }
@@ -199,29 +203,6 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
   // Channel management
   // ------------------------------------------------------------------
-
-  /**
-   * Create a new mailbox and link it to this identity.
-   *
-   * @param options.displayName - Optional human-readable sender name.
-   * @returns The newly created and linked {@link IdentityMailbox}.
-   */
-  async createMailbox(options: { displayName?: string } = {}): Promise<IdentityMailbox> {
-    const mailbox = await this._inkbox._mailboxes.create({
-      agentHandle: this.agentHandle,
-      ...options,
-    });
-    const linked: IdentityMailbox = {
-      id: mailbox.id,
-      emailAddress: mailbox.emailAddress,
-      displayName: mailbox.displayName,
-      status: mailbox.status,
-      createdAt: mailbox.createdAt,
-      updatedAt: mailbox.updatedAt,
-    };
-    this._mailbox = linked;
-    return linked;
-  }
 
   /**
    * Link an existing mailbox to this identity.
@@ -434,7 +415,7 @@ export class AgentIdentity {
    * @param options.newHandle - New agent handle.
    * @param options.status - New lifecycle status: `"active"` or `"paused"`.
    */
-  async update(options: { newHandle?: string; status?: string }): Promise<void> {
+  async update(options: { newHandle?: string; status?: ResourceStatus }): Promise<void> {
     const result = await this._inkbox._idsResource.update(this.agentHandle, options);
     this._data = {
       ...result,
@@ -481,7 +462,7 @@ export class AgentIdentity {
   private _requireMailbox(): void {
     if (!this._mailbox) {
       throw new InkboxError(
-        `Identity '${this.agentHandle}' has no mailbox assigned. Call identity.createMailbox() or identity.assignMailbox() first.`,
+        `Identity '${this.agentHandle}' has no mailbox assigned. Call identity.assignMailbox() first.`,
       );
     }
   }

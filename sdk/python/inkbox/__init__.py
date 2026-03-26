@@ -33,6 +33,7 @@ from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailbox,
     IdentityPhoneNumber,
+    ResourceStatus,
 )
 
 # Vault types
@@ -94,6 +95,7 @@ __all__ = [
     "AgentIdentitySummary",
     "IdentityMailbox",
     "IdentityPhoneNumber",
+    "ResourceStatus",
     # Vault types
     "AccessRule",
     "VaultSecretType",

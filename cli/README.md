@@ -25,7 +25,7 @@ export INKBOX_API_KEY="ApiKey_..."
 export INKBOX_VAULT_KEY="my-vault-key"    # only needed for vault decrypt/create
 ```
 
-Get your API key at [console.inkbox.ai](https://console.inkbox.ai/).
+Get your API key at [inkbox.ai/console](https://inkbox.ai/console).
 
 ## Quick start
 

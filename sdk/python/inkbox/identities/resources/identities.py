@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
+from inkbox.identities.types import AgentIdentitySummary, ResourceStatus, _AgentIdentityData
 
 if TYPE_CHECKING:
     from inkbox.identities._http import HttpTransport
@@ -19,17 +19,30 @@ class IdentitiesResource:
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
-    def create(self, *, agent_handle: str) -> AgentIdentitySummary:
-        """Create a new agent identity.
+    def create(
+        self,
+        *,
+        agent_handle: str,
+        display_name: str | None = None,
+    ) -> AgentIdentitySummary:
+        """Create a new agent identity with an email address.
+
+        The server auto-creates a mailbox for the identity using the
+        ``agent_handle`` as the email local-part.
 
         Args:
             agent_handle: Unique handle for this identity within your organisation
                 (e.g. ``"sales-agent"`` or ``"@sales-agent"``).
+            display_name: Optional human-readable name for the identity.
+                Defaults to ``agent_handle`` on the server if omitted.
 
         Returns:
-            The created identity.
+            The created identity (with ``email_address`` populated).
         """
-        data = self._http.post("/", json={"agent_handle": agent_handle})
+        body: dict[str, Any] = {"agent_handle": agent_handle}
+        if display_name is not None:
+            body["display_name"] = display_name
+        data = self._http.post("/", json=body)
         return AgentIdentitySummary._from_dict(data)
 
     def list(self) -> list[AgentIdentitySummary]:
@@ -51,7 +64,7 @@ class IdentitiesResource:
         agent_handle: str,
         *,
         new_handle: str | None = None,
-        status: str | None = None,
+        status: ResourceStatus | None = None,
     ) -> AgentIdentitySummary:
         """Update an identity's handle or status.
 

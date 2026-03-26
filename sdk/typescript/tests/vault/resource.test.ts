@@ -30,6 +30,7 @@ const RAW_INFO: RawVaultInfo = {
   status: "active",
   created_at: "2026-03-18T12:00:00Z",
   updated_at: "2026-03-18T12:00:00Z",
+  deleted_at: null,
   key_count: 1,
   secret_count: 2,
   recovery_key_count: 4,

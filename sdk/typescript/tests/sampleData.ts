@@ -154,6 +154,7 @@ export const RAW_IDENTITY = {
   organization_id: "org-abc123",
   agent_handle: "sales-agent",
   status: "active",
+  email_address: "sales-agent@inkboxmail.com",
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:00:00Z",
 };

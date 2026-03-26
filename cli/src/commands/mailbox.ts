@@ -30,34 +30,6 @@ export function registerMailboxCommands(program: Command): void {
     );
 
   mailbox
-    .command("create")
-    .description("Create a new mailbox")
-    .requiredOption("--handle <handle>", "Agent handle to create mailbox for")
-    .option("--display-name <name>", "Display name for the mailbox")
-    .action(
-      withErrorHandler(async function (
-        this: Command,
-        cmdOpts: { handle: string; displayName?: string },
-      ) {
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        const mb = await inkbox.mailboxes.create({
-          agentHandle: cmdOpts.handle,
-          displayName: cmdOpts.displayName,
-        });
-        output(
-          {
-            emailAddress: mb.emailAddress,
-            id: mb.id,
-            displayName: mb.displayName,
-            status: mb.status,
-          },
-          { json: !!opts.json },
-        );
-      }),
-    );
-
-  mailbox
     .command("get <email-address>")
     .description("Get mailbox details")
     .action(
