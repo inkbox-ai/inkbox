@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { registerIdentityCommands } from "./commands/identity.js";
 import { registerEmailCommands } from "./commands/email.js";
 import { registerPhoneCommands } from "./commands/phone.js";
+import { registerTextCommands } from "./commands/text.js";
 import { registerVaultCommands } from "./commands/vault.js";
 import { registerMailboxCommands } from "./commands/mailbox.js";
 import { registerNumberCommands } from "./commands/number.js";
@@ -22,6 +23,7 @@ const program = new Command()
 registerIdentityCommands(program);
 registerEmailCommands(program);
 registerPhoneCommands(program);
+registerTextCommands(program);
 registerVaultCommands(program);
 registerMailboxCommands(program);
 registerNumberCommands(program);

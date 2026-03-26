@@ -1,6 +1,6 @@
 # @inkbox/cli
 
-Command-line interface for the [Inkbox API](https://inkbox.ai/docs) — email, phone, identities, and encrypted vault for AI agents.
+Command-line interface for the [Inkbox API](https://inkbox.ai/docs) — identities, email, phone, and encrypted vault for AI agents.
 
 ## Install
 
@@ -132,6 +132,34 @@ inkbox phone search-transcripts -i <handle>  # Search transcripts
   -q, --query <query>                        #   Search query (required)
   --party <party>                            #   Filter: local or remote
   --limit <n>                                #   Max results (default: 50)
+```
+
+### text
+
+Text message (SMS/MMS) operations, scoped to an identity. Requires `-i <handle>`.
+
+```bash
+inkbox text list -i <handle>                # List text messages
+  --limit <n>                               #   Max results (default: 50)
+  --offset <n>                              #   Pagination offset (default: 0)
+  --unread-only                             #   Show only unread messages
+
+inkbox text get <text-id> -i <handle>       # Get a single text message
+
+inkbox text conversations -i <handle>       # List conversation summaries
+  --limit <n>                               #   Max results (default: 50)
+  --offset <n>                              #   Pagination offset (default: 0)
+
+inkbox text conversation <remote-number> -i <handle>  # Get messages in a conversation
+  --limit <n>                               #   Max results (default: 50)
+  --offset <n>                              #   Pagination offset (default: 0)
+
+inkbox text search -i <handle>              # Search text messages
+  -q, --query <query>                       #   Search query (required)
+  --limit <n>                               #   Max results (default: 50)
+
+inkbox text mark-read <text-id> -i <handle>                # Mark a text as read
+inkbox text mark-conversation-read <remote-number> -i <handle>  # Mark conversation as read
 ```
 
 ### vault

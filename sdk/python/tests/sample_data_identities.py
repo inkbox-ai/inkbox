@@ -25,6 +25,7 @@ IDENTITY_PHONE_DICT = {
     "status": "active",
     "incoming_call_action": "auto_reject",
     "client_websocket_url": None,
+    "incoming_text_webhook_url": None,
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:00:00Z",
 }

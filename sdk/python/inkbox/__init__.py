@@ -26,6 +26,9 @@ from inkbox.phone.types import (
     PhoneNumber,
     PhoneTranscript,
     RateLimitInfo,
+    TextConversationSummary,
+    TextMediaItem,
+    TextMessage,
 )
 
 # Identity types
@@ -90,6 +93,9 @@ __all__ = [
     "PhoneNumber",
     "PhoneTranscript",
     "RateLimitInfo",
+    "TextConversationSummary",
+    "TextMediaItem",
+    "TextMessage",
     # Identity types
     "AgentIdentitySummary",
     "IdentityMailbox",

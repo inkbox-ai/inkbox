@@ -73,3 +73,14 @@ class TestIdentityPhoneNumberParsing:
         assert p.status == "active"
         assert p.incoming_call_action == "auto_reject"
         assert p.client_websocket_url is None
+        assert p.incoming_text_webhook_url is None
+
+    def test_parses_incoming_text_webhook_url(self):
+        p = IdentityPhoneNumber._from_dict(
+            {
+                **IDENTITY_PHONE_DICT,
+                "incoming_text_webhook_url": "https://example.com/texts",
+            }
+        )
+
+        assert p.incoming_text_webhook_url == "https://example.com/texts"

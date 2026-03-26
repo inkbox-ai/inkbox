@@ -204,6 +204,45 @@ for t in hits:
 
 ---
 
+## Text Messages (SMS/MMS)
+
+Receive and read inbound text messages. Outbound SMS sending is coming soon.
+
+```python
+# List text messages
+texts = identity.list_texts(limit=20)
+for t in texts:
+    print(t.remote_phone_number, t.text, t.is_read)
+
+# Filter to unread only
+unread = identity.list_texts(is_read=False)
+
+# Get a single text
+text = identity.get_text("text-uuid")
+print(text.type)  # "sms" or "mms"
+if text.media:    # MMS attachments (presigned S3 URLs, 1hr expiry)
+    for m in text.media:
+        print(m.content_type, m.size, m.url)
+
+# List conversation summaries (one row per remote number)
+convos = identity.list_text_conversations(limit=20)
+for c in convos:
+    print(c.remote_phone_number, c.latest_text, c.unread_count)
+
+# Get messages in a specific conversation
+msgs = identity.get_text_conversation("+15167251294", limit=50)
+
+# Mark as read
+identity.mark_text_read("text-uuid")
+identity.mark_text_conversation_read("+15167251294")
+
+# Org-level: search and delete
+results = inkbox.texts.search(phone.id, q="invoice", limit=20)
+inkbox.texts.update(phone.id, "text-uuid", status="deleted")
+```
+
+---
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.

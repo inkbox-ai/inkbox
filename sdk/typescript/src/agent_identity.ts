@@ -15,7 +15,13 @@ import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
 import { MessageDirection } from "./mail/types.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
-import type { PhoneCall, PhoneCallWithRateLimit, PhoneTranscript } from "./phone/types.js";
+import type {
+  PhoneCall,
+  PhoneCallWithRateLimit,
+  PhoneTranscript,
+  TextConversationSummary,
+  TextMessage,
+} from "./phone/types.js";
 import type {
   AgentIdentitySummary,
   _AgentIdentityData,
@@ -422,6 +428,91 @@ export class AgentIdentity {
   async listTranscripts(callId: string): Promise<PhoneTranscript[]> {
     this._requirePhone();
     return this._inkbox._transcripts.list(this._phoneNumber!.id, callId);
+  }
+
+  // ------------------------------------------------------------------
+  // Text message helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * List text messages for this identity's phone number.
+   *
+   * @param options.limit - Maximum number of results. Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   * @param options.isRead - Filter by read state.
+   */
+  async listTexts(
+    options?: { limit?: number; offset?: number; isRead?: boolean },
+  ): Promise<TextMessage[]> {
+    this._requirePhone();
+    return this._inkbox._texts.list(this._phoneNumber!.id, options);
+  }
+
+  /**
+   * Get a single text message by ID.
+   *
+   * @param textId - UUID of the text message to fetch.
+   */
+  async getText(textId: string): Promise<TextMessage> {
+    this._requirePhone();
+    return this._inkbox._texts.get(this._phoneNumber!.id, textId);
+  }
+
+  /**
+   * List text conversations (one row per remote number).
+   *
+   * @param options.limit - Maximum number of results. Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   */
+  async listTextConversations(
+    options?: { limit?: number; offset?: number },
+  ): Promise<TextConversationSummary[]> {
+    this._requirePhone();
+    return this._inkbox._texts.listConversations(this._phoneNumber!.id, options);
+  }
+
+  /**
+   * Get all messages with a specific remote number.
+   *
+   * @param remoteNumber - E.164 remote phone number.
+   * @param options.limit - Maximum number of results. Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   */
+  async getTextConversation(
+    remoteNumber: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<TextMessage[]> {
+    this._requirePhone();
+    return this._inkbox._texts.getConversation(this._phoneNumber!.id, remoteNumber, options);
+  }
+
+  /**
+   * Mark a single text message as read.
+   *
+   * @param textId - UUID of the text message.
+   */
+  async markTextRead(textId: string): Promise<TextMessage> {
+    this._requirePhone();
+    return this._inkbox._texts.update(this._phoneNumber!.id, textId, {
+      isRead: true,
+    });
+  }
+
+  /**
+   * Mark all messages in a conversation as read.
+   *
+   * @param remoteNumber - E.164 remote phone number.
+   * @returns Object with `remotePhoneNumber`, `isRead`, and `updatedCount`.
+   */
+  async markTextConversationRead(
+    remoteNumber: string,
+  ): Promise<{ remotePhoneNumber: string; isRead: boolean; updatedCount: number }> {
+    this._requirePhone();
+    return this._inkbox._texts.updateConversation(
+      this._phoneNumber!.id,
+      remoteNumber,
+      { isRead: true },
+    );
   }
 
   // ------------------------------------------------------------------

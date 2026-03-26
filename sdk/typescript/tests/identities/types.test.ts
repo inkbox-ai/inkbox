@@ -62,6 +62,15 @@ describe("parseIdentityPhoneNumber", () => {
     expect(p.type).toBe("toll_free");
     expect(p.incomingCallAction).toBe("auto_reject");
     expect(p.clientWebsocketUrl).toBeNull();
+    expect(p.incomingTextWebhookUrl).toBeNull();
     expect(p.createdAt).toBeInstanceOf(Date);
+  });
+
+  it("parses incomingTextWebhookUrl", () => {
+    const p = parseIdentityPhoneNumber({
+      ...RAW_IDENTITY_PHONE,
+      incoming_text_webhook_url: "https://example.com/texts",
+    });
+    expect(p.incomingTextWebhookUrl).toBe("https://example.com/texts");
   });
 });

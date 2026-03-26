@@ -215,6 +215,49 @@ for (const t of hits) {
 
 ---
 
+## Text Messages (SMS/MMS)
+
+Receive and read inbound text messages. Outbound SMS sending is coming soon.
+
+```ts
+// List text messages
+const texts = await identity.listTexts({ limit: 20 });
+for (const t of texts) {
+  console.log(t.remotePhoneNumber, t.text, t.isRead);
+}
+
+// Filter to unread only
+const unread = await identity.listTexts({ isRead: false });
+
+// Get a single text
+const text = await identity.getText("text-uuid");
+console.log(text.type);  // "sms" or "mms"
+if (text.media) {         // MMS attachments (presigned S3 URLs, 1hr expiry)
+  for (const m of text.media) {
+    console.log(m.contentType, m.size, m.url);
+  }
+}
+
+// List conversation summaries (one row per remote number)
+const convos = await identity.listTextConversations({ limit: 20 });
+for (const c of convos) {
+  console.log(c.remotePhoneNumber, c.latestText, c.unreadCount);
+}
+
+// Get messages in a specific conversation
+const msgs = await identity.getTextConversation("+15167251294", { limit: 50 });
+
+// Mark as read
+await identity.markTextRead("text-uuid");
+await identity.markTextConversationRead("+15167251294");
+
+// Org-level: search and delete
+const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
+await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
+```
+
+---
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.

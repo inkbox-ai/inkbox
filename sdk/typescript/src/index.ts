@@ -19,6 +19,9 @@ export type {
   PhoneCallWithRateLimit,
   RateLimitInfo,
   PhoneTranscript,
+  TextMediaItem,
+  TextMessage,
+  TextConversationSummary,
 } from "./phone/types.js";
 export type {
   AgentIdentitySummary,
