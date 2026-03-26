@@ -1,6 +1,6 @@
 # @inkbox/cli
 
-Command-line interface for the [Inkbox API](https://inkbox.ai/docs) — email, phone, identities, and encrypted vault for AI agents.
+Command-line interface for the [Inkbox API](https://inkbox.ai/docs) — identities, email, phone, and encrypted vault for AI agents.
 
 ## Install
 
