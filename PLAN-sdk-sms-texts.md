@@ -66,12 +66,35 @@ Vitest with mocked HttpTransport.
 
 ---
 
+---
+
+## CLI (`cli/src/`)
+
+### 11. Text command — `commands/text.ts`
+New `registerTextCommands(program)` under `inkbox text` subcommand:
+
+| Command | Description | Flags |
+|---------|-------------|-------|
+| `inkbox text list` | List texts for an identity's phone number | `-i --identity`, `--limit`, `--offset`, `--unread-only` |
+| `inkbox text get <text-id>` | Get a single text message | `-i --identity` |
+| `inkbox text conversations` | List conversation summaries | `-i --identity`, `--limit`, `--offset` |
+| `inkbox text conversation <remote-number>` | Get messages in a conversation | `-i --identity`, `--limit`, `--offset` |
+| `inkbox text search` | Full-text search across texts | `-i --identity`, `--query`, `--limit` |
+| `inkbox text mark-read <text-id>` | Mark a text as read | `-i --identity` |
+| `inkbox text mark-conversation-read <remote-number>` | Mark all texts in a conversation as read | `-i --identity` |
+
+### 12. Wire into index — `index.ts`
+- Import and call `registerTextCommands(program)`
+
+---
+
 ## Files to create
 
 - `sdk/python/inkbox/phone/resources/texts.py`
 - `sdk/python/tests/test_texts.py`
 - `sdk/typescript/src/phone/resources/texts.ts`
 - `sdk/typescript/tests/phone/texts.test.ts`
+- `cli/src/commands/text.ts`
 
 ## Files to modify
 
@@ -82,3 +105,4 @@ Vitest with mocked HttpTransport.
 - `sdk/typescript/src/phone/types.ts` — add Text* types + parsers
 - `sdk/typescript/src/inkbox.ts` — wire TextsResource
 - `sdk/typescript/src/agent_identity.ts` — add convenience methods
+- `cli/src/index.ts` — register text commands
