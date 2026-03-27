@@ -233,7 +233,11 @@ class VaultResource:
         decrypted: list[DecryptedVaultSecret] = []
         for raw in data.get("encrypted_secrets", []):
             detail = VaultSecretDetail._from_dict(raw)
-            payload_dict = decrypt_payload(org_key, detail.encrypted_payload, secret_id=str(detail.id))
+            payload_dict = decrypt_payload(
+                org_key,
+                detail.encrypted_payload,
+                secret_id=str(detail.id),
+            )
             payload = _parse_payload(detail.secret_type, payload_dict)
             decrypted.append(
                 DecryptedVaultSecret(
@@ -329,7 +333,11 @@ class UnlockedVault:
         """
         data = self._http.get(f"/secrets/{secret_id}")
         detail = VaultSecretDetail._from_dict(data)
-        payload_dict = decrypt_payload(self._org_key, detail.encrypted_payload, secret_id=str(detail.id))
+        payload_dict = decrypt_payload(
+            self._org_key,
+            detail.encrypted_payload,
+            secret_id=str(detail.id),
+        )
         payload = _parse_payload(
             secret_type=detail.secret_type,
             raw=payload_dict,
@@ -366,13 +374,15 @@ class UnlockedVault:
         Returns:
             :class:`~inkbox.vault.types.VaultSecret` metadata (no payload).
         """
-
         secret_type = _infer_secret_type(payload)
-        # Generate the UUID client-side so we can use it as AAD for
+
+        # generate the UUID client-side so we can use it as AAD for
         # encryption in the same request.
         secret_id = str(uuid4())
         encrypted = encrypt_payload(
-            self._org_key, payload._to_dict(), secret_id=secret_id,
+            self._org_key,
+            payload._to_dict(),
+            secret_id=secret_id,
         )
         body: dict[str, Any] = {
             "id": secret_id,
