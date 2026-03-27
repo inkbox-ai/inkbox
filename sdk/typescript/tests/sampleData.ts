@@ -83,6 +83,7 @@ export const RAW_PHONE_NUMBER = {
   status: "active",
   incoming_call_action: "auto_reject",
   client_websocket_url: null,
+  incoming_text_webhook_url: null,
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:00:00Z",
 };
@@ -127,6 +128,52 @@ export const RAW_PHONE_TRANSCRIPT = {
   created_at: "2026-03-09T00:01:01Z",
 };
 
+// ---- Texts ----
+
+export const RAW_TEXT_MESSAGE = {
+  id: "dddd4444-0000-0000-0000-000000000001",
+  direction: "inbound",
+  local_phone_number: "+18335794607",
+  remote_phone_number: "+15167251294",
+  text: "Hello, is this support?",
+  type: "sms",
+  media: null,
+  status: "active",
+  is_read: false,
+  created_at: "2026-03-09T00:10:00Z",
+  updated_at: "2026-03-09T00:10:00Z",
+};
+
+export const RAW_TEXT_MESSAGE_MMS = {
+  id: "dddd4444-0000-0000-0000-000000000002",
+  direction: "inbound",
+  local_phone_number: "+18335794607",
+  remote_phone_number: "+15167251294",
+  text: "Check this out",
+  type: "mms",
+  media: [
+    {
+      content_type: "image/jpeg",
+      size: 534972,
+      url: "https://s3.example.com/media/photo.jpg?signed=1",
+    },
+  ],
+  status: "active",
+  is_read: true,
+  created_at: "2026-03-09T00:12:00Z",
+  updated_at: "2026-03-09T00:12:00Z",
+};
+
+export const RAW_TEXT_CONVERSATION_SUMMARY = {
+  remote_phone_number: "+15167251294",
+  latest_text: "Hello, is this support?",
+  latest_direction: "inbound",
+  latest_type: "sms",
+  latest_message_at: "2026-03-09T00:10:00Z",
+  unread_count: 3,
+  total_count: 15,
+};
+
 // ---- Identities ----
 
 export const RAW_IDENTITY_MAILBOX = {
@@ -145,6 +192,7 @@ export const RAW_IDENTITY_PHONE = {
   status: "active",
   incoming_call_action: "auto_reject",
   client_websocket_url: null,
+  incoming_text_webhook_url: null,
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:00:00Z",
 };

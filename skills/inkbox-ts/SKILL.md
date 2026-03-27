@@ -1,6 +1,6 @@
 ---
 name: inkbox-ts
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, vault, or agent identity features using the Inkbox TypeScript SDK.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, vault, or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: false
 ---
 
@@ -33,6 +33,7 @@ Inkbox (org-level client)
 ├── .listIdentities()       → Promise<AgentIdentitySummary[]>
 ├── .mailboxes              → MailboxesResource
 ├── .phoneNumbers           → PhoneNumbersResource
+├── .texts                  → TextsResource
 ├── .vault                  → VaultResource
 └── .createSigningKey()     → Promise<SigningKey>
 
@@ -41,7 +42,8 @@ AgentIdentity (identity-scoped helper)
 ├── .phoneNumber            → IdentityPhoneNumber | null
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── mail methods            (requires assigned mailbox)
-└── phone methods           (requires assigned phone number)
+├── phone methods           (requires assigned phone number)
+└── text methods            (requires assigned phone number)
 ```
 
 An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxAPIError` is thrown.
@@ -150,6 +152,48 @@ const segments = await identity.listTranscripts(calls[0].id);
 for (const t of segments) {
   console.log(`[${t.party}] ${t.text}`);   // party: "local" or "remote"
 }
+```
+
+## Text Messages (SMS/MMS)
+
+```typescript
+// List text messages (offset pagination)
+const texts = await identity.listTexts({ limit: 20, offset: 0 });
+for (const t of texts) {
+  console.log(t.id, t.direction, t.remotePhoneNumber, t.text, t.isRead);
+}
+
+// Filter by read state
+const unread = await identity.listTexts({ isRead: false });
+
+// Get a single text message
+const text = await identity.getText("text-uuid");
+console.log(text.type);   // "sms" or "mms"
+if (text.media) {          // MMS media attachments (presigned S3 URLs, 1hr expiry)
+  for (const m of text.media) {
+    console.log(m.contentType, m.size, m.url);
+  }
+}
+
+// List conversation summaries (one row per remote number)
+const convos = await identity.listTextConversations({ limit: 20 });
+for (const c of convos) {
+  console.log(c.remotePhoneNumber, c.latestText, c.unreadCount, c.totalCount);
+}
+
+// Get messages in a specific conversation
+const msgs = await identity.getTextConversation("+15167251294", { limit: 50 });
+
+// Mark a text as read (identity convenience method)
+await identity.markTextRead("text-uuid");
+
+// Mark all messages in a conversation as read
+const readResult = await identity.markTextConversationRead("+15167251294");
+console.log(readResult.updatedCount);
+
+// Org-level: search, update, soft-delete
+const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
+await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });   // soft-delete
 ```
 
 ## Vault

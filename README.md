@@ -12,6 +12,7 @@ API-first communication infrastructure for AI agents — email, phone, identitie
 |---|---|---|
 | [`inkbox`](./sdk/python/) | Python ≥ 3.11 | `pip install inkbox` |
 | [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 18 | `npm install @inkbox/sdk` |
+| [`@inkbox/cli`](./cli/) | CLI / Node ≥ 18 | `npm install -g @inkbox/cli` |
 
 ---
 
@@ -42,6 +43,10 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
 
     # Place a phone call
     call = identity.place_call(to_number="+15551234567")
+
+    # Read text messages (SMS/MMS)
+    for t in identity.list_texts():
+        print(t.remote_phone_number, t.text)
 ```
 
 ### TypeScript
@@ -69,6 +74,12 @@ for await (const msg of identity.iterEmails()) {
 
 // Place a phone call
 const call = await identity.placeCall({ toNumber: "+15551234567" });
+
+// Read text messages (SMS/MMS)
+const texts = await identity.listTexts();
+for (const t of texts) {
+  console.log(t.remotePhoneNumber, t.text);
+}
 ```
 
 ---

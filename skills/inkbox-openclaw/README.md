@@ -99,7 +99,8 @@ The `@inkbox/sdk` supports additional capabilities you can use inline:
 
 - **HTML emails**: pass `bodyHtml` alongside or instead of `bodyText` in `sendEmail()`
 - **Attachments**: pass `attachments: [{ filename, contentType, contentBase64 }]` to `sendEmail()`
-- **Mark as read**: use `identity.markEmailsRead(messageIds)`
+- **Mark emails as read**: use `identity.markEmailsRead(messageIds)`
+- **Mark texts as read**: use `identity.markTextRead(textId)` or `identity.markTextConversationRead(remoteNumber)`
 - **Star/unstar messages**: use `inkbox._messages.star()` / `inkbox._messages.unstar()`
 - **Delete messages or threads**: use `inkbox._messages.delete()` / `inkbox._threads.delete()`
 - **Search call transcripts**: use `inkbox.phoneNumbers.searchTranscripts(phoneNumberId, { q })` for full-text transcript search

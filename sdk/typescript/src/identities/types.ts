@@ -53,6 +53,7 @@ export interface IdentityPhoneNumber {
   /** "auto_accept" | "auto_reject" | "webhook" */
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
+  incomingTextWebhookUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -96,6 +97,7 @@ export interface RawIdentityPhoneNumber {
   status: string;
   incoming_call_action: string;
   client_websocket_url: string | null;
+  incoming_text_webhook_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -136,6 +138,7 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     status: r.status,
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
+    incomingTextWebhookUrl: r.incoming_text_webhook_url ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

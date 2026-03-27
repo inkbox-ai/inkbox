@@ -42,6 +42,17 @@ class TestNumbersGet:
         assert number.number == "+18335794607"
         assert number.incoming_call_action == "auto_reject"
 
+    def test_parses_incoming_text_webhook_url(self, client, transport):
+        transport.get.return_value = {
+            **PHONE_NUMBER_DICT,
+            "incoming_text_webhook_url": "https://example.com/texts",
+        }
+        uid = "aaaa1111-0000-0000-0000-000000000001"
+
+        number = client._numbers.get(uid)
+
+        assert number.incoming_text_webhook_url == "https://example.com/texts"
+
 
 class TestNumbersUpdate:
     def test_update_incoming_call_action(self, client, transport):
@@ -63,6 +74,7 @@ class TestNumbersUpdate:
             "incoming_call_action": "webhook",
             "client_websocket_url": "wss://agent.example.com/ws",
             "incoming_call_webhook_url": "https://example.com/hook",
+            "incoming_text_webhook_url": "https://example.com/texts",
         }
         transport.patch.return_value = updated
         uid = "aaaa1111-0000-0000-0000-000000000001"
@@ -72,6 +84,7 @@ class TestNumbersUpdate:
             incoming_call_action="webhook",
             client_websocket_url="wss://agent.example.com/ws",
             incoming_call_webhook_url="https://example.com/hook",
+            incoming_text_webhook_url="https://example.com/texts",
         )
 
         transport.patch.assert_called_once_with(
@@ -80,10 +93,12 @@ class TestNumbersUpdate:
                 "incoming_call_action": "webhook",
                 "client_websocket_url": "wss://agent.example.com/ws",
                 "incoming_call_webhook_url": "https://example.com/hook",
+                "incoming_text_webhook_url": "https://example.com/texts",
             },
         )
         assert result.client_websocket_url == "wss://agent.example.com/ws"
         assert result.incoming_call_webhook_url == "https://example.com/hook"
+        assert result.incoming_text_webhook_url == "https://example.com/texts"
 
     def test_omitted_fields_not_sent(self, client, transport):
         transport.patch.return_value = PHONE_NUMBER_DICT
@@ -94,6 +109,7 @@ class TestNumbersUpdate:
         _, kwargs = transport.patch.call_args
         assert "client_websocket_url" not in kwargs["json"]
         assert "incoming_call_webhook_url" not in kwargs["json"]
+        assert "incoming_text_webhook_url" not in kwargs["json"]
 
 
 class TestNumbersProvision:
@@ -128,6 +144,27 @@ class TestNumbersProvision:
         _, kwargs = transport.post.call_args
         assert kwargs["json"]["type"] == "toll_free"
         assert kwargs["json"]["agent_handle"] == "sales-bot"
+
+    def test_provision_sends_incoming_text_webhook_url(self, client, transport):
+        transport.post.return_value = {
+            **PHONE_NUMBER_DICT,
+            "incoming_text_webhook_url": "https://example.com/texts",
+        }
+
+        number = client._numbers.provision(
+            agent_handle="sales-bot",
+            incoming_text_webhook_url="https://example.com/texts",
+        )
+
+        transport.post.assert_called_once_with(
+            "/numbers",
+            json={
+                "agent_handle": "sales-bot",
+                "type": "toll_free",
+                "incoming_text_webhook_url": "https://example.com/texts",
+            },
+        )
+        assert number.incoming_text_webhook_url == "https://example.com/texts"
 
 
 class TestNumbersRelease:

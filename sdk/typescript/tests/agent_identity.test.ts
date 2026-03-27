@@ -61,6 +61,7 @@ function mockInkbox() {
     _numbers: { provision: vi.fn() },
     _calls: { place: vi.fn(), list: vi.fn() },
     _transcripts: { list: vi.fn() },
+    _texts: { update: vi.fn(), updateConversation: vi.fn() },
     _idsResource: {
       get: vi.fn(),
       create: vi.fn(),
@@ -342,6 +343,47 @@ describe("AgentIdentity phone helpers", () => {
   it("listTranscripts throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
     await expect(identity.listTranscripts("call-1")).rejects.toThrow(InkboxError);
+  });
+
+  it("markTextRead delegates to texts resource", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._texts.update).mockResolvedValue({ id: "txt-1" } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.markTextRead("txt-1");
+
+    expect(ink._texts.update).toHaveBeenCalledWith(PARSED_PHONE.id, "txt-1", {
+      isRead: true,
+    });
+  });
+
+  it("markTextRead throws when no phone", async () => {
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
+    await expect(identity.markTextRead("txt-1")).rejects.toThrow(InkboxError);
+  });
+
+  it("markTextConversationRead delegates to texts resource", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._texts.updateConversation).mockResolvedValue({
+      remotePhoneNumber: "+15551234567",
+      isRead: true,
+      updatedCount: 3,
+    });
+    const identity = new AgentIdentity(makeData(), ink);
+
+    const result = await identity.markTextConversationRead("+15551234567");
+
+    expect(ink._texts.updateConversation).toHaveBeenCalledWith(
+      PARSED_PHONE.id,
+      "+15551234567",
+      { isRead: true },
+    );
+    expect(result.updatedCount).toBe(3);
+  });
+
+  it("markTextConversationRead throws when no phone", async () => {
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
+    await expect(identity.markTextConversationRead("+15551234567")).rejects.toThrow(InkboxError);
   });
 });
 

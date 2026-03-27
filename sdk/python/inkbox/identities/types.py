@@ -137,6 +137,7 @@ class IdentityPhoneNumber:
     status: str
     incoming_call_action: str
     client_websocket_url: str | None
+    incoming_text_webhook_url: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -149,6 +150,7 @@ class IdentityPhoneNumber:
             status=d["status"],
             incoming_call_action=d["incoming_call_action"],
             client_websocket_url=d.get("client_websocket_url"),
+            incoming_text_webhook_url=d.get("incoming_text_webhook_url"),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
         )

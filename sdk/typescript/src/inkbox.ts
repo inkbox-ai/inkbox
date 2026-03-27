@@ -12,6 +12,7 @@ import { SigningKeysResource } from "./signing_keys.js";
 import type { SigningKey } from "./signing_keys.js";
 import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
+import { TextsResource } from "./phone/resources/texts.js";
 import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
@@ -78,6 +79,7 @@ export class Inkbox {
   readonly _signingKeys: SigningKeysResource;
   readonly _numbers: PhoneNumbersResource;
   readonly _calls: CallsResource;
+  readonly _texts: TextsResource;
   readonly _transcripts: TranscriptsResource;
   readonly _idsResource: IdentitiesResource;
   readonly _vaultResource: VaultResource;
@@ -112,6 +114,7 @@ export class Inkbox {
 
     this._numbers     = new PhoneNumbersResource(phoneHttp);
     this._calls       = new CallsResource(phoneHttp);
+    this._texts       = new TextsResource(phoneHttp);
     this._transcripts = new TranscriptsResource(phoneHttp);
 
     this._idsResource = new IdentitiesResource(idsHttp);
@@ -159,6 +162,9 @@ export class Inkbox {
 
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
+
+  /** Text message operations (list, get, search, conversations). */
+  get texts(): TextsResource { return this._texts; }
 
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }
