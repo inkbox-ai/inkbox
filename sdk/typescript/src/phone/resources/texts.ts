@@ -57,12 +57,12 @@ export class TextsResource {
   }
 
   /**
-   * Update a text message (mark as read, soft-delete).
+   * Update a text message (mark as read, delete).
    *
    * @param phoneNumberId - UUID of the phone number.
    * @param textId - UUID of the text message.
    * @param options.isRead - Mark as read or unread.
-   * @param options.status - Set to `"deleted"` to soft-delete.
+   * @param options.status - Set to `"deleted"` to delete.
    */
   async update(
     phoneNumberId: string,

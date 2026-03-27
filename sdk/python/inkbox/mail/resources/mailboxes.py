@@ -18,6 +18,7 @@ _UNSET = object()
 
 
 class MailboxesResource:
+
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
@@ -84,7 +85,10 @@ class MailboxesResource:
             body["display_name"] = display_name
         if webhook_url is not _UNSET:
             body["webhook_url"] = webhook_url
-        data = self._http.patch(f"{_BASE}/{email_address}", json=body)
+        data = self._http.patch(
+            f"{_BASE}/{email_address}",
+            json=body,
+        )
         return Mailbox._from_dict(data)
 
     def delete(self, email_address: str) -> None:
@@ -114,6 +118,9 @@ class MailboxesResource:
         """
         data = self._http.get(
             f"{_BASE}/{email_address}/search",
-            params={"q": q, "limit": limit},
+            params={
+                "q": q,
+                "limit": limit,
+            },
         )
         return [Message._from_dict(m) for m in data["items"]]

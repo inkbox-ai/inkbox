@@ -160,6 +160,12 @@ export class Inkbox {
   /** Org-level mailbox operations (list, get, create, update, delete). */
   get mailboxes(): MailboxesResource { return this._mailboxes; }
 
+  /** Message operations (list, get, send, delete, star/unstar). */
+  get messages(): MessagesResource { return this._messages; }
+
+  /** Thread operations (list, get, delete). */
+  get threads(): ThreadsResource { return this._threads; }
+
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
 

@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
-import type { SecretPayload } from "@inkbox/sdk";
+import type { SecretPayload, ResourceStatus } from "@inkbox/sdk";
 import { parseTotpUri } from "@inkbox/sdk";
 
 export function registerIdentityCommands(program: Command): void {
@@ -94,7 +94,7 @@ export function registerIdentityCommands(program: Command): void {
         const id = await inkbox.getIdentity(handle);
         await id.update({
           newHandle: cmdOpts.newHandle,
-          status: cmdOpts.status,
+          status: cmdOpts.status as ResourceStatus | undefined,
         });
         console.log(`Updated identity '${handle}'.`);
       }),
@@ -458,6 +458,82 @@ export function registerIdentityCommands(program: Command): void {
           },
           { json: !!opts.json },
         );
+      }),
+    );
+
+  identity
+    .command("assign-mailbox <handle>")
+    .description("Assign an existing mailbox to an identity")
+    .requiredOption("--mailbox-id <id>", "UUID of the mailbox to assign")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { mailboxId: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const id = await inkbox.getIdentity(handle);
+        const mb = await id.assignMailbox(cmdOpts.mailboxId);
+        output(
+          {
+            agentHandle: id.agentHandle,
+            mailboxId: mb.id,
+            emailAddress: mb.emailAddress,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  identity
+    .command("unlink-mailbox <handle>")
+    .description("Unlink the mailbox from an identity (does not delete the mailbox)")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const id = await inkbox.getIdentity(handle);
+        await id.unlinkMailbox();
+        console.log(`Unlinked mailbox from identity '${handle}'.`);
+      }),
+    );
+
+  identity
+    .command("assign-phone <handle>")
+    .description("Assign an existing phone number to an identity")
+    .requiredOption("--phone-number-id <id>", "UUID of the phone number to assign")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { phoneNumberId: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const id = await inkbox.getIdentity(handle);
+        const pn = await id.assignPhoneNumber(cmdOpts.phoneNumberId);
+        output(
+          {
+            agentHandle: id.agentHandle,
+            phoneNumberId: pn.id,
+            number: pn.number,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  identity
+    .command("unlink-phone <handle>")
+    .description("Unlink the phone number from an identity (does not release the number)")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const id = await inkbox.getIdentity(handle);
+        await id.unlinkPhoneNumber();
+        console.log(`Unlinked phone number from identity '${handle}'.`);
       }),
     );
 }

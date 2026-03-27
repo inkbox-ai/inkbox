@@ -179,9 +179,9 @@ identity.mark_text_read("text-uuid")
 result = identity.mark_text_conversation_read("+15167251294")
 print(result["updated_count"])
 
-# Org-level: search, update, soft-delete
+# Org-level: search, update, delete
 results = inkbox.texts.search(phone.id, q="invoice", limit=20)
-inkbox.texts.update(phone.id, "text-uuid", status="deleted")   # soft-delete
+inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 ```
 
 ## Vault

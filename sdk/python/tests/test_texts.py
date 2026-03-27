@@ -91,7 +91,7 @@ class TestTextsUpdate:
         )
         assert text.is_read is True
 
-    def test_soft_delete(self, client, transport):
+    def test_delete(self, client, transport):
         transport.patch.return_value = {**TEXT_MESSAGE_DICT, "status": "deleted"}
 
         text = client._texts.update(NUM_ID, TEXT_ID, status="deleted")

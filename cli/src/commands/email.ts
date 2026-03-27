@@ -228,6 +228,128 @@ export function registerEmailCommands(program: Command): void {
     );
 
   email
+    .command("delete <message-id>")
+    .description("Delete an email")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        if (!identity.mailbox) {
+          console.error(
+            `Identity '${cmdOpts.identity}' has no mailbox assigned.`,
+          );
+          process.exit(1);
+        }
+        await inkbox.messages.delete(
+          identity.mailbox.emailAddress,
+          messageId,
+        );
+        console.log(`Deleted message '${messageId}'.`);
+      }),
+    );
+
+  email
+    .command("delete-thread <thread-id>")
+    .description("Delete an email thread and all its messages")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        threadId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        if (!identity.mailbox) {
+          console.error(
+            `Identity '${cmdOpts.identity}' has no mailbox assigned.`,
+          );
+          process.exit(1);
+        }
+        await inkbox.threads.delete(
+          identity.mailbox.emailAddress,
+          threadId,
+        );
+        console.log(`Deleted thread '${threadId}'.`);
+      }),
+    );
+
+  email
+    .command("star <message-id>")
+    .description("Star an email")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        if (!identity.mailbox) {
+          console.error(
+            `Identity '${cmdOpts.identity}' has no mailbox assigned.`,
+          );
+          process.exit(1);
+        }
+        const msg = await inkbox.messages.star(
+          identity.mailbox.emailAddress,
+          messageId,
+        );
+        output(
+          {
+            id: msg.id,
+            subject: msg.subject,
+            isStarred: msg.isStarred,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  email
+    .command("unstar <message-id>")
+    .description("Unstar an email")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        if (!identity.mailbox) {
+          console.error(
+            `Identity '${cmdOpts.identity}' has no mailbox assigned.`,
+          );
+          process.exit(1);
+        }
+        const msg = await inkbox.messages.unstar(
+          identity.mailbox.emailAddress,
+          messageId,
+        );
+        output(
+          {
+            id: msg.id,
+            subject: msg.subject,
+            isStarred: msg.isStarred,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  email
     .command("thread <thread-id>")
     .description("Get an email thread with all messages")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

@@ -18,6 +18,7 @@ _DEFAULT_PAGE_SIZE = 50
 
 
 class MessagesResource:
+
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
@@ -42,7 +43,11 @@ class MessagesResource:
             for msg in client.messages.list(email_address):
                 print(msg.subject, msg.from_address)
         """
-        return self._paginate(email_address, page_size=page_size, direction=direction)
+        return self._paginate(
+            email_address,
+            page_size=page_size,
+            direction=direction,
+        )
 
     def _paginate(
         self,
@@ -118,7 +123,10 @@ class MessagesResource:
         if bcc:
             recipients["bcc"] = bcc
 
-        body: dict[str, Any] = {"recipients": recipients, "subject": subject}
+        body: dict[str, Any] = {
+            "recipients": recipients,
+            "subject": subject,
+        }
         if body_text is not None:
             body["body_text"] = body_text
         if body_html is not None:

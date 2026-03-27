@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 
 class TextsResource:
+
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
@@ -35,7 +36,10 @@ class TextsResource:
             offset: Pagination offset.
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
         """
-        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {
+            "limit": limit,
+            "offset": offset,
+        }
         if is_read is not None:
             params["is_read"] = is_read
         data = self._http.get(
@@ -66,13 +70,13 @@ class TextsResource:
         is_read: bool | None = None,
         status: str | None = None,
     ) -> TextMessage:
-        """Update a text message (mark as read, soft-delete).
+        """Update a text message (mark as read, delete).
 
         Args:
             phone_number_id: UUID of the phone number.
             text_id: UUID of the text message.
             is_read: Mark as read (``True``) or unread (``False``).
-            status: Set to ``"deleted"`` to soft-delete.
+            status: Set to ``"deleted"`` to delete.
         """
         body: dict[str, Any] = {}
         if is_read is not None:

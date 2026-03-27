@@ -18,6 +18,7 @@ _DEFAULT_PAGE_SIZE = 50
 
 
 class ThreadsResource:
+
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 

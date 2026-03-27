@@ -272,6 +272,70 @@ export function registerVaultCommands(program: Command): void {
     );
 
   vault
+    .command("grant-access <secret-id>")
+    .description("Grant an identity access to a vault secret")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        secretId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const rule = await inkbox.vault.grantAccess(secretId, identity.id);
+        output(
+          {
+            id: rule.id,
+            vaultSecretId: rule.vaultSecretId,
+            identityId: rule.identityId,
+            createdAt: rule.createdAt,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  vault
+    .command("revoke-access <secret-id>")
+    .description("Revoke an identity's access to a vault secret")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        secretId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        await inkbox.vault.revokeAccess(secretId, identity.id);
+        console.log(
+          `Revoked access to secret '${secretId}' for identity '${cmdOpts.identity}'.`,
+        );
+      }),
+    );
+
+  vault
+    .command("access-list <secret-id>")
+    .description("List identity access rules for a vault secret")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        secretId: string,
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rules = await inkbox.vault.listAccessRules(secretId);
+        output(rules, {
+          json: !!opts.json,
+          columns: ["id", "vaultSecretId", "identityId", "createdAt"],
+        });
+      }),
+    );
+
+  vault
     .command("logins")
     .description("List login credentials for an identity")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

@@ -30,6 +30,41 @@ export function registerMailboxCommands(program: Command): void {
     );
 
   mailbox
+    .command("create")
+    .description("Create a mailbox")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle to link the mailbox to")
+    .option("--display-name <name>", "Display name for the mailbox")
+    .option("--local-part <part>", "Requested email local part (random if omitted)")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          identity: string;
+          displayName?: string;
+          localPart?: string;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const mb = await inkbox.mailboxes.create({
+          agentHandle: cmdOpts.identity,
+          displayName: cmdOpts.displayName,
+          emailLocalPart: cmdOpts.localPart,
+        });
+        output(
+          {
+            emailAddress: mb.emailAddress,
+            id: mb.id,
+            displayName: mb.displayName,
+            status: mb.status,
+            createdAt: mb.createdAt,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  mailbox
     .command("get <email-address>")
     .description("Get mailbox details")
     .action(

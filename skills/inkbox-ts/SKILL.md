@@ -191,9 +191,9 @@ await identity.markTextRead("text-uuid");
 const readResult = await identity.markTextConversationRead("+15167251294");
 console.log(readResult.updatedCount);
 
-// Org-level: search, update, soft-delete
+// Org-level: search, update, delete
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
-await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });   // soft-delete
+await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 ```
 
 ## Vault

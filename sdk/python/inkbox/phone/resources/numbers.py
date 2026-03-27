@@ -19,6 +19,7 @@ _UNSET = object()
 
 
 class PhoneNumbersResource:
+
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
