@@ -6,7 +6,7 @@
 export enum MessageDirection {
   /** Email received from an external sender. */
   INBOUND = "inbound",
-  /** Email sent by the mailbox via SES. */
+  /** Email sent by the mailbox. */
   OUTBOUND = "outbound",
 }
 
@@ -192,4 +192,3 @@ export function parseThreadDetail(r: RawThread): ThreadDetail {
     messages: (r.messages ?? []).map(parseMessage),
   };
 }
-

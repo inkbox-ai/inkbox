@@ -19,7 +19,11 @@ from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.vault._http import HttpTransport as VaultHttpTransport
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.agent_identity import AgentIdentity
-from inkbox.identities.types import AgentIdentitySummary
+from inkbox.identities.types import (
+    AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
+    IdentityVaultInitializeRequest,
+)
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 
 _DEFAULT_BASE_URL = "https://inkbox.ai"
@@ -144,7 +148,7 @@ class Inkbox:
 
     @property
     def mailboxes(self) -> MailboxesResource:
-        """Access org-level mailbox operations (list, get, update, delete)."""
+        """Access org-level mailbox operations (list, get, create, update, delete)."""
         return self._mailboxes
 
     @property
@@ -163,25 +167,36 @@ class Inkbox:
         self,
         agent_handle: str,
         *,
+        create_mailbox: bool = False,
         display_name: str | None = None,
+        email_local_part: str | None = None,
+        vault: IdentityVaultInitializeRequest | None = None,
     ) -> AgentIdentity:
         """
-        Create a new agent identity with an email address.
-
-        The server auto-creates a mailbox for the identity using the
-        ``agent_handle`` as the email local-part.
+        Create a new agent identity.
 
         Args:
             agent_handle: Unique handle for this identity (e.g. ``"sales-bot"``).
-            display_name: Optional human-readable name for the identity.
-                Defaults to ``agent_handle`` on the server if omitted.
+            create_mailbox: Whether to create and link a mailbox in the same
+                request. This is also implied when ``display_name`` or
+                ``email_local_part`` is provided.
+            display_name: Optional human-readable mailbox name.
+            email_local_part: Optional requested mailbox local part.
+            vault: Optional vault-initialization payload for the organisation.
 
         Returns:
-            The created :class:`AgentIdentity` (with ``email_address`` populated).
+            The created :class:`AgentIdentity`.
         """
+        mailbox = None
+        if create_mailbox or display_name is not None or email_local_part is not None:
+            mailbox = IdentityMailboxCreateOptions(
+                display_name=display_name,
+                email_local_part=email_local_part,
+            )
         self._ids_resource.create(
             agent_handle=agent_handle,
-            display_name=display_name,
+            mailbox=mailbox,
+            vault=vault,
         )
         data = self._ids_resource.get(agent_handle)
         return AgentIdentity(data, self)

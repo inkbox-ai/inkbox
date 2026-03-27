@@ -8,9 +8,13 @@ import { HttpTransport } from "../../_http.js";
 import type { ResourceStatus } from "../types.js";
 import {
   AgentIdentitySummary,
+  IdentityMailboxCreateOptions,
+  IdentityVaultInitializeRequest,
   _AgentIdentityData,
   RawAgentIdentitySummary,
   RawAgentIdentityData,
+  identityMailboxCreateOptionsToWire,
+  identityVaultInitializeRequestToWire,
   parseAgentIdentitySummary,
   parseAgentIdentityData,
 } from "../types.js";
@@ -19,19 +23,21 @@ export class IdentitiesResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
-   * Create a new agent identity with an email address.
-   *
-   * The server auto-creates a mailbox for the identity using the
-   * `agentHandle` as the email local-part.
+   * Create a new agent identity.
    *
    * @param options.agentHandle - Unique handle for this identity within your organisation
    *   (e.g. `"sales-agent"` or `"@sales-agent"`).
-   * @param options.displayName - Optional human-readable name for the identity.
-   *   Defaults to `agentHandle` on the server if omitted.
+   * @param options.mailbox - Optional mailbox payload to create and link a mailbox.
+   * @param options.vault - Optional vault-initialization payload for the organisation.
    */
-  async create(options: { agentHandle: string; displayName?: string }): Promise<AgentIdentitySummary> {
+  async create(options: {
+    agentHandle: string;
+    mailbox?: IdentityMailboxCreateOptions;
+    vault?: IdentityVaultInitializeRequest;
+  }): Promise<AgentIdentitySummary> {
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
-    if (options.displayName !== undefined) body["display_name"] = options.displayName;
+    if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
+    if (options.vault !== undefined) body["vault"] = identityVaultInitializeRequestToWire(options.vault);
     const data = await this.http.post<RawAgentIdentitySummary>("/", body);
     return parseAgentIdentitySummary(data);
   }

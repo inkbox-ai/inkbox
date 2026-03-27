@@ -8,12 +8,12 @@ import pytest
 from unittest.mock import MagicMock
 
 from sample_data_identities import IDENTITY_DETAIL_DICT
-from sample_data_mail import MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
+from sample_data_mail import MAILBOX_DICT, MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
 
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
-from inkbox.mail.types import MessageDetail, ThreadDetail
+from inkbox.mail.types import Mailbox, MessageDetail, ThreadDetail
 
 
 def _identity_with_mailbox():
@@ -51,6 +51,26 @@ class TestAgentIdentityGetMessage:
             identity.get_message("bbbb2222-0000-0000-0000-000000000001")
 
 
+class TestAgentIdentityCreateMailbox:
+    def test_create_mailbox_links_mailbox(self):
+        identity, inkbox = _identity_without_mailbox()
+        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
+
+        mailbox = identity.create_mailbox(
+            display_name="Sales Team",
+            email_local_part="sales.team",
+        )
+
+        inkbox._mailboxes.create.assert_called_once_with(
+            agent_handle="sales-agent",
+            display_name="Sales Team",
+            email_local_part="sales.team",
+        )
+        assert mailbox.email_address == MAILBOX_DICT["email_address"]
+        assert identity.email_address == MAILBOX_DICT["email_address"]
+        assert identity.mailbox is not None
+
+
 class TestAgentIdentityGetThread:
     def test_get_thread_returns_thread_detail(self):
         identity, inkbox = _identity_with_mailbox()
@@ -69,5 +89,3 @@ class TestAgentIdentityGetThread:
 
         with pytest.raises(InkboxError, match="no mailbox assigned"):
             identity.get_thread("eeee5555-0000-0000-0000-000000000001")
-
-

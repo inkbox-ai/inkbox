@@ -16,7 +16,7 @@ import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
 import { AgentIdentity } from "./agent_identity.js";
-import type { AgentIdentitySummary } from "./identities/types.js";
+import type { AgentIdentitySummary, CreateIdentityOptions } from "./identities/types.js";
 
 const DEFAULT_BASE_URL = "https://inkbox.ai";
 
@@ -154,7 +154,7 @@ export class Inkbox {
   // Public resource accessors
   // ------------------------------------------------------------------
 
-  /** Org-level mailbox operations (list, get, update, delete). */
+  /** Org-level mailbox operations (list, get, create, update, delete). */
   get mailboxes(): MailboxesResource { return this._mailboxes; }
 
   /** Org-level phone number operations (list, get, provision, release). */
@@ -168,21 +168,29 @@ export class Inkbox {
   // ------------------------------------------------------------------
 
   /**
-   * Create a new agent identity with an email address.
-   *
-   * The server auto-creates a mailbox for the identity using the
-   * `agentHandle` as the email local-part.
+   * Create a new agent identity.
    *
    * @param agentHandle - Unique handle for this identity (e.g. `"sales-bot"`).
-   * @param options.displayName - Optional human-readable name for the identity.
-   *   Defaults to `agentHandle` on the server if omitted.
-   * @returns The created {@link AgentIdentity} (with `emailAddress` populated).
+   * @param options.createMailbox - Whether to create and link a mailbox in the
+   *   same request. This is also implied when `displayName` or `emailLocalPart`
+   *   is provided.
+   * @param options.displayName - Optional human-readable mailbox name.
+   * @param options.emailLocalPart - Optional requested mailbox local part.
+   * @param options.vault - Optional vault-initialization payload.
+   * @returns The created {@link AgentIdentity}.
    */
   async createIdentity(
     agentHandle: string,
-    options: { displayName?: string } = {},
+    options: CreateIdentityOptions = {},
   ): Promise<AgentIdentity> {
-    await this._idsResource.create({ agentHandle, ...options });
+    const mailbox =
+      options.createMailbox || options.displayName !== undefined || options.emailLocalPart !== undefined
+        ? {
+            displayName: options.displayName,
+            emailLocalPart: options.emailLocalPart,
+          }
+        : undefined;
+    await this._idsResource.create({ agentHandle, mailbox, vault: options.vault });
     // POST /identities returns summary (no channel fields); fetch detail so
     // AgentIdentity has a fully-populated _AgentIdentityData.
     const data = await this._idsResource.get(agentHandle);

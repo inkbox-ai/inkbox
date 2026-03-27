@@ -5,10 +5,18 @@ Tests for IdentitiesResource.
 """
 
 from unittest.mock import MagicMock
+from uuid import UUID
 
 from sample_data_identities import IDENTITY_DICT, IDENTITY_DETAIL_DICT
 from inkbox.identities.resources.identities import IdentitiesResource
-from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
+from inkbox.identities.types import (
+    AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
+    IdentityVaultInitializeRequest,
+    _AgentIdentityData,
+)
+from inkbox.vault.crypto import VaultKeyMaterial
+from inkbox.vault.types import VaultKeyType
 
 
 def _resource():
@@ -29,6 +37,64 @@ class TestIdentitiesCreate:
         http.post.assert_called_once_with("/", json={"agent_handle": HANDLE})
         assert isinstance(identity, AgentIdentitySummary)
         assert identity.agent_handle == HANDLE
+
+    def test_creates_identity_with_mailbox_and_vault(self):
+        res, http = _resource()
+        http.post.return_value = {**IDENTITY_DICT, "email_address": "sales.team@inkboxmail.com"}
+
+        identity = res.create(
+            agent_handle=HANDLE,
+            mailbox=IdentityMailboxCreateOptions(
+                display_name="Sales Team",
+                email_local_part="sales.team",
+            ),
+            vault=IdentityVaultInitializeRequest(
+                vault_key=VaultKeyMaterial(
+                    id=UUID("11111111-1111-1111-1111-111111111111"),
+                    wrapped_org_encryption_key="wrapped-primary",
+                    auth_hash="auth-primary",
+                    key_type=VaultKeyType.PRIMARY,
+                ),
+                recovery_keys=[
+                    VaultKeyMaterial(
+                        id=UUID(f"22222222-2222-2222-2222-22222222222{i}"),
+                        wrapped_org_encryption_key=f"wrapped-recovery-{i}",
+                        auth_hash=f"auth-recovery-{i}",
+                        key_type=VaultKeyType.RECOVERY,
+                    )
+                    for i in range(4)
+                ],
+            ),
+        )
+
+        http.post.assert_called_once_with(
+            "/",
+            json={
+                "agent_handle": HANDLE,
+                "mailbox": {
+                    "display_name": "Sales Team",
+                    "email_local_part": "sales.team",
+                },
+                "vault": {
+                    "vault_key": {
+                        "id": "11111111-1111-1111-1111-111111111111",
+                        "wrapped_org_encryption_key": "wrapped-primary",
+                        "auth_hash": "auth-primary",
+                        "key_type": "primary",
+                    },
+                    "recovery_keys": [
+                        {
+                            "id": f"22222222-2222-2222-2222-22222222222{i}",
+                            "wrapped_org_encryption_key": f"wrapped-recovery-{i}",
+                            "auth_hash": f"auth-recovery-{i}",
+                            "key_type": "recovery",
+                        }
+                        for i in range(4)
+                    ],
+                },
+            },
+        )
+        assert identity.email_address == "sales.team@inkboxmail.com"
 
 
 class TestIdentitiesList:
@@ -146,5 +212,4 @@ class TestIdentitiesUnlinkPhoneNumber:
         res.unlink_phone_number(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/phone_number")
-
 

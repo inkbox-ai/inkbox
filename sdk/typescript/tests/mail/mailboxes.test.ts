@@ -49,6 +49,27 @@ describe("MailboxesResource.get", () => {
   });
 });
 
+describe("MailboxesResource.create", () => {
+  it("creates a mailbox for an identity", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+
+    const mailbox = await res.create({
+      agentHandle: "sales-agent",
+      displayName: "Sales Team",
+      emailLocalPart: "sales.team",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
+      agent_handle: "sales-agent",
+      display_name: "Sales Team",
+      email_local_part: "sales.team",
+    });
+    expect(mailbox.emailAddress).toBe("agent01@inkbox.ai");
+  });
+});
+
 describe("MailboxesResource.update", () => {
   it("sends displayName", async () => {
     const http = mockHttp();

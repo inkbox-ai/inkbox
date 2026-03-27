@@ -37,6 +37,26 @@ export class MailboxesResource {
   }
 
   /**
+   * Create and link a mailbox to an existing identity.
+   *
+   * @param options.agentHandle - Handle of the identity that should own the mailbox.
+   * @param options.displayName - Optional human-readable sender name.
+   * @param options.emailLocalPart - Optional requested local part. If omitted,
+   *   the server generates a random address.
+   */
+  async create(options: {
+    agentHandle: string;
+    displayName?: string;
+    emailLocalPart?: string;
+  }): Promise<Mailbox> {
+    const body: Record<string, unknown> = { agent_handle: options.agentHandle };
+    if (options.displayName !== undefined) body["display_name"] = options.displayName;
+    if (options.emailLocalPart !== undefined) body["email_local_part"] = options.emailLocalPart;
+    const data = await this.http.post<RawMailbox>(BASE, body);
+    return parseMailbox(data);
+  }
+
+  /**
    * Update mutable mailbox fields.
    *
    * Only provided fields are applied; omitted fields are left unchanged.

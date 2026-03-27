@@ -97,6 +97,35 @@ describe("AgentIdentity properties", () => {
 });
 
 describe("AgentIdentity channel management", () => {
+  it("createMailbox creates and links a mailbox", async () => {
+    const ink = mockInkbox();
+    ink._mailboxes = {
+      create: vi.fn().mockResolvedValue({
+      id: RAW_MAILBOX.id,
+      emailAddress: RAW_MAILBOX.email_address,
+      displayName: RAW_MAILBOX.display_name,
+      webhookUrl: null,
+      status: RAW_MAILBOX.status,
+      createdAt: new Date(RAW_MAILBOX.created_at),
+      updatedAt: new Date(RAW_MAILBOX.updated_at),
+      }),
+    } as any;
+    const identity = new AgentIdentity(makeData({ mailbox: null, emailAddress: null }), ink);
+
+    const mailbox = await identity.createMailbox({
+      displayName: "Sales Team",
+      emailLocalPart: "sales.team",
+    });
+
+    expect(ink._mailboxes.create).toHaveBeenCalledWith({
+      agentHandle: "sales-agent",
+      displayName: "Sales Team",
+      emailLocalPart: "sales.team",
+    });
+    expect(mailbox.emailAddress).toBe(RAW_MAILBOX.email_address);
+    expect(identity.emailAddress).toBe(RAW_MAILBOX.email_address);
+  });
+
   it("assignMailbox links existing mailbox", async () => {
     const ink = mockInkbox();
     vi.mocked(ink._idsResource.assignMailbox).mockResolvedValue(makeData());
@@ -359,4 +388,3 @@ describe("AgentIdentity management", () => {
     expect(ink._idsResource.delete).toHaveBeenCalledWith("sales-agent");
   });
 });
-

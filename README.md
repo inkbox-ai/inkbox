@@ -25,7 +25,7 @@ Get an API key from the [Inkbox Console](https://inkbox.ai/console), then:
 from inkbox import Inkbox
 
 with Inkbox(api_key="ApiKey_...") as inkbox:
-    # Create an agent identity (mailbox is created automatically)
+    # Create an agent identity with a linked mailbox
     identity = inkbox.create_identity("my-agent", display_name="My Agent")
     identity.provision_phone_number(type="toll_free")
 
@@ -51,7 +51,7 @@ import { Inkbox } from "@inkbox/sdk";
 
 const inkbox = new Inkbox({ apiKey: "ApiKey_..." });
 
-// Create an agent identity (mailbox is created automatically)
+// Create an agent identity with a linked mailbox
 const identity = await inkbox.createIdentity("my-agent", { displayName: "My Agent" });
 const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 

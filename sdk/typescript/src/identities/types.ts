@@ -2,6 +2,8 @@
  * inkbox-identities TypeScript SDK — public types.
  */
 
+import type { VaultKeyMaterial } from "../vault/crypto.js";
+
 /**
  * Allowed lifecycle statuses for identity updates.
  */
@@ -10,6 +12,23 @@ export const ResourceStatus = {
   PAUSED: "paused",
 } as const;
 export type ResourceStatus = (typeof ResourceStatus)[keyof typeof ResourceStatus];
+
+export interface IdentityMailboxCreateOptions {
+  displayName?: string;
+  emailLocalPart?: string;
+}
+
+export interface IdentityVaultInitializeRequest {
+  vaultKey: VaultKeyMaterial;
+  recoveryKeys: VaultKeyMaterial[];
+}
+
+export interface CreateIdentityOptions {
+  createMailbox?: boolean;
+  displayName?: string;
+  emailLocalPart?: string;
+  vault?: IdentityVaultInitializeRequest;
+}
 
 export interface IdentityMailbox {
   id: string;
@@ -136,5 +155,36 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
     ...parseAgentIdentitySummary(r),
     mailbox: r.mailbox ? parseIdentityMailbox(r.mailbox) : null,
     phoneNumber: r.phone_number ? parseIdentityPhoneNumber(r.phone_number) : null,
+  };
+}
+
+export function identityMailboxCreateOptionsToWire(
+  options: IdentityMailboxCreateOptions,
+): Record<string, string> {
+  const body: Record<string, string> = {};
+  if (options.displayName !== undefined) body["display_name"] = options.displayName;
+  if (options.emailLocalPart !== undefined) body["email_local_part"] = options.emailLocalPart;
+  return body;
+}
+
+export function identityVaultInitializeRequestToWire(
+  request: IdentityVaultInitializeRequest,
+): Record<string, unknown> {
+  if (request.recoveryKeys.length !== 4) {
+    throw new Error("recoveryKeys must contain exactly 4 entries");
+  }
+  return {
+    vault_key: {
+      id: request.vaultKey.id,
+      wrapped_org_encryption_key: request.vaultKey.wrappedOrgEncryptionKey,
+      auth_hash: request.vaultKey.authHash,
+      key_type: request.vaultKey.keyType,
+    },
+    recovery_keys: request.recoveryKeys.map((key) => ({
+      id: key.id,
+      wrapped_org_encryption_key: key.wrappedOrgEncryptionKey,
+      auth_hash: key.authHash,
+      key_type: key.keyType,
+    })),
   };
 }

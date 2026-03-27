@@ -205,6 +205,32 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
 
   /**
+   * Create a new mailbox and link it to this identity.
+   *
+   * @param options.displayName - Optional human-readable sender name.
+   * @param options.emailLocalPart - Optional requested mailbox local part.
+   */
+  async createMailbox(
+    options: { displayName?: string; emailLocalPart?: string } = {},
+  ): Promise<IdentityMailbox> {
+    const mailbox = await this._inkbox._mailboxes.create({
+      agentHandle: this.agentHandle,
+      ...options,
+    });
+    const linked: IdentityMailbox = {
+      id: mailbox.id,
+      emailAddress: mailbox.emailAddress,
+      displayName: mailbox.displayName,
+      status: mailbox.status,
+      createdAt: mailbox.createdAt,
+      updatedAt: mailbox.updatedAt,
+    };
+    this._mailbox = linked;
+    this._data.emailAddress = mailbox.emailAddress;
+    return linked;
+  }
+
+  /**
    * Link an existing mailbox to this identity.
    *
    * @param mailboxId - UUID of the mailbox to link. Obtain via
@@ -462,7 +488,7 @@ export class AgentIdentity {
   private _requireMailbox(): void {
     if (!this._mailbox) {
       throw new InkboxError(
-        `Identity '${this.agentHandle}' has no mailbox assigned. Call identity.assignMailbox() first.`,
+        `Identity '${this.agentHandle}' has no mailbox assigned. Call identity.createMailbox() or identity.assignMailbox() first.`,
       );
     }
   }

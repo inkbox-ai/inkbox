@@ -22,8 +22,11 @@ export type {
 } from "./phone/types.js";
 export type {
   AgentIdentitySummary,
+  CreateIdentityOptions,
+  IdentityMailboxCreateOptions,
   IdentityMailbox,
   IdentityPhoneNumber,
+  IdentityVaultInitializeRequest,
 } from "./identities/types.js";
 export { ResourceStatus } from "./identities/types.js";
 export type {

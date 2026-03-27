@@ -12,16 +12,64 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from inkbox.vault.crypto import VaultKeyMaterial
+
 
 class ResourceStatus(StrEnum):
-    """Allowed lifecycle statuses for identity updates."""
-
+    """
+    Allowed lifecycle statuses for identity updates.
+    """
     ACTIVE = "active"
     PAUSED = "paused"
 
 
-def _dt(value: str | None) -> datetime | None:
-    return datetime.fromisoformat(value) if value else None
+@dataclass
+class IdentityMailboxCreateOptions:
+    """
+    Optional mailbox payload nested under identity creation.
+
+    Attributes:
+        display_name: Optional human-readable mailbox name to set when the
+            mailbox is created.
+        email_local_part: Optional requested local part to use before the
+            sending domain. If omitted, the server generates a random one.
+    """
+
+    display_name: str | None = None
+    email_local_part: str | None = None
+
+    def to_wire(self) -> dict[str, str]:
+        """Return a JSON-serializable dict matching the API schema."""
+        body: dict[str, str] = {}
+        if self.display_name is not None:
+            body["display_name"] = self.display_name
+        if self.email_local_part is not None:
+            body["email_local_part"] = self.email_local_part
+        return body
+
+
+@dataclass
+class IdentityVaultInitializeRequest:
+    """
+    Vault initialization payload nested under identity creation.
+
+    Attributes:
+        vault_key: Primary vault key material to register for the new vault.
+        recovery_keys: Exactly four recovery-key materials to register
+            alongside the primary key.
+    """
+
+    vault_key: VaultKeyMaterial
+    recovery_keys: list[VaultKeyMaterial]
+
+    def to_wire(self) -> dict[str, Any]:
+        """Return a JSON-serializable dict matching the API schema."""
+        if len(self.recovery_keys) != 4:
+            raise ValueError("recovery_keys must contain exactly 4 entries")
+        return {
+            "vault_key": self.vault_key.to_wire(),
+            "recovery_keys": [key.to_wire() for key in self.recovery_keys],
+        }
 
 
 @dataclass
@@ -101,7 +149,8 @@ class AgentIdentitySummary:
 
 @dataclass
 class _AgentIdentityData(AgentIdentitySummary):
-    """Agent identity with linked communication channels.
+    """
+    Agent identity with linked communication channels.
 
     Returned by get, assign-mailbox, and assign-phone-number endpoints.
     Internal — users interact with AgentIdentity (the domain class) instead.

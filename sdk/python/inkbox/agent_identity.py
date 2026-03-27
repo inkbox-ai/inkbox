@@ -40,7 +40,7 @@ class AgentIdentity:
         # or
         identity = inkbox.get_identity("support-bot")
 
-    The identity is created with an email address automatically::
+    If the identity has a mailbox, you can communicate directly::
 
         identity.send_email(to=["user@example.com"], subject="Hi", body_text="Hello")
         identity.place_call(to_number="+15555550100", client_websocket_url="wss://my-app.com/ws")
@@ -241,6 +241,30 @@ class AgentIdentity:
         self._credentials = None
 
     ## Channel management
+
+    def create_mailbox(
+        self,
+        *,
+        display_name: str | None = None,
+        email_local_part: str | None = None,
+    ) -> IdentityMailbox:
+        """Create a new mailbox and link it to this identity."""
+        mailbox = self._inkbox._mailboxes.create(
+            agent_handle=self.agent_handle,
+            display_name=display_name,
+            email_local_part=email_local_part,
+        )
+        linked = IdentityMailbox(
+            id=mailbox.id,
+            email_address=mailbox.email_address,
+            display_name=mailbox.display_name,
+            status=mailbox.status,
+            created_at=mailbox.created_at,
+            updated_at=mailbox.updated_at,
+        )
+        self._mailbox = linked
+        self._data.email_address = mailbox.email_address
+        return linked
 
     def assign_mailbox(self, mailbox_id: str) -> IdentityMailbox:
         """Link an existing mailbox to this identity.
@@ -531,7 +555,7 @@ class AgentIdentity:
         if not self._mailbox:
             raise InkboxError(
                 f"Identity '{self.agent_handle}' has no mailbox assigned. "
-                "Call identity.assign_mailbox() first."
+                "Call identity.create_mailbox() or identity.assign_mailbox() first."
             )
 
     def _require_phone(self) -> None:

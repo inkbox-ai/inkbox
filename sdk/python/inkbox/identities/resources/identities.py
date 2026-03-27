@@ -9,7 +9,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.identities.types import AgentIdentitySummary, ResourceStatus, _AgentIdentityData
+from inkbox.identities.types import (
+    AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
+    IdentityVaultInitializeRequest,
+    ResourceStatus,
+    _AgentIdentityData,
+)
 
 if TYPE_CHECKING:
     from inkbox.identities._http import HttpTransport
@@ -23,25 +29,27 @@ class IdentitiesResource:
         self,
         *,
         agent_handle: str,
-        display_name: str | None = None,
+        mailbox: IdentityMailboxCreateOptions | None = None,
+        vault: IdentityVaultInitializeRequest | None = None,
     ) -> AgentIdentitySummary:
-        """Create a new agent identity with an email address.
-
-        The server auto-creates a mailbox for the identity using the
-        ``agent_handle`` as the email local-part.
+        """Create a new agent identity.
 
         Args:
             agent_handle: Unique handle for this identity within your organisation
                 (e.g. ``"sales-agent"`` or ``"@sales-agent"``).
-            display_name: Optional human-readable name for the identity.
-                Defaults to ``agent_handle`` on the server if omitted.
+            mailbox: Optional mailbox payload to create and link a mailbox
+                during identity creation.
+            vault: Optional vault-initialization payload for the organisation.
 
         Returns:
-            The created identity (with ``email_address`` populated).
+            The created identity. ``email_address`` is populated only when a
+            mailbox was created for the identity.
         """
         body: dict[str, Any] = {"agent_handle": agent_handle}
-        if display_name is not None:
-            body["display_name"] = display_name
+        if mailbox is not None:
+            body["mailbox"] = mailbox.to_wire()
+        if vault is not None:
+            body["vault"] = vault.to_wire()
         data = self._http.post("/", json=body)
         return AgentIdentitySummary._from_dict(data)
 
@@ -144,4 +152,3 @@ class IdentitiesResource:
             agent_handle: Handle of the identity.
         """
         self._http.delete(f"/{agent_handle}/phone_number")
-

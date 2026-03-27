@@ -47,6 +47,28 @@ class TestMailboxesGet:
         assert mailbox.display_name == "Agent 01"
 
 
+class TestMailboxesCreate:
+    def test_create_mailbox(self):
+        res, http = _resource()
+        http.post.return_value = MAILBOX_DICT
+
+        mailbox = res.create(
+            agent_handle="sales-agent",
+            display_name="Sales Team",
+            email_local_part="sales.team",
+        )
+
+        http.post.assert_called_once_with(
+            "/mailboxes",
+            json={
+                "agent_handle": "sales-agent",
+                "display_name": "Sales Team",
+                "email_local_part": "sales.team",
+            },
+        )
+        assert mailbox.email_address == "agent01@inkbox.ai"
+
+
 class TestMailboxesUpdate:
     def test_update_display_name(self):
         res, http = _resource()

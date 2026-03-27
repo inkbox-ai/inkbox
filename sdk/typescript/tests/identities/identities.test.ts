@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { IdentitiesResource } from "../../src/identities/resources/identities.js";
 import type { HttpTransport } from "../../src/_http.js";
+import { VaultKeyType } from "../../src/vault/types.js";
 import { RAW_IDENTITY, RAW_IDENTITY_DETAIL } from "../sampleData.js";
 
 function mockHttp() {
@@ -25,6 +26,60 @@ describe("IdentitiesResource.create", () => {
 
     expect(http.post).toHaveBeenCalledWith("/", { agent_handle: HANDLE });
     expect(identity.agentHandle).toBe(HANDLE);
+  });
+
+  it("supports nested mailbox and vault payloads", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_IDENTITY,
+      email_address: "sales.team@inkboxmail.com",
+    });
+    const res = new IdentitiesResource(http);
+
+    const identity = await res.create({
+      agentHandle: HANDLE,
+      mailbox: {
+        displayName: "Sales Team",
+        emailLocalPart: "sales.team",
+      },
+      vault: {
+        vaultKey: {
+          id: "11111111-1111-1111-1111-111111111111",
+          wrappedOrgEncryptionKey: "wrapped-primary",
+          authHash: "auth-primary",
+          keyType: VaultKeyType.PRIMARY,
+        },
+        recoveryKeys: Array.from({ length: 4 }, (_, i) => ({
+          id: `22222222-2222-2222-2222-22222222222${i}`,
+          wrappedOrgEncryptionKey: `wrapped-recovery-${i}`,
+          authHash: `auth-recovery-${i}`,
+          keyType: VaultKeyType.RECOVERY,
+        })),
+      },
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/", {
+      agent_handle: HANDLE,
+      mailbox: {
+        display_name: "Sales Team",
+        email_local_part: "sales.team",
+      },
+      vault: {
+        vault_key: {
+          id: "11111111-1111-1111-1111-111111111111",
+          wrapped_org_encryption_key: "wrapped-primary",
+          auth_hash: "auth-primary",
+          key_type: "primary",
+        },
+        recovery_keys: Array.from({ length: 4 }, (_, i) => ({
+          id: `22222222-2222-2222-2222-22222222222${i}`,
+          wrapped_org_encryption_key: `wrapped-recovery-${i}`,
+          auth_hash: `auth-recovery-${i}`,
+          key_type: "recovery",
+        })),
+      },
+    });
+    expect(identity.emailAddress).toBe("sales.team@inkboxmail.com");
   });
 });
 
@@ -162,4 +217,3 @@ describe("IdentitiesResource.unlinkPhoneNumber", () => {
     expect(http.delete).toHaveBeenCalledWith(`/${HANDLE}/phone_number`);
   });
 });
-

@@ -95,6 +95,44 @@ describe("Inkbox.createIdentity", () => {
     expect(identity).toBeInstanceOf(AgentIdentity);
     expect(identity.agentHandle).toBe("sales-agent");
   });
+
+  it("maps mailbox convenience options into the nested request payload", async () => {
+    const ink = makeInkbox();
+    vi.spyOn(ink._idsResource, "create").mockResolvedValue({
+      id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
+      agentHandle: RAW_IDENTITY.agent_handle,
+      status: RAW_IDENTITY.status,
+      emailAddress: "sales.team@inkboxmail.com",
+      createdAt: RAW_IDENTITY.created_at,
+      updatedAt: RAW_IDENTITY.updated_at,
+    });
+    vi.spyOn(ink._idsResource, "get").mockResolvedValue({
+      id: RAW_IDENTITY_DETAIL.id,
+      organizationId: RAW_IDENTITY_DETAIL.organization_id,
+      agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
+      status: RAW_IDENTITY_DETAIL.status,
+      emailAddress: RAW_IDENTITY_DETAIL.email_address,
+      createdAt: RAW_IDENTITY_DETAIL.created_at,
+      updatedAt: RAW_IDENTITY_DETAIL.updated_at,
+      mailbox: null,
+      phoneNumber: null,
+    });
+
+    await ink.createIdentity("sales-agent", {
+      displayName: "Sales Team",
+      emailLocalPart: "sales.team",
+    });
+
+    expect(ink._idsResource.create).toHaveBeenCalledWith({
+      agentHandle: "sales-agent",
+      mailbox: {
+        displayName: "Sales Team",
+        emailLocalPart: "sales.team",
+      },
+      vault: undefined,
+    });
+  });
 });
 
 describe("Inkbox.getIdentity", () => {

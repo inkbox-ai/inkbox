@@ -36,6 +36,29 @@ class MailboxesResource:
         data = self._http.get(f"{_BASE}/{email_address}")
         return Mailbox._from_dict(data)
 
+    def create(
+        self,
+        *,
+        agent_handle: str,
+        display_name: str | None = None,
+        email_local_part: str | None = None,
+    ) -> Mailbox:
+        """Create and link a mailbox to an existing identity.
+
+        Args:
+            agent_handle: Handle of the identity that should own the mailbox.
+            display_name: Optional human-readable sender name.
+            email_local_part: Optional requested local part. If omitted, the
+                server generates a random address.
+        """
+        body: dict[str, Any] = {"agent_handle": agent_handle}
+        if display_name is not None:
+            body["display_name"] = display_name
+        if email_local_part is not None:
+            body["email_local_part"] = email_local_part
+        data = self._http.post(_BASE, json=body)
+        return Mailbox._from_dict(data)
+
     def update(
         self,
         email_address: str,
