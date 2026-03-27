@@ -81,16 +81,6 @@ export class VaultResource {
   }
 
   /**
-   * Delete the vault, its keys, and all secrets.
-   *
-   * The organisation can re-initialize the vault after deletion by
-   * calling the initialize flow again.
-   */
-  async delete(): Promise<void> {
-    await this.http.delete("/");
-  }
-
-  /**
    * Initialize a new vault for the organisation.
    *
    * Generates a random org encryption key, wraps it with the provided
@@ -246,26 +236,6 @@ export class VaultResource {
 
     const data = await this.http.put<RawVaultKey>("/keys/primary", body);
     return parseVaultKey(data);
-  }
-
-  /**
-   * Delete a vault key by providing the key string.
-   *
-   * Derives the `auth_hash` from the vault key (or recovery code) and
-   * sends `DELETE /keys/{auth_hash}`.
-   *
-   * The server refuses to delete the last active primary key (409).
-   *
-   * @param vaultKeyOrRecoveryCode - The vault key or recovery code to
-   *   delete.
-   * @throws If the key is not found or is the last active primary key.
-   */
-  async deleteKey(vaultKeyOrRecoveryCode: string): Promise<void> {
-    const vaultInfo = await this.info();
-    const salt = deriveSalt(vaultInfo.organizationId);
-    const masterKey = await deriveMasterKey(vaultKeyOrRecoveryCode, salt);
-    const authHash = computeAuthHash(masterKey);
-    await this.http.delete(`/keys/${authHash}`);
   }
 
   // ------------------------------------------------------------------

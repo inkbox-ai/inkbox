@@ -67,15 +67,6 @@ class VaultResource:
         data = self._http.get("/info")
         return VaultInfo._from_dict(data)
 
-    def delete(self) -> None:
-        """
-        Delete the vault, its keys, and all secrets.
-
-        The organisation can re-initialize the vault after deletion by
-        calling the initialize flow again.
-        """
-        self._http.delete("/")
-
     def initialize(
         self,
         vault_key: str,
@@ -251,29 +242,6 @@ class VaultResource:
 
         data = self._http.put("/keys/primary", json=body)
         return VaultKey._from_dict(data)
-
-    def delete_key(self, vault_key_or_recovery_code: str) -> None:
-        """
-        Delete a vault key by providing the key string.
-
-        Derives the ``auth_hash`` from the vault key (or recovery code)
-        and sends ``DELETE /keys/{auth_hash}``.
-
-        The server refuses to delete the last active primary key (409).
-
-        Args:
-            vault_key_or_recovery_code: The vault key or recovery code
-                to delete.
-
-        Raises:
-            InkboxAPIError: If the key is not found (404) or is the last
-                active primary key (409).
-        """
-        vault_info = self.info()
-        salt = derive_salt(vault_info.organization_id)
-        master_key = derive_master_key(vault_key_or_recovery_code, salt)
-        auth_hash = compute_auth_hash(master_key)
-        self._http.delete(f"/keys/{auth_hash}")
 
     ## Keys (read-only via API key)
 
