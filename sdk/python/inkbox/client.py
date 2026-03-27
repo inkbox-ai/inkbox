@@ -22,9 +22,11 @@ from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
-    IdentityVaultInitializeRequest,
+    IdentityPhoneNumberCreateOptions,
 )
 from inkbox.signing_keys import SigningKey, SigningKeysResource
+from uuid import UUID
+from typing import Literal
 
 _DEFAULT_BASE_URL = "https://inkbox.ai"
 
@@ -170,7 +172,8 @@ class Inkbox:
         create_mailbox: bool = False,
         display_name: str | None = None,
         email_local_part: str | None = None,
-        vault: IdentityVaultInitializeRequest | None = None,
+        phone_number: IdentityPhoneNumberCreateOptions | None = None,
+        vault_secret_ids: UUID | str | list[UUID | str] | Literal["*", "all"] | None = None,
     ) -> AgentIdentity:
         """
         Create a new agent identity.
@@ -182,7 +185,11 @@ class Inkbox:
                 ``email_local_part`` is provided.
             display_name: Optional human-readable mailbox name.
             email_local_part: Optional requested mailbox local part.
-            vault: Optional vault-initialization payload for the organisation.
+            phone_number: Optional phone-number provisioning payload to create
+                and link a number in the same request.
+            vault_secret_ids: Optional vault secret selection to attach to the
+                new identity. Use ``"*"``, ``"all"``, a single UUID/string, or
+                a list of UUIDs/strings.
 
         Returns:
             The created :class:`AgentIdentity`.
@@ -196,7 +203,8 @@ class Inkbox:
         self._ids_resource.create(
             agent_handle=agent_handle,
             mailbox=mailbox,
-            vault=vault,
+            phone_number=phone_number,
+            vault_secret_ids=vault_secret_ids,
         )
         data = self._ids_resource.get(agent_handle)
         return AgentIdentity(data, self)

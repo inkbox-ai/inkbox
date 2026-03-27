@@ -25,8 +25,8 @@ export type {
   CreateIdentityOptions,
   IdentityMailboxCreateOptions,
   IdentityMailbox,
+  IdentityPhoneNumberCreateOptions,
   IdentityPhoneNumber,
-  IdentityVaultInitializeRequest,
 } from "./identities/types.js";
 export { ResourceStatus } from "./identities/types.js";
 export type {

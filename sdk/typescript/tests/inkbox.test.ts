@@ -96,7 +96,7 @@ describe("Inkbox.createIdentity", () => {
     expect(identity.agentHandle).toBe("sales-agent");
   });
 
-  it("maps mailbox convenience options into the nested request payload", async () => {
+  it("maps mailbox, phone, and vault secret options into the nested request payload", async () => {
     const ink = makeInkbox();
     vi.spyOn(ink._idsResource, "create").mockResolvedValue({
       id: RAW_IDENTITY.id,
@@ -122,6 +122,11 @@ describe("Inkbox.createIdentity", () => {
     await ink.createIdentity("sales-agent", {
       displayName: "Sales Team",
       emailLocalPart: "sales.team",
+      phoneNumber: {
+        incomingCallAction: "webhook",
+        incomingCallWebhookUrl: "https://example.com/calls",
+      },
+      vaultSecretIds: ["secret-1", "secret-2"],
     });
 
     expect(ink._idsResource.create).toHaveBeenCalledWith({
@@ -130,7 +135,11 @@ describe("Inkbox.createIdentity", () => {
         displayName: "Sales Team",
         emailLocalPart: "sales.team",
       },
-      vault: undefined,
+      phoneNumber: {
+        incomingCallAction: "webhook",
+        incomingCallWebhookUrl: "https://example.com/calls",
+      },
+      vaultSecretIds: ["secret-1", "secret-2"],
     });
   });
 });

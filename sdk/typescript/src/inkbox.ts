@@ -176,7 +176,9 @@ export class Inkbox {
    *   is provided.
    * @param options.displayName - Optional human-readable mailbox name.
    * @param options.emailLocalPart - Optional requested mailbox local part.
-   * @param options.vault - Optional vault-initialization payload.
+   * @param options.phoneNumber - Optional phone-number provisioning payload.
+   * @param options.vaultSecretIds - Optional vault secret selection to attach
+   *   to the new identity.
    * @returns The created {@link AgentIdentity}.
    */
   async createIdentity(
@@ -190,7 +192,12 @@ export class Inkbox {
             emailLocalPart: options.emailLocalPart,
           }
         : undefined;
-    await this._idsResource.create({ agentHandle, mailbox, vault: options.vault });
+    await this._idsResource.create({
+      agentHandle,
+      mailbox,
+      phoneNumber: options.phoneNumber,
+      vaultSecretIds: options.vaultSecretIds,
+    });
     // POST /identities returns summary (no channel fields); fetch detail so
     // AgentIdentity has a fully-populated _AgentIdentityData.
     const data = await this._idsResource.get(agentHandle);

@@ -12,8 +12,9 @@ from uuid import UUID
 from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
-    IdentityVaultInitializeRequest,
+    IdentityPhoneNumberCreateOptions,
     ResourceStatus,
+    vault_secret_ids_to_wire,
     _AgentIdentityData,
 )
 
@@ -30,7 +31,8 @@ class IdentitiesResource:
         *,
         agent_handle: str,
         mailbox: IdentityMailboxCreateOptions | None = None,
-        vault: IdentityVaultInitializeRequest | None = None,
+        phone_number: IdentityPhoneNumberCreateOptions | None = None,
+        vault_secret_ids: UUID | str | list[UUID | str] | None = None,
     ) -> AgentIdentitySummary:
         """Create a new agent identity.
 
@@ -39,7 +41,10 @@ class IdentitiesResource:
                 (e.g. ``"sales-agent"`` or ``"@sales-agent"``).
             mailbox: Optional mailbox payload to create and link a mailbox
                 during identity creation.
-            vault: Optional vault-initialization payload for the organisation.
+            phone_number: Optional phone-number provisioning payload.
+            vault_secret_ids: Optional vault secret selection to attach to the
+                new identity. Use ``"*"``, ``"all"``, a single UUID/string, or
+                a list of UUIDs/strings.
 
         Returns:
             The created identity. ``email_address`` is populated only when a
@@ -48,8 +53,10 @@ class IdentitiesResource:
         body: dict[str, Any] = {"agent_handle": agent_handle}
         if mailbox is not None:
             body["mailbox"] = mailbox.to_wire()
-        if vault is not None:
-            body["vault"] = vault.to_wire()
+        if phone_number is not None:
+            body["phone_number"] = phone_number.to_wire()
+        if vault_secret_ids is not None:
+            body["vault_secret_ids"] = vault_secret_ids_to_wire(vault_secret_ids)
         data = self._http.post("/", json=body)
         return AgentIdentitySummary._from_dict(data)
 

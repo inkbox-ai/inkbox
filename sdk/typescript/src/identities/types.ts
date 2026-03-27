@@ -2,8 +2,6 @@
  * inkbox-identities TypeScript SDK — public types.
  */
 
-import type { VaultKeyMaterial } from "../vault/crypto.js";
-
 /**
  * Allowed lifecycle statuses for identity updates.
  */
@@ -18,16 +16,21 @@ export interface IdentityMailboxCreateOptions {
   emailLocalPart?: string;
 }
 
-export interface IdentityVaultInitializeRequest {
-  vaultKey: VaultKeyMaterial;
-  recoveryKeys: VaultKeyMaterial[];
+export interface IdentityPhoneNumberCreateOptions {
+  type?: string;
+  state?: string;
+  incomingCallAction?: string;
+  clientWebsocketUrl?: string;
+  incomingCallWebhookUrl?: string;
+  incomingTextWebhookUrl?: string;
 }
 
 export interface CreateIdentityOptions {
   createMailbox?: boolean;
   displayName?: string;
   emailLocalPart?: string;
-  vault?: IdentityVaultInitializeRequest;
+  phoneNumber?: IdentityPhoneNumberCreateOptions;
+  vaultSecretIds?: string | string[] | "*" | "all";
 }
 
 export interface IdentityMailbox {
@@ -167,24 +170,31 @@ export function identityMailboxCreateOptionsToWire(
   return body;
 }
 
-export function identityVaultInitializeRequestToWire(
-  request: IdentityVaultInitializeRequest,
+export function identityPhoneNumberCreateOptionsToWire(
+  options: IdentityPhoneNumberCreateOptions,
 ): Record<string, unknown> {
-  if (request.recoveryKeys.length !== 4) {
-    throw new Error("recoveryKeys must contain exactly 4 entries");
+  if (options.type === "toll_free" && options.state !== undefined) {
+    throw new Error("state is only supported for local phone numbers");
   }
-  return {
-    vault_key: {
-      id: request.vaultKey.id,
-      wrapped_org_encryption_key: request.vaultKey.wrappedOrgEncryptionKey,
-      auth_hash: request.vaultKey.authHash,
-      key_type: request.vaultKey.keyType,
-    },
-    recovery_keys: request.recoveryKeys.map((key) => ({
-      id: key.id,
-      wrapped_org_encryption_key: key.wrappedOrgEncryptionKey,
-      auth_hash: key.authHash,
-      key_type: key.keyType,
-    })),
-  };
+  if (options.incomingCallAction === "auto_accept" && options.clientWebsocketUrl === undefined) {
+    throw new Error("clientWebsocketUrl is required for auto_accept");
+  }
+  if (options.incomingCallAction === "webhook" && options.incomingCallWebhookUrl === undefined) {
+    throw new Error("incomingCallWebhookUrl is required for webhook");
+  }
+
+  const body: Record<string, unknown> = {};
+  if (options.type !== undefined) body["type"] = options.type;
+  if (options.state !== undefined) body["state"] = options.state;
+  if (options.incomingCallAction !== undefined) body["incoming_call_action"] = options.incomingCallAction;
+  if (options.clientWebsocketUrl !== undefined) body["client_websocket_url"] = options.clientWebsocketUrl;
+  if (options.incomingCallWebhookUrl !== undefined) body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
+  if (options.incomingTextWebhookUrl !== undefined) body["incoming_text_webhook_url"] = options.incomingTextWebhookUrl;
+  return body;
+}
+
+export function vaultSecretIdsToWire(
+  value: string | string[] | "*" | "all" | undefined,
+): string | string[] | "*" | "all" | undefined {
+  return value;
 }

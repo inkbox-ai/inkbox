@@ -9,10 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
-
-from inkbox.vault.crypto import VaultKeyMaterial
 
 
 class ResourceStatus(StrEnum):
@@ -49,27 +47,61 @@ class IdentityMailboxCreateOptions:
 
 
 @dataclass
-class IdentityVaultInitializeRequest:
+class IdentityPhoneNumberCreateOptions:
     """
-    Vault initialization payload nested under identity creation.
+    Optional phone-number provisioning payload nested under identity creation.
 
     Attributes:
-        vault_key: Primary vault key material to register for the new vault.
-        recovery_keys: Exactly four recovery-key materials to register
-            alongside the primary key.
+        type: Type of phone number to provision. Defaults to ``"toll_free"``.
+        state: Optional US state abbreviation filter for local numbers.
+        incoming_call_action: How to handle inbound calls on the provisioned number.
+        client_websocket_url: WebSocket URL for ``"auto_accept"`` call handling.
+        incoming_call_webhook_url: Webhook URL for ``"webhook"`` call handling.
+        incoming_text_webhook_url: Webhook URL for inbound text notifications.
     """
 
-    vault_key: VaultKeyMaterial
-    recovery_keys: list[VaultKeyMaterial]
+    type: str = "toll_free"
+    state: str | None = None
+    incoming_call_action: str = "auto_reject"
+    client_websocket_url: str | None = None
+    incoming_call_webhook_url: str | None = None
+    incoming_text_webhook_url: str | None = None
 
     def to_wire(self) -> dict[str, Any]:
         """Return a JSON-serializable dict matching the API schema."""
-        if len(self.recovery_keys) != 4:
-            raise ValueError("recovery_keys must contain exactly 4 entries")
-        return {
-            "vault_key": self.vault_key.to_wire(),
-            "recovery_keys": [key.to_wire() for key in self.recovery_keys],
+        if self.type == "toll_free" and self.state is not None:
+            raise ValueError("state is only supported for local phone numbers")
+        if self.incoming_call_action == "auto_accept" and self.client_websocket_url is None:
+            raise ValueError("client_websocket_url is required for auto_accept")
+        if self.incoming_call_action == "webhook" and self.incoming_call_webhook_url is None:
+            raise ValueError("incoming_call_webhook_url is required for webhook")
+
+        body: dict[str, Any] = {
+            "type": self.type,
+            "incoming_call_action": self.incoming_call_action,
         }
+        if self.state is not None:
+            body["state"] = self.state
+        if self.client_websocket_url is not None:
+            body["client_websocket_url"] = self.client_websocket_url
+        if self.incoming_call_webhook_url is not None:
+            body["incoming_call_webhook_url"] = self.incoming_call_webhook_url
+        if self.incoming_text_webhook_url is not None:
+            body["incoming_text_webhook_url"] = self.incoming_text_webhook_url
+        return body
+
+
+def vault_secret_ids_to_wire(
+    value: UUID | str | list[UUID | str] | Literal["*", "all"] | None,
+) -> str | list[str] | Literal["*", "all"] | None:
+    """Return a JSON-serializable vault secret selection value."""
+    if value in (None, "*", "all"):
+        return value
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, str):
+        return value
+    return [str(item) for item in value]
 
 
 @dataclass

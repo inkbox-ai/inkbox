@@ -9,14 +9,15 @@ import type { ResourceStatus } from "../types.js";
 import {
   AgentIdentitySummary,
   IdentityMailboxCreateOptions,
-  IdentityVaultInitializeRequest,
+  IdentityPhoneNumberCreateOptions,
   _AgentIdentityData,
   RawAgentIdentitySummary,
   RawAgentIdentityData,
   identityMailboxCreateOptionsToWire,
-  identityVaultInitializeRequestToWire,
+  identityPhoneNumberCreateOptionsToWire,
   parseAgentIdentitySummary,
   parseAgentIdentityData,
+  vaultSecretIdsToWire,
 } from "../types.js";
 
 export class IdentitiesResource {
@@ -28,16 +29,19 @@ export class IdentitiesResource {
    * @param options.agentHandle - Unique handle for this identity within your organisation
    *   (e.g. `"sales-agent"` or `"@sales-agent"`).
    * @param options.mailbox - Optional mailbox payload to create and link a mailbox.
-   * @param options.vault - Optional vault-initialization payload for the organisation.
+   * @param options.phoneNumber - Optional phone-number provisioning payload.
+   * @param options.vaultSecretIds - Optional vault secret selection to attach to the identity.
    */
   async create(options: {
     agentHandle: string;
     mailbox?: IdentityMailboxCreateOptions;
-    vault?: IdentityVaultInitializeRequest;
+    phoneNumber?: IdentityPhoneNumberCreateOptions;
+    vaultSecretIds?: string | string[] | "*" | "all";
   }): Promise<AgentIdentitySummary> {
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
     if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
-    if (options.vault !== undefined) body["vault"] = identityVaultInitializeRequestToWire(options.vault);
+    if (options.phoneNumber !== undefined) body["phone_number"] = identityPhoneNumberCreateOptionsToWire(options.phoneNumber);
+    if (options.vaultSecretIds !== undefined) body["vault_secret_ids"] = vaultSecretIdsToWire(options.vaultSecretIds);
     const data = await this.http.post<RawAgentIdentitySummary>("/", body);
     return parseAgentIdentitySummary(data);
   }

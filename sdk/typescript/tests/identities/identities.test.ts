@@ -2,7 +2,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { IdentitiesResource } from "../../src/identities/resources/identities.js";
 import type { HttpTransport } from "../../src/_http.js";
-import { VaultKeyType } from "../../src/vault/types.js";
 import { RAW_IDENTITY, RAW_IDENTITY_DETAIL } from "../sampleData.js";
 
 function mockHttp() {
@@ -28,7 +27,7 @@ describe("IdentitiesResource.create", () => {
     expect(identity.agentHandle).toBe(HANDLE);
   });
 
-  it("supports nested mailbox and vault payloads", async () => {
+  it("supports nested mailbox, phone number, and vault secret payloads", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue({
       ...RAW_IDENTITY,
@@ -42,20 +41,17 @@ describe("IdentitiesResource.create", () => {
         displayName: "Sales Team",
         emailLocalPart: "sales.team",
       },
-      vault: {
-        vaultKey: {
-          id: "11111111-1111-1111-1111-111111111111",
-          wrappedOrgEncryptionKey: "wrapped-primary",
-          authHash: "auth-primary",
-          keyType: VaultKeyType.PRIMARY,
-        },
-        recoveryKeys: Array.from({ length: 4 }, (_, i) => ({
-          id: `22222222-2222-2222-2222-22222222222${i}`,
-          wrappedOrgEncryptionKey: `wrapped-recovery-${i}`,
-          authHash: `auth-recovery-${i}`,
-          keyType: VaultKeyType.RECOVERY,
-        })),
+      phoneNumber: {
+        type: "local",
+        state: "NY",
+        incomingCallAction: "webhook",
+        incomingCallWebhookUrl: "https://example.com/calls",
+        incomingTextWebhookUrl: "https://example.com/texts",
       },
+      vaultSecretIds: [
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+      ],
     });
 
     expect(http.post).toHaveBeenCalledWith("/", {
@@ -64,22 +60,35 @@ describe("IdentitiesResource.create", () => {
         display_name: "Sales Team",
         email_local_part: "sales.team",
       },
-      vault: {
-        vault_key: {
-          id: "11111111-1111-1111-1111-111111111111",
-          wrapped_org_encryption_key: "wrapped-primary",
-          auth_hash: "auth-primary",
-          key_type: "primary",
-        },
-        recovery_keys: Array.from({ length: 4 }, (_, i) => ({
-          id: `22222222-2222-2222-2222-22222222222${i}`,
-          wrapped_org_encryption_key: `wrapped-recovery-${i}`,
-          auth_hash: `auth-recovery-${i}`,
-          key_type: "recovery",
-        })),
+      phone_number: {
+        type: "local",
+        state: "NY",
+        incoming_call_action: "webhook",
+        incoming_call_webhook_url: "https://example.com/calls",
+        incoming_text_webhook_url: "https://example.com/texts",
       },
+      vault_secret_ids: [
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+      ],
     });
     expect(identity.emailAddress).toBe("sales.team@inkboxmail.com");
+  });
+
+  it("supports a single vault secret ID", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY);
+    const res = new IdentitiesResource(http);
+
+    await res.create({
+      agentHandle: HANDLE,
+      vaultSecretIds: "11111111-1111-1111-1111-111111111111",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/", {
+      agent_handle: HANDLE,
+      vault_secret_ids: "11111111-1111-1111-1111-111111111111",
+    });
   });
 });
 

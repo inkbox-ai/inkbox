@@ -12,11 +12,9 @@ from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
-    IdentityVaultInitializeRequest,
+    IdentityPhoneNumberCreateOptions,
     _AgentIdentityData,
 )
-from inkbox.vault.crypto import VaultKeyMaterial
-from inkbox.vault.types import VaultKeyType
 
 
 def _resource():
@@ -38,7 +36,7 @@ class TestIdentitiesCreate:
         assert isinstance(identity, AgentIdentitySummary)
         assert identity.agent_handle == HANDLE
 
-    def test_creates_identity_with_mailbox_and_vault(self):
+    def test_creates_identity_with_mailbox_phone_number_and_secret_access(self):
         res, http = _resource()
         http.post.return_value = {**IDENTITY_DICT, "email_address": "sales.team@inkboxmail.com"}
 
@@ -48,23 +46,17 @@ class TestIdentitiesCreate:
                 display_name="Sales Team",
                 email_local_part="sales.team",
             ),
-            vault=IdentityVaultInitializeRequest(
-                vault_key=VaultKeyMaterial(
-                    id=UUID("11111111-1111-1111-1111-111111111111"),
-                    wrapped_org_encryption_key="wrapped-primary",
-                    auth_hash="auth-primary",
-                    key_type=VaultKeyType.PRIMARY,
-                ),
-                recovery_keys=[
-                    VaultKeyMaterial(
-                        id=UUID(f"22222222-2222-2222-2222-22222222222{i}"),
-                        wrapped_org_encryption_key=f"wrapped-recovery-{i}",
-                        auth_hash=f"auth-recovery-{i}",
-                        key_type=VaultKeyType.RECOVERY,
-                    )
-                    for i in range(4)
-                ],
+            phone_number=IdentityPhoneNumberCreateOptions(
+                type="local",
+                state="NY",
+                incoming_call_action="webhook",
+                incoming_call_webhook_url="https://example.com/calls",
+                incoming_text_webhook_url="https://example.com/texts",
             ),
+            vault_secret_ids=[
+                UUID("11111111-1111-1111-1111-111111111111"),
+                UUID("22222222-2222-2222-2222-222222222222"),
+            ],
         )
 
         http.post.assert_called_once_with(
@@ -75,26 +67,35 @@ class TestIdentitiesCreate:
                     "display_name": "Sales Team",
                     "email_local_part": "sales.team",
                 },
-                "vault": {
-                    "vault_key": {
-                        "id": "11111111-1111-1111-1111-111111111111",
-                        "wrapped_org_encryption_key": "wrapped-primary",
-                        "auth_hash": "auth-primary",
-                        "key_type": "primary",
-                    },
-                    "recovery_keys": [
-                        {
-                            "id": f"22222222-2222-2222-2222-22222222222{i}",
-                            "wrapped_org_encryption_key": f"wrapped-recovery-{i}",
-                            "auth_hash": f"auth-recovery-{i}",
-                            "key_type": "recovery",
-                        }
-                        for i in range(4)
-                    ],
+                "phone_number": {
+                    "type": "local",
+                    "state": "NY",
+                    "incoming_call_action": "webhook",
+                    "incoming_call_webhook_url": "https://example.com/calls",
+                    "incoming_text_webhook_url": "https://example.com/texts",
                 },
+                "vault_secret_ids": [
+                    "11111111-1111-1111-1111-111111111111",
+                    "22222222-2222-2222-2222-222222222222",
+                ],
             },
         )
         assert identity.email_address == "sales.team@inkboxmail.com"
+
+    def test_creates_identity_with_single_vault_secret_id(self):
+        res, http = _resource()
+        http.post.return_value = IDENTITY_DICT
+
+        secret_id = UUID("11111111-1111-1111-1111-111111111111")
+        res.create(agent_handle=HANDLE, vault_secret_ids=secret_id)
+
+        http.post.assert_called_once_with(
+            "/",
+            json={
+                "agent_handle": HANDLE,
+                "vault_secret_ids": "11111111-1111-1111-1111-111111111111",
+            },
+        )
 
 
 class TestIdentitiesList:
@@ -212,4 +213,3 @@ class TestIdentitiesUnlinkPhoneNumber:
         res.unlink_phone_number(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/phone_number")
-
