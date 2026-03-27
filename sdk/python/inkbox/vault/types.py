@@ -177,6 +177,25 @@ class AccessRule:
         )
 
 
+@dataclass
+class VaultInitializeResult:
+    """
+    Result of vault initialization.
+
+    Attributes:
+        vault_id: UUID of the newly created vault.
+        vault_key_id: UUID of the primary vault key.
+        recovery_key_count: Number of recovery keys created (always 4).
+        recovery_codes: The four recovery code strings.
+            Store securely — they cannot be retrieved again.
+    """
+
+    vault_id: UUID
+    vault_key_id: UUID
+    recovery_key_count: int
+    recovery_codes: list[str]
+
+
 ## Client-side structured secret payloads
 
 @dataclass

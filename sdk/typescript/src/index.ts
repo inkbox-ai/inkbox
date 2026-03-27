@@ -35,6 +35,7 @@ export { ResourceStatus } from "./identities/types.js";
 export type {
   AccessRule,
   VaultInfo,
+  VaultInitializeResult,
   VaultKey,
   VaultSecret,
   VaultSecretDetail,

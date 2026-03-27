@@ -17,6 +17,9 @@ from inkbox.vault.crypto import (
     derive_master_key,
     derive_salt,
     encrypt_payload,
+    generate_org_encryption_key,
+    generate_recovery_code,
+    generate_vault_key_material,
     unwrap_org_key,
 )
 from inkbox.vault.types import (
@@ -24,6 +27,7 @@ from inkbox.vault.types import (
     DecryptedVaultSecret,
     SecretPayload,
     VaultInfo,
+    VaultInitializeResult,
     VaultKey,
     VaultSecret,
     VaultSecretDetail,
@@ -71,6 +75,205 @@ class VaultResource:
         calling the initialize flow again.
         """
         self._http.delete("/")
+
+    def initialize(
+        self,
+        vault_key: str,
+        organization_id: str,
+    ) -> VaultInitializeResult:
+        """
+        Initialize a new vault for the organisation.
+
+        Generates a random org encryption key, wraps it with the provided
+        vault key, and creates four recovery codes.  All cryptographic
+        material is generated client-side; the server only receives
+        ciphertexts and identifiers.
+
+        Args:
+            vault_key: The vault key (password) to protect the vault.
+                Must be at least 16 characters with uppercase, lowercase,
+                digit, and special character.
+            organization_id: The organisation ID (needed for key
+                derivation; the vault does not exist yet so it cannot
+                be fetched).
+
+        Returns:
+            :class:`~inkbox.vault.types.VaultInitializeResult` containing
+            the vault ID, primary key ID, and recovery codes.  The
+            recovery codes must be stored securely — they cannot be
+            retrieved again.
+
+        Raises:
+            InkboxAPIError: If the organisation already has an active vault (409).
+        """
+        org_encryption_key = generate_org_encryption_key()
+
+        primary_material = generate_vault_key_material(
+            vault_key,
+            organization_id,
+            org_encryption_key,
+        )
+
+        recovery_codes: list[str] = []
+        recovery_wires: list[dict[str, str]] = []
+        for _ in range(4):
+            code, material = generate_recovery_code(
+                organization_id,
+                org_encryption_key,
+            )
+            recovery_codes.append(code)
+            recovery_wires.append(material.to_wire())
+
+        data = self._http.post(
+            "/initialize",
+            json={
+                "vault_key": primary_material.to_wire(),
+                "recovery_keys": recovery_wires,
+            },
+        )
+
+        return VaultInitializeResult(
+            vault_id=UUID(data["vault_id"]),
+            vault_key_id=UUID(data["vault_key_id"]),
+            recovery_key_count=data["recovery_key_count"],
+            recovery_codes=recovery_codes,
+        )
+
+    def update_key(
+        self,
+        new_vault_key: str,
+        *,
+        current_vault_key: str | None = None,
+        recovery_code: str | None = None,
+    ) -> VaultKey:
+        """
+        Replace the primary vault key (change the vault password).
+
+        Exactly one of ``current_vault_key`` or ``recovery_code`` must be
+        provided to authenticate the change:
+
+        - **Normal update** (``current_vault_key``): proves knowledge of
+          the current primary key.  The old key is deleted.
+        - **Recovery update** (``recovery_code``): proves knowledge of a
+          recovery code which is consumed (one-time use).  The current
+          primary key is also deleted.
+
+        In both cases a new primary key is created from ``new_vault_key``.
+
+        Args:
+            new_vault_key: The new vault key (password).
+            current_vault_key: Current primary vault key (normal update).
+            recovery_code: A recovery code (recovery update).
+
+        Returns:
+            :class:`~inkbox.vault.types.VaultKey` metadata for the newly
+            created primary key.
+
+        Raises:
+            ValueError: If neither or both auth methods are provided.
+        """
+        has_current = current_vault_key is not None
+        has_recovery = recovery_code is not None
+        if has_current == has_recovery:
+            raise ValueError(
+                "Exactly one of current_vault_key or recovery_code must be provided"
+            )
+
+        auth_key = current_vault_key if has_current else recovery_code
+        assert auth_key is not None  # guaranteed by validation above
+
+        # Fetch org_id (vault must already exist)
+        vault_info = self.info()
+        salt = derive_salt(vault_info.organization_id)
+
+        # Derive master key and auth hash from the authenticating key
+        auth_master_key = derive_master_key(auth_key, salt)
+        auth_auth_hash = compute_auth_hash(auth_master_key)
+
+        # Fetch wrapped org encryption key
+        unlock_data = self._http.get(
+            "/unlock",
+            params={"auth_hash": auth_auth_hash},
+        )
+
+        wrapped = unlock_data.get("wrapped_org_encryption_key")
+        if wrapped is None:
+            raise ValueError(
+                "No vault key matched. "
+                "Check that the vault key or recovery code is correct."
+            )
+
+        # Unwrap org encryption key (try each active key ID as AAD)
+        keys_data = self._http.get("/keys")
+        primary_key_ids = [
+            k["id"] for k in keys_data
+            if k.get("key_type") == "primary" and k.get("status") == "active"
+        ]
+        recovery_key_ids = [
+            k["id"] for k in keys_data
+            if k.get("key_type") == "recovery" and k.get("status") == "active"
+        ]
+        all_key_ids = primary_key_ids + recovery_key_ids
+
+        org_key: bytes | None = None
+        for key_id in all_key_ids:
+            try:
+                org_key = unwrap_org_key(
+                    auth_master_key, wrapped, vault_key_id=key_id,
+                )
+                break
+            except Exception:
+                continue
+
+        if org_key is None:
+            raise ValueError(
+                "Failed to unwrap org encryption key. "
+                "Check that the vault key is correct."
+            )
+
+        # Generate new primary key material
+        new_material = generate_vault_key_material(
+            new_vault_key,
+            vault_info.organization_id,
+            org_key,
+        )
+
+        # PUT /keys/primary
+        body: dict[str, Any] = {
+            "id": str(new_material.id),
+            "wrapped_org_encryption_key": new_material.wrapped_org_encryption_key,
+            "auth_hash": new_material.auth_hash,
+        }
+        if has_current:
+            body["current_auth_hash"] = auth_auth_hash
+        else:
+            body["recovery_auth_hash"] = auth_auth_hash
+
+        data = self._http.put("/keys/primary", json=body)
+        return VaultKey._from_dict(data)
+
+    def delete_key(self, vault_key_or_recovery_code: str) -> None:
+        """
+        Delete a vault key by providing the key string.
+
+        Derives the ``auth_hash`` from the vault key (or recovery code)
+        and sends ``DELETE /keys/{auth_hash}``.
+
+        The server refuses to delete the last active primary key (409).
+
+        Args:
+            vault_key_or_recovery_code: The vault key or recovery code
+                to delete.
+
+        Raises:
+            InkboxAPIError: If the key is not found (404) or is the last
+                active primary key (409).
+        """
+        vault_info = self.info()
+        salt = derive_salt(vault_info.organization_id)
+        master_key = derive_master_key(vault_key_or_recovery_code, salt)
+        auth_hash = compute_auth_hash(master_key)
+        self._http.delete(f"/keys/{auth_hash}")
 
     ## Keys (read-only via API key)
 

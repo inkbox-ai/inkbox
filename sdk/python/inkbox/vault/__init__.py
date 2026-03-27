@@ -11,6 +11,7 @@ from inkbox.vault.types import (
     OtherPayload,
     SSHKeyPayload,
     VaultInfo,
+    VaultInitializeResult,
     VaultKey,
     VaultKeyType,
     VaultSecret,
@@ -40,6 +41,7 @@ __all__ = [
     "VaultSecret",
     "VaultSecretDetail",
     "DecryptedVaultSecret",
+    "VaultInitializeResult",
     # Enums
     "VaultSecretType",
     "VaultKeyType",
