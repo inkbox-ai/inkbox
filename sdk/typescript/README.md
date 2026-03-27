@@ -285,6 +285,193 @@ const secret = creds.get("secret-uuid");          // → DecryptedVaultSecret
 
 ---
 
+## Vault Management
+
+Manage the encrypted vault at the org level. Access via `inkbox.vault`.
+
+```ts
+// Get vault metadata (key counts, secret counts)
+const info = await inkbox.vault.info();
+console.log(info.secretCount, info.keyCount);
+
+// Initialize a new vault (creates primary key + recovery keys)
+const result = await inkbox.vault.initialize("my-Vault-key-01!", "org-uuid");
+for (const key of result.recoveryKeys) {
+  console.log(key.recoveryCode); // save these immediately
+}
+
+// Rotate the vault password
+await inkbox.vault.updateKey({
+  newVaultKey: "new-Vault-key-02!",
+  currentVaultKey: "my-Vault-key-01!",
+});
+
+// Rotate using a recovery code (if primary key is lost)
+await inkbox.vault.updateKey({
+  newVaultKey: "new-Vault-key-02!",
+  recoveryCode: "recovery-code-here",
+});
+
+// List vault keys
+const keys = await inkbox.vault.listKeys();                          // all keys
+const primaryKeys = await inkbox.vault.listKeys({ keyType: "PRIMARY" });
+const recoveryKeys = await inkbox.vault.listKeys({ keyType: "RECOVERY" });
+
+// List secrets (metadata only — no encrypted payloads)
+const secrets = await inkbox.vault.listSecrets();
+const logins  = await inkbox.vault.listSecrets({ secretType: "login" });
+
+// Delete a secret
+await inkbox.vault.deleteSecret("secret-uuid");
+
+// Unlock the vault for decryption (returns an UnlockedVault)
+const unlocked = await inkbox.vault.unlock("my-Vault-key-01!");
+const secret = await unlocked.getSecret("secret-uuid");
+console.log(secret.name, secret.payload);
+```
+
+### Access control
+
+Control which identities can access which secrets.
+
+```ts
+// List access rules for a secret
+const rules = await inkbox.vault.listAccessRules("secret-uuid");
+for (const rule of rules) {
+  console.log(rule.identityId);
+}
+
+// Grant an identity access to a secret
+await inkbox.vault.grantAccess("secret-uuid", "identity-uuid");
+
+// Revoke access
+await inkbox.vault.revokeAccess("secret-uuid", "identity-uuid");
+```
+
+---
+
+## Identity Secret Management
+
+Manage vault secrets scoped to a specific identity. These methods create secrets and automatically grant the identity access.
+
+```ts
+const identity = await inkbox.getIdentity("my-agent");
+
+// Create a secret and auto-grant this identity access
+const secret = await identity.createSecret({
+  name: "CRM Login",
+  payload: { type: "login", username: "bot@crm.com", password: "s3cret" },
+  description: "CRM service account",
+});
+
+// Fetch and decrypt a secret
+const decrypted = await identity.getSecret(secret.id);
+console.log(decrypted.payload);
+
+// Delete a secret
+await identity.deleteSecret(secret.id);
+
+// Revoke this identity's access (without deleting the secret)
+await identity.revokeCredentialAccess(secret.id);
+```
+
+### TOTP (one-time passwords)
+
+Add, remove, and generate TOTP codes for login secrets.
+
+```ts
+// Add TOTP to a login secret (accepts otpauth:// URI or TOTPConfig)
+await identity.setTotp(secret.id, "otpauth://totp/Example:user?secret=JBSWY3DPEHPK3PXP&issuer=Example");
+
+// Generate the current TOTP code
+const code = await identity.getTotpCode(secret.id);
+console.log(code.code, code.expiresIn);
+
+// Remove TOTP from a secret
+await identity.removeTotp(secret.id);
+```
+
+---
+
+## Org-level Messages and Threads
+
+Access messages and threads directly without going through an identity. Useful for org-wide operations.
+
+```ts
+// List messages for a mailbox (paginated automatically)
+for await (const msg of inkbox.messages.list("abc@inkboxmail.com")) {
+  console.log(msg.subject);
+}
+
+// Get a single message with full body
+const detail = await inkbox.messages.get("abc@inkboxmail.com", "message-uuid");
+console.log(detail.bodyText);
+
+// Send a message from a mailbox
+await inkbox.messages.send("abc@inkboxmail.com", {
+  to: ["user@example.com"],
+  subject: "Hello",
+  bodyText: "Hi there!",
+});
+
+// Update message flags
+await inkbox.messages.updateFlags("abc@inkboxmail.com", "message-uuid", { isRead: true });
+await inkbox.messages.markRead("abc@inkboxmail.com", "message-uuid");
+await inkbox.messages.markUnread("abc@inkboxmail.com", "message-uuid");
+await inkbox.messages.star("abc@inkboxmail.com", "message-uuid");
+await inkbox.messages.unstar("abc@inkboxmail.com", "message-uuid");
+
+// Delete a message
+await inkbox.messages.delete("abc@inkboxmail.com", "message-uuid");
+
+// Get an attachment presigned URL
+const attachment = await inkbox.messages.getAttachment("abc@inkboxmail.com", "message-uuid", "report.pdf");
+console.log(attachment.url);
+
+// List threads (paginated automatically)
+for await (const thread of inkbox.threads.list("abc@inkboxmail.com")) {
+  console.log(thread.subject, thread.messageCount);
+}
+
+// Get a thread with all messages
+const thread = await inkbox.threads.get("abc@inkboxmail.com", "thread-uuid");
+
+// Delete a thread
+await inkbox.threads.delete("abc@inkboxmail.com", "thread-uuid");
+```
+
+---
+
+## Org-level Calls and Transcripts
+
+Access calls and transcripts directly. Access via `inkbox.calls` and `inkbox.transcripts`.
+
+```ts
+// List calls for a phone number
+const calls = await inkbox.calls.list("phone-number-uuid", { limit: 10 });
+for (const call of calls) {
+  console.log(call.id, call.direction, call.status);
+}
+
+// Get a single call
+const call = await inkbox.calls.get("phone-number-uuid", "call-uuid");
+
+// Place an outbound call
+const placed = await inkbox.calls.place({
+  fromNumber: "phone-number-uuid",
+  toNumber: "+15167251294",
+  clientWebsocketUrl: "wss://example.com/ws",
+});
+
+// List transcript segments for a call
+const segments = await inkbox.transcripts.list("phone-number-uuid", "call-uuid");
+for (const t of segments) {
+  console.log(`[${t.party}] ${t.text}`);
+}
+```
+
+---
+
 ## Org-level Mailboxes
 
 Manage mailboxes directly without going through an identity. Access via `inkbox.mailboxes`.
@@ -352,7 +539,7 @@ for (const t of hits) {
 }
 
 // Release a number
-await inkbox.phoneNumbers.release({ number: num.number });
+await inkbox.phoneNumbers.release(num.id);
 ```
 
 ---

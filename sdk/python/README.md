@@ -267,6 +267,184 @@ secret = identity.credentials.get("secret-uuid")             # → DecryptedVaul
 
 ---
 
+## Vault Management
+
+Manage the encrypted vault at the org level. Access via `inkbox.vault`.
+
+```python
+# Get vault metadata (key counts, secret counts)
+info = inkbox.vault.info()
+print(info.secret_count, info.key_count)
+
+# Initialize a new vault (creates primary key + recovery keys)
+result = inkbox.vault.initialize("my-Vault-key-01!", organization_id="org-uuid")
+for recovery_key in result.recovery_keys:
+    print(recovery_key.recovery_code)  # save these immediately
+
+# Rotate the vault password
+inkbox.vault.update_key("new-Vault-key-02!", current_vault_key="my-Vault-key-01!")
+
+# Rotate using a recovery code (if primary key is lost)
+inkbox.vault.update_key("new-Vault-key-02!", recovery_code="recovery-code-here")
+
+# List vault keys
+keys = inkbox.vault.list_keys()                         # all keys
+primary_keys = inkbox.vault.list_keys(key_type="PRIMARY")
+recovery_keys = inkbox.vault.list_keys(key_type="RECOVERY")
+
+# List secrets (metadata only — no encrypted payloads)
+secrets = inkbox.vault.list_secrets()
+logins  = inkbox.vault.list_secrets(secret_type="login")
+
+# Delete a secret
+inkbox.vault.delete_secret("secret-uuid")
+
+# Unlock the vault for decryption (returns an UnlockedVault)
+unlocked = inkbox.vault.unlock("my-Vault-key-01!")
+secret = unlocked.get_secret("secret-uuid")
+print(secret.name, secret.payload)
+```
+
+### Access control
+
+Control which identities can access which secrets.
+
+```python
+# List access rules for a secret
+rules = inkbox.vault.list_access_rules("secret-uuid")
+for rule in rules:
+    print(rule.identity_id)
+
+# Grant an identity access to a secret
+inkbox.vault.grant_access("secret-uuid", "identity-uuid")
+
+# Revoke access
+inkbox.vault.revoke_access("secret-uuid", "identity-uuid")
+```
+
+---
+
+## Identity Secret Management
+
+Manage vault secrets scoped to a specific identity. These methods create secrets and automatically grant the identity access.
+
+```python
+from inkbox.vault.models import LoginPayload, APIKeyPayload
+
+identity = inkbox.get_identity("my-agent")
+
+# Create a secret and auto-grant this identity access
+secret = identity.create_secret(
+    name="CRM Login",
+    payload=LoginPayload(username="bot@crm.com", password="s3cret"),
+    description="CRM service account",
+)
+
+# Fetch and decrypt a secret
+decrypted = identity.get_secret(secret.id)
+print(decrypted.payload.username)
+
+# Delete a secret
+identity.delete_secret(secret.id)
+
+# Revoke this identity's access (without deleting the secret)
+identity.revoke_credential_access(secret.id)
+```
+
+### TOTP (one-time passwords)
+
+Add, remove, and generate TOTP codes for login secrets.
+
+```python
+# Add TOTP to a login secret (accepts otpauth:// URI or TOTPConfig)
+identity.set_totp(secret.id, "otpauth://totp/Example:user?secret=JBSWY3DPEHPK3PXP&issuer=Example")
+
+# Generate the current TOTP code
+code = identity.get_totp_code(secret.id)
+print(code.code, code.expires_in)
+
+# Remove TOTP from a secret
+identity.remove_totp(secret.id)
+```
+
+---
+
+## Org-level Messages and Threads
+
+Access messages and threads directly without going through an identity. Useful for org-wide operations.
+
+```python
+# List messages for a mailbox (paginated automatically)
+for msg in inkbox.messages.list("abc@inkboxmail.com"):
+    print(msg.subject)
+
+# Get a single message with full body
+detail = inkbox.messages.get("abc@inkboxmail.com", "message-uuid")
+print(detail.body_text)
+
+# Send a message from a mailbox
+inkbox.messages.send(
+    "abc@inkboxmail.com",
+    to=["user@example.com"],
+    subject="Hello",
+    body_text="Hi there!",
+)
+
+# Update message flags
+inkbox.messages.update_flags("abc@inkboxmail.com", "message-uuid", is_read=True)
+inkbox.messages.mark_read("abc@inkboxmail.com", "message-uuid")
+inkbox.messages.mark_unread("abc@inkboxmail.com", "message-uuid")
+inkbox.messages.star("abc@inkboxmail.com", "message-uuid")
+inkbox.messages.unstar("abc@inkboxmail.com", "message-uuid")
+
+# Delete a message
+inkbox.messages.delete("abc@inkboxmail.com", "message-uuid")
+
+# Get an attachment presigned URL
+attachment = inkbox.messages.get_attachment("abc@inkboxmail.com", "message-uuid", "report.pdf")
+print(attachment["url"])
+
+# List threads (paginated automatically)
+for thread in inkbox.threads.list("abc@inkboxmail.com"):
+    print(thread.subject, thread.message_count)
+
+# Get a thread with all messages
+thread = inkbox.threads.get("abc@inkboxmail.com", "thread-uuid")
+
+# Delete a thread
+inkbox.threads.delete("abc@inkboxmail.com", "thread-uuid")
+```
+
+---
+
+## Org-level Calls and Transcripts
+
+Access calls and transcripts directly. Access via `inkbox.calls` and `inkbox.transcripts`.
+
+```python
+# List calls for a phone number
+calls = inkbox.calls.list("phone-number-uuid", limit=10)
+for call in calls:
+    print(call.id, call.direction, call.status)
+
+# Get a single call
+call = inkbox.calls.get("phone-number-uuid", "call-uuid")
+
+# Place an outbound call
+call = inkbox.calls.place(
+    from_number="phone-number-uuid",
+    to_number="+15167251294",
+    client_websocket_url="wss://example.com/ws",
+)
+
+# List transcript segments for a call
+segments = inkbox.transcripts.list("phone-number-uuid", "call-uuid")
+for t in segments:
+    print(f"[{t.party}] {t.text}")
+```
+
+---
+
 ## Org-level Mailboxes
 
 Manage mailboxes directly without going through an identity. Access via `inkbox.mailboxes`.
@@ -334,7 +512,7 @@ for t in hits:
     print(f"[{t.party}] {t.text}")
 
 # Release a number
-inkbox.phone_numbers.release(number=number.number)
+inkbox.phone_numbers.release(number.id)
 ```
 
 ---
