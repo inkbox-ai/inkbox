@@ -282,11 +282,13 @@ all_creds = identity.credentials.list()
 logins    = identity.credentials.list_logins()
 api_keys  = identity.credentials.list_api_keys()
 ssh_keys  = identity.credentials.list_ssh_keys()
+key_pairs = identity.credentials.list_key_pairs()
 
 # Access by UUID — returns typed payload directly
-login   = identity.credentials.get_login("secret-uuid")      # → LoginPayload
-api_key = identity.credentials.get_api_key("secret-uuid")    # → APIKeyPayload
-ssh_key = identity.credentials.get_ssh_key("secret-uuid")    # → SSHKeyPayload
+login    = identity.credentials.get_login("secret-uuid")      # → LoginPayload
+api_key  = identity.credentials.get_api_key("secret-uuid")    # → APIKeyPayload
+ssh_key  = identity.credentials.get_ssh_key("secret-uuid")    # → SSHKeyPayload
+key_pair = identity.credentials.get_key_pair("secret-uuid")   # → KeyPairPayload
 
 # Generic access — returns DecryptedVaultSecret
 secret = identity.credentials.get("secret-uuid")

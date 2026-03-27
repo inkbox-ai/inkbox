@@ -46,7 +46,7 @@ AgentIdentity (identity-scoped helper)
 └── text methods            (requires assigned phone number)
 ```
 
-An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxAPIError` is thrown.
+An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxError` is thrown.
 
 ## Identities
 
@@ -302,17 +302,19 @@ const allCreds = creds.list();
 const logins   = creds.listLogins();
 const apiKeys  = creds.listApiKeys();
 const sshKeys  = creds.listSshKeys();
+const keyPairs = creds.listKeyPairs();
 
 // Access by UUID — returns typed payload directly
-const login  = creds.getLogin("secret-uuid");    // → LoginPayload
-const apiKey = creds.getApiKey("secret-uuid");    // → APIKeyPayload
-const sshKey = creds.getSshKey("secret-uuid");    // → SSHKeyPayload
+const login   = creds.getLogin("secret-uuid");    // → LoginPayload
+const apiKey  = creds.getApiKey("secret-uuid");    // → APIKeyPayload
+const sshKey  = creds.getSshKey("secret-uuid");    // → SSHKeyPayload
+const keyPair = creds.getKeyPair("secret-uuid");   // → KeyPairPayload
 
 // Generic access — returns DecryptedVaultSecret
 const secret = creds.get("secret-uuid");
 ```
 
-- Requires `inkbox.vault.unlock()` first — throws `InkboxAPIError` if vault is not unlocked
+- Requires `inkbox.vault.unlock()` first — throws `InkboxError` if vault is not unlocked
 - Results are filtered to secrets the identity has access to (via access rules)
 - Cached after first call; call `identity.refresh()` to clear the cache
 - `get*` throws `Error` if not found, `TypeError` if wrong secret type
