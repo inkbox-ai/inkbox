@@ -103,6 +103,9 @@ inkbox phone call -i my-agent --to +15551234567
 # Read text messages
 inkbox text list -i my-agent
 
+# Initialize vault (first time only)
+inkbox vault init
+
 # Manage vault secrets
 inkbox vault create --name "CRM Login" --type login --username bot@crm.com --password s3cret
 inkbox vault secrets
