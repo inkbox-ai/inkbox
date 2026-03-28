@@ -82,6 +82,33 @@ for (const t of texts) {
 }
 ```
 
+### CLI
+
+```bash
+# Create an agent identity (mailbox is created automatically)
+inkbox identity create my-agent
+
+# Send an email
+inkbox email send -i my-agent \
+  --to user@example.com \
+  --subject "Hello" \
+  --body-text "Hi from my agent!"
+
+# List recent emails
+inkbox email list -i my-agent --limit 10
+
+# Place a phone call
+inkbox phone call -i my-agent --to +15551234567
+
+# Read text messages
+inkbox text list -i my-agent
+
+# Manage vault secrets
+inkbox vault create --name "CRM Login" --type login --username bot@crm.com --password s3cret
+inkbox vault secrets
+inkbox vault get <secret-id>
+```
+
 ---
 
 ## What's in this repo
@@ -90,10 +117,14 @@ for (const t of texts) {
 |---|---|
 | [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
 | [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
-| [`skills/`](./skills/) | Agent skills for Claude Code and other coding agents |
-| [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email and browser |
-| [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
+| [`cli/`](./cli/) | CLI (`@inkbox/cli`) |
+| [`skills/inkbox-python/`](./skills/inkbox-python/) | Python agent skill for Claude Code and other coding agents |
+| [`skills/inkbox-ts/`](./skills/inkbox-ts/) | TypeScript agent skill for Claude Code and other coding agents |
 | [`skills/inkbox-openclaw/`](./skills/inkbox-openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
+| [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email, phone, and vault |
+| [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
+| [`examples/use-inkbox-cli/`](./examples/use-inkbox-cli/) | Shell script examples for CLI automation and CI pipelines |
+| [`examples/use-inkbox-vault/`](./examples/use-inkbox-vault/) | Vault TOTP example — create credentials with one-time codes |
 
 ---
 
