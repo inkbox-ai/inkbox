@@ -18,7 +18,7 @@ API-first communication infrastructure for AI agents — email, phone, identitie
 
 ## Quick Start
 
-Get an API key from the [Inkbox Console](https://console.inkbox.ai/), then:
+Get an API key from the [Inkbox Console](https://inkbox.ai/console), then:
 
 ### Python
 
@@ -26,11 +26,8 @@ Get an API key from the [Inkbox Console](https://console.inkbox.ai/), then:
 from inkbox import Inkbox
 
 with Inkbox(api_key="ApiKey_...") as inkbox:
-    # Create an agent identity
-    identity = inkbox.create_identity("my-agent")
-
-    # Create and link new channels
-    identity.create_mailbox(display_name="My Agent")
+    # Create an agent identity with a linked mailbox
+    identity = inkbox.create_identity("my-agent", display_name="My Agent")
     identity.provision_phone_number(type="toll_free")
 
     # Send an email
@@ -59,11 +56,8 @@ import { Inkbox } from "@inkbox/sdk";
 
 const inkbox = new Inkbox({ apiKey: "ApiKey_..." });
 
-// Create an agent identity
-const identity = await inkbox.createIdentity("my-agent");
-
-// Create and link new channels
-const mailbox = await identity.createMailbox({ displayName: "My Agent" });
+// Create an agent identity with a linked mailbox
+const identity = await inkbox.createIdentity("my-agent", { displayName: "My Agent" });
 const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 
 // Send an email
@@ -88,6 +82,33 @@ for (const t of texts) {
 }
 ```
 
+### CLI
+
+```bash
+# Create an agent identity (mailbox is created automatically)
+inkbox identity create my-agent
+
+# Send an email
+inkbox email send -i my-agent \
+  --to user@example.com \
+  --subject "Hello" \
+  --body-text "Hi from my agent!"
+
+# List recent emails
+inkbox email list -i my-agent --limit 10
+
+# Place a phone call
+inkbox phone call -i my-agent --to +15551234567
+
+# Read text messages
+inkbox text list -i my-agent
+
+# Manage vault secrets
+inkbox vault create --name "CRM Login" --type login --username bot@crm.com --password s3cret
+inkbox vault secrets
+inkbox vault get <secret-id>
+```
+
 ---
 
 ## What's in this repo
@@ -96,10 +117,14 @@ for (const t of texts) {
 |---|---|
 | [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
 | [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
-| [`skills/`](./skills/) | Agent skills for Claude Code and other coding agents |
-| [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email and browser |
-| [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
+| [`cli/`](./cli/) | CLI (`@inkbox/cli`) |
+| [`skills/inkbox-python/`](./skills/inkbox-python/) | Python agent skill for Claude Code and other coding agents |
+| [`skills/inkbox-ts/`](./skills/inkbox-ts/) | TypeScript agent skill for Claude Code and other coding agents |
 | [`skills/inkbox-openclaw/`](./skills/inkbox-openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
+| [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email, phone, and vault |
+| [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
+| [`examples/use-inkbox-cli/`](./examples/use-inkbox-cli/) | Shell script examples for CLI automation and CI pipelines |
+| [`examples/use-inkbox-vault/`](./examples/use-inkbox-vault/) | Vault TOTP example — create credentials with one-time codes |
 
 ---
 
@@ -119,7 +144,7 @@ See [`skills/README.md`](./skills/README.md) for details.
 
 - [Inkbox Docs](https://inkbox.ai/docs)
 - [API Reference](https://inkbox.ai/docs/api-reference)
-- [Console](https://console.inkbox.ai/)
+- [Console](https://inkbox.ai/console)
 
 ## License
 

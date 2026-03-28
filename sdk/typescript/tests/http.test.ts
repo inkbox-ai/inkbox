@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { HttpTransport, InkboxAPIError } from "../src/_http.js";
 
-const BASE = "https://api.inkbox.ai/api/v1";
+const BASE = "https://inkbox.ai/api/v1";
 const API_KEY = "test-key";
 
 function makeTransport(timeout = 30_000) {

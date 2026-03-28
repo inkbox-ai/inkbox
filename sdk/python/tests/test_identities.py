@@ -5,10 +5,16 @@ Tests for IdentitiesResource.
 """
 
 from unittest.mock import MagicMock
+from uuid import UUID
 
 from sample_data_identities import IDENTITY_DICT, IDENTITY_DETAIL_DICT
 from inkbox.identities.resources.identities import IdentitiesResource
-from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
+from inkbox.identities.types import (
+    AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
+    IdentityPhoneNumberCreateOptions,
+    _AgentIdentityData,
+)
 
 
 def _resource():
@@ -29,6 +35,67 @@ class TestIdentitiesCreate:
         http.post.assert_called_once_with("/", json={"agent_handle": HANDLE})
         assert isinstance(identity, AgentIdentitySummary)
         assert identity.agent_handle == HANDLE
+
+    def test_creates_identity_with_mailbox_phone_number_and_secret_access(self):
+        res, http = _resource()
+        http.post.return_value = {**IDENTITY_DICT, "email_address": "sales.team@inkboxmail.com"}
+
+        identity = res.create(
+            agent_handle=HANDLE,
+            mailbox=IdentityMailboxCreateOptions(
+                display_name="Sales Team",
+                email_local_part="sales.team",
+            ),
+            phone_number=IdentityPhoneNumberCreateOptions(
+                type="local",
+                state="NY",
+                incoming_call_action="webhook",
+                incoming_call_webhook_url="https://example.com/calls",
+                incoming_text_webhook_url="https://example.com/texts",
+            ),
+            vault_secret_ids=[
+                UUID("11111111-1111-1111-1111-111111111111"),
+                UUID("22222222-2222-2222-2222-222222222222"),
+            ],
+        )
+
+        http.post.assert_called_once_with(
+            "/",
+            json={
+                "agent_handle": HANDLE,
+                "mailbox": {
+                    "display_name": "Sales Team",
+                    "email_local_part": "sales.team",
+                },
+                "phone_number": {
+                    "type": "local",
+                    "state": "NY",
+                    "incoming_call_action": "webhook",
+                    "incoming_call_webhook_url": "https://example.com/calls",
+                    "incoming_text_webhook_url": "https://example.com/texts",
+                },
+                "vault_secret_ids": [
+                    "11111111-1111-1111-1111-111111111111",
+                    "22222222-2222-2222-2222-222222222222",
+                ],
+            },
+        )
+        assert identity.email_address == "sales.team@inkboxmail.com"
+
+    def test_creates_identity_with_single_vault_secret_id(self):
+        res, http = _resource()
+        http.post.return_value = IDENTITY_DICT
+
+        secret_id = UUID("11111111-1111-1111-1111-111111111111")
+        res.create(agent_handle=HANDLE, vault_secret_ids=secret_id)
+
+        http.post.assert_called_once_with(
+            "/",
+            json={
+                "agent_handle": HANDLE,
+                "vault_secret_ids": "11111111-1111-1111-1111-111111111111",
+            },
+        )
 
 
 class TestIdentitiesList:
@@ -146,5 +213,3 @@ class TestIdentitiesUnlinkPhoneNumber:
         res.unlink_phone_number(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/phone_number")
-
-

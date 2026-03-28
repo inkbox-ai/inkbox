@@ -96,7 +96,7 @@ describe("TextsResource.update", () => {
     expect(text.isRead).toBe(true);
   });
 
-  it("soft-deletes", async () => {
+  it("deletes", async () => {
     const http = mockHttp();
     vi.mocked(http.patch).mockResolvedValue({ ...RAW_TEXT_MESSAGE, status: "deleted" });
     const res = new TextsResource(http);

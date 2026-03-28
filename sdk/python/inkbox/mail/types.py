@@ -19,7 +19,7 @@ class MessageDirection(StrEnum):
 
     Attributes:
         INBOUND: Email received from an external sender.
-        OUTBOUND: Email sent by the mailbox via SES.
+        OUTBOUND: Email sent by the mailbox.
     """
     INBOUND = "inbound"
     OUTBOUND = "outbound"
@@ -167,5 +167,4 @@ class ThreadDetail(Thread):
             **base.__dict__,
             messages=[Message._from_dict(m) for m in d.get("messages", [])],
         )
-
 

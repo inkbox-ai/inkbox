@@ -26,7 +26,7 @@ Once installed, your OpenClaw agent can:
 
 ### 1. Get an Inkbox API key
 
-Sign in at [console.inkbox.ai](https://console.inkbox.ai) and create an API key.
+Sign in at [inkbox.ai/console](https://inkbox.ai/console) and create an API key.
 
 ### 2. Store the Inkbox API key in a protected env file
 

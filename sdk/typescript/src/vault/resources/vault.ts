@@ -14,13 +14,18 @@ import {
   deriveMasterKey,
   deriveSalt,
   encryptPayload,
+  generateOrgEncryptionKey,
+  generateRecoveryCode,
+  generateVaultKeyMaterial,
   unwrapOrgKey,
+  vaultKeyMaterialToWire,
 } from "../crypto.js";
 import type {
   AccessRule,
   DecryptedVaultSecret,
   SecretPayload,
   VaultInfo,
+  VaultInitializeResult,
   VaultKey,
   VaultSecret,
   VaultSecretDetail,
@@ -39,6 +44,7 @@ import {
 import type {
   RawAccessRule,
   RawVaultInfo,
+  RawVaultInitializeResponse,
   RawVaultKey,
   RawVaultSecret,
   RawVaultSecretDetail,
@@ -74,6 +80,164 @@ export class VaultResource {
     return parseVaultInfo(data);
   }
 
+  /**
+   * Initialize a new vault for the organisation.
+   *
+   * Generates a random org encryption key, wraps it with the provided
+   * vault key, and creates four recovery codes. All cryptographic
+   * material is generated client-side; the server only receives
+   * ciphertexts and identifiers.
+   *
+   * @param vaultKey - The vault key (password) to protect the vault.
+   *   Must be at least 16 characters with uppercase, lowercase, digit,
+   *   and special character.
+   * @param organizationId - The organisation ID (needed for key
+   *   derivation; the vault does not exist yet so it cannot be fetched).
+   * @returns {@link VaultInitializeResult} containing the vault ID,
+   *   primary key ID, and recovery codes. The recovery codes must be
+   *   stored securely — they cannot be retrieved again.
+   * @throws If the organisation already has an active vault (409).
+   */
+  async initialize(
+    vaultKey: string,
+    organizationId: string,
+  ): Promise<VaultInitializeResult> {
+    const orgEncryptionKey = generateOrgEncryptionKey();
+
+    const primaryMaterial = await generateVaultKeyMaterial(
+      vaultKey,
+      organizationId,
+      orgEncryptionKey,
+    );
+
+    const recoveryCodes: string[] = [];
+    const recoveryWires: Record<string, string>[] = [];
+    for (let i = 0; i < 4; i++) {
+      const [code, material] = await generateRecoveryCode(
+        organizationId,
+        orgEncryptionKey,
+      );
+      recoveryCodes.push(code);
+      recoveryWires.push(vaultKeyMaterialToWire(material));
+    }
+
+    const data = await this.http.post<RawVaultInitializeResponse>(
+      "/initialize",
+      {
+        vault_key: vaultKeyMaterialToWire(primaryMaterial),
+        recovery_keys: recoveryWires,
+      },
+    );
+
+    return {
+      vaultId: data.vault_id,
+      vaultKeyId: data.vault_key_id,
+      recoveryKeyCount: data.recovery_key_count,
+      recoveryCodes,
+    };
+  }
+
+  /**
+   * Replace the primary vault key (change the vault password).
+   *
+   * Exactly one of `currentVaultKey` or `recoveryCode` must be
+   * provided to authenticate the change:
+   *
+   * - **Normal update** (`currentVaultKey`): proves knowledge of the
+   *   current primary key. The old key is deleted.
+   * - **Recovery update** (`recoveryCode`): proves knowledge of a
+   *   recovery code which is consumed (one-time use). The current
+   *   primary key is also deleted.
+   *
+   * In both cases a new primary key is created from `newVaultKey`.
+   *
+   * @param options.newVaultKey - The new vault key (password).
+   * @param options.currentVaultKey - Current primary vault key (normal update).
+   * @param options.recoveryCode - A recovery code (recovery update).
+   * @returns {@link VaultKey} metadata for the newly created primary key.
+   */
+  async updateKey(options: {
+    newVaultKey: string;
+    currentVaultKey?: string;
+    recoveryCode?: string;
+  }): Promise<VaultKey> {
+    const hasCurrentKey = options.currentVaultKey !== undefined;
+    const hasRecoveryCode = options.recoveryCode !== undefined;
+    if (hasCurrentKey === hasRecoveryCode) {
+      throw new Error(
+        "Exactly one of currentVaultKey or recoveryCode must be provided",
+      );
+    }
+
+    const authKey = options.currentVaultKey ?? options.recoveryCode!;
+
+    // Fetch org_id (vault must already exist)
+    const vaultInfo = await this.info();
+    const salt = deriveSalt(vaultInfo.organizationId);
+
+    // Derive master key and auth hash from the authenticating key
+    const authMasterKey = await deriveMasterKey(authKey, salt);
+    const authAuthHash = computeAuthHash(authMasterKey);
+
+    // Fetch wrapped org encryption key
+    const unlockData = await this.http.get<RawVaultUnlockResponse>(
+      "/unlock",
+      { auth_hash: authAuthHash },
+    );
+
+    const wrapped = unlockData.wrapped_org_encryption_key;
+    if (!wrapped) {
+      throw new Error(
+        "No vault key matched. " +
+          "Check that the vault key or recovery code is correct.",
+      );
+    }
+
+    // Unwrap org encryption key (try each active key ID as AAD)
+    const keysData = await this.http.get<RawVaultKey[]>("/keys");
+    const activeKeyIds = keysData
+      .filter((k) => k.status === "active")
+      .map((k) => k.id);
+
+    let orgKey: Uint8Array | null = null;
+    for (const keyId of activeKeyIds) {
+      try {
+        orgKey = unwrapOrgKey(authMasterKey, wrapped, keyId);
+        break;
+      } catch {
+        continue;
+      }
+    }
+    if (!orgKey) {
+      throw new Error(
+        "Failed to unwrap org encryption key. " +
+          "Check that the vault key is correct.",
+      );
+    }
+
+    // Generate new primary key material
+    const newMaterial = await generateVaultKeyMaterial(
+      options.newVaultKey,
+      vaultInfo.organizationId,
+      orgKey,
+    );
+
+    // PUT /keys/primary
+    const body: Record<string, unknown> = {
+      id: newMaterial.id,
+      wrapped_org_encryption_key: newMaterial.wrappedOrgEncryptionKey,
+      auth_hash: newMaterial.authHash,
+    };
+    if (hasCurrentKey) {
+      body.current_auth_hash = authAuthHash;
+    } else {
+      body.recovery_auth_hash = authAuthHash;
+    }
+
+    const data = await this.http.put<RawVaultKey>("/keys/primary", body);
+    return parseVaultKey(data);
+  }
+
   // ------------------------------------------------------------------
   // Keys (read-only via API key)
   // ------------------------------------------------------------------
@@ -88,6 +252,15 @@ export class VaultResource {
     if (options.keyType !== undefined) params["type"] = options.keyType;
     const data = await this.http.get<RawVaultKey[]>("/keys", params);
     return data.map(parseVaultKey);
+  }
+
+  /**
+   * Delete a vault key by auth hash.
+   *
+   * @param authHash - Auth hash of the key to revoke.
+   */
+  async deleteKey(authHash: string): Promise<void> {
+    await this.http.delete(`/keys/${authHash}`);
   }
 
   // ------------------------------------------------------------------

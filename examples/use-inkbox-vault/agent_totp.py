@@ -25,7 +25,7 @@ with Inkbox(api_key=os.environ["INKBOX_API_KEY"]) as inkbox:
         inkbox.vault.info()
     except Exception:
         print("ERROR: Vault is not initialized for this organization.")
-        print("       Initialize it from the Inkbox console first (console.inkbox.ai).")
+        print("       Initialize it from the Inkbox console first (inkbox.ai/console).")
         raise SystemExit(1)
 
     inkbox.vault.unlock(os.environ["INKBOX_VAULT_KEY"])

@@ -25,7 +25,7 @@ try {
   }).ready();
 } catch (e) {
   console.error(
-    "ERROR: Failed to unlock vault. Is the vault initialized? Check console.inkbox.ai.",
+    "ERROR: Failed to unlock vault. Is the vault initialized? Check inkbox.ai/console.",
   );
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);

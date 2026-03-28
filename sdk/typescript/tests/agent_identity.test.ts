@@ -41,8 +41,10 @@ const PARSED_PHONE = {
 function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityData {
   return {
     id: RAW_IDENTITY_DETAIL.id,
+    organizationId: RAW_IDENTITY_DETAIL.organization_id,
     agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
     status: RAW_IDENTITY_DETAIL.status,
+    emailAddress: RAW_IDENTITY_DETAIL.email_address,
     createdAt: RAW_IDENTITY_DETAIL.created_at,
     updatedAt: RAW_IDENTITY_DETAIL.updated_at,
     mailbox: PARSED_MAILBOX,
@@ -53,7 +55,7 @@ function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityDa
 
 function mockInkbox() {
   return {
-    _mailboxes: { create: vi.fn() },
+    _mailboxes: {},
     _messages: { send: vi.fn(), list: vi.fn(), markRead: vi.fn(), get: vi.fn() },
     _threads: { get: vi.fn() },
     _numbers: { provision: vi.fn() },
@@ -74,11 +76,12 @@ function mockInkbox() {
 }
 
 describe("AgentIdentity properties", () => {
-  it("exposes agentHandle, id, status", () => {
+  it("exposes agentHandle, id, status, emailAddress", () => {
     const identity = new AgentIdentity(makeData(), mockInkbox());
     expect(identity.agentHandle).toBe("sales-agent");
     expect(identity.id).toBe(RAW_IDENTITY_DETAIL.id);
     expect(identity.status).toBe("active");
+    expect(identity.emailAddress).toBe("sales-agent@inkboxmail.com");
   });
 
   it("exposes mailbox and phoneNumber", () => {
@@ -95,26 +98,33 @@ describe("AgentIdentity properties", () => {
 });
 
 describe("AgentIdentity channel management", () => {
-  it("createMailbox creates and links", async () => {
+  it("createMailbox creates and links a mailbox", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._mailboxes.create).mockResolvedValue({
+    ink._mailboxes = {
+      create: vi.fn().mockResolvedValue({
       id: RAW_MAILBOX.id,
       emailAddress: RAW_MAILBOX.email_address,
       displayName: RAW_MAILBOX.display_name,
+      webhookUrl: null,
       status: RAW_MAILBOX.status,
-      createdAt: RAW_MAILBOX.created_at,
-      updatedAt: RAW_MAILBOX.updated_at,
-    });
-    const identity = new AgentIdentity(makeData({ mailbox: null }), ink);
+      createdAt: new Date(RAW_MAILBOX.created_at),
+      updatedAt: new Date(RAW_MAILBOX.updated_at),
+      }),
+    } as any;
+    const identity = new AgentIdentity(makeData({ mailbox: null, emailAddress: null }), ink);
 
-    const mailbox = await identity.createMailbox({ displayName: "Test" });
+    const mailbox = await identity.createMailbox({
+      displayName: "Sales Team",
+      emailLocalPart: "sales.team",
+    });
 
     expect(ink._mailboxes.create).toHaveBeenCalledWith({
       agentHandle: "sales-agent",
-      displayName: "Test",
+      displayName: "Sales Team",
+      emailLocalPart: "sales.team",
     });
     expect(mailbox.emailAddress).toBe(RAW_MAILBOX.email_address);
-    expect(identity.mailbox).toEqual(mailbox);
+    expect(identity.emailAddress).toBe(RAW_MAILBOX.email_address);
   });
 
   it("assignMailbox links existing mailbox", async () => {
@@ -382,8 +392,10 @@ describe("AgentIdentity management", () => {
     const ink = mockInkbox();
     vi.mocked(ink._idsResource.update).mockResolvedValue({
       id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
       agentHandle: "new-handle",
       status: "active",
+      emailAddress: RAW_IDENTITY.email_address,
       createdAt: RAW_IDENTITY.created_at,
       updatedAt: RAW_IDENTITY.updated_at,
     });
@@ -418,4 +430,3 @@ describe("AgentIdentity management", () => {
     expect(ink._idsResource.delete).toHaveBeenCalledWith("sales-agent");
   });
 });
-

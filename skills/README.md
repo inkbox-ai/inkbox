@@ -32,7 +32,7 @@ cp -r skills/inkbox-ts ~/.claude/skills/
    npm install @inkbox/sdk
    ```
 
-2. **Get an API key** from the [Inkbox Console](https://console.inkbox.ai/)
+2. **Get an API key** from the [Inkbox Console](https://inkbox.ai/console)
 
 Once the skills are installed, your coding agent will automatically know how to use the Inkbox SDK whenever it sees an import or is asked to add email/phone features.
 
@@ -48,7 +48,7 @@ Once the skills are installed, your coding agent will automatically know how to 
 
 - [Inkbox Docs](https://inkbox.ai/docs)
 - [API Reference](https://inkbox.ai/docs/api-reference)
-- [Console](https://console.inkbox.ai/)
+- [Console](https://inkbox.ai/console)
 
 ## License
 

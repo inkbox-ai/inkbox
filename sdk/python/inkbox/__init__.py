@@ -34,8 +34,11 @@ from inkbox.phone.types import (
 # Identity types
 from inkbox.identities.types import (
     AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
     IdentityMailbox,
+    IdentityPhoneNumberCreateOptions,
     IdentityPhoneNumber,
+    ResourceStatus,
 )
 
 # Vault types
@@ -48,6 +51,7 @@ from inkbox.vault.types import (
     OtherPayload,
     SSHKeyPayload,
     VaultInfo,
+    VaultInitializeResult,
     VaultKey,
     VaultKeyType,
     VaultSecret,
@@ -98,8 +102,11 @@ __all__ = [
     "TextMessage",
     # Identity types
     "AgentIdentitySummary",
+    "IdentityMailboxCreateOptions",
     "IdentityMailbox",
+    "IdentityPhoneNumberCreateOptions",
     "IdentityPhoneNumber",
+    "ResourceStatus",
     # Vault types
     "AccessRule",
     "VaultSecretType",
@@ -109,6 +116,7 @@ __all__ = [
     "VaultSecret",
     "VaultSecretDetail",
     "DecryptedVaultSecret",
+    "VaultInitializeResult",
     "LoginPayload",
     "SSHKeyPayload",
     "APIKeyPayload",

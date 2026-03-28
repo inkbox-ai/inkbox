@@ -77,7 +77,7 @@ AgentIdentity (identity-scoped helper)
 └── text methods            (requires assigned phone number)
 ```
 
-An identity must have a channel assigned before you can use mail/phone/text methods. If not assigned, an `InkboxAPIError` is thrown.
+An identity must have a channel assigned before you can use mail/phone/text methods. If not assigned, an `InkboxError` is thrown.
 
 ## Identities
 
@@ -102,11 +102,10 @@ After creating a new identity:
 ## Channel Management
 
 ```js
-// Create and auto-link new channels
-const mailbox  = await identity.createMailbox({ displayName: "Sales Agent" });
-const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
+// Identity is created with a mailbox automatically — provision a phone number
+const phone = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
 
-console.log(mailbox.emailAddress);   // e.g. "abc-xyz@inkboxmail.com"
+console.log(identity.emailAddress);  // e.g. "sales-agent@inkboxmail.com"
 console.log(phone.number);           // e.g. "+18005551234"
 
 // Link existing channels
@@ -357,17 +356,19 @@ const allCreds = creds.list();
 const logins   = creds.listLogins();
 const apiKeys  = creds.listApiKeys();
 const sshKeys  = creds.listSshKeys();
+const keyPairs = creds.listKeyPairs();
 
 // Access by UUID — returns typed payload directly
-const login  = creds.getLogin("secret-uuid");    // → LoginPayload
-const apiKey = creds.getApiKey("secret-uuid");    // → APIKeyPayload
-const sshKey = creds.getSshKey("secret-uuid");    // → SSHKeyPayload
+const login   = creds.getLogin("secret-uuid");    // → LoginPayload
+const apiKey  = creds.getApiKey("secret-uuid");    // → APIKeyPayload
+const sshKey  = creds.getSshKey("secret-uuid");    // → SSHKeyPayload
+const keyPair = creds.getKeyPair("secret-uuid");   // → KeyPairPayload
 
 // Generic access — returns DecryptedVaultSecret
 const secret = creds.get("secret-uuid");
 ```
 
-- Requires `inkbox.vault.unlock()` first — throws `InkboxAPIError` if vault is not unlocked
+- Requires `inkbox.vault.unlock()` first — throws `InkboxError` if vault is not unlocked
 - Results are filtered to secrets the identity has access to (via access rules)
 - Cached after first call; call `identity.refresh()` to clear the cache
 - `get*` throws `Error` if not found, `TypeError` if wrong secret type
@@ -431,14 +432,13 @@ const code = await unlocked.getTotpCode(secretId);
 ```js
 const mailboxes = await inkbox.mailboxes.list();
 const mailbox   = await inkbox.mailboxes.get("abc@inkboxmail.com");
-const mb        = await inkbox.mailboxes.create({ agentHandle: "support", displayName: "Support Inbox" });
 
-await inkbox.mailboxes.update(mb.emailAddress, { displayName: "New Name" });
-await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: "https://example.com/hook" });
-await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: null });   // remove webhook
+await inkbox.mailboxes.update(mailbox.emailAddress, { displayName: "New Name" });
+await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: "https://example.com/hook" });
+await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: null });   // remove webhook
 
-const results = await inkbox.mailboxes.search(mb.emailAddress, { q: "invoice", limit: 20 });
-await inkbox.mailboxes.delete(mb.emailAddress);
+const results = await inkbox.mailboxes.search(mailbox.emailAddress, { q: "invoice", limit: 20 });
+await inkbox.mailboxes.delete(mailbox.emailAddress);
 ```
 
 ### Phone Numbers (`inkbox.phoneNumbers`)

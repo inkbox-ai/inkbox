@@ -5,13 +5,19 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import type { ResourceStatus } from "../types.js";
 import {
   AgentIdentitySummary,
+  IdentityMailboxCreateOptions,
+  IdentityPhoneNumberCreateOptions,
   _AgentIdentityData,
   RawAgentIdentitySummary,
   RawAgentIdentityData,
+  identityMailboxCreateOptionsToWire,
+  identityPhoneNumberCreateOptionsToWire,
   parseAgentIdentitySummary,
   parseAgentIdentityData,
+  vaultSecretIdsToWire,
 } from "../types.js";
 
 export class IdentitiesResource {
@@ -22,11 +28,21 @@ export class IdentitiesResource {
    *
    * @param options.agentHandle - Unique handle for this identity within your organisation
    *   (e.g. `"sales-agent"` or `"@sales-agent"`).
+   * @param options.mailbox - Optional mailbox payload to create and link a mailbox.
+   * @param options.phoneNumber - Optional phone-number provisioning payload.
+   * @param options.vaultSecretIds - Optional vault secret selection to attach to the identity.
    */
-  async create(options: { agentHandle: string }): Promise<AgentIdentitySummary> {
-    const data = await this.http.post<RawAgentIdentitySummary>("/", {
-      agent_handle: options.agentHandle,
-    });
+  async create(options: {
+    agentHandle: string;
+    mailbox?: IdentityMailboxCreateOptions;
+    phoneNumber?: IdentityPhoneNumberCreateOptions;
+    vaultSecretIds?: string | string[] | "*" | "all";
+  }): Promise<AgentIdentitySummary> {
+    const body: Record<string, unknown> = { agent_handle: options.agentHandle };
+    if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
+    if (options.phoneNumber !== undefined) body["phone_number"] = identityPhoneNumberCreateOptionsToWire(options.phoneNumber);
+    if (options.vaultSecretIds !== undefined) body["vault_secret_ids"] = vaultSecretIdsToWire(options.vaultSecretIds);
+    const data = await this.http.post<RawAgentIdentitySummary>("/", body);
     return parseAgentIdentitySummary(data);
   }
 
@@ -57,7 +73,7 @@ export class IdentitiesResource {
    */
   async update(
     agentHandle: string,
-    options: { newHandle?: string; status?: string },
+    options: { newHandle?: string; status?: ResourceStatus },
   ): Promise<AgentIdentitySummary> {
     const body: Record<string, unknown> = {};
     if (options.newHandle !== undefined) body["agent_handle"] = options.newHandle;

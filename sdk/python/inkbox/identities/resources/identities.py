@@ -9,7 +9,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
+from inkbox.identities.types import (
+    AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
+    IdentityPhoneNumberCreateOptions,
+    ResourceStatus,
+    vault_secret_ids_to_wire,
+    _AgentIdentityData,
+)
 
 if TYPE_CHECKING:
     from inkbox.identities._http import HttpTransport
@@ -19,17 +26,38 @@ class IdentitiesResource:
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
-    def create(self, *, agent_handle: str) -> AgentIdentitySummary:
+    def create(
+        self,
+        *,
+        agent_handle: str,
+        mailbox: IdentityMailboxCreateOptions | None = None,
+        phone_number: IdentityPhoneNumberCreateOptions | None = None,
+        vault_secret_ids: UUID | str | list[UUID | str] | None = None,
+    ) -> AgentIdentitySummary:
         """Create a new agent identity.
 
         Args:
             agent_handle: Unique handle for this identity within your organisation
                 (e.g. ``"sales-agent"`` or ``"@sales-agent"``).
+            mailbox: Optional mailbox payload to create and link a mailbox
+                during identity creation.
+            phone_number: Optional phone-number provisioning payload.
+            vault_secret_ids: Optional vault secret selection to attach to the
+                new identity. Use ``"*"``, ``"all"``, a single UUID/string, or
+                a list of UUIDs/strings.
 
         Returns:
-            The created identity.
+            The created identity. ``email_address`` is populated only when a
+            mailbox was created for the identity.
         """
-        data = self._http.post("/", json={"agent_handle": agent_handle})
+        body: dict[str, Any] = {"agent_handle": agent_handle}
+        if mailbox is not None:
+            body["mailbox"] = mailbox.to_wire()
+        if phone_number is not None:
+            body["phone_number"] = phone_number.to_wire()
+        if vault_secret_ids is not None:
+            body["vault_secret_ids"] = vault_secret_ids_to_wire(vault_secret_ids)
+        data = self._http.post("/", json=body)
         return AgentIdentitySummary._from_dict(data)
 
     def list(self) -> list[AgentIdentitySummary]:
@@ -51,7 +79,7 @@ class IdentitiesResource:
         agent_handle: str,
         *,
         new_handle: str | None = None,
-        status: str | None = None,
+        status: ResourceStatus | None = None,
     ) -> AgentIdentitySummary:
         """Update an identity's handle or status.
 
@@ -131,4 +159,3 @@ class IdentitiesResource:
             agent_handle: Handle of the identity.
         """
         self._http.delete(f"/{agent_handle}/phone_number")
-

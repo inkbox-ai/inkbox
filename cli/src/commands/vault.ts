@@ -11,6 +11,30 @@ export function registerVaultCommands(program: Command): void {
     .description("Encrypted vault operations");
 
   vault
+    .command("init")
+    .description("Initialize a vault for an organization")
+    .requiredOption("--organization-id <id>", "Organization ID")
+    .option("--vault-key <key>", "Vault key to initialize with")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { organizationId: string; vaultKey?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        if (!vaultKey) {
+          console.error(
+            "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
+          );
+          process.exit(1);
+        }
+        const inkbox = createClient(opts);
+        const result = await inkbox.vault.initialize(vaultKey, cmdOpts.organizationId);
+        output(result, { json: !!opts.json });
+      }),
+    );
+
+  vault
     .command("info")
     .description("Show vault info")
     .action(
@@ -267,6 +291,112 @@ export function registerVaultCommands(program: Command): void {
         output(keys, {
           json: !!opts.json,
           columns: ["id", "keyType", "status", "createdBy", "createdAt"],
+        });
+      }),
+    );
+
+  vault
+    .command("update-key")
+    .description("Rotate the primary vault key")
+    .requiredOption("--new-vault-key <key>", "New primary vault key")
+    .option("--current-vault-key <key>", "Current primary vault key")
+    .option("--recovery-code <code>", "Recovery code to use instead of the current key")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          newVaultKey: string;
+          currentVaultKey?: string;
+          recoveryCode?: string;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const currentVaultKey = cmdOpts.currentVaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const inkbox = createClient(opts);
+        const result = await inkbox.vault.updateKey({
+          newVaultKey: cmdOpts.newVaultKey,
+          currentVaultKey: cmdOpts.recoveryCode ? undefined : currentVaultKey,
+          recoveryCode: cmdOpts.recoveryCode,
+        });
+        output(result, { json: !!opts.json });
+      }),
+    );
+
+  vault
+    .command("delete-key <auth-hash>")
+    .description("Delete a vault key by auth hash")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        authHash: string,
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        await inkbox.vault.deleteKey(authHash);
+        console.log(`Deleted vault key '${authHash}'.`);
+      }),
+    );
+
+  vault
+    .command("grant-access <secret-id>")
+    .description("Grant an identity access to a vault secret")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        secretId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const rule = await inkbox.vault.grantAccess(secretId, identity.id);
+        output(
+          {
+            id: rule.id,
+            vaultSecretId: rule.vaultSecretId,
+            identityId: rule.identityId,
+            createdAt: rule.createdAt,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  vault
+    .command("revoke-access <secret-id>")
+    .description("Revoke an identity's access to a vault secret")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        secretId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        await inkbox.vault.revokeAccess(secretId, identity.id);
+        console.log(
+          `Revoked access to secret '${secretId}' for identity '${cmdOpts.identity}'.`,
+        );
+      }),
+    );
+
+  vault
+    .command("access-list <secret-id>")
+    .description("List identity access rules for a vault secret")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        secretId: string,
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rules = await inkbox.vault.listAccessRules(secretId);
+        output(rules, {
+          json: !!opts.json,
+          columns: ["id", "vaultSecretId", "identityId", "createdAt"],
         });
       }),
     );

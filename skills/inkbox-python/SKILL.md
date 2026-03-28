@@ -23,7 +23,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     ...
 ```
 
-Constructor: `Inkbox(api_key, base_url="https://api.inkbox.ai", timeout=30.0)`
+Constructor: `Inkbox(api_key, base_url="https://inkbox.ai", timeout=30.0)`
 
 ## Core Model
 
@@ -65,10 +65,9 @@ identity.delete()                        # unlinks channels
 ## Channel Management
 
 ```python
-# Create and auto-link new channels
-mailbox = identity.create_mailbox(display_name="Sales Agent")
-phone   = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
-print(mailbox.email_address)   # e.g. "abc-xyz@inkboxmail.com"
+# Identity is created with a mailbox automatically — provision a phone number
+phone = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
+print(identity.email_address)  # e.g. "sales-agent@inkboxmail.com"
 print(phone.number)            # e.g. "+18005551234"
 
 # Link existing channels
@@ -180,9 +179,9 @@ identity.mark_text_read("text-uuid")
 result = identity.mark_text_conversation_read("+15167251294")
 print(result["updated_count"])
 
-# Org-level: search, update, soft-delete
+# Org-level: search, update, delete
 results = inkbox.texts.search(phone.id, q="invoice", limit=20)
-inkbox.texts.update(phone.id, "text-uuid", status="deleted")   # soft-delete
+inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 ```
 
 ## Vault
@@ -283,11 +282,13 @@ all_creds = identity.credentials.list()
 logins    = identity.credentials.list_logins()
 api_keys  = identity.credentials.list_api_keys()
 ssh_keys  = identity.credentials.list_ssh_keys()
+key_pairs = identity.credentials.list_key_pairs()
 
 # Access by UUID — returns typed payload directly
-login   = identity.credentials.get_login("secret-uuid")      # → LoginPayload
-api_key = identity.credentials.get_api_key("secret-uuid")    # → APIKeyPayload
-ssh_key = identity.credentials.get_ssh_key("secret-uuid")    # → SSHKeyPayload
+login    = identity.credentials.get_login("secret-uuid")      # → LoginPayload
+api_key  = identity.credentials.get_api_key("secret-uuid")    # → APIKeyPayload
+ssh_key  = identity.credentials.get_ssh_key("secret-uuid")    # → SSHKeyPayload
+key_pair = identity.credentials.get_key_pair("secret-uuid")   # → KeyPairPayload
 
 # Generic access — returns DecryptedVaultSecret
 secret = identity.credentials.get("secret-uuid")
@@ -357,7 +358,6 @@ code = unlocked.get_totp_code(secret_id)
 ```python
 mailboxes = inkbox.mailboxes.list()
 mailbox   = inkbox.mailboxes.get("abc@inkboxmail.com")
-mailbox   = inkbox.mailboxes.create(agent_handle="support", display_name="Support Inbox")
 
 inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")
 inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")

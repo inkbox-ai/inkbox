@@ -5,7 +5,7 @@ Shell script examples showing how to automate Inkbox from the command line — u
 ## Prerequisites
 
 1. Node.js >= 18
-2. An Inkbox API key (`INKBOX_API_KEY`) — get one at [console.inkbox.ai](https://console.inkbox.ai/)
+2. An Inkbox API key (`INKBOX_API_KEY`) — get one at [inkbox.ai/console](https://inkbox.ai/console)
 3. A vault key (`INKBOX_VAULT_KEY`) — only needed for vault/TOTP scripts; initialize from the console first
 4. [`jq`](https://jqlang.github.io/jq/) — used to parse `--json` output
 

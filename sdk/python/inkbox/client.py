@@ -20,10 +20,16 @@ from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.vault._http import HttpTransport as VaultHttpTransport
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.agent_identity import AgentIdentity
-from inkbox.identities.types import AgentIdentitySummary
+from inkbox.identities.types import (
+    AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
+    IdentityPhoneNumberCreateOptions,
+)
 from inkbox.signing_keys import SigningKey, SigningKeysResource
+from uuid import UUID
+from typing import Literal
 
-_DEFAULT_BASE_URL = "https://api.inkbox.ai"
+_DEFAULT_BASE_URL = "https://inkbox.ai"
 
 
 class Inkbox:
@@ -36,7 +42,6 @@ class Inkbox:
 
         with Inkbox(api_key="ApiKey_...") as inkbox:
             identity = inkbox.create_identity("support-bot")
-            identity.create_mailbox(display_name="Support Bot")
             identity.send_email(
                 to=["customer@example.com"],
                 subject="Hello!",
@@ -167,17 +172,47 @@ class Inkbox:
 
     ## Org-level operations
 
-    def create_identity(self, agent_handle: str) -> AgentIdentity:
+    def create_identity(
+        self,
+        agent_handle: str,
+        *,
+        create_mailbox: bool = False,
+        display_name: str | None = None,
+        email_local_part: str | None = None,
+        phone_number: IdentityPhoneNumberCreateOptions | None = None,
+        vault_secret_ids: UUID | str | list[UUID | str] | Literal["*", "all"] | None = None,
+    ) -> AgentIdentity:
         """
         Create a new agent identity.
 
         Args:
             agent_handle: Unique handle for this identity (e.g. ``"sales-bot"``).
+            create_mailbox: Whether to create and link a mailbox in the same
+                request. This is also implied when ``display_name`` or
+                ``email_local_part`` is provided.
+            display_name: Optional human-readable mailbox name.
+            email_local_part: Optional requested mailbox local part.
+            phone_number: Optional phone-number provisioning payload to create
+                and link a number in the same request.
+            vault_secret_ids: Optional vault secret selection to attach to the
+                new identity. Use ``"*"``, ``"all"``, a single UUID/string, or
+                a list of UUIDs/strings.
 
         Returns:
             The created :class:`AgentIdentity`.
         """
-        self._ids_resource.create(agent_handle=agent_handle)
+        mailbox = None
+        if create_mailbox or display_name is not None or email_local_part is not None:
+            mailbox = IdentityMailboxCreateOptions(
+                display_name=display_name,
+                email_local_part=email_local_part,
+            )
+        self._ids_resource.create(
+            agent_handle=agent_handle,
+            mailbox=mailbox,
+            phone_number=phone_number,
+            vault_secret_ids=vault_secret_ids,
+        )
         data = self._ids_resource.get(agent_handle)
         return AgentIdentity(data, self)
 

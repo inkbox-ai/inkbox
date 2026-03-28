@@ -2,6 +2,37 @@
  * inkbox-identities TypeScript SDK — public types.
  */
 
+/**
+ * Allowed lifecycle statuses for identity updates.
+ */
+export const ResourceStatus = {
+  ACTIVE: "active",
+  PAUSED: "paused",
+} as const;
+export type ResourceStatus = (typeof ResourceStatus)[keyof typeof ResourceStatus];
+
+export interface IdentityMailboxCreateOptions {
+  displayName?: string;
+  emailLocalPart?: string;
+}
+
+export interface IdentityPhoneNumberCreateOptions {
+  type?: string;
+  state?: string;
+  incomingCallAction?: string;
+  clientWebsocketUrl?: string;
+  incomingCallWebhookUrl?: string;
+  incomingTextWebhookUrl?: string;
+}
+
+export interface CreateIdentityOptions {
+  createMailbox?: boolean;
+  displayName?: string;
+  emailLocalPart?: string;
+  phoneNumber?: IdentityPhoneNumberCreateOptions;
+  vaultSecretIds?: string | string[] | "*" | "all";
+}
+
 export interface IdentityMailbox {
   id: string;
   emailAddress: string;
@@ -34,6 +65,8 @@ export interface AgentIdentitySummary {
   agentHandle: string;
   /** "active" | "paused" | "deleted" */
   status: string;
+  /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
+  emailAddress: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,6 +107,7 @@ export interface RawAgentIdentitySummary {
   organization_id: string;
   agent_handle: string;
   status: string;
+  email_address: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -116,6 +150,7 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     organizationId: r.organization_id,
     agentHandle: r.agent_handle,
     status: r.status,
+    emailAddress: r.email_address,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -127,4 +162,42 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
     mailbox: r.mailbox ? parseIdentityMailbox(r.mailbox) : null,
     phoneNumber: r.phone_number ? parseIdentityPhoneNumber(r.phone_number) : null,
   };
+}
+
+export function identityMailboxCreateOptionsToWire(
+  options: IdentityMailboxCreateOptions,
+): Record<string, string> {
+  const body: Record<string, string> = {};
+  if (options.displayName !== undefined) body["display_name"] = options.displayName;
+  if (options.emailLocalPart !== undefined) body["email_local_part"] = options.emailLocalPart;
+  return body;
+}
+
+export function identityPhoneNumberCreateOptionsToWire(
+  options: IdentityPhoneNumberCreateOptions,
+): Record<string, unknown> {
+  if (options.type === "toll_free" && options.state !== undefined) {
+    throw new Error("state is only supported for local phone numbers");
+  }
+  if (options.incomingCallAction === "auto_accept" && options.clientWebsocketUrl === undefined) {
+    throw new Error("clientWebsocketUrl is required for auto_accept");
+  }
+  if (options.incomingCallAction === "webhook" && options.incomingCallWebhookUrl === undefined) {
+    throw new Error("incomingCallWebhookUrl is required for webhook");
+  }
+
+  const body: Record<string, unknown> = {};
+  if (options.type !== undefined) body["type"] = options.type;
+  if (options.state !== undefined) body["state"] = options.state;
+  if (options.incomingCallAction !== undefined) body["incoming_call_action"] = options.incomingCallAction;
+  if (options.clientWebsocketUrl !== undefined) body["client_websocket_url"] = options.clientWebsocketUrl;
+  if (options.incomingCallWebhookUrl !== undefined) body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
+  if (options.incomingTextWebhookUrl !== undefined) body["incoming_text_webhook_url"] = options.incomingTextWebhookUrl;
+  return body;
+}
+
+export function vaultSecretIdsToWire(
+  value: string | string[] | "*" | "all" | undefined,
+): string | string[] | "*" | "all" | undefined {
+  return value;
 }

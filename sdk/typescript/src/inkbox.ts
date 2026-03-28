@@ -17,9 +17,9 @@ import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
 import { AgentIdentity } from "./agent_identity.js";
-import type { AgentIdentitySummary } from "./identities/types.js";
+import type { AgentIdentitySummary, CreateIdentityOptions } from "./identities/types.js";
 
-const DEFAULT_BASE_URL = "https://api.inkbox.ai";
+const DEFAULT_BASE_URL = "https://inkbox.ai";
 
 export interface InkboxOptions {
   /** Your Inkbox API key (sent as `X-Service-Token`). */
@@ -48,9 +48,8 @@ export interface InkboxOptions {
  * // Create an agent identity
  * const identity = await inkbox.createIdentity("support-bot");
  *
- * // Create and link new channels
- * const mailbox = await identity.createMailbox({ displayName: "Support Bot" });
- * const phone   = await identity.provisionPhoneNumber({ type: "toll_free" });
+ * // Provision a phone number for the identity
+ * const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
  *
  * // Send email directly from the identity
  * await identity.sendEmail({
@@ -161,6 +160,12 @@ export class Inkbox {
   /** Org-level mailbox operations (list, get, create, update, delete). */
   get mailboxes(): MailboxesResource { return this._mailboxes; }
 
+  /** Message operations (list, get, send, delete, star/unstar). */
+  get messages(): MessagesResource { return this._messages; }
+
+  /** Thread operations (list, get, delete). */
+  get threads(): ThreadsResource { return this._threads; }
+
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
 
@@ -178,10 +183,33 @@ export class Inkbox {
    * Create a new agent identity.
    *
    * @param agentHandle - Unique handle for this identity (e.g. `"sales-bot"`).
+   * @param options.createMailbox - Whether to create and link a mailbox in the
+   *   same request. This is also implied when `displayName` or `emailLocalPart`
+   *   is provided.
+   * @param options.displayName - Optional human-readable mailbox name.
+   * @param options.emailLocalPart - Optional requested mailbox local part.
+   * @param options.phoneNumber - Optional phone-number provisioning payload.
+   * @param options.vaultSecretIds - Optional vault secret selection to attach
+   *   to the new identity.
    * @returns The created {@link AgentIdentity}.
    */
-  async createIdentity(agentHandle: string): Promise<AgentIdentity> {
-    await this._idsResource.create({ agentHandle });
+  async createIdentity(
+    agentHandle: string,
+    options: CreateIdentityOptions = {},
+  ): Promise<AgentIdentity> {
+    const mailbox =
+      options.createMailbox || options.displayName !== undefined || options.emailLocalPart !== undefined
+        ? {
+            displayName: options.displayName,
+            emailLocalPart: options.emailLocalPart,
+          }
+        : undefined;
+    await this._idsResource.create({
+      agentHandle,
+      mailbox,
+      phoneNumber: options.phoneNumber,
+      vaultSecretIds: options.vaultSecretIds,
+    });
     // POST /identities returns summary (no channel fields); fetch detail so
     // AgentIdentity has a fully-populated _AgentIdentityData.
     const data = await this._idsResource.get(agentHandle);

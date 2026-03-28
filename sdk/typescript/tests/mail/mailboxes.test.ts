@@ -15,33 +15,6 @@ function mockHttp() {
 
 const ADDR = "agent01@inkbox.ai";
 
-describe("MailboxesResource.create", () => {
-  it("creates with displayName", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
-    const res = new MailboxesResource(http);
-
-    const mailbox = await res.create({ agentHandle: "sales-agent", displayName: "Agent 01" });
-
-    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
-      agent_handle: "sales-agent",
-      display_name: "Agent 01",
-    });
-    expect(mailbox.emailAddress).toBe("agent01@inkbox.ai");
-  });
-
-  it("creates without displayName omits the field", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
-    const res = new MailboxesResource(http);
-
-    await res.create({ agentHandle: "sales-agent" });
-
-    const [, body] = vi.mocked(http.post).mock.calls[0];
-    expect((body as Record<string, unknown>)["display_name"]).toBeUndefined();
-  });
-});
-
 describe("MailboxesResource.list", () => {
   it("returns array of mailboxes", async () => {
     const http = mockHttp();
@@ -73,6 +46,27 @@ describe("MailboxesResource.get", () => {
 
     expect(http.get).toHaveBeenCalledWith(`/mailboxes/${ADDR}`);
     expect(mailbox.displayName).toBe("Agent 01");
+  });
+});
+
+describe("MailboxesResource.create", () => {
+  it("creates a mailbox for an identity", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+
+    const mailbox = await res.create({
+      agentHandle: "sales-agent",
+      displayName: "Sales Team",
+      emailLocalPart: "sales.team",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
+      agent_handle: "sales-agent",
+      display_name: "Sales Team",
+      email_local_part: "sales.team",
+    });
+    expect(mailbox.emailAddress).toBe("agent01@inkbox.ai");
   });
 });
 

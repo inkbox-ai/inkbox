@@ -20,6 +20,7 @@ describe("parseAgentIdentitySummary", () => {
     expect(i.organizationId).toBe("org-abc123");
     expect(i.agentHandle).toBe("sales-agent");
     expect(i.status).toBe("active");
+    expect(i.emailAddress).toBe("sales-agent@inkboxmail.com");
     expect(i.createdAt).toBeInstanceOf(Date);
     expect(i.updatedAt).toBeInstanceOf(Date);
   });

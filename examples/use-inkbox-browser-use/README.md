@@ -167,6 +167,6 @@ curl http://127.0.0.1:9222/json/version
 
 | Variable | Required | Description | Get your key |
 |----------|----------|-------------|-------------|
-| `INKBOX_API_KEY` | Yes | Inkbox API key for identity + email | [console.inkbox.ai](https://console.inkbox.ai) |
+| `INKBOX_API_KEY` | Yes | Inkbox API key for identity + email | [inkbox.ai/console](https://inkbox.ai/console) |
 | `BROWSER_USE_API_KEY` | Yes | Browser Use API key | [browser-use.com](https://browser-use.com) |
 | `INKBOX_VAULT_KEY` | No | Vault key to unlock stored credentials and TOTP codes | Set in Inkbox console |

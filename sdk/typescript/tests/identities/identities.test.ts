@@ -26,6 +26,70 @@ describe("IdentitiesResource.create", () => {
     expect(http.post).toHaveBeenCalledWith("/", { agent_handle: HANDLE });
     expect(identity.agentHandle).toBe(HANDLE);
   });
+
+  it("supports nested mailbox, phone number, and vault secret payloads", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_IDENTITY,
+      email_address: "sales.team@inkboxmail.com",
+    });
+    const res = new IdentitiesResource(http);
+
+    const identity = await res.create({
+      agentHandle: HANDLE,
+      mailbox: {
+        displayName: "Sales Team",
+        emailLocalPart: "sales.team",
+      },
+      phoneNumber: {
+        type: "local",
+        state: "NY",
+        incomingCallAction: "webhook",
+        incomingCallWebhookUrl: "https://example.com/calls",
+        incomingTextWebhookUrl: "https://example.com/texts",
+      },
+      vaultSecretIds: [
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+      ],
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/", {
+      agent_handle: HANDLE,
+      mailbox: {
+        display_name: "Sales Team",
+        email_local_part: "sales.team",
+      },
+      phone_number: {
+        type: "local",
+        state: "NY",
+        incoming_call_action: "webhook",
+        incoming_call_webhook_url: "https://example.com/calls",
+        incoming_text_webhook_url: "https://example.com/texts",
+      },
+      vault_secret_ids: [
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+      ],
+    });
+    expect(identity.emailAddress).toBe("sales.team@inkboxmail.com");
+  });
+
+  it("supports a single vault secret ID", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY);
+    const res = new IdentitiesResource(http);
+
+    await res.create({
+      agentHandle: HANDLE,
+      vaultSecretIds: "11111111-1111-1111-1111-111111111111",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/", {
+      agent_handle: HANDLE,
+      vault_secret_ids: "11111111-1111-1111-1111-111111111111",
+    });
+  });
 });
 
 describe("IdentitiesResource.list", () => {
@@ -162,4 +226,3 @@ describe("IdentitiesResource.unlinkPhoneNumber", () => {
     expect(http.delete).toHaveBeenCalledWith(`/${HANDLE}/phone_number`);
   });
 });
-

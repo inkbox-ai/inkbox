@@ -188,7 +188,26 @@ export interface DecryptedVaultSecret {
   payload: SecretPayload;
 }
 
+/** Result of vault initialization. */
+export interface VaultInitializeResult {
+  /** UUID of the newly created vault. */
+  vaultId: string;
+  /** UUID of the primary vault key. */
+  vaultKeyId: string;
+  /** Number of recovery keys created (always 4). */
+  recoveryKeyCount: number;
+  /** The four recovery code strings. Store securely — they cannot be retrieved again. */
+  recoveryCodes: string[];
+}
+
 // ---- Raw API shapes (snake_case from JSON) ----
+
+/** @internal */
+export interface RawVaultInitializeResponse {
+  vault_id: string;
+  vault_key_id: string;
+  recovery_key_count: number;
+}
 
 /** @internal */
 export interface RawVaultInfo {

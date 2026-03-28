@@ -9,14 +9,24 @@ from unittest.mock import MagicMock
 import pytest
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT
 from inkbox.vault.crypto import (
+    compute_auth_hash,
     derive_master_key,
     derive_salt,
     encrypt_payload,
     generate_org_encryption_key,
+    unwrap_org_key,
     wrap_org_key,
 )
 from inkbox.vault.resources.vault import VaultResource, UnlockedVault
-from inkbox.vault.types import AccessRule, LoginPayload, OtherPayload, VaultInfo, VaultKey, VaultSecret
+from inkbox.vault.types import (
+    AccessRule,
+    LoginPayload,
+    OtherPayload,
+    VaultInfo,
+    VaultInitializeResult,
+    VaultKey,
+    VaultSecret,
+)
 
 VALID_VAULT_KEY = "Test-Passw0rd!xy"
 
@@ -655,3 +665,305 @@ class TestStrictAADEnforcement:
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
         with pytest.raises(Exception):
             unlocked.get_secret("cccc3333-0000-0000-0000-000000000001")
+
+
+# ---- VaultResource.initialize tests ----
+
+
+class TestVaultResourceInitialize:
+    def test_posts_crypto_material_and_returns_result(self):
+        res, http = _resource()
+        http.post.return_value = {
+            "vault_id": "aaaa1111-0000-0000-0000-000000000099",
+            "vault_key_id": "bbbb2222-0000-0000-0000-000000000099",
+            "recovery_key_count": 4,
+        }
+
+        result = res.initialize(VALID_VAULT_KEY, "org_test_123")
+
+        assert isinstance(result, VaultInitializeResult)
+        assert str(result.vault_id) == "aaaa1111-0000-0000-0000-000000000099"
+        assert str(result.vault_key_id) == "bbbb2222-0000-0000-0000-000000000099"
+        assert result.recovery_key_count == 4
+        assert len(result.recovery_codes) == 4
+
+        # Verify HTTP call
+        http.post.assert_called_once()
+        call_kwargs = http.post.call_args
+        assert call_kwargs[0][0] == "/initialize"
+        body = call_kwargs[1]["json"]
+
+        # vault_key must be primary with all required fields
+        vk = body["vault_key"]
+        assert "id" in vk
+        assert "wrapped_org_encryption_key" in vk
+        assert "auth_hash" in vk
+        assert vk["key_type"] == "primary"
+
+        # recovery_keys must have 4 entries, all recovery type
+        assert len(body["recovery_keys"]) == 4
+        for rk in body["recovery_keys"]:
+            assert "id" in rk
+            assert "wrapped_org_encryption_key" in rk
+            assert "auth_hash" in rk
+            assert rk["key_type"] == "recovery"
+
+    def test_recovery_codes_match_expected_pattern(self):
+        import re
+
+        res, http = _resource()
+        http.post.return_value = {
+            "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
+        }
+
+        result = res.initialize(VALID_VAULT_KEY, "org_test_123")
+
+        pattern = re.compile(r"^[A-Z2-9]{4}(-[A-Z2-9]{4}){7}$")
+        for code in result.recovery_codes:
+            assert pattern.match(code), f"Recovery code {code!r} does not match pattern"
+
+    def test_all_key_ids_and_auth_hashes_unique(self):
+        res, http = _resource()
+        http.post.return_value = {
+            "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
+        }
+        res.initialize(VALID_VAULT_KEY, "org_test_123")
+
+        body = http.post.call_args[1]["json"]
+        all_keys = [body["vault_key"]] + body["recovery_keys"]
+        ids = [k["id"] for k in all_keys]
+        hashes = [k["auth_hash"] for k in all_keys]
+        assert len(set(ids)) == 5, "All key IDs must be unique"
+        assert len(set(hashes)) == 5, "All auth hashes must be unique"
+
+    def test_wrapped_org_key_can_be_round_tripped(self):
+        """Verify that the vault key in the POST body can actually unwrap
+        the org encryption key — a crypto round-trip test."""
+        res, http = _resource()
+        http.post.return_value = {
+            "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
+        }
+        res.initialize(VALID_VAULT_KEY, "org_test_123")
+
+        body = http.post.call_args[1]["json"]
+        vk = body["vault_key"]
+        salt = derive_salt("org_test_123")
+        mk = derive_master_key(VALID_VAULT_KEY, salt)
+        org_key = unwrap_org_key(mk, vk["wrapped_org_encryption_key"], vault_key_id=vk["id"])
+        assert isinstance(org_key, bytes)
+        assert len(org_key) == 32
+
+    def test_all_recovery_codes_unwrap_same_org_key(self):
+        """Each recovery code must unwrap to the identical org encryption key."""
+        res, http = _resource()
+        http.post.return_value = {
+            "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
+        }
+        result = res.initialize(VALID_VAULT_KEY, "org_test_123")
+
+        body = http.post.call_args[1]["json"]
+        salt = derive_salt("org_test_123")
+
+        # Reference: unwrap via primary key
+        vk = body["vault_key"]
+        primary_mk = derive_master_key(VALID_VAULT_KEY, salt)
+        reference_org_key = unwrap_org_key(
+            primary_mk, vk["wrapped_org_encryption_key"], vault_key_id=vk["id"],
+        )
+
+        for i, code in enumerate(result.recovery_codes):
+            rk = body["recovery_keys"][i]
+            rc_mk = derive_master_key(code, salt)
+            org_key = unwrap_org_key(
+                rc_mk, rk["wrapped_org_encryption_key"], vault_key_id=rk["id"],
+            )
+            assert org_key == reference_org_key, f"Recovery code {i} unwrapped different org key"
+
+
+# ---- VaultResource.update_key tests ----
+
+
+def _setup_vault_crypto():
+    """Create real crypto state for a vault with a known vault key."""
+    org_key = generate_org_encryption_key()
+    vault_key = VALID_VAULT_KEY
+    org_id = "org_test_123"
+    salt = derive_salt(org_id)
+    mk = derive_master_key(vault_key, salt)
+    auth_hash = compute_auth_hash(mk)
+    wrapped = wrap_org_key(mk, org_key, vault_key_id=VAULT_KEY_DICT["id"])
+    return org_key, vault_key, org_id, mk, auth_hash, wrapped
+
+
+class TestVaultResourceUpdateKey:
+    def test_normal_update_derives_auth_and_puts(self):
+        org_key, vault_key, org_id, mk, auth_hash, wrapped = _setup_vault_crypto()
+        new_vault_key = "New-Passw0rd!xyz"
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,                              # info()
+            {                                             # /unlock
+                "wrapped_org_encryption_key": wrapped,
+                "encrypted_secrets": [],
+            },
+            [VAULT_KEY_DICT],                             # /keys
+        ]
+        http.put.return_value = {**VAULT_KEY_DICT, "id": "eeee5555-0000-0000-0000-000000000099"}
+
+        result = res.update_key(new_vault_key, current_vault_key=vault_key)
+
+        assert isinstance(result, VaultKey)
+        assert str(result.id) == "eeee5555-0000-0000-0000-000000000099"
+
+        http.put.assert_called_once()
+        call_args = http.put.call_args
+        assert call_args[0][0] == "/keys/primary"
+        body = call_args[1]["json"]
+        assert "id" in body
+        assert "wrapped_org_encryption_key" in body
+        assert "auth_hash" in body
+        assert "current_auth_hash" in body
+        assert "recovery_auth_hash" not in body
+
+    def test_recovery_update_uses_recovery_auth_hash(self):
+        org_key = generate_org_encryption_key()
+        org_id = "org_test_123"
+        recovery_code = "ABCD-EFGH-JKLM-NPQR-STUV-WXYZ-2345-6789"
+        salt = derive_salt(org_id)
+        recovery_mk = derive_master_key(recovery_code, salt)
+        recovery_wrapped = wrap_org_key(recovery_mk, org_key, vault_key_id="recovery-key-id")
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {
+                "wrapped_org_encryption_key": recovery_wrapped,
+                "encrypted_secrets": [],
+            },
+            [
+                {**VAULT_KEY_DICT, "id": "recovery-key-id", "key_type": "recovery"},
+            ],
+        ]
+        http.put.return_value = {**VAULT_KEY_DICT, "id": "eeee5555-0000-0000-0000-000000000099"}
+
+        result = res.update_key("New-Passw0rd!xyz", recovery_code=recovery_code)
+
+        assert str(result.id) == "eeee5555-0000-0000-0000-000000000099"
+        body = http.put.call_args[1]["json"]
+        assert "recovery_auth_hash" in body
+        assert "current_auth_hash" not in body
+
+    def test_new_key_can_be_unlocked_with_new_vault_key(self):
+        """Verify that the wrapped org key in the PUT body can be unwrapped
+        with the new vault key — and yields the original org key."""
+        org_key, vault_key, org_id, mk, auth_hash, wrapped = _setup_vault_crypto()
+        new_vault_key = "New-Passw0rd!xyz"
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {"wrapped_org_encryption_key": wrapped, "encrypted_secrets": []},
+            [VAULT_KEY_DICT],
+        ]
+        http.put.return_value = VAULT_KEY_DICT
+
+        res.update_key(new_vault_key, current_vault_key=vault_key)
+
+        body = http.put.call_args[1]["json"]
+        salt = derive_salt("org_test_123")
+        new_mk = derive_master_key(new_vault_key, salt)
+        unwrapped = unwrap_org_key(
+            new_mk, body["wrapped_org_encryption_key"], vault_key_id=body["id"],
+        )
+        assert unwrapped == org_key
+
+    def test_current_auth_hash_matches_derived_hash(self):
+        org_key, vault_key, org_id, mk, auth_hash, wrapped = _setup_vault_crypto()
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {"wrapped_org_encryption_key": wrapped, "encrypted_secrets": []},
+            [VAULT_KEY_DICT],
+        ]
+        http.put.return_value = VAULT_KEY_DICT
+
+        res.update_key("New-Passw0rd!xyz", current_vault_key=vault_key)
+
+        body = http.put.call_args[1]["json"]
+        assert body["current_auth_hash"] == auth_hash
+
+    def test_sends_correct_auth_hash_to_unlock(self):
+        org_key, vault_key, org_id, mk, auth_hash, wrapped = _setup_vault_crypto()
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {"wrapped_org_encryption_key": wrapped, "encrypted_secrets": []},
+            [VAULT_KEY_DICT],
+        ]
+        http.put.return_value = VAULT_KEY_DICT
+
+        res.update_key("New-Passw0rd!xyz", current_vault_key=vault_key)
+
+        # Second get call should be /unlock with the correct auth_hash
+        unlock_call = http.get.call_args_list[1]
+        assert unlock_call[0][0] == "/unlock"
+        assert unlock_call[1]["params"] == {"auth_hash": auth_hash}
+
+    def test_raises_when_neither_auth_method_provided(self):
+        res, http = _resource()
+        with pytest.raises(ValueError, match="Exactly one of"):
+            res.update_key("New-Passw0rd!xyz")
+
+    def test_raises_when_both_auth_methods_provided(self):
+        res, http = _resource()
+        with pytest.raises(ValueError, match="Exactly one of"):
+            res.update_key(
+                "New-Passw0rd!xyz",
+                current_vault_key=VALID_VAULT_KEY,
+                recovery_code="some-code",
+            )
+
+    def test_raises_when_no_vault_key_matches(self):
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {"wrapped_org_encryption_key": None, "encrypted_secrets": []},
+        ]
+        with pytest.raises(ValueError, match="No vault key matched"):
+            res.update_key("New-Passw0rd!xyz", current_vault_key=VALID_VAULT_KEY)
+
+    def test_raises_when_wrapped_key_missing(self):
+        """Response has no wrapped_org_encryption_key field at all."""
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {"encrypted_secrets": []},
+        ]
+        with pytest.raises(ValueError, match="No vault key matched"):
+            res.update_key("New-Passw0rd!xyz", current_vault_key=VALID_VAULT_KEY)
+
+    def test_raises_when_org_key_cannot_be_unwrapped(self):
+        """AAD mismatch: the key ID returned by /keys doesn't match the one
+        used to wrap the org key."""
+        _, vault_key, _, _, _, wrapped = _setup_vault_crypto()
+
+        res, http = _resource()
+        http.get.side_effect = [
+            VAULT_INFO_DICT,
+            {"wrapped_org_encryption_key": wrapped, "encrypted_secrets": []},
+            [{**VAULT_KEY_DICT, "id": "wrong-key-id"}],
+        ]
+        with pytest.raises(ValueError, match="Failed to unwrap"):
+            res.update_key("New-Passw0rd!xyz", current_vault_key=vault_key)
+
+
+class TestVaultResourceDeleteKey:
+    def test_deletes_key_by_auth_hash(self):
+        res, http = _resource()
+
+        res.delete_key("auth-hash-123")
+
+        http.delete.assert_called_once_with("/keys/auth-hash-123")

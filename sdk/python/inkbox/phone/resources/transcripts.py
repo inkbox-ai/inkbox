@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 
 class TranscriptsResource:
+
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 

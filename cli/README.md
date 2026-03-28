@@ -25,16 +25,13 @@ export INKBOX_API_KEY="ApiKey_..."
 export INKBOX_VAULT_KEY="my-vault-key"    # only needed for vault decrypt/create
 ```
 
-Get your API key at [console.inkbox.ai](https://console.inkbox.ai/).
+Get your API key at [inkbox.ai/console](https://inkbox.ai/console).
 
 ## Quick start
 
 ```bash
-# Create an agent identity
+# Create an agent identity (mailbox is created automatically)
 inkbox identity create support-bot
-
-# Create a mailbox for the identity
-inkbox mailbox create --handle support-bot
 
 # Send an email
 inkbox email send -i support-bot \
@@ -75,6 +72,13 @@ inkbox identity get-secret <handle> <secret-id>     # Decrypt a secret (vault ke
 inkbox identity delete-secret <handle> <secret-id>  # Delete a secret (vault key)
 inkbox identity revoke-access <handle> <secret-id>  # Revoke credential access
 
+inkbox identity assign-mailbox <handle>              # Assign an existing mailbox
+  --mailbox-id <id>                            #   Mailbox UUID (required)
+inkbox identity unlink-mailbox <handle>              # Unlink mailbox from identity
+inkbox identity assign-phone <handle>                # Assign an existing phone number
+  --phone-number-id <id>                       #   Phone number UUID (required)
+inkbox identity unlink-phone <handle>                # Unlink phone number from identity
+
 inkbox identity set-totp <handle> <secret-id>       # Add TOTP to login (vault key)
   --uri <otpauth-uri>                        #   otpauth:// URI (required)
 inkbox identity remove-totp <handle> <secret-id>    # Remove TOTP (vault key)
@@ -110,6 +114,10 @@ inkbox email unread -i <handle>              # List unread emails
   --limit <n>                                #   Max messages (default: 50)
 
 inkbox email mark-read <ids...> -i <handle>  # Mark messages as read
+inkbox email delete <message-id> -i <handle> # Delete a message
+inkbox email delete-thread <thread-id> -i <handle>  # Delete a thread
+inkbox email star <message-id> -i <handle>   # Star a message
+inkbox email unstar <message-id> -i <handle> # Unstar a message
 inkbox email thread <thread-id> -i <handle>  # Get thread with all messages
 ```
 
@@ -182,6 +190,12 @@ inkbox vault create                          # Create a secret (requires vault k
 inkbox vault keys                            # List vault keys
   --type <type>                              #   Filter: primary or recovery
 
+inkbox vault grant-access <secret-id>        # Grant identity access to a secret
+  -i, --identity <handle>                    #   Agent identity handle (required)
+inkbox vault revoke-access <secret-id>       # Revoke identity access to a secret
+  -i, --identity <handle>                    #   Agent identity handle (required)
+inkbox vault access-list <secret-id>         # List access rules for a secret
+
 inkbox vault logins -i <handle>              # List login credentials (vault key)
 inkbox vault api-keys -i <handle>            # List API key credentials (vault key)
 inkbox vault ssh-keys -i <handle>            # List SSH key credentials (vault key)
@@ -214,9 +228,10 @@ Org-level mailbox management.
 ```bash
 inkbox mailbox list                          # List all mailboxes
 inkbox mailbox get <email-address>           # Get mailbox details
-inkbox mailbox create                        # Create a mailbox
-  --handle <handle>                          #   Agent handle (required)
+inkbox mailbox create                        # Create a new mailbox
+  -i, --identity <handle>                   #   Agent handle (required)
   --display-name <name>                      #   Display name
+  --local-part <part>                        #   Requested email local part (random if omitted)
 inkbox mailbox update <email-address>        # Update a mailbox
   --display-name <name>                      #   New display name
   --webhook-url <url>                        #   Webhook URL ("" to clear)
@@ -234,10 +249,12 @@ inkbox number provision                      # Provision a new number
   --handle <handle>                          #   Agent handle (required)
   --type <type>                              #   toll_free or local (default: toll_free)
   --state <state>                            #   US state abbreviation (for local)
+  --incoming-text-webhook-url <url>          #   Webhook URL for incoming texts
 inkbox number update <id>                    # Update phone number config
   --incoming-call-action <action>            #   auto_accept, auto_reject, or webhook
   --client-websocket-url <url>               #   WebSocket URL for audio bridging
   --incoming-call-webhook-url <url>          #   Webhook URL for incoming calls
+  --incoming-text-webhook-url <url>          #   Webhook URL for incoming texts
 inkbox number release <number-id>             # Release a phone number
 ```
 

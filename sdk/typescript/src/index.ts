@@ -25,12 +25,17 @@ export type {
 } from "./phone/types.js";
 export type {
   AgentIdentitySummary,
+  CreateIdentityOptions,
+  IdentityMailboxCreateOptions,
   IdentityMailbox,
+  IdentityPhoneNumberCreateOptions,
   IdentityPhoneNumber,
 } from "./identities/types.js";
+export { ResourceStatus } from "./identities/types.js";
 export type {
   AccessRule,
   VaultInfo,
+  VaultInitializeResult,
   VaultKey,
   VaultSecret,
   VaultSecretDetail,

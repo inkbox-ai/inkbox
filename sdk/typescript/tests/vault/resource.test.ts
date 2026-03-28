@@ -7,6 +7,7 @@ import {
   deriveMasterKey,
   computeAuthHash,
   wrapOrgKey,
+  unwrapOrgKey,
   encryptPayload,
   generateOrgEncryptionKey,
 } from "../../src/vault/crypto.js";
@@ -628,5 +629,328 @@ describe("strict AAD enforcement", () => {
     vi.mocked(http.get).mockResolvedValue({ ...RAW_SECRET, encrypted_payload: encrypted });
     const unlocked = new UnlockedVault(http, orgKey, []);
     await expect(unlocked.getSecret(RAW_SECRET.id)).rejects.toThrow();
+  });
+});
+
+// ---- VaultResource.initialize tests ----
+
+describe("VaultResource.initialize", () => {
+  it("posts crypto material to /initialize and returns result with recovery codes", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      vault_id: "vault-uuid-1234",
+      vault_key_id: "key-uuid-5678",
+      recovery_key_count: 4,
+    });
+
+    const res = new VaultResource(http);
+    const result = await res.initialize(VALID_VAULT_KEY, "org_test_123");
+
+    expect(result.vaultId).toBe("vault-uuid-1234");
+    expect(result.vaultKeyId).toBe("key-uuid-5678");
+    expect(result.recoveryKeyCount).toBe(4);
+    expect(result.recoveryCodes).toHaveLength(4);
+
+    // Verify HTTP call
+    expect(http.post).toHaveBeenCalledTimes(1);
+    const [path, body] = vi.mocked(http.post).mock.calls[0];
+    expect(path).toBe("/initialize");
+
+    // vault_key must be primary with all required fields
+    expect(body.vault_key.id).toEqual(expect.any(String));
+    expect(body.vault_key.wrapped_org_encryption_key).toEqual(expect.any(String));
+    expect(body.vault_key.auth_hash).toEqual(expect.any(String));
+    expect(body.vault_key.key_type).toBe("primary");
+
+    // recovery_keys must have 4 entries, all recovery type
+    expect(body.recovery_keys).toHaveLength(4);
+    for (const rk of body.recovery_keys) {
+      expect(rk.id).toEqual(expect.any(String));
+      expect(rk.wrapped_org_encryption_key).toEqual(expect.any(String));
+      expect(rk.auth_hash).toEqual(expect.any(String));
+      expect(rk.key_type).toBe("recovery");
+    }
+  });
+
+  it("recovery codes match XXXX-XXXX-…-XXXX pattern (8 groups of 4)", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
+    });
+    const res = new VaultResource(http);
+    const result = await res.initialize(VALID_VAULT_KEY, "org_test_123");
+
+    for (const code of result.recoveryCodes) {
+      expect(code).toMatch(/^[A-Z2-9]{4}(-[A-Z2-9]{4}){7}$/);
+    }
+  });
+
+  it("all key IDs and auth_hashes are unique", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
+    });
+    const res = new VaultResource(http);
+    await res.initialize(VALID_VAULT_KEY, "org_test_123");
+
+    const [, body] = vi.mocked(http.post).mock.calls[0];
+    const allKeys = [body.vault_key, ...body.recovery_keys];
+    const ids = allKeys.map((k: Record<string, string>) => k.id);
+    const hashes = allKeys.map((k: Record<string, string>) => k.auth_hash);
+    expect(new Set(ids).size).toBe(5);
+    expect(new Set(hashes).size).toBe(5);
+  });
+
+  it("wrapped org key can be round-tripped with the same vault key", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
+    });
+    const res = new VaultResource(http);
+    await res.initialize(VALID_VAULT_KEY, "org_test_123");
+
+    const [, body] = vi.mocked(http.post).mock.calls[0];
+    const salt = deriveSalt("org_test_123");
+    const mk = await deriveMasterKey(VALID_VAULT_KEY, salt);
+    const orgKey = unwrapOrgKey(mk, body.vault_key.wrapped_org_encryption_key, body.vault_key.id);
+    expect(orgKey).toBeInstanceOf(Uint8Array);
+    expect(orgKey.length).toBe(32);
+  });
+
+  it("all four recovery codes can each unwrap the same org key", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
+    });
+    const res = new VaultResource(http);
+    const result = await res.initialize(VALID_VAULT_KEY, "org_test_123");
+
+    const [, body] = vi.mocked(http.post).mock.calls[0];
+    const salt = deriveSalt("org_test_123");
+
+    // First unwrap the org key via the primary key to get the reference
+    const primaryMk = await deriveMasterKey(VALID_VAULT_KEY, salt);
+    const referenceOrgKey = unwrapOrgKey(
+      primaryMk, body.vault_key.wrapped_org_encryption_key, body.vault_key.id,
+    );
+
+    // Each recovery code should unwrap to the same org key
+    for (let i = 0; i < 4; i++) {
+      const code = result.recoveryCodes[i];
+      const rk = body.recovery_keys[i];
+      const rcMk = await deriveMasterKey(code, salt);
+      const orgKey = unwrapOrgKey(rcMk, rk.wrapped_org_encryption_key, rk.id);
+      expect(Buffer.from(orgKey)).toEqual(Buffer.from(referenceOrgKey));
+    }
+  });
+});
+
+// ---- VaultResource.updateKey tests ----
+
+describe("VaultResource.updateKey", () => {
+  async function setupVaultCrypto() {
+    const orgKey = generateOrgEncryptionKey();
+    const vaultKey = VALID_VAULT_KEY;
+    const orgId = "org_test_123";
+    const salt = deriveSalt(orgId);
+    const mk = await deriveMasterKey(vaultKey, salt);
+    const authHash = computeAuthHash(mk);
+    const wrapped = wrapOrgKey(mk, orgKey, RAW_KEY.id);
+    return { orgKey, vaultKey, orgId, salt, mk, authHash, wrapped };
+  }
+
+  it("normal update: derives auth, unwraps, re-wraps, and PUTs", async () => {
+    const { vaultKey, wrapped } = await setupVaultCrypto();
+    const newVaultKey = "New-Passw0rd!xyz";
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [],
+      })
+      .mockResolvedValueOnce([RAW_KEY]);
+    vi.mocked(http.put).mockResolvedValue({ ...RAW_KEY, id: "new-key-uuid" });
+
+    const res = new VaultResource(http);
+    const result = await res.updateKey({ newVaultKey, currentVaultKey: vaultKey });
+
+    expect(result.id).toBe("new-key-uuid");
+
+    expect(http.put).toHaveBeenCalledTimes(1);
+    const [path, body] = vi.mocked(http.put).mock.calls[0];
+    expect(path).toBe("/keys/primary");
+    expect(body.id).toEqual(expect.any(String));
+    expect(body.wrapped_org_encryption_key).toEqual(expect.any(String));
+    expect(body.auth_hash).toEqual(expect.any(String));
+    expect(body.current_auth_hash).toEqual(expect.any(String));
+    expect(body.recovery_auth_hash).toBeUndefined();
+  });
+
+  it("recovery update: uses recovery_auth_hash", async () => {
+    const orgKey = generateOrgEncryptionKey();
+    const orgId = "org_test_123";
+    const recoveryCode = "ABCD-EFGH-JKLM-NPQR-STUV-WXYZ-2345-6789";
+    const salt = deriveSalt(orgId);
+    const recoveryMk = await deriveMasterKey(recoveryCode, salt);
+    const recoveryWrapped = wrapOrgKey(recoveryMk, orgKey, "recovery-key-id");
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: recoveryWrapped,
+        encrypted_secrets: [],
+      })
+      .mockResolvedValueOnce([
+        { ...RAW_KEY, id: "recovery-key-id", key_type: "recovery" },
+      ]);
+    vi.mocked(http.put).mockResolvedValue({ ...RAW_KEY, id: "new-key-uuid" });
+
+    const res = new VaultResource(http);
+    const result = await res.updateKey({
+      newVaultKey: "New-Passw0rd!xyz",
+      recoveryCode,
+    });
+
+    expect(result.id).toBe("new-key-uuid");
+    const [, body] = vi.mocked(http.put).mock.calls[0];
+    expect(body.recovery_auth_hash).toEqual(expect.any(String));
+    expect(body.current_auth_hash).toBeUndefined();
+  });
+
+  it("new key material can be unlocked with the new vault key", async () => {
+    const { orgKey, vaultKey, wrapped } = await setupVaultCrypto();
+    const newVaultKey = "New-Passw0rd!xyz";
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [],
+      })
+      .mockResolvedValueOnce([RAW_KEY]);
+    vi.mocked(http.put).mockResolvedValue(RAW_KEY);
+
+    const res = new VaultResource(http);
+    await res.updateKey({ newVaultKey, currentVaultKey: vaultKey });
+
+    const [, body] = vi.mocked(http.put).mock.calls[0];
+    const salt = deriveSalt("org_test_123");
+    const newMk = await deriveMasterKey(newVaultKey, salt);
+    const unwrapped = unwrapOrgKey(newMk, body.wrapped_org_encryption_key, body.id);
+    expect(unwrapped).toBeInstanceOf(Uint8Array);
+    expect(unwrapped.length).toBe(32);
+    // The unwrapped key must be the same org key
+    expect(Buffer.from(unwrapped)).toEqual(Buffer.from(orgKey));
+  });
+
+  it("current_auth_hash matches what the server would expect", async () => {
+    const { vaultKey, authHash, wrapped } = await setupVaultCrypto();
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [],
+      })
+      .mockResolvedValueOnce([RAW_KEY]);
+    vi.mocked(http.put).mockResolvedValue(RAW_KEY);
+
+    const res = new VaultResource(http);
+    await res.updateKey({ newVaultKey: "New-Passw0rd!xyz", currentVaultKey: vaultKey });
+
+    const [, body] = vi.mocked(http.put).mock.calls[0];
+    expect(body.current_auth_hash).toBe(authHash);
+  });
+
+  it("throws when neither currentVaultKey nor recoveryCode provided", async () => {
+    const http = mockHttp();
+    const res = new VaultResource(http);
+    await expect(
+      res.updateKey({ newVaultKey: "New-Passw0rd!xyz" }),
+    ).rejects.toThrow("Exactly one of");
+  });
+
+  it("throws when both currentVaultKey and recoveryCode provided", async () => {
+    const http = mockHttp();
+    const res = new VaultResource(http);
+    await expect(
+      res.updateKey({
+        newVaultKey: "New-Passw0rd!xyz",
+        currentVaultKey: VALID_VAULT_KEY,
+        recoveryCode: "some-code",
+      }),
+    ).rejects.toThrow("Exactly one of");
+  });
+
+  it("throws when no vault key matches (null wrapped key)", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: null,
+        encrypted_secrets: [],
+      });
+
+    const res = new VaultResource(http);
+    await expect(
+      res.updateKey({ newVaultKey: "New-Passw0rd!xyz", currentVaultKey: VALID_VAULT_KEY }),
+    ).rejects.toThrow("No vault key matched");
+  });
+
+  it("throws when org key cannot be unwrapped (AAD mismatch)", async () => {
+    const { wrapped } = await setupVaultCrypto();
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [],
+      })
+      .mockResolvedValueOnce([{ ...RAW_KEY, id: "wrong-key-id" }]);
+
+    const res = new VaultResource(http);
+    await expect(
+      res.updateKey({ newVaultKey: "New-Passw0rd!xyz", currentVaultKey: VALID_VAULT_KEY }),
+    ).rejects.toThrow("Failed to unwrap");
+  });
+
+  it("sends correct auth_hash to /unlock endpoint", async () => {
+    const { vaultKey, authHash, wrapped } = await setupVaultCrypto();
+
+    const http = mockHttp();
+    vi.mocked(http.get)
+      .mockResolvedValueOnce(RAW_INFO)
+      .mockResolvedValueOnce({
+        wrapped_org_encryption_key: wrapped,
+        encrypted_secrets: [],
+      })
+      .mockResolvedValueOnce([RAW_KEY]);
+    vi.mocked(http.put).mockResolvedValue(RAW_KEY);
+
+    const res = new VaultResource(http);
+    await res.updateKey({ newVaultKey: "New-Passw0rd!xyz", currentVaultKey: vaultKey });
+
+    // Second get call should be /unlock with the correct auth_hash
+    expect(vi.mocked(http.get).mock.calls[1]).toEqual([
+      "/unlock", { auth_hash: authHash },
+    ]);
+  });
+});
+
+describe("VaultResource.deleteKey", () => {
+  it("deletes the matching key by auth hash", async () => {
+    const http = mockHttp();
+    const res = new VaultResource(http);
+
+    await res.deleteKey("auth-hash-123");
+
+    expect(http.delete).toHaveBeenCalledTimes(1);
+    expect(http.delete).toHaveBeenCalledWith("/keys/auth-hash-123");
   });
 });
