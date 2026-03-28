@@ -11,6 +11,30 @@ export function registerVaultCommands(program: Command): void {
     .description("Encrypted vault operations");
 
   vault
+    .command("init")
+    .description("Initialize a vault for an organization")
+    .requiredOption("--organization-id <id>", "Organization ID")
+    .option("--vault-key <key>", "Vault key to initialize with")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { organizationId: string; vaultKey?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        if (!vaultKey) {
+          console.error(
+            "Error: Vault key required. Set INKBOX_VAULT_KEY or pass --vault-key.",
+          );
+          process.exit(1);
+        }
+        const inkbox = createClient(opts);
+        const result = await inkbox.vault.initialize(vaultKey, cmdOpts.organizationId);
+        output(result, { json: !!opts.json });
+      }),
+    );
+
+  vault
     .command("info")
     .description("Show vault info")
     .action(
@@ -268,6 +292,48 @@ export function registerVaultCommands(program: Command): void {
           json: !!opts.json,
           columns: ["id", "keyType", "status", "createdBy", "createdAt"],
         });
+      }),
+    );
+
+  vault
+    .command("update-key")
+    .description("Rotate the primary vault key")
+    .requiredOption("--new-vault-key <key>", "New primary vault key")
+    .option("--current-vault-key <key>", "Current primary vault key")
+    .option("--recovery-code <code>", "Recovery code to use instead of the current key")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          newVaultKey: string;
+          currentVaultKey?: string;
+          recoveryCode?: string;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const currentVaultKey = cmdOpts.currentVaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+        const inkbox = createClient(opts);
+        const result = await inkbox.vault.updateKey({
+          newVaultKey: cmdOpts.newVaultKey,
+          currentVaultKey: cmdOpts.recoveryCode ? undefined : currentVaultKey,
+          recoveryCode: cmdOpts.recoveryCode,
+        });
+        output(result, { json: !!opts.json });
+      }),
+    );
+
+  vault
+    .command("delete-key <auth-hash>")
+    .description("Delete a vault key by auth hash")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        authHash: string,
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        await inkbox.vault.deleteKey(authHash);
+        console.log(`Deleted vault key '${authHash}'.`);
       }),
     );
 

@@ -254,6 +254,15 @@ export class VaultResource {
     return data.map(parseVaultKey);
   }
 
+  /**
+   * Delete a vault key by auth hash.
+   *
+   * @param authHash - Auth hash of the key to revoke.
+   */
+  async deleteKey(authHash: string): Promise<void> {
+    await this.http.delete(`/keys/${authHash}`);
+  }
+
   // ------------------------------------------------------------------
   // Secrets (metadata-only operations)
   // ------------------------------------------------------------------

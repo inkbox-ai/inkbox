@@ -258,6 +258,15 @@ class VaultResource:
         data = self._http.get("/keys", params=params)
         return [VaultKey._from_dict(k) for k in data]
 
+    def delete_key(self, auth_hash: str) -> None:
+        """
+        Delete a vault key by auth hash.
+
+        Args:
+            auth_hash: Auth hash of the key to revoke.
+        """
+        self._http.delete(f"/keys/{auth_hash}")
+
     ## Secrets (metadata-only operations)
 
     def list_secrets(self, *, secret_type: str | None = None) -> list[VaultSecret]:

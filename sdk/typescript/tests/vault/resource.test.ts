@@ -942,3 +942,15 @@ describe("VaultResource.updateKey", () => {
     ]);
   });
 });
+
+describe("VaultResource.deleteKey", () => {
+  it("deletes the matching key by auth hash", async () => {
+    const http = mockHttp();
+    const res = new VaultResource(http);
+
+    await res.deleteKey("auth-hash-123");
+
+    expect(http.delete).toHaveBeenCalledTimes(1);
+    expect(http.delete).toHaveBeenCalledWith("/keys/auth-hash-123");
+  });
+});

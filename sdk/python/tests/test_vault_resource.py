@@ -958,3 +958,12 @@ class TestVaultResourceUpdateKey:
         ]
         with pytest.raises(ValueError, match="Failed to unwrap"):
             res.update_key("New-Passw0rd!xyz", current_vault_key=vault_key)
+
+
+class TestVaultResourceDeleteKey:
+    def test_deletes_key_by_auth_hash(self):
+        res, http = _resource()
+
+        res.delete_key("auth-hash-123")
+
+        http.delete.assert_called_once_with("/keys/auth-hash-123")
