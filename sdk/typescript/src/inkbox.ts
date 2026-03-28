@@ -101,11 +101,12 @@ export class Inkbox {
     const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;
 
-    const mailHttp  = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms);
-    const phoneHttp = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms);
-    const idsHttp   = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms);
-    const vaultHttp = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms);
-    const apiHttp   = new HttpTransport(options.apiKey, apiRoot, ms);
+    const mailHttp     = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms);
+    const phoneHttp    = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms);
+    const idsHttp      = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms);
+    const vaultHttp    = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms);
+    const rootApiHttp  = new HttpTransport(options.apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms);
+    const apiHttp      = new HttpTransport(options.apiKey, apiRoot, ms);
 
     this._mailboxes   = new MailboxesResource(mailHttp);
     this._messages    = new MessagesResource(mailHttp);
@@ -119,7 +120,7 @@ export class Inkbox {
 
     this._idsResource = new IdentitiesResource(idsHttp);
 
-    this._vaultResource = new VaultResource(vaultHttp);
+    this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
 
     if (options.vaultKey !== undefined) {
       this._vaultUnlockPromise = this._vaultResource.unlock(options.vaultKey);

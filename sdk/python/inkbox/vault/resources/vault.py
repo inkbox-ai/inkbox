@@ -51,8 +51,13 @@ class VaultResource:
     :meth:`unlock` first.
     """
 
-    def __init__(self, http: HttpTransport) -> None:
+    def __init__(
+        self,
+        http: HttpTransport,
+        api_http: HttpTransport | None = None,
+    ) -> None:
         self._http = http
+        self._api_http = api_http
         self._unlocked: UnlockedVault | None = None
 
     ## Vault metadata
@@ -67,10 +72,24 @@ class VaultResource:
         data = self._http.get("/info")
         return VaultInfo._from_dict(data)
 
+    def _fetch_organization_id(self) -> str:
+        """Fetch the organisation ID via ``/api/whoami``."""
+        if self._api_http is None:
+            raise ValueError(
+                "organization_id is required when the vault resource "
+                "is not connected to the API (no api_http transport)"
+            )
+        data = self._api_http.get("/whoami")
+        org_id = data.get("organization_id")
+        if not org_id:
+            raise ValueError(
+                "Could not determine organization ID from API key"
+            )
+        return org_id
+
     def initialize(
         self,
         vault_key: str,
-        organization_id: str,
     ) -> VaultInitializeResult:
         """
         Initialize a new vault for the organisation.
@@ -84,9 +103,6 @@ class VaultResource:
             vault_key: The vault key (password) to protect the vault.
                 Must be at least 16 characters with uppercase, lowercase,
                 digit, and special character.
-            organization_id: The organisation ID (needed for key
-                derivation; the vault does not exist yet so it cannot
-                be fetched).
 
         Returns:
             :class:`~inkbox.vault.types.VaultInitializeResult` containing
@@ -97,6 +113,8 @@ class VaultResource:
         Raises:
             InkboxAPIError: If the organisation already has an active vault (409).
         """
+        organization_id = self._fetch_organization_id()
+
         org_encryption_key = generate_org_encryption_key()
 
         primary_material = generate_vault_key_material(

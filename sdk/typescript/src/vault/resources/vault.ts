@@ -63,11 +63,15 @@ export class VaultResource {
   readonly http: HttpTransport;
 
   /** @internal */
+  private readonly apiHttp: HttpTransport | null;
+
+  /** @internal */
   _unlocked: UnlockedVault | null = null;
 
   /** @internal */
-  constructor(http: HttpTransport) {
+  constructor(http: HttpTransport, apiHttp?: HttpTransport) {
     this.http = http;
+    this.apiHttp = apiHttp ?? null;
   }
 
   // ------------------------------------------------------------------
@@ -81,6 +85,23 @@ export class VaultResource {
   }
 
   /**
+   * Fetch the organisation ID via `/api/whoami`.
+   * @internal
+   */
+  private async fetchOrganizationId(): Promise<string> {
+    if (!this.apiHttp) {
+      throw new Error(
+        "Cannot fetch organization ID: no API transport available",
+      );
+    }
+    const data = await this.apiHttp.get<{ organization_id: string }>("/whoami");
+    if (!data.organization_id) {
+      throw new Error("Could not determine organization ID from API key");
+    }
+    return data.organization_id;
+  }
+
+  /**
    * Initialize a new vault for the organisation.
    *
    * Generates a random org encryption key, wraps it with the provided
@@ -91,8 +112,6 @@ export class VaultResource {
    * @param vaultKey - The vault key (password) to protect the vault.
    *   Must be at least 16 characters with uppercase, lowercase, digit,
    *   and special character.
-   * @param organizationId - The organisation ID (needed for key
-   *   derivation; the vault does not exist yet so it cannot be fetched).
    * @returns {@link VaultInitializeResult} containing the vault ID,
    *   primary key ID, and recovery codes. The recovery codes must be
    *   stored securely — they cannot be retrieved again.
@@ -100,8 +119,8 @@ export class VaultResource {
    */
   async initialize(
     vaultKey: string,
-    organizationId: string,
   ): Promise<VaultInitializeResult> {
+    const organizationId = await this.fetchOrganizationId();
     const orgEncryptionKey = generateOrgEncryptionKey();
 
     const primaryMaterial = await generateVaultKeyMaterial(

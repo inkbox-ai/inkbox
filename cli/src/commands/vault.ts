@@ -13,12 +13,11 @@ export function registerVaultCommands(program: Command): void {
   vault
     .command("init")
     .description("Initialize a vault for an organization")
-    .requiredOption("--organization-id <id>", "Organization ID")
     .option("--vault-key <key>", "Vault key to initialize with")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { organizationId: string; vaultKey?: string },
+        cmdOpts: { vaultKey?: string },
       ) {
         const opts = getGlobalOpts(this);
         const vaultKey = cmdOpts.vaultKey ?? opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
@@ -29,7 +28,7 @@ export function registerVaultCommands(program: Command): void {
           process.exit(1);
         }
         const inkbox = createClient(opts);
-        const result = await inkbox.vault.initialize(vaultKey, cmdOpts.organizationId);
+        const result = await inkbox.vault.initialize(vaultKey);
         output(result, { json: !!opts.json });
       }),
     );
