@@ -40,10 +40,6 @@ include = ["src*"]
 [project.scripts]
 inkbox-browser-use = "src.cli:main"
 
-## override browser-use's pinned python-dotenv to resolve with inkbox
-[tool.uv]
-override-dependencies = ["python-dotenv>=1.2.2"]
-
 ## ruff setup
 [tool.ruff]
 line-length = 125

@@ -15,7 +15,6 @@ dependencies = [
     "argon2-cffi>=23.1",
     "cryptography>=43.0",
     "httpx>=0.27",
-    "python-dotenv>=1.2.2",
 ]
 
 [project.optional-dependencies]
