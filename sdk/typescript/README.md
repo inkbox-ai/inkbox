@@ -295,7 +295,7 @@ const info = await inkbox.vault.info();
 console.log(info.secretCount, info.keyCount);
 
 // Initialize a new vault (creates primary key + recovery keys)
-const result = await inkbox.vault.initialize("my-Vault-key-01!", "org-uuid");
+const result = await inkbox.vault.initialize("my-Vault-key-01!");
 for (const key of result.recoveryKeys) {
   console.log(key.recoveryCode); // save these immediately
 }
