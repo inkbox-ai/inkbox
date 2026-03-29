@@ -200,6 +200,17 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 Encrypted credential vault with client-side Argon2id key derivation and AES-256-GCM encryption. The server never sees plaintext secrets. Requires `hash-wasm` (included as a dependency).
 
+### Initialize
+
+```typescript
+// Initialize a new vault (org ID is fetched automatically from the API key)
+const result = await inkbox.vault.initialize("my-Vault-key-01!");
+console.log(result.vaultId, result.vaultKeyId);
+for (const code of result.recoveryCodes) {
+  console.log(code); // save these immediately — they cannot be retrieved again
+}
+```
+
 ### Unlock & Read
 
 ```typescript

@@ -109,6 +109,12 @@ class Inkbox:
             base_url=f"{_api_root}/vault",
             timeout=timeout,
         )
+        _api_base = f"{base_url.rstrip('/')}/api"
+        self._root_api_http = MailHttpTransport(
+            api_key=api_key,
+            base_url=_api_base,
+            timeout=timeout,
+        )
         self._api_http = MailHttpTransport(
             api_key=api_key,
             base_url=_api_root,
@@ -124,7 +130,7 @@ class Inkbox:
         self._texts = TextsResource(self._phone_http)
         self._transcripts = TranscriptsResource(self._phone_http)
 
-        self._vault_resource = VaultResource(self._vault_http)
+        self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
 
         self._signing_keys = SigningKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
@@ -146,6 +152,7 @@ class Inkbox:
         self._phone_http.close()
         self._ids_http.close()
         self._vault_http.close()
+        self._root_api_http.close()
         self._api_http.close()
 
     ## Public resource accessors

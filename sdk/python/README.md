@@ -277,7 +277,7 @@ info = inkbox.vault.info()
 print(info.secret_count, info.key_count)
 
 # Initialize a new vault (creates primary key + recovery keys)
-result = inkbox.vault.initialize("my-Vault-key-01!", organization_id="org-uuid")
+result = inkbox.vault.initialize("my-Vault-key-01!")
 for recovery_key in result.recovery_keys:
     print(recovery_key.recovery_code)  # save these immediately
 

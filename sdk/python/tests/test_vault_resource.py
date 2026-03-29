@@ -33,7 +33,9 @@ VALID_VAULT_KEY = "Test-Passw0rd!xy"
 
 def _resource():
     http = MagicMock()
-    return VaultResource(http), http
+    api_http = MagicMock()
+    api_http.get.return_value = {"organization_id": "org_test_123"}
+    return VaultResource(http, api_http=api_http), http
 
 
 class TestVaultResourceInfo:
@@ -679,7 +681,7 @@ class TestVaultResourceInitialize:
             "recovery_key_count": 4,
         }
 
-        result = res.initialize(VALID_VAULT_KEY, "org_test_123")
+        result = res.initialize(VALID_VAULT_KEY)
 
         assert isinstance(result, VaultInitializeResult)
         assert str(result.vault_id) == "aaaa1111-0000-0000-0000-000000000099"
@@ -716,7 +718,7 @@ class TestVaultResourceInitialize:
             "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
         }
 
-        result = res.initialize(VALID_VAULT_KEY, "org_test_123")
+        result = res.initialize(VALID_VAULT_KEY)
 
         pattern = re.compile(r"^[A-Z2-9]{4}(-[A-Z2-9]{4}){7}$")
         for code in result.recovery_codes:
@@ -727,7 +729,7 @@ class TestVaultResourceInitialize:
         http.post.return_value = {
             "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
         }
-        res.initialize(VALID_VAULT_KEY, "org_test_123")
+        res.initialize(VALID_VAULT_KEY)
 
         body = http.post.call_args[1]["json"]
         all_keys = [body["vault_key"]] + body["recovery_keys"]
@@ -743,7 +745,7 @@ class TestVaultResourceInitialize:
         http.post.return_value = {
             "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
         }
-        res.initialize(VALID_VAULT_KEY, "org_test_123")
+        res.initialize(VALID_VAULT_KEY)
 
         body = http.post.call_args[1]["json"]
         vk = body["vault_key"]
@@ -759,7 +761,7 @@ class TestVaultResourceInitialize:
         http.post.return_value = {
             "vault_id": "aaaa1111-0000-0000-0000-000000000099", "vault_key_id": "bbbb2222-0000-0000-0000-000000000099", "recovery_key_count": 4,
         }
-        result = res.initialize(VALID_VAULT_KEY, "org_test_123")
+        result = res.initialize(VALID_VAULT_KEY)
 
         body = http.post.call_args[1]["json"]
         salt = derive_salt("org_test_123")

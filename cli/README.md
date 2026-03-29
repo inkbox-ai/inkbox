@@ -175,6 +175,9 @@ inkbox text mark-conversation-read <remote-number> -i <handle>  # Mark conversat
 Encrypted vault operations. `get`, `create`, and credential listing require a vault key.
 
 ```bash
+inkbox vault init                            # Initialize vault (creates primary + recovery keys)
+  --vault-key <key>                          #   Vault key (or set INKBOX_VAULT_KEY)
+
 inkbox vault info                            # Show vault info
 inkbox vault secrets                         # List secrets (metadata only)
   --type <type>                              #   Filter: login, api_key, ssh_key, key_pair, other

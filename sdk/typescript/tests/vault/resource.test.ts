@@ -634,6 +634,12 @@ describe("strict AAD enforcement", () => {
 
 // ---- VaultResource.initialize tests ----
 
+function mockApiHttp() {
+  const apiHttp = mockHttp();
+  vi.mocked(apiHttp.get).mockResolvedValue({ organization_id: "org_test_123" });
+  return apiHttp;
+}
+
 describe("VaultResource.initialize", () => {
   it("posts crypto material to /initialize and returns result with recovery codes", async () => {
     const http = mockHttp();
@@ -643,8 +649,8 @@ describe("VaultResource.initialize", () => {
       recovery_key_count: 4,
     });
 
-    const res = new VaultResource(http);
-    const result = await res.initialize(VALID_VAULT_KEY, "org_test_123");
+    const res = new VaultResource(http, mockApiHttp());
+    const result = await res.initialize(VALID_VAULT_KEY);
 
     expect(result.vaultId).toBe("vault-uuid-1234");
     expect(result.vaultKeyId).toBe("key-uuid-5678");
@@ -677,8 +683,8 @@ describe("VaultResource.initialize", () => {
     vi.mocked(http.post).mockResolvedValue({
       vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
     });
-    const res = new VaultResource(http);
-    const result = await res.initialize(VALID_VAULT_KEY, "org_test_123");
+    const res = new VaultResource(http, mockApiHttp());
+    const result = await res.initialize(VALID_VAULT_KEY);
 
     for (const code of result.recoveryCodes) {
       expect(code).toMatch(/^[A-Z2-9]{4}(-[A-Z2-9]{4}){7}$/);
@@ -690,8 +696,8 @@ describe("VaultResource.initialize", () => {
     vi.mocked(http.post).mockResolvedValue({
       vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
     });
-    const res = new VaultResource(http);
-    await res.initialize(VALID_VAULT_KEY, "org_test_123");
+    const res = new VaultResource(http, mockApiHttp());
+    await res.initialize(VALID_VAULT_KEY);
 
     const [, body] = vi.mocked(http.post).mock.calls[0];
     const allKeys = [body.vault_key, ...body.recovery_keys];
@@ -706,8 +712,8 @@ describe("VaultResource.initialize", () => {
     vi.mocked(http.post).mockResolvedValue({
       vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
     });
-    const res = new VaultResource(http);
-    await res.initialize(VALID_VAULT_KEY, "org_test_123");
+    const res = new VaultResource(http, mockApiHttp());
+    await res.initialize(VALID_VAULT_KEY);
 
     const [, body] = vi.mocked(http.post).mock.calls[0];
     const salt = deriveSalt("org_test_123");
@@ -722,8 +728,8 @@ describe("VaultResource.initialize", () => {
     vi.mocked(http.post).mockResolvedValue({
       vault_id: "v1", vault_key_id: "k1", recovery_key_count: 4,
     });
-    const res = new VaultResource(http);
-    const result = await res.initialize(VALID_VAULT_KEY, "org_test_123");
+    const res = new VaultResource(http, mockApiHttp());
+    const result = await res.initialize(VALID_VAULT_KEY);
 
     const [, body] = vi.mocked(http.post).mock.calls[0];
     const salt = deriveSalt("org_test_123");

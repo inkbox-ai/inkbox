@@ -188,6 +188,16 @@ inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 
 Encrypted credential vault with client-side Argon2id key derivation and AES-256-GCM encryption. The server never sees plaintext secrets. Requires `argon2-cffi` and `cryptography` (included as dependencies).
 
+### Initialize
+
+```python
+# Initialize a new vault (org ID is fetched automatically from the API key)
+result = inkbox.vault.initialize("my-Vault-key-01!")
+print(result.vault_id, result.vault_key_id)
+for code in result.recovery_codes:
+    print(code)  # save these immediately — they cannot be retrieved again
+```
+
 ### Unlock & Read
 
 ```python
