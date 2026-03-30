@@ -206,6 +206,8 @@ class VaultResource:
 
         # Fetch org_id (vault must already exist)
         vault_info = self.info()
+        if vault_info is None:
+            raise ValueError("Vault has not been initialized")
         salt = derive_salt(vault_info.organization_id)
 
         # Derive master key and auth hash from the authenticating key
@@ -391,6 +393,8 @@ class VaultResource:
         """
         # Step 1: get org_id for salt derivation
         vault_info = self.info()
+        if vault_info is None:
+            raise ValueError("Vault has not been initialized")
         salt = derive_salt(vault_info.organization_id)
 
         # Step 2: derive master key → auth hash

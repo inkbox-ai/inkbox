@@ -204,6 +204,9 @@ export class VaultResource {
 
     // Fetch org_id (vault must already exist)
     const vaultInfo = await this.info();
+    if (!vaultInfo) {
+      throw new InkboxError("Vault has not been initialized");
+    }
     const salt = deriveSalt(vaultInfo.organizationId);
 
     // Derive master key and auth hash from the authenticating key
@@ -384,6 +387,9 @@ export class VaultResource {
   ): Promise<UnlockedVault> {
     // Step 1: get org_id for salt derivation
     const vaultInfo = await this.info();
+    if (!vaultInfo) {
+      throw new InkboxError("Vault has not been initialized");
+    }
     const salt = deriveSalt(vaultInfo.organizationId);
 
     // Step 2: derive master key → auth hash
