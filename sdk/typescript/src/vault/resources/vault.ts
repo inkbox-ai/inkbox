@@ -35,7 +35,6 @@ import {
   inferSecretType,
   parseAccessRule,
   parsePayload,
-  notInitializedVaultInfo,
   parseVaultInfo,
   parseVaultKey,
   parseVaultSecret,
@@ -84,14 +83,14 @@ export class VaultResource {
   // Vault metadata
   // ------------------------------------------------------------------
 
-  /** Get vault metadata for the caller's organisation. */
-  async info(): Promise<VaultInfo> {
+  /** Get vault metadata for the caller's organisation, or `null` if not initialized. */
+  async info(): Promise<VaultInfo | null> {
     try {
       const data = await this.http.get<RawVaultInfo>("/info");
       return parseVaultInfo(data);
     } catch (err) {
       if (err instanceof InkboxAPIError && err.statusCode === 404) {
-        return notInitializedVaultInfo();
+        return null;
       }
       throw err;
     }

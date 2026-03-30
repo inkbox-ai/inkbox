@@ -69,20 +69,19 @@ class VaultResource:
         """The cached :class:`UnlockedVault`, or ``None`` if not yet unlocked."""
         return self._unlocked
 
-    def info(self) -> VaultInfo:
+    def info(self) -> VaultInfo | None:
         """
         Get vault metadata for the caller's organisation.
 
         Returns:
-            :class:`~inkbox.vault.types.VaultInfo` with counts and status.
-            If the vault has not been initialized yet, returns a
-            ``VaultInfo`` with ``is_initialized=False``.
+            :class:`~inkbox.vault.types.VaultInfo`, or ``None`` if the
+            vault has not been initialized yet.
         """
         try:
             data = self._http.get("/info")
         except InkboxAPIError as exc:
             if exc.status_code == 404:
-                return VaultInfo._not_initialized()
+                return None
             raise
         return VaultInfo._from_dict(data)
 

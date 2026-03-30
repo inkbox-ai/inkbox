@@ -59,12 +59,11 @@ class VaultKeyType(StrEnum):
 class VaultInfo:
     """Vault metadata returned by the info endpoint."""
 
-    id: UUID | None
-    organization_id: str | None
+    id: UUID
+    organization_id: str
     status: str
-    is_initialized: bool
-    created_at: datetime | None
-    updated_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
     key_count: int
     secret_count: int
     recovery_key_count: int
@@ -75,26 +74,11 @@ class VaultInfo:
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
             status=d["status"],
-            is_initialized=True,
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             key_count=d["key_count"],
             secret_count=d["secret_count"],
             recovery_key_count=d["recovery_key_count"],
-        )
-
-    @classmethod
-    def _not_initialized(cls) -> VaultInfo:
-        return cls(
-            id=None,
-            organization_id=None,
-            status="not_initialized",
-            is_initialized=False,
-            created_at=None,
-            updated_at=None,
-            key_count=0,
-            secret_count=0,
-            recovery_key_count=0,
         )
 
 
