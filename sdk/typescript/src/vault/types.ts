@@ -41,12 +41,14 @@ export type VaultKeyType = (typeof VaultKeyType)[keyof typeof VaultKeyType];
 
 /** Vault metadata returned by the info endpoint. */
 export interface VaultInfo {
-  id: string;
-  organizationId: string;
+  id: string | null;
+  organizationId: string | null;
   /** @example "active" */
   status: string;
-  createdAt: Date;
-  updatedAt: Date;
+  /** Whether the vault has been initialized. */
+  isInitialized: boolean;
+  createdAt: Date | null;
+  updatedAt: Date | null;
   /** Number of active primary vault keys. */
   keyCount: number;
   /** Number of active vault secrets. */
@@ -264,11 +266,27 @@ export function parseVaultInfo(r: RawVaultInfo): VaultInfo {
     id: r.id,
     organizationId: r.organization_id,
     status: r.status,
+    isInitialized: true,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     keyCount: r.key_count,
     secretCount: r.secret_count,
     recoveryKeyCount: r.recovery_key_count,
+  };
+}
+
+/** Return a {@link VaultInfo} representing a vault that has not been initialized. @internal */
+export function notInitializedVaultInfo(): VaultInfo {
+  return {
+    id: null,
+    organizationId: null,
+    status: "not_initialized",
+    isInitialized: false,
+    createdAt: null,
+    updatedAt: null,
+    keyCount: 0,
+    secretCount: 0,
+    recoveryKeyCount: 0,
   };
 }
 

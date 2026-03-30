@@ -39,6 +39,8 @@ from inkbox.vault.types import (
 if TYPE_CHECKING:
     from inkbox.vault._http import HttpTransport
 
+from inkbox.exceptions import InkboxAPIError
+
 _UNSET = object()
 
 
@@ -62,14 +64,26 @@ class VaultResource:
 
     ## Vault metadata
 
+    @property
+    def unlocked(self) -> UnlockedVault | None:
+        """The cached :class:`UnlockedVault`, or ``None`` if not yet unlocked."""
+        return self._unlocked
+
     def info(self) -> VaultInfo:
         """
         Get vault metadata for the caller's organisation.
 
         Returns:
             :class:`~inkbox.vault.types.VaultInfo` with counts and status.
+            If the vault has not been initialized yet, returns a
+            ``VaultInfo`` with ``is_initialized=False``.
         """
-        data = self._http.get("/info")
+        try:
+            data = self._http.get("/info")
+        except InkboxAPIError as exc:
+            if exc.status_code == 404:
+                return VaultInfo._not_initialized()
+            raise
         return VaultInfo._from_dict(data)
 
     def _fetch_organization_id(self) -> str:

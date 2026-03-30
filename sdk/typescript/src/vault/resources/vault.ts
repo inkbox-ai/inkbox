@@ -5,7 +5,7 @@
  * UnlockedVault   — crypto-enabled wrapper for secret CRUD after unlock.
  */
 
-import { HttpTransport, InkboxError } from "../../_http.js";
+import { HttpTransport, InkboxAPIError, InkboxError } from "../../_http.js";
 import type { TOTPCode, TOTPConfig } from "../totp.js";
 import { generateTotp, parseTotpUri } from "../totp.js";
 import {
@@ -35,6 +35,7 @@ import {
   inferSecretType,
   parseAccessRule,
   parsePayload,
+  notInitializedVaultInfo,
   parseVaultInfo,
   parseVaultKey,
   parseVaultSecret,
@@ -68,6 +69,11 @@ export class VaultResource {
   /** @internal */
   _unlocked: UnlockedVault | null = null;
 
+  /** The cached {@link UnlockedVault}, or `null` if not yet unlocked. */
+  get unlocked(): UnlockedVault | null {
+    return this._unlocked;
+  }
+
   /** @internal */
   constructor(http: HttpTransport, apiHttp?: HttpTransport) {
     this.http = http;
@@ -80,8 +86,15 @@ export class VaultResource {
 
   /** Get vault metadata for the caller's organisation. */
   async info(): Promise<VaultInfo> {
-    const data = await this.http.get<RawVaultInfo>("/info");
-    return parseVaultInfo(data);
+    try {
+      const data = await this.http.get<RawVaultInfo>("/info");
+      return parseVaultInfo(data);
+    } catch (err) {
+      if (err instanceof InkboxAPIError && err.statusCode === 404) {
+        return notInitializedVaultInfo();
+      }
+      throw err;
+    }
   }
 
   /**
