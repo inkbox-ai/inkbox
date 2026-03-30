@@ -59,3 +59,24 @@ jobs:
 
       - name: Run TypeScript tests
         run: npx vitest run --coverage --coverage.thresholds.lines=75
+
+  trigger-integration-tests:
+    needs: [python-tests, typescript-tests]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.INTEGRATION_APP_ID }}
+          private-key: ${{ secrets.INTEGRATION_APP_PRIVATE_KEY }}
+          owner: inkbox-ai
+
+      - name: Trigger integration tests
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: inkbox-ai/integration-tests
+          event-type: run-integration-tests
+          client-payload: '{"inkbox_ref": "${{ github.head_ref || github.ref_name }}"}'
