@@ -41,6 +41,10 @@ export function registerVaultCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const info = await inkbox.vault.info();
+        if (info === null) {
+          console.log("No vault initialized for this organization.");
+          return;
+        }
         output(info, { json: !!opts.json });
       }),
     );

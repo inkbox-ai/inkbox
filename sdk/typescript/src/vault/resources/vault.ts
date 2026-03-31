@@ -5,7 +5,7 @@
  * UnlockedVault   — crypto-enabled wrapper for secret CRUD after unlock.
  */
 
-import { HttpTransport, InkboxError } from "../../_http.js";
+import { HttpTransport, InkboxAPIError, InkboxError } from "../../_http.js";
 import type { TOTPCode, TOTPConfig } from "../totp.js";
 import { generateTotp, parseTotpUri } from "../totp.js";
 import {
@@ -68,6 +68,11 @@ export class VaultResource {
   /** @internal */
   _unlocked: UnlockedVault | null = null;
 
+  /** The cached {@link UnlockedVault}, or `null` if not yet unlocked. */
+  get unlocked(): UnlockedVault | null {
+    return this._unlocked;
+  }
+
   /** @internal */
   constructor(http: HttpTransport, apiHttp?: HttpTransport) {
     this.http = http;
@@ -78,10 +83,17 @@ export class VaultResource {
   // Vault metadata
   // ------------------------------------------------------------------
 
-  /** Get vault metadata for the caller's organisation. */
-  async info(): Promise<VaultInfo> {
-    const data = await this.http.get<RawVaultInfo>("/info");
-    return parseVaultInfo(data);
+  /** Get vault metadata for the caller's organisation, or `null` if not initialized. */
+  async info(): Promise<VaultInfo | null> {
+    try {
+      const data = await this.http.get<RawVaultInfo>("/info");
+      return parseVaultInfo(data);
+    } catch (err) {
+      if (err instanceof InkboxAPIError && err.statusCode === 404) {
+        return null;
+      }
+      throw err;
+    }
   }
 
   /**
@@ -192,6 +204,9 @@ export class VaultResource {
 
     // Fetch org_id (vault must already exist)
     const vaultInfo = await this.info();
+    if (!vaultInfo) {
+      throw new InkboxError("Vault has not been initialized");
+    }
     const salt = deriveSalt(vaultInfo.organizationId);
 
     // Derive master key and auth hash from the authenticating key
@@ -372,6 +387,9 @@ export class VaultResource {
   ): Promise<UnlockedVault> {
     // Step 1: get org_id for salt derivation
     const vaultInfo = await this.info();
+    if (!vaultInfo) {
+      throw new InkboxError("Vault has not been initialized");
+    }
     const salt = deriveSalt(vaultInfo.organizationId);
 
     // Step 2: derive master key → auth hash
