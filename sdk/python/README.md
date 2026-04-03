@@ -74,9 +74,9 @@ from inkbox import Inkbox
 
 # Sign up (public — no API key needed)
 result = Inkbox.signup(
-    human_email="alex@example.com",
+    human_email="john@example.com",
     display_name="Sales Agent",
-    note_to_human="Hey Alex, this is your sales bot signing up!",  # required
+    note_to_human="Hey John, this is your sales bot signing up!",  # required
 )
 api_key = result.api_key          # save — shown only once
 email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"

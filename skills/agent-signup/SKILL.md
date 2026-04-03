@@ -33,9 +33,9 @@ from inkbox import Inkbox
 
 # 1. Register
 result = Inkbox.signup(
-    human_email="alex@example.com",
+    human_email="john@example.com",
     display_name="Sales Agent",
-    note_to_human="Hey Alex, this is your sales bot signing up!",
+    note_to_human="Hey John, this is your sales bot signing up!",
 )
 
 # Save these — the api_key is shown only once
@@ -56,7 +56,7 @@ status = Inkbox.get_signup_status(api_key)
 # status.claim_status      → "agent_unclaimed" or "agent_claimed"
 # status.human_state        → "human_no_account", "human_account_unverified", etc.
 # status.restrictions.max_sends_per_day → 10 (unclaimed) or 500 (claimed)
-# status.restrictions.allowed_recipients → ["alex@example.com"] (unclaimed)
+# status.restrictions.allowed_recipients → ["john@example.com"] (unclaimed)
 ```
 
 Using the API key after signup:
@@ -65,7 +65,7 @@ Using the API key after signup:
 with Inkbox(api_key=api_key) as inkbox:
     identity = inkbox.get_identity(handle)
     identity.send_email(
-        to=["alex@example.com"],
+        to=["john@example.com"],
         subject="Hello from your agent!",
         body_text="I'm all set up.",
     )
@@ -80,9 +80,9 @@ import { Inkbox } from "@inkbox/sdk";
 
 // 1. Register
 const result = await Inkbox.signup({
-  humanEmail: "alex@example.com",
+  humanEmail: "john@example.com",
   displayName: "Sales Agent",
-  noteToHuman: "Hey Alex, this is your sales bot signing up!",
+  noteToHuman: "Hey John, this is your sales bot signing up!",
 });
 
 // Save these — the apiKey is shown only once
@@ -103,7 +103,7 @@ const status = await Inkbox.getSignupStatus(apiKey);
 // status.claimStatus       → "agent_unclaimed" or "agent_claimed"
 // status.humanState         → "human_no_account", "human_account_unverified", etc.
 // status.restrictions.maxSendsPerDay → 10 (unclaimed) or 500 (claimed)
-// status.restrictions.allowedRecipients → ["alex@example.com"] (unclaimed)
+// status.restrictions.allowedRecipients → ["john@example.com"] (unclaimed)
 ```
 
 Using the API key after signup:
@@ -112,7 +112,7 @@ Using the API key after signup:
 const inkbox = new Inkbox({ apiKey });
 const identity = await inkbox.getIdentity(handle);
 await identity.sendEmail({
-  to: ["alex@example.com"],
+  to: ["john@example.com"],
   subject: "Hello from your agent!",
   bodyText: "I'm all set up.",
 });
@@ -128,9 +128,9 @@ Base URL: `https://inkbox.ai/api`
 curl -X POST https://inkbox.ai/api/v1/agent-signup \
   -H "Content-Type: application/json" \
   -d '{
-    "human_email": "alex@example.com",
+    "human_email": "john@example.com",
     "display_name": "Sales Agent",
-    "note_to_human": "Hey Alex, this is your sales bot signing up!"
+    "note_to_human": "Hey John, this is your sales bot signing up!"
   }'
 ```
 
@@ -143,7 +143,7 @@ Response:
   "api_key": "ik_live_...",
   "agent_handle": "sales-agent-a1b2c3",
   "claim_status": "UNCLAIMED",
-  "human_email": "alex@example.com",
+  "human_email": "john@example.com",
   "message": "Agent created successfully."
 }
 ```
@@ -183,10 +183,10 @@ Response:
 {
   "claim_status": "UNCLAIMED",
   "human_state": "human_no_account",
-  "human_email": "alex@example.com",
+  "human_email": "john@example.com",
   "restrictions": {
     "max_sends_per_day": 10,
-    "allowed_recipients": ["alex@example.com"],
+    "allowed_recipients": ["john@example.com"],
     "can_receive": true,
     "can_create_mailboxes": false
   }

@@ -21,7 +21,7 @@ cp .env.example .env
 ## Quickstart
 
 ```bash
-uv run inkbox-kernel "Go to news.ycombinator.com, read the top 3 posts, and email me a summary at alex@example.com"
+uv run inkbox-kernel "Go to news.ycombinator.com, read the top 3 posts, and email me a summary at john@example.com"
 ```
 
 ## Usage

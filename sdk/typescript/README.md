@@ -75,9 +75,9 @@ import { Inkbox } from "@inkbox/sdk";
 
 // Sign up (public — no API key needed)
 const result = await Inkbox.signup({
-  humanEmail: "alex@example.com",
+  humanEmail: "john@example.com",
   displayName: "Sales Agent",
-  noteToHuman: "Hey Alex, this is your sales bot signing up!",
+  noteToHuman: "Hey John, this is your sales bot signing up!",
 });
 const apiKey = result.apiKey;          // save — shown only once
 const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
