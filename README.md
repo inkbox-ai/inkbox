@@ -127,6 +127,7 @@ from inkbox import Inkbox
 result = Inkbox.signup(
     human_email="alex@example.com",
     display_name="My Agent",
+    note_to_human="Hey Alex, this is your agent signing up!",
 )
 api_key = result.api_key  # save this — shown only once
 
@@ -148,6 +149,7 @@ import { Inkbox } from "@inkbox/sdk";
 const result = await Inkbox.signup({
   humanEmail: "alex@example.com",
   displayName: "My Agent",
+  noteToHuman: "Hey Alex, this is your agent signing up!",
 });
 const apiKey = result.apiKey; // save this — shown only once
 
@@ -164,7 +166,8 @@ await identity.sendEmail({ to: ["alex@example.com"], subject: "Hello!", bodyText
 
 ```bash
 # 1. Sign up (no --api-key needed)
-inkbox signup create --human-email alex@example.com --display-name "My Agent"
+inkbox signup create --human-email alex@example.com --display-name "My Agent" \
+  --note-to-human "Hey Alex, this is your agent signing up!"
 
 # 2. Verify (after human shares the 6-digit code)
 inkbox signup verify --code 483921
