@@ -163,7 +163,7 @@ curl -X POST https://inkbox.ai/api/v1/agent-signup/verify \
   -d '{ "verification_code": "483921" }'
 ```
 
-The verification code expires after 24 hours. Max 5 attempts before a resend is required.
+The verification code expires after 48 hours. Max 5 attempts before a resend is required.
 
 ### Resend Verification
 
