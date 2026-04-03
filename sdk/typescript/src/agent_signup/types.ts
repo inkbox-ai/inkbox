@@ -143,12 +143,11 @@ export function parseAgentSignupStatusResponse(r: RawAgentSignupStatusResponse):
 export function agentSignupRequestToWire(
   req: AgentSignupRequest,
 ): Record<string, string> {
-  const body: Record<string, string> = {
+  return {
     human_email: req.humanEmail,
     display_name: req.displayName,
+    note_to_human: req.noteToHuman,
   };
-  body["note_to_human"] = req.noteToHuman;
-  return body;
 }
 
 export function agentSignupVerifyRequestToWire(
