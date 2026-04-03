@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { registerSignupCommands } from "./commands/signup.js";
 import { registerIdentityCommands } from "./commands/identity.js";
 import { registerEmailCommands } from "./commands/email.js";
 import { registerPhoneCommands } from "./commands/phone.js";
@@ -20,6 +21,7 @@ const program = new Command()
   .option("--base-url <url>", "Override API base URL")
   .option("--json", "Output as JSON", false);
 
+registerSignupCommands(program);
 registerIdentityCommands(program);
 registerEmailCommands(program);
 registerPhoneCommands(program);

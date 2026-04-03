@@ -49,6 +49,72 @@ AgentIdentity (identity-scoped helper)
 
 An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxError` is raised with a clear message.
 
+## Agent Signup
+
+Agents can self-register for an Inkbox account without a pre-existing API key. The signup flow provisions a mailbox, identity, and API key in a single call. A verification email is sent to the specified human for approval.
+
+All signup methods are **class methods** on `Inkbox` — no instance required.
+
+### Signup (public, no API key)
+
+```python
+from inkbox import Inkbox
+
+result = Inkbox.signup(
+    human_email="alex@example.com",
+    display_name="Sales Agent",
+    note_to_human="Hey Alex, this is your sales bot signing up!",
+)
+
+# Save these — the api_key is shown only once
+api_key = result.api_key
+email = result.email_address       # e.g. "sales-agent-a1b2c3@inkboxmail.com"
+handle = result.agent_handle       # e.g. "sales-agent-a1b2c3"
+org_id = result.organization_id    # provisional org
+```
+
+### Verify (requires the API key from signup)
+
+After the human receives the verification email and shares the 6-digit code:
+
+```python
+verify = Inkbox.verify_signup(api_key, verification_code="483921")
+# verify.claim_status → "agent_claimed"
+```
+
+### Resend Verification
+
+```python
+resend = Inkbox.resend_signup_verification(api_key)
+# 5-minute cooldown between resends
+```
+
+### Check Status
+
+```python
+status = Inkbox.get_signup_status(api_key)
+# status.claim_status      → "agent_unclaimed" or "agent_claimed"
+# status.human_state        → "human_no_account", "human_account_unverified", etc.
+# status.restrictions.max_sends_per_day → 10 (unclaimed) or 500 (claimed)
+# status.restrictions.allowed_recipients → ["alex@example.com"] (unclaimed)
+```
+
+### Using the API key after signup
+
+Once you have the API key, use it like any other Inkbox API key:
+
+```python
+with Inkbox(api_key=api_key) as inkbox:
+    identity = inkbox.get_identity(handle)
+    identity.send_email(
+        to=["alex@example.com"],
+        subject="Hello from your agent!",
+        body_text="I'm all set up.",
+    )
+```
+
+> **Note:** Unclaimed agents can only send to the `human_email` specified at signup (max 10/day). After verification or human approval, full capabilities are unlocked.
+
 ## Identities
 
 ```python

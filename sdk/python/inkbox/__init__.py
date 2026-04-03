@@ -72,6 +72,15 @@ from inkbox.vault.crypto import (
     generate_vault_key_material,
 )
 
+# Agent signup types
+from inkbox.agent_signup.types import (
+    AgentSignupResponse,
+    AgentSignupVerifyResponse,
+    AgentSignupResendResponse,
+    AgentSignupStatusResponse,
+    SignupRestrictions,
+)
+
 # Signing key + webhook verification
 from inkbox.signing_keys import SigningKey, verify_webhook
 
@@ -132,6 +141,12 @@ __all__ = [
     "TOTPConfig",
     "generate_totp",
     "parse_totp_uri",
+    # Agent signup types
+    "AgentSignupResponse",
+    "AgentSignupVerifyResponse",
+    "AgentSignupResendResponse",
+    "AgentSignupStatusResponse",
+    "SignupRestrictions",
     # Signing key + webhook verification
     "SigningKey",
     "verify_webhook",

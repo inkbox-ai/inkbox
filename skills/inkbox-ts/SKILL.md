@@ -48,6 +48,72 @@ AgentIdentity (identity-scoped helper)
 
 An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxError` is thrown.
 
+## Agent Signup
+
+Agents can self-register for an Inkbox account without a pre-existing API key. The signup flow provisions a mailbox, identity, and API key in a single call. A verification email is sent to the specified human for approval.
+
+All signup methods are **static methods** on `Inkbox` — no instance required.
+
+### Signup (public, no API key)
+
+```ts
+import { Inkbox } from "@inkbox/sdk";
+
+const result = await Inkbox.signup({
+  humanEmail: "alex@example.com",
+  displayName: "Sales Agent",
+  noteToHuman: "Hey Alex, this is your sales bot signing up!",
+});
+
+// Save these — the apiKey is shown only once
+const apiKey = result.apiKey;
+const email = result.emailAddress;       // e.g. "sales-agent-a1b2c3@inkboxmail.com"
+const handle = result.agentHandle;       // e.g. "sales-agent-a1b2c3"
+const orgId = result.organizationId;     // provisional org
+```
+
+### Verify (requires the API key from signup)
+
+After the human receives the verification email and shares the 6-digit code:
+
+```ts
+const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+// verify.claimStatus → "agent_claimed"
+```
+
+### Resend Verification
+
+```ts
+const resend = await Inkbox.resendSignupVerification(apiKey);
+// 5-minute cooldown between resends
+```
+
+### Check Status
+
+```ts
+const status = await Inkbox.getSignupStatus(apiKey);
+// status.claimStatus       → "agent_unclaimed" or "agent_claimed"
+// status.humanState         → "human_no_account", "human_account_unverified", etc.
+// status.restrictions.maxSendsPerDay → 10 (unclaimed) or 500 (claimed)
+// status.restrictions.allowedRecipients → ["alex@example.com"] (unclaimed)
+```
+
+### Using the API key after signup
+
+Once you have the API key, use it like any other Inkbox API key:
+
+```ts
+const inkbox = new Inkbox({ apiKey });
+const identity = await inkbox.getIdentity(handle);
+await identity.sendEmail({
+  to: ["alex@example.com"],
+  subject: "Hello from your agent!",
+  bodyText: "I'm all set up.",
+});
+```
+
+> **Note:** Unclaimed agents can only send to the `humanEmail` specified at signup (max 10/day). After verification or human approval, full capabilities are unlocked.
+
 ## Identities
 
 ```typescript

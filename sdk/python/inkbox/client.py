@@ -26,6 +26,12 @@ from inkbox.identities.types import (
     IdentityPhoneNumberCreateOptions,
 )
 from inkbox.signing_keys import SigningKey, SigningKeysResource
+from inkbox.agent_signup.types import (
+    AgentSignupResponse,
+    AgentSignupVerifyResponse,
+    AgentSignupResendResponse,
+    AgentSignupStatusResponse,
+)
 from uuid import UUID
 from typing import Literal
 
@@ -249,3 +255,156 @@ class Inkbox:
         The plaintext key is returned once — save it immediately.
         """
         return self._signing_keys.create_or_rotate()
+
+    ## Agent signup (class methods — no instance required)
+
+    @classmethod
+    def _validate_base_url(cls, base_url: str) -> None:
+        if not base_url.startswith("https://"):
+            from urllib.parse import urlparse
+            _parsed = urlparse(base_url)
+            if _parsed.hostname not in ("localhost", "127.0.0.1"):
+                raise ValueError(
+                    "Only HTTPS base URLs are permitted (HTTP is allowed for "
+                    "localhost and 127.0.0.1)."
+                )
+
+    @classmethod
+    def _signup_request(
+        cls,
+        method: str,
+        path: str,
+        *,
+        api_key: str | None = None,
+        json: dict | None = None,
+        base_url: str = _DEFAULT_BASE_URL,
+        timeout: float = 30.0,
+    ) -> dict:
+        """One-shot HTTP request for agent-signup endpoints."""
+        import httpx
+        from inkbox.exceptions import InkboxAPIError
+
+        cls._validate_base_url(base_url)
+        url = f"{base_url.rstrip('/')}/api/v1/agent-signup{path}"
+        headers: dict[str, str] = {"Accept": "application/json"}
+        if api_key:
+            headers["X-Service-Token"] = api_key
+
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.request(method, url, headers=headers, json=json)
+
+        if resp.status_code >= 400:
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                detail = resp.text
+            raise InkboxAPIError(status_code=resp.status_code, detail=str(detail))
+        return resp.json()
+
+    @classmethod
+    def signup(
+        cls,
+        human_email: str,
+        display_name: str,
+        *,
+        note_to_human: str | None = None,
+        base_url: str = _DEFAULT_BASE_URL,
+        timeout: float = 30.0,
+    ) -> AgentSignupResponse:
+        """
+        Register a new agent (public — no API key required).
+
+        Returns the provisioned email, org, and a one-time API key.
+
+        Args:
+            human_email: Email of the human who should approve this agent.
+            display_name: Human-readable name for the agent.
+            note_to_human: Optional message included in the verification email.
+            base_url: Override the API base URL.
+            timeout: Request timeout in seconds.
+        """
+        body: dict[str, str] = {
+            "human_email": human_email,
+            "display_name": display_name,
+        }
+        if note_to_human is not None:
+            body["note_to_human"] = note_to_human
+        data = cls._signup_request(
+            "POST", "", json=body, base_url=base_url, timeout=timeout,
+        )
+        return AgentSignupResponse._from_dict(data)
+
+    @classmethod
+    def verify_signup(
+        cls,
+        api_key: str,
+        verification_code: str,
+        *,
+        base_url: str = _DEFAULT_BASE_URL,
+        timeout: float = 30.0,
+    ) -> AgentSignupVerifyResponse:
+        """
+        Submit a 6-digit verification code to unlock full capabilities.
+
+        Args:
+            api_key: The API key returned from :meth:`signup`.
+            verification_code: The 6-digit code from the verification email.
+            base_url: Override the API base URL.
+            timeout: Request timeout in seconds.
+        """
+        data = cls._signup_request(
+            "POST", "/verify",
+            api_key=api_key,
+            json={"verification_code": verification_code},
+            base_url=base_url,
+            timeout=timeout,
+        )
+        return AgentSignupVerifyResponse._from_dict(data)
+
+    @classmethod
+    def resend_signup_verification(
+        cls,
+        api_key: str,
+        *,
+        base_url: str = _DEFAULT_BASE_URL,
+        timeout: float = 30.0,
+    ) -> AgentSignupResendResponse:
+        """
+        Resend the verification email (5-minute cooldown).
+
+        Args:
+            api_key: The API key returned from :meth:`signup`.
+            base_url: Override the API base URL.
+            timeout: Request timeout in seconds.
+        """
+        data = cls._signup_request(
+            "POST", "/resend-verification",
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+        )
+        return AgentSignupResendResponse._from_dict(data)
+
+    @classmethod
+    def get_signup_status(
+        cls,
+        api_key: str,
+        *,
+        base_url: str = _DEFAULT_BASE_URL,
+        timeout: float = 30.0,
+    ) -> AgentSignupStatusResponse:
+        """
+        Check the current signup claim status and restrictions.
+
+        Args:
+            api_key: The API key returned from :meth:`signup`.
+            base_url: Override the API base URL.
+            timeout: Request timeout in seconds.
+        """
+        data = cls._signup_request(
+            "GET", "/status",
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+        )
+        return AgentSignupStatusResponse._from_dict(data)

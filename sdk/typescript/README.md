@@ -66,6 +66,48 @@ for (const login of creds.listLogins()) {
 
 ---
 
+## Agent Signup
+
+Agents can self-register without a pre-existing API key. All signup methods are **static** — no `Inkbox` instance required.
+
+```ts
+import { Inkbox } from "@inkbox/sdk";
+
+// Sign up (public — no API key needed)
+const result = await Inkbox.signup({
+  humanEmail: "alex@example.com",
+  displayName: "Sales Agent",
+  noteToHuman: "Hey Alex, this is your sales bot signing up!",
+});
+const apiKey = result.apiKey;          // save — shown only once
+const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
+const handle = result.agentHandle;     // e.g. "sales-agent-a1b2c3"
+
+// Verify (after human shares the 6-digit code from the email)
+await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+
+// Resend verification email (5-minute cooldown)
+await Inkbox.resendSignupVerification(apiKey);
+
+// Check status and restrictions
+const status = await Inkbox.getSignupStatus(apiKey);
+console.log(status.claimStatus);                    // "agent_unclaimed" or "agent_claimed"
+console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (claimed)
+```
+
+| Method | Auth | Returns |
+|---|---|---|
+| `Inkbox.signup(request, options?)` | None | `AgentSignupResponse` |
+| `Inkbox.verifySignup(apiKey, request, options?)` | API key | `AgentSignupVerifyResponse` |
+| `Inkbox.resendSignupVerification(apiKey, options?)` | API key | `AgentSignupResendResponse` |
+| `Inkbox.getSignupStatus(apiKey, options?)` | API key | `AgentSignupStatusResponse` |
+
+All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
+
+> **Note:** Unclaimed agents can only send to the `humanEmail` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
+
+---
+
 ## Identities
 
 `inkbox.createIdentity()` and `inkbox.getIdentity()` return an `AgentIdentity` object that holds the identity's channels and exposes convenience methods scoped to those channels.

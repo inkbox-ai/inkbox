@@ -48,6 +48,24 @@ inkbox --json identity list
 
 ## Commands
 
+### signup
+
+Agent self-signup flow. The `create` command does not require an API key.
+
+```bash
+inkbox signup create                             # Register a new agent (no API key needed)
+  --human-email <email>                          #   Email of the human to approve (required)
+  --display-name <name>                          #   Agent display name (required)
+  --note-to-human <note>                         #   Optional message in verification email
+
+inkbox signup verify                             # Submit verification code
+  --code <code>                                  #   6-digit code from email (required)
+
+inkbox signup resend-verification                # Resend the verification email (5-min cooldown)
+
+inkbox signup status                             # Check claim status and restrictions
+```
+
 ### identity
 
 Manage agent identities.

@@ -40,9 +40,9 @@ Once the skills are installed, your coding agent will automatically know how to 
 
 | Skill | Language | Description |
 |-------|----------|-------------|
-| **inkbox-python** | Python ≥ 3.11 | Identities, email, phone, webhooks using the `inkbox` Python SDK |
-| **inkbox-ts** | TypeScript / Node ≥ 18 | Identities, email, phone, webhooks using the `@inkbox/sdk` TypeScript SDK |
-| **inkbox-openclaw** | TypeScript / Node ≥ 18 | OpenClaw skill — email and phone for your OpenClaw agent |
+| **inkbox-python** | Python ≥ 3.11 | Agent signup, identities, email, phone, webhooks using the `inkbox` Python SDK |
+| **inkbox-ts** | TypeScript / Node ≥ 18 | Agent signup, identities, email, phone, webhooks using the `@inkbox/sdk` TypeScript SDK |
+| **inkbox-openclaw** | TypeScript / Node ≥ 18 | OpenClaw skill — agent signup, email and phone for your OpenClaw agent |
 
 ## Documentation
 

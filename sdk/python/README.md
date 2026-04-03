@@ -65,6 +65,48 @@ Use `with Inkbox(...) as inkbox:` (recommended) or call `inkbox.close()` manuall
 
 ---
 
+## Agent Signup
+
+Agents can self-register without a pre-existing API key. All signup methods are **class methods** — no `Inkbox` instance required.
+
+```python
+from inkbox import Inkbox
+
+# Sign up (public — no API key needed)
+result = Inkbox.signup(
+    human_email="alex@example.com",
+    display_name="Sales Agent",
+    note_to_human="Hey Alex, this is your sales bot signing up!",
+)
+api_key = result.api_key          # save — shown only once
+email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
+handle = result.agent_handle      # e.g. "sales-agent-a1b2c3"
+
+# Verify (after human shares the 6-digit code from the email)
+Inkbox.verify_signup(api_key, verification_code="483921")
+
+# Resend verification email (5-minute cooldown)
+Inkbox.resend_signup_verification(api_key)
+
+# Check status and restrictions
+status = Inkbox.get_signup_status(api_key)
+print(status.claim_status)                    # "agent_unclaimed" or "agent_claimed"
+print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
+```
+
+| Method | Auth | Returns |
+|---|---|---|
+| `Inkbox.signup(human_email, display_name, *, note_to_human=None)` | None | `AgentSignupResponse` |
+| `Inkbox.verify_signup(api_key, verification_code)` | API key | `AgentSignupVerifyResponse` |
+| `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
+| `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |
+
+All methods accept optional `base_url` and `timeout` keyword arguments.
+
+> **Note:** Unclaimed agents can only send to the `human_email` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
+
+---
+
 ## Identities
 
 `inkbox.create_identity()` and `inkbox.get_identity()` return an `AgentIdentity` object that holds the identity's channels and exposes convenience methods scoped to those channels.
