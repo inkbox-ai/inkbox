@@ -40,6 +40,8 @@ RAW_VERIFY = {
 }
 
 RAW_RESEND = {
+    "claim_status": "pending_verification",
+    "organization_id": "org-123",
     "message": "Verification email resent",
 }
 
@@ -158,6 +160,8 @@ class TestResendSignupVerification:
         )
 
         assert isinstance(result, AgentSignupResendResponse)
+        assert result.claim_status == "pending_verification"
+        assert result.organization_id == "org-123"
         assert result.message == "Verification email resent"
 
 

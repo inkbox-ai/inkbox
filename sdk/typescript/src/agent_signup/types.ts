@@ -33,6 +33,8 @@ export interface AgentSignupVerifyResponse {
 }
 
 export interface AgentSignupResendResponse {
+  claimStatus: string;
+  organizationId: string;
   message: string;
 }
 
@@ -69,6 +71,8 @@ export interface RawAgentSignupVerifyResponse {
 }
 
 export interface RawAgentSignupResendResponse {
+  claim_status: string;
+  organization_id: string;
   message: string;
 }
 
@@ -109,7 +113,11 @@ export function parseAgentSignupVerifyResponse(r: RawAgentSignupVerifyResponse):
 }
 
 export function parseAgentSignupResendResponse(r: RawAgentSignupResendResponse): AgentSignupResendResponse {
-  return { message: r.message };
+  return {
+    claimStatus: r.claim_status,
+    organizationId: r.organization_id,
+    message: r.message,
+  };
 }
 
 function parseSignupRestrictions(r: RawSignupRestrictions): SignupRestrictions {

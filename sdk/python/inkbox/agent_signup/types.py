@@ -56,11 +56,17 @@ class AgentSignupVerifyResponse:
 class AgentSignupResendResponse:
     """Response from ``POST /api/v1/agent-signup/resend-verification``."""
 
+    claim_status: str
+    organization_id: str
     message: str
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentSignupResendResponse:
-        return cls(message=d["message"])
+        return cls(
+            claim_status=d["claim_status"],
+            organization_id=d["organization_id"],
+            message=d["message"],
+        )
 
 
 @dataclass
