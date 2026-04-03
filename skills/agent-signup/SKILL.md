@@ -50,6 +50,7 @@ verify = Inkbox.verify_signup(api_key, verification_code="483921")
 
 # 3. Resend verification (5-minute cooldown)
 resend = Inkbox.resend_signup_verification(api_key)
+# resend.organization_id → current org (may differ from signup if migrated)
 
 # 4. Check status
 status = Inkbox.get_signup_status(api_key)
@@ -97,6 +98,7 @@ const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" })
 
 // 3. Resend verification (5-minute cooldown)
 const resend = await Inkbox.resendSignupVerification(apiKey);
+// resend.organizationId → current org (may differ from signup if migrated)
 
 // 4. Check status
 const status = await Inkbox.getSignupStatus(apiKey);
@@ -149,6 +151,8 @@ Response:
 ```
 
 Save the `api_key` — it is shown only once.
+
+> **Note:** The `organization_id` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. The `/verify` and `/resend-verification` endpoints both return the current `organization_id` — always prefer the most recent value over the one from the initial signup.
 
 ### Verify
 

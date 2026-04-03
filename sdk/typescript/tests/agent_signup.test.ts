@@ -39,6 +39,8 @@ const RAW_VERIFY_RESPONSE = {
 };
 
 const RAW_RESEND_RESPONSE = {
+  claim_status: "pending_verification",
+  organization_id: "org_abc123",
   message: "Verification email resent",
 };
 
@@ -166,7 +168,11 @@ describe("Inkbox.resendSignupVerification", () => {
     expect(headers["X-Service-Token"]).toBe("ApiKey_abc");
     expect(init!.body).toBeUndefined();
 
-    expect(result).toEqual({ message: "Verification email resent" });
+    expect(result).toEqual({
+      claimStatus: "pending_verification",
+      organizationId: "org_abc123",
+      message: "Verification email resent",
+    });
   });
 });
 

@@ -62,6 +62,7 @@ inkbox signup verify                             # Submit verification code
   --code <code>                                  #   6-digit code from email (required)
 
 inkbox signup resend-verification                # Resend the verification email (5-min cooldown)
+                                                 # Returns current organization_id (may change after verify/approval)
 
 inkbox signup status                             # Check claim status and restrictions
 ```

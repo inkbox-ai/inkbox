@@ -106,6 +106,8 @@ console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (cl
 
 > **Note:** Unclaimed agents can only send to the `humanEmail` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
 
+> **Note:** The `organizationId` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. Always use the `organizationId` from the most recent response (`verifySignup` or `resendSignupVerification`) rather than caching the value from the initial `signup()` call.
+
 ---
 
 ## Identities

@@ -105,6 +105,8 @@ All three arguments to `signup()` (`human_email`, `display_name`, `note_to_human
 
 > **Note:** Unclaimed agents can only send to the `human_email` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
 
+> **Note:** The `organization_id` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. Always use the `organization_id` from the most recent response (`verify_signup` or `resend_signup_verification`) rather than caching the value from the initial `signup()` call.
+
 ---
 
 ## Identities
