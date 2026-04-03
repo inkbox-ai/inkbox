@@ -9,7 +9,7 @@
 export interface AgentSignupRequest {
   humanEmail: string;
   displayName: string;
-  noteToHuman?: string;
+  noteToHuman: string;
 }
 
 export interface AgentSignupResponse {
@@ -139,7 +139,7 @@ export function agentSignupRequestToWire(
     human_email: req.humanEmail,
     display_name: req.displayName,
   };
-  if (req.noteToHuman !== undefined) body["note_to_human"] = req.noteToHuman;
+  body["note_to_human"] = req.noteToHuman;
   return body;
 }
 

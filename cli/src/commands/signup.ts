@@ -25,7 +25,7 @@ export function registerSignupCommands(program: Command): void {
     .description("Register a new agent (no API key required)")
     .requiredOption("--human-email <email>", "Email of the human who should approve this agent")
     .requiredOption("--display-name <name>", "Human-readable name for the agent")
-    .option("--note-to-human <note>", "Optional message included in the verification email")
+    .requiredOption("--note-to-human <note>", "Message from the agent to the human, included in the verification email")
     .action(
       withErrorHandler(async function (this: Command) {
         const globalOpts = getGlobalOpts(this);

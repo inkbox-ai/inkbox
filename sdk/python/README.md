@@ -76,7 +76,7 @@ from inkbox import Inkbox
 result = Inkbox.signup(
     human_email="alex@example.com",
     display_name="Sales Agent",
-    note_to_human="Hey Alex, this is your sales bot signing up!",
+    note_to_human="Hey Alex, this is your sales bot signing up!",  # required
 )
 api_key = result.api_key          # save — shown only once
 email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
@@ -96,7 +96,7 @@ print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
 
 | Method | Auth | Returns |
 |---|---|---|
-| `Inkbox.signup(human_email, display_name, *, note_to_human=None)` | None | `AgentSignupResponse` |
+| `Inkbox.signup(human_email, display_name, note_to_human)` | None | `AgentSignupResponse` |
 | `Inkbox.verify_signup(api_key, verification_code)` | API key | `AgentSignupVerifyResponse` |
 | `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |

@@ -307,7 +307,7 @@ class Inkbox:
         human_email: str,
         display_name: str,
         *,
-        note_to_human: str | None = None,
+        note_to_human: str,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
     ) -> AgentSignupResponse:
@@ -319,16 +319,16 @@ class Inkbox:
         Args:
             human_email: Email of the human who should approve this agent.
             display_name: Human-readable name for the agent.
-            note_to_human: Optional message included in the verification email.
+            note_to_human: Message from the agent to the human, included in
+                the verification email.
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
         """
         body: dict[str, str] = {
             "human_email": human_email,
             "display_name": display_name,
+            "note_to_human": note_to_human,
         }
-        if note_to_human is not None:
-            body["note_to_human"] = note_to_human
         data = cls._signup_request(
             "POST", "", json=body, base_url=base_url, timeout=timeout,
         )
