@@ -36,6 +36,7 @@ Inkbox (org-level client)
 ├── .phone_numbers           → PhoneNumbersResource
 ├── .texts                   → TextsResource
 ├── .vault                   → VaultResource
+├── .whoami()                → WhoamiResponse
 └── .create_signing_key()    → SigningKey
 
 AgentIdentity (identity-scoped helper)
@@ -48,6 +49,14 @@ AgentIdentity (identity-scoped helper)
 ```
 
 An identity must have a channel assigned before you can use mail/phone methods. If not assigned, an `InkboxError` is raised with a clear message.
+
+## Agent Signup
+
+For the full agent self-signup flow (register, verify, check status, restrictions, and direct API examples), read the shared reference:
+
+> **See:** `skills/agent-signup/SKILL.md`
+
+Python SDK methods: `Inkbox.signup(...)`, `Inkbox.verify_signup(api_key, ...)`, `Inkbox.resend_signup_verification(api_key)`, `Inkbox.get_signup_status(api_key)`.
 
 ## Identities
 
@@ -399,6 +408,17 @@ inkbox.phone_numbers.update(
 hits = inkbox.phone_numbers.search_transcripts(number.id, q="refund", party="remote", limit=50)
 inkbox.phone_numbers.release(number.id)
 ```
+
+## Whoami
+
+```python
+# Check the authenticated caller's identity
+info = inkbox.whoami()
+print(info.auth_type)        # "api_key" or "jwt"
+print(info.organization_id)
+```
+
+Returns `WhoamiApiKeyResponse` (with `key_id`, `label`, `creator_type`, etc.) or `WhoamiJwtResponse` (with `email`, `org_role`, etc.) based on `auth_type`.
 
 ## Webhooks & Signature Verification
 

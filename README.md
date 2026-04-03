@@ -114,6 +114,70 @@ inkbox vault get <secret-id>
 
 ---
 
+## Agent Signup
+
+Agents can self-register without a pre-existing API key. The flow provisions a mailbox, identity, and API key in one call:
+
+### Python
+
+```python
+from inkbox import Inkbox
+
+# 1. Sign up (no API key needed)
+result = Inkbox.signup(
+    human_email="john@example.com",
+    display_name="My Agent",
+    note_to_human="Hey John, this is your agent signing up!",
+)
+api_key = result.api_key  # save this — shown only once
+
+# 2. Verify (after human shares the 6-digit code)
+Inkbox.verify_signup(api_key, verification_code="483921")
+
+# 3. Use the API key
+with Inkbox(api_key=api_key) as inkbox:
+    identity = inkbox.get_identity(result.agent_handle)
+    identity.send_email(to=["john@example.com"], subject="Hello!", body_text="I'm set up.")
+```
+
+### TypeScript
+
+```typescript
+import { Inkbox } from "@inkbox/sdk";
+
+// 1. Sign up (no API key needed)
+const result = await Inkbox.signup({
+  humanEmail: "john@example.com",
+  displayName: "My Agent",
+  noteToHuman: "Hey John, this is your agent signing up!",
+});
+const apiKey = result.apiKey; // save this — shown only once
+
+// 2. Verify (after human shares the 6-digit code)
+await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+
+// 3. Use the API key
+const inkbox = new Inkbox({ apiKey });
+const identity = await inkbox.getIdentity(result.agentHandle);
+await identity.sendEmail({ to: ["john@example.com"], subject: "Hello!", bodyText: "I'm set up." });
+```
+
+### CLI
+
+```bash
+# 1. Sign up (no --api-key needed)
+inkbox signup create --human-email john@example.com --display-name "My Agent" \
+  --note-to-human "Hey John, this is your agent signing up!"
+
+# 2. Verify (after human shares the 6-digit code)
+inkbox signup verify --code 483921
+
+# 3. Check status
+inkbox signup status
+```
+
+---
+
 ## What's in this repo
 
 | Directory | Description |

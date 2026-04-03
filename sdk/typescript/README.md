@@ -66,6 +66,50 @@ for (const login of creds.listLogins()) {
 
 ---
 
+## Agent Signup
+
+Agents can self-register without a pre-existing API key. All signup methods are **static** — no `Inkbox` instance required.
+
+```ts
+import { Inkbox } from "@inkbox/sdk";
+
+// Sign up (public — no API key needed)
+const result = await Inkbox.signup({
+  humanEmail: "john@example.com",
+  displayName: "Sales Agent",
+  noteToHuman: "Hey John, this is your sales bot signing up!",
+});
+const apiKey = result.apiKey;          // save — shown only once
+const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
+const handle = result.agentHandle;     // e.g. "sales-agent-a1b2c3"
+
+// Verify (after human shares the 6-digit code from the email)
+await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+
+// Resend verification email (5-minute cooldown)
+await Inkbox.resendSignupVerification(apiKey);
+
+// Check status and restrictions
+const status = await Inkbox.getSignupStatus(apiKey);
+console.log(status.claimStatus);                    // "agent_unclaimed" or "agent_claimed"
+console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (claimed)
+```
+
+| Method | Auth | Returns |
+|---|---|---|
+| `Inkbox.signup(request, options?)` | None | `AgentSignupResponse` |
+| `Inkbox.verifySignup(apiKey, request, options?)` | API key | `AgentSignupVerifyResponse` |
+| `Inkbox.resendSignupVerification(apiKey, options?)` | API key | `AgentSignupResendResponse` |
+| `Inkbox.getSignupStatus(apiKey, options?)` | API key | `AgentSignupStatusResponse` |
+
+`request` for `signup()` requires `humanEmail`, `displayName`, and `noteToHuman`. All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
+
+> **Note:** Unclaimed agents can only send to the `humanEmail` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
+
+> **Note:** The `organizationId` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. Always use the `organizationId` from the most recent response (`verifySignup` or `resendSignupVerification`) rather than caching the value from the initial `signup()` call.
+
+---
+
 ## Identities
 
 `inkbox.createIdentity()` and `inkbox.getIdentity()` return an `AgentIdentity` object that holds the identity's channels and exposes convenience methods scoped to those channels.
@@ -570,6 +614,24 @@ await inkbox.phoneNumbers.update(number.id, {
   incomingCallAction: "webhook",
   incomingCallWebhookUrl: "https://example.com/calls",
 });
+```
+
+---
+
+## Whoami
+
+```ts
+// Check the authenticated caller's identity
+const info = await inkbox.whoami();
+console.log(info.authType);        // "api_key" or "jwt"
+console.log(info.organizationId);
+
+// Narrow by auth type (discriminated union)
+if (info.authType === "api_key") {
+  console.log(info.keyId, info.label);
+} else {
+  console.log(info.email, info.orgRole);
+}
 ```
 
 ---

@@ -65,6 +65,50 @@ Use `with Inkbox(...) as inkbox:` (recommended) or call `inkbox.close()` manuall
 
 ---
 
+## Agent Signup
+
+Agents can self-register without a pre-existing API key. All signup methods are **class methods** — no `Inkbox` instance required.
+
+```python
+from inkbox import Inkbox
+
+# Sign up (public — no API key needed)
+result = Inkbox.signup(
+    human_email="john@example.com",
+    display_name="Sales Agent",
+    note_to_human="Hey John, this is your sales bot signing up!",  # required
+)
+api_key = result.api_key          # save — shown only once
+email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
+handle = result.agent_handle      # e.g. "sales-agent-a1b2c3"
+
+# Verify (after human shares the 6-digit code from the email)
+Inkbox.verify_signup(api_key, verification_code="483921")
+
+# Resend verification email (5-minute cooldown)
+Inkbox.resend_signup_verification(api_key)
+
+# Check status and restrictions
+status = Inkbox.get_signup_status(api_key)
+print(status.claim_status)                    # "agent_unclaimed" or "agent_claimed"
+print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
+```
+
+| Method | Auth | Returns |
+|---|---|---|
+| `Inkbox.signup(human_email, display_name, note_to_human)` | None | `AgentSignupResponse` |
+| `Inkbox.verify_signup(api_key, verification_code)` | API key | `AgentSignupVerifyResponse` |
+| `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
+| `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |
+
+All three arguments to `signup()` (`human_email`, `display_name`, `note_to_human`) are required. All methods accept optional `base_url` and `timeout` keyword arguments.
+
+> **Note:** Unclaimed agents can only send to the `human_email` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
+
+> **Note:** The `organization_id` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. Always use the `organization_id` from the most recent response (`verify_signup` or `resend_signup_verification`) rather than caching the value from the initial `signup()` call.
+
+---
+
 ## Identities
 
 `inkbox.create_identity()` and `inkbox.get_identity()` return an `AgentIdentity` object that holds the identity's channels and exposes convenience methods scoped to those channels.
@@ -544,6 +588,23 @@ inkbox.phone_numbers.update(
     incoming_call_action="webhook",
     incoming_call_webhook_url="https://example.com/calls",
 )
+```
+
+---
+
+## Whoami
+
+```python
+# Check the authenticated caller's identity
+info = inkbox.whoami()
+print(info.auth_type)        # "api_key" or "jwt"
+print(info.organization_id)
+
+# Narrow by auth type
+if isinstance(info, inkbox.WhoamiApiKeyResponse):
+    print(info.key_id, info.label)
+elif isinstance(info, inkbox.WhoamiJwtResponse):
+    print(info.email, info.org_role)
 ```
 
 ---

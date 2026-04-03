@@ -4,7 +4,9 @@
  * Inkbox — org-level entry point for all Inkbox APIs.
  */
 
-import { HttpTransport } from "./_http.js";
+import { HttpTransport, InkboxAPIError } from "./_http.js";
+import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
+import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
@@ -18,8 +20,35 @@ import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type { AgentIdentitySummary, CreateIdentityOptions } from "./identities/types.js";
+import type {
+  AgentSignupRequest,
+  AgentSignupResponse,
+  AgentSignupVerifyRequest,
+  AgentSignupVerifyResponse,
+  AgentSignupResendResponse,
+  AgentSignupStatusResponse,
+  RawAgentSignupResponse,
+  RawAgentSignupVerifyResponse,
+  RawAgentSignupResendResponse,
+  RawAgentSignupStatusResponse,
+} from "./agent_signup/types.js";
+import {
+  agentSignupRequestToWire,
+  agentSignupVerifyRequestToWire,
+  parseAgentSignupResponse,
+  parseAgentSignupVerifyResponse,
+  parseAgentSignupResendResponse,
+  parseAgentSignupStatusResponse,
+} from "./agent_signup/types.js";
 
 const DEFAULT_BASE_URL = "https://inkbox.ai";
+
+export interface SignupOptions {
+  /** Override the API base URL (useful for self-hosting or testing). */
+  baseUrl?: string;
+  /** Request timeout in milliseconds. Defaults to 30 000. */
+  timeoutMs?: number;
+}
 
 export interface InkboxOptions {
   /** Your Inkbox API key (sent as `X-Service-Token`). */
@@ -83,6 +112,7 @@ export class Inkbox {
   readonly _transcripts: TranscriptsResource;
   readonly _idsResource: IdentitiesResource;
   readonly _vaultResource: VaultResource;
+  readonly _rootApiHttp: HttpTransport;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
 
@@ -120,6 +150,7 @@ export class Inkbox {
 
     this._idsResource = new IdentitiesResource(idsHttp);
 
+    this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
 
     if (options.vaultKey !== undefined) {
@@ -245,5 +276,126 @@ export class Inkbox {
    */
   async createSigningKey(): Promise<SigningKey> {
     return this._signingKeys.createOrRotate();
+  }
+
+  /**
+   * Return the authenticated caller's identity and auth type.
+   *
+   * @returns A {@link WhoamiResponse} — either an API-key or JWT variant.
+   */
+  async whoami(): Promise<WhoamiResponse> {
+    const raw = await this._rootApiHttp.get<RawWhoamiResponse>("/whoami");
+    return parseWhoamiResponse(raw);
+  }
+
+  // ------------------------------------------------------------------
+  // Agent signup (static — no instance required)
+  // ------------------------------------------------------------------
+
+  /** @internal One-shot fetch for agent-signup endpoints. */
+  private static async _signupFetch<T>(
+    method: string,
+    path: string,
+    opts: { apiKey?: string; body?: unknown; baseUrl?: string; timeoutMs?: number },
+  ): Promise<T> {
+    const base = opts.baseUrl ?? DEFAULT_BASE_URL;
+    if (!base.startsWith("https://")) {
+      const parsed = new URL(base);
+      if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+        throw new Error(
+          "Only HTTPS base URLs are permitted (HTTP is allowed for " +
+          "localhost and 127.0.0.1).",
+        );
+      }
+    }
+    const url = `${base.replace(/\/$/, "")}/api/v1/agent-signup${path}`;
+    const ms = opts.timeoutMs ?? 30_000;
+
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (opts.apiKey) headers["X-Service-Token"] = opts.apiKey;
+
+    let bodyStr: string | undefined;
+    if (opts.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+      bodyStr = JSON.stringify(opts.body);
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+
+    let resp: Response;
+    try {
+      resp = await fetch(url, { method, headers, body: bodyStr, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!resp.ok) {
+      let detail: string;
+      try {
+        const err = (await resp.json()) as { detail?: string };
+        detail = err.detail ?? resp.statusText;
+      } catch {
+        detail = resp.statusText;
+      }
+      throw new InkboxAPIError(resp.status, detail);
+    }
+
+    return resp.json() as Promise<T>;
+  }
+
+  /**
+   * Register a new agent (public — no API key required).
+   *
+   * Returns the provisioned email, org, and a one-time API key.
+   */
+  static async signup(
+    request: AgentSignupRequest,
+    options?: SignupOptions,
+  ): Promise<AgentSignupResponse> {
+    const raw = await Inkbox._signupFetch<RawAgentSignupResponse>(
+      "POST", "", { body: agentSignupRequestToWire(request), ...options },
+    );
+    return parseAgentSignupResponse(raw);
+  }
+
+  /**
+   * Submit a 6-digit verification code to unlock full capabilities.
+   */
+  static async verifySignup(
+    apiKey: string,
+    request: AgentSignupVerifyRequest,
+    options?: SignupOptions,
+  ): Promise<AgentSignupVerifyResponse> {
+    const raw = await Inkbox._signupFetch<RawAgentSignupVerifyResponse>(
+      "POST", "/verify", { apiKey, body: agentSignupVerifyRequestToWire(request), ...options },
+    );
+    return parseAgentSignupVerifyResponse(raw);
+  }
+
+  /**
+   * Resend the verification email (5-minute cooldown).
+   */
+  static async resendSignupVerification(
+    apiKey: string,
+    options?: SignupOptions,
+  ): Promise<AgentSignupResendResponse> {
+    const raw = await Inkbox._signupFetch<RawAgentSignupResendResponse>(
+      "POST", "/resend-verification", { apiKey, ...options },
+    );
+    return parseAgentSignupResendResponse(raw);
+  }
+
+  /**
+   * Check the current signup claim status and restrictions.
+   */
+  static async getSignupStatus(
+    apiKey: string,
+    options?: SignupOptions,
+  ): Promise<AgentSignupStatusResponse> {
+    const raw = await Inkbox._signupFetch<RawAgentSignupStatusResponse>(
+      "GET", "/status", { apiKey, ...options },
+    );
+    return parseAgentSignupStatusResponse(raw);
   }
 }

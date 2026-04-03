@@ -21,7 +21,7 @@ cp .env.example .env
 ## Quickstart
 
 ```bash
-uv run inkbox-browser-use "Go to news.ycombinator.com, get the top 5 posts, and email a summary to alex@example.com"
+uv run inkbox-browser-use "Go to news.ycombinator.com, get the top 5 posts, and email a summary to john@example.com"
 ```
 
 Chrome will be auto-launched in debug mode if it isn't already running.
@@ -30,19 +30,19 @@ Chrome will be auto-launched in debug mode if it isn't already running.
 
 ```bash
 # local Chrome (default — auto-launches if not running)
-uv run inkbox-browser-use "Go to hacker news, get the top 10 posts, and email them to alex@example.com"
+uv run inkbox-browser-use "Go to hacker news, get the top 10 posts, and email them to john@example.com"
 
 # sign up for a service using the agent's email
 uv run inkbox-browser-use "Sign up for a free account on example.com using my email"
 
 # Browser Use Cloud (no local Chrome needed)
-uv run inkbox-browser-use --env cloud "Go to example.com/pricing, summarize the plans, and email it to alex@example.com"
+uv run inkbox-browser-use --env cloud "Go to example.com/pricing, summarize the plans, and email it to john@example.com"
 
 # keep the browser open after the task completes
 uv run inkbox-browser-use --keep-browser "Sign up for a free account on example.com using my email"
 
 # local Chrome with custom debug URL
-uv run inkbox-browser-use --chrome-debug-url http://127.0.0.1:9333 "Email alex@example.com with a summary of example.com"
+uv run inkbox-browser-use --chrome-debug-url http://127.0.0.1:9333 "Email john@example.com with a summary of example.com"
 ```
 
 ### CLI flags

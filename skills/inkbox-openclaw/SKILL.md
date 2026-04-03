@@ -66,6 +66,7 @@ Inkbox (org-level client)
 ├── .phoneNumbers           → PhoneNumbersResource
 ├── .texts                  → TextsResource
 ├── .vault                  → VaultResource
+├── .whoami()               → Promise<WhoamiResponse>
 └── .createSigningKey()     → Promise<SigningKey>
 
 AgentIdentity (identity-scoped helper)
@@ -78,6 +79,16 @@ AgentIdentity (identity-scoped helper)
 ```
 
 An identity must have a channel assigned before you can use mail/phone/text methods. If not assigned, an `InkboxError` is thrown.
+
+## Agent Signup
+
+For the full agent self-signup flow (register, verify, check status, restrictions, and direct API examples), read the shared reference:
+
+> **See:** `skills/agent-signup/SKILL.md`
+
+SDK methods: `Inkbox.signup({...})`, `Inkbox.verifySignup(apiKey, {...})`, `Inkbox.resendSignupVerification(apiKey)`, `Inkbox.getSignupStatus(apiKey)`.
+
+> **Important:** Always confirm with the user before initiating a signup, as it sends a real email to the specified human.
 
 ## Identities
 
@@ -472,6 +483,21 @@ await inkbox.phoneNumbers.update(num.id, {
 const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", party: "remote", limit: 50 });
 await inkbox.phoneNumbers.release(num.id);
 ```
+
+## Whoami
+
+```js
+// Check the authenticated caller's identity
+const info = await inkbox.whoami();
+console.log(info.authType);        // "api_key" or "jwt"
+console.log(info.organizationId);
+
+if (info.authType === "api_key") {
+  console.log(info.keyId, info.label);
+}
+```
+
+Returns `WhoamiApiKeyResponse` or `WhoamiJwtResponse` — discriminated on `authType`.
 
 ## Webhooks & Signature Verification
 

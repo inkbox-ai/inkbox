@@ -1,8 +1,22 @@
 export { Inkbox } from "./inkbox.js";
 export { AgentIdentity } from "./agent_identity.js";
 export { Credentials } from "./credentials.js";
-export type { InkboxOptions } from "./inkbox.js";
+export type { InkboxOptions, SignupOptions } from "./inkbox.js";
+export type {
+  AgentSignupRequest,
+  AgentSignupResponse,
+  AgentSignupVerifyRequest,
+  AgentSignupVerifyResponse,
+  AgentSignupResendResponse,
+  SignupRestrictions,
+  AgentSignupStatusResponse,
+} from "./agent_signup/types.js";
 export { InkboxError, InkboxAPIError, InkboxVaultKeyError } from "./_http.js";
+export type {
+  WhoamiApiKeyResponse,
+  WhoamiJwtResponse,
+  WhoamiResponse,
+} from "./whoami/types.js";
 export type { SigningKey } from "./signing_keys.js";
 export { verifyWebhook } from "./signing_keys.js";
 export { MessageDirection } from "./mail/types.js";
