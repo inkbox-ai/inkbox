@@ -5,6 +5,8 @@
  */
 
 import { HttpTransport, InkboxAPIError } from "./_http.js";
+import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
+import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
@@ -110,6 +112,7 @@ export class Inkbox {
   readonly _transcripts: TranscriptsResource;
   readonly _idsResource: IdentitiesResource;
   readonly _vaultResource: VaultResource;
+  readonly _rootApiHttp: HttpTransport;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
 
@@ -147,6 +150,7 @@ export class Inkbox {
 
     this._idsResource = new IdentitiesResource(idsHttp);
 
+    this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
 
     if (options.vaultKey !== undefined) {
@@ -272,6 +276,16 @@ export class Inkbox {
    */
   async createSigningKey(): Promise<SigningKey> {
     return this._signingKeys.createOrRotate();
+  }
+
+  /**
+   * Return the authenticated caller's identity and auth type.
+   *
+   * @returns A {@link WhoamiResponse} — either an API-key or JWT variant.
+   */
+  async whoami(): Promise<WhoamiResponse> {
+    const raw = await this._rootApiHttp.get<RawWhoamiResponse>("/whoami");
+    return parseWhoamiResponse(raw);
   }
 
   // ------------------------------------------------------------------

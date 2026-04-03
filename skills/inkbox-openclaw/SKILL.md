@@ -66,6 +66,7 @@ Inkbox (org-level client)
 ├── .phoneNumbers           → PhoneNumbersResource
 ├── .texts                  → TextsResource
 ├── .vault                  → VaultResource
+├── .whoami()               → Promise<WhoamiResponse>
 └── .createSigningKey()     → Promise<SigningKey>
 
 AgentIdentity (identity-scoped helper)
@@ -482,6 +483,21 @@ await inkbox.phoneNumbers.update(num.id, {
 const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", party: "remote", limit: 50 });
 await inkbox.phoneNumbers.release(num.id);
 ```
+
+## Whoami
+
+```js
+// Check the authenticated caller's identity
+const info = await inkbox.whoami();
+console.log(info.authType);        // "api_key" or "jwt"
+console.log(info.organizationId);
+
+if (info.authType === "api_key") {
+  console.log(info.keyId, info.label);
+}
+```
+
+Returns `WhoamiApiKeyResponse` or `WhoamiJwtResponse` — discriminated on `authType`.
 
 ## Webhooks & Signature Verification
 

@@ -280,6 +280,15 @@ inkbox number update <id>                    # Update phone number config
 inkbox number release <number-id>             # Release a phone number
 ```
 
+### whoami
+
+Show the authenticated caller's identity.
+
+```bash
+inkbox whoami                                # Display caller identity (API key or JWT)
+inkbox whoami --json                         # Output as JSON
+```
+
 ### signing-key
 
 Webhook signing key management.

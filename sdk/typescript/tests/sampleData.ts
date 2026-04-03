@@ -219,3 +219,30 @@ export const RAW_SIGNING_KEY = {
   signing_key: "sk-test-hmac-secret-abc123",
   created_at: "2026-03-09T00:00:00Z",
 };
+
+// ---- Whoami ----
+
+export const RAW_WHOAMI_API_KEY = {
+  auth_type: "api_key" as const,
+  auth_subtype: "human",
+  organization_id: "org-abc123",
+  created_by: "user_abc",
+  creator_type: "human",
+  key_id: "key_xyz",
+  label: "My Key",
+  description: "Dev key",
+  created_at: 1711929600,
+  last_used_at: 1711933200,
+  expires_at: null,
+};
+
+export const RAW_WHOAMI_JWT = {
+  auth_type: "jwt" as const,
+  auth_subtype: "clerk",
+  user_id: "user_abc",
+  email: "dev@example.com",
+  name: "Dev User",
+  organization_id: "org-abc123",
+  org_role: "admin",
+  org_slug: "my-org",
+};

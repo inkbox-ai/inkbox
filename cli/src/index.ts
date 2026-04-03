@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerSignupCommands } from "./commands/signup.js";
 import { registerIdentityCommands } from "./commands/identity.js";
 import { registerEmailCommands } from "./commands/email.js";
@@ -21,6 +22,7 @@ const program = new Command()
   .option("--base-url <url>", "Override API base URL")
   .option("--json", "Output as JSON", false);
 
+registerWhoamiCommand(program);
 registerSignupCommands(program);
 registerIdentityCommands(program);
 registerEmailCommands(program);

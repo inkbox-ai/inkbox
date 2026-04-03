@@ -26,6 +26,7 @@ from inkbox.identities.types import (
     IdentityPhoneNumberCreateOptions,
 )
 from inkbox.signing_keys import SigningKey, SigningKeysResource
+from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 from inkbox.agent_signup.types import (
     AgentSignupResponse,
     AgentSignupVerifyResponse,
@@ -247,6 +248,11 @@ class Inkbox:
     def list_identities(self) -> list[AgentIdentitySummary]:
         """List all agent identities for your organisation."""
         return self._ids_resource.list()
+
+    def whoami(self) -> WhoamiResponse:
+        """Return the authenticated caller's identity and auth type."""
+        data = self._root_api_http.get("/whoami")
+        return _parse_whoami(data)
 
     def create_signing_key(self) -> SigningKey:
         """

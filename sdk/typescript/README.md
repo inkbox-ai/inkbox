@@ -618,6 +618,24 @@ await inkbox.phoneNumbers.update(number.id, {
 
 ---
 
+## Whoami
+
+```ts
+// Check the authenticated caller's identity
+const info = await inkbox.whoami();
+console.log(info.authType);        // "api_key" or "jwt"
+console.log(info.organizationId);
+
+// Narrow by auth type (discriminated union)
+if (info.authType === "api_key") {
+  console.log(info.keyId, info.label);
+} else {
+  console.log(info.email, info.orgRole);
+}
+```
+
+---
+
 ## Signing Keys
 
 ```ts

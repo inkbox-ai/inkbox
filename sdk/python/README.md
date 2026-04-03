@@ -592,6 +592,23 @@ inkbox.phone_numbers.update(
 
 ---
 
+## Whoami
+
+```python
+# Check the authenticated caller's identity
+info = inkbox.whoami()
+print(info.auth_type)        # "api_key" or "jwt"
+print(info.organization_id)
+
+# Narrow by auth type
+if isinstance(info, inkbox.WhoamiApiKeyResponse):
+    print(info.key_id, info.label)
+elif isinstance(info, inkbox.WhoamiJwtResponse):
+    print(info.email, info.org_role)
+```
+
+---
+
 ## Signing Keys
 
 ```python
