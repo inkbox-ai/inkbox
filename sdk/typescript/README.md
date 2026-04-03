@@ -102,7 +102,7 @@ console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (cl
 | `Inkbox.resendSignupVerification(apiKey, options?)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.getSignupStatus(apiKey, options?)` | API key | `AgentSignupStatusResponse` |
 
-All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
+`request` for `signup()` requires `humanEmail`, `displayName`, and `noteToHuman`. All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
 
 > **Note:** Unclaimed agents can only send to the `humanEmail` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
 

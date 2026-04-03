@@ -101,7 +101,7 @@ print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
 | `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |
 
-All methods accept optional `base_url` and `timeout` keyword arguments.
+All three arguments to `signup()` (`human_email`, `display_name`, `note_to_human`) are required. All methods accept optional `base_url` and `timeout` keyword arguments.
 
 > **Note:** Unclaimed agents can only send to the `human_email` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
 
