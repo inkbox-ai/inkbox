@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Inkbox } from "@inkbox/sdk";
-import type { Message } from "@inkbox/sdk";
+import type { Message, DecryptedVaultSecret } from "@inkbox/sdk";
 import {
   loadConfig,
   bootstrapTestOrg,
@@ -125,6 +125,70 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     await alpha.update({ status: "active" });
     await alpha.refresh();
     expect(alpha.status).toBe("active");
+
+    // ── vault + credentials ───────────────────────────────────
+    const vaultKey = "IntegrationTest-Key-01!";
+    logStep(config, "initialize vault");
+    const vaultResult = await inkbox.vault.initialize(vaultKey);
+    expect(vaultResult.vaultKeyId).toBeTruthy();
+    expect(vaultResult.recoveryCodes).toHaveLength(4);
+
+    logStep(config, "vault info");
+    const vaultInfo = await inkbox.vault.info();
+    expect(vaultInfo).not.toBeNull();
+    expect(vaultInfo!.keyCount).toBe(1);
+    expect(vaultInfo!.recoveryKeyCount).toBe(4);
+    expect(vaultInfo!.secretCount).toBe(0);
+
+    logStep(config, "unlock vault");
+    await inkbox.vault.unlock(vaultKey);
+
+    logStep(config, "create API key secret via alpha identity");
+    const secretA = await alpha.createSecret({
+      name: "test-api-key",
+      payload: { apiKey: "sk-test-secret-12345" },
+      description: "Integration test API key",
+    });
+    expect(secretA.name).toBe("test-api-key");
+    expect(secretA.secretType).toBe("api_key");
+
+    logStep(config, "create login secret via alpha identity");
+    const secretB = await alpha.createSecret({
+      name: "test-login",
+      payload: { username: "testuser", password: "testpass123" },
+      description: "Integration test login",
+    });
+    expect(secretB.name).toBe("test-login");
+    expect(secretB.secretType).toBe("login");
+
+    logStep(config, "list secrets shows both");
+    const allSecrets = await inkbox.vault.listSecrets();
+    expect(allSecrets).toHaveLength(2);
+
+    logStep(config, "list secrets filtered by type");
+    const apiKeySecrets = await inkbox.vault.listSecrets({ secretType: "api_key" });
+    expect(apiKeySecrets).toHaveLength(1);
+    expect(apiKeySecrets[0].name).toBe("test-api-key");
+
+    logStep(config, "verify alpha credentials include both secrets (no client-side filtering)");
+    const creds = await alpha.getCredentials();
+    const apiKeys = creds.listApiKeys();
+    expect(apiKeys).toHaveLength(1);
+    expect(apiKeys[0].payload.apiKey).toBe("sk-test-secret-12345");
+    const logins = creds.listLogins();
+    expect(logins).toHaveLength(1);
+    expect(logins[0].payload.username).toBe("testuser");
+
+    logStep(config, "get secret by ID and verify decrypted payload");
+    const fetched = await alpha.getSecret(secretA.id);
+    expect(fetched.name).toBe("test-api-key");
+    expect(fetched.payload.apiKey).toBe("sk-test-secret-12345");
+
+    logStep(config, "delete secrets");
+    await alpha.deleteSecret(secretA.id);
+    await alpha.deleteSecret(secretB.id);
+    const remaining = await inkbox.vault.listSecrets();
+    expect(remaining).toHaveLength(0);
 
     // ── signing key ───────────────────────────────────────────
     logStep(config, "create signing key");

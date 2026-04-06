@@ -110,6 +110,70 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         alpha.refresh()
         assert alpha.status == "active"
 
+        # ── vault + credentials ───────────────────────────────────
+        vault_key = "IntegrationTest-Key-01!"
+        log_step(ctx, "initialize vault")
+        vault_result = inkbox.vault.initialize(vault_key)
+        assert vault_result.vault_key_id is not None
+        assert len(vault_result.recovery_codes) == 4
+
+        log_step(ctx, "vault info")
+        vault_info = inkbox.vault.info()
+        assert vault_info is not None
+        assert vault_info.key_count == 1
+        assert vault_info.recovery_key_count == 4
+        assert vault_info.secret_count == 0
+
+        log_step(ctx, "unlock vault")
+        inkbox.vault.unlock(vault_key)
+
+        log_step(ctx, "create secret via alpha identity")
+        from inkbox.vault.types import APIKeyPayload, LoginPayload
+        secret_a = alpha.create_secret(
+            name="test-api-key",
+            payload=APIKeyPayload(api_key="sk-test-secret-12345"),
+            description="Integration test API key",
+        )
+        assert secret_a.name == "test-api-key"
+        assert secret_a.secret_type == "api_key"
+
+        log_step(ctx, "create login secret via alpha identity")
+        secret_b = alpha.create_secret(
+            name="test-login",
+            payload=LoginPayload(username="testuser", password="testpass123"),
+            description="Integration test login",
+        )
+        assert secret_b.name == "test-login"
+        assert secret_b.secret_type == "login"
+
+        log_step(ctx, "list secrets shows both")
+        all_secrets = inkbox.vault.list_secrets()
+        assert len(all_secrets) == 2
+
+        log_step(ctx, "list secrets filtered by type")
+        api_key_secrets = inkbox.vault.list_secrets(secret_type="api_key")
+        assert len(api_key_secrets) == 1
+        assert api_key_secrets[0].name == "test-api-key"
+
+        log_step(ctx, "verify alpha credentials include both secrets (no client-side filtering)")
+        creds = alpha.credentials
+        api_keys = creds.list_api_keys()
+        assert len(api_keys) == 1
+        assert api_keys[0].payload.api_key == "sk-test-secret-12345"
+        logins = creds.list_logins()
+        assert len(logins) == 1
+        assert logins[0].payload.username == "testuser"
+
+        log_step(ctx, "get secret by ID and verify decrypted payload")
+        fetched = alpha.get_secret(secret_a.id)
+        assert fetched.name == "test-api-key"
+        assert fetched.payload.api_key == "sk-test-secret-12345"
+
+        log_step(ctx, "delete secrets")
+        alpha.delete_secret(secret_a.id)
+        alpha.delete_secret(secret_b.id)
+        assert len(inkbox.vault.list_secrets()) == 0
+
         # ── signing key ───────────────────────────────────────────
         log_step(ctx, "create signing key")
         signing_key = inkbox.create_signing_key()

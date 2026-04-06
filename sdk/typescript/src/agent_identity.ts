@@ -88,19 +88,7 @@ export class AgentIdentity {
     }
     this._requireVaultUnlocked();
     const unlocked = vault._unlocked!;
-    // Filter secrets by identity access rules (same logic as
-    // VaultResource.unlock with identityId).
-    const idStr = this.id;
-    const filtered = [];
-    for (const secret of unlocked.secrets) {
-      const rules = await vault.http.get<
-        Array<{ id: string; vault_secret_id: string; identity_id: string; created_at: string }>
-      >(`/secrets/${secret.id}/access`);
-      if (rules.some((r) => r.identity_id === idStr)) {
-        filtered.push(secret);
-      }
-    }
-    this._credentials = new Credentials(filtered);
+    this._credentials = new Credentials(unlocked.secrets);
     this._credentialsVaultRef = unlocked;
     return this._credentials;
   }
