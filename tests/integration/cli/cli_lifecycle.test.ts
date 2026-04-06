@@ -52,7 +52,7 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
 
     logStep(config, "create mailbox for alpha");
     const alphaMb = inkboxJson<{ emailAddress: string }>(
-      "mailbox create --handle alpha",
+      "mailbox create -i alpha",
       cliOpts,
     );
     expect(alphaMb.emailAddress).toBeTruthy();
@@ -62,7 +62,7 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
 
     logStep(config, "create mailbox for bravo");
     const bravoMb = inkboxJson<{ emailAddress: string }>(
-      "mailbox create --handle bravo",
+      "mailbox create -i bravo",
       cliOpts,
     );
     expect(bravoMb.emailAddress).toBeTruthy();
