@@ -51,6 +51,7 @@ export async function bootstrapTestOrg(config: SdkIntegrationConfig): Promise<Bo
       "X-Interservice-Secret": config.interserviceSecret,
       "Content-Type": "application/json",
     },
+    body: JSON.stringify({ create_api_key: true }),
   });
   if (!resp.ok) {
     throw new Error(`Bootstrap failed: ${resp.status} ${await resp.text()}`);

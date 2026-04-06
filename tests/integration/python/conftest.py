@@ -93,6 +93,7 @@ def sdk_context(sdk_integration_config: SdkIntegrationConfig) -> Generator[SdkIn
     resp = httpx.post(
         f"{api_url}/testing/create-test-user-organization",
         headers={"X-Interservice-Secret": cfg.interservice_secret},
+        json={"create_api_key": True},
         timeout=cfg.http_timeout,
     )
     resp.raise_for_status()
