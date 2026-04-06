@@ -33,19 +33,30 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            matrix='{"include":[{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+            # Scheduled: beta only, both local and published
+            matrix='{"include":[
+              {"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"},
+              {"environment":"beta","source":"published","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}
+            ]}'
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            matrix='{"include":[{"environment":"development","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+            # PRs: dev + beta, local only
+            matrix='{"include":[
+              {"environment":"development","source":"local","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},
+              {"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}
+            ]}'
           else
             case "${{ inputs.target }}" in
               development)
-                matrix='{"include":[{"environment":"development","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"}]}'
+                matrix='{"include":[{"environment":"development","source":"local","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"}]}'
                 ;;
               beta)
-                matrix='{"include":[{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+                matrix='{"include":[{"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
                 ;;
               both)
-                matrix='{"include":[{"environment":"development","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+                matrix='{"include":[
+                  {"environment":"development","source":"local","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},
+                  {"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}
+                ]}'
                 ;;
               *)
                 echo "Unexpected target: ${{ inputs.target }}" >&2
@@ -57,7 +68,7 @@ jobs:
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   python-sdk:
-    name: Python SDK (${{ matrix.environment }})
+    name: Python SDK (${{ matrix.environment }}, ${{ matrix.source }})
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -81,11 +92,18 @@ jobs:
           cache: pip
           cache-dependency-path: sdk/python/pyproject.toml
 
-      - name: Install SDK and test dependencies
+      - name: Install SDK (local)
+        if: matrix.source == 'local'
         working-directory: sdk/python
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+
+      - name: Install SDK (published)
+        if: matrix.source == 'published'
+        run: |
+          python -m pip install --upgrade pip
+          pip install inkbox pytest httpx
 
       - name: Export environment secrets
         env:
@@ -121,7 +139,7 @@ jobs:
           curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "text": "⚠️ Python SDK integration tests *FAILED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "⚠️ Python SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
       - name: Notify Google Chat on scheduled success
@@ -130,11 +148,11 @@ jobs:
           curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "text": "✅ Python SDK integration tests *PASSED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "✅ Python SDK integration tests *PASSED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
   typescript-sdk:
-    name: TypeScript SDK (${{ matrix.environment }})
+    name: TypeScript SDK (${{ matrix.environment }}, ${{ matrix.source }})
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -156,17 +174,24 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install SDK
+      - name: Install SDK (local)
+        if: matrix.source == 'local'
         working-directory: sdk/typescript
-        run: npm install
+        run: |
+          npm install
+          npx tsc
 
-      - name: Build SDK
-        working-directory: sdk/typescript
-        run: npx tsc
-
-      - name: Install test dependencies
+      - name: Install test dependencies (local)
+        if: matrix.source == 'local'
         working-directory: tests/integration/typescript
         run: npm install
+
+      - name: Install test dependencies (published)
+        if: matrix.source == 'published'
+        working-directory: tests/integration/typescript
+        run: |
+          npm install
+          npm install @inkbox/sdk@latest
 
       - name: Export environment secrets
         env:
@@ -201,7 +226,7 @@ jobs:
           curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "text": "⚠️ TypeScript SDK integration tests *FAILED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "⚠️ TypeScript SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
       - name: Notify Google Chat on scheduled success
@@ -210,11 +235,11 @@ jobs:
           curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "text": "✅ TypeScript SDK integration tests *PASSED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "✅ TypeScript SDK integration tests *PASSED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
   cli:
-    name: CLI (${{ matrix.environment }})
+    name: CLI (${{ matrix.environment }}, ${{ matrix.source }})
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -236,21 +261,23 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install and build SDK
-        working-directory: sdk/typescript
+      - name: Install and build SDK + CLI (local)
+        if: matrix.source == 'local'
         run: |
-          npm install
-          npx tsc
+          cd sdk/typescript && npm install && npx tsc
+          cd ../../cli && npm install && npx tsc
 
-      - name: Install and build CLI
-        working-directory: cli
-        run: |
-          npm install
-          npx tsc
+      - name: Install CLI (published)
+        if: matrix.source == 'published'
+        run: npm install -g @inkbox/cli@latest
 
       - name: Install test dependencies
         working-directory: tests/integration/cli
         run: npm install
+
+      - name: Set CLI binary path for published
+        if: matrix.source == 'published'
+        run: echo "INKBOX_CLI_BIN=$(which inkbox)" >> "${GITHUB_ENV}"
 
       - name: Export environment secrets
         env:
@@ -285,7 +312,7 @@ jobs:
           curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "text": "⚠️ CLI integration tests *FAILED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "⚠️ CLI integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
       - name: Notify Google Chat on scheduled success
@@ -294,5 +321,5 @@ jobs:
           curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
-              "text": "✅ CLI integration tests *PASSED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              "text": "✅ CLI integration tests *PASSED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'

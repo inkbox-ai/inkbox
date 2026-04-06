@@ -84,7 +84,8 @@ export async function cleanupTestOrg(
   return resp.json();
 }
 
-const CLI_BIN = path.resolve(import.meta.dirname, "../../../cli/dist/index.js");
+const CLI_BIN = process.env.INKBOX_CLI_BIN
+  ?? path.resolve(import.meta.dirname, "../../../cli/dist/index.js");
 
 export function inkbox(
   args: string,
