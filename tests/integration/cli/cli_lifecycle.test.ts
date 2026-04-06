@@ -143,7 +143,7 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
 
     // ── signing key ───────────────────────────────────────────
     logStep(config, "create signing key");
-    const signingKey = inkboxJson<{ signingKey: string }>("signing-key rotate", cliOpts);
+    const signingKey = inkboxJson<{ signingKey: string }>("signing-key create", cliOpts);
     expect(signingKey.signingKey).toBeTruthy();
 
     // ── cleanup: delete identities ────────────────────────────
