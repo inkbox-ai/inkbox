@@ -1,0 +1,12 @@
+{
+  "name": "sdk-integration-cli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.1",
+    "typescript": "^5.4.0"
+  }
+}

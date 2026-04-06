@@ -1,0 +1,298 @@
+# .github/workflows/sdk_integration.yml
+
+name: SDK Integration Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which deployed environment(s) to hit
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - development
+          - beta
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  select-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+    steps:
+      - id: select
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            matrix='{"include":[{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            matrix='{"include":[{"environment":"development","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+          else
+            case "${{ inputs.target }}" in
+              development)
+                matrix='{"include":[{"environment":"development","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"}]}'
+                ;;
+              beta)
+                matrix='{"include":[{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+                ;;
+              both)
+                matrix='{"include":[{"environment":"development","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},{"environment":"beta","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
+                ;;
+              *)
+                echo "Unexpected target: ${{ inputs.target }}" >&2
+                exit 1
+                ;;
+            esac
+          fi
+
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  python-sdk:
+    name: Python SDK (${{ matrix.environment }})
+    needs: select-targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.select-targets.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash -l {0}
+    env:
+      SDK_INTEGRATION_ENV: ${{ matrix.environment }}
+      SDK_INTEGRATION_VERBOSE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: sdk/python/pyproject.toml
+
+      - name: Install SDK and test dependencies
+        working-directory: sdk/python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Export environment secrets
+        env:
+          SDK_INTEGRATION_API_URL_DEVELOPMENT: ${{ secrets.SDK_INTEGRATION_API_URL_DEVELOPMENT }}
+          SDK_INTEGRATION_API_URL_BETA: ${{ secrets.SDK_INTEGRATION_API_URL_BETA }}
+          SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT: ${{ secrets.SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT }}
+          SDK_INTEGRATION_INTERSERVICE_SECRET_BETA: ${{ secrets.SDK_INTEGRATION_INTERSERVICE_SECRET_BETA }}
+        run: |
+          if [ "${SDK_INTEGRATION_ENV}" = "development" ]; then
+            selected_url="${SDK_INTEGRATION_API_URL_DEVELOPMENT}"
+            selected_secret="${SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT}"
+          else
+            selected_url="${SDK_INTEGRATION_API_URL_BETA}"
+            selected_secret="${SDK_INTEGRATION_INTERSERVICE_SECRET_BETA}"
+          fi
+
+          if [ -z "${selected_url}" ] || [ -z "${selected_secret}" ]; then
+            echo "::error::Missing repository secrets for ${SDK_INTEGRATION_ENV}"
+            exit 1
+          fi
+
+          echo "SDK_INTEGRATION_API_URL=${selected_url}" >> "${GITHUB_ENV}"
+          echo "SDK_INTEGRATION_INTERSERVICE_SECRET=${selected_secret}" >> "${GITHUB_ENV}"
+
+      - name: Run Python SDK integration tests
+        working-directory: tests/integration/python
+        run: |
+          pytest -m sdk_integration -vv -s
+
+      - name: Notify Google Chat on scheduled failure
+        if: failure() && github.event_name == 'schedule'
+        run: |
+          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "⚠️ Python SDK integration tests *FAILED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
+
+      - name: Notify Google Chat on scheduled success
+        if: success() && github.event_name == 'schedule'
+        run: |
+          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "✅ Python SDK integration tests *PASSED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
+
+  typescript-sdk:
+    name: TypeScript SDK (${{ matrix.environment }})
+    needs: select-targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.select-targets.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash -l {0}
+    env:
+      SDK_INTEGRATION_ENV: ${{ matrix.environment }}
+      SDK_INTEGRATION_VERBOSE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install SDK
+        working-directory: sdk/typescript
+        run: npm install
+
+      - name: Build SDK
+        working-directory: sdk/typescript
+        run: npx tsc
+
+      - name: Install test dependencies
+        working-directory: tests/integration/typescript
+        run: npm install
+
+      - name: Export environment secrets
+        env:
+          SDK_INTEGRATION_API_URL_DEVELOPMENT: ${{ secrets.SDK_INTEGRATION_API_URL_DEVELOPMENT }}
+          SDK_INTEGRATION_API_URL_BETA: ${{ secrets.SDK_INTEGRATION_API_URL_BETA }}
+          SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT: ${{ secrets.SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT }}
+          SDK_INTEGRATION_INTERSERVICE_SECRET_BETA: ${{ secrets.SDK_INTEGRATION_INTERSERVICE_SECRET_BETA }}
+        run: |
+          if [ "${SDK_INTEGRATION_ENV}" = "development" ]; then
+            selected_url="${SDK_INTEGRATION_API_URL_DEVELOPMENT}"
+            selected_secret="${SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT}"
+          else
+            selected_url="${SDK_INTEGRATION_API_URL_BETA}"
+            selected_secret="${SDK_INTEGRATION_INTERSERVICE_SECRET_BETA}"
+          fi
+
+          if [ -z "${selected_url}" ] || [ -z "${selected_secret}" ]; then
+            echo "::error::Missing repository secrets for ${SDK_INTEGRATION_ENV}"
+            exit 1
+          fi
+
+          echo "SDK_INTEGRATION_API_URL=${selected_url}" >> "${GITHUB_ENV}"
+          echo "SDK_INTEGRATION_INTERSERVICE_SECRET=${selected_secret}" >> "${GITHUB_ENV}"
+
+      - name: Run TypeScript SDK integration tests
+        working-directory: tests/integration/typescript
+        run: npx vitest run
+
+      - name: Notify Google Chat on scheduled failure
+        if: failure() && github.event_name == 'schedule'
+        run: |
+          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "⚠️ TypeScript SDK integration tests *FAILED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
+
+      - name: Notify Google Chat on scheduled success
+        if: success() && github.event_name == 'schedule'
+        run: |
+          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "✅ TypeScript SDK integration tests *PASSED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
+
+  cli:
+    name: CLI (${{ matrix.environment }})
+    needs: select-targets
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.select-targets.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash -l {0}
+    env:
+      SDK_INTEGRATION_ENV: ${{ matrix.environment }}
+      SDK_INTEGRATION_VERBOSE: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install and build SDK
+        working-directory: sdk/typescript
+        run: |
+          npm install
+          npx tsc
+
+      - name: Install and build CLI
+        working-directory: cli
+        run: |
+          npm install
+          npx tsc
+
+      - name: Install test dependencies
+        working-directory: tests/integration/cli
+        run: npm install
+
+      - name: Export environment secrets
+        env:
+          SDK_INTEGRATION_API_URL_DEVELOPMENT: ${{ secrets.SDK_INTEGRATION_API_URL_DEVELOPMENT }}
+          SDK_INTEGRATION_API_URL_BETA: ${{ secrets.SDK_INTEGRATION_API_URL_BETA }}
+          SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT: ${{ secrets.SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT }}
+          SDK_INTEGRATION_INTERSERVICE_SECRET_BETA: ${{ secrets.SDK_INTEGRATION_INTERSERVICE_SECRET_BETA }}
+        run: |
+          if [ "${SDK_INTEGRATION_ENV}" = "development" ]; then
+            selected_url="${SDK_INTEGRATION_API_URL_DEVELOPMENT}"
+            selected_secret="${SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT}"
+          else
+            selected_url="${SDK_INTEGRATION_API_URL_BETA}"
+            selected_secret="${SDK_INTEGRATION_INTERSERVICE_SECRET_BETA}"
+          fi
+
+          if [ -z "${selected_url}" ] || [ -z "${selected_secret}" ]; then
+            echo "::error::Missing repository secrets for ${SDK_INTEGRATION_ENV}"
+            exit 1
+          fi
+
+          echo "SDK_INTEGRATION_API_URL=${selected_url}" >> "${GITHUB_ENV}"
+          echo "SDK_INTEGRATION_INTERSERVICE_SECRET=${selected_secret}" >> "${GITHUB_ENV}"
+
+      - name: Run CLI integration tests
+        working-directory: tests/integration/cli
+        run: npx vitest run
+
+      - name: Notify Google Chat on scheduled failure
+        if: failure() && github.event_name == 'schedule'
+        run: |
+          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "⚠️ CLI integration tests *FAILED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
+
+      - name: Notify Google Chat on scheduled success
+        if: success() && github.event_name == 'schedule'
+        run: |
+          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "text": "✅ CLI integration tests *PASSED* for *${{ matrix.environment }}*\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
