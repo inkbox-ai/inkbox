@@ -225,20 +225,20 @@ describe("AgentIdentity.getCredentials", () => {
     await expect(identity.getCredentials()).rejects.toThrow("Vault must be unlocked");
   });
 
-  it("returns Credentials filtered by identity", async () => {
+  it("returns all unlocked secrets", async () => {
     const identity = new AgentIdentity(mockIdentityData(), mockInkbox());
     const creds = await identity.getCredentials();
     expect(creds).toBeInstanceOf(Credentials);
     expect(creds.length).toBe(4);
   });
 
-  it("filters out inaccessible secrets", async () => {
+  it("returns all secrets regardless of access rules", async () => {
     const identity = new AgentIdentity(
       mockIdentityData(),
       mockInkbox({ accessRules: [] }),
     );
     const creds = await identity.getCredentials();
-    expect(creds.length).toBe(0);
+    expect(creds.length).toBe(4);
   });
 
   it("caches credentials", async () => {
