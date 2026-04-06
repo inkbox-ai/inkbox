@@ -33,17 +33,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            # Scheduled: beta only, both local and published
-            matrix='{"include":[
-              {"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"},
-              {"environment":"beta","source":"published","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}
-            ]}'
+            matrix='{"include":[{"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"},{"environment":"beta","source":"published","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PRs: dev + beta, local only
-            matrix='{"include":[
-              {"environment":"development","source":"local","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},
-              {"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}
-            ]}'
+            matrix='{"include":[{"environment":"development","source":"local","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},{"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
           else
             case "${{ inputs.target }}" in
               development)
@@ -53,10 +45,7 @@ jobs:
                 matrix='{"include":[{"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
                 ;;
               both)
-                matrix='{"include":[
-                  {"environment":"development","source":"local","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},
-                  {"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}
-                ]}'
+                matrix='{"include":[{"environment":"development","source":"local","url_secret":"SDK_INTEGRATION_API_URL_DEVELOPMENT","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_DEVELOPMENT"},{"environment":"beta","source":"local","url_secret":"SDK_INTEGRATION_API_URL_BETA","auth_secret":"SDK_INTEGRATION_INTERSERVICE_SECRET_BETA"}]}'
                 ;;
               *)
                 echo "Unexpected target: ${{ inputs.target }}" >&2
