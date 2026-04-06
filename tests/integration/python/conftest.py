@@ -55,8 +55,9 @@ class SdkIntegrationContext:
             f"{api_url}/testing/cleanup-test-user-organization",
             headers={"X-Interservice-Secret": self.config.interservice_secret},
             json={
-                "user_id": self.bootstrap.user_id,
-                "org_id": self.bootstrap.org_id,
+                "accounts": [
+                    {"user_id": self.bootstrap.user_id, "org_id": self.bootstrap.org_id},
+                ],
             },
             timeout=self.config.http_timeout,
         )
@@ -98,13 +99,14 @@ def sdk_context(sdk_integration_config: SdkIntegrationConfig) -> Generator[SdkIn
     )
     resp.raise_for_status()
     data = resp.json()
+    account = data["accounts"][0]
 
     bootstrap = BootstrapResult(
-        email_address=data["email_address"],
-        password=data["password"],
-        user_id=data["user_id"],
-        org_id=data["org_id"],
-        api_key=data["api_key"],
+        email_address=account["email_address"],
+        password=account["password"],
+        user_id=account["user_id"],
+        org_id=account["org_id"],
+        api_key=account["api_key"],
     )
 
     ctx = SdkIntegrationContext(config=cfg, bootstrap=bootstrap)

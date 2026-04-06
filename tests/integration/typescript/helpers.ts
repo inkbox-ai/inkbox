@@ -57,12 +57,13 @@ export async function bootstrapTestOrg(config: SdkIntegrationConfig): Promise<Bo
     throw new Error(`Bootstrap failed: ${resp.status} ${await resp.text()}`);
   }
   const data = await resp.json();
+  const account = data.accounts[0];
   return {
-    emailAddress: data.email_address,
-    password: data.password,
-    userId: data.user_id,
-    orgId: data.org_id,
-    apiKey: data.api_key,
+    emailAddress: account.email_address,
+    password: account.password,
+    userId: account.user_id,
+    orgId: account.org_id,
+    apiKey: account.api_key,
   };
 }
 
@@ -78,8 +79,9 @@ export async function cleanupTestOrg(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      user_id: bootstrap.userId,
-      org_id: bootstrap.orgId,
+      accounts: [
+        { user_id: bootstrap.userId, org_id: bootstrap.orgId },
+      ],
     }),
   });
   if (!resp.ok) {
