@@ -58,6 +58,7 @@ jobs:
 
   python-sdk:
     name: Python SDK (${{ matrix.environment }}, ${{ matrix.source }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -142,6 +143,7 @@ jobs:
 
   typescript-sdk:
     name: TypeScript SDK (${{ matrix.environment }}, ${{ matrix.source }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -229,6 +231,7 @@ jobs:
 
   cli:
     name: CLI (${{ matrix.environment }}, ${{ matrix.source }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
