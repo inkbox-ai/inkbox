@@ -205,16 +205,16 @@ class TestAgentIdentityCredentials:
         with pytest.raises(InkboxError, match="Vault must be unlocked"):
             _ = identity.credentials
 
-    def test_returns_credentials_filtered_by_identity(self):
+    def test_returns_all_unlocked_secrets(self):
         identity = _identity()
         creds = identity.credentials
         assert isinstance(creds, Credentials)
         assert len(creds) == 4
 
-    def test_filters_out_inaccessible_secrets(self):
+    def test_returns_all_secrets_regardless_of_access_rules(self):
         identity = _identity(access_rules=[])
         creds = identity.credentials
-        assert len(creds) == 0
+        assert len(creds) == 4
 
     def test_caches_credentials(self):
         identity = _identity()

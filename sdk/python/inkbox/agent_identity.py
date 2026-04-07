@@ -114,15 +114,7 @@ class AgentIdentity:
             return self._credentials
         self._require_vault_unlocked()
         unlocked = vault._unlocked
-        # Filter secrets by identity access rules (same logic as
-        # VaultResource.unlock with identity_id).
-        id_str = str(self.id)
-        filtered = []
-        for secret in unlocked.secrets:  # type: ignore[union-attr]
-            access_rules = vault._http.get(f"/secrets/{secret.id}/access")
-            if any(r["identity_id"] == id_str for r in access_rules):
-                filtered.append(secret)
-        self._credentials = Credentials(filtered)
+        self._credentials = Credentials(unlocked.secrets)  # type: ignore[union-attr]
         self._credentials_vault_ref = unlocked
         return self._credentials
 
