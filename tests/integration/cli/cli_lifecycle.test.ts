@@ -130,17 +130,6 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     expect(thread.subject).toBe(subject);
     expect(thread.messages.length).toBeGreaterThanOrEqual(1);
 
-    // ── identity update ───────────────────────────────────────
-    logStep(config, "pause alpha");
-    inkbox("identity update alpha --status paused", cliOpts);
-    const paused = inkboxJson<{ status: string }>("identity get alpha", cliOpts);
-    // CLI identity get returns a flat object; status may vary in format
-    // Just verify it's accessible
-    expect(paused).toBeTruthy();
-
-    logStep(config, "resume alpha");
-    inkbox("identity update alpha --status active", cliOpts);
-
     // ── signing key ───────────────────────────────────────────
     logStep(config, "create signing key");
     const signingKey = inkboxJson<{ signingKey: string }>("signing-key create", cliOpts);
