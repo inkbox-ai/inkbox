@@ -15,8 +15,6 @@ export interface Mailbox {
   emailAddress: string;
   displayName: string | null;
   webhookUrl: string | null;
-  /** "active" | "paused" | "deleted" */
-  status: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,8 +56,6 @@ export interface Thread {
   id: string;
   mailboxId: string;
   subject: string | null;
-  /** "active" | "paused" | "deleted" */
-  status: string;
   messageCount: number;
   lastMessageAt: Date;
   createdAt: Date;
@@ -77,7 +73,6 @@ export interface RawMailbox {
   email_address: string;
   display_name: string | null;
   webhook_url: string | null;
-  status: string;
   created_at: string;
   updated_at: string;
 }
@@ -113,7 +108,6 @@ export interface RawThread {
   id: string;
   mailbox_id: string;
   subject: string | null;
-  status: string;
   message_count: number;
   last_message_at: string;
   created_at: string;
@@ -134,7 +128,6 @@ export function parseMailbox(r: RawMailbox): Mailbox {
     emailAddress: r.email_address,
     displayName: r.display_name,
     webhookUrl: r.webhook_url,
-    status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -179,7 +172,6 @@ export function parseThread(r: RawThread): Thread {
     id: r.id,
     mailboxId: r.mailbox_id,
     subject: r.subject,
-    status: r.status,
     messageCount: r.message_count,
     lastMessageAt: new Date(r.last_message_at),
     createdAt: new Date(r.created_at),

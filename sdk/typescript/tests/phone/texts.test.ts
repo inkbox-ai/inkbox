@@ -77,7 +77,6 @@ describe("TextsResource.get", () => {
 
     expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/texts/${TEXT_ID}`);
     expect(text.id).toBe(TEXT_ID);
-    expect(text.status).toBe("active");
   });
 });
 
@@ -96,19 +95,6 @@ describe("TextsResource.update", () => {
     expect(text.isRead).toBe(true);
   });
 
-  it("deletes", async () => {
-    const http = mockHttp();
-    vi.mocked(http.patch).mockResolvedValue({ ...RAW_TEXT_MESSAGE, status: "deleted" });
-    const res = new TextsResource(http);
-
-    const text = await res.update(NUM_ID, TEXT_ID, { status: "deleted" });
-
-    expect(http.patch).toHaveBeenCalledWith(
-      `/numbers/${NUM_ID}/texts/${TEXT_ID}`,
-      { status: "deleted" },
-    );
-    expect(text.status).toBe("deleted");
-  });
 });
 
 describe("TextsResource.search", () => {

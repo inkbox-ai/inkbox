@@ -28,7 +28,6 @@ class TestAgentIdentitySummaryParsing:
         assert isinstance(i.id, UUID)
         assert i.organization_id == "org-abc123"
         assert i.agent_handle == "sales-agent"
-        assert i.status == "active"
         assert isinstance(i.created_at, datetime)
         assert isinstance(i.updated_at, datetime)
 
@@ -58,7 +57,6 @@ class TestIdentityMailboxParsing:
         assert isinstance(m.id, UUID)
         assert m.email_address == "sales-agent@inkbox.ai"
         assert m.display_name == "Sales Agent"
-        assert m.status == "active"
         assert isinstance(m.created_at, datetime)
         assert isinstance(m.updated_at, datetime)
 

@@ -76,7 +76,6 @@ class TestTextsGet:
             f"/numbers/{NUM_ID}/texts/{TEXT_ID}"
         )
         assert text.id == UUID(TEXT_ID)
-        assert text.status == "active"
 
 
 class TestTextsUpdate:
@@ -90,17 +89,6 @@ class TestTextsUpdate:
             json={"is_read": True},
         )
         assert text.is_read is True
-
-    def test_delete(self, client, transport):
-        transport.patch.return_value = {**TEXT_MESSAGE_DICT, "status": "deleted"}
-
-        text = client._texts.update(NUM_ID, TEXT_ID, status="deleted")
-
-        transport.patch.assert_called_once_with(
-            f"/numbers/{NUM_ID}/texts/{TEXT_ID}",
-            json={"status": "deleted"},
-        )
-        assert text.status == "deleted"
 
     def test_empty_body_when_no_fields(self, client, transport):
         transport.patch.return_value = TEXT_MESSAGE_DICT

@@ -21,7 +21,6 @@ from inkbox.identities.types import (
     _AgentIdentityData,
     IdentityMailbox,
     IdentityPhoneNumber,
-    ResourceStatus,
 )
 from inkbox.exceptions import InkboxError
 from inkbox.mail.types import Message, MessageDetail, MessageDirection, ThreadDetail
@@ -72,10 +71,6 @@ class AgentIdentity:
     @property
     def id(self):
         return self._data.id
-
-    @property
-    def status(self) -> str:
-        return self._data.status
 
     @property
     def email_address(self) -> str | None:
@@ -256,7 +251,6 @@ class AgentIdentity:
             id=mailbox.id,
             email_address=mailbox.email_address,
             display_name=mailbox.display_name,
-            status=mailbox.status,
             created_at=mailbox.created_at,
             updated_at=mailbox.updated_at,
         )
@@ -600,22 +594,19 @@ class AgentIdentity:
         self,
         *,
         new_handle: str | None = None,
-        status: ResourceStatus | None = None,
     ) -> None:
-        """Update this identity's handle or status.
+        """Update this identity's handle.
 
         Args:
             new_handle: New agent handle.
-            status: New lifecycle status: ``"active"`` or ``"paused"``.
         """
         result = self._inkbox._ids_resource.update(
-            self.agent_handle, new_handle=new_handle, status=status
+            self.agent_handle, new_handle=new_handle
         )
         self._data = _AgentIdentityData(
             id=result.id,
             organization_id=result.organization_id,
             agent_handle=result.agent_handle,
-            status=result.status,
             email_address=result.email_address,
             created_at=result.created_at,
             updated_at=result.updated_at,

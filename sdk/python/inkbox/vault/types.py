@@ -61,7 +61,6 @@ class VaultInfo:
 
     id: UUID
     organization_id: str
-    status: str
     created_at: datetime
     updated_at: datetime
     key_count: int
@@ -73,7 +72,6 @@ class VaultInfo:
         return cls(
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
-            status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             key_count=d["key_count"],
@@ -89,7 +87,6 @@ class VaultKey:
     id: UUID
     key_type: str
     created_by: str | None
-    status: str
     created_at: datetime
     updated_at: datetime
 
@@ -99,7 +96,6 @@ class VaultKey:
             id=UUID(d["id"]),
             key_type=d["key_type"],
             created_by=d.get("created_by"),
-            status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
         )
@@ -112,7 +108,6 @@ class VaultSecret:
     id: UUID
     name: str
     secret_type: str
-    status: str
     created_at: datetime
     updated_at: datetime
     description: str | None = None
@@ -123,7 +118,6 @@ class VaultSecret:
             id=UUID(d["id"]),
             name=d["name"],
             secret_type=d["secret_type"],
-            status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             description=d.get("description"),
@@ -142,7 +136,6 @@ class VaultSecretDetail(VaultSecret):
             id=UUID(d["id"]),
             name=d["name"],
             secret_type=d["secret_type"],
-            status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             description=d.get("description"),
@@ -380,7 +373,6 @@ class DecryptedVaultSecret:
         description: Optional description.
         secret_type: Credential category (``login``, ``ssh_key``,
             ``api_key``, ``other``).
-        status: Lifecycle status.
         created_at: Creation timestamp.
         updated_at: Last modification timestamp.
         payload: The decrypted, structured payload.
@@ -389,7 +381,6 @@ class DecryptedVaultSecret:
     id: UUID
     name: str
     secret_type: str
-    status: str
     created_at: datetime
     updated_at: datetime
     payload: SecretPayload

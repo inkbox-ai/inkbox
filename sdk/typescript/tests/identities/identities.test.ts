@@ -138,26 +138,15 @@ describe("IdentitiesResource.update", () => {
     expect(result.agentHandle).toBe("new-handle");
   });
 
-  it("sends status", async () => {
-    const http = mockHttp();
-    vi.mocked(http.patch).mockResolvedValue({ ...RAW_IDENTITY, status: "paused" });
-    const res = new IdentitiesResource(http);
-
-    const result = await res.update(HANDLE, { status: "paused" });
-
-    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, { status: "paused" });
-    expect(result.status).toBe("paused");
-  });
-
   it("omits undefined fields", async () => {
     const http = mockHttp();
     vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
     const res = new IdentitiesResource(http);
 
-    await res.update(HANDLE, { status: "active" });
+    await res.update(HANDLE, { newHandle: "new-handle" });
 
     const [, body] = vi.mocked(http.patch).mock.calls[0] as [string, Record<string, unknown>];
-    expect(body["agent_handle"]).toBeUndefined();
+    expect(body["agent_handle"]).toBe("new-handle");
   });
 });
 

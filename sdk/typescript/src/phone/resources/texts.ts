@@ -57,21 +57,19 @@ export class TextsResource {
   }
 
   /**
-   * Update a text message (mark as read, delete).
+   * Update a text message (mark as read).
    *
    * @param phoneNumberId - UUID of the phone number.
    * @param textId - UUID of the text message.
    * @param options.isRead - Mark as read or unread.
-   * @param options.status - Set to `"deleted"` to delete.
    */
   async update(
     phoneNumberId: string,
     textId: string,
-    options: { isRead?: boolean; status?: string },
+    options: { isRead?: boolean },
   ): Promise<TextMessage> {
     const body: Record<string, unknown> = {};
     if (options.isRead !== undefined) body["is_read"] = options.isRead;
-    if (options.status !== undefined) body["status"] = options.status;
     const data = await this.http.patch<RawTextMessage>(
       `/numbers/${phoneNumberId}/texts/${textId}`,
       body,

@@ -2,15 +2,6 @@
  * inkbox-identities TypeScript SDK — public types.
  */
 
-/**
- * Allowed lifecycle statuses for identity updates.
- */
-export const ResourceStatus = {
-  ACTIVE: "active",
-  PAUSED: "paused",
-} as const;
-export type ResourceStatus = (typeof ResourceStatus)[keyof typeof ResourceStatus];
-
 export interface IdentityMailboxCreateOptions {
   displayName?: string;
   emailLocalPart?: string;
@@ -37,8 +28,6 @@ export interface IdentityMailbox {
   id: string;
   emailAddress: string;
   displayName: string | null;
-  /** "active" | "paused" | "deleted" */
-  status: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,8 +52,6 @@ export interface AgentIdentitySummary {
   id: string;
   organizationId: string;
   agentHandle: string;
-  /** "active" | "paused" | "deleted" */
-  status: string;
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   emailAddress: string | null;
   createdAt: Date;
@@ -85,7 +72,6 @@ export interface RawIdentityMailbox {
   id: string;
   email_address: string;
   display_name: string | null;
-  status: string;
   created_at: string;
   updated_at: string;
 }
@@ -106,7 +92,6 @@ export interface RawAgentIdentitySummary {
   id: string;
   organization_id: string;
   agent_handle: string;
-  status: string;
   email_address: string | null;
   created_at: string;
   updated_at: string;
@@ -124,7 +109,6 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
     id: r.id,
     emailAddress: r.email_address,
     displayName: r.display_name,
-    status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -149,7 +133,6 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     id: r.id,
     organizationId: r.organization_id,
     agentHandle: r.agent_handle,
-    status: r.status,
     emailAddress: r.email_address,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),

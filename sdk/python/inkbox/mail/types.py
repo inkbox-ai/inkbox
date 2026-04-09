@@ -37,7 +37,6 @@ class Mailbox:
     email_address: str
     display_name: str | None
     webhook_url: str | None
-    status: str
     created_at: datetime
     updated_at: datetime
 
@@ -48,7 +47,6 @@ class Mailbox:
             email_address=d["email_address"],
             display_name=d.get("display_name"),
             webhook_url=d.get("webhook_url"),
-            status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
         )
@@ -136,7 +134,6 @@ class Thread:
     id: UUID
     mailbox_id: UUID
     subject: str | None
-    status: str
     message_count: int
     last_message_at: datetime
     created_at: datetime
@@ -147,7 +144,6 @@ class Thread:
             id=UUID(d["id"]),
             mailbox_id=UUID(d["mailbox_id"]),
             subject=d.get("subject"),
-            status=d["status"],
             message_count=d["message_count"],
             last_message_at=datetime.fromisoformat(d["last_message_at"]),
             created_at=datetime.fromisoformat(d["created_at"]),

@@ -77,8 +77,6 @@ export interface TextMessage {
   /** "sms" | "mms" */
   type: string;
   media: TextMediaItem[] | null;
-  /** "active" | "deleted" */
-  status: string;
   isRead: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -152,7 +150,6 @@ export interface RawTextMessage {
   text: string | null;
   type: string;
   media: RawTextMediaItem[] | null;
-  status: string;
   is_read: boolean;
   created_at: string;
   updated_at: string;
@@ -262,7 +259,6 @@ export function parseTextMessage(r: RawTextMessage): TextMessage {
     text: r.text,
     type: r.type,
     media: r.media ? r.media.map(parseTextMediaItem) : null,
-    status: r.status,
     isRead: r.is_read,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),

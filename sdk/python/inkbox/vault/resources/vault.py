@@ -231,11 +231,11 @@ class VaultResource:
         keys_data = self._http.get("/keys")
         primary_key_ids = [
             k["id"] for k in keys_data
-            if k.get("key_type") == "primary" and k.get("status") == "active"
+            if k.get("key_type") == "primary"
         ]
         recovery_key_ids = [
             k["id"] for k in keys_data
-            if k.get("key_type") == "recovery" and k.get("status") == "active"
+            if k.get("key_type") == "recovery"
         ]
         all_key_ids = primary_key_ids + recovery_key_ids
 
@@ -422,11 +422,11 @@ class VaultResource:
         keys_data = self._http.get("/keys")
         primary_key_ids = [
             k["id"] for k in keys_data
-            if k.get("key_type") == "primary" and k.get("status") == "active"
+            if k.get("key_type") == "primary"
         ]
         recovery_key_ids = [
             k["id"] for k in keys_data
-            if k.get("key_type") == "recovery" and k.get("status") == "active"
+            if k.get("key_type") == "recovery"
         ]
         all_key_ids = primary_key_ids + recovery_key_ids
 
@@ -459,7 +459,6 @@ class VaultResource:
                     id=detail.id,
                     name=detail.name,
                     secret_type=detail.secret_type,
-                    status=detail.status,
                     created_at=detail.created_at,
                     updated_at=detail.updated_at,
                     payload=payload,
@@ -561,7 +560,6 @@ class UnlockedVault:
             id=detail.id,
             name=detail.name,
             secret_type=detail.secret_type,
-            status=detail.status,
             created_at=detail.created_at,
             updated_at=detail.updated_at,
             payload=payload,

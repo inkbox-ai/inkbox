@@ -43,8 +43,6 @@ export type VaultKeyType = (typeof VaultKeyType)[keyof typeof VaultKeyType];
 export interface VaultInfo {
   id: string;
   organizationId: string;
-  /** @example "active" */
-  status: string;
   createdAt: Date;
   updatedAt: Date;
   /** Number of active primary vault keys. */
@@ -62,7 +60,6 @@ export interface VaultKey {
   keyType: string;
   /** Clerk user ID of the creator, or `null`. */
   createdBy: string | null;
-  status: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,7 +73,6 @@ export interface VaultSecret {
   description: string | null;
   /** `"login"` | `"ssh_key"` | `"api_key"` | `"other"` */
   secretType: string;
-  status: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -181,7 +177,6 @@ export interface DecryptedVaultSecret {
   description: string | null;
   /** `"login"` | `"ssh_key"` | `"api_key"` | `"other"` */
   secretType: string;
-  status: string;
   createdAt: Date;
   updatedAt: Date;
   /** The decrypted, structured payload. */
@@ -213,7 +208,6 @@ export interface RawVaultInitializeResponse {
 export interface RawVaultInfo {
   id: string;
   organization_id: string;
-  status: string;
   created_at: string;
   updated_at: string;
   key_count: number;
@@ -226,7 +220,6 @@ export interface RawVaultKey {
   id: string;
   key_type: string;
   created_by: string | null;
-  status: string;
   created_at: string;
   updated_at: string;
 }
@@ -237,7 +230,6 @@ export interface RawVaultSecret {
   name: string;
   description: string | null;
   secret_type: string;
-  status: string;
   created_at: string;
   updated_at: string;
 }
@@ -263,7 +255,6 @@ export function parseVaultInfo(r: RawVaultInfo): VaultInfo {
   return {
     id: r.id,
     organizationId: r.organization_id,
-    status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     keyCount: r.key_count,
@@ -278,7 +269,6 @@ export function parseVaultKey(r: RawVaultKey): VaultKey {
     id: r.id,
     keyType: r.key_type,
     createdBy: r.created_by,
-    status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -291,7 +281,6 @@ export function parseVaultSecret(r: RawVaultSecret): VaultSecret {
     name: r.name,
     description: r.description,
     secretType: r.secret_type,
-    status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

@@ -22,7 +22,6 @@ const PARSED_MAILBOX = {
   id: RAW_IDENTITY_MAILBOX.id,
   emailAddress: RAW_IDENTITY_MAILBOX.email_address,
   displayName: RAW_IDENTITY_MAILBOX.display_name,
-  status: RAW_IDENTITY_MAILBOX.status,
   createdAt: RAW_IDENTITY_MAILBOX.created_at,
   updatedAt: RAW_IDENTITY_MAILBOX.updated_at,
 };
@@ -43,7 +42,6 @@ function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityDa
     id: RAW_IDENTITY_DETAIL.id,
     organizationId: RAW_IDENTITY_DETAIL.organization_id,
     agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
-    status: RAW_IDENTITY_DETAIL.status,
     emailAddress: RAW_IDENTITY_DETAIL.email_address,
     createdAt: RAW_IDENTITY_DETAIL.created_at,
     updatedAt: RAW_IDENTITY_DETAIL.updated_at,
@@ -76,11 +74,10 @@ function mockInkbox() {
 }
 
 describe("AgentIdentity properties", () => {
-  it("exposes agentHandle, id, status, emailAddress", () => {
+  it("exposes agentHandle, id, emailAddress", () => {
     const identity = new AgentIdentity(makeData(), mockInkbox());
     expect(identity.agentHandle).toBe("sales-agent");
     expect(identity.id).toBe(RAW_IDENTITY_DETAIL.id);
-    expect(identity.status).toBe("active");
     expect(identity.emailAddress).toBe("sales-agent@inkboxmail.com");
   });
 
@@ -106,7 +103,6 @@ describe("AgentIdentity channel management", () => {
       emailAddress: RAW_MAILBOX.email_address,
       displayName: RAW_MAILBOX.display_name,
       webhookUrl: null,
-      status: RAW_MAILBOX.status,
       createdAt: new Date(RAW_MAILBOX.created_at),
       updatedAt: new Date(RAW_MAILBOX.updated_at),
       }),
@@ -394,7 +390,6 @@ describe("AgentIdentity management", () => {
       id: RAW_IDENTITY.id,
       organizationId: RAW_IDENTITY.organization_id,
       agentHandle: "new-handle",
-      status: "active",
       emailAddress: RAW_IDENTITY.email_address,
       createdAt: RAW_IDENTITY.created_at,
       updatedAt: RAW_IDENTITY.updated_at,

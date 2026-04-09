@@ -527,7 +527,6 @@ def _unlocked_with_login(*, totp_config=None):
         id=UUID(VAULT_SECRET_DICT["id"]),
         name=VAULT_SECRET_DICT["name"],
         secret_type="login",
-        status="active",
         created_at=datetime.fromisoformat(VAULT_SECRET_DICT["created_at"]),
         updated_at=datetime.fromisoformat(VAULT_SECRET_DICT["updated_at"]),
         payload=payload,

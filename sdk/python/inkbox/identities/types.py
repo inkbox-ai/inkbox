@@ -8,17 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID
-
-
-class ResourceStatus(StrEnum):
-    """
-    Allowed lifecycle statuses for identity updates.
-    """
-    ACTIVE = "active"
-    PAUSED = "paused"
 
 
 @dataclass
@@ -111,7 +102,6 @@ class IdentityMailbox:
     id: UUID
     email_address: str
     display_name: str | None
-    status: str
     created_at: datetime
     updated_at: datetime
 
@@ -121,7 +111,6 @@ class IdentityMailbox:
             id=UUID(d["id"]),
             email_address=d["email_address"],
             display_name=d.get("display_name"),
-            status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
         )
@@ -163,7 +152,6 @@ class AgentIdentitySummary:
     id: UUID
     organization_id: str
     agent_handle: str
-    status: str
     email_address: str | None
     created_at: datetime
     updated_at: datetime
@@ -174,7 +162,6 @@ class AgentIdentitySummary:
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
             agent_handle=d["agent_handle"],
-            status=d["status"],
             email_address=d.get("email_address"),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),

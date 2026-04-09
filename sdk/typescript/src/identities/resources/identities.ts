@@ -5,7 +5,6 @@
  */
 
 import { HttpTransport } from "../../_http.js";
-import type { ResourceStatus } from "../types.js";
 import {
   AgentIdentitySummary,
   IdentityMailboxCreateOptions,
@@ -63,21 +62,19 @@ export class IdentitiesResource {
   }
 
   /**
-   * Update an identity's handle or status.
+   * Update an identity's handle.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
    *
    * @param agentHandle - Current handle of the identity to update.
    * @param options.newHandle - New handle value.
-   * @param options.status - New lifecycle status: `"active"` or `"paused"`.
    */
   async update(
     agentHandle: string,
-    options: { newHandle?: string; status?: ResourceStatus },
+    options: { newHandle?: string },
   ): Promise<AgentIdentitySummary> {
     const body: Record<string, unknown> = {};
     if (options.newHandle !== undefined) body["agent_handle"] = options.newHandle;
-    if (options.status !== undefined) body["status"] = options.status;
     const data = await this.http.patch<RawAgentIdentitySummary>(`/${agentHandle}`, body);
     return parseAgentIdentitySummary(data);
   }

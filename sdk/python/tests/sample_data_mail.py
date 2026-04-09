@@ -4,7 +4,6 @@ MAILBOX_DICT = {
     "id": "aaaa1111-0000-0000-0000-000000000001",
     "email_address": "agent01@inkbox.ai",
     "display_name": "Agent 01",
-    "status": "active",
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:00:00Z",
 }
@@ -43,7 +42,6 @@ THREAD_DICT = {
     "id": "eeee5555-0000-0000-0000-000000000001",
     "mailbox_id": "aaaa1111-0000-0000-0000-000000000001",
     "subject": "Hello from test",
-    "status": "active",
     "message_count": 2,
     "last_message_at": "2026-03-09T00:05:00Z",
     "created_at": "2026-03-09T00:00:00Z",

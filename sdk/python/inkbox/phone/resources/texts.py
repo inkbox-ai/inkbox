@@ -68,21 +68,17 @@ class TextsResource:
         text_id: UUID | str,
         *,
         is_read: bool | None = None,
-        status: str | None = None,
     ) -> TextMessage:
-        """Update a text message (mark as read, delete).
+        """Update a text message (mark as read).
 
         Args:
             phone_number_id: UUID of the phone number.
             text_id: UUID of the text message.
             is_read: Mark as read (``True``) or unread (``False``).
-            status: Set to ``"deleted"`` to delete.
         """
         body: dict[str, Any] = {}
         if is_read is not None:
             body["is_read"] = is_read
-        if status is not None:
-            body["status"] = status
         data = self._http.patch(
             f"/numbers/{phone_number_id}/texts/{text_id}",
             json=body,

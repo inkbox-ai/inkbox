@@ -26,7 +26,6 @@ import type {
 const RAW_INFO: RawVaultInfo = {
   id: "aaaa1111-0000-0000-0000-000000000001",
   organization_id: "org_test_123",
-  status: "active",
   created_at: "2026-03-18T12:00:00Z",
   updated_at: "2026-03-18T12:00:00Z",
   key_count: 1,
@@ -38,7 +37,6 @@ const RAW_KEY: RawVaultKey = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   key_type: "primary",
   created_by: "user_abc",
-  status: "active",
   created_at: "2026-03-18T12:00:00Z",
   updated_at: "2026-03-18T12:00:00Z",
 };
@@ -48,7 +46,6 @@ const RAW_SECRET: RawVaultSecret = {
   name: "AWS Production",
   description: null,
   secret_type: "login",
-  status: "active",
   created_at: "2026-03-18T12:00:00Z",
   updated_at: "2026-03-18T12:00:00Z",
 };
