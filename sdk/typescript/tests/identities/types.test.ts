@@ -19,7 +19,6 @@ describe("parseAgentIdentitySummary", () => {
     expect(i.id).toBe(RAW_IDENTITY.id);
     expect(i.organizationId).toBe("org-abc123");
     expect(i.agentHandle).toBe("sales-agent");
-    expect(i.status).toBe("active");
     expect(i.emailAddress).toBe("sales-agent@inkboxmail.com");
     expect(i.createdAt).toBeInstanceOf(Date);
     expect(i.updatedAt).toBeInstanceOf(Date);
@@ -49,7 +48,6 @@ describe("parseIdentityMailbox", () => {
     expect(m.id).toBe(RAW_IDENTITY_MAILBOX.id);
     expect(m.emailAddress).toBe("sales-agent@inkbox.ai");
     expect(m.displayName).toBe("Sales Agent");
-    expect(m.status).toBe("active");
     expect(m.createdAt).toBeInstanceOf(Date);
     expect(m.updatedAt).toBeInstanceOf(Date);
   });

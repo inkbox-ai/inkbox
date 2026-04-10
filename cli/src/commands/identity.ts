@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
-import type { SecretPayload, ResourceStatus } from "@inkbox/sdk";
+import type { SecretPayload } from "@inkbox/sdk";
 import { parseTotpUri } from "@inkbox/sdk";
 
 export function registerIdentityCommands(program: Command): void {
@@ -20,7 +20,7 @@ export function registerIdentityCommands(program: Command): void {
         const identities = await inkbox.listIdentities();
         output(identities, {
           json: !!opts.json,
-          columns: ["agentHandle", "id", "status", "createdAt"],
+          columns: ["agentHandle", "id", "createdAt"],
         });
       }),
     );
@@ -37,7 +37,6 @@ export function registerIdentityCommands(program: Command): void {
           {
             agentHandle: id.agentHandle,
             id: id.id,
-            status: id.status,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
           },
@@ -58,7 +57,6 @@ export function registerIdentityCommands(program: Command): void {
           {
             agentHandle: id.agentHandle,
             id: id.id,
-            status: id.status,
           },
           { json: !!opts.json },
         );
@@ -82,19 +80,17 @@ export function registerIdentityCommands(program: Command): void {
     .command("update <handle>")
     .description("Update an identity")
     .option("--new-handle <name>", "New handle")
-    .option("--status <status>", "New status (active, paused)")
     .action(
       withErrorHandler(async function (
         this: Command,
         handle: string,
-        cmdOpts: { newHandle?: string; status?: string },
+        cmdOpts: { newHandle?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
         await id.update({
           newHandle: cmdOpts.newHandle,
-          status: cmdOpts.status as ResourceStatus | undefined,
         });
         console.log(`Updated identity '${handle}'.`);
       }),
@@ -113,7 +109,6 @@ export function registerIdentityCommands(program: Command): void {
           {
             agentHandle: id.agentHandle,
             id: id.id,
-            status: id.status,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
           },
@@ -274,7 +269,6 @@ export function registerIdentityCommands(program: Command): void {
             id: secret.id,
             name: secret.name,
             secretType: secret.secretType,
-            status: secret.status,
           },
           { json: !!opts.json },
         );
@@ -307,7 +301,6 @@ export function registerIdentityCommands(program: Command): void {
             id: secret.id,
             name: secret.name,
             secretType: secret.secretType,
-            status: secret.status,
             createdAt: secret.createdAt,
             payload: secret.payload,
           },
@@ -388,7 +381,6 @@ export function registerIdentityCommands(program: Command): void {
             id: secret.id,
             name: secret.name,
             secretType: secret.secretType,
-            status: secret.status,
           },
           { json: !!opts.json },
         );
@@ -421,7 +413,6 @@ export function registerIdentityCommands(program: Command): void {
             id: secret.id,
             name: secret.name,
             secretType: secret.secretType,
-            status: secret.status,
           },
           { json: !!opts.json },
         );

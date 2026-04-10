@@ -141,23 +141,14 @@ class TestIdentitiesUpdate:
         )
         assert result.agent_handle == "new-handle"
 
-    def test_update_status(self):
-        res, http = _resource()
-        http.patch.return_value = {**IDENTITY_DICT, "status": "paused"}
-
-        result = res.update(HANDLE, status="paused")
-
-        http.patch.assert_called_once_with(f"/{HANDLE}", json={"status": "paused"})
-        assert result.status == "paused"
-
     def test_omitted_fields_not_sent(self):
         res, http = _resource()
         http.patch.return_value = IDENTITY_DICT
 
-        res.update(HANDLE, status="active")
+        res.update(HANDLE, new_handle="new-handle")
 
         _, kwargs = http.patch.call_args
-        assert "agent_handle" not in kwargs["json"]
+        assert "status" not in kwargs["json"]
 
 
 class TestIdentitiesDelete:

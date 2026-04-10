@@ -117,15 +117,6 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     expect(thread.subject).toBe(subject);
     expect(thread.messages.length).toBeGreaterThanOrEqual(1);
 
-    // ── identity update ───────────────────────────────────────
-    logStep(config, "pause and resume alpha");
-    await alpha.update({ status: "paused" });
-    await alpha.refresh();
-    expect(alpha.status).toBe("paused");
-    await alpha.update({ status: "active" });
-    await alpha.refresh();
-    expect(alpha.status).toBe("active");
-
     // ── vault + credentials ───────────────────────────────────
     const vaultKey = "IntegrationTest-Key-01!";
     logStep(config, "initialize vault");

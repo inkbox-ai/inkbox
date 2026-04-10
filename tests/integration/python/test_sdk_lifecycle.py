@@ -101,15 +101,6 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         assert thread.subject == subject
         assert len(thread.messages) >= 1
 
-        # ── identity update ───────────────────────────────────────
-        log_step(ctx, "pause and resume alpha")
-        alpha.update(status="paused")
-        alpha.refresh()
-        assert alpha.status == "paused"
-        alpha.update(status="active")
-        alpha.refresh()
-        assert alpha.status == "active"
-
         # ── vault + credentials ───────────────────────────────────
         vault_key = "IntegrationTest-Key-01!"
         log_step(ctx, "initialize vault")

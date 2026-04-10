@@ -65,7 +65,7 @@ export function registerVaultCommands(program: Command): void {
         });
         output(secrets, {
           json: !!opts.json,
-          columns: ["id", "name", "secretType", "status", "createdAt"],
+          columns: ["id", "name", "secretType", "createdAt"],
         });
       }),
     );
@@ -95,7 +95,6 @@ export function registerVaultCommands(program: Command): void {
             id: secret.id,
             name: secret.name,
             secretType: secret.secretType,
-            status: secret.status,
             createdAt: secret.createdAt,
             payload: secret.payload,
           },
@@ -255,7 +254,6 @@ export function registerVaultCommands(program: Command): void {
             id: secret.id,
             name: secret.name,
             secretType: secret.secretType,
-            status: secret.status,
           },
           { json: !!opts.json },
         );
@@ -293,7 +291,7 @@ export function registerVaultCommands(program: Command): void {
         });
         output(keys, {
           json: !!opts.json,
-          columns: ["id", "keyType", "status", "createdBy", "createdAt"],
+          columns: ["id", "keyType", "createdBy", "createdAt"],
         });
       }),
     );
@@ -428,7 +426,7 @@ export function registerVaultCommands(program: Command): void {
         const secrets = creds.listLogins();
         output(secrets, {
           json: !!opts.json,
-          columns: ["id", "name", "secretType", "status", "createdAt"],
+          columns: ["id", "name", "secretType", "createdAt"],
         });
       }),
     );
@@ -457,7 +455,7 @@ export function registerVaultCommands(program: Command): void {
         const secrets = creds.listApiKeys();
         output(secrets, {
           json: !!opts.json,
-          columns: ["id", "name", "secretType", "status", "createdAt"],
+          columns: ["id", "name", "secretType", "createdAt"],
         });
       }),
     );
@@ -486,7 +484,7 @@ export function registerVaultCommands(program: Command): void {
         const secrets = creds.listSshKeys();
         output(secrets, {
           json: !!opts.json,
-          columns: ["id", "name", "secretType", "status", "createdAt"],
+          columns: ["id", "name", "secretType", "createdAt"],
         });
       }),
     );
@@ -515,7 +513,7 @@ export function registerVaultCommands(program: Command): void {
         const secrets = creds.listKeyPairs();
         output(secrets, {
           json: !!opts.json,
-          columns: ["id", "name", "secretType", "status", "createdAt"],
+          columns: ["id", "name", "secretType", "createdAt"],
         });
       }),
     );

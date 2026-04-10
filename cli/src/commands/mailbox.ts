@@ -22,7 +22,6 @@ export function registerMailboxCommands(program: Command): void {
             "emailAddress",
             "id",
             "displayName",
-            "status",
             "createdAt",
           ],
         });
@@ -56,7 +55,6 @@ export function registerMailboxCommands(program: Command): void {
             emailAddress: mb.emailAddress,
             id: mb.id,
             displayName: mb.displayName,
-            status: mb.status,
             createdAt: mb.createdAt,
           },
           { json: !!opts.json },
@@ -81,7 +79,6 @@ export function registerMailboxCommands(program: Command): void {
             id: mb.id,
             displayName: mb.displayName,
             webhookUrl: mb.webhookUrl ?? null,
-            status: mb.status,
             createdAt: mb.createdAt,
           },
           { json: !!opts.json },
@@ -113,7 +110,6 @@ export function registerMailboxCommands(program: Command): void {
             id: mb.id,
             displayName: mb.displayName,
             webhookUrl: mb.webhookUrl ?? null,
-            status: mb.status,
           },
           { json: !!opts.json },
         );

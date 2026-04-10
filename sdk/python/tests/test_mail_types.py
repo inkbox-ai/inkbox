@@ -30,7 +30,6 @@ class TestMailboxParsing:
         assert isinstance(m.id, UUID)
         assert m.email_address == "agent01@inkbox.ai"
         assert m.display_name == "Agent 01"
-        assert m.status == "active"
         assert isinstance(m.created_at, datetime)
         assert isinstance(m.updated_at, datetime)
 
@@ -83,7 +82,6 @@ class TestThreadParsing:
         assert isinstance(t.id, UUID)
         assert isinstance(t.mailbox_id, UUID)
         assert t.subject == "Hello from test"
-        assert t.status == "active"
         assert t.message_count == 2
         assert isinstance(t.last_message_at, datetime)
         assert isinstance(t.created_at, datetime)

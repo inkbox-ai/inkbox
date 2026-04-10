@@ -38,7 +38,6 @@ from inkbox.identities.types import (
     IdentityMailbox,
     IdentityPhoneNumberCreateOptions,
     IdentityPhoneNumber,
-    ResourceStatus,
 )
 
 # Vault types
@@ -122,7 +121,6 @@ __all__ = [
     "IdentityMailbox",
     "IdentityPhoneNumberCreateOptions",
     "IdentityPhoneNumber",
-    "ResourceStatus",
     # Vault types
     "AccessRule",
     "VaultSecretType",

@@ -45,7 +45,6 @@ export type {
   IdentityPhoneNumberCreateOptions,
   IdentityPhoneNumber,
 } from "./identities/types.js";
-export { ResourceStatus } from "./identities/types.js";
 export type {
   AccessRule,
   VaultInfo,

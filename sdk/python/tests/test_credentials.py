@@ -28,7 +28,7 @@ LOGIN_SECRET = DecryptedVaultSecret(
     id=UUID("aaaa0000-0000-0000-0000-000000000001"),
     name="GitHub Login",
     secret_type="login",
-    status="active",
+
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
     payload=LoginPayload(password="s3cret", username="admin", url="https://github.com"),
@@ -38,7 +38,7 @@ API_KEY_SECRET = DecryptedVaultSecret(
     id=UUID("bbbb0000-0000-0000-0000-000000000002"),
     name="OpenAI Key",
     secret_type="api_key",
-    status="active",
+
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
     payload=APIKeyPayload(api_key="sk-abc123", endpoint="https://api.openai.com"),
@@ -48,7 +48,7 @@ SSH_KEY_SECRET = DecryptedVaultSecret(
     id=UUID("cccc0000-0000-0000-0000-000000000003"),
     name="Prod Server",
     secret_type="ssh_key",
-    status="active",
+
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
     payload=SSHKeyPayload(private_key="-----BEGIN OPENSSH PRIVATE KEY-----..."),
@@ -58,7 +58,7 @@ OTHER_SECRET = DecryptedVaultSecret(
     id=UUID("dddd0000-0000-0000-0000-000000000004"),
     name="Misc",
     secret_type="other",
-    status="active",
+
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
     payload=OtherPayload(data="something"),
@@ -174,7 +174,7 @@ def _identity(*, vault_unlocked=True, access_rules=None):
         id=UUID(IDENTITY_ID),
         organization_id="org_test_123",
         agent_handle="test-bot",
-        status="active",
+    
         email_address="test-bot@inkboxmail.com",
         created_at=datetime(2026, 1, 1),
         updated_at=datetime(2026, 1, 1),
@@ -230,7 +230,7 @@ class TestAgentIdentityCredentials:
             id=UUID(IDENTITY_ID),
             organization_id="org_test_123",
             agent_handle="test-bot",
-            status="active",
+        
             email_address="test-bot@inkboxmail.com",
             created_at=datetime(2026, 1, 1),
             updated_at=datetime(2026, 1, 1),
@@ -261,7 +261,7 @@ LOGIN_WITH_TOTP = DecryptedVaultSecret(
     id=UUID("ffff0000-0000-0000-0000-000000000006"),
     name="GitHub with 2FA",
     secret_type="login",
-    status="active",
+
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
     payload=LoginPayload(
@@ -277,7 +277,7 @@ LOGIN_WITHOUT_TOTP = DecryptedVaultSecret(
     id=UUID("ffff0000-0000-0000-0000-000000000007"),
     name="GitHub no 2FA",
     secret_type="login",
-    status="active",
+
     created_at=datetime(2026, 1, 1),
     updated_at=datetime(2026, 1, 1),
     payload=LoginPayload(password="s3cret", username="admin"),

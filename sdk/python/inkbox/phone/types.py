@@ -153,7 +153,6 @@ class TextMessage:
     text: str | None
     type: str
     media: list[TextMediaItem] | None
-    status: str
     is_read: bool
     created_at: datetime
     updated_at: datetime
@@ -170,7 +169,6 @@ class TextMessage:
             text=d.get("text"),
             type=d["type"],
             media=media,
-            status=d["status"],
             is_read=d["is_read"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),

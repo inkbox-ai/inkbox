@@ -13,7 +13,6 @@ from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
-    ResourceStatus,
     vault_secret_ids_to_wire,
     _AgentIdentityData,
 )
@@ -79,22 +78,18 @@ class IdentitiesResource:
         agent_handle: str,
         *,
         new_handle: str | None = None,
-        status: ResourceStatus | None = None,
     ) -> AgentIdentitySummary:
-        """Update an identity's handle or status.
+        """Update an identity's handle.
 
         Only provided fields are applied; omitted fields are left unchanged.
 
         Args:
             agent_handle: Current handle of the identity to update.
             new_handle: New handle value.
-            status: New lifecycle status: ``"active"`` or ``"paused"``.
         """
         body: dict[str, Any] = {}
         if new_handle is not None:
             body["agent_handle"] = new_handle
-        if status is not None:
-            body["status"] = status
         data = self._http.patch(f"/{agent_handle}", json=body)
         return AgentIdentitySummary._from_dict(data)
 

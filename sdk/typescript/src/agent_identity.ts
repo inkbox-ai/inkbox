@@ -27,7 +27,6 @@ import type {
   _AgentIdentityData,
   IdentityMailbox,
   IdentityPhoneNumber,
-  ResourceStatus,
 } from "./identities/types.js";
 import type { Inkbox } from "./inkbox.js";
 
@@ -52,7 +51,6 @@ export class AgentIdentity {
 
   get agentHandle(): string { return this._data.agentHandle; }
   get id(): string           { return this._data.id; }
-  get status(): string       { return this._data.status; }
 
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   get emailAddress(): string | null { return this._data.emailAddress; }
@@ -215,7 +213,6 @@ export class AgentIdentity {
       id: mailbox.id,
       emailAddress: mailbox.emailAddress,
       displayName: mailbox.displayName,
-      status: mailbox.status,
       createdAt: mailbox.createdAt,
       updatedAt: mailbox.updatedAt,
     };
@@ -515,12 +512,11 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
 
   /**
-   * Update this identity's handle or status.
+   * Update this identity's handle.
    *
    * @param options.newHandle - New agent handle.
-   * @param options.status - New lifecycle status: `"active"` or `"paused"`.
    */
-  async update(options: { newHandle?: string; status?: ResourceStatus }): Promise<void> {
+  async update(options: { newHandle?: string }): Promise<void> {
     const result = await this._inkbox._idsResource.update(this.agentHandle, options);
     this._data = {
       ...result,

@@ -230,7 +230,6 @@ export class VaultResource {
     // Unwrap org encryption key (try each active key ID as AAD)
     const keysData = await this.http.get<RawVaultKey[]>("/keys");
     const activeKeyIds = keysData
-      .filter((k) => k.status === "active")
       .map((k) => k.id);
 
     let orgKey: Uint8Array | null = null;
@@ -419,7 +418,6 @@ export class VaultResource {
     // Fetch all key IDs and try each as AAD until one works.
     const keysData = await this.http.get<RawVaultKey[]>("/keys");
     const allKeyIds = keysData
-      .filter((k) => k.status === "active")
       .map((k) => k.id);
 
     let orgKey: Uint8Array | null = null;
@@ -451,7 +449,6 @@ export class VaultResource {
         name: detail.name,
         description: detail.description,
         secretType: detail.secretType,
-        status: detail.status,
         createdAt: detail.createdAt,
         updatedAt: detail.updatedAt,
         payload,
@@ -548,7 +545,6 @@ export class UnlockedVault {
       name: detail.name,
       description: detail.description,
       secretType: detail.secretType,
-      status: detail.status,
       createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
       payload,
