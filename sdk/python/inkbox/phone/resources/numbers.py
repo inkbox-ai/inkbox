@@ -12,7 +12,7 @@ from uuid import UUID
 from inkbox.phone.types import PhoneNumber, PhoneTranscript
 
 if TYPE_CHECKING:
-    from inkbox.phone._http import HttpTransport
+    from inkbox._http import HttpTransport
 
 _BASE = "/numbers"
 _UNSET = object()

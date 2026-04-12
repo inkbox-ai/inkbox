@@ -12,7 +12,7 @@ from uuid import UUID
 from inkbox.phone.types import PhoneCall, PhoneCallWithRateLimit
 
 if TYPE_CHECKING:
-    from inkbox.phone._http import HttpTransport
+    from inkbox._http import HttpTransport
 
 
 class CallsResource:
