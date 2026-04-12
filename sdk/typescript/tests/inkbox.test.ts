@@ -13,6 +13,41 @@ function makeInkbox() {
 }
 
 describe("Inkbox constructor", () => {
+  it("shares cookies across transports within one client", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: {
+          get: () => "AWSALB=shared-cookie; Path=/api; HttpOnly",
+          getSetCookie: () => ["AWSALB=shared-cookie; Path=/api; HttpOnly"],
+        },
+        json: () => Promise.resolve({ ok: true }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: {
+          get: () => null,
+          getSetCookie: () => [],
+        },
+        json: () => Promise.resolve({ ok: true }),
+      } as unknown as Response);
+
+    const ink = makeInkbox();
+
+    await ink._rootApiHttp.get("/first");
+    await (ink._idsResource as unknown as { http: { get: (path: string) => Promise<unknown> } }).http.get("/second");
+
+    const [, secondInit] = vi.mocked(fetch).mock.calls[1];
+    expect((secondInit!.headers as Record<string, string>).Cookie).toBe("AWSALB=shared-cookie");
+
+    vi.restoreAllMocks();
+  });
+
   it("exposes mailboxes accessor", () => {
     const ink = makeInkbox();
     expect(ink.mailboxes).toBeInstanceOf(MailboxesResource);

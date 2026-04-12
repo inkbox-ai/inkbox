@@ -6,6 +6,7 @@ Tests for Inkbox unified client.
 
 from unittest.mock import patch
 
+import httpx
 import pytest
 
 from inkbox import Inkbox
@@ -57,4 +58,86 @@ class TestInkboxVaultKey:
     def test_no_vault_key_skips_unlock(self, mock_unlock):
         client = Inkbox(api_key="sk-test")
         mock_unlock.assert_not_called()
+        client.close()
+
+
+class TestInkboxCookies:
+    def test_mail_transport_reuses_cookie_from_previous_response(self):
+        client = Inkbox(api_key="sk-test", base_url="https://test.inkbox.ai")
+
+        client._mail_http._cookie_jar.store_from_headers(
+            "https://test.inkbox.ai/api/v1/mail/first",
+            {"set-cookie": "AWSALB=mail-cookie; Path=/api/v1/mail; HttpOnly"},
+        )
+
+        seen: dict[str, str | None] = {"cookie": None}
+
+        def fake_send(request: httpx.Request) -> httpx.Response:
+            seen["cookie"] = request.headers.get("cookie")
+            return httpx.Response(200, json={}, request=request)
+
+        client._mail_http._client.send = fake_send  # type: ignore[method-assign]
+        client._mail_http.get("/second")
+
+        assert seen["cookie"] == "AWSALB=mail-cookie"
+        client.close()
+
+    def test_client_shares_cookies_across_transports(self):
+        client = Inkbox(api_key="sk-test", base_url="https://test.inkbox.ai")
+
+        client._mail_http._cookie_jar.store_from_headers(
+            "https://test.inkbox.ai/api/v1/mail/first",
+            {"set-cookie": "AWSALB=shared-cookie; Path=/api/v1; HttpOnly"},
+        )
+
+        seen: dict[str, str | None] = {"cookie": None}
+
+        def fake_send(request: httpx.Request) -> httpx.Response:
+            seen["cookie"] = request.headers.get("cookie")
+            return httpx.Response(200, json=[], request=request)
+
+        client._phone_http._client.send = fake_send  # type: ignore[method-assign]
+        client._phone_http.get("/numbers")
+
+        assert seen["cookie"] == "AWSALB=shared-cookie"
+        client.close()
+
+    def test_client_does_not_leak_path_scoped_cookie_across_transports(self):
+        client = Inkbox(api_key="sk-test", base_url="https://test.inkbox.ai")
+
+        client._mail_http._cookie_jar.store_from_headers(
+            "https://test.inkbox.ai/api/v1/mail/first",
+            {"set-cookie": "AWSALB=mail-only; Path=/api/v1/mail; HttpOnly"},
+        )
+
+        seen: dict[str, str | None] = {"cookie": None}
+
+        def fake_send(request: httpx.Request) -> httpx.Response:
+            seen["cookie"] = request.headers.get("cookie")
+            return httpx.Response(200, json=[], request=request)
+
+        client._phone_http._client.send = fake_send  # type: ignore[method-assign]
+        client._phone_http.get("/numbers")
+
+        assert seen["cookie"] is None
+        client.close()
+
+    def test_cookie_jar_accepts_expires_attribute(self):
+        client = Inkbox(api_key="sk-test", base_url="https://test.inkbox.ai")
+
+        client._mail_http._cookie_jar.store_from_headers(
+            "https://test.inkbox.ai/api/v1/mail/first",
+            {"set-cookie": "AWSALB=exp-cookie; Expires=Wed, 21 Oct 2030 07:28:00 GMT; Path=/api/v1"},
+        )
+
+        seen: dict[str, str | None] = {"cookie": None}
+
+        def fake_send(request: httpx.Request) -> httpx.Response:
+            seen["cookie"] = request.headers.get("cookie")
+            return httpx.Response(200, json={}, request=request)
+
+        client._mail_http._client.send = fake_send  # type: ignore[method-assign]
+        client._mail_http.get("/second")
+
+        assert seen["cookie"] == "AWSALB=exp-cookie"
         client.close()
