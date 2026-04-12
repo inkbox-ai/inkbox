@@ -36,6 +36,7 @@ from inkbox.agent_signup.types import (
 from uuid import UUID
 from typing import Literal
 
+from inkbox._cookies import CookieJar
 _DEFAULT_BASE_URL = "https://inkbox.ai"
 
 
@@ -95,37 +96,44 @@ class Inkbox:
                     "Received a base_url that does not start with 'https://'."
                 )
         _api_root = f"{base_url.rstrip('/')}/api/v1"
+        _cookie_jar = CookieJar()
 
         self._mail_http = MailHttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/mail",
             timeout=timeout,
+            cookie_jar=_cookie_jar,
         )
         self._phone_http = PhoneHttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/phone",
             timeout=timeout,
+            cookie_jar=_cookie_jar,
         )
         self._ids_http = IdsHttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/identities",
             timeout=timeout,
+            cookie_jar=_cookie_jar,
         )
         self._vault_http = VaultHttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/vault",
             timeout=timeout,
+            cookie_jar=_cookie_jar,
         )
         _api_base = f"{base_url.rstrip('/')}/api"
         self._root_api_http = MailHttpTransport(
             api_key=api_key,
             base_url=_api_base,
             timeout=timeout,
+            cookie_jar=_cookie_jar,
         )
         self._api_http = MailHttpTransport(
             api_key=api_key,
             base_url=_api_root,
             timeout=timeout,
+            cookie_jar=_cookie_jar,
         )
 
         self._mailboxes = MailboxesResource(self._mail_http)

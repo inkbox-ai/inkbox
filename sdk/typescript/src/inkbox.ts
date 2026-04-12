@@ -4,7 +4,7 @@
  * Inkbox — org-level entry point for all Inkbox APIs.
  */
 
-import { HttpTransport, InkboxAPIError } from "./_http.js";
+import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
 import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
 import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
@@ -130,13 +130,14 @@ export class Inkbox {
     }
     const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;
+    const cookieJar = new CookieJar();
 
-    const mailHttp     = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms);
-    const phoneHttp    = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms);
-    const idsHttp      = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms);
-    const vaultHttp    = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms);
-    const rootApiHttp  = new HttpTransport(options.apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms);
-    const apiHttp      = new HttpTransport(options.apiKey, apiRoot, ms);
+    const mailHttp     = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms, cookieJar);
+    const phoneHttp    = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms, cookieJar);
+    const idsHttp      = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms, cookieJar);
+    const vaultHttp    = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms, cookieJar);
+    const rootApiHttp  = new HttpTransport(options.apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar);
+    const apiHttp      = new HttpTransport(options.apiKey, apiRoot, ms, cookieJar);
 
     this._mailboxes   = new MailboxesResource(mailHttp);
     this._messages    = new MessagesResource(mailHttp);

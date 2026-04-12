@@ -9,6 +9,30 @@ function makeTransport(timeout = 30_000) {
   return new HttpTransport(API_KEY, BASE, timeout);
 }
 
+function makeHeaders(setCookies?: string[]) {
+  return {
+    get(name: string) {
+      if (name.toLowerCase() !== "set-cookie" || !setCookies || setCookies.length === 0) {
+        return null;
+      }
+      return setCookies[0];
+    },
+    getSetCookie() {
+      return setCookies ?? [];
+    },
+  } as unknown as Headers;
+}
+
+function makeResponse(status: number, body: unknown, options?: { ok?: boolean; setCookies?: string[] }) {
+  return {
+    ok: options?.ok ?? status < 400,
+    status,
+    statusText: "Error",
+    headers: makeHeaders(options?.setCookies),
+    json: () => Promise.resolve(body),
+  } as Response;
+}
+
 describe("HttpTransport", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -19,12 +43,7 @@ describe("HttpTransport", () => {
   });
 
   function mockFetch(status: number, body: unknown, ok = status < 400) {
-    vi.mocked(fetch).mockResolvedValue({
-      ok,
-      status,
-      statusText: "Error",
-      json: () => Promise.resolve(body),
-    } as Response);
+    vi.mocked(fetch).mockResolvedValue(makeResponse(status, body, { ok }));
   }
 
   // --- GET ---
@@ -94,6 +113,50 @@ describe("HttpTransport", () => {
     const [, init] = vi.mocked(fetch).mock.calls[0];
     expect((init!.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
     expect(init!.body).toBeUndefined();
+  });
+
+  it("stores cookies from a response and sends them on the next request", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeResponse(200, { ok: true }, { setCookies: ["AWSALB=test-cookie; Path=/api/v1; HttpOnly"] }))
+      .mockResolvedValueOnce(makeResponse(200, { ok: true }));
+
+    const http = makeTransport();
+
+    await http.get("/first");
+    await http.get("/second");
+
+    const [, secondInit] = vi.mocked(fetch).mock.calls[1];
+    expect((secondInit!.headers as Record<string, string>).Cookie).toBe("AWSALB=test-cookie");
+  });
+
+  it("does not send a path-scoped cookie to a different path", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeResponse(200, { ok: true }, { setCookies: ["AWSALB=mail-cookie; Path=/api/v1/mail; HttpOnly"] }))
+      .mockResolvedValueOnce(makeResponse(200, { ok: true }));
+
+    const http = makeTransport();
+
+    await http.get("/mail/items");
+    await http.get("/phone/items");
+
+    const [, secondInit] = vi.mocked(fetch).mock.calls[1];
+    expect((secondInit!.headers as Record<string, string>).Cookie).toBeUndefined();
+  });
+
+  it("removes a cookie when the server expires it", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeResponse(200, { ok: true }, { setCookies: ["AWSALB=test-cookie; Path=/api/v1; HttpOnly"] }))
+      .mockResolvedValueOnce(makeResponse(200, { ok: true }, { setCookies: ["AWSALB=deleted; Path=/api/v1; Max-Age=0"] }))
+      .mockResolvedValueOnce(makeResponse(200, { ok: true }));
+
+    const http = makeTransport();
+
+    await http.get("/first");
+    await http.get("/second");
+    await http.get("/third");
+
+    const [, thirdInit] = vi.mocked(fetch).mock.calls[2];
+    expect((thirdInit!.headers as Record<string, string>).Cookie).toBeUndefined();
   });
 
   // --- PATCH ---
