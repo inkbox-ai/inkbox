@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 from inkbox.mail.types import Mailbox, Message
 
 if TYPE_CHECKING:
-    from inkbox.mail._http import HttpTransport
+    from inkbox._http import HttpTransport
 
 _BASE = "/mailboxes"
 _UNSET = object()

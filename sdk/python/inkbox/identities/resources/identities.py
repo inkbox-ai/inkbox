@@ -18,7 +18,7 @@ from inkbox.identities.types import (
 )
 
 if TYPE_CHECKING:
-    from inkbox.identities._http import HttpTransport
+    from inkbox._http import HttpTransport
 
 
 class IdentitiesResource:

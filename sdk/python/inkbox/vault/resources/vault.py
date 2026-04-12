@@ -37,7 +37,7 @@ from inkbox.vault.types import (
 )
 
 if TYPE_CHECKING:
-    from inkbox.vault._http import HttpTransport
+    from inkbox._http import HttpTransport
 
 from inkbox.exceptions import InkboxAPIError
 

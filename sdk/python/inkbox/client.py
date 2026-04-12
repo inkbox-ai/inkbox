@@ -6,18 +6,15 @@ Inkbox — org-level entry point for all Inkbox APIs.
 
 from __future__ import annotations
 
-from inkbox.mail._http import HttpTransport as MailHttpTransport
+from inkbox._http import HttpTransport
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
-from inkbox.phone._http import HttpTransport as PhoneHttpTransport
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
-from inkbox.identities._http import HttpTransport as IdsHttpTransport
 from inkbox.identities.resources.identities import IdentitiesResource
-from inkbox.vault._http import HttpTransport as VaultHttpTransport
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import (
@@ -98,38 +95,38 @@ class Inkbox:
         _api_root = f"{base_url.rstrip('/')}/api/v1"
         _cookie_jar = CookieJar()
 
-        self._mail_http = MailHttpTransport(
+        self._mail_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/mail",
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
-        self._phone_http = PhoneHttpTransport(
+        self._phone_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/phone",
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
-        self._ids_http = IdsHttpTransport(
+        self._ids_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/identities",
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
-        self._vault_http = VaultHttpTransport(
+        self._vault_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/vault",
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
         _api_base = f"{base_url.rstrip('/')}/api"
-        self._root_api_http = MailHttpTransport(
+        self._root_api_http = HttpTransport(
             api_key=api_key,
             base_url=_api_base,
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
-        self._api_http = MailHttpTransport(
+        self._api_http = HttpTransport(
             api_key=api_key,
             base_url=_api_root,
             timeout=timeout,

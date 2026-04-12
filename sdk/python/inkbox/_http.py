@@ -1,7 +1,7 @@
 """
-inkbox/identities/_http.py
+inkbox/_http.py
 
-Sync HTTP transport (internal).
+Sync HTTP transport (internal). Shared by all resource packages.
 """
 
 from __future__ import annotations
@@ -45,6 +45,11 @@ class HttpTransport:
         _raise_for_status(resp)
         if resp.status_code == 204:
             return None
+        return resp.json()
+
+    def put(self, path: str, *, json: dict[str, Any]) -> Any:
+        resp = self._send("PUT", path, json=json)
+        _raise_for_status(resp)
         return resp.json()
 
     def patch(self, path: str, *, json: dict[str, Any]) -> Any:
