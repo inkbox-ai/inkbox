@@ -12,7 +12,7 @@ from uuid import UUID
 from inkbox.mail.types import Message, MessageDetail, MessageDirection
 
 if TYPE_CHECKING:
-    from inkbox.mail._http import HttpTransport
+    from inkbox._http import HttpTransport
 
 _DEFAULT_PAGE_SIZE = 50
 

@@ -1,7 +1,7 @@
 """
-inkbox/vault/_http.py
+inkbox/_http.py
 
-Sync HTTP transport (internal).
+Sync HTTP transport (internal). Shared by all resource packages.
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ _DEFAULT_TIMEOUT = 30.0
 
 
 class HttpTransport:
-
     def __init__(
         self,
         api_key: str,
@@ -33,10 +32,7 @@ class HttpTransport:
         )
 
     def get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
-        cleaned = {
-            k: v for k, v in (params or {}).items()
-            if v is not None
-        }
+        cleaned = {k: v for k, v in (params or {}).items() if v is not None}
         resp = self._client.get(path, params=cleaned)
         _raise_for_status(resp)
         return resp.json()
@@ -79,7 +75,4 @@ def _raise_for_status(resp: httpx.Response) -> None:
         detail = resp.json().get("detail", resp.text)
     except Exception:
         detail = resp.text
-    raise InkboxAPIError(
-        status_code=resp.status_code,
-        detail=str(detail),
-    )
+    raise InkboxAPIError(status_code=resp.status_code, detail=str(detail))
