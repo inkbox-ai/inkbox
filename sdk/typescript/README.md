@@ -76,8 +76,10 @@ import { Inkbox } from "@inkbox/sdk";
 // Sign up (public — no API key needed)
 const result = await Inkbox.signup({
   humanEmail: "john@example.com",
-  displayName: "Sales Agent",
   noteToHuman: "Hey John, this is your sales bot signing up!",
+  displayName: "Sales Agent",      // optional
+  agentHandle: "sales-agent",      // optional
+  emailLocalPart: "sales.agent",   // optional
 });
 const apiKey = result.apiKey;          // save — shown only once
 const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
@@ -102,7 +104,7 @@ console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (cl
 | `Inkbox.resendSignupVerification(apiKey, options?)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.getSignupStatus(apiKey, options?)` | API key | `AgentSignupStatusResponse` |
 
-`request` for `signup()` requires `humanEmail`, `displayName`, and `noteToHuman`. All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
+`request` for `signup()` requires `humanEmail` and `noteToHuman`. `displayName`, `agentHandle`, and `emailLocalPart` are optional. All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
 
 > **Note:** Unclaimed agents can only send to the `humanEmail` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
 
