@@ -1,6 +1,6 @@
 ---
-name: inkbox
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, vault, or agent identity features using the Inkbox TypeScript SDK.
+name: inkbox-openclaw
+description: Openclaw-distributed Inkbox skill — use when adding email, phone, text/SMS, encrypted vault, or agent identity features via the Inkbox TypeScript SDK (`@inkbox/sdk`) with openclaw environment and dependency provisioning.
 metadata:
   openclaw:
     emoji: "📬"
