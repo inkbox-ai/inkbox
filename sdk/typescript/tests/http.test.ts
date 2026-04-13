@@ -59,7 +59,7 @@ describe("HttpTransport", () => {
       expect.objectContaining({
         method: "GET",
         headers: expect.objectContaining({
-          "X-Service-Token": API_KEY,
+          "X-API-Key": API_KEY,
           Accept: "application/json",
         }),
       }),

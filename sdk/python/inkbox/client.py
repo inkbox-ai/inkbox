@@ -6,7 +6,28 @@ Inkbox — org-level entry point for all Inkbox APIs.
 
 from __future__ import annotations
 
+from typing import Literal
+from urllib.parse import urlparse
+from uuid import UUID
+
+import httpx
+
 from inkbox._http import HttpTransport
+from inkbox._cookies import CookieJar
+from inkbox.agent_identity import AgentIdentity
+from inkbox.agent_signup.types import (
+    AgentSignupResponse,
+    AgentSignupVerifyResponse,
+    AgentSignupResendResponse,
+    AgentSignupStatusResponse,
+)
+from inkbox.exceptions import InkboxAPIError
+from inkbox.identities.resources.identities import IdentitiesResource
+from inkbox.identities.types import (
+    AgentIdentitySummary,
+    IdentityMailboxCreateOptions,
+    IdentityPhoneNumberCreateOptions,
+)
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
@@ -14,26 +35,10 @@ from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
-from inkbox.identities.resources.identities import IdentitiesResource
-from inkbox.vault.resources.vault import VaultResource
-from inkbox.agent_identity import AgentIdentity
-from inkbox.identities.types import (
-    AgentIdentitySummary,
-    IdentityMailboxCreateOptions,
-    IdentityPhoneNumberCreateOptions,
-)
 from inkbox.signing_keys import SigningKey, SigningKeysResource
+from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
-from inkbox.agent_signup.types import (
-    AgentSignupResponse,
-    AgentSignupVerifyResponse,
-    AgentSignupResendResponse,
-    AgentSignupStatusResponse,
-)
-from uuid import UUID
-from typing import Literal
 
-from inkbox._cookies import CookieJar
 _DEFAULT_BASE_URL = "https://inkbox.ai"
 
 
@@ -75,7 +80,7 @@ class Inkbox:
         Create an Inkbox client.
 
         Args:
-            api_key: Your Inkbox API key (``X-Service-Token``).
+            api_key: Your Inkbox API key (``X-API-Key``).
             base_url: Override the API base URL (useful for self-hosting
                 or testing).
             timeout: Request timeout in seconds (default 30).
@@ -84,7 +89,6 @@ class Inkbox:
                 ``identity.credentials`` is immediately available.
         """
         if not base_url.startswith("https://"):
-            from urllib.parse import urlparse
             _parsed = urlparse(base_url)
             if _parsed.hostname not in ("localhost", "127.0.0.1"):
                 raise ValueError(
@@ -272,7 +276,6 @@ class Inkbox:
     @classmethod
     def _validate_base_url(cls, base_url: str) -> None:
         if not base_url.startswith("https://"):
-            from urllib.parse import urlparse
             _parsed = urlparse(base_url)
             if _parsed.hostname not in ("localhost", "127.0.0.1"):
                 raise ValueError(
@@ -292,14 +295,11 @@ class Inkbox:
         timeout: float = 30.0,
     ) -> dict:
         """One-shot HTTP request for agent-signup endpoints."""
-        import httpx
-        from inkbox.exceptions import InkboxAPIError
-
         cls._validate_base_url(base_url)
         url = f"{base_url.rstrip('/')}/api/v1/agent-signup{path}"
         headers: dict[str, str] = {"Accept": "application/json"}
         if api_key:
-            headers["X-Service-Token"] = api_key
+            headers["X-API-Key"] = api_key
 
         with httpx.Client(timeout=timeout) as client:
             resp = client.request(method, url, headers=headers, json=json)
@@ -316,9 +316,11 @@ class Inkbox:
     def signup(
         cls,
         human_email: str,
-        display_name: str,
         *,
         note_to_human: str,
+        display_name: str | None = None,
+        agent_handle: str | None = None,
+        email_local_part: str | None = None,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
     ) -> AgentSignupResponse:
@@ -329,17 +331,24 @@ class Inkbox:
 
         Args:
             human_email: Email of the human who should approve this agent.
-            display_name: Human-readable name for the agent.
             note_to_human: Message from the agent to the human, included in
                 the verification email.
+            display_name: Optional human-readable name for the agent.
+            agent_handle: Optional requested handle for the agent identity.
+            email_local_part: Optional requested mailbox local part.
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
         """
         body: dict[str, str] = {
             "human_email": human_email,
-            "display_name": display_name,
             "note_to_human": note_to_human,
         }
+        if display_name is not None:
+            body["display_name"] = display_name
+        if agent_handle is not None:
+            body["agent_handle"] = agent_handle
+        if email_local_part is not None:
+            body["email_local_part"] = email_local_part
         data = cls._signup_request(
             "POST", "", json=body, base_url=base_url, timeout=timeout,
         )

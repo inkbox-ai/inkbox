@@ -73,7 +73,7 @@ describe("Inkbox.signup", () => {
     expect(init!.method).toBe("POST");
 
     const headers = init!.headers as Record<string, string>;
-    expect(headers["X-Service-Token"]).toBeUndefined();
+    expect(headers["X-API-Key"]).toBeUndefined();
     expect(headers["Content-Type"]).toBe("application/json");
 
     const body = JSON.parse(init!.body as string);
@@ -95,11 +95,49 @@ describe("Inkbox.signup", () => {
     });
   });
 
+  it("omits optional fields by default", async () => {
+    mockFetch(200, RAW_SIGNUP_RESPONSE);
+
+    await Inkbox.signup({
+      humanEmail: "human@example.com",
+      noteToHuman: "Please approve me",
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    const body = JSON.parse(init!.body as string);
+    expect(body).toEqual({
+      human_email: "human@example.com",
+      note_to_human: "Please approve me",
+    });
+  });
+
+  it("serializes optional agentHandle and emailLocalPart", async () => {
+    mockFetch(200, RAW_SIGNUP_RESPONSE);
+
+    await Inkbox.signup({
+      humanEmail: "human@example.com",
+      noteToHuman: "Please approve me",
+      displayName: "My Agent",
+      agentHandle: "my-agent",
+      emailLocalPart: "my.agent",
+    });
+
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    const body = JSON.parse(init!.body as string);
+    expect(body).toEqual({
+      human_email: "human@example.com",
+      note_to_human: "Please approve me",
+      display_name: "My Agent",
+      agent_handle: "my-agent",
+      email_local_part: "my.agent",
+    });
+  });
+
   it("uses custom baseUrl", async () => {
     mockFetch(200, RAW_SIGNUP_RESPONSE);
 
     await Inkbox.signup(
-      { humanEmail: "h@e.com", displayName: "A", noteToHuman: "hi" },
+      { humanEmail: "h@e.com", noteToHuman: "hi" },
       { baseUrl: "https://custom.example.com" },
     );
 
@@ -110,7 +148,7 @@ describe("Inkbox.signup", () => {
   it("rejects non-HTTPS baseUrl", async () => {
     await expect(
       Inkbox.signup(
-        { humanEmail: "h@e.com", displayName: "A", noteToHuman: "hi" },
+        { humanEmail: "h@e.com", noteToHuman: "hi" },
         { baseUrl: "http://evil.com" },
       ),
     ).rejects.toThrow("Only HTTPS base URLs are permitted");
@@ -121,7 +159,7 @@ describe("Inkbox.signup", () => {
 
     await expect(
       Inkbox.signup(
-        { humanEmail: "h@e.com", displayName: "A", noteToHuman: "hi" },
+        { humanEmail: "h@e.com", noteToHuman: "hi" },
         { baseUrl: "http://localhost:8000" },
       ),
     ).resolves.toBeDefined();
@@ -141,7 +179,7 @@ describe("Inkbox.verifySignup", () => {
     expect(init!.method).toBe("POST");
 
     const headers = init!.headers as Record<string, string>;
-    expect(headers["X-Service-Token"]).toBe("ApiKey_abc");
+    expect(headers["X-API-Key"]).toBe("ApiKey_abc");
 
     const body = JSON.parse(init!.body as string);
     expect(body).toEqual({ verification_code: "123456" });
@@ -165,7 +203,7 @@ describe("Inkbox.resendSignupVerification", () => {
     expect(init!.method).toBe("POST");
 
     const headers = init!.headers as Record<string, string>;
-    expect(headers["X-Service-Token"]).toBe("ApiKey_abc");
+    expect(headers["X-API-Key"]).toBe("ApiKey_abc");
     expect(init!.body).toBeUndefined();
 
     expect(result).toEqual({
@@ -187,7 +225,7 @@ describe("Inkbox.getSignupStatus", () => {
     expect(init!.method).toBe("GET");
 
     const headers = init!.headers as Record<string, string>;
-    expect(headers["X-Service-Token"]).toBe("ApiKey_abc");
+    expect(headers["X-API-Key"]).toBe("ApiKey_abc");
 
     expect(result).toEqual({
       claimStatus: "unclaimed",
@@ -225,7 +263,7 @@ describe("Agent signup error handling", () => {
     } as Response);
 
     await expect(
-      Inkbox.signup({ humanEmail: "h@e.com", displayName: "A", noteToHuman: "hi" }),
+      Inkbox.signup({ humanEmail: "h@e.com", noteToHuman: "hi" }),
     ).rejects.toThrow("Internal Server Error");
   });
 });

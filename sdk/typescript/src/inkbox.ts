@@ -51,7 +51,7 @@ export interface SignupOptions {
 }
 
 export interface InkboxOptions {
-  /** Your Inkbox API key (sent as `X-Service-Token`). */
+  /** Your Inkbox API key (sent as `X-API-Key`). */
   apiKey: string;
   /** Override the API base URL (useful for self-hosting or testing). */
   baseUrl?: string;
@@ -313,7 +313,7 @@ export class Inkbox {
     const ms = opts.timeoutMs ?? 30_000;
 
     const headers: Record<string, string> = { Accept: "application/json" };
-    if (opts.apiKey) headers["X-Service-Token"] = opts.apiKey;
+    if (opts.apiKey) headers["X-API-Key"] = opts.apiKey;
 
     let bodyStr: string | undefined;
     if (opts.body !== undefined) {

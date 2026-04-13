@@ -24,8 +24,10 @@ export function registerSignupCommands(program: Command): void {
     .command("create")
     .description("Register a new agent (no API key required)")
     .requiredOption("--human-email <email>", "Email of the human who should approve this agent")
-    .requiredOption("--display-name <name>", "Human-readable name for the agent")
     .requiredOption("--note-to-human <note>", "Message from the agent to the human, included in the verification email")
+    .option("--display-name <name>", "Human-readable name for the agent")
+    .option("--agent-handle <handle>", "Requested handle for the agent identity")
+    .option("--email-local-part <local>", "Requested mailbox local part before the sending domain")
     .action(
       withErrorHandler(async function (this: Command) {
         const globalOpts = getGlobalOpts(this);
@@ -33,8 +35,10 @@ export function registerSignupCommands(program: Command): void {
         const result = await Inkbox.signup(
           {
             humanEmail: cmdOpts.humanEmail,
-            displayName: cmdOpts.displayName,
             noteToHuman: cmdOpts.noteToHuman,
+            displayName: cmdOpts.displayName,
+            agentHandle: cmdOpts.agentHandle,
+            emailLocalPart: cmdOpts.emailLocalPart,
           },
           { baseUrl: globalOpts.baseUrl },
         );
