@@ -92,6 +92,5 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
     const identity = await inkbox.getIdentity(agentHandle);
     expect(identity.agentHandle).toBe(agentHandle);
     expect(identity.emailAddress).toBe(signup.emailAddress);
-    inkbox.close();
   });
 });
