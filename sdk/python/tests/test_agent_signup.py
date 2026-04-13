@@ -105,12 +105,55 @@ class TestSignup:
         assert result.message == "Verification email sent"
 
     @patch("httpx.Client")
+    def test_signup_omits_optional_fields_by_default(self, mock_client_cls: MagicMock):
+        client = _mock_httpx_client(mock_client_cls, 200, RAW_SIGNUP)
+
+        Inkbox.signup(
+            human_email="human@example.com",
+            note_to_human="Please approve me",
+        )
+
+        client.request.assert_called_once_with(
+            "POST",
+            "https://inkbox.ai/api/v1/agent-signup",
+            headers={"Accept": "application/json"},
+            json={
+                "human_email": "human@example.com",
+                "note_to_human": "Please approve me",
+            },
+        )
+
+    @patch("httpx.Client")
+    def test_signup_sends_optional_handle_and_email_local_part(self, mock_client_cls: MagicMock):
+        client = _mock_httpx_client(mock_client_cls, 200, RAW_SIGNUP)
+
+        Inkbox.signup(
+            human_email="human@example.com",
+            note_to_human="Please approve me",
+            display_name="My Agent",
+            agent_handle="my-agent",
+            email_local_part="my.agent",
+        )
+
+        client.request.assert_called_once_with(
+            "POST",
+            "https://inkbox.ai/api/v1/agent-signup",
+            headers={"Accept": "application/json"},
+            json={
+                "human_email": "human@example.com",
+                "note_to_human": "Please approve me",
+                "display_name": "My Agent",
+                "agent_handle": "my-agent",
+                "email_local_part": "my.agent",
+            },
+        )
+
+    @patch("httpx.Client")
     def test_signup_custom_base_url(self, mock_client_cls: MagicMock):
         client = _mock_httpx_client(mock_client_cls, 200, RAW_SIGNUP)
 
         Inkbox.signup(
             human_email="h@e.com",
-            display_name="A",
             note_to_human="hi",
             base_url="https://custom.example.com",
         )
@@ -131,7 +174,7 @@ class TestVerifySignup:
             "https://inkbox.ai/api/v1/agent-signup/verify",
             headers={
                 "Accept": "application/json",
-                "X-Service-Token": "ApiKey_abc",
+                "X-API-Key": "ApiKey_abc",
             },
             json={"verification_code": "123456"},
         )
@@ -154,7 +197,7 @@ class TestResendSignupVerification:
             "https://inkbox.ai/api/v1/agent-signup/resend-verification",
             headers={
                 "Accept": "application/json",
-                "X-Service-Token": "ApiKey_abc",
+                "X-API-Key": "ApiKey_abc",
             },
             json=None,
         )
@@ -177,7 +220,7 @@ class TestGetSignupStatus:
             "https://inkbox.ai/api/v1/agent-signup/status",
             headers={
                 "Accept": "application/json",
-                "X-Service-Token": "ApiKey_abc",
+                "X-API-Key": "ApiKey_abc",
             },
             json=None,
         )
@@ -215,7 +258,6 @@ class TestSignupErrors:
         with pytest.raises(ValueError, match="Only HTTPS base URLs are permitted"):
             Inkbox.signup(
                 human_email="h@e.com",
-                display_name="A",
                 note_to_human="hi",
                 base_url="http://evil.com",
             )
@@ -226,7 +268,6 @@ class TestSignupErrors:
 
         result = Inkbox.signup(
             human_email="h@e.com",
-            display_name="A",
             note_to_human="hi",
             base_url="http://localhost:8000",
         )
@@ -238,7 +279,6 @@ class TestSignupErrors:
 
         result = Inkbox.signup(
             human_email="h@e.com",
-            display_name="A",
             note_to_human="hi",
             base_url="http://127.0.0.1:8000",
         )

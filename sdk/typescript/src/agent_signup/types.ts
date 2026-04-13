@@ -8,8 +8,10 @@
 
 export interface AgentSignupRequest {
   humanEmail: string;
-  displayName: string;
   noteToHuman: string;
+  displayName?: string;
+  agentHandle?: string;
+  emailLocalPart?: string;
 }
 
 export interface AgentSignupResponse {
@@ -143,11 +145,14 @@ export function parseAgentSignupStatusResponse(r: RawAgentSignupStatusResponse):
 export function agentSignupRequestToWire(
   req: AgentSignupRequest,
 ): Record<string, string> {
-  return {
+  const body: Record<string, string> = {
     human_email: req.humanEmail,
-    display_name: req.displayName,
     note_to_human: req.noteToHuman,
   };
+  if (req.displayName !== undefined) body["display_name"] = req.displayName;
+  if (req.agentHandle !== undefined) body["agent_handle"] = req.agentHandle;
+  if (req.emailLocalPart !== undefined) body["email_local_part"] = req.emailLocalPart;
+  return body;
 }
 
 export function agentSignupVerifyRequestToWire(

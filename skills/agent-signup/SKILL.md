@@ -1,3 +1,8 @@
+---
+name: agent-signup
+description: Use when guiding or implementing the Inkbox agent self-signup flow, including verification, resend-verification, signup restrictions, and optional signup fields like agent handles or mailbox local parts.
+---
+
 # Agent Signup
 
 ## Overview
@@ -28,14 +33,19 @@ The flow has four steps:
 
 All signup methods are **class methods** on `Inkbox` — no instance required.
 
+`human_email` and `note_to_human` are required. `display_name`, `agent_handle`, and
+`email_local_part` are optional.
+
 ```python
 from inkbox import Inkbox
 
 # 1. Register
 result = Inkbox.signup(
     human_email="john@example.com",
-    display_name="Sales Agent",
     note_to_human="Hey John, this is your sales bot signing up!",
+    display_name="Sales Agent",          # optional
+    agent_handle="sales-agent",          # optional
+    email_local_part="sales.agent",      # optional
 )
 
 # Save these — the api_key is shown only once
@@ -76,14 +86,19 @@ with Inkbox(api_key=api_key) as inkbox:
 
 All signup methods are **static methods** on `Inkbox` — no instance required.
 
+`humanEmail` and `noteToHuman` are required. `displayName`, `agentHandle`, and
+`emailLocalPart` are optional.
+
 ```ts
 import { Inkbox } from "@inkbox/sdk";
 
 // 1. Register
 const result = await Inkbox.signup({
   humanEmail: "john@example.com",
-  displayName: "Sales Agent",
   noteToHuman: "Hey John, this is your sales bot signing up!",
+  displayName: "Sales Agent",      // optional
+  agentHandle: "sales-agent",      // optional
+  emailLocalPart: "sales.agent",   // optional
 });
 
 // Save these — the apiKey is shown only once
@@ -131,10 +146,15 @@ curl -X POST https://inkbox.ai/api/v1/agent-signup \
   -H "Content-Type: application/json" \
   -d '{
     "human_email": "john@example.com",
+    "note_to_human": "Hey John, this is your sales bot signing up!",
     "display_name": "Sales Agent",
-    "note_to_human": "Hey John, this is your sales bot signing up!"
+    "agent_handle": "sales-agent",
+    "email_local_part": "sales.agent"
   }'
 ```
+
+`human_email` and `note_to_human` are required. `display_name`, `agent_handle`, and
+`email_local_part` are optional.
 
 Response:
 
@@ -159,7 +179,7 @@ Save the `api_key` — it is shown only once.
 ```bash
 curl -X POST https://inkbox.ai/api/v1/agent-signup/verify \
   -H "Content-Type: application/json" \
-  -H "X-Service-Token: ik_live_..." \
+  -H "X-API-Key: ik_live_..." \
   -d '{ "verification_code": "483921" }'
 ```
 
@@ -169,7 +189,7 @@ The verification code expires after 48 hours. Max 5 attempts before a resend is 
 
 ```bash
 curl -X POST https://inkbox.ai/api/v1/agent-signup/resend-verification \
-  -H "X-Service-Token: ik_live_..."
+  -H "X-API-Key: ik_live_..."
 ```
 
 5-minute cooldown between resends.
@@ -178,7 +198,7 @@ curl -X POST https://inkbox.ai/api/v1/agent-signup/resend-verification \
 
 ```bash
 curl https://inkbox.ai/api/v1/agent-signup/status \
-  -H "X-Service-Token: ik_live_..."
+  -H "X-API-Key: ik_live_..."
 ```
 
 Response:

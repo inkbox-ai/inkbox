@@ -219,7 +219,7 @@ export class HttpTransport {
     }
 
     const headers: Record<string, string> = {
-      "X-Service-Token": this.apiKey,
+      "X-API-Key": this.apiKey,
       Accept: "application/json",
     };
     const cookieHeader = this.cookieJar.getHeaderValue(url);

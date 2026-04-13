@@ -27,7 +27,7 @@ class HttpTransport:
         self._client = httpx.Client(
             base_url=base_url,
             headers={
-                "X-Service-Token": api_key,
+                "X-API-Key": api_key,
                 "Accept": "application/json",
             },
             timeout=timeout,

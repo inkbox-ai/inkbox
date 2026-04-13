@@ -55,8 +55,10 @@ Agent self-signup flow. The `create` command does not require an API key.
 ```bash
 inkbox signup create                             # Register a new agent (no API key needed)
   --human-email <email>                          #   Email of the human to approve (required)
-  --display-name <name>                          #   Agent display name (required)
   --note-to-human <note>                         #   Message to human in verification email (required)
+  --display-name <name>                          #   Agent display name (optional)
+  --agent-handle <handle>                        #   Requested agent handle (optional)
+  --email-local-part <local>                     #   Requested mailbox local part (optional)
 
 inkbox signup verify                             # Submit verification code
   --code <code>                                  #   6-digit code from email (required)

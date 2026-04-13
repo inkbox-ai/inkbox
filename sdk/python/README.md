@@ -75,8 +75,10 @@ from inkbox import Inkbox
 # Sign up (public — no API key needed)
 result = Inkbox.signup(
     human_email="john@example.com",
-    display_name="Sales Agent",
     note_to_human="Hey John, this is your sales bot signing up!",  # required
+    display_name="Sales Agent",          # optional
+    agent_handle="sales-agent",          # optional
+    email_local_part="sales.agent",      # optional
 )
 api_key = result.api_key          # save — shown only once
 email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
@@ -96,12 +98,12 @@ print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
 
 | Method | Auth | Returns |
 |---|---|---|
-| `Inkbox.signup(human_email, display_name, note_to_human)` | None | `AgentSignupResponse` |
+| `Inkbox.signup(human_email, *, note_to_human, display_name=None, agent_handle=None, email_local_part=None)` | None | `AgentSignupResponse` |
 | `Inkbox.verify_signup(api_key, verification_code)` | API key | `AgentSignupVerifyResponse` |
 | `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |
 
-All three arguments to `signup()` (`human_email`, `display_name`, `note_to_human`) are required. All methods accept optional `base_url` and `timeout` keyword arguments.
+`signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, and `email_local_part` are optional. All methods accept optional `base_url` and `timeout` keyword arguments.
 
 > **Note:** Unclaimed agents can only send to the `human_email` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
 
