@@ -1,13 +1,13 @@
 ---
-name: agent-signup
+name: agent-self-signup
 description: Use when guiding or implementing the Inkbox agent self-signup flow, including verification, resend-verification, signup restrictions, and optional signup fields like agent handles or mailbox local parts.
 ---
 
-# Agent Signup
+# Agent Self-Signup
 
 ## Overview
 
-Agents can self-register for an Inkbox account without a pre-existing API key. The signup flow provisions a mailbox, identity, and API key in a single call. A verification email is sent to the specified human for approval.
+Agents can self-register for an Inkbox account without a pre-existing API key. The self-signup flow provisions a mailbox, identity, and API key in a single call. A verification email is sent to the specified human for approval.
 
 The flow has four steps:
 
