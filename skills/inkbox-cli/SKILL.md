@@ -91,7 +91,7 @@ inkbox signup resend-verification
 inkbox signup status
 ```
 
-`signup create` is the main command that does not require an API key. The later signup commands authenticate using the signup-issued credentials persisted by the CLI flow.
+`signup create` is the main command that does not require an API key. The later signup commands require the signup-issued API key to be passed back via `--api-key` or exported as `INKBOX_API_KEY`; the CLI does not persist it automatically.
 
 ## Identities
 
