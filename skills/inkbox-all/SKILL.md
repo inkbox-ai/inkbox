@@ -40,26 +40,25 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 ## Example Skills
 
-- `browser-use`
+- `use-inkbox-browser-use`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/examples/use-inkbox-browser-use/SKILL.md
   Prompt template for an agent that has Browser Use browser automation plus an Inkbox-backed email identity and vault access.
 
-- `kernel`
+- `use-inkbox-kernel`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/examples/use-inkbox-kernel/SKILL.md
   Prompt template for an agent that has a Kernel cloud browser plus an Inkbox-backed email identity.
 
 ## Related Examples
 
-These are example directories in the repo that are useful alongside the skills above:
-
-- `use-inkbox-browser-use`
-  GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-browser-use
+These example directories are useful references, but they are not standalone skills because they do not contain a `SKILL.md` file.
 
 - `use-inkbox-cli`
   GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-cli
+  Shell script examples for automating Inkbox from terminal workflows, CI, and agent shell execution using `@inkbox/cli` plus `jq`.
 
-- `use-inkbox-kernel`
-  GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-kernel
+- `use-inkbox-vault`
+  GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-vault
+  Small Python and TypeScript examples showing how to create a login credential with TOTP, generate codes, and clean up.
 
 ## How To Choose
 
@@ -69,3 +68,4 @@ These are example directories in the repo that are useful alongside the skills a
 - Use `agent-self-signup` when the agent does not have an API key yet and needs to self-register.
 - Use `inkbox-openclaw` when the environment is specifically OpenClaw.
 - Use the example skills when you want a reusable agent prompt rather than SDK integration code.
+- Use the related examples when you want runnable scripts or end-to-end sample workflows instead of a reusable skill prompt.
