@@ -84,7 +84,7 @@ An identity must have a channel assigned before you can use mail/phone/text meth
 
 For the full agent self-signup flow (register, verify, check status, restrictions, and direct API examples), read the shared reference:
 
-> **See:** `skills/agent-signup/SKILL.md`
+> **See:** `skills/agent-self-signup/SKILL.md`
 
 SDK methods: `Inkbox.signup({...})`, `Inkbox.verifySignup(apiKey, {...})`, `Inkbox.resendSignupVerification(apiKey)`, `Inkbox.getSignupStatus(apiKey)`.
 
