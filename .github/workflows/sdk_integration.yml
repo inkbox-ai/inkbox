@@ -132,15 +132,6 @@ jobs:
               "text": "⚠️ Python SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
-      - name: Notify Google Chat on scheduled success
-        if: success() && github.event_name == 'schedule'
-        run: |
-          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
-            -H 'Content-Type: application/json' \
-            -d '{
-              "text": "✅ Python SDK integration tests *PASSED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
-
   typescript-sdk:
     name: TypeScript SDK (${{ matrix.environment }}, ${{ matrix.source }})
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -218,15 +209,6 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{
               "text": "⚠️ TypeScript SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
-
-      - name: Notify Google Chat on scheduled success
-        if: success() && github.event_name == 'schedule'
-        run: |
-          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
-            -H 'Content-Type: application/json' \
-            -d '{
-              "text": "✅ TypeScript SDK integration tests *PASSED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
   cli:
@@ -307,11 +289,3 @@ jobs:
               "text": "⚠️ CLI integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
 
-      - name: Notify Google Chat on scheduled success
-        if: success() && github.event_name == 'schedule'
-        run: |
-          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
-            -H 'Content-Type: application/json' \
-            -d '{
-              "text": "✅ CLI integration tests *PASSED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
