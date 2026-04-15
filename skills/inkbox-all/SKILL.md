@@ -6,6 +6,14 @@ user-invocable: false
 
 # Inkbox Skills Index
 
+Inkbox is an identity layer for AI agents. It gives agents a persistent identity with a real inbox, phone number, and secure vault, so they can send emails, receive replies, answer calls, store credentials, and manage conversations as a single, consistent entity. Learn more at https://inkbox.ai.
+
+Useful links:
+
+- Website: https://inkbox.ai
+- LLMs: https://inkbox.ai/llms.txt
+- OpenAPI: https://inkbox.ai/api/openapi.json
+
 This skill is just a directory of the other Inkbox skills in this repository. Use it when you want to see the full menu before choosing a more specific skill. In practice, the SDK skills are the main references for application code, `agent-self-signup` covers the self-registration flow, `inkbox-cli` covers shell usage, and the example skills under `examples/` are prompt templates for browser-capable agents.
 
 ## Core Skills
