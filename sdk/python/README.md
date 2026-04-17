@@ -1,6 +1,6 @@
 # inkbox
 
-Python SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, identities, encrypted vault — login credentials, API keys, key pairs, SSH keys, OTP, etc.).
+Python SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, identities, custodial wallets, encrypted vault — login credentials, API keys, key pairs, SSH keys, OTP, etc.).
 
 ## Install
 
@@ -47,6 +47,16 @@ with Inkbox(
 
     # List calls
     calls = identity.list_calls()
+
+    # Create and use a wallet
+    wallet = identity.create_wallet()
+    balance = identity.get_wallet_balance()
+    identity.send_wallet(
+        chain="base",
+        to_address="0x1111111111111111111111111111111111111111",
+        token="USDC",
+        amount="1.50",
+    )
 
     # Access credentials (vault unlocked at construction)
     for login in identity.credentials.list_logins():
@@ -242,6 +252,49 @@ for t in identity.list_transcripts(calls[0].id):
 hits = inkbox.phone_numbers.search_transcripts(phone.id, q="refund", party="remote")
 for t in hits:
     print(f"[{t.party}] {t.text}")
+```
+
+---
+
+## Wallets
+
+```python
+# Create a wallet directly on an identity
+wallet = identity.create_wallet(chains=["base", "tempo"])
+print(wallet.addresses["evm"])
+
+# Or manage wallets at the org level
+wallets = inkbox.wallets.list()
+same_wallet = inkbox.wallets.get(wallet.id)
+
+# Live balances
+balance = inkbox.wallets.get_balance(wallet.id)
+print(balance.chains["base"].native.balance)
+
+# Send funds
+tx = inkbox.wallets.send(
+    wallet.id,
+    chain="base",
+    to_address="0x1111111111111111111111111111111111111111",
+    token="USDC",
+    amount="2.50",
+    idempotency_key="invoice-123",
+)
+print(tx.status, tx.chain_tx_hash)
+
+# Sign a SIWE-style auth challenge
+signature = inkbox.wallets.sign_auth(
+    wallet.id,
+    message="example.com wants you to sign in...",
+)
+print(signature.signature)
+
+# Pay a machine-payments 402 challenge
+result = identity.pay_with_wallet(
+    url="https://example.com/protected",
+    max_cost="0.10",
+)
+print(result.status, result.payment["protocol"])
 ```
 
 ---

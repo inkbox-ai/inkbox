@@ -39,6 +39,8 @@ export function registerIdentityCommands(program: Command): void {
             id: id.id,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
+            walletId: id.wallet?.id ?? null,
+            walletAddress: id.wallet?.addresses["evm"] ?? null,
           },
           { json: !!opts.json },
         );
@@ -48,15 +50,28 @@ export function registerIdentityCommands(program: Command): void {
   identity
     .command("create <handle>")
     .description("Create a new identity")
+    .option("--wallet", "Provision a custodial wallet during identity creation")
+    .option("--wallet-chains <chains>", "Comma-separated wallet chain list, e.g. base,tempo")
     .action(
-      withErrorHandler(async function (this: Command, handle: string) {
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { wallet?: boolean; walletChains?: string },
+      ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        const id = await inkbox.createIdentity(handle);
+        const chains = cmdOpts.walletChains
+          ? cmdOpts.walletChains.split(",").map((item) => item.trim()).filter(Boolean)
+          : undefined;
+        const id = await inkbox.createIdentity(handle, {
+          wallet: cmdOpts.wallet || chains ? { chains } : undefined,
+        });
         output(
           {
             agentHandle: id.agentHandle,
             id: id.id,
+            walletId: id.wallet?.id ?? null,
+            walletAddress: id.wallet?.addresses["evm"] ?? null,
           },
           { json: !!opts.json },
         );
@@ -111,6 +126,8 @@ export function registerIdentityCommands(program: Command): void {
             id: id.id,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
+            walletId: id.wallet?.id ?? null,
+            walletAddress: id.wallet?.addresses["evm"] ?? null,
           },
           { json: !!opts.json },
         );

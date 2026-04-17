@@ -18,6 +18,7 @@ import { TextsResource } from "./phone/resources/texts.js";
 import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
+import { WalletsResource } from "./wallet/resources/wallets.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type { AgentIdentitySummary, CreateIdentityOptions } from "./identities/types.js";
 import type {
@@ -112,6 +113,7 @@ export class Inkbox {
   readonly _transcripts: TranscriptsResource;
   readonly _idsResource: IdentitiesResource;
   readonly _vaultResource: VaultResource;
+  readonly _wallets: WalletsResource;
   readonly _rootApiHttp: HttpTransport;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
@@ -136,6 +138,7 @@ export class Inkbox {
     const phoneHttp    = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms, cookieJar);
     const idsHttp      = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms, cookieJar);
     const vaultHttp    = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms, cookieJar);
+    const walletHttp   = new HttpTransport(options.apiKey, `${apiRoot}/wallets`, ms, cookieJar);
     const rootApiHttp  = new HttpTransport(options.apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar);
     const apiHttp      = new HttpTransport(options.apiKey, apiRoot, ms, cookieJar);
 
@@ -150,6 +153,7 @@ export class Inkbox {
     this._transcripts = new TranscriptsResource(phoneHttp);
 
     this._idsResource = new IdentitiesResource(idsHttp);
+    this._wallets = new WalletsResource(walletHttp);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
@@ -208,6 +212,9 @@ export class Inkbox {
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }
 
+  /** Org-level wallet operations (create, list, balance, sends, history, pay-request). */
+  get wallets(): WalletsResource { return this._wallets; }
+
   // ------------------------------------------------------------------
   // Org-level operations
   // ------------------------------------------------------------------
@@ -222,6 +229,7 @@ export class Inkbox {
    * @param options.displayName - Optional human-readable mailbox name.
    * @param options.emailLocalPart - Optional requested mailbox local part.
    * @param options.phoneNumber - Optional phone-number provisioning payload.
+   * @param options.wallet - Optional wallet provisioning payload.
    * @param options.vaultSecretIds - Optional vault secret selection to attach
    *   to the new identity.
    * @returns The created {@link AgentIdentity}.
@@ -241,6 +249,7 @@ export class Inkbox {
       agentHandle,
       mailbox,
       phoneNumber: options.phoneNumber,
+      wallet: options.wallet,
       vaultSecretIds: options.vaultSecretIds,
     });
     // POST /identities returns summary (no channel fields); fetch detail so

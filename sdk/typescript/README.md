@@ -1,6 +1,6 @@
 # @inkbox/sdk
 
-TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, identities, encrypted vault — login credentials, API keys, key pairs, SSH keys, OTP, etc.).
+TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first communication infrastructure for AI agents (email, phone, identities, custodial wallets, encrypted vault — login credentials, API keys, key pairs, SSH keys, OTP, etc.).
 
 ## Install
 
@@ -48,6 +48,16 @@ for await (const message of identity.iterEmails()) {
 
 // List calls
 const calls = await identity.listCalls();
+
+// Create and use a wallet
+const wallet = await identity.createWallet();
+const balance = await identity.getWalletBalance();
+await identity.sendWallet({
+  chain: "base",
+  toAddress: "0x1111111111111111111111111111111111111111",
+  token: "USDC",
+  amount: "1.50",
+});
 
 // Access credentials (vault unlocked at construction)
 const creds = await identity.getCredentials();
@@ -253,6 +263,47 @@ const hits = await inkbox.phoneNumbers.searchTranscripts(phone.id, { q: "refund"
 for (const t of hits) {
   console.log(`[${t.party}] ${t.text}`);
 }
+```
+
+---
+
+## Wallets
+
+```ts
+// Create a wallet directly on an identity
+const wallet = await identity.createWallet({ chains: ["base", "tempo"] });
+console.log(wallet.addresses.evm);
+
+// Or manage wallets at the org level
+const wallets = await inkbox.wallets.list();
+const sameWallet = await inkbox.wallets.get(wallet.id);
+
+// Live balances
+const balance = await inkbox.wallets.getBalance(wallet.id);
+console.log(balance.chains.base.native?.balance);
+
+// Send funds
+const tx = await inkbox.wallets.send(wallet.id, {
+  chain: "base",
+  toAddress: "0x1111111111111111111111111111111111111111",
+  token: "USDC",
+  amount: "2.50",
+  idempotencyKey: "invoice-123",
+});
+console.log(tx.status, tx.chainTxHash);
+
+// Sign a SIWE-style auth challenge
+const signature = await inkbox.wallets.signAuth(wallet.id, {
+  message: "example.com wants you to sign in...",
+});
+console.log(signature.signature);
+
+// Pay a machine-payments 402 challenge
+const result = await identity.payWithWallet({
+  url: "https://example.com/protected",
+  maxCost: "0.10",
+});
+console.log(result.status, result.payment?.protocol);
 ```
 
 ---

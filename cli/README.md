@@ -1,6 +1,6 @@
 # @inkbox/cli
 
-Command-line interface for the [Inkbox API](https://inkbox.ai/docs) — identities, email, phone, and encrypted vault for AI agents.
+Command-line interface for the [Inkbox API](https://inkbox.ai/docs) — identities, email, phone, custodial wallets, and encrypted vault for AI agents.
 
 ## Install
 
@@ -42,6 +42,10 @@ inkbox email send -i support-bot \
 # List recent emails
 inkbox email list -i support-bot --limit 10
 
+# Create and inspect a wallet
+inkbox wallet create --handle support-bot
+inkbox wallet list
+
 # List all identities (JSON output)
 inkbox --json identity list
 ```
@@ -77,6 +81,8 @@ Manage agent identities.
 inkbox identity list                         # List all identities
 inkbox identity get <handle>                 # Get identity details
 inkbox identity create <handle>              # Create a new identity
+  --wallet                                   #   Provision a wallet during identity creation
+  --wallet-chains <chains>                   #   Comma-separated wallet chains, e.g. base,tempo
 inkbox identity delete <handle>              # Delete an identity
 inkbox identity update <handle>              # Update an identity
   --new-handle <handle>                      #   New handle
@@ -189,6 +195,51 @@ inkbox text search -i <handle>              # Search text messages
 
 inkbox text mark-read <text-id> -i <handle>                # Mark a text as read
 inkbox text mark-conversation-read <remote-number> -i <handle>  # Mark conversation as read
+```
+
+### wallet
+
+Custodial wallet operations.
+
+```bash
+inkbox wallet list                           # List wallets visible to the caller
+inkbox wallet create                         # Create a wallet for an identity
+  --handle <handle>                          #   Agent handle (required)
+  --chains <chains>                          #   Comma-separated chains, e.g. base,tempo
+
+inkbox wallet get <wallet-id>                # Get wallet details
+inkbox wallet balance <wallet-id>            # Fetch live wallet balances
+
+inkbox wallet send <wallet-id>               # Send funds from a wallet
+  --chain <chain>                            #   base or tempo (required)
+  --to <address>                             #   Destination address (required)
+  --token <token>                            #   ETH, USDC, USDC.e (required)
+  --amount <amount>                          #   Decimal amount string (required)
+  --memo <memo>                              #   Optional memo
+  --idempotency-key <key>                    #   Optional idempotency key
+
+inkbox wallet sign-auth <wallet-id>          # Sign a SIWE-style auth challenge
+  --message <message>                        #   Challenge text (required)
+
+inkbox wallet transactions <wallet-id>       # List wallet audit-log transactions
+  --chain <chain>                            #   Optional chain filter
+  --status <status>                          #   Optional status filter
+  --limit <n>                                #   Max rows (default: 50)
+
+inkbox wallet receipt <wallet-id> <tx-id>    # Fetch one transaction receipt
+
+inkbox wallet onchain-transactions <wallet-id>   # Read-through on-chain history
+  --chain <chain>                            #   Optional chain filter
+  --direction <direction>                    #   in or out
+  --cursor <cursor>                          #   Opaque cursor from a previous response
+  --limit <n>                                #   Max rows (default: 50)
+
+inkbox wallet pay-request <wallet-id>        # Make an HTTP request and auto-pay supported 402s
+  --url <url>                                #   Target URL (required)
+  --method <method>                          #   HTTP method (default: GET)
+  --header <header>                          #   Repeatable 'Name: value' header
+  --body-base64 <body>                       #   Base64-encoded request body
+  --max-cost <usd>                           #   Max payment amount in USD
 ```
 
 ### vault

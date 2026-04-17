@@ -28,6 +28,15 @@ import type {
   IdentityMailbox,
   IdentityPhoneNumber,
 } from "./identities/types.js";
+import type {
+  AgentWallet,
+  AgentWalletBalance,
+  OnchainTransactionPage,
+  WalletAuthSignature,
+  WalletPayRequestResponse,
+  WalletTransaction,
+  WalletTransactionReceipt,
+} from "./wallet/types.js";
 import type { Inkbox } from "./inkbox.js";
 
 export class AgentIdentity {
@@ -35,6 +44,7 @@ export class AgentIdentity {
   private readonly _inkbox: Inkbox;
   private _mailbox: IdentityMailbox | null;
   private _phoneNumber: IdentityPhoneNumber | null;
+  private _wallet: AgentWallet | null;
   private _credentials: Credentials | null = null;
   private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
@@ -43,6 +53,7 @@ export class AgentIdentity {
     this._inkbox            = inkbox;
     this._mailbox           = data.mailbox;
     this._phoneNumber       = data.phoneNumber;
+    this._wallet            = data.wallet;
   }
 
   // ------------------------------------------------------------------
@@ -60,6 +71,9 @@ export class AgentIdentity {
 
   /** The phone number currently assigned to this identity, or `null` if none. */
   get phoneNumber(): IdentityPhoneNumber | null { return this._phoneNumber; }
+
+  /** The wallet currently assigned to this identity, or `null` if none. */
+  get wallet(): AgentWallet | null { return this._wallet; }
 
   /**
    * Identity-scoped credential access.
@@ -286,6 +300,104 @@ export class AgentIdentity {
     this._requirePhone();
     await this._inkbox._idsResource.unlinkPhoneNumber(this.agentHandle);
     this._phoneNumber = null;
+  }
+
+  /**
+   * Create a new custodial wallet and link it to this identity.
+   *
+   * @param options.chains - Optional chain activation list. Defaults to the API default.
+   */
+  async createWallet(
+    options: { chains?: string[] } = {},
+  ): Promise<AgentWallet> {
+    const wallet = await this._inkbox._wallets.create({
+      agentHandle: this.agentHandle,
+      chains: options.chains,
+    });
+    this._wallet = wallet;
+    this._data.wallet = wallet;
+    this._data.walletId = wallet.id;
+    return wallet;
+  }
+
+  /**
+   * Fetch live on-chain balances for this identity's wallet.
+   */
+  async getWalletBalance(): Promise<AgentWalletBalance> {
+    this._requireWallet();
+    return this._inkbox._wallets.getBalance(this._wallet!.id);
+  }
+
+  /**
+   * Broadcast an outbound transaction from this identity's wallet.
+   */
+  async sendWallet(options: {
+    chain: string;
+    toAddress: string;
+    token: string;
+    amount: string;
+    memo?: string;
+    idempotencyKey?: string;
+  }): Promise<WalletTransaction> {
+    this._requireWallet();
+    return this._inkbox._wallets.send(this._wallet!.id, options);
+  }
+
+  /**
+   * Sign a SIWE-style authentication challenge with this identity's wallet.
+   */
+  async signWalletAuth(message: string): Promise<WalletAuthSignature> {
+    this._requireWallet();
+    return this._inkbox._wallets.signAuth(this._wallet!.id, { message });
+  }
+
+  /**
+   * List server-side wallet transactions for this identity.
+   */
+  async listWalletTransactions(options: {
+    chain?: string;
+    status?: string;
+    limit?: number;
+  } = {}): Promise<WalletTransaction[]> {
+    this._requireWallet();
+    return this._inkbox._wallets.listTransactions(this._wallet!.id, options);
+  }
+
+  /**
+   * Fetch one wallet transaction receipt for this identity.
+   */
+  async getWalletTransactionReceipt(
+    transactionId: string,
+  ): Promise<WalletTransactionReceipt> {
+    this._requireWallet();
+    return this._inkbox._wallets.getTransactionReceipt(this._wallet!.id, transactionId);
+  }
+
+  /**
+   * List read-through on-chain wallet history for this identity.
+   */
+  async listWalletOnchainTransactions(options: {
+    chain?: string;
+    direction?: string;
+    cursor?: string;
+    limit?: number;
+  } = {}): Promise<OnchainTransactionPage> {
+    this._requireWallet();
+    return this._inkbox._wallets.listOnchainTransactions(this._wallet!.id, options);
+  }
+
+  /**
+   * Make an HTTP request and automatically pay any supported 402 challenge.
+   */
+  async payWithWallet(options: {
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+    bodyBase64?: string;
+    maxCost?: string | number;
+  }): Promise<WalletPayRequestResponse> {
+    this._requireWallet();
+    return this._inkbox._wallets.payRequest(this._wallet!.id, options);
   }
 
   // ------------------------------------------------------------------
@@ -522,6 +634,7 @@ export class AgentIdentity {
       ...result,
       mailbox:          this._mailbox,
       phoneNumber:      this._phoneNumber,
+      wallet:           this._wallet,
     };
   }
 
@@ -539,6 +652,7 @@ export class AgentIdentity {
     this._data             = data;
     this._mailbox          = data.mailbox;
     this._phoneNumber      = data.phoneNumber;
+    this._wallet           = data.wallet;
     this._credentials      = null;
     return this;
   }
@@ -572,6 +686,14 @@ export class AgentIdentity {
     if (!this._phoneNumber) {
       throw new InkboxError(
         `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() or identity.assignPhoneNumber() first.`,
+      );
+    }
+  }
+
+  private _requireWallet(): void {
+    if (!this._wallet) {
+      throw new InkboxError(
+        `Identity '${this.agentHandle}' has no wallet assigned. Call identity.createWallet() first.`,
       );
     }
   }

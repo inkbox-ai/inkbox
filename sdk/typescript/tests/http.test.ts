@@ -219,6 +219,15 @@ describe("HttpTransport", () => {
     await expect(http.get("/fail")).rejects.toThrow("HTTP 502: Bad Gateway");
   });
 
+  it("stringifies structured error detail objects", async () => {
+    mockFetch(400, { detail: { reason: "wallet_not_active", message: "wallet status is paused" } }, false);
+    const http = makeTransport();
+
+    await expect(http.get("/wallets")).rejects.toThrow(
+      'HTTP 400: {"reason":"wallet_not_active","message":"wallet status is paused"}',
+    );
+  });
+
   // --- Timeout ---
 
   it("aborts request on timeout", async () => {

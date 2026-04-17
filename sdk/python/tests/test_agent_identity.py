@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sample_data_identities import IDENTITY_DETAIL_DICT
 from sample_data_mail import MAILBOX_DICT, MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
+from sample_data_wallet import WALLET_TRANSACTION_DICT
 
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
@@ -79,6 +80,60 @@ class TestAgentIdentityCreateMailbox:
         assert mailbox.email_address == MAILBOX_DICT["email_address"]
         assert identity.email_address == MAILBOX_DICT["email_address"]
         assert identity.mailbox is not None
+
+
+class TestAgentIdentityWallet:
+    def test_create_wallet_links_wallet(self):
+        identity, inkbox = _identity_without_mailbox()
+        inkbox._wallets.create.return_value = identity.wallet or _AgentIdentityData._from_dict(IDENTITY_DETAIL_DICT).wallet
+
+        wallet = identity.create_wallet(chains=["base"])
+
+        inkbox._wallets.create.assert_called_once_with(
+            agent_handle="sales-agent",
+            chains=["base"],
+        )
+        assert str(wallet.id) == IDENTITY_DETAIL_DICT["wallet"]["id"]
+        assert identity.wallet is not None
+
+    def test_get_wallet_balance_delegates(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._wallets.get_balance.return_value = MagicMock()
+
+        identity.get_wallet_balance()
+
+        inkbox._wallets.get_balance.assert_called_once_with(
+            UUID(IDENTITY_DETAIL_DICT["wallet"]["id"])
+        )
+
+    def test_send_wallet_delegates(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._wallets.send.return_value = type("Tx", (), {"id": WALLET_TRANSACTION_DICT["id"]})()
+
+        identity.send_wallet(
+            chain="base",
+            to_address="0x1111111111111111111111111111111111111111",
+            token="USDC",
+            amount="50.0",
+        )
+
+        inkbox._wallets.send.assert_called_once_with(
+            UUID(IDENTITY_DETAIL_DICT["wallet"]["id"]),
+            chain="base",
+            to_address="0x1111111111111111111111111111111111111111",
+            token="USDC",
+            amount="50.0",
+            memo=None,
+            idempotency_key=None,
+        )
+
+    def test_wallet_helpers_require_wallet(self):
+        detail = {**IDENTITY_DETAIL_DICT, "wallet": None}
+        data = _AgentIdentityData._from_dict(detail)
+        identity = AgentIdentity(data, MagicMock())
+
+        with pytest.raises(InkboxError, match="no wallet assigned"):
+            identity.get_wallet_balance()
 
 
 class TestAgentIdentityGetThread:

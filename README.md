@@ -6,7 +6,7 @@ https://inkbox.ai
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-API-first communication infrastructure for AI agents — email, phone, identities, and encrypted vault (login credentials, API keys, key pairs, SSH keys, OTP, etc.).
+API-first communication infrastructure for AI agents — email, phone, identities, custodial wallets, and encrypted vault (login credentials, API keys, key pairs, SSH keys, OTP, etc.).
 
 | Package | Language | Install |
 |---|---|---|
@@ -47,6 +47,16 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     # Read text messages (SMS/MMS)
     for t in identity.list_texts():
         print(t.remote_phone_number, t.text)
+
+    # Create and use a wallet
+    wallet = identity.create_wallet()
+    balance = identity.get_wallet_balance()
+    tx = identity.send_wallet(
+        chain="base",
+        to_address="0x1111111111111111111111111111111111111111",
+        token="USDC",
+        amount="1.50",
+    )
 ```
 
 ### TypeScript
@@ -80,6 +90,16 @@ const texts = await identity.listTexts();
 for (const t of texts) {
   console.log(t.remotePhoneNumber, t.text);
 }
+
+// Create and use a wallet
+const wallet = await identity.createWallet();
+const balance = await identity.getWalletBalance();
+const tx = await identity.sendWallet({
+  chain: "base",
+  toAddress: "0x1111111111111111111111111111111111111111",
+  token: "USDC",
+  amount: "1.50",
+});
 ```
 
 ### CLI
@@ -102,6 +122,11 @@ inkbox phone call -i my-agent --to +15551234567
 
 # Read text messages
 inkbox text list -i my-agent
+
+# Create and use a wallet
+inkbox wallet create --handle my-agent
+inkbox wallet list
+inkbox wallet balance <wallet-id>
 
 # Initialize vault (first time only — requires INKBOX_VAULT_KEY)
 inkbox vault init --vault-key "my-vault-key"

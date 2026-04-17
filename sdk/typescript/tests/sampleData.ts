@@ -192,11 +192,28 @@ export const RAW_IDENTITY_PHONE = {
   updated_at: "2026-03-09T00:00:00Z",
 };
 
+export const RAW_WALLET = {
+  id: "ffff6666-0000-0000-0000-000000000001",
+  organization_id: "org-abc123",
+  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
+  status: "active",
+  addresses: {
+    evm: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1",
+  },
+  chains: [
+    { chain: "base" },
+    { chain: "tempo" },
+  ],
+  created_at: "2026-03-09T00:00:00Z",
+  updated_at: "2026-03-09T00:00:00Z",
+};
+
 export const RAW_IDENTITY = {
   id: "eeee5555-0000-0000-0000-000000000001",
   organization_id: "org-abc123",
   agent_handle: "sales-agent",
   email_address: "sales-agent@inkboxmail.com",
+  wallet_id: RAW_WALLET.id,
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:00:00Z",
 };
@@ -205,6 +222,124 @@ export const RAW_IDENTITY_DETAIL = {
   ...RAW_IDENTITY,
   mailbox: RAW_IDENTITY_MAILBOX,
   phone_number: RAW_IDENTITY_PHONE,
+  wallet: RAW_WALLET,
+};
+
+// ---- Wallets ----
+
+export const RAW_WALLET_BALANCE = {
+  wallet_id: RAW_WALLET.id,
+  chains: {
+    base: {
+      address: RAW_WALLET.addresses.evm,
+      native: {
+        symbol: "ETH",
+        balance: "0.5",
+        balance_raw: "500000000000000000",
+        decimals: 18,
+      },
+      tokens: [
+        {
+          symbol: "USDC",
+          contract_address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+          balance: "150.0",
+          balance_raw: "150000000",
+          decimals: 6,
+        },
+      ],
+    },
+    tempo: {
+      address: RAW_WALLET.addresses.evm,
+      native: null,
+      tokens: [
+        {
+          symbol: "USDC.e",
+          contract_address: "0x20C000000000000000000000b9537d11c60E8b50",
+          balance: "50.0",
+          balance_raw: "50000000",
+          decimals: 6,
+        },
+      ],
+    },
+  },
+};
+
+export const RAW_WALLET_TRANSACTION = {
+  id: "99997777-0000-0000-0000-000000000001",
+  wallet_id: RAW_WALLET.id,
+  chain: "base",
+  chain_tx_hash: "0xdeadbeef",
+  from_address: RAW_WALLET.addresses.evm,
+  to_address: "0x1111111111111111111111111111111111111111",
+  token: "USDC",
+  amount_raw: "50000000",
+  amount_decimal: "50.0",
+  status: "pending",
+  failure_reason: null,
+  memo: "Payment for API call",
+  idempotency_key: "pay-123",
+  metadata: null,
+  created_at: "2026-03-09T00:00:00Z",
+  broadcast_at: "2026-03-09T00:00:01Z",
+  confirmed_at: null,
+};
+
+export const RAW_WALLET_AUTH_SIGNATURE = {
+  signer_address: RAW_WALLET.addresses.evm,
+  message: "example.com wants you to sign in",
+  digest: "0xabc123",
+  signature: "0xdef456",
+  r: "0xr",
+  s: "0xs",
+  v: 27,
+};
+
+export const RAW_WALLET_RECEIPT = {
+  tx_id: RAW_WALLET_TRANSACTION.id,
+  chain_tx_hash: RAW_WALLET_TRANSACTION.chain_tx_hash,
+  chain: RAW_WALLET_TRANSACTION.chain,
+  status: "confirmed",
+  block_number: 123456,
+  gas_used: 21000,
+  explorer_url: "https://basescan.org/tx/0xdeadbeef",
+};
+
+export const RAW_ONCHAIN_TRANSACTION = {
+  chain: "base",
+  hash: "0xfeedface",
+  direction: "out",
+  from_address: RAW_WALLET.addresses.evm,
+  to_address: "0x2222222222222222222222222222222222222222",
+  token: "ETH",
+  amount_raw: "1000000000000000",
+  amount_decimal: "0.001",
+  decimals: 18,
+  status: "confirmed",
+  block_number: 123456,
+  confirmed_at: "2026-03-09T00:03:00Z",
+  explorer_url: "https://basescan.org/tx/0xfeedface",
+};
+
+export const RAW_ONCHAIN_TRANSACTION_PAGE = {
+  items: [RAW_ONCHAIN_TRANSACTION],
+  next_cursor: "cursor-123",
+};
+
+export const RAW_WALLET_PAY_REQUEST_RESPONSE = {
+  status: 200,
+  headers: {
+    "content-type": "application/json",
+  },
+  body: "eyJvayI6dHJ1ZX0=",
+  body_truncated: false,
+  payment: {
+    protocol: "mpp",
+    chain: "tempo",
+    currency: "USDC.e",
+    amount_raw: "1000000",
+    recipient: "0x3333333333333333333333333333333333333333",
+    tx_hash: "0xpaid",
+  },
 };
 
 // ---- Signing Keys ----

@@ -16,6 +16,9 @@ import {
   RAW_PHONE_CALL_WITH_RATE_LIMIT,
   RAW_PHONE_CALL,
   RAW_PHONE_TRANSCRIPT,
+  RAW_WALLET,
+  RAW_WALLET_BALANCE,
+  RAW_WALLET_TRANSACTION,
 } from "./sampleData.js";
 
 const PARSED_MAILBOX = {
@@ -37,16 +40,29 @@ const PARSED_PHONE = {
   updatedAt: RAW_IDENTITY_PHONE.updated_at,
 };
 
+const PARSED_WALLET = {
+  id: RAW_WALLET.id,
+  organizationId: RAW_WALLET.organization_id,
+  agentIdentityId: RAW_WALLET.agent_identity_id,
+  status: RAW_WALLET.status,
+  addresses: RAW_WALLET.addresses,
+  chains: RAW_WALLET.chains,
+  createdAt: RAW_WALLET.created_at,
+  updatedAt: RAW_WALLET.updated_at,
+};
+
 function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityData {
   return {
     id: RAW_IDENTITY_DETAIL.id,
     organizationId: RAW_IDENTITY_DETAIL.organization_id,
     agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
     emailAddress: RAW_IDENTITY_DETAIL.email_address,
+    walletId: RAW_IDENTITY_DETAIL.wallet_id,
     createdAt: RAW_IDENTITY_DETAIL.created_at,
     updatedAt: RAW_IDENTITY_DETAIL.updated_at,
     mailbox: PARSED_MAILBOX,
     phoneNumber: PARSED_PHONE,
+    wallet: PARSED_WALLET,
     ...overrides,
   };
 }
@@ -60,6 +76,16 @@ function mockInkbox() {
     _calls: { place: vi.fn(), list: vi.fn() },
     _transcripts: { list: vi.fn() },
     _texts: { update: vi.fn(), updateConversation: vi.fn() },
+    _wallets: {
+      create: vi.fn(),
+      getBalance: vi.fn(),
+      send: vi.fn(),
+      signAuth: vi.fn(),
+      listTransactions: vi.fn(),
+      getTransactionReceipt: vi.fn(),
+      listOnchainTransactions: vi.fn(),
+      payRequest: vi.fn(),
+    },
     _idsResource: {
       get: vi.fn(),
       create: vi.fn(),
@@ -85,12 +111,17 @@ describe("AgentIdentity properties", () => {
     const identity = new AgentIdentity(makeData(), mockInkbox());
     expect(identity.mailbox).toEqual(PARSED_MAILBOX);
     expect(identity.phoneNumber).toEqual(PARSED_PHONE);
+    expect(identity.wallet).toEqual(PARSED_WALLET);
   });
 
   it("returns null for missing channels", () => {
-    const identity = new AgentIdentity(makeData({ mailbox: null, phoneNumber: null }), mockInkbox());
+    const identity = new AgentIdentity(
+      makeData({ mailbox: null, phoneNumber: null, wallet: null, walletId: null }),
+      mockInkbox(),
+    );
     expect(identity.mailbox).toBeNull();
     expect(identity.phoneNumber).toBeNull();
+    expect(identity.wallet).toBeNull();
   });
 });
 
@@ -190,6 +221,21 @@ describe("AgentIdentity channel management", () => {
   it("unlinkPhoneNumber throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
     await expect(identity.unlinkPhoneNumber()).rejects.toThrow(InkboxError);
+  });
+
+  it("createWallet creates and links a wallet", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._wallets.create).mockResolvedValue(PARSED_WALLET as never);
+    const identity = new AgentIdentity(makeData({ wallet: null, walletId: null }), ink);
+
+    const wallet = await identity.createWallet({ chains: ["base"] });
+
+    expect(ink._wallets.create).toHaveBeenCalledWith({
+      agentHandle: "sales-agent",
+      chains: ["base"],
+    });
+    expect(wallet.id).toBe(RAW_WALLET.id);
+    expect(identity.wallet?.addresses.evm).toBe(RAW_WALLET.addresses.evm);
   });
 });
 
@@ -380,6 +426,46 @@ describe("AgentIdentity phone helpers", () => {
   it("markTextConversationRead throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
     await expect(identity.markTextConversationRead("+15551234567")).rejects.toThrow(InkboxError);
+  });
+});
+
+describe("AgentIdentity wallet helpers", () => {
+  it("getWalletBalance delegates to wallets resource", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._wallets.getBalance).mockResolvedValue({
+      walletId: RAW_WALLET.id,
+      chains: RAW_WALLET_BALANCE.chains,
+    } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.getWalletBalance();
+
+    expect(ink._wallets.getBalance).toHaveBeenCalledWith(RAW_WALLET.id);
+  });
+
+  it("sendWallet delegates to wallets resource", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._wallets.send).mockResolvedValue({ id: RAW_WALLET_TRANSACTION.id } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.sendWallet({
+      chain: "base",
+      toAddress: "0x1111111111111111111111111111111111111111",
+      token: "USDC",
+      amount: "50.0",
+    });
+
+    expect(ink._wallets.send).toHaveBeenCalledWith(RAW_WALLET.id, {
+      chain: "base",
+      toAddress: "0x1111111111111111111111111111111111111111",
+      token: "USDC",
+      amount: "50.0",
+    });
+  });
+
+  it("wallet helpers throw when no wallet", async () => {
+    const identity = new AgentIdentity(makeData({ wallet: null, walletId: null }), mockInkbox());
+    await expect(identity.getWalletBalance()).rejects.toThrow(InkboxError);
   });
 });
 

@@ -2,6 +2,9 @@
  * inkbox-identities TypeScript SDK — public types.
  */
 
+import type { AgentWallet, RawAgentWallet } from "../wallet/types.js";
+import { parseAgentWallet } from "../wallet/types.js";
+
 export interface IdentityMailboxCreateOptions {
   displayName?: string;
   emailLocalPart?: string;
@@ -16,11 +19,16 @@ export interface IdentityPhoneNumberCreateOptions {
   incomingTextWebhookUrl?: string;
 }
 
+export interface IdentityWalletCreateOptions {
+  chains?: string[];
+}
+
 export interface CreateIdentityOptions {
   createMailbox?: boolean;
   displayName?: string;
   emailLocalPart?: string;
   phoneNumber?: IdentityPhoneNumberCreateOptions;
+  wallet?: IdentityWalletCreateOptions;
   vaultSecretIds?: string | string[] | "*" | "all";
 }
 
@@ -54,6 +62,7 @@ export interface AgentIdentitySummary {
   agentHandle: string;
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   emailAddress: string | null;
+  walletId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +73,8 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
+  /** Wallet assigned to this identity, or null if unlinked. */
+  wallet: AgentWallet | null;
 }
 
 // ---- internal raw API shapes (snake_case from JSON) ----
@@ -93,6 +104,7 @@ export interface RawAgentIdentitySummary {
   organization_id: string;
   agent_handle: string;
   email_address: string | null;
+  wallet_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -100,6 +112,7 @@ export interface RawAgentIdentitySummary {
 export interface RawAgentIdentityData extends RawAgentIdentitySummary {
   mailbox: RawIdentityMailbox | null;
   phone_number: RawIdentityPhoneNumber | null;
+  wallet: RawAgentWallet | null;
 }
 
 // ---- parsers ----
@@ -134,6 +147,7 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     organizationId: r.organization_id,
     agentHandle: r.agent_handle,
     emailAddress: r.email_address,
+    walletId: r.wallet_id,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -144,6 +158,7 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
     ...parseAgentIdentitySummary(r),
     mailbox: r.mailbox ? parseIdentityMailbox(r.mailbox) : null,
     phoneNumber: r.phone_number ? parseIdentityPhoneNumber(r.phone_number) : null,
+    wallet: r.wallet ? parseAgentWallet(r.wallet) : null,
   };
 }
 
@@ -176,6 +191,14 @@ export function identityPhoneNumberCreateOptionsToWire(
   if (options.clientWebsocketUrl !== undefined) body["client_websocket_url"] = options.clientWebsocketUrl;
   if (options.incomingCallWebhookUrl !== undefined) body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
   if (options.incomingTextWebhookUrl !== undefined) body["incoming_text_webhook_url"] = options.incomingTextWebhookUrl;
+  return body;
+}
+
+export function identityWalletCreateOptionsToWire(
+  options: IdentityWalletCreateOptions,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (options.chains !== undefined) body["chains"] = options.chains;
   return body;
 }
 

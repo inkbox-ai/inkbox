@@ -6,7 +6,8 @@ import { PhoneNumbersResource } from "../src/phone/resources/numbers.js";
 import { IdentitiesResource } from "../src/identities/resources/identities.js";
 import { AgentIdentity } from "../src/agent_identity.js";
 import { VaultResource } from "../src/vault/resources/vault.js";
-import { RAW_IDENTITY, RAW_IDENTITY_DETAIL, RAW_SIGNING_KEY } from "./sampleData.js";
+import { WalletsResource } from "../src/wallet/resources/wallets.js";
+import { RAW_IDENTITY, RAW_IDENTITY_DETAIL, RAW_SIGNING_KEY, RAW_WALLET } from "./sampleData.js";
 
 function makeInkbox() {
   return new Inkbox({ apiKey: "test-key", baseUrl: "https://test.inkbox.ai" });
@@ -58,6 +59,11 @@ describe("Inkbox constructor", () => {
     expect(ink.phoneNumbers).toBeInstanceOf(PhoneNumbersResource);
   });
 
+  it("exposes wallets accessor", () => {
+    const ink = makeInkbox();
+    expect(ink.wallets).toBeInstanceOf(WalletsResource);
+  });
+
   it("strips trailing slash from baseUrl", () => {
     const ink = new Inkbox({ apiKey: "key", baseUrl: "https://test.inkbox.ai/" });
     expect(ink.mailboxes).toBeInstanceOf(MailboxesResource);
@@ -91,6 +97,7 @@ describe("Inkbox.createIdentity", () => {
       organizationId: RAW_IDENTITY.organization_id,
       agentHandle: RAW_IDENTITY.agent_handle,
       emailAddress: RAW_IDENTITY.email_address,
+      walletId: RAW_IDENTITY.wallet_id,
       createdAt: RAW_IDENTITY.created_at,
       updatedAt: RAW_IDENTITY.updated_at,
     });
@@ -99,6 +106,7 @@ describe("Inkbox.createIdentity", () => {
       organizationId: RAW_IDENTITY_DETAIL.organization_id,
       agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
       emailAddress: RAW_IDENTITY_DETAIL.email_address,
+      walletId: RAW_IDENTITY_DETAIL.wallet_id,
       createdAt: RAW_IDENTITY_DETAIL.created_at,
       updatedAt: RAW_IDENTITY_DETAIL.updated_at,
       mailbox: {
@@ -118,6 +126,16 @@ describe("Inkbox.createIdentity", () => {
         createdAt: RAW_IDENTITY_DETAIL.phone_number.created_at,
         updatedAt: RAW_IDENTITY_DETAIL.phone_number.updated_at,
       },
+      wallet: {
+        id: RAW_WALLET.id,
+        organizationId: RAW_WALLET.organization_id,
+        agentIdentityId: RAW_WALLET.agent_identity_id,
+        status: RAW_WALLET.status,
+        addresses: RAW_WALLET.addresses,
+        chains: RAW_WALLET.chains,
+        createdAt: RAW_WALLET.created_at,
+        updatedAt: RAW_WALLET.updated_at,
+      },
     });
 
     const identity = await ink.createIdentity("sales-agent");
@@ -135,6 +153,7 @@ describe("Inkbox.createIdentity", () => {
       organizationId: RAW_IDENTITY.organization_id,
       agentHandle: RAW_IDENTITY.agent_handle,
       emailAddress: "sales.team@inkboxmail.com",
+      walletId: RAW_IDENTITY.wallet_id,
       createdAt: RAW_IDENTITY.created_at,
       updatedAt: RAW_IDENTITY.updated_at,
     });
@@ -156,6 +175,9 @@ describe("Inkbox.createIdentity", () => {
         incomingCallAction: "webhook",
         incomingCallWebhookUrl: "https://example.com/calls",
       },
+      wallet: {
+        chains: ["base", "tempo"],
+      },
       vaultSecretIds: ["secret-1", "secret-2"],
     });
 
@@ -168,6 +190,9 @@ describe("Inkbox.createIdentity", () => {
       phoneNumber: {
         incomingCallAction: "webhook",
         incomingCallWebhookUrl: "https://example.com/calls",
+      },
+      wallet: {
+        chains: ["base", "tempo"],
       },
       vaultSecretIds: ["secret-1", "secret-2"],
     });
@@ -182,10 +207,12 @@ describe("Inkbox.getIdentity", () => {
       organizationId: RAW_IDENTITY_DETAIL.organization_id,
       agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
       emailAddress: RAW_IDENTITY_DETAIL.email_address,
+      walletId: RAW_IDENTITY_DETAIL.wallet_id,
       createdAt: RAW_IDENTITY_DETAIL.created_at,
       updatedAt: RAW_IDENTITY_DETAIL.updated_at,
       mailbox: null,
       phoneNumber: null,
+      wallet: null,
     });
 
     const identity = await ink.getIdentity("sales-agent");
@@ -204,6 +231,7 @@ describe("Inkbox.listIdentities", () => {
         organizationId: RAW_IDENTITY.organization_id,
         agentHandle: RAW_IDENTITY.agent_handle,
         emailAddress: RAW_IDENTITY.email_address,
+        walletId: RAW_IDENTITY.wallet_id,
         createdAt: RAW_IDENTITY.created_at,
         updatedAt: RAW_IDENTITY.updated_at,
       },

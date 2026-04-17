@@ -12,6 +12,7 @@ from sample_data_identities import (
     IDENTITY_DETAIL_DICT,
     IDENTITY_MAILBOX_DICT,
     IDENTITY_PHONE_DICT,
+    IDENTITY_WALLET_DICT,
 )
 from inkbox.identities.types import (
     AgentIdentitySummary,
@@ -19,6 +20,7 @@ from inkbox.identities.types import (
     IdentityMailbox,
     IdentityPhoneNumber,
 )
+from inkbox.wallet.types import AgentWallet
 
 
 class TestAgentIdentitySummaryParsing:
@@ -28,6 +30,7 @@ class TestAgentIdentitySummaryParsing:
         assert isinstance(i.id, UUID)
         assert i.organization_id == "org-abc123"
         assert i.agent_handle == "sales-agent"
+        assert i.wallet_id is None
         assert isinstance(i.created_at, datetime)
         assert isinstance(i.updated_at, datetime)
 
@@ -42,12 +45,15 @@ class TestAgentIdentityDataParsing:
         assert d.mailbox.email_address == "sales-agent@inkbox.ai"
         assert isinstance(d.phone_number, IdentityPhoneNumber)
         assert d.phone_number.number == "+18335794607"
+        assert isinstance(d.wallet, AgentWallet)
+        assert d.wallet.addresses["evm"] == IDENTITY_WALLET_DICT["addresses"]["evm"]
 
     def test_no_channels(self):
         d = _AgentIdentityData._from_dict(IDENTITY_DICT)
 
         assert d.mailbox is None
         assert d.phone_number is None
+        assert d.wallet is None
 
 
 class TestIdentityMailboxParsing:

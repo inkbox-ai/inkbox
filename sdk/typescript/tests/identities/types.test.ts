@@ -11,6 +11,7 @@ import {
   RAW_IDENTITY_DETAIL,
   RAW_IDENTITY_MAILBOX,
   RAW_IDENTITY_PHONE,
+  RAW_WALLET,
 } from "../sampleData.js";
 
 describe("parseAgentIdentitySummary", () => {
@@ -20,6 +21,7 @@ describe("parseAgentIdentitySummary", () => {
     expect(i.organizationId).toBe("org-abc123");
     expect(i.agentHandle).toBe("sales-agent");
     expect(i.emailAddress).toBe("sales-agent@inkboxmail.com");
+    expect(i.walletId).toBe(RAW_WALLET.id);
     expect(i.createdAt).toBeInstanceOf(Date);
     expect(i.updatedAt).toBeInstanceOf(Date);
   });
@@ -33,12 +35,15 @@ describe("parseAgentIdentityData", () => {
     expect(d.mailbox!.emailAddress).toBe("sales-agent@inkbox.ai");
     expect(d.phoneNumber).not.toBeNull();
     expect(d.phoneNumber!.number).toBe("+18335794607");
+    expect(d.wallet).not.toBeNull();
+    expect(d.wallet!.addresses.evm).toBe(RAW_WALLET.addresses.evm);
   });
 
   it("returns null for missing channels", () => {
-    const d = parseAgentIdentityData({ ...RAW_IDENTITY, mailbox: null, phone_number: null });
+    const d = parseAgentIdentityData({ ...RAW_IDENTITY, mailbox: null, phone_number: null, wallet: null });
     expect(d.mailbox).toBeNull();
     expect(d.phoneNumber).toBeNull();
+    expect(d.wallet).toBeNull();
   });
 });
 

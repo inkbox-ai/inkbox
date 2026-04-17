@@ -30,6 +30,16 @@ export class InkboxAPIError extends InkboxError {
   }
 }
 
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (detail === undefined || detail === null) return fallback;
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return String(detail);
+  }
+}
+
 type Params = Record<string, string | number | boolean | undefined | null>;
 
 type StoredCookie = {
@@ -253,8 +263,8 @@ export class HttpTransport {
     if (!resp.ok) {
       let detail: string;
       try {
-        const err = (await resp.json()) as { detail?: string };
-        detail = err.detail ?? resp.statusText;
+        const err = (await resp.json()) as { detail?: unknown };
+        detail = formatErrorDetail(err.detail, resp.statusText);
       } catch {
         detail = resp.statusText;
       }

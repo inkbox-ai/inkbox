@@ -11,6 +11,8 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
+from inkbox.wallet.types import AgentWallet
+
 
 @dataclass
 class IdentityMailboxCreateOptions:
@@ -79,6 +81,26 @@ class IdentityPhoneNumberCreateOptions:
             body["incoming_call_webhook_url"] = self.incoming_call_webhook_url
         if self.incoming_text_webhook_url is not None:
             body["incoming_text_webhook_url"] = self.incoming_text_webhook_url
+        return body
+
+
+@dataclass
+class IdentityWalletCreateOptions:
+    """
+    Optional wallet provisioning payload nested under identity creation.
+
+    Attributes:
+        chains: Optional list of chains to activate. If omitted, the API
+            uses its default chain set.
+    """
+
+    chains: list[str] | None = None
+
+    def to_wire(self) -> dict[str, Any]:
+        """Return a JSON-serializable dict matching the API schema."""
+        body: dict[str, Any] = {}
+        if self.chains is not None:
+            body["chains"] = self.chains
         return body
 
 
@@ -155,6 +177,7 @@ class AgentIdentitySummary:
     email_address: str | None
     created_at: datetime
     updated_at: datetime
+    wallet_id: UUID | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentIdentitySummary:
@@ -163,6 +186,7 @@ class AgentIdentitySummary:
             organization_id=d["organization_id"],
             agent_handle=d["agent_handle"],
             email_address=d.get("email_address"),
+            wallet_id=UUID(d["wallet_id"]) if d.get("wallet_id") else None,
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
         )
@@ -179,14 +203,17 @@ class _AgentIdentityData(AgentIdentitySummary):
 
     mailbox: IdentityMailbox | None = field(default=None)
     phone_number: IdentityPhoneNumber | None = field(default=None)
+    wallet: AgentWallet | None = field(default=None)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> _AgentIdentityData:  # type: ignore[override]
         base = AgentIdentitySummary._from_dict(d)
         mailbox_data = d.get("mailbox")
         phone_data = d.get("phone_number")
+        wallet_data = d.get("wallet")
         return cls(
             **base.__dict__,
             mailbox=IdentityMailbox._from_dict(mailbox_data) if mailbox_data else None,
             phone_number=IdentityPhoneNumber._from_dict(phone_data) if phone_data else None,
+            wallet=AgentWallet._from_dict(wallet_data) if wallet_data else None,
         )

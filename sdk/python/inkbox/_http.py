@@ -6,6 +6,7 @@ Sync HTTP transport (internal). Shared by all resource packages.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -84,7 +85,22 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code < 400:
         return
     try:
-        detail = resp.json().get("detail", resp.text)
+        payload = resp.json()
+        detail = payload.get("detail", resp.text) if isinstance(payload, dict) else payload
     except Exception:
         detail = resp.text
-    raise InkboxAPIError(status_code=resp.status_code, detail=str(detail))
+    raise InkboxAPIError(
+        status_code=resp.status_code,
+        detail=_format_error_detail(detail, resp.text),
+    )
+
+
+def _format_error_detail(detail: object, fallback: str) -> str:
+    if isinstance(detail, str):
+        return detail
+    if detail is None:
+        return fallback
+    try:
+        return json.dumps(detail, separators=(",", ":"))
+    except TypeError:
+        return str(detail)

@@ -38,6 +38,7 @@ from inkbox.identities.types import (
     IdentityMailbox,
     IdentityPhoneNumberCreateOptions,
     IdentityPhoneNumber,
+    IdentityWalletCreateOptions,
 )
 
 # Vault types
@@ -69,6 +70,20 @@ from inkbox.vault.crypto import (
     generate_org_encryption_key,
     generate_recovery_code,
     generate_vault_key_material,
+)
+from inkbox.wallet.types import (
+    AgentWallet,
+    AgentWalletBalance,
+    AgentWalletChain,
+    NativeBalance,
+    OnchainTransaction,
+    OnchainTransactionPage,
+    TokenBalance,
+    WalletAuthSignature,
+    WalletChainBalance,
+    WalletPayRequestResponse,
+    WalletTransaction,
+    WalletTransactionReceipt,
 )
 
 # Agent signup types
@@ -121,6 +136,20 @@ __all__ = [
     "IdentityMailbox",
     "IdentityPhoneNumberCreateOptions",
     "IdentityPhoneNumber",
+    "IdentityWalletCreateOptions",
+    # Wallet types
+    "AgentWallet",
+    "AgentWalletBalance",
+    "AgentWalletChain",
+    "NativeBalance",
+    "OnchainTransaction",
+    "OnchainTransactionPage",
+    "TokenBalance",
+    "WalletAuthSignature",
+    "WalletChainBalance",
+    "WalletPayRequestResponse",
+    "WalletTransaction",
+    "WalletTransactionReceipt",
     # Vault types
     "AccessRule",
     "VaultSecretType",

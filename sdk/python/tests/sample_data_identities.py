@@ -28,8 +28,26 @@ IDENTITY_PHONE_DICT = {
     "updated_at": "2026-03-09T00:00:00Z",
 }
 
+IDENTITY_WALLET_DICT = {
+    "id": "ffff6666-0000-0000-0000-000000000001",
+    "organization_id": "org-abc123",
+    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
+    "status": "active",
+    "addresses": {
+        "evm": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1",
+    },
+    "chains": [
+        {"chain": "base"},
+        {"chain": "tempo"},
+    ],
+    "created_at": "2026-03-09T00:00:00Z",
+    "updated_at": "2026-03-09T00:00:00Z",
+}
+
 IDENTITY_DETAIL_DICT = {
     **IDENTITY_DICT,
+    "wallet_id": IDENTITY_WALLET_DICT["id"],
     "mailbox": IDENTITY_MAILBOX_DICT,
     "phone_number": IDENTITY_PHONE_DICT,
+    "wallet": IDENTITY_WALLET_DICT,
 }

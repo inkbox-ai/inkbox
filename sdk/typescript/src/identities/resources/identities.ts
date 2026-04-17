@@ -9,11 +9,13 @@ import {
   AgentIdentitySummary,
   IdentityMailboxCreateOptions,
   IdentityPhoneNumberCreateOptions,
+  IdentityWalletCreateOptions,
   _AgentIdentityData,
   RawAgentIdentitySummary,
   RawAgentIdentityData,
   identityMailboxCreateOptionsToWire,
   identityPhoneNumberCreateOptionsToWire,
+  identityWalletCreateOptionsToWire,
   parseAgentIdentitySummary,
   parseAgentIdentityData,
   vaultSecretIdsToWire,
@@ -29,17 +31,20 @@ export class IdentitiesResource {
    *   (e.g. `"sales-agent"` or `"@sales-agent"`).
    * @param options.mailbox - Optional mailbox payload to create and link a mailbox.
    * @param options.phoneNumber - Optional phone-number provisioning payload.
+   * @param options.wallet - Optional wallet provisioning payload.
    * @param options.vaultSecretIds - Optional vault secret selection to attach to the identity.
    */
   async create(options: {
     agentHandle: string;
     mailbox?: IdentityMailboxCreateOptions;
     phoneNumber?: IdentityPhoneNumberCreateOptions;
+    wallet?: IdentityWalletCreateOptions;
     vaultSecretIds?: string | string[] | "*" | "all";
   }): Promise<AgentIdentitySummary> {
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
     if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
     if (options.phoneNumber !== undefined) body["phone_number"] = identityPhoneNumberCreateOptionsToWire(options.phoneNumber);
+    if (options.wallet !== undefined) body["wallet"] = identityWalletCreateOptionsToWire(options.wallet);
     if (options.vaultSecretIds !== undefined) body["vault_secret_ids"] = vaultSecretIdsToWire(options.vaultSecretIds);
     const data = await this.http.post<RawAgentIdentitySummary>("/", body);
     return parseAgentIdentitySummary(data);

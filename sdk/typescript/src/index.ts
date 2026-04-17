@@ -44,7 +44,22 @@ export type {
   IdentityMailbox,
   IdentityPhoneNumberCreateOptions,
   IdentityPhoneNumber,
+  IdentityWalletCreateOptions,
 } from "./identities/types.js";
+export type {
+  AgentWallet,
+  AgentWalletBalance,
+  AgentWalletChain,
+  NativeBalance,
+  OnchainTransaction,
+  OnchainTransactionPage,
+  TokenBalance,
+  WalletAuthSignature,
+  WalletChainBalance,
+  WalletPayRequestResponse,
+  WalletTransaction,
+  WalletTransactionReceipt,
+} from "./wallet/types.js";
 export type {
   AccessRule,
   VaultInfo,

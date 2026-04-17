@@ -27,6 +27,7 @@ from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
+    IdentityWalletCreateOptions,
 )
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
@@ -37,6 +38,7 @@ from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.vault.resources.vault import VaultResource
+from inkbox.wallet.resources.wallets import WalletsResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
 _DEFAULT_BASE_URL = "https://inkbox.ai"
@@ -123,6 +125,12 @@ class Inkbox:
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
+        self._wallet_http = HttpTransport(
+            api_key=api_key,
+            base_url=f"{_api_root}/wallets",
+            timeout=timeout,
+            cookie_jar=_cookie_jar,
+        )
         _api_base = f"{base_url.rstrip('/')}/api"
         self._root_api_http = HttpTransport(
             api_key=api_key,
@@ -147,6 +155,7 @@ class Inkbox:
         self._transcripts = TranscriptsResource(self._phone_http)
 
         self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
+        self._wallets = WalletsResource(self._wallet_http)
 
         self._signing_keys = SigningKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
@@ -168,6 +177,7 @@ class Inkbox:
         self._phone_http.close()
         self._ids_http.close()
         self._vault_http.close()
+        self._wallet_http.close()
         self._root_api_http.close()
         self._api_http.close()
 
@@ -193,6 +203,11 @@ class Inkbox:
         """Access the encrypted vault (info, unlock, secrets)."""
         return self._vault_resource
 
+    @property
+    def wallets(self) -> WalletsResource:
+        """Access org-level wallet operations."""
+        return self._wallets
+
     ## Org-level operations
 
     def create_identity(
@@ -203,6 +218,7 @@ class Inkbox:
         display_name: str | None = None,
         email_local_part: str | None = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
+        wallet: IdentityWalletCreateOptions | None = None,
         vault_secret_ids: UUID | str | list[UUID | str] | Literal["*", "all"] | None = None,
     ) -> AgentIdentity:
         """
@@ -234,6 +250,7 @@ class Inkbox:
             agent_handle=agent_handle,
             mailbox=mailbox,
             phone_number=phone_number,
+            wallet=wallet,
             vault_secret_ids=vault_secret_ids,
         )
         data = self._ids_resource.get(agent_handle)

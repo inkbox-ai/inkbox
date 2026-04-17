@@ -31,6 +31,15 @@ from inkbox.phone.types import (
     TextConversationSummary,
     TextMessage,
 )
+from inkbox.wallet.types import (
+    AgentWallet,
+    AgentWalletBalance,
+    OnchainTransactionPage,
+    WalletAuthSignature,
+    WalletPayRequestResponse,
+    WalletTransaction,
+    WalletTransactionReceipt,
+)
 
 if TYPE_CHECKING:
     from inkbox.client import Inkbox
@@ -59,6 +68,7 @@ class AgentIdentity:
         self._inkbox = inkbox
         self._mailbox: IdentityMailbox | None = data.mailbox
         self._phone_number: IdentityPhoneNumber | None = data.phone_number
+        self._wallet: AgentWallet | None = data.wallet
         self._credentials: Credentials | None = None
         self._credentials_vault_ref: object | None = None  # tracks which _unlocked built the cache
 
@@ -87,6 +97,10 @@ class AgentIdentity:
     @property
     def phone_number(self) -> IdentityPhoneNumber | None:
         return self._phone_number
+
+    @property
+    def wallet(self) -> AgentWallet | None:
+        return self._wallet
 
     @property
     def credentials(self) -> Credentials:
@@ -321,6 +335,117 @@ class AgentIdentity:
         self._require_phone()
         self._inkbox._ids_resource.unlink_phone_number(self.agent_handle)
         self._phone_number = None
+
+    def create_wallet(self, *, chains: list[str] | None = None) -> AgentWallet:
+        """Create a new custodial wallet and link it to this identity."""
+        wallet = self._inkbox._wallets.create(
+            agent_handle=self.agent_handle,
+            chains=chains,
+        )
+        self._wallet = wallet
+        self._data.wallet = wallet
+        self._data.wallet_id = wallet.id
+        return wallet
+
+    def get_wallet_balance(self) -> AgentWalletBalance:
+        """Fetch live on-chain balances for this identity's wallet."""
+        self._require_wallet()
+        return self._inkbox._wallets.get_balance(self._wallet.id)  # type: ignore[union-attr]
+
+    def send_wallet(
+        self,
+        *,
+        chain: str,
+        to_address: str,
+        token: str,
+        amount: str,
+        memo: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> WalletTransaction:
+        """Broadcast an outbound transaction from this identity's wallet."""
+        self._require_wallet()
+        return self._inkbox._wallets.send(
+            self._wallet.id,  # type: ignore[union-attr]
+            chain=chain,
+            to_address=to_address,
+            token=token,
+            amount=amount,
+            memo=memo,
+            idempotency_key=idempotency_key,
+        )
+
+    def sign_wallet_auth(self, message: str) -> WalletAuthSignature:
+        """Sign a SIWE-style authentication challenge with this identity's wallet."""
+        self._require_wallet()
+        return self._inkbox._wallets.sign_auth(
+            self._wallet.id,  # type: ignore[union-attr]
+            message=message,
+        )
+
+    def list_wallet_transactions(
+        self,
+        *,
+        chain: str | None = None,
+        status: str | None = None,
+        limit: int | None = None,
+    ) -> list[WalletTransaction]:
+        """List server-side wallet transactions for this identity."""
+        self._require_wallet()
+        return self._inkbox._wallets.list_transactions(
+            self._wallet.id,  # type: ignore[union-attr]
+            chain=chain,
+            status=status,
+            limit=limit,
+        )
+
+    def get_wallet_transaction_receipt(
+        self,
+        transaction_id: UUID | str,
+    ) -> WalletTransactionReceipt:
+        """Fetch one wallet transaction receipt for this identity."""
+        self._require_wallet()
+        return self._inkbox._wallets.get_transaction_receipt(
+            self._wallet.id,  # type: ignore[union-attr]
+            transaction_id,
+        )
+
+    def list_wallet_onchain_transactions(
+        self,
+        *,
+        chain: str | None = None,
+        direction: str | None = None,
+        cursor: str | None = None,
+        limit: int | None = None,
+    ) -> OnchainTransactionPage:
+        """List read-through on-chain wallet history for this identity."""
+        self._require_wallet()
+        return self._inkbox._wallets.list_onchain_transactions(
+            self._wallet.id,  # type: ignore[union-attr]
+            chain=chain,
+            direction=direction,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    def pay_with_wallet(
+        self,
+        *,
+        url: str,
+        method: str | None = None,
+        headers: dict[str, str] | None = None,
+        body_base64: str | None = None,
+        max_cost: str | int | float | None = None,
+    ) -> WalletPayRequestResponse:
+        """Make an HTTP request and automatically pay any supported 402 challenge."""
+        self._require_wallet()
+        return self._inkbox._wallets.pay_request(
+            self._wallet.id,  # type: ignore[union-attr]
+            url=url,
+            method=method,
+            headers=headers,
+            body_base64=body_base64,
+            max_cost=max_cost,
+        )
 
     ## Mail helpers
 
@@ -608,10 +733,12 @@ class AgentIdentity:
             organization_id=result.organization_id,
             agent_handle=result.agent_handle,
             email_address=result.email_address,
+            wallet_id=result.wallet_id,
             created_at=result.created_at,
             updated_at=result.updated_at,
             mailbox=self._mailbox,
             phone_number=self._phone_number,
+            wallet=self._wallet,
         )
 
     def refresh(self) -> AgentIdentity:
@@ -628,6 +755,7 @@ class AgentIdentity:
         self._data = data
         self._mailbox = data.mailbox
         self._phone_number = data.phone_number
+        self._wallet = data.wallet
         self._credentials = None
         return self
 
@@ -651,6 +779,13 @@ class AgentIdentity:
                 "Call identity.provision_phone_number() or identity.assign_phone_number() first."
             )
 
+    def _require_wallet(self) -> None:
+        if not self._wallet:
+            raise InkboxError(
+                f"Identity '{self.agent_handle}' has no wallet assigned. "
+                "Call identity.create_wallet() first."
+            )
+
     def _require_vault_unlocked(self) -> None:
         if self._inkbox._vault_resource._unlocked is None:
             raise InkboxError(
@@ -662,5 +797,6 @@ class AgentIdentity:
         return (
             f"AgentIdentity(agent_handle={self.agent_handle!r}, "
             f"mailbox={self._mailbox.email_address if self._mailbox else None!r}, "
-            f"phone={self._phone_number.number if self._phone_number else None!r})"
+            f"phone={self._phone_number.number if self._phone_number else None!r}, "
+            f"wallet={str(self._wallet.id) if self._wallet else None!r})"
         )

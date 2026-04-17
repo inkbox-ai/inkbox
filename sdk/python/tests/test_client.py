@@ -10,10 +10,13 @@ import httpx
 import pytest
 
 from inkbox import Inkbox
+from inkbox._http import HttpTransport
+from inkbox.exceptions import InkboxAPIError
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKeysResource
+from inkbox.wallet.resources.wallets import WalletsResource
 
 
 class TestInkboxPhoneResources:
@@ -24,6 +27,7 @@ class TestInkboxPhoneResources:
         assert isinstance(client._calls, CallsResource)
         assert isinstance(client._transcripts, TranscriptsResource)
         assert isinstance(client._signing_keys, SigningKeysResource)
+        assert isinstance(client._wallets, WalletsResource)
 
         client.close()
 
@@ -141,3 +145,30 @@ class TestInkboxCookies:
 
         assert seen["cookie"] == "AWSALB=exp-cookie"
         client.close()
+
+
+class TestHttpTransportErrors:
+    def test_stringifies_structured_error_detail_objects(self):
+        http = HttpTransport(api_key="sk-test", base_url="http://localhost:8000/api/v1")
+
+        def fake_send(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                400,
+                json={
+                    "detail": {
+                        "reason": "wallet_not_active",
+                        "message": "wallet status is paused",
+                    },
+                },
+                request=request,
+            )
+
+        http._client.send = fake_send  # type: ignore[method-assign]
+
+        with pytest.raises(
+            InkboxAPIError,
+            match=r'HTTP 400: \{"reason":"wallet_not_active","message":"wallet status is paused"\}',
+        ):
+            http.get("/wallets")
+
+        http.close()

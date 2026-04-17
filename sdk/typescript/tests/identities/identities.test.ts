@@ -48,6 +48,9 @@ describe("IdentitiesResource.create", () => {
         incomingCallWebhookUrl: "https://example.com/calls",
         incomingTextWebhookUrl: "https://example.com/texts",
       },
+      wallet: {
+        chains: ["base", "tempo"],
+      },
       vaultSecretIds: [
         "11111111-1111-1111-1111-111111111111",
         "22222222-2222-2222-2222-222222222222",
@@ -66,6 +69,9 @@ describe("IdentitiesResource.create", () => {
         incoming_call_action: "webhook",
         incoming_call_webhook_url: "https://example.com/calls",
         incoming_text_webhook_url: "https://example.com/texts",
+      },
+      wallet: {
+        chains: ["base", "tempo"],
       },
       vault_secret_ids: [
         "11111111-1111-1111-1111-111111111111",
@@ -123,6 +129,7 @@ describe("IdentitiesResource.get", () => {
 
     expect(http.get).toHaveBeenCalledWith(`/${HANDLE}`);
     expect(detail.mailbox!.emailAddress).toBe("sales-agent@inkbox.ai");
+    expect(detail.wallet!.addresses.evm).toBe("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1");
   });
 });
 

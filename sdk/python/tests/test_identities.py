@@ -13,6 +13,7 @@ from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
+    IdentityWalletCreateOptions,
     _AgentIdentityData,
 )
 
@@ -53,6 +54,9 @@ class TestIdentitiesCreate:
                 incoming_call_webhook_url="https://example.com/calls",
                 incoming_text_webhook_url="https://example.com/texts",
             ),
+            wallet=IdentityWalletCreateOptions(
+                chains=["base", "tempo"],
+            ),
             vault_secret_ids=[
                 UUID("11111111-1111-1111-1111-111111111111"),
                 UUID("22222222-2222-2222-2222-222222222222"),
@@ -73,6 +77,9 @@ class TestIdentitiesCreate:
                     "incoming_call_action": "webhook",
                     "incoming_call_webhook_url": "https://example.com/calls",
                     "incoming_text_webhook_url": "https://example.com/texts",
+                },
+                "wallet": {
+                    "chains": ["base", "tempo"],
                 },
                 "vault_secret_ids": [
                     "11111111-1111-1111-1111-111111111111",
@@ -127,6 +134,7 @@ class TestIdentitiesGet:
         assert isinstance(detail, _AgentIdentityData)
         assert detail.mailbox.email_address == "sales-agent@inkbox.ai"
         assert detail.phone_number.number == "+18335794607"
+        assert detail.wallet.addresses["evm"] == "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1"
 
 
 class TestIdentitiesUpdate:

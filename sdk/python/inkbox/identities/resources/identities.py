@@ -13,6 +13,7 @@ from inkbox.identities.types import (
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
+    IdentityWalletCreateOptions,
     vault_secret_ids_to_wire,
     _AgentIdentityData,
 )
@@ -31,6 +32,7 @@ class IdentitiesResource:
         agent_handle: str,
         mailbox: IdentityMailboxCreateOptions | None = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
+        wallet: IdentityWalletCreateOptions | None = None,
         vault_secret_ids: UUID | str | list[UUID | str] | None = None,
     ) -> AgentIdentitySummary:
         """Create a new agent identity.
@@ -54,6 +56,8 @@ class IdentitiesResource:
             body["mailbox"] = mailbox.to_wire()
         if phone_number is not None:
             body["phone_number"] = phone_number.to_wire()
+        if wallet is not None:
+            body["wallet"] = wallet.to_wire()
         if vault_secret_ids is not None:
             body["vault_secret_ids"] = vault_secret_ids_to_wire(vault_secret_ids)
         data = self._http.post("/", json=body)

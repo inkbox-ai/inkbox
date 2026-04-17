@@ -3,6 +3,10 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@inkbox/sdk": ["../sdk/typescript/dist/index.d.ts"]
+    },
     "types": ["node"],
     "sourceMap": true,
     "outDir": "dist",
