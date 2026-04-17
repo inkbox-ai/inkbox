@@ -219,7 +219,8 @@ inkbox wallet send <wallet-id>               # Send funds from a wallet
   --idempotency-key <key>                    #   Optional idempotency key
 
 inkbox wallet sign-auth <wallet-id>          # Sign a SIWE-style auth challenge
-  --message <message>                        #   Challenge text (required)
+  --message <message>                        #   Challenge text; pass '-' to read from stdin
+  --message-file <path>                      #   Read challenge text from a file or '-' for stdin
 
 inkbox wallet transactions <wallet-id>       # List wallet audit-log transactions
   --chain <chain>                            #   Optional chain filter
@@ -233,6 +234,8 @@ inkbox wallet pay-request <wallet-id>        # Make an HTTP request and auto-pay
   --method <method>                          #   HTTP method (default: GET)
   --header <header>                          #   Repeatable 'Name: value' header
   --body-base64 <body>                       #   Base64-encoded request body
+  --body-file <path>                         #   Read raw request bytes from a file or '-' for stdin
+  --body-json <json>                         #   Encode a JSON string as UTF-8 and base64-encode it
   --max-cost <usd>                           #   Max payment amount in USD
 ```
 

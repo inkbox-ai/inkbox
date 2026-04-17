@@ -37,7 +37,7 @@ class WalletsResource:
         agent_handle: str,
         chains: list[str] | None = None,
     ) -> AgentWallet:
-        """Create a new wallet for an identity."""
+        """Create a new wallet for an identity. Defaults to base+tempo if None."""
         body: dict[str, Any] = {"agent_handle": agent_handle}
         if chains is not None:
             body["chains"] = chains
@@ -101,6 +101,7 @@ class WalletsResource:
         limit: int | None = None,
     ) -> list[WalletTransaction]:
         """List wallet transactions from the server-side audit log."""
+        # TODO: add cursor support here when the server paginates this route.
         data = self._http.get(
             f"/{wallet_id}/transactions",
             params={"chain": chain, "status": status, "limit": limit},
@@ -112,7 +113,10 @@ class WalletsResource:
         wallet_id: UUID | str,
         transaction_id: UUID | str,
     ) -> WalletTransactionReceipt:
-        """Fetch the current on-chain receipt state for one transaction row."""
+        """Fetch the current on-chain receipt state for one transaction row.
+
+        May flip a pending row to confirmed/failed based on the chain's receipt.
+        """
         data = self._http.get(f"/{wallet_id}/transactions/{transaction_id}/receipt")
         return WalletTransactionReceipt._from_dict(data)
 

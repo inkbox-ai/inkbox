@@ -35,7 +35,7 @@ export class WalletsResource {
     return data.map(parseAgentWallet);
   }
 
-  /** Create a new wallet for an identity. */
+  /** Create a new wallet for an identity. Defaults to the server's base+tempo chain set when chains are omitted. */
   async create(options: {
     agentHandle: string;
     chains?: string[];
@@ -96,7 +96,7 @@ export class WalletsResource {
     return parseWalletAuthSignature(data);
   }
 
-  /** List wallet transactions from the server-side audit log. */
+  /** List wallet transactions from the server-side audit log. The server currently returns a plain list. */
   async listTransactions(
     walletId: string,
     options: {
@@ -105,6 +105,7 @@ export class WalletsResource {
       limit?: number;
     } = {},
   ): Promise<WalletTransaction[]> {
+    // Add cursor support here when the server paginates this route.
     const data = await this.http.get<RawWalletTransaction[]>(
       `/${walletId}/transactions`,
       {
@@ -116,7 +117,7 @@ export class WalletsResource {
     return data.map(parseWalletTransaction);
   }
 
-  /** Fetch the current on-chain receipt state for one transaction row. */
+  /** Fetch the current on-chain receipt state for one transaction row. May flip a pending row to confirmed/failed based on the chain's receipt. */
   async getTransactionReceipt(
     walletId: string,
     transactionId: string,

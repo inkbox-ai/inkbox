@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -33,6 +34,70 @@ function parseHeaders(values: string[] | undefined): Record<string, string> | un
     headers[name] = value;
   }
   return headers;
+}
+
+async function readStdin(): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+async function readUtf8Input(path: string): Promise<string> {
+  if (path === "-") {
+    return (await readStdin()).toString("utf8");
+  }
+  return readFile(path, "utf8");
+}
+
+async function readBinaryInput(path: string): Promise<Buffer> {
+  if (path === "-") {
+    return readStdin();
+  }
+  return readFile(path);
+}
+
+async function resolveSignAuthMessage(
+  options: { message?: string; messageFile?: string },
+): Promise<string> {
+  if (options.message !== undefined && options.messageFile !== undefined) {
+    throw new Error("Use either --message or --message-file, not both.");
+  }
+  if (options.messageFile !== undefined) {
+    return readUtf8Input(options.messageFile);
+  }
+  if (options.message === "-") {
+    return readUtf8Input("-");
+  }
+  if (options.message !== undefined) {
+    return options.message;
+  }
+  throw new Error("Provide --message or --message-file.");
+}
+
+async function resolveBodyBase64(
+  options: { bodyBase64?: string; bodyFile?: string; bodyJson?: string },
+): Promise<string | undefined> {
+  const provided = [
+    options.bodyBase64 !== undefined ? "--body-base64" : null,
+    options.bodyFile !== undefined ? "--body-file" : null,
+    options.bodyJson !== undefined ? "--body-json" : null,
+  ].filter((value): value is string => value !== null);
+
+  if (provided.length > 1) {
+    throw new Error(`Use only one of ${provided.join(", ")}.`);
+  }
+  if (options.bodyBase64 !== undefined) {
+    return options.bodyBase64;
+  }
+  if (options.bodyFile !== undefined) {
+    return (await readBinaryInput(options.bodyFile)).toString("base64");
+  }
+  if (options.bodyJson !== undefined) {
+    return Buffer.from(options.bodyJson, "utf8").toString("base64");
+  }
+  return undefined;
 }
 
 export function registerWalletCommands(program: Command): void {
@@ -182,17 +247,19 @@ export function registerWalletCommands(program: Command): void {
   wallet
     .command("sign-auth <wallet-id>")
     .description("Sign a SIWE-style authentication challenge")
-    .requiredOption("--message <message>", "The full auth challenge text to sign")
+    .option("--message <message>", "The full auth challenge text to sign; pass '-' to read from stdin")
+    .option("--message-file <path>", "Read the full auth challenge text from a file or '-' for stdin")
     .action(
       withErrorHandler(async function (
         this: Command,
         walletId: string,
-        cmdOpts: { message: string },
+        cmdOpts: { message?: string; messageFile?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
+        const message = await resolveSignAuthMessage(cmdOpts);
         const signature = await inkbox.wallets.signAuth(walletId, {
-          message: cmdOpts.message,
+          message,
         });
         output(signature, { json: !!opts.json });
       }),
@@ -247,6 +314,8 @@ export function registerWalletCommands(program: Command): void {
     .option("--method <method>", "HTTP method", "GET")
     .option("--header <header>", "Header in 'Name: value' form; repeat as needed", collect, [])
     .option("--body-base64 <body>", "Base64-encoded request body")
+    .option("--body-file <path>", "Read raw request bytes from a file or '-' for stdin and base64-encode them")
+    .option("--body-json <json>", "Encode a JSON string as UTF-8 and base64-encode it")
     .option("--max-cost <usd>", "Maximum payment amount in USD")
     .action(
       withErrorHandler(async function (
@@ -257,16 +326,19 @@ export function registerWalletCommands(program: Command): void {
           method: string;
           header: string[];
           bodyBase64?: string;
+          bodyFile?: string;
+          bodyJson?: string;
           maxCost?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
+        const bodyBase64 = await resolveBodyBase64(cmdOpts);
         const result = await inkbox.wallets.payRequest(walletId, {
           url: cmdOpts.url,
           method: cmdOpts.method,
           headers: parseHeaders(cmdOpts.header),
-          bodyBase64: cmdOpts.bodyBase64,
+          bodyBase64,
           maxCost: cmdOpts.maxCost,
         });
         output(result, { json: !!opts.json });
