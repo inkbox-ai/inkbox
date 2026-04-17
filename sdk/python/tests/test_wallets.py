@@ -6,7 +6,6 @@ Tests for WalletsResource.
 
 from sample_data_identities import IDENTITY_WALLET_DICT
 from sample_data_wallet import (
-    ONCHAIN_TRANSACTION_PAGE_DICT,
     WALLET_AUTH_SIGNATURE_DICT,
     WALLET_BALANCE_DICT,
     WALLET_PAY_REQUEST_RESPONSE_DICT,
@@ -121,23 +120,6 @@ class TestWalletsTransactions:
             f"/{IDENTITY_WALLET_DICT['id']}/transactions/{WALLET_TRANSACTION_DICT['id']}/receipt"
         )
         assert receipt.status == "confirmed"
-
-
-class TestWalletsOnchainHistory:
-    def test_lists_onchain_transactions(self, client, transport):
-        transport.get.return_value = ONCHAIN_TRANSACTION_PAGE_DICT
-
-        page = client.wallets.list_onchain_transactions(
-            IDENTITY_WALLET_DICT["id"],
-            chain="base",
-            limit=25,
-        )
-
-        transport.get.assert_called_once_with(
-            f"/{IDENTITY_WALLET_DICT['id']}/onchain-transactions",
-            params={"chain": "base", "direction": None, "cursor": None, "limit": 25},
-        )
-        assert len(page.items) == 1
 
 
 class TestWalletsPayRequest:

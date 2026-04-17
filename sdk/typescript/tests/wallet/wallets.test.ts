@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import type { HttpTransport } from "../../src/_http.js";
 import { WalletsResource } from "../../src/wallet/resources/wallets.js";
 import {
-  RAW_ONCHAIN_TRANSACTION_PAGE,
   RAW_WALLET,
   RAW_WALLET_AUTH_SIGNATURE,
   RAW_WALLET_BALANCE,
@@ -121,22 +120,6 @@ describe("WalletsResource", () => {
       `/${WALLET_ID}/transactions/${RAW_WALLET_TRANSACTION.id}/receipt`,
     );
     expect(receipt.status).toBe("confirmed");
-  });
-
-  it("lists onchain transactions", async () => {
-    const http = mockHttp();
-    vi.mocked(http.get).mockResolvedValue(RAW_ONCHAIN_TRANSACTION_PAGE);
-    const res = new WalletsResource(http);
-
-    const page = await res.listOnchainTransactions(WALLET_ID, { chain: "base", limit: 25 });
-
-    expect(http.get).toHaveBeenCalledWith(`/${WALLET_ID}/onchain-transactions`, {
-      chain: "base",
-      direction: undefined,
-      cursor: undefined,
-      limit: 25,
-    });
-    expect(page.items).toHaveLength(1);
   });
 
   it("pays requests", async () => {

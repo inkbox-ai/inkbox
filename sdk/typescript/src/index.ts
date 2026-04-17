@@ -51,8 +51,6 @@ export type {
   AgentWalletBalance,
   AgentWalletChain,
   NativeBalance,
-  OnchainTransaction,
-  OnchainTransactionPage,
   TokenBalance,
   WalletAuthSignature,
   WalletChainBalance,

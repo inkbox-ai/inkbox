@@ -8,10 +8,8 @@ import { HttpTransport } from "../../_http.js";
 import {
   AgentWallet,
   AgentWalletBalance,
-  OnchainTransactionPage,
   RawAgentWallet,
   RawAgentWalletBalance,
-  RawOnchainTransactionPage,
   RawWalletAuthSignature,
   RawWalletPayRequestResponse,
   RawWalletTransaction,
@@ -22,7 +20,6 @@ import {
   WalletTransactionReceipt,
   parseAgentWallet,
   parseAgentWalletBalance,
-  parseOnchainTransactionPage,
   parseWalletAuthSignature,
   parseWalletPayRequestResponse,
   parseWalletTransaction,
@@ -128,28 +125,6 @@ export class WalletsResource {
       `/${walletId}/transactions/${transactionId}/receipt`,
     );
     return parseWalletTransactionReceipt(data);
-  }
-
-  /** List read-through on-chain history for a wallet. */
-  async listOnchainTransactions(
-    walletId: string,
-    options: {
-      chain?: string;
-      direction?: string;
-      cursor?: string;
-      limit?: number;
-    } = {},
-  ): Promise<OnchainTransactionPage> {
-    const data = await this.http.get<RawOnchainTransactionPage>(
-      `/${walletId}/onchain-transactions`,
-      {
-        chain: options.chain,
-        direction: options.direction,
-        cursor: options.cursor,
-        limit: options.limit,
-      },
-    );
-    return parseOnchainTransactionPage(data);
   }
 
   /** Make an HTTP request and automatically pay any supported 402 challenge. */

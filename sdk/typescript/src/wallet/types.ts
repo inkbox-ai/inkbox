@@ -83,27 +83,6 @@ export interface WalletTransactionReceipt {
   explorerUrl: string | null;
 }
 
-export interface OnchainTransaction {
-  chain: string;
-  hash: string;
-  direction: string;
-  fromAddress: string;
-  toAddress: string;
-  token: string;
-  amountRaw: string;
-  amountDecimal: string;
-  decimals: number;
-  status: string;
-  blockNumber: number;
-  confirmedAt: Date;
-  explorerUrl: string | null;
-}
-
-export interface OnchainTransactionPage {
-  items: OnchainTransaction[];
-  nextCursor: string | null;
-}
-
 export interface WalletPayRequestResponse {
   status: number;
   headers: Record<string, string>;
@@ -193,27 +172,6 @@ export interface RawWalletTransactionReceipt {
   block_number: number | null;
   gas_used: number | null;
   explorer_url: string | null;
-}
-
-export interface RawOnchainTransaction {
-  chain: string;
-  hash: string;
-  direction: string;
-  from_address: string;
-  to_address: string;
-  token: string;
-  amount_raw: string;
-  amount_decimal: string;
-  decimals: number;
-  status: string;
-  block_number: number;
-  confirmed_at: string;
-  explorer_url: string | null;
-}
-
-export interface RawOnchainTransactionPage {
-  items: RawOnchainTransaction[];
-  next_cursor: string | null;
 }
 
 export interface RawWalletPayRequestResponse {
@@ -324,33 +282,6 @@ export function parseWalletTransactionReceipt(
     blockNumber: r.block_number,
     gasUsed: r.gas_used,
     explorerUrl: r.explorer_url,
-  };
-}
-
-export function parseOnchainTransaction(r: RawOnchainTransaction): OnchainTransaction {
-  return {
-    chain: r.chain,
-    hash: r.hash,
-    direction: r.direction,
-    fromAddress: r.from_address,
-    toAddress: r.to_address,
-    token: r.token,
-    amountRaw: r.amount_raw,
-    amountDecimal: r.amount_decimal,
-    decimals: r.decimals,
-    status: r.status,
-    blockNumber: r.block_number,
-    confirmedAt: new Date(r.confirmed_at),
-    explorerUrl: r.explorer_url,
-  };
-}
-
-export function parseOnchainTransactionPage(
-  r: RawOnchainTransactionPage,
-): OnchainTransactionPage {
-  return {
-    items: r.items.map(parseOnchainTransaction),
-    nextCursor: r.next_cursor,
   };
 }
 

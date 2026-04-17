@@ -241,37 +241,6 @@ export function registerWalletCommands(program: Command): void {
     );
 
   wallet
-    .command("onchain-transactions <wallet-id>")
-    .description("List read-through on-chain transaction history for a wallet")
-    .option("--chain <chain>", "Chain to query")
-    .option("--direction <direction>", "Filter by direction: in or out")
-    .option("--cursor <cursor>", "Opaque cursor from a previous response")
-    .option("--limit <n>", "Maximum rows to return", "50")
-    .action(
-      withErrorHandler(async function (
-        this: Command,
-        walletId: string,
-        cmdOpts: { chain?: string; direction?: string; cursor?: string; limit: string },
-      ) {
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        const page = await inkbox.wallets.listOnchainTransactions(walletId, {
-          chain: cmdOpts.chain,
-          direction: cmdOpts.direction,
-          cursor: cmdOpts.cursor,
-          limit: parseInt(cmdOpts.limit, 10),
-        });
-        output(
-          page.items,
-          {
-            json: !!opts.json,
-            columns: ["hash", "chain", "direction", "token", "amountDecimal", "status", "confirmedAt"],
-          },
-        );
-      }),
-    );
-
-  wallet
     .command("pay-request <wallet-id>")
     .description("Make an HTTP request and automatically pay any supported 402 challenge")
     .requiredOption("--url <url>", "Target URL")

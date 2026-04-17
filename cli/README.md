@@ -228,12 +228,6 @@ inkbox wallet transactions <wallet-id>       # List wallet audit-log transaction
 
 inkbox wallet receipt <wallet-id> <tx-id>    # Fetch one transaction receipt
 
-inkbox wallet onchain-transactions <wallet-id>   # Read-through on-chain history
-  --chain <chain>                            #   Optional chain filter
-  --direction <direction>                    #   in or out
-  --cursor <cursor>                          #   Opaque cursor from a previous response
-  --limit <n>                                #   Max rows (default: 50)
-
 inkbox wallet pay-request <wallet-id>        # Make an HTTP request and auto-pay supported 402s
   --url <url>                                #   Target URL (required)
   --method <method>                          #   HTTP method (default: GET)

@@ -2,14 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   parseAgentWallet,
   parseAgentWalletBalance,
-  parseOnchainTransactionPage,
   parseWalletAuthSignature,
   parseWalletPayRequestResponse,
   parseWalletTransaction,
   parseWalletTransactionReceipt,
 } from "../../src/wallet/types.js";
 import {
-  RAW_ONCHAIN_TRANSACTION_PAGE,
   RAW_WALLET,
   RAW_WALLET_AUTH_SIGNATURE,
   RAW_WALLET_BALANCE,
@@ -54,13 +52,6 @@ describe("wallet parsers", () => {
     const receipt = parseWalletTransactionReceipt(RAW_WALLET_RECEIPT);
     expect(receipt.txId).toBe(RAW_WALLET_TRANSACTION.id);
     expect(receipt.explorerUrl).toContain("basescan.org");
-  });
-
-  it("parses onchain pages", () => {
-    const page = parseOnchainTransactionPage(RAW_ONCHAIN_TRANSACTION_PAGE);
-    expect(page.items).toHaveLength(1);
-    expect(page.items[0].confirmedAt).toBeInstanceOf(Date);
-    expect(page.nextCursor).toBe("cursor-123");
   });
 
   it("parses pay-request responses", () => {

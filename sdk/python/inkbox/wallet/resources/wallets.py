@@ -12,7 +12,6 @@ from uuid import UUID
 from inkbox.wallet.types import (
     AgentWallet,
     AgentWalletBalance,
-    OnchainTransactionPage,
     WalletAuthSignature,
     WalletPayRequestResponse,
     WalletTransaction,
@@ -116,27 +115,6 @@ class WalletsResource:
         """Fetch the current on-chain receipt state for one transaction row."""
         data = self._http.get(f"/{wallet_id}/transactions/{transaction_id}/receipt")
         return WalletTransactionReceipt._from_dict(data)
-
-    def list_onchain_transactions(
-        self,
-        wallet_id: UUID | str,
-        *,
-        chain: str | None = None,
-        direction: str | None = None,
-        cursor: str | None = None,
-        limit: int | None = None,
-    ) -> OnchainTransactionPage:
-        """List read-through on-chain history for a wallet."""
-        data = self._http.get(
-            f"/{wallet_id}/onchain-transactions",
-            params={
-                "chain": chain,
-                "direction": direction,
-                "cursor": cursor,
-                "limit": limit,
-            },
-        )
-        return OnchainTransactionPage._from_dict(data)
 
     def pay_request(
         self,

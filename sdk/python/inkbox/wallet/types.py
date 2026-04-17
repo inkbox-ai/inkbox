@@ -211,54 +211,6 @@ class WalletTransactionReceipt:
 
 
 @dataclass
-class OnchainTransaction:
-    chain: str
-    hash: str
-    direction: str
-    from_address: str
-    to_address: str
-    token: str
-    amount_raw: str
-    amount_decimal: str
-    decimals: int
-    status: str
-    block_number: int
-    confirmed_at: datetime
-    explorer_url: str | None
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> OnchainTransaction:
-        return cls(
-            chain=d["chain"],
-            hash=d["hash"],
-            direction=d["direction"],
-            from_address=d["from_address"],
-            to_address=d["to_address"],
-            token=d["token"],
-            amount_raw=d["amount_raw"],
-            amount_decimal=d["amount_decimal"],
-            decimals=d["decimals"],
-            status=d["status"],
-            block_number=d["block_number"],
-            confirmed_at=datetime.fromisoformat(d["confirmed_at"]),
-            explorer_url=d.get("explorer_url"),
-        )
-
-
-@dataclass
-class OnchainTransactionPage:
-    items: list[OnchainTransaction]
-    next_cursor: str | None
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> OnchainTransactionPage:
-        return cls(
-            items=[OnchainTransaction._from_dict(item) for item in d.get("items", [])],
-            next_cursor=d.get("next_cursor"),
-        )
-
-
-@dataclass
 class WalletPayRequestResponse:
     status: int
     headers: dict[str, str]

@@ -304,27 +304,6 @@ export const RAW_WALLET_RECEIPT = {
   explorer_url: "https://basescan.org/tx/0xdeadbeef",
 };
 
-export const RAW_ONCHAIN_TRANSACTION = {
-  chain: "base",
-  hash: "0xfeedface",
-  direction: "out",
-  from_address: RAW_WALLET.addresses.evm,
-  to_address: "0x2222222222222222222222222222222222222222",
-  token: "ETH",
-  amount_raw: "1000000000000000",
-  amount_decimal: "0.001",
-  decimals: 18,
-  status: "confirmed",
-  block_number: 123456,
-  confirmed_at: "2026-03-09T00:03:00Z",
-  explorer_url: "https://basescan.org/tx/0xfeedface",
-};
-
-export const RAW_ONCHAIN_TRANSACTION_PAGE = {
-  items: [RAW_ONCHAIN_TRANSACTION],
-  next_cursor: "cursor-123",
-};
-
 export const RAW_WALLET_PAY_REQUEST_RESPONSE = {
   status: 200,
   headers: {

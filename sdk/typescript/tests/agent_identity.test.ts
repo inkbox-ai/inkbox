@@ -83,7 +83,6 @@ function mockInkbox() {
       signAuth: vi.fn(),
       listTransactions: vi.fn(),
       getTransactionReceipt: vi.fn(),
-      listOnchainTransactions: vi.fn(),
       payRequest: vi.fn(),
     },
     _idsResource: {

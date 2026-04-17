@@ -34,7 +34,6 @@ from inkbox.phone.types import (
 from inkbox.wallet.types import (
     AgentWallet,
     AgentWalletBalance,
-    OnchainTransactionPage,
     WalletAuthSignature,
     WalletPayRequestResponse,
     WalletTransaction,
@@ -407,24 +406,6 @@ class AgentIdentity:
         return self._inkbox._wallets.get_transaction_receipt(
             self._wallet.id,  # type: ignore[union-attr]
             transaction_id,
-        )
-
-    def list_wallet_onchain_transactions(
-        self,
-        *,
-        chain: str | None = None,
-        direction: str | None = None,
-        cursor: str | None = None,
-        limit: int | None = None,
-    ) -> OnchainTransactionPage:
-        """List read-through on-chain wallet history for this identity."""
-        self._require_wallet()
-        return self._inkbox._wallets.list_onchain_transactions(
-            self._wallet.id,  # type: ignore[union-attr]
-            chain=chain,
-            direction=direction,
-            cursor=cursor,
-            limit=limit,
         )
 
     def pay_with_wallet(

@@ -79,27 +79,6 @@ WALLET_RECEIPT_DICT = {
     "explorer_url": "https://basescan.org/tx/0xdeadbeef",
 }
 
-ONCHAIN_TRANSACTION_DICT = {
-    "chain": "base",
-    "hash": "0xfeedface",
-    "direction": "out",
-    "from_address": IDENTITY_WALLET_DICT["addresses"]["evm"],
-    "to_address": "0x2222222222222222222222222222222222222222",
-    "token": "ETH",
-    "amount_raw": "1000000000000000",
-    "amount_decimal": "0.001",
-    "decimals": 18,
-    "status": "confirmed",
-    "block_number": 123456,
-    "confirmed_at": "2026-03-09T00:03:00Z",
-    "explorer_url": "https://basescan.org/tx/0xfeedface",
-}
-
-ONCHAIN_TRANSACTION_PAGE_DICT = {
-    "items": [ONCHAIN_TRANSACTION_DICT],
-    "next_cursor": "cursor-123",
-}
-
 WALLET_PAY_REQUEST_RESPONSE_DICT = {
     "status": 200,
     "headers": {

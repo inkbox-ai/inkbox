@@ -31,7 +31,6 @@ import type {
 import type {
   AgentWallet,
   AgentWalletBalance,
-  OnchainTransactionPage,
   WalletAuthSignature,
   WalletPayRequestResponse,
   WalletTransaction,
@@ -371,19 +370,6 @@ export class AgentIdentity {
   ): Promise<WalletTransactionReceipt> {
     this._requireWallet();
     return this._inkbox._wallets.getTransactionReceipt(this._wallet!.id, transactionId);
-  }
-
-  /**
-   * List read-through on-chain wallet history for this identity.
-   */
-  async listWalletOnchainTransactions(options: {
-    chain?: string;
-    direction?: string;
-    cursor?: string;
-    limit?: number;
-  } = {}): Promise<OnchainTransactionPage> {
-    this._requireWallet();
-    return this._inkbox._wallets.listOnchainTransactions(this._wallet!.id, options);
   }
 
   /**
