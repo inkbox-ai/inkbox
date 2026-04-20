@@ -8,8 +8,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
+
+from inkbox.mail.types import ContactRuleStatus, FilterMode, FilterModeChangeNotice
+
+
+class PhoneRuleAction(StrEnum):
+    """Whether a matching phone number is allowed through or blocked."""
+
+    ALLOW = "allow"
+    BLOCK = "block"
+
+
+class PhoneRuleMatchType(StrEnum):
+    """What a phone contact rule matches on."""
+
+    EXACT_NUMBER = "exact_number"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -28,11 +44,14 @@ class PhoneNumber:
     client_websocket_url: str | None
     incoming_call_webhook_url: str | None
     incoming_text_webhook_url: str | None
+    filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneNumber:
+        notice = d.get("filter_mode_change_notice")
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
@@ -42,8 +61,12 @@ class PhoneNumber:
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
             incoming_text_webhook_url=d.get("incoming_text_webhook_url"),
+            filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            filter_mode_change_notice=(
+                FilterModeChangeNotice._from_dict(notice) if notice else None
+            ),
         )
 
 
@@ -225,3 +248,28 @@ class PhoneTranscript:
         )
 
 
+@dataclass
+class PhoneContactRule:
+    """An inbound/outbound allow/block rule scoped to a phone number."""
+
+    id: UUID
+    phone_number_id: UUID
+    action: PhoneRuleAction
+    match_type: PhoneRuleMatchType
+    match_target: str
+    status: ContactRuleStatus
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> PhoneContactRule:
+        return cls(
+            id=UUID(d["id"]),
+            phone_number_id=UUID(d["phone_number_id"]),
+            action=PhoneRuleAction(d["action"]),
+            match_type=PhoneRuleMatchType(d["match_type"]),
+            match_target=d["match_target"],
+            status=ContactRuleStatus(d.get("status", "active")),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )

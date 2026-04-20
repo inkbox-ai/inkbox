@@ -11,26 +11,49 @@ export type {
   SignupRestrictions,
   AgentSignupStatusResponse,
 } from "./agent_signup/types.js";
-export { InkboxError, InkboxAPIError, InkboxVaultKeyError } from "./_http.js";
+export {
+  DuplicateContactRuleError,
+  InkboxAPIError,
+  InkboxError,
+  InkboxVaultKeyError,
+  RedundantContactAccessGrantError,
+} from "./_http.js";
+export type { InkboxAPIErrorDetail } from "./_http.js";
 export type {
   WhoamiApiKeyResponse,
   WhoamiJwtResponse,
   WhoamiResponse,
 } from "./whoami/types.js";
+export {
+  AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED,
+  AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED,
+  AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED,
+} from "./whoami/types.js";
 export type { SigningKey } from "./signing_keys.js";
 export { verifyWebhook } from "./signing_keys.js";
-export { MessageDirection } from "./mail/types.js";
+export {
+  ContactRuleStatus,
+  FilterMode,
+  MailRuleAction,
+  MailRuleMatchType,
+  MessageDirection,
+  ThreadFolder,
+} from "./mail/types.js";
 export type {
+  FilterModeChangeNotice,
   Mailbox,
+  MailContactRule,
   Message,
   MessageDetail,
   Thread,
   ThreadDetail,
 } from "./mail/types.js";
+export { PhoneRuleAction, PhoneRuleMatchType } from "./phone/types.js";
 export type {
   PhoneNumber,
   PhoneCall,
   PhoneCallWithRateLimit,
+  PhoneContactRule,
   RateLimitInfo,
   PhoneTranscript,
   TextMediaItem,
@@ -45,6 +68,28 @@ export type {
   IdentityPhoneNumberCreateOptions,
   IdentityPhoneNumber,
 } from "./identities/types.js";
+export type {
+  Contact,
+  ContactAccess,
+  ContactAddress,
+  ContactCustomField,
+  ContactDate,
+  ContactEmail,
+  ContactImportResult,
+  ContactImportResultItem,
+  ContactPhone,
+  ContactWebsite,
+  CreateContactOptions,
+  ListContactsOptions,
+  LookupContactsOptions,
+  UpdateContactOptions,
+} from "./contacts/index.js";
+export type { Note, NoteAccess } from "./notes/types.js";
+export type {
+  CreateNoteOptions,
+  ListNotesOptions,
+  UpdateNoteOptions,
+} from "./notes/resources/notes.js";
 export type {
   AccessRule,
   VaultInfo,

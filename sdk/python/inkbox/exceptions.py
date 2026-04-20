@@ -6,6 +6,9 @@ Canonical exception types for the Inkbox SDK.
 
 from __future__ import annotations
 
+from typing import Any
+from uuid import UUID
+
 
 class InkboxError(Exception):
     """
@@ -25,12 +28,48 @@ class InkboxAPIError(InkboxError):
 
     Attributes:
         status_code: HTTP status code.
-        detail: Error detail from the response body.
+        detail: Error detail from the response body. May be a human-readable
+            string, or a structured ``dict`` for errors that carry extra
+            machine-readable fields (e.g. ``{"existing_rule_id": ..., ...}``).
     """
 
-    def __init__(self, status_code: int, detail: str) -> None:
+    def __init__(self, status_code: int, detail: str | dict[str, Any]) -> None:
         super().__init__(
             f"HTTP {status_code}: {detail}"
         )
         self.status_code = status_code
-        self.detail = detail
+        self.detail: str | dict[str, Any] = detail
+
+
+class DuplicateContactRuleError(InkboxAPIError):
+    """
+    Raised on 409 when creating a mail or phone contact rule that duplicates
+    an existing (match_type, match_target) pair on the same resource.
+
+    Attributes:
+        existing_rule_id: UUID of the already-existing rule.
+        detail: The full structured detail dict from the server.
+    """
+
+    def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.existing_rule_id: UUID = UUID(str(detail["existing_rule_id"]))
+
+
+class RedundantContactAccessGrantError(InkboxAPIError):
+    """
+    Raised on 409 when posting a contact-access grant that is redundant
+    under the current access model (e.g. adding a per-identity grant on
+    top of an active wildcard).
+
+    Attributes:
+        error: Discriminator string from the server (``"redundant_grant"``).
+        detail_message: Human-readable explanation from the server's
+            ``detail`` field.
+        detail: The full structured detail dict from the server.
+    """
+
+    def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.error: str = str(detail.get("error", "redundant_grant"))
+        self.detail_message: str = str(detail.get("detail", ""))

@@ -25,6 +25,89 @@ class MessageDirection(StrEnum):
     OUTBOUND = "outbound"
 
 
+class FilterMode(StrEnum):
+    """
+    Contact-rule filter mode on a mailbox or phone number.
+
+    Attributes:
+        WHITELIST: Only contacts matching an ``allow`` rule are delivered;
+            everything else is blocked.
+        BLACKLIST: Everything is delivered except contacts matching a
+            ``block`` rule. This is the default.
+    """
+
+    WHITELIST = "whitelist"
+    BLACKLIST = "blacklist"
+
+
+class ThreadFolder(StrEnum):
+    """
+    Logical folder a thread lives in.
+
+    ``BLOCKED`` is server-assigned by the contact-rule engine at ingest;
+    clients cannot move a thread into ``BLOCKED``.
+    """
+
+    INBOX = "inbox"
+    SPAM = "spam"
+    BLOCKED = "blocked"
+    ARCHIVE = "archive"
+
+
+class MailRuleAction(StrEnum):
+    """Whether a matching address is allowed through or blocked."""
+
+    ALLOW = "allow"
+    BLOCK = "block"
+
+
+class MailRuleMatchType(StrEnum):
+    """What a mail contact rule matches on."""
+
+    EXACT_EMAIL = "exact_email"
+    DOMAIN = "domain"
+
+
+class ContactRuleStatus(StrEnum):
+    """Whether a contact rule is currently enforced."""
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+
+
+@dataclass
+class FilterModeChangeNotice:
+    """Summary returned on PATCH when ``filter_mode`` actually changed.
+
+    Reports how many existing active rules are now redundant under the
+    new mode so the caller can prompt for cleanup. The blacklist <-> whitelist
+    flip does not touch the contact-rules table — redundant rules still
+    evaluate correctly, they just match the new default verdict.
+
+    Attributes:
+        new_filter_mode: The mode the resource was just flipped to.
+        redundant_rule_action: The action whose rules are now redundant —
+            ``"block"`` under whitelist, ``"allow"`` under blacklist. Typed as
+            a free-form string to tolerate new server values; match against
+            :class:`MailRuleAction` / :class:`PhoneRuleAction` values.
+        redundant_rule_count: Count of active rules whose action equals
+            ``redundant_rule_action``. ``0`` is a clean flip. Paused and
+            soft-deleted rules are not counted.
+    """
+
+    new_filter_mode: FilterMode
+    redundant_rule_action: str
+    redundant_rule_count: int
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> FilterModeChangeNotice:
+        return cls(
+            new_filter_mode=FilterMode(d["new_filter_mode"]),
+            redundant_rule_action=str(d["redundant_rule_action"]),
+            redundant_rule_count=int(d["redundant_rule_count"]),
+        )
+
+
 def _dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
@@ -37,18 +120,25 @@ class Mailbox:
     email_address: str
     display_name: str | None
     webhook_url: str | None
+    filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Mailbox:
+        notice = d.get("filter_mode_change_notice")
         return cls(
             id=UUID(d["id"]),
             email_address=d["email_address"],
             display_name=d.get("display_name"),
             webhook_url=d.get("webhook_url"),
+            filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            filter_mode_change_notice=(
+                FilterModeChangeNotice._from_dict(notice) if notice else None
+            ),
         )
 
 
@@ -134,6 +224,7 @@ class Thread:
     id: UUID
     mailbox_id: UUID
     subject: str | None
+    folder: ThreadFolder
     message_count: int
     last_message_at: datetime
     created_at: datetime
@@ -144,6 +235,7 @@ class Thread:
             id=UUID(d["id"]),
             mailbox_id=UUID(d["mailbox_id"]),
             subject=d.get("subject"),
+            folder=ThreadFolder(d.get("folder", "inbox")),
             message_count=d["message_count"],
             last_message_at=datetime.fromisoformat(d["last_message_at"]),
             created_at=datetime.fromisoformat(d["created_at"]),
@@ -164,3 +256,29 @@ class ThreadDetail(Thread):
             messages=[Message._from_dict(m) for m in d.get("messages", [])],
         )
 
+
+@dataclass
+class MailContactRule:
+    """An inbound/outbound allow/block rule scoped to a mailbox."""
+
+    id: UUID
+    mailbox_id: UUID
+    action: MailRuleAction
+    match_type: MailRuleMatchType
+    match_target: str
+    status: ContactRuleStatus
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> MailContactRule:
+        return cls(
+            id=UUID(d["id"]),
+            mailbox_id=UUID(d["mailbox_id"]),
+            action=MailRuleAction(d["action"]),
+            match_type=MailRuleMatchType(d["match_type"]),
+            match_target=d["match_target"],
+            status=ContactRuleStatus(d.get("status", "active")),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )

@@ -1,7 +1,8 @@
 /**
  * inkbox-mail/resources/threads.ts
  *
- * Thread operations: list (auto-paginated), get with messages, delete.
+ * Thread operations: list (auto-paginated), get with messages, folder
+ * listing, per-thread update, and delete.
  */
 
 import { HttpTransport } from "../../_http.js";
@@ -10,6 +11,7 @@ import {
   RawThread,
   Thread,
   ThreadDetail,
+  ThreadFolder,
   parseThread,
   parseThreadDetail,
 } from "../types.js";
@@ -20,28 +22,39 @@ export class ThreadsResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
-   * Async iterator over all threads in a mailbox, most recent activity first.
+   * Async iterator over threads in a mailbox, most recent activity first.
    *
    * Pagination is handled automatically — just iterate.
    *
+   * @param options.folder - Optional folder filter. When omitted, the server
+   *   returns all visible folders for the caller.
+   * @param options.pageSize - Number of threads fetched per API call (1–100).
+   *
    * @example
    * ```ts
-   * for await (const thread of client.threads.list(emailAddress)) {
-   *   console.log(thread.subject, thread.messageCount);
+   * for await (const thread of client.threads.list(emailAddress, { folder: ThreadFolder.BLOCKED })) {
+   *   console.log(thread.subject, thread.folder);
    * }
    * ```
    */
   async *list(
     emailAddress: string,
-    options?: { pageSize?: number },
+    options?: { folder?: ThreadFolder; pageSize?: number },
   ): AsyncGenerator<Thread> {
     const limit = options?.pageSize ?? DEFAULT_PAGE_SIZE;
     let cursor: string | undefined;
 
     while (true) {
+      const params: Record<string, string | number | undefined> = {
+        limit,
+        cursor,
+      };
+      if (options?.folder !== undefined) {
+        params.folder = options.folder;
+      }
       const page = await this.http.get<RawCursorPage<RawThread>>(
         `/mailboxes/${emailAddress}/threads`,
-        { limit, cursor },
+        params,
       );
       for (const item of page.items) {
         yield parseThread(item);
@@ -49,6 +62,20 @@ export class ThreadsResource {
       if (!page.has_more) break;
       cursor = page.next_cursor ?? undefined;
     }
+  }
+
+  /**
+   * Return the distinct folders that have at least one thread in this
+   * mailbox.
+   *
+   * @returns Sorted list of {@link ThreadFolder} values that currently hold
+   *   at least one non-deleted thread.
+   */
+  async listFolders(emailAddress: string): Promise<ThreadFolder[]> {
+    const data = await this.http.get<string[]>(
+      `/mailboxes/${emailAddress}/threads/folders`,
+    );
+    return data.map((f) => f as ThreadFolder);
   }
 
   /**
@@ -62,6 +89,38 @@ export class ThreadsResource {
       `/mailboxes/${emailAddress}/threads/${threadId}`,
     );
     return parseThreadDetail(data);
+  }
+
+  /**
+   * Update mutable thread fields.
+   *
+   * Returns a bare {@link Thread} (no inlined messages). Use {@link get} to
+   * refetch the thread with messages attached.
+   *
+   * @param options.folder - New folder. `ThreadFolder.BLOCKED` is
+   *   server-assigned by the contact-rule engine and cannot be set by
+   *   clients; passing it throws synchronously without making an HTTP call.
+   */
+  async update(
+    emailAddress: string,
+    threadId: string,
+    options: { folder?: ThreadFolder } = {},
+  ): Promise<Thread> {
+    const body: Record<string, unknown> = {};
+    if (options.folder !== undefined) {
+      if (options.folder === ThreadFolder.BLOCKED) {
+        throw new Error(
+          "folder='blocked' is server-assigned and cannot be set by clients " +
+            "— the server will reject this PATCH.",
+        );
+      }
+      body["folder"] = options.folder;
+    }
+    const data = await this.http.patch<RawThread>(
+      `/mailboxes/${emailAddress}/threads/${threadId}`,
+      body,
+    );
+    return parseThread(data);
   }
 
   /** Delete a thread. */

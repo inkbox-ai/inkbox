@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from inkbox.mail.types import FilterMode
 from inkbox.phone.types import PhoneNumber, PhoneTranscript
 
 if TYPE_CHECKING:
@@ -41,6 +42,7 @@ class PhoneNumbersResource:
         client_websocket_url: str | None = _UNSET,  # type: ignore[assignment]
         incoming_call_webhook_url: str | None = _UNSET,  # type: ignore[assignment]
         incoming_text_webhook_url: str | None = _UNSET,  # type: ignore[assignment]
+        filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> PhoneNumber:
         """Update phone number settings.
 
@@ -53,6 +55,14 @@ class PhoneNumbersResource:
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             incoming_call_webhook_url: Webhook URL called for incoming calls when action is ``"webhook"``.
             incoming_text_webhook_url: Webhook URL called for incoming text messages.
+            filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on
+                the server; agent-scoped keys receive 403. A single value
+                governs both inbound voice and SMS.
+
+        Returns:
+            The updated phone number. When ``filter_mode`` was supplied and
+            the value actually changed, ``number.filter_mode_change_notice``
+            is populated with counts of now-redundant rules.
         """
         body: dict[str, Any] = {}
         if incoming_call_action is not _UNSET:
@@ -63,6 +73,10 @@ class PhoneNumbersResource:
             body["incoming_call_webhook_url"] = incoming_call_webhook_url
         if incoming_text_webhook_url is not _UNSET:
             body["incoming_text_webhook_url"] = incoming_text_webhook_url
+        if filter_mode is not _UNSET:
+            body["filter_mode"] = (
+                filter_mode.value if isinstance(filter_mode, FilterMode) else filter_mode
+            )
         data = self._http.patch(f"{_BASE}/{phone_number_id}", json=body)
         return PhoneNumber._from_dict(data)
 

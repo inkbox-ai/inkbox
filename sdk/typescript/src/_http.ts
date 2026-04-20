@@ -18,15 +18,64 @@ export class InkboxVaultKeyError extends InkboxError {
   }
 }
 
+export type InkboxAPIErrorDetail = string | Record<string, unknown>;
+
 export class InkboxAPIError extends InkboxError {
   readonly statusCode: number;
-  readonly detail: string;
+  readonly detail: InkboxAPIErrorDetail;
 
-  constructor(statusCode: number, detail: string) {
-    super(`HTTP ${statusCode}: ${detail}`);
+  constructor(statusCode: number, detail: InkboxAPIErrorDetail) {
+    super(`HTTP ${statusCode}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
     this.name = "InkboxAPIError";
     this.statusCode = statusCode;
     this.detail = detail;
+  }
+}
+
+export class DuplicateContactRuleError extends InkboxAPIError {
+  readonly existingRuleId: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "DuplicateContactRuleError";
+    this.existingRuleId = String(detail["existing_rule_id"]);
+  }
+}
+
+export class RedundantContactAccessGrantError extends InkboxAPIError {
+  readonly error: string;
+  readonly detailMessage: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "RedundantContactAccessGrantError";
+    this.error = String(detail["error"] ?? "redundant_grant");
+    this.detailMessage = String(detail["detail"] ?? "");
+  }
+}
+
+function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail): never {
+  if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
+    if ("existing_rule_id" in rawDetail) {
+      throw new DuplicateContactRuleError(status, rawDetail);
+    }
+    if (rawDetail["error"] === "redundant_grant") {
+      throw new RedundantContactAccessGrantError(status, rawDetail);
+    }
+  }
+  throw new InkboxAPIError(status, rawDetail);
+}
+
+async function readErrorDetail(resp: Response): Promise<InkboxAPIErrorDetail> {
+  try {
+    const parsed = (await resp.json()) as { detail?: unknown };
+    const d = parsed?.detail;
+    if (d === undefined || d === null) return resp.statusText;
+    if (typeof d === "string") return d;
+    if (typeof d === "object") return d as Record<string, unknown>;
+    return String(d);
+  } catch {
+    return resp.statusText;
   }
 }
 
@@ -200,10 +249,39 @@ export class HttpTransport {
     await this.request<void>("DELETE", path);
   }
 
+  /**
+   * POST a raw body with a caller-supplied Content-Type. JSON response.
+   *
+   * Used for non-JSON payloads like vCard imports.
+   */
+  async postRaw<T>(
+    path: string,
+    body: string | Uint8Array,
+    contentType: string,
+  ): Promise<T> {
+    return this.request<T>("POST", path, { rawBody: body, contentType });
+  }
+
+  /**
+   * GET a non-JSON response as text.
+   *
+   * Used for vCard export and similar text endpoints.
+   */
+  async getText(path: string, accept: string, params?: Params): Promise<string> {
+    return this.request<string>("GET", path, { params, accept, rawResponse: "text" });
+  }
+
   private async request<T>(
     method: string,
     path: string,
-    opts: { params?: Params; body?: unknown } = {},
+    opts: {
+      params?: Params;
+      body?: unknown;
+      rawBody?: string | Uint8Array;
+      contentType?: string;
+      accept?: string;
+      rawResponse?: "text" | "bytes";
+    } = {},
   ): Promise<T> {
     let url = `${this.baseUrl}${path}`;
 
@@ -220,17 +298,20 @@ export class HttpTransport {
 
     const headers: Record<string, string> = {
       "X-API-Key": this.apiKey,
-      Accept: "application/json",
+      Accept: opts.accept ?? "application/json",
     };
     const cookieHeader = this.cookieJar.getHeaderValue(url);
     if (cookieHeader) {
       headers.Cookie = cookieHeader;
     }
 
-    let bodyStr: string | undefined;
-    if (opts.body !== undefined) {
+    let bodyPayload: string | Uint8Array | undefined;
+    if (opts.rawBody !== undefined) {
+      headers["Content-Type"] = opts.contentType ?? "application/octet-stream";
+      bodyPayload = opts.rawBody;
+    } else if (opts.body !== undefined) {
       headers["Content-Type"] = "application/json";
-      bodyStr = JSON.stringify(opts.body);
+      bodyPayload = JSON.stringify(opts.body);
     }
 
     const controller = new AbortController();
@@ -241,7 +322,7 @@ export class HttpTransport {
       resp = await fetch(url, {
         method,
         headers,
-        body: bodyStr,
+        body: bodyPayload as BodyInit | undefined,
         signal: controller.signal,
       });
     } finally {
@@ -251,18 +332,16 @@ export class HttpTransport {
     this.cookieJar.storeFromResponse(url, resp);
 
     if (!resp.ok) {
-      let detail: string;
-      try {
-        const err = (await resp.json()) as { detail?: string };
-        detail = err.detail ?? resp.statusText;
-      } catch {
-        detail = resp.statusText;
-      }
-      throw new InkboxAPIError(resp.status, detail);
+      const detail = await readErrorDetail(resp);
+      raiseForErrorResponse(resp.status, detail);
     }
 
     if (resp.status === 204) {
       return undefined as T;
+    }
+
+    if (opts.rawResponse === "text") {
+      return (await resp.text()) as unknown as T;
     }
 
     return resp.json() as Promise<T>;

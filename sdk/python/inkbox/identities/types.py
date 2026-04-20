@@ -11,6 +11,8 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
+from inkbox.mail.types import FilterMode, FilterModeChangeNotice
+
 
 @dataclass
 class IdentityMailboxCreateOptions:
@@ -102,17 +104,24 @@ class IdentityMailbox:
     id: UUID
     email_address: str
     display_name: str | None
+    filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityMailbox:
+        notice = d.get("filter_mode_change_notice")
         return cls(
             id=UUID(d["id"]),
             email_address=d["email_address"],
             display_name=d.get("display_name"),
+            filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            filter_mode_change_notice=(
+                FilterModeChangeNotice._from_dict(notice) if notice else None
+            ),
         )
 
 
@@ -127,11 +136,14 @@ class IdentityPhoneNumber:
     incoming_call_action: str
     client_websocket_url: str | None
     incoming_text_webhook_url: str | None
+    filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityPhoneNumber:
+        notice = d.get("filter_mode_change_notice")
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
@@ -140,8 +152,12 @@ class IdentityPhoneNumber:
             incoming_call_action=d["incoming_call_action"],
             client_websocket_url=d.get("client_websocket_url"),
             incoming_text_webhook_url=d.get("incoming_text_webhook_url"),
+            filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            filter_mode_change_notice=(
+                FilterModeChangeNotice._from_dict(notice) if notice else None
+            ),
         )
 
 

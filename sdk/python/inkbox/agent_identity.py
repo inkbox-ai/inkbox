@@ -251,8 +251,10 @@ class AgentIdentity:
             id=mailbox.id,
             email_address=mailbox.email_address,
             display_name=mailbox.display_name,
+            filter_mode=mailbox.filter_mode,
             created_at=mailbox.created_at,
             updated_at=mailbox.updated_at,
+            filter_mode_change_notice=mailbox.filter_mode_change_notice,
         )
         self._mailbox = linked
         self._data.email_address = mailbox.email_address

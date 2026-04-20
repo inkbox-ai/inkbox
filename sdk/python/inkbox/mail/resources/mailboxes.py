@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from inkbox.mail.types import Mailbox, Message
+from inkbox.mail.types import FilterMode, Mailbox, Message
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -66,6 +66,7 @@ class MailboxesResource:
         *,
         display_name: str | None = _UNSET,  # type: ignore[assignment]
         webhook_url: str | None = _UNSET,  # type: ignore[assignment]
+        filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> Mailbox:
         """Update mutable mailbox fields.
 
@@ -76,15 +77,23 @@ class MailboxesResource:
             email_address: Full email address of the mailbox to update.
             display_name: New human-readable sender name.
             webhook_url: HTTPS URL to receive webhook events, or ``None`` to unsubscribe.
+            filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on the
+                server — agent-scoped keys will receive 403.
 
         Returns:
-            The updated mailbox.
+            The updated mailbox. When ``filter_mode`` was supplied and the
+            value actually changed, ``mailbox.filter_mode_change_notice`` is
+            populated; otherwise it's ``None``.
         """
         body: dict[str, Any] = {}
         if display_name is not _UNSET:
             body["display_name"] = display_name
         if webhook_url is not _UNSET:
             body["webhook_url"] = webhook_url
+        if filter_mode is not _UNSET:
+            body["filter_mode"] = (
+                filter_mode.value if isinstance(filter_mode, FilterMode) else filter_mode
+            )
         data = self._http.patch(
             f"{_BASE}/{email_address}",
             json=body,

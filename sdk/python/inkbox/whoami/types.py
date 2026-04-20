@@ -9,6 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+# Named constants for the ``auth_subtype`` values returned on API-key responses.
+# The field itself is typed as a free-form ``str`` because the server may add
+# more variants over time; these constants are the current set.
+AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED = "api_key.admin_scoped"
+AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED = "api_key.agent_scoped.claimed"
+AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED = "api_key.agent_scoped.unclaimed"
+
 
 @dataclass
 class WhoamiApiKeyResponse:

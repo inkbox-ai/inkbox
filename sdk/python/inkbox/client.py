@@ -15,6 +15,8 @@ import httpx
 from inkbox._http import HttpTransport
 from inkbox._cookies import CookieJar
 from inkbox.agent_identity import AgentIdentity
+from inkbox.contacts.resources.contacts import ContactsResource
+from inkbox.notes.resources.notes import NotesResource
 from inkbox.agent_signup.types import (
     AgentSignupResponse,
     AgentSignupVerifyResponse,
@@ -28,10 +30,12 @@ from inkbox.identities.types import (
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
 )
+from inkbox.mail.resources.contact_rules import MailContactRulesResource
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.calls import CallsResource
+from inkbox.phone.resources.contact_rules import PhoneContactRulesResource
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
@@ -105,6 +109,12 @@ class Inkbox:
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
+        self._contacts_http = HttpTransport(
+            api_key=api_key,
+            base_url=_api_root,
+            timeout=timeout,
+            cookie_jar=_cookie_jar,
+        )
         self._phone_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/phone",
@@ -140,16 +150,21 @@ class Inkbox:
         self._mailboxes = MailboxesResource(self._mail_http)
         self._messages = MessagesResource(self._mail_http)
         self._threads = ThreadsResource(self._mail_http)
+        self._mail_contact_rules = MailContactRulesResource(self._mail_http)
 
         self._calls = CallsResource(self._phone_http)
         self._numbers = PhoneNumbersResource(self._phone_http)
         self._texts = TextsResource(self._phone_http)
         self._transcripts = TranscriptsResource(self._phone_http)
+        self._phone_contact_rules = PhoneContactRulesResource(self._phone_http)
 
         self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
 
         self._signing_keys = SigningKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
+
+        self._contacts = ContactsResource(self._contacts_http)
+        self._notes = NotesResource(self._contacts_http)
 
         if vault_key is not None:
             self._vault_resource.unlock(vault_key)
@@ -170,6 +185,7 @@ class Inkbox:
         self._vault_http.close()
         self._root_api_http.close()
         self._api_http.close()
+        self._contacts_http.close()
 
     ## Public resource accessors
 
@@ -192,6 +208,26 @@ class Inkbox:
     def vault(self) -> VaultResource:
         """Access the encrypted vault (info, unlock, secrets)."""
         return self._vault_resource
+
+    @property
+    def contacts(self) -> ContactsResource:
+        """Org-wide contacts (list, get, create, update, delete, lookup, access, vCards)."""
+        return self._contacts
+
+    @property
+    def notes(self) -> NotesResource:
+        """Org-scoped notes with per-identity access grants."""
+        return self._notes
+
+    @property
+    def mail_contact_rules(self) -> MailContactRulesResource:
+        """Mail per-mailbox allow/block rules (+ org-wide list)."""
+        return self._mail_contact_rules
+
+    @property
+    def phone_contact_rules(self) -> PhoneContactRulesResource:
+        """Phone per-number allow/block rules (+ org-wide list)."""
+        return self._phone_contact_rules
 
     ## Org-level operations
 

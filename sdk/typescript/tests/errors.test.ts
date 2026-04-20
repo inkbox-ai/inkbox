@@ -1,6 +1,33 @@
 // sdk/typescript/tests/errors.test.ts
-import { describe, it, expect } from "vitest";
-import { InkboxError, InkboxAPIError, InkboxVaultKeyError } from "../src/_http.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  DuplicateContactRuleError,
+  HttpTransport,
+  InkboxAPIError,
+  InkboxError,
+  InkboxVaultKeyError,
+  RedundantContactAccessGrantError,
+} from "../src/_http.js";
+
+const BASE = "https://inkbox.ai/api/v1";
+const API_KEY = "test-key";
+
+function makeHeaders() {
+  return {
+    get() { return null; },
+    getSetCookie() { return []; },
+  } as unknown as Headers;
+}
+
+function makeErrorResponse(status: number, body: unknown) {
+  return {
+    ok: false,
+    status,
+    statusText: "Error",
+    headers: makeHeaders(),
+    json: () => Promise.resolve(body),
+  } as Response;
+}
 
 describe("InkboxError", () => {
   it("sets message and name", () => {
@@ -15,20 +42,22 @@ describe("InkboxError", () => {
 });
 
 describe("InkboxAPIError", () => {
-  it("formats the message correctly", () => {
+  it("formats string detail into message", () => {
     const err = new InkboxAPIError(404, "not found");
     expect(err.message).toBe("HTTP 404: not found");
   });
 
-  it("exposes statusCode and detail", () => {
+  it("exposes statusCode and string detail", () => {
     const err = new InkboxAPIError(422, "validation error");
     expect(err.statusCode).toBe(422);
     expect(err.detail).toBe("validation error");
   });
 
-  it("sets name to InkboxAPIError", () => {
-    const err = new InkboxAPIError(500, "server error");
-    expect(err.name).toBe("InkboxAPIError");
+  it("accepts and round-trips object detail", () => {
+    const err = new InkboxAPIError(409, { error: "redundant_grant", detail: "why" });
+    expect(err.statusCode).toBe(409);
+    expect(typeof err.detail).toBe("object");
+    expect(err.message).toContain("redundant_grant");
   });
 
   it("is an instance of InkboxError", () => {
@@ -44,5 +73,82 @@ describe("InkboxVaultKeyError", () => {
     expect(err).toBeInstanceOf(InkboxError);
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe("InkboxVaultKeyError");
+  });
+});
+
+describe("HttpTransport 409 routing", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("routes duplicate-rule 409 to DuplicateContactRuleError", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(409, {
+        detail: {
+          existing_rule_id: "aaaa1111-0000-0000-0000-000000000009",
+          message: "exists",
+        },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    await expect(http.get("/mailboxes/x/contact-rules")).rejects.toMatchObject({
+      name: "DuplicateContactRuleError",
+      existingRuleId: "aaaa1111-0000-0000-0000-000000000009",
+      statusCode: 409,
+    });
+  });
+
+  it("routes redundant_grant 409 to RedundantContactAccessGrantError", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(409, {
+        detail: {
+          error: "redundant_grant",
+          detail: "wildcard already implies this identity",
+        },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    await expect(http.post("/contacts/x/access")).rejects.toMatchObject({
+      name: "RedundantContactAccessGrantError",
+      error: "redundant_grant",
+      detailMessage: "wildcard already implies this identity",
+      statusCode: 409,
+    });
+  });
+
+  it("plain-string 409 stays on InkboxAPIError with string detail", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(409, { detail: "Access already granted" }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/contacts/x/access");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      expect(err).not.toBeInstanceOf(DuplicateContactRuleError);
+      expect(err).not.toBeInstanceOf(RedundantContactAccessGrantError);
+      expect((err as InkboxAPIError).detail).toBe("Access already granted");
+    }
+  });
+
+  it("preserves dict detail shape on generic 409", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(409, { detail: { misc: "field" } }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/x");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      const detail = (err as InkboxAPIError).detail;
+      expect(typeof detail).toBe("object");
+      expect((detail as Record<string, unknown>).misc).toBe("field");
+    }
   });
 });

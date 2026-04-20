@@ -2,6 +2,16 @@
  * inkbox-identities TypeScript SDK — public types.
  */
 
+import type {
+  FilterMode,
+  FilterModeChangeNotice,
+  RawFilterModeChangeNotice,
+} from "../mail/types.js";
+import {
+  FilterMode as FilterModeEnum,
+  parseFilterModeChangeNotice,
+} from "../mail/types.js";
+
 export interface IdentityMailboxCreateOptions {
   displayName?: string;
   emailLocalPart?: string;
@@ -28,8 +38,10 @@ export interface IdentityMailbox {
   id: string;
   emailAddress: string;
   displayName: string | null;
+  filterMode: FilterMode;
   createdAt: Date;
   updatedAt: Date;
+  filterModeChangeNotice: FilterModeChangeNotice | null;
 }
 
 export interface IdentityPhoneNumber {
@@ -43,8 +55,10 @@ export interface IdentityPhoneNumber {
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
   incomingTextWebhookUrl: string | null;
+  filterMode: FilterMode;
   createdAt: Date;
   updatedAt: Date;
+  filterModeChangeNotice: FilterModeChangeNotice | null;
 }
 
 /** Lightweight identity returned by list and update endpoints. */
@@ -72,6 +86,8 @@ export interface RawIdentityMailbox {
   id: string;
   email_address: string;
   display_name: string | null;
+  filter_mode?: string;
+  filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,6 +100,8 @@ export interface RawIdentityPhoneNumber {
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_text_webhook_url: string | null;
+  filter_mode?: string;
+  filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
 }
@@ -109,8 +127,12 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
     id: r.id,
     emailAddress: r.email_address,
     displayName: r.display_name,
+    filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+    filterModeChangeNotice: r.filter_mode_change_notice
+      ? parseFilterModeChangeNotice(r.filter_mode_change_notice)
+      : null,
   };
 }
 
@@ -123,8 +145,12 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingTextWebhookUrl: r.incoming_text_webhook_url ?? null,
+    filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+    filterModeChangeNotice: r.filter_mode_change_notice
+      ? parseFilterModeChangeNotice(r.filter_mode_change_notice)
+      : null,
   };
 }
 

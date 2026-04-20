@@ -6,6 +6,7 @@
 
 import { HttpTransport } from "../../_http.js";
 import {
+  FilterMode,
   Mailbox,
   Message,
   RawCursorPage,
@@ -68,7 +69,11 @@ export class MailboxesResource {
    */
   async update(
     emailAddress: string,
-    options: { displayName?: string; webhookUrl?: string | null },
+    options: {
+      displayName?: string;
+      webhookUrl?: string | null;
+      filterMode?: FilterMode;
+    },
   ): Promise<Mailbox> {
     const body: Record<string, unknown> = {};
     if (options.displayName !== undefined) {
@@ -76,6 +81,9 @@ export class MailboxesResource {
     }
     if ("webhookUrl" in options) {
       body["webhook_url"] = options.webhookUrl;
+    }
+    if (options.filterMode !== undefined) {
+      body["filter_mode"] = options.filterMode;
     }
     const data = await this.http.patch<RawMailbox>(`${BASE}/${emailAddress}`, body);
     return parseMailbox(data);
