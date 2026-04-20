@@ -4,7 +4,7 @@ name: SDK Integration Tests
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
   schedule:
     - cron: "0 */2 * * *"
   workflow_dispatch:
@@ -22,9 +22,38 @@ on:
 permissions:
   contents: read
   packages: read
+  checks: read  # required by lewagon/wait-on-check-action to poll check-runs
 
 jobs:
+  # On PRs, gate the rest of the workflow on the unit-test workflow
+  # succeeding first. Skipped for scheduled and manual runs, and for
+  # draft PRs (tests run once marked ready for review).
+  wait-for-unit-tests:
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Python unit tests
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: Python Tests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 20
+
+      - name: Wait for TypeScript unit tests
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          check-name: TypeScript Tests
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 20
+
   select-targets:
+    needs: [wait-for-unit-tests]
+    if: |
+      always() &&
+      (needs.wait-for-unit-tests.result == 'success' || needs.wait-for-unit-tests.result == 'skipped') &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
