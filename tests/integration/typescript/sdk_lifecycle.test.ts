@@ -1,12 +1,11 @@
 // tests/integration/typescript/sdk_lifecycle.test.ts
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Inkbox } from "@inkbox/sdk";
 import type { Message, DecryptedVaultSecret } from "@inkbox/sdk";
 import {
   loadConfig,
-  bootstrapTestOrg,
-  cleanupTestOrg,
+  loadBootstrapFromEnv,
   logStep,
   pollUntil,
   type SdkIntegrationConfig,
@@ -17,15 +16,11 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
   let config: SdkIntegrationConfig;
   let bootstrap: BootstrapResult;
 
-  beforeAll(async () => {
+  beforeAll(() => {
+    // Bootstrap is provisioned once per vitest run by globalSetup.ts and
+    // shared across every test file in this directory.
     config = loadConfig();
-    bootstrap = await bootstrapTestOrg(config);
-  });
-
-  afterAll(async () => {
-    if (bootstrap) {
-      await cleanupTestOrg(config, bootstrap);
-    }
+    bootstrap = loadBootstrapFromEnv();
   });
 
   it("exercises the full SDK lifecycle", async () => {

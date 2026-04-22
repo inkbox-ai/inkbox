@@ -213,8 +213,11 @@ export class AgentIdentity {
       id: mailbox.id,
       emailAddress: mailbox.emailAddress,
       displayName: mailbox.displayName,
+      filterMode: mailbox.filterMode,
+      agentIdentityId: mailbox.agentIdentityId,
       createdAt: mailbox.createdAt,
       updatedAt: mailbox.updatedAt,
+      filterModeChangeNotice: mailbox.filterModeChangeNotice,
     };
     this._mailbox = linked;
     this._data.emailAddress = mailbox.emailAddress;

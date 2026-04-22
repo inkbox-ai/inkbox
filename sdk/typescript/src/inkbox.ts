@@ -10,14 +10,18 @@ import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
+import { MailContactRulesResource } from "./mail/resources/contactRules.js";
 import { SigningKeysResource } from "./signing_keys.js";
 import type { SigningKey } from "./signing_keys.js";
 import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
 import { TranscriptsResource } from "./phone/resources/transcripts.js";
+import { PhoneContactRulesResource } from "./phone/resources/contactRules.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
+import { ContactsResource } from "./contacts/resources/contacts.js";
+import { NotesResource } from "./notes/resources/notes.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type { AgentIdentitySummary, CreateIdentityOptions } from "./identities/types.js";
 import type {
@@ -105,13 +109,17 @@ export class Inkbox {
   readonly _mailboxes: MailboxesResource;
   readonly _messages: MessagesResource;
   readonly _threads: ThreadsResource;
+  readonly _mailContactRules: MailContactRulesResource;
   readonly _signingKeys: SigningKeysResource;
   readonly _numbers: PhoneNumbersResource;
   readonly _calls: CallsResource;
   readonly _texts: TextsResource;
   readonly _transcripts: TranscriptsResource;
+  readonly _phoneContactRules: PhoneContactRulesResource;
   readonly _idsResource: IdentitiesResource;
   readonly _vaultResource: VaultResource;
+  readonly _contacts: ContactsResource;
+  readonly _notes: NotesResource;
   readonly _rootApiHttp: HttpTransport;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
@@ -139,17 +147,22 @@ export class Inkbox {
     const rootApiHttp  = new HttpTransport(options.apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar);
     const apiHttp      = new HttpTransport(options.apiKey, apiRoot, ms, cookieJar);
 
-    this._mailboxes   = new MailboxesResource(mailHttp);
-    this._messages    = new MessagesResource(mailHttp);
-    this._threads     = new ThreadsResource(mailHttp);
-    this._signingKeys = new SigningKeysResource(apiHttp);
+    this._mailboxes        = new MailboxesResource(mailHttp);
+    this._messages         = new MessagesResource(mailHttp);
+    this._threads          = new ThreadsResource(mailHttp);
+    this._mailContactRules = new MailContactRulesResource(mailHttp);
+    this._signingKeys      = new SigningKeysResource(apiHttp);
 
-    this._numbers     = new PhoneNumbersResource(phoneHttp);
-    this._calls       = new CallsResource(phoneHttp);
-    this._texts       = new TextsResource(phoneHttp);
-    this._transcripts = new TranscriptsResource(phoneHttp);
+    this._numbers          = new PhoneNumbersResource(phoneHttp);
+    this._calls            = new CallsResource(phoneHttp);
+    this._texts            = new TextsResource(phoneHttp);
+    this._transcripts      = new TranscriptsResource(phoneHttp);
+    this._phoneContactRules = new PhoneContactRulesResource(phoneHttp);
 
     this._idsResource = new IdentitiesResource(idsHttp);
+
+    this._contacts = new ContactsResource(apiHttp);
+    this._notes = new NotesResource(apiHttp);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
@@ -207,6 +220,18 @@ export class Inkbox {
 
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }
+
+  /** Org-wide contacts (list, get, create, update, delete, lookup, access, vCards). */
+  get contacts(): ContactsResource { return this._contacts; }
+
+  /** Org-scoped notes with per-identity access grants. */
+  get notes(): NotesResource { return this._notes; }
+
+  /** Mail per-mailbox allow/block rules (+ org-wide list). */
+  get mailContactRules(): MailContactRulesResource { return this._mailContactRules; }
+
+  /** Phone per-number allow/block rules (+ org-wide list). */
+  get phoneContactRules(): PhoneContactRulesResource { return this._phoneContactRules; }
 
   // ------------------------------------------------------------------
   // Org-level operations

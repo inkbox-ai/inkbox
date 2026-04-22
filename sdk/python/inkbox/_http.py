@@ -11,7 +11,11 @@ from typing import Any
 import httpx
 
 from inkbox._cookies import CookieJar
-from inkbox.exceptions import InkboxAPIError
+from inkbox.exceptions import (
+    DuplicateContactRuleError,
+    InkboxAPIError,
+    RedundantContactAccessGrantError,
+)
 
 _DEFAULT_TIMEOUT = 30.0
 
@@ -61,6 +65,43 @@ class HttpTransport:
         resp = self._send("DELETE", path)
         _raise_for_status(resp)
 
+    def post_bytes(
+        self,
+        path: str,
+        *,
+        content: bytes,
+        content_type: str,
+        accept: str = "application/json",
+    ) -> Any:
+        """POST arbitrary bytes with a caller-supplied Content-Type.
+
+        Used for non-JSON payloads like vCard imports. The response is
+        still decoded as JSON.
+        """
+        headers = {"Content-Type": content_type, "Accept": accept}
+        resp = self._send("POST", path, content=content, headers=headers)
+        _raise_for_status(resp)
+        if resp.status_code == 204:
+            return None
+        return resp.json()
+
+    def get_bytes(
+        self,
+        path: str,
+        *,
+        accept: str,
+        params: dict[str, Any] | None = None,
+    ) -> bytes:
+        """GET a non-JSON response and return the raw body.
+
+        Used for vCard export and any other binary/text endpoints.
+        """
+        cleaned = {k: v for k, v in (params or {}).items() if v is not None}
+        headers = {"Accept": accept}
+        resp = self._send("GET", path, params=cleaned, headers=headers)
+        _raise_for_status(resp)
+        return resp.content
+
     def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         request = self._client.build_request(method, path, **kwargs)
         cookie = self._cookie_jar.header_for_url(str(request.url))
@@ -83,8 +124,20 @@ class HttpTransport:
 def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code < 400:
         return
+    raw_detail: Any
     try:
-        detail = resp.json().get("detail", resp.text)
+        raw_detail = resp.json().get("detail", resp.text)
     except Exception:
-        detail = resp.text
-    raise InkboxAPIError(status_code=resp.status_code, detail=str(detail))
+        raw_detail = resp.text
+
+    if resp.status_code == 409 and isinstance(raw_detail, dict):
+        if "existing_rule_id" in raw_detail:
+            raise DuplicateContactRuleError(
+                status_code=resp.status_code, detail=raw_detail,
+            )
+        if raw_detail.get("error") == "redundant_grant":
+            raise RedundantContactAccessGrantError(
+                status_code=resp.status_code, detail=raw_detail,
+            )
+
+    raise InkboxAPIError(status_code=resp.status_code, detail=raw_detail)

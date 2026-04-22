@@ -8,8 +8,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
+
+from inkbox.mail.types import ContactRuleStatus, FilterMode, FilterModeChangeNotice
+
+
+class PhoneRuleAction(StrEnum):
+    """Whether a matching phone number is allowed through or blocked."""
+
+    ALLOW = "allow"
+    BLOCK = "block"
+
+
+class PhoneRuleMatchType(StrEnum):
+    """What a phone contact rule matches on."""
+
+    EXACT_NUMBER = "exact_number"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -18,7 +34,12 @@ def _dt(value: str | None) -> datetime | None:
 
 @dataclass
 class PhoneNumber:
-    """A phone number owned by your organisation."""
+    """A phone number owned by your organisation.
+
+    ``agent_identity_id`` is the UUID of the owning agent identity, or
+    ``None`` if the phone number is standalone (not tied to any agent).
+    Always populated on every phone-number response.
+    """
 
     id: UUID
     number: str
@@ -28,11 +49,16 @@ class PhoneNumber:
     client_websocket_url: str | None
     incoming_call_webhook_url: str | None
     incoming_text_webhook_url: str | None
+    filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    agent_identity_id: UUID | None = None
+    filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneNumber:
+        notice = d.get("filter_mode_change_notice")
+        agent_identity_id = d.get("agent_identity_id")
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
@@ -42,8 +68,13 @@ class PhoneNumber:
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
             incoming_text_webhook_url=d.get("incoming_text_webhook_url"),
+            filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
+            filter_mode_change_notice=(
+                FilterModeChangeNotice._from_dict(notice) if notice else None
+            ),
         )
 
 
@@ -86,7 +117,7 @@ class PhoneCall:
 
 @dataclass
 class RateLimitInfo:
-    """Rolling 24-hour rate limit snapshot for an organisation."""
+    """Rate limit snapshot for an organisation."""
 
     calls_used: int
     calls_remaining: int
@@ -225,3 +256,28 @@ class PhoneTranscript:
         )
 
 
+@dataclass
+class PhoneContactRule:
+    """An inbound/outbound allow/block rule scoped to a phone number."""
+
+    id: UUID
+    phone_number_id: UUID
+    action: PhoneRuleAction
+    match_type: PhoneRuleMatchType
+    match_target: str
+    status: ContactRuleStatus
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> PhoneContactRule:
+        return cls(
+            id=UUID(d["id"]),
+            phone_number_id=UUID(d["phone_number_id"]),
+            action=PhoneRuleAction(d["action"]),
+            match_type=PhoneRuleMatchType(d["match_type"]),
+            match_target=d["match_target"],
+            status=ContactRuleStatus(d.get("status", "active")),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )

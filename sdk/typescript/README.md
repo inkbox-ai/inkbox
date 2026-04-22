@@ -106,9 +106,9 @@ console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (cl
 
 `request` for `signup()` requires `humanEmail` and `noteToHuman`. `displayName`, `agentHandle`, and `emailLocalPart` are optional. All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
 
-> **Note:** Unclaimed agents can only send to the `humanEmail` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
+> **Note:** Unclaimed agents have a limited send quota and can only email the `humanEmail` specified at signup. After verification or human approval in the console, full capabilities are unlocked.
 
-> **Note:** The `organizationId` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. Always use the `organizationId` from the most recent response (`verifySignup` or `resendSignupVerification`) rather than caching the value from the initial `signup()` call.
+> **Note:** The `organizationId` returned at signup may change after verification or human approval. Always use the `organizationId` from the most recent response (`verifySignup` or `resendSignupVerification`) rather than caching the value from the initial `signup()` call.
 
 ---
 
@@ -274,7 +274,7 @@ const unread = await identity.listTexts({ isRead: false });
 // Get a single text
 const text = await identity.getText("text-uuid");
 console.log(text.type);  // "sms" or "mms"
-if (text.media) {         // MMS attachments (presigned S3 URLs, 1hr expiry)
+if (text.media) {         // MMS attachments (temporary signed URLs)
   for (const m of text.media) {
     console.log(m.contentType, m.size, m.url);
   }
@@ -470,7 +470,7 @@ await inkbox.messages.unstar("abc@inkboxmail.com", "message-uuid");
 // Delete a message
 await inkbox.messages.delete("abc@inkboxmail.com", "message-uuid");
 
-// Get an attachment presigned URL
+// Get a temporary signed URL for an attachment
 const attachment = await inkbox.messages.getAttachment("abc@inkboxmail.com", "message-uuid", "report.pdf");
 console.log(attachment.url);
 

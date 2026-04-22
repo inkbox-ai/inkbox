@@ -86,11 +86,16 @@ def sdk_integration_config() -> SdkIntegrationConfig:
     )
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def sdk_context(sdk_integration_config: SdkIntegrationConfig) -> Generator[SdkIntegrationContext, None, None]:
+    # Session-scoped: one Clerk org/user is bootstrapped per pytest invocation
+    # and shared across every test in this directory. Tests are responsible
+    # for cleaning up any identities/secrets they create so that later tests
+    # see a predictable starting state.
     cfg = sdk_integration_config
     api_url = f"{cfg.base_url.rstrip('/')}/api/v1"
 
+    # Bootstrap a fresh test user + org (with API key) via the testing subapp
     resp = httpx.post(
         f"{api_url}/testing/create-test-user-organization",
         headers={"X-Interservice-Secret": cfg.interservice_secret},
@@ -113,6 +118,7 @@ def sdk_context(sdk_integration_config: SdkIntegrationConfig) -> Generator[SdkIn
     try:
         yield ctx
     finally:
+        # Tear down the shared org once at the end of the session
         ctx.cleanup()
 
 

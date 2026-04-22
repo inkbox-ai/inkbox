@@ -57,6 +57,7 @@ class TestIdentityMailboxParsing:
         assert isinstance(m.id, UUID)
         assert m.email_address == "sales-agent@inkbox.ai"
         assert m.display_name == "Sales Agent"
+        assert m.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
         assert isinstance(m.created_at, datetime)
         assert isinstance(m.updated_at, datetime)
 
@@ -72,6 +73,7 @@ class TestIdentityPhoneNumberParsing:
         assert p.incoming_call_action == "auto_reject"
         assert p.client_websocket_url is None
         assert p.incoming_text_webhook_url is None
+        assert p.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
 
     def test_parses_incoming_text_webhook_url(self):
         p = IdentityPhoneNumber._from_dict(

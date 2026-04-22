@@ -1,4 +1,14 @@
-import { InkboxAPIError, InkboxError, InkboxVaultKeyError } from "@inkbox/sdk";
+import {
+  DuplicateContactRuleError,
+  InkboxAPIError,
+  InkboxError,
+  InkboxVaultKeyError,
+  RedundantContactAccessGrantError,
+} from "@inkbox/sdk";
+
+function renderDetail(detail: string | Record<string, unknown>): string {
+  return typeof detail === "string" ? detail : JSON.stringify(detail);
+}
 
 export function withErrorHandler<T extends unknown[]>(
   fn: (...args: T) => Promise<void>,
@@ -7,8 +17,16 @@ export function withErrorHandler<T extends unknown[]>(
     try {
       await fn.call(this, ...args);
     } catch (err) {
-      if (err instanceof InkboxAPIError) {
-        console.error(`Error: HTTP ${err.statusCode}: ${err.detail}`);
+      if (err instanceof DuplicateContactRuleError) {
+        console.error(
+          `Error: HTTP ${err.statusCode}: duplicate rule (existing_rule_id=${err.existingRuleId})`,
+        );
+      } else if (err instanceof RedundantContactAccessGrantError) {
+        console.error(
+          `Error: HTTP ${err.statusCode}: redundant grant — ${err.detailMessage}`,
+        );
+      } else if (err instanceof InkboxAPIError) {
+        console.error(`Error: HTTP ${err.statusCode}: ${renderDetail(err.detail)}`);
         if (err.statusCode === 401) {
           console.error("Hint: Check your API key.");
         }

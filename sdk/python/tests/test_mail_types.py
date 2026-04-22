@@ -30,8 +30,19 @@ class TestMailboxParsing:
         assert isinstance(m.id, UUID)
         assert m.email_address == "agent01@inkbox.ai"
         assert m.display_name == "Agent 01"
+        assert m.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
         assert isinstance(m.created_at, datetime)
         assert isinstance(m.updated_at, datetime)
+
+    def test_agent_identity_id_nullable(self):
+        m = Mailbox._from_dict({**MAILBOX_DICT, "agent_identity_id": None})
+        assert m.agent_identity_id is None
+
+    def test_agent_identity_id_missing(self):
+        d = {**MAILBOX_DICT}
+        del d["agent_identity_id"]
+        m = Mailbox._from_dict(d)
+        assert m.agent_identity_id is None
 
 
 class TestMessageParsing:

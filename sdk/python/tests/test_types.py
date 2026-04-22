@@ -30,8 +30,13 @@ class TestPhoneNumberParsing:
         assert n.incoming_call_action == "auto_reject"
         assert n.client_websocket_url is None
         assert n.incoming_call_webhook_url is None
+        assert n.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
         assert isinstance(n.created_at, datetime)
         assert isinstance(n.updated_at, datetime)
+
+    def test_agent_identity_id_nullable(self):
+        n = PhoneNumber._from_dict({**PHONE_NUMBER_DICT, "agent_identity_id": None})
+        assert n.agent_identity_id is None
 
 
 class TestPhoneCallParsing:

@@ -189,7 +189,7 @@ class MessagesResource:
         *,
         redirect: bool = False,
     ) -> dict[str, Any]:
-        """Get a presigned URL for a message attachment.
+        """Get a temporary signed URL for a message attachment.
 
         Args:
             email_address: Full email address of the owning mailbox.

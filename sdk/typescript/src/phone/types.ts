@@ -2,6 +2,28 @@
  * inkbox-phone TypeScript SDK — public types.
  */
 
+import type {
+  ContactRuleStatus,
+  FilterMode,
+  FilterModeChangeNotice,
+  RawFilterModeChangeNotice,
+} from "../mail/types.js";
+import {
+  FilterMode as FilterModeEnum,
+  parseFilterModeChangeNotice,
+} from "../mail/types.js";
+
+/** Whether a matching phone number is allowed through or blocked. */
+export enum PhoneRuleAction {
+  ALLOW = "allow",
+  BLOCK = "block",
+}
+
+/** What a phone contact rule matches on. */
+export enum PhoneRuleMatchType {
+  EXACT_NUMBER = "exact_number",
+}
+
 export interface PhoneNumber {
   id: string;
   number: string;
@@ -14,6 +36,25 @@ export interface PhoneNumber {
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
   incomingTextWebhookUrl: string | null;
+  filterMode: FilterMode;
+  /**
+   * UUID of the owning agent identity, or `null` if the phone number is
+   * standalone (not tied to any agent). Always present on every
+   * phone-number response shape.
+   */
+  agentIdentityId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  filterModeChangeNotice: FilterModeChangeNotice | null;
+}
+
+export interface PhoneContactRule {
+  id: string;
+  phoneNumberId: string;
+  action: PhoneRuleAction;
+  matchType: PhoneRuleMatchType;
+  matchTarget: string;
+  status: ContactRuleStatus;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -103,6 +144,20 @@ export interface RawPhoneNumber {
   client_websocket_url: string | null;
   incoming_call_webhook_url: string | null;
   incoming_text_webhook_url: string | null;
+  filter_mode?: string;
+  agent_identity_id?: string | null;
+  filter_mode_change_notice?: RawFilterModeChangeNotice | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RawPhoneContactRule {
+  id: string;
+  phone_number_id: string;
+  action: string;
+  match_type: string;
+  match_target: string;
+  status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -187,6 +242,24 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
     incomingTextWebhookUrl: r.incoming_text_webhook_url,
+    filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    agentIdentityId: r.agent_identity_id ?? null,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+    filterModeChangeNotice: r.filter_mode_change_notice
+      ? parseFilterModeChangeNotice(r.filter_mode_change_notice)
+      : null,
+  };
+}
+
+export function parsePhoneContactRule(r: RawPhoneContactRule): PhoneContactRule {
+  return {
+    id: r.id,
+    phoneNumberId: r.phone_number_id,
+    action: r.action as PhoneRuleAction,
+    matchType: r.match_type as PhoneRuleMatchType,
+    matchTarget: r.match_target,
+    status: (r.status as ContactRuleStatus) ?? ("active" as ContactRuleStatus),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

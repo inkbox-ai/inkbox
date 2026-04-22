@@ -5,6 +5,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import { FilterMode } from "../../mail/types.js";
 import {
   PhoneNumber,
   PhoneTranscript,
@@ -49,6 +50,7 @@ export class PhoneNumbersResource {
       clientWebsocketUrl?: string | null;
       incomingCallWebhookUrl?: string | null;
       incomingTextWebhookUrl?: string | null;
+      filterMode?: FilterMode;
     },
   ): Promise<PhoneNumber> {
     const body: Record<string, unknown> = {};
@@ -63,6 +65,9 @@ export class PhoneNumbersResource {
     }
     if ("incomingTextWebhookUrl" in options) {
       body["incoming_text_webhook_url"] = options.incomingTextWebhookUrl;
+    }
+    if (options.filterMode !== undefined) {
+      body["filter_mode"] = options.filterMode;
     }
     const data = await this.http.patch<RawPhoneNumber>(
       `${BASE}/${phoneNumberId}`,

@@ -4,6 +4,16 @@
  * Types for the ``GET /api/whoami`` endpoint.
  */
 
+/**
+ * Named constants for the `authSubtype` values returned on API-key responses.
+ *
+ * The field itself is typed as `string | null` because the server may add
+ * more variants over time; these constants are the current set.
+ */
+export const AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED = "api_key.admin_scoped";
+export const AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED = "api_key.agent_scoped.claimed";
+export const AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED = "api_key.agent_scoped.unclaimed";
+
 // ---- public interfaces (camelCase) ----
 
 export interface WhoamiApiKeyResponse {

@@ -10,13 +10,80 @@ export enum MessageDirection {
   OUTBOUND = "outbound",
 }
 
+/**
+ * Contact-rule filter mode on a mailbox or phone number.
+ *
+ * `WHITELIST` — only addresses that match an `allow` rule are delivered.
+ * `BLACKLIST` — everything is delivered except matches against a
+ *   `block` rule. This is the default.
+ */
+export enum FilterMode {
+  WHITELIST = "whitelist",
+  BLACKLIST = "blacklist",
+}
+
+/**
+ * Logical folder a thread lives in.
+ *
+ * `BLOCKED` is server-assigned and is not client-settable — PATCH will
+ * reject it.
+ */
+export enum ThreadFolder {
+  INBOX = "inbox",
+  SPAM = "spam",
+  BLOCKED = "blocked",
+  ARCHIVE = "archive",
+}
+
+/** Whether a matching address is allowed through or blocked. */
+export enum MailRuleAction {
+  ALLOW = "allow",
+  BLOCK = "block",
+}
+
+/** What a mail contact rule matches on. */
+export enum MailRuleMatchType {
+  EXACT_EMAIL = "exact_email",
+  DOMAIN = "domain",
+}
+
+/** Whether a contact rule is currently enforced. */
+export enum ContactRuleStatus {
+  ACTIVE = "active",
+  PAUSED = "paused",
+}
+
+export interface FilterModeChangeNotice {
+  /** The mode the resource was just flipped to. */
+  newFilterMode: FilterMode;
+  /**
+   * Action whose rules are now redundant under `newFilterMode` —
+   * `"block"` under whitelist, `"allow"` under blacklist. Typed as a
+   * free-form string to tolerate new server values.
+   */
+  redundantRuleAction: string;
+  /**
+   * Count of active rules whose `action` equals `redundantRuleAction`.
+   * `0` is a clean flip. Paused / deleted rules are not counted.
+   */
+  redundantRuleCount: number;
+}
+
 export interface Mailbox {
   id: string;
   emailAddress: string;
   displayName: string | null;
   webhookUrl: string | null;
+  filterMode: FilterMode;
+  /**
+   * UUID of the owning agent identity, or `null` if the mailbox is
+   * standalone (not tied to any agent). Always present on every mailbox
+   * response shape.
+   */
+  agentIdentityId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  filterModeChangeNotice: FilterModeChangeNotice | null;
 }
 
 export interface Message {
@@ -56,6 +123,7 @@ export interface Thread {
   id: string;
   mailboxId: string;
   subject: string | null;
+  folder: ThreadFolder;
   messageCount: number;
   lastMessageAt: Date;
   createdAt: Date;
@@ -66,13 +134,33 @@ export interface ThreadDetail extends Thread {
   messages: Message[];
 }
 
+export interface MailContactRule {
+  id: string;
+  mailboxId: string;
+  action: MailRuleAction;
+  matchType: MailRuleMatchType;
+  matchTarget: string;
+  status: ContactRuleStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // ---- internal raw API shapes (snake_case from JSON) ----
+
+export interface RawFilterModeChangeNotice {
+  new_filter_mode: string;
+  redundant_rule_action: string;
+  redundant_rule_count: number;
+}
 
 export interface RawMailbox {
   id: string;
   email_address: string;
   display_name: string | null;
   webhook_url: string | null;
+  filter_mode?: string;
+  agent_identity_id?: string | null;
+  filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
 }
@@ -108,10 +196,22 @@ export interface RawThread {
   id: string;
   mailbox_id: string;
   subject: string | null;
+  folder?: string;
   message_count: number;
   last_message_at: string;
   created_at: string;
   messages?: RawMessage[];
+}
+
+export interface RawMailContactRule {
+  id: string;
+  mailbox_id: string;
+  action: string;
+  match_type: string;
+  match_target: string;
+  status?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RawCursorPage<T> {
@@ -122,14 +222,29 @@ export interface RawCursorPage<T> {
 
 // ---- parsers ----
 
+export function parseFilterModeChangeNotice(
+  r: RawFilterModeChangeNotice,
+): FilterModeChangeNotice {
+  return {
+    newFilterMode: r.new_filter_mode as FilterMode,
+    redundantRuleAction: r.redundant_rule_action,
+    redundantRuleCount: r.redundant_rule_count,
+  };
+}
+
 export function parseMailbox(r: RawMailbox): Mailbox {
   return {
     id: r.id,
     emailAddress: r.email_address,
     displayName: r.display_name,
     webhookUrl: r.webhook_url,
+    filterMode: (r.filter_mode as FilterMode) ?? FilterMode.BLACKLIST,
+    agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+    filterModeChangeNotice: r.filter_mode_change_notice
+      ? parseFilterModeChangeNotice(r.filter_mode_change_notice)
+      : null,
   };
 }
 
@@ -172,6 +287,7 @@ export function parseThread(r: RawThread): Thread {
     id: r.id,
     mailboxId: r.mailbox_id,
     subject: r.subject,
+    folder: (r.folder as ThreadFolder) ?? ThreadFolder.INBOX,
     messageCount: r.message_count,
     lastMessageAt: new Date(r.last_message_at),
     createdAt: new Date(r.created_at),
@@ -182,5 +298,18 @@ export function parseThreadDetail(r: RawThread): ThreadDetail {
   return {
     ...parseThread(r),
     messages: (r.messages ?? []).map(parseMessage),
+  };
+}
+
+export function parseMailContactRule(r: RawMailContactRule): MailContactRule {
+  return {
+    id: r.id,
+    mailboxId: r.mailbox_id,
+    action: r.action as MailRuleAction,
+    matchType: r.match_type as MailRuleMatchType,
+    matchTarget: r.match_target,
+    status: (r.status as ContactRuleStatus) ?? ContactRuleStatus.ACTIVE,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
   };
 }

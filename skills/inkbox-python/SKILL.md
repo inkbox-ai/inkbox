@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, vault, or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -28,16 +28,20 @@ Constructor: `Inkbox(api_key, base_url="https://inkbox.ai", timeout=30.0)`
 ## Core Model
 
 ```
-Inkbox (org-level client)
-├── .create_identity(handle) → AgentIdentity
-├── .get_identity(handle)    → AgentIdentity
-├── .list_identities()       → list[AgentIdentitySummary]
-├── .mailboxes               → MailboxesResource
-├── .phone_numbers           → PhoneNumbersResource
-├── .texts                   → TextsResource
-├── .vault                   → VaultResource
-├── .whoami()                → WhoamiResponse
-└── .create_signing_key()    → SigningKey
+Inkbox (admin-only client)
+├── .create_identity(handle)  → AgentIdentity
+├── .get_identity(handle)     → AgentIdentity
+├── .list_identities()        → list[AgentIdentitySummary]
+├── .mailboxes                → MailboxesResource
+├── .phone_numbers            → PhoneNumbersResource
+├── .texts                    → TextsResource
+├── .mail_contact_rules       → MailContactRulesResource
+├── .phone_contact_rules      → PhoneContactRulesResource
+├── .contacts                 → ContactsResource  (.access, .vcards)
+├── .notes                    → NotesResource     (.access)
+├── .vault                    → VaultResource
+├── .whoami()                 → WhoamiResponse
+└── .create_signing_key()     → SigningKey
 
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                 → IdentityMailbox | None
@@ -134,6 +138,17 @@ for m in thread.messages:
     print(f"[{m.from_address}] {m.subject}")
 ```
 
+### Thread Folders
+
+Threads carry a `folder` field: `inbox`, `spam`, `archive`, or `blocked` (server-assigned, never client-set).
+
+```python
+from inkbox import ThreadFolder
+# Thread.folder / ThreadDetail.folder is always one of the four values above.
+```
+
+Low-level folder listing / per-thread updates (`list(folder=…)`, `list_folders(email)`, `update(..., folder=…)`) live on `ThreadsResource`. Passing `folder="blocked"` to `update` raises `ValueError` before the HTTP call.
+
 ## Phone
 
 ```python
@@ -143,7 +158,7 @@ call = identity.place_call(
     client_websocket_url="wss://your-agent.example.com/ws",
 )
 print(call.status)
-print(call.rate_limit.calls_remaining)   # rolling 24h budget
+print(call.rate_limit.calls_remaining)
 
 # List calls (offset pagination)
 calls = identity.list_calls(limit=10, offset=0)
@@ -169,7 +184,7 @@ unread = identity.list_texts(is_read=False)
 # Get a single text message
 text = identity.get_text("text-uuid")
 print(text.type)   # "sms" or "mms"
-if text.media:     # MMS media attachments (presigned S3 URLs, 1hr expiry)
+if text.media:     # MMS media attachments (temporary signed URLs)
     for m in text.media:
         print(m.content_type, m.size, m.url)
 
@@ -188,7 +203,7 @@ identity.mark_text_read("text-uuid")
 result = identity.mark_text_conversation_read("+15167251294")
 print(result["updated_count"])
 
-# Org-level: search, update, delete
+# Admin-only: search, update, delete
 results = inkbox.texts.search(phone.id, q="invoice", limit=20)
 inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 ```
@@ -350,7 +365,7 @@ identity.set_totp(secret_id, "otpauth://totp/...?secret=...")
 identity.remove_totp(secret_id)
 ```
 
-### From the unlocked vault (org-level)
+### From the unlocked vault (admin-only)
 
 ```python
 unlocked = inkbox.vault.unlock("my-Vault-key-01!")
@@ -370,7 +385,7 @@ code = unlocked.get_totp_code(secret_id)
 | `period_end` | `int` | Unix timestamp when the code expires |
 | `seconds_remaining` | `int` | Seconds until expiry |
 
-## Org-level Resources
+## Admin-only Resources
 
 ### Mailboxes (`inkbox.mailboxes`)
 
@@ -381,6 +396,17 @@ mailbox   = inkbox.mailboxes.get("abc@inkboxmail.com")
 inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")
 inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")
 inkbox.mailboxes.update(mailbox.email_address, webhook_url=None)   # remove webhook
+
+# Switch contact-rule filter mode (admin-only — agent-scoped keys get 403)
+updated = inkbox.mailboxes.update(mailbox.email_address, filter_mode="whitelist")
+if updated.filter_mode_change_notice:
+    # Populated when filter_mode actually changed — tells you how many
+    # rules are now redundant under the new mode.
+    n = updated.filter_mode_change_notice
+    print(n.redundant_rule_count, n.redundant_rule_action, n.new_filter_mode)
+
+# Mailbox responses now also carry mailbox.agent_identity_id when the
+# mailbox is linked to an identity.
 
 results = inkbox.mailboxes.search(mailbox.email_address, q="invoice", limit=20)
 inkbox.mailboxes.delete(mailbox.email_address)
@@ -409,6 +435,124 @@ hits = inkbox.phone_numbers.search_transcripts(number.id, q="refund", party="rem
 inkbox.phone_numbers.release(number.id)
 ```
 
+Phone numbers carry the same `filter_mode` / `agent_identity_id` / `filter_mode_change_notice` fields as mailboxes; flipping `filter_mode` is admin-only and returns a change-notice when the value actually changed.
+
+## Contact Rules
+
+Per-mailbox or per-phone-number allow/block lists, enforced server-side. The active `filter_mode` on the owning resource controls whether the rules are interpreted as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
+
+```python
+from inkbox import (
+    MailRuleAction, MailRuleMatchType, PhoneRuleAction, PhoneRuleMatchType,
+    DuplicateContactRuleError,
+)
+
+# Mail rules — scoped to a single mailbox. New rules always start active;
+# call `update(..., status="paused")` afterwards to pause one.
+rule = inkbox.mail_contact_rules.create(
+    mailbox.email_address,
+    action=MailRuleAction.ALLOW,         # or BLOCK
+    match_type=MailRuleMatchType.DOMAIN, # or EXACT_EMAIL
+    match_target="example.com",
+)
+inkbox.mail_contact_rules.list(mailbox.email_address)
+inkbox.mail_contact_rules.get(mailbox.email_address, rule.id)
+inkbox.mail_contact_rules.update(mailbox.email_address, rule.id, status="paused")  # admin-only
+inkbox.mail_contact_rules.delete(mailbox.email_address, rule.id)                   # admin-only
+
+# Admin-only list; optionally narrow to a single mailbox_id
+all_rules = inkbox.mail_contact_rules.list_all(mailbox_id=str(mailbox.id))
+
+# Duplicate (match_type, match_target) on the same mailbox raises 409:
+try:
+    inkbox.mail_contact_rules.create(
+        mailbox.email_address,
+        action="allow", match_type="domain", match_target="example.com",
+    )
+except DuplicateContactRuleError as e:
+    print(e.existing_rule_id)   # UUID of the rule that already matched
+
+# Phone rules — same shape, only match_type="exact_number" is supported.
+inkbox.phone_contact_rules.create(
+    number.id,
+    action=PhoneRuleAction.BLOCK,
+    match_type=PhoneRuleMatchType.EXACT_NUMBER,
+    match_target="+15551234567",
+)
+inkbox.phone_contact_rules.list(number.id)
+inkbox.phone_contact_rules.list_all(phone_number_id=str(number.id))
+```
+
+## Contacts
+
+Admin-only address book with per-identity access grants and vCard import/export.
+
+```python
+from inkbox import (
+    Contact, ContactEmail, ContactPhone, ContactAddress,
+    RedundantContactAccessGrantError,
+)
+
+# CRUD
+contact = inkbox.contacts.create(
+    given_name="Ada",
+    family_name="Lovelace",
+    emails=[ContactEmail(label="work", value="ada@example.com")],
+    phones=[ContactPhone(label="mobile", value="+15551234567")],
+    # access_identity_ids defaults to "wildcard" (every active identity);
+    # pass [] for admin-only, or a list of identity UUIDs for explicit grants.
+)
+inkbox.contacts.get(str(contact.id))
+inkbox.contacts.list(q="ada", order="recent", limit=50, offset=0)
+inkbox.contacts.update(str(contact.id), job_title="Analyst")       # JSON-merge-patch via kwargs
+inkbox.contacts.delete(str(contact.id))
+
+# Reverse-lookup — exactly one filter required (else ValueError before HTTP)
+inkbox.contacts.lookup(email="ada@example.com")
+inkbox.contacts.lookup(email_domain="example.com")
+inkbox.contacts.lookup(phone="+15551234567")
+inkbox.contacts.lookup(email_contains="ada")
+inkbox.contacts.lookup(phone_contains="555")
+
+# Access grants (admin + JWT only; agents can self-revoke)
+inkbox.contacts.access.list(str(contact.id))
+inkbox.contacts.access.grant(str(contact.id), identity_id="agent-uuid")
+inkbox.contacts.access.grant(str(contact.id), wildcard=True)       # every active identity
+inkbox.contacts.access.revoke(str(contact.id), "agent-uuid")
+
+# Redundant grants (e.g. per-identity on top of wildcard) raise 409
+try:
+    inkbox.contacts.access.grant(str(contact.id), identity_id="agent-uuid")
+except RedundantContactAccessGrantError as e:
+    print(e.error, e.detail_message)
+
+# vCards
+result = inkbox.contacts.vcards.import_vcards(vcf_text)   # bulk, ≤5 MiB, ≤1000 cards
+print(result.created_ids)     # list[UUID]
+for item in result.errors:    # list[ContactImportResultItem]
+    print(item.index, item.error)
+
+vcf = inkbox.contacts.vcards.export_vcard(str(contact.id))  # vCard 4.0 string
+```
+
+## Notes
+
+Admin-only free-form notes with per-identity access grants. Identities must be granted access explicitly — there is no wildcard for notes.
+
+```python
+note = inkbox.notes.create(body="Customer prefers email follow-up.", title="Ada")
+inkbox.notes.get(str(note.id))
+inkbox.notes.list(q="email", identity_id="agent-uuid", order="recent", limit=50)
+inkbox.notes.update(str(note.id), body="Updated body")
+inkbox.notes.update(str(note.id), title=None)   # clear title (body cannot be null)
+inkbox.notes.delete(str(note.id))
+
+# Access grants (admin + JWT only)
+inkbox.notes.access.list(str(note.id))
+inkbox.notes.access.grant(str(note.id), identity_id="agent-uuid")
+inkbox.notes.access.revoke(str(note.id), "agent-uuid")
+```
+
 ## Whoami
 
 ```python
@@ -418,7 +562,20 @@ print(info.auth_type)        # "api_key" or "jwt"
 print(info.organization_id)
 ```
 
-Returns `WhoamiApiKeyResponse` (with `key_id`, `label`, `creator_type`, etc.) or `WhoamiJwtResponse` (with `email`, `org_role`, etc.) based on `auth_type`.
+Returns `WhoamiApiKeyResponse` (with `key_id`, `label`, `creator_type`, `auth_subtype`, etc.) or `WhoamiJwtResponse` (with `email`, `org_role`, etc.) based on `auth_type`.
+
+For branching on API-key scope, compare against the exported constants:
+
+```python
+from inkbox import (
+    AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED,
+    AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED,
+    AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED,
+)
+
+if info.auth_type == "api_key" and info.auth_subtype == AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED:
+    ...   # admin-only operations (filter_mode flips, rule updates/deletes, etc.)
+```
 
 ## Webhooks & Signature Verification
 
@@ -443,14 +600,23 @@ Algorithm: HMAC-SHA256 over `"{request_id}.{timestamp}.{body}"`.
 ## Error Handling
 
 ```python
-from inkbox import InkboxAPIError
+from inkbox import (
+    InkboxAPIError,
+    DuplicateContactRuleError,
+    RedundantContactAccessGrantError,
+)
 
 try:
     identity = inkbox.get_identity("unknown")
 except InkboxAPIError as e:
     print(e.status_code)   # HTTP status (e.g. 404)
-    print(e.detail)        # message from API
+    print(e.detail)        # str for legacy errors, dict for structured ones
 ```
+
+`InkboxAPIError.detail` can now be a `dict` for structured responses (e.g. contact-rule / access conflicts). Catch the narrower subclasses when you need the parsed fields:
+
+- `DuplicateContactRuleError` — 409 when creating a contact rule with an already-taken `(match_type, match_target)` on the same resource. Exposes `.existing_rule_id: UUID`.
+- `RedundantContactAccessGrantError` — 409 when a contact-access grant is redundant (e.g. per-identity grant on top of an active wildcard). Exposes `.error` and `.detail_message`.
 
 ## Key Conventions
 

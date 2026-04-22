@@ -7,23 +7,39 @@ from inkbox.agent_identity import AgentIdentity
 from inkbox.credentials import Credentials
 
 # Exceptions (canonical source)
-from inkbox.exceptions import InkboxAPIError, InkboxError, InkboxVaultKeyError
+from inkbox.exceptions import (
+    DuplicateContactRuleError,
+    InkboxAPIError,
+    InkboxError,
+    InkboxVaultKeyError,
+    RedundantContactAccessGrantError,
+)
 
 # Mail types
 from inkbox.mail.types import (
+    ContactRuleStatus,
+    FilterMode,
+    FilterModeChangeNotice,
+    MailContactRule,
+    MailRuleAction,
+    MailRuleMatchType,
     Mailbox,
     Message,
     MessageDetail,
     MessageDirection,
     Thread,
     ThreadDetail,
+    ThreadFolder,
 )
 
 # Phone types
 from inkbox.phone.types import (
     PhoneCall,
     PhoneCallWithRateLimit,
+    PhoneContactRule,
     PhoneNumber,
+    PhoneRuleAction,
+    PhoneRuleMatchType,
     PhoneTranscript,
     RateLimitInfo,
     TextConversationSummary,
@@ -39,6 +55,23 @@ from inkbox.identities.types import (
     IdentityPhoneNumberCreateOptions,
     IdentityPhoneNumber,
 )
+
+# Contacts types
+from inkbox.contacts.types import (
+    Contact,
+    ContactAccess,
+    ContactAddress,
+    ContactCustomField,
+    ContactDate,
+    ContactEmail,
+    ContactImportResult,
+    ContactImportResultItem,
+    ContactPhone,
+    ContactWebsite,
+)
+
+# Notes types
+from inkbox.notes.types import Note, NoteAccess
 
 # Vault types
 from inkbox.vault.types import (
@@ -80,8 +113,11 @@ from inkbox.agent_signup.types import (
     SignupRestrictions,
 )
 
-# Whoami types
+# Whoami types and named auth_subtype constants
 from inkbox.whoami.types import (
+    AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED,
+    AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED,
+    AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED,
     WhoamiApiKeyResponse,
     WhoamiJwtResponse,
     WhoamiResponse,
@@ -99,17 +135,29 @@ __all__ = [
     "InkboxError",
     "InkboxAPIError",
     "InkboxVaultKeyError",
+    "DuplicateContactRuleError",
+    "RedundantContactAccessGrantError",
     # Mail types
+    "ContactRuleStatus",
+    "FilterMode",
+    "FilterModeChangeNotice",
+    "MailContactRule",
+    "MailRuleAction",
+    "MailRuleMatchType",
     "Mailbox",
     "Message",
     "MessageDetail",
     "MessageDirection",
     "Thread",
     "ThreadDetail",
+    "ThreadFolder",
     # Phone types
     "PhoneCall",
     "PhoneCallWithRateLimit",
+    "PhoneContactRule",
     "PhoneNumber",
+    "PhoneRuleAction",
+    "PhoneRuleMatchType",
     "PhoneTranscript",
     "RateLimitInfo",
     "TextConversationSummary",
@@ -121,6 +169,20 @@ __all__ = [
     "IdentityMailbox",
     "IdentityPhoneNumberCreateOptions",
     "IdentityPhoneNumber",
+    # Contacts types
+    "Contact",
+    "ContactAccess",
+    "ContactAddress",
+    "ContactCustomField",
+    "ContactDate",
+    "ContactEmail",
+    "ContactImportResult",
+    "ContactImportResultItem",
+    "ContactPhone",
+    "ContactWebsite",
+    # Notes types
+    "Note",
+    "NoteAccess",
     # Vault types
     "AccessRule",
     "VaultSecretType",
@@ -152,7 +214,10 @@ __all__ = [
     "AgentSignupResendResponse",
     "AgentSignupStatusResponse",
     "SignupRestrictions",
-    # Whoami types
+    # Whoami types + auth_subtype constants
+    "AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED",
+    "AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED",
+    "AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED",
     "WhoamiApiKeyResponse",
     "WhoamiJwtResponse",
     "WhoamiResponse",
