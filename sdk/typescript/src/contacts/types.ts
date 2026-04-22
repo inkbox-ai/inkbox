@@ -114,12 +114,12 @@ export interface RawContactPhone {
 
 export interface RawContactWebsite {
   label?: string | null;
-  value: string;
+  url: string;
 }
 
 export interface RawContactDate {
   label?: string | null;
-  value: string;
+  date: string;
 }
 
 export interface RawContactAddress {
@@ -127,7 +127,7 @@ export interface RawContactAddress {
   street?: string | null;
   city?: string | null;
   region?: string | null;
-  postal_code?: string | null;
+  postal?: string | null;
   country?: string | null;
 }
 
@@ -200,11 +200,11 @@ export function parseContactPhone(r: RawContactPhone): ContactPhone {
 }
 
 export function parseContactWebsite(r: RawContactWebsite): ContactWebsite {
-  return { label: r.label ?? null, value: r.value };
+  return { label: r.label ?? null, value: r.url };
 }
 
 export function parseContactDate(r: RawContactDate): ContactDate {
-  return { label: r.label ?? null, value: r.value };
+  return { label: r.label ?? null, value: r.date };
 }
 
 export function parseContactAddress(r: RawContactAddress): ContactAddress {
@@ -213,7 +213,7 @@ export function parseContactAddress(r: RawContactAddress): ContactAddress {
     street: r.street ?? null,
     city: r.city ?? null,
     region: r.region ?? null,
-    postalCode: r.postal_code ?? null,
+    postalCode: r.postal ?? null,
     country: r.country ?? null,
   };
 }
@@ -307,13 +307,13 @@ export function contactPhoneToWire(p: ContactPhone): RawContactPhone {
 }
 
 export function contactWebsiteToWire(w: ContactWebsite): RawContactWebsite {
-  const out: RawContactWebsite = { value: w.value };
+  const out: RawContactWebsite = { url: w.value };
   if (w.label !== null) out.label = w.label;
   return out;
 }
 
 export function contactDateToWire(d: ContactDate): RawContactDate {
-  const out: RawContactDate = { value: d.value };
+  const out: RawContactDate = { date: d.value };
   if (d.label !== null) out.label = d.label;
   return out;
 }
@@ -324,7 +324,7 @@ export function contactAddressToWire(a: ContactAddress): RawContactAddress {
   if (a.street !== null) out.street = a.street;
   if (a.city !== null) out.city = a.city;
   if (a.region !== null) out.region = a.region;
-  if (a.postalCode !== null) out.postal_code = a.postalCode;
+  if (a.postalCode !== null) out.postal = a.postalCode;
   if (a.country !== null) out.country = a.country;
   return out;
 }

@@ -464,15 +464,15 @@ Per-mailbox or per-phone-number allow/block lists, enforced server-side. The act
 ```typescript
 import {
   MailRuleAction, MailRuleMatchType, PhoneRuleAction, PhoneRuleMatchType,
-  ContactRuleStatus, DuplicateContactRuleError,
+  DuplicateContactRuleError,
 } from "@inkbox/sdk";
 
-// Mail rules — scoped to a single mailbox
+// Mail rules — scoped to a single mailbox. New rules always start active;
+// call `update(..., { status: "paused" })` afterwards to pause one.
 const rule = await inkbox.mailContactRules.create(mailbox.emailAddress, {
   action: MailRuleAction.ALLOW,          // or BLOCK
   matchType: MailRuleMatchType.DOMAIN,   // or EXACT_EMAIL
   matchTarget: "example.com",
-  status: ContactRuleStatus.ACTIVE,      // default; or PAUSED
 });
 await inkbox.mailContactRules.list(mailbox.emailAddress);
 await inkbox.mailContactRules.get(mailbox.emailAddress, rule.id);

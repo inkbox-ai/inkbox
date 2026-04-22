@@ -70,9 +70,9 @@ class MailContactRulesResource:
         action: MailRuleAction | str,
         match_type: MailRuleMatchType | str,
         match_target: str,
-        status: ContactRuleStatus | str | None = None,
     ) -> MailContactRule:
-        """Create a rule.
+        """Create a rule. New rules are always ``active``; use
+        :meth:`update` to pause one after creation.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.
@@ -84,8 +84,6 @@ class MailContactRulesResource:
             ),
             "match_target": match_target,
         }
-        if status is not None:
-            body["status"] = status.value if isinstance(status, ContactRuleStatus) else status
         data = self._http.post(_rule_path(email_address), json=body)
         return MailContactRule._from_dict(data)
 

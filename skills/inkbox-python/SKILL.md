@@ -444,16 +444,16 @@ Per-mailbox or per-phone-number allow/block lists, enforced server-side. The act
 ```python
 from inkbox import (
     MailRuleAction, MailRuleMatchType, PhoneRuleAction, PhoneRuleMatchType,
-    ContactRuleStatus, DuplicateContactRuleError,
+    DuplicateContactRuleError,
 )
 
-# Mail rules — scoped to a single mailbox
+# Mail rules — scoped to a single mailbox. New rules always start active;
+# call `update(..., status="paused")` afterwards to pause one.
 rule = inkbox.mail_contact_rules.create(
     mailbox.email_address,
     action=MailRuleAction.ALLOW,         # or BLOCK
     match_type=MailRuleMatchType.DOMAIN, # or EXACT_EMAIL
     match_target="example.com",
-    status=ContactRuleStatus.ACTIVE,     # default; or PAUSED
 )
 inkbox.mail_contact_rules.list(mailbox.email_address)
 inkbox.mail_contact_rules.get(mailbox.email_address, rule.id)

@@ -70,9 +70,9 @@ class PhoneContactRulesResource:
         action: PhoneRuleAction | str,
         match_target: str,
         match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
-        status: ContactRuleStatus | str | None = None,
     ) -> PhoneContactRule:
-        """Create a rule.
+        """Create a rule. New rules are always ``active``; use
+        :meth:`update` to pause one after creation.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.
@@ -84,8 +84,6 @@ class PhoneContactRulesResource:
             ),
             "match_target": match_target,
         }
-        if status is not None:
-            body["status"] = status.value if isinstance(status, ContactRuleStatus) else status
         data = self._http.post(_rule_path(phone_number_id), json=body)
         return PhoneContactRule._from_dict(data)
 

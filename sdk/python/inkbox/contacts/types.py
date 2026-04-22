@@ -79,10 +79,10 @@ class ContactWebsite:
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ContactWebsite:
-        return cls(label=d.get("label"), value=d["value"])
+        return cls(label=d.get("label"), value=d["url"])
 
     def to_wire(self) -> dict[str, Any]:
-        body: dict[str, Any] = {"value": self.value}
+        body: dict[str, Any] = {"url": self.value}
         if self.label is not None:
             body["label"] = self.label
         return body
@@ -95,10 +95,10 @@ class ContactDate:
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ContactDate:
-        return cls(label=d.get("label"), value=date.fromisoformat(d["value"]))
+        return cls(label=d.get("label"), value=date.fromisoformat(d["date"]))
 
     def to_wire(self) -> dict[str, Any]:
-        body: dict[str, Any] = {"value": self.value.isoformat()}
+        body: dict[str, Any] = {"date": self.value.isoformat()}
         if self.label is not None:
             body["label"] = self.label
         return body
@@ -120,16 +120,18 @@ class ContactAddress:
             street=d.get("street"),
             city=d.get("city"),
             region=d.get("region"),
-            postal_code=d.get("postal_code"),
+            postal_code=d.get("postal"),
             country=d.get("country"),
         )
 
     def to_wire(self) -> dict[str, Any]:
         body: dict[str, Any] = {}
-        for name in ("label", "street", "city", "region", "postal_code", "country"):
+        for name in ("label", "street", "city", "region", "country"):
             value = getattr(self, name)
             if value is not None:
                 body[name] = value
+        if self.postal_code is not None:
+            body["postal"] = self.postal_code
         return body
 
 

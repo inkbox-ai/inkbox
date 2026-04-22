@@ -33,7 +33,6 @@ export interface CreateMailContactRuleOptions {
   action: MailRuleAction;
   matchType: MailRuleMatchType;
   matchTarget: string;
-  status?: ContactRuleStatus;
 }
 
 export interface UpdateMailContactRuleOptions {
@@ -84,7 +83,6 @@ export class MailContactRulesResource {
       match_type: options.matchType,
       match_target: options.matchTarget,
     };
-    if (options.status !== undefined) body.status = options.status;
     const data = await this.http.post<RawMailContactRule>(
       rulePath(emailAddress),
       body,

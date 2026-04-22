@@ -108,12 +108,11 @@ function registerNumberRulesCommands(parent: Command): void {
 
   rules
     .command("create")
-    .description("Create a rule")
+    .description("Create a rule (always starts active; use `update` to pause)")
     .requiredOption("--number <id>", "Phone number id")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-target <value>", "Phone number to match (E.164)")
     .option("--match-type <type>", "exact_number (default)", PhoneRuleMatchType.EXACT_NUMBER)
-    .option("--status <status>", "active (default) or paused")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -122,7 +121,6 @@ function registerNumberRulesCommands(parent: Command): void {
           action: string;
           matchType: string;
           matchTarget: string;
-          status?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -131,7 +129,6 @@ function registerNumberRulesCommands(parent: Command): void {
           action: cmdOpts.action as PhoneRuleAction,
           matchType: cmdOpts.matchType as PhoneRuleMatchType,
           matchTarget: cmdOpts.matchTarget,
-          status: cmdOpts.status as ContactRuleStatus | undefined,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
       }),

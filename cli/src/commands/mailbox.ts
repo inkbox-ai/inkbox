@@ -117,12 +117,11 @@ function registerMailboxRulesCommands(parent: Command): void {
 
   rules
     .command("create")
-    .description("Create a rule")
+    .description("Create a rule (always starts active; use `update` to pause)")
     .requiredOption("--mailbox <email>", "Mailbox email address")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-type <type>", "exact_email or domain")
     .requiredOption("--match-target <value>", "Address or domain to match")
-    .option("--status <status>", "active (default) or paused")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -131,7 +130,6 @@ function registerMailboxRulesCommands(parent: Command): void {
           action: string;
           matchType: string;
           matchTarget: string;
-          status?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -140,7 +138,6 @@ function registerMailboxRulesCommands(parent: Command): void {
           action: cmdOpts.action as MailRuleAction,
           matchType: cmdOpts.matchType as MailRuleMatchType,
           matchTarget: cmdOpts.matchTarget,
-          status: cmdOpts.status as ContactRuleStatus | undefined,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
       }),

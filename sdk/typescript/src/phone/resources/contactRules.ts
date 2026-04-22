@@ -33,7 +33,6 @@ export interface CreatePhoneContactRuleOptions {
   action: PhoneRuleAction;
   matchTarget: string;
   matchType?: PhoneRuleMatchType;
-  status?: ContactRuleStatus;
 }
 
 export interface UpdatePhoneContactRuleOptions {
@@ -84,7 +83,6 @@ export class PhoneContactRulesResource {
       match_type: options.matchType ?? PhoneRuleMatchType.EXACT_NUMBER,
       match_target: options.matchTarget,
     };
-    if (options.status !== undefined) body.status = options.status;
     const data = await this.http.post<RawPhoneContactRule>(
       rulePath(phoneNumberId),
       body,
