@@ -180,8 +180,6 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         identities = inkbox.list_identities()
         assert len(identities) == 0
 
-    # ── final test-org cleanup ────────────────────────────────────
-    log_step(ctx, "cleanup test organization")
-    deleted = ctx.cleanup()
-    assert "deleted" in deleted
-    log_step(ctx, f"cleanup complete: {deleted['deleted']}")
+    # Test-org cleanup is now handled by the session-scoped sdk_context
+    # fixture teardown so that subsequent tests in the same pytest run
+    # (e.g. test_sdk_signup) can reuse the same Clerk org.
