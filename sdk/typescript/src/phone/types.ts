@@ -37,6 +37,12 @@ export interface PhoneNumber {
   incomingCallWebhookUrl: string | null;
   incomingTextWebhookUrl: string | null;
   filterMode: FilterMode;
+  /**
+   * UUID of the owning agent identity, or `null` if the phone number is
+   * standalone (not tied to any agent). Always present on every
+   * phone-number response shape.
+   */
+  agentIdentityId: string | null;
   createdAt: Date;
   updatedAt: Date;
   filterModeChangeNotice: FilterModeChangeNotice | null;
@@ -139,6 +145,7 @@ export interface RawPhoneNumber {
   incoming_call_webhook_url: string | null;
   incoming_text_webhook_url: string | null;
   filter_mode?: string;
+  agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
@@ -236,6 +243,7 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
     incomingTextWebhookUrl: r.incoming_text_webhook_url,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     filterModeChangeNotice: r.filter_mode_change_notice

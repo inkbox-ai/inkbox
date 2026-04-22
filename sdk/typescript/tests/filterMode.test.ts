@@ -16,6 +16,7 @@ const MAILBOX_DICT = {
   email_address: "box@inkbox.ai",
   display_name: "Agent",
   webhook_url: null,
+  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   created_at: "2026-04-20T00:00:00Z",
   updated_at: "2026-04-20T00:00:00Z",
 };
@@ -47,6 +48,19 @@ describe("Mailbox filterMode", () => {
     const mb = parseMailbox(MAILBOX_DICT as unknown as any);
     expect(mb.filterMode).toBe(FilterMode.BLACKLIST);
     expect(mb.filterModeChangeNotice).toBeNull();
+  });
+
+  it("parseMailbox surfaces agentIdentityId", () => {
+    const mb = parseMailbox(MAILBOX_DICT as unknown as any);
+    expect(mb.agentIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
+  });
+
+  it("parseMailbox null agentIdentityId for standalone mailbox", () => {
+    const mb = parseMailbox({
+      ...MAILBOX_DICT,
+      agent_identity_id: null,
+    } as unknown as any);
+    expect(mb.agentIdentityId).toBeNull();
   });
 
   it("parseMailbox parses change notice when present", () => {

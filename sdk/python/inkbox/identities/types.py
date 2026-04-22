@@ -99,7 +99,11 @@ def vault_secret_ids_to_wire(
 
 @dataclass
 class IdentityMailbox:
-    """Mailbox channel linked to an agent identity."""
+    """Mailbox channel linked to an agent identity.
+
+    ``agent_identity_id`` mirrors the same field on :class:`Mailbox`;
+    on the embedded variant it always equals the owning identity's ID.
+    """
 
     id: UUID
     email_address: str
@@ -107,11 +111,13 @@ class IdentityMailbox:
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityMailbox:
         notice = d.get("filter_mode_change_notice")
+        agent_identity_id = d.get("agent_identity_id")
         return cls(
             id=UUID(d["id"]),
             email_address=d["email_address"],
@@ -119,6 +125,7 @@ class IdentityMailbox:
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
             filter_mode_change_notice=(
                 FilterModeChangeNotice._from_dict(notice) if notice else None
             ),
@@ -127,7 +134,11 @@ class IdentityMailbox:
 
 @dataclass
 class IdentityPhoneNumber:
-    """Phone number channel linked to an agent identity."""
+    """Phone number channel linked to an agent identity.
+
+    ``agent_identity_id`` mirrors the same field on :class:`PhoneNumber`;
+    on the embedded variant it always equals the owning identity's ID.
+    """
 
     id: UUID
     number: str
@@ -139,11 +150,13 @@ class IdentityPhoneNumber:
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityPhoneNumber:
         notice = d.get("filter_mode_change_notice")
+        agent_identity_id = d.get("agent_identity_id")
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
@@ -155,6 +168,7 @@ class IdentityPhoneNumber:
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
             filter_mode_change_notice=(
                 FilterModeChangeNotice._from_dict(notice) if notice else None
             ),

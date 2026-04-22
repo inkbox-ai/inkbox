@@ -24,8 +24,14 @@ describe("parsePhoneNumber", () => {
     expect(n.status).toBe("active");
     expect(n.incomingCallAction).toBe("auto_reject");
     expect(n.clientWebsocketUrl).toBeNull();
+    expect(n.agentIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
     expect(n.createdAt).toBeInstanceOf(Date);
     expect(n.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it("null agentIdentityId for standalone number", () => {
+    const n = parsePhoneNumber({ ...RAW_PHONE_NUMBER, agent_identity_id: null });
+    expect(n.agentIdentityId).toBeNull();
   });
 });
 

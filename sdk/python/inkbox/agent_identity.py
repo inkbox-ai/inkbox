@@ -254,6 +254,7 @@ class AgentIdentity:
             filter_mode=mailbox.filter_mode,
             created_at=mailbox.created_at,
             updated_at=mailbox.updated_at,
+            agent_identity_id=mailbox.agent_identity_id,
             filter_mode_change_notice=mailbox.filter_mode_change_notice,
         )
         self._mailbox = linked

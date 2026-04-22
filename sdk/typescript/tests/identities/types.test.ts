@@ -48,6 +48,7 @@ describe("parseIdentityMailbox", () => {
     expect(m.id).toBe(RAW_IDENTITY_MAILBOX.id);
     expect(m.emailAddress).toBe("sales-agent@inkbox.ai");
     expect(m.displayName).toBe("Sales Agent");
+    expect(m.agentIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
     expect(m.createdAt).toBeInstanceOf(Date);
     expect(m.updatedAt).toBeInstanceOf(Date);
   });
@@ -62,6 +63,7 @@ describe("parseIdentityPhoneNumber", () => {
     expect(p.incomingCallAction).toBe("auto_reject");
     expect(p.clientWebsocketUrl).toBeNull();
     expect(p.incomingTextWebhookUrl).toBeNull();
+    expect(p.agentIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
     expect(p.createdAt).toBeInstanceOf(Date);
   });
 

@@ -14,6 +14,7 @@ const MAILBOX_LIST_COLUMNS = [
   "id",
   "displayName",
   "filterMode",
+  "agentIdentityId",
   "createdAt",
 ];
 
@@ -233,6 +234,7 @@ export function registerMailboxCommands(program: Command): void {
             id: mb.id,
             displayName: mb.displayName,
             filterMode: mb.filterMode,
+            agentIdentityId: mb.agentIdentityId,
             createdAt: mb.createdAt,
           },
           { json: !!opts.json },
@@ -258,6 +260,7 @@ export function registerMailboxCommands(program: Command): void {
             displayName: mb.displayName,
             webhookUrl: mb.webhookUrl ?? null,
             filterMode: mb.filterMode,
+            agentIdentityId: mb.agentIdentityId,
             createdAt: mb.createdAt,
           },
           { json: !!opts.json },
@@ -295,6 +298,7 @@ export function registerMailboxCommands(program: Command): void {
             displayName: mb.displayName,
             webhookUrl: mb.webhookUrl ?? null,
             filterMode: mb.filterMode,
+            agentIdentityId: mb.agentIdentityId,
           },
           { json: !!opts.json },
         );

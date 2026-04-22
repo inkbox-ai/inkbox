@@ -9,6 +9,7 @@ PHONE_NUMBER_DICT = {
     "client_websocket_url": None,
     "incoming_call_webhook_url": None,
     "incoming_text_webhook_url": None,
+    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:00:00Z",
 }

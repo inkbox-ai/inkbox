@@ -214,6 +214,7 @@ export class AgentIdentity {
       emailAddress: mailbox.emailAddress,
       displayName: mailbox.displayName,
       filterMode: mailbox.filterMode,
+      agentIdentityId: mailbox.agentIdentityId,
       createdAt: mailbox.createdAt,
       updatedAt: mailbox.updatedAt,
       filterModeChangeNotice: mailbox.filterModeChangeNotice,

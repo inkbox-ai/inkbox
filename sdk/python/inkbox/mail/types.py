@@ -114,7 +114,12 @@ def _dt(value: str | None) -> datetime | None:
 
 @dataclass
 class Mailbox:
-    """An Inkbox mailbox (an email address owned by your organisation)."""
+    """An Inkbox mailbox (an email address owned by your organisation).
+
+    ``agent_identity_id`` is the UUID of the owning agent identity, or
+    ``None`` if the mailbox is standalone (not tied to any agent).
+    Always populated on every mailbox response.
+    """
 
     id: UUID
     email_address: str
@@ -123,11 +128,13 @@ class Mailbox:
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Mailbox:
         notice = d.get("filter_mode_change_notice")
+        agent_identity_id = d.get("agent_identity_id")
         return cls(
             id=UUID(d["id"]),
             email_address=d["email_address"],
@@ -136,6 +143,7 @@ class Mailbox:
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
             filter_mode_change_notice=(
                 FilterModeChangeNotice._from_dict(notice) if notice else None
             ),

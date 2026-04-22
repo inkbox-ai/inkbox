@@ -192,7 +192,7 @@ export function registerNumberCommands(program: Command): void {
         const numbers = await inkbox.phoneNumbers.list();
         output(numbers, {
           json: !!opts.json,
-          columns: ["number", "id", "type", "status", "filterMode", "createdAt"],
+          columns: ["number", "id", "type", "status", "filterMode", "agentIdentityId", "createdAt"],
         });
       }),
     );
@@ -224,6 +224,7 @@ export function registerNumberCommands(program: Command): void {
             type: num.type,
             status: num.status,
             filterMode: num.filterMode,
+            agentIdentityId: num.agentIdentityId,
           },
           { json: !!opts.json },
         );
@@ -249,6 +250,7 @@ export function registerNumberCommands(program: Command): void {
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
             incomingTextWebhookUrl: num.incomingTextWebhookUrl ?? null,
             filterMode: num.filterMode,
+            agentIdentityId: num.agentIdentityId,
             createdAt: num.createdAt,
           },
           { json: !!opts.json },
@@ -302,6 +304,7 @@ export function registerNumberCommands(program: Command): void {
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
             incomingTextWebhookUrl: num.incomingTextWebhookUrl ?? null,
             filterMode: num.filterMode,
+            agentIdentityId: num.agentIdentityId,
           },
           { json: !!opts.json },
         );

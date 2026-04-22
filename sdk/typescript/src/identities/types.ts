@@ -39,6 +39,11 @@ export interface IdentityMailbox {
   emailAddress: string;
   displayName: string | null;
   filterMode: FilterMode;
+  /**
+   * UUID of the owning agent identity, or `null` if standalone. On the
+   * embedded variant this always equals the owning identity's ID.
+   */
+  agentIdentityId: string | null;
   createdAt: Date;
   updatedAt: Date;
   filterModeChangeNotice: FilterModeChangeNotice | null;
@@ -56,6 +61,11 @@ export interface IdentityPhoneNumber {
   clientWebsocketUrl: string | null;
   incomingTextWebhookUrl: string | null;
   filterMode: FilterMode;
+  /**
+   * UUID of the owning agent identity, or `null` if standalone. On the
+   * embedded variant this always equals the owning identity's ID.
+   */
+  agentIdentityId: string | null;
   createdAt: Date;
   updatedAt: Date;
   filterModeChangeNotice: FilterModeChangeNotice | null;
@@ -87,6 +97,7 @@ export interface RawIdentityMailbox {
   email_address: string;
   display_name: string | null;
   filter_mode?: string;
+  agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
@@ -101,6 +112,7 @@ export interface RawIdentityPhoneNumber {
   client_websocket_url: string | null;
   incoming_text_webhook_url: string | null;
   filter_mode?: string;
+  agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
@@ -128,6 +140,7 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
     emailAddress: r.email_address,
     displayName: r.display_name,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     filterModeChangeNotice: r.filter_mode_change_notice
@@ -146,6 +159,7 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     clientWebsocketUrl: r.client_websocket_url,
     incomingTextWebhookUrl: r.incoming_text_webhook_url ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     filterModeChangeNotice: r.filter_mode_change_notice

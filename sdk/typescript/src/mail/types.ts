@@ -75,6 +75,12 @@ export interface Mailbox {
   displayName: string | null;
   webhookUrl: string | null;
   filterMode: FilterMode;
+  /**
+   * UUID of the owning agent identity, or `null` if the mailbox is
+   * standalone (not tied to any agent). Always present on every mailbox
+   * response shape.
+   */
+  agentIdentityId: string | null;
   createdAt: Date;
   updatedAt: Date;
   filterModeChangeNotice: FilterModeChangeNotice | null;
@@ -153,6 +159,7 @@ export interface RawMailbox {
   display_name: string | null;
   webhook_url: string | null;
   filter_mode?: string;
+  agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
@@ -232,6 +239,7 @@ export function parseMailbox(r: RawMailbox): Mailbox {
     displayName: r.display_name,
     webhookUrl: r.webhook_url,
     filterMode: (r.filter_mode as FilterMode) ?? FilterMode.BLACKLIST,
+    agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     filterModeChangeNotice: r.filter_mode_change_notice
