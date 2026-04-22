@@ -1,6 +1,6 @@
 ---
 name: inkbox-ts
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, vault, or agent identity features using the Inkbox TypeScript SDK.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: false
 ---
 
@@ -27,16 +27,20 @@ Constructor options: `{ apiKey: string, baseUrl?: string, timeoutMs?: number }`
 ## Core Model
 
 ```
-Inkbox (org-level client)
-├── .createIdentity(handle) → Promise<AgentIdentity>
-├── .getIdentity(handle)    → Promise<AgentIdentity>
-├── .listIdentities()       → Promise<AgentIdentitySummary[]>
-├── .mailboxes              → MailboxesResource
-├── .phoneNumbers           → PhoneNumbersResource
-├── .texts                  → TextsResource
-├── .vault                  → VaultResource
-├── .whoami()               → Promise<WhoamiResponse>
-└── .createSigningKey()     → Promise<SigningKey>
+Inkbox (admin-only client)
+├── .createIdentity(handle)   → Promise<AgentIdentity>
+├── .getIdentity(handle)      → Promise<AgentIdentity>
+├── .listIdentities()         → Promise<AgentIdentitySummary[]>
+├── .mailboxes                → MailboxesResource
+├── .phoneNumbers             → PhoneNumbersResource
+├── .texts                    → TextsResource
+├── .mailContactRules         → MailContactRulesResource
+├── .phoneContactRules        → PhoneContactRulesResource
+├── .contacts                 → ContactsResource   (.access, .vcards)
+├── .notes                    → NotesResource      (.access)
+├── .vault                    → VaultResource
+├── .whoami()                 → Promise<WhoamiResponse>
+└── .createSigningKey()       → Promise<SigningKey>
 
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                → IdentityMailbox | null
@@ -139,6 +143,17 @@ for (const m of thread.messages) {
 }
 ```
 
+### Thread Folders
+
+Threads carry a `folder` field: `inbox`, `spam`, `archive`, or `blocked` (server-assigned by the contact-rule engine at ingest, never client-set).
+
+```typescript
+import { ThreadFolder } from "@inkbox/sdk";
+// thread.folder / threadDetail.folder is always one of the four values above.
+```
+
+Low-level folder listing / per-thread updates (`list({ folder })`, `listFolders(email)`, `update(..., { folder })`) live on `ThreadsResource`. Passing `folder: "blocked"` to `update` throws before the HTTP call.
+
 ## Phone
 
 ```typescript
@@ -200,7 +215,7 @@ await identity.markTextRead("text-uuid");
 const readResult = await identity.markTextConversationRead("+15167251294");
 console.log(readResult.updatedCount);
 
-// Org-level: search, update, delete
+// Admin-only: search, update, delete
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
 await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 ```
@@ -371,7 +386,7 @@ await identity.setTotp(secretId, "otpauth://totp/...?secret=...");
 await identity.removeTotp(secretId);
 ```
 
-### From the unlocked vault (org-level)
+### From the unlocked vault (admin-only)
 
 ```typescript
 const unlocked = await inkbox.vault.unlock("my-Vault-key-01!");
@@ -391,7 +406,7 @@ const code = await unlocked.getTotpCode(secretId);
 | `periodEnd` | `number` | Unix timestamp when the code expires |
 | `secondsRemaining` | `number` | Seconds until expiry |
 
-## Org-level Resources
+## Admin-only Resources
 
 ### Mailboxes (`inkbox.mailboxes`)
 
@@ -402,6 +417,18 @@ const mailbox   = await inkbox.mailboxes.get("abc@inkboxmail.com");
 await inkbox.mailboxes.update(mailbox.emailAddress, { displayName: "New Name" });
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: "https://example.com/hook" });
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: null });   // remove webhook
+
+// Switch contact-rule filter mode (admin-only — agent-scoped keys get 403)
+const updated = await inkbox.mailboxes.update(mailbox.emailAddress, {
+  filterMode: "whitelist",   // or "blacklist" — see FilterMode enum
+});
+if (updated.filterModeChangeNotice) {
+  // Populated when filterMode actually changed.
+  const n = updated.filterModeChangeNotice;
+  console.log(n.redundantRuleCount, n.redundantRuleAction, n.newFilterMode);
+}
+
+// Mailbox responses now also carry mailbox.agentIdentityId when linked.
 
 const results = await inkbox.mailboxes.search(mailbox.emailAddress, { q: "invoice", limit: 20 });
 await inkbox.mailboxes.delete(mailbox.emailAddress);
@@ -428,6 +455,125 @@ const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", 
 await inkbox.phoneNumbers.release(num.id);
 ```
 
+Phone numbers carry the same `filterMode` / `agentIdentityId` / `filterModeChangeNotice` fields as mailboxes; flipping `filterMode` is admin-only and returns a change-notice when the value actually changed.
+
+## Contact Rules
+
+Per-mailbox or per-phone-number allow/block lists, enforced at ingest. The active `filterMode` on the owning resource decides whether the rules are a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
+
+```typescript
+import {
+  MailRuleAction, MailRuleMatchType, PhoneRuleAction, PhoneRuleMatchType,
+  ContactRuleStatus, DuplicateContactRuleError,
+} from "@inkbox/sdk";
+
+// Mail rules — scoped to a single mailbox
+const rule = await inkbox.mailContactRules.create(mailbox.emailAddress, {
+  action: MailRuleAction.ALLOW,          // or BLOCK
+  matchType: MailRuleMatchType.DOMAIN,   // or EXACT_EMAIL
+  matchTarget: "example.com",
+  status: ContactRuleStatus.ACTIVE,      // default; or PAUSED
+});
+await inkbox.mailContactRules.list(mailbox.emailAddress);
+await inkbox.mailContactRules.get(mailbox.emailAddress, rule.id);
+await inkbox.mailContactRules.update(mailbox.emailAddress, rule.id, { status: "paused" });  // admin-only
+await inkbox.mailContactRules.delete(mailbox.emailAddress, rule.id);                        // admin-only
+
+// Admin-only list; optionally narrow to a single mailboxId
+const allRules = await inkbox.mailContactRules.listAll({ mailboxId: mailbox.id });
+
+// Duplicate (matchType, matchTarget) on the same mailbox throws 409:
+try {
+  await inkbox.mailContactRules.create(mailbox.emailAddress, {
+    action: "allow", matchType: "domain", matchTarget: "example.com",
+  });
+} catch (e) {
+  if (e instanceof DuplicateContactRuleError) {
+    console.log(e.existingRuleId);   // id of the rule that already matched
+  }
+}
+
+// Phone rules — same shape, only matchType: "exact_number" is supported.
+await inkbox.phoneContactRules.create(num.id, {
+  action: PhoneRuleAction.BLOCK,
+  matchType: PhoneRuleMatchType.EXACT_NUMBER,
+  matchTarget: "+15551234567",
+});
+await inkbox.phoneContactRules.list(num.id);
+await inkbox.phoneContactRules.listAll({ phoneNumberId: num.id });
+```
+
+## Contacts
+
+Admin-only address book with per-identity access grants and vCard import/export.
+
+```typescript
+import type { CreateContactOptions, ContactEmail, ContactPhone } from "@inkbox/sdk";
+import { RedundantContactAccessGrantError } from "@inkbox/sdk";
+
+// CRUD
+const contact = await inkbox.contacts.create({
+  givenName: "Ada",
+  familyName: "Lovelace",
+  emails: [{ label: "work", value: "ada@example.com" }],
+  phones: [{ label: "mobile", value: "+15551234567" }],
+  // accessIdentityIds defaults to "wildcard"; pass [] for admin-only, or
+  // a list of identity UUIDs for explicit grants.
+});
+await inkbox.contacts.get(contact.id);
+await inkbox.contacts.list({ q: "ada", order: "recent", limit: 50, offset: 0 });
+await inkbox.contacts.update(contact.id, { jobTitle: "Analyst" });   // JSON-merge-patch
+await inkbox.contacts.delete(contact.id);                            // soft-delete
+
+// Reverse-lookup — exactly one filter required (else thrown before HTTP)
+await inkbox.contacts.lookup({ email: "ada@example.com" });
+await inkbox.contacts.lookup({ emailDomain: "example.com" });
+await inkbox.contacts.lookup({ phone: "+15551234567" });
+await inkbox.contacts.lookup({ emailContains: "ada" });
+await inkbox.contacts.lookup({ phoneContains: "555" });
+
+// Access grants (admin + JWT only; agents can self-revoke)
+await inkbox.contacts.access.list(contact.id);
+await inkbox.contacts.access.grant(contact.id, { identityId: "agent-uuid" });
+await inkbox.contacts.access.grant(contact.id, { wildcard: true });   // every active identity
+await inkbox.contacts.access.revoke(contact.id, "agent-uuid");
+
+try {
+  await inkbox.contacts.access.grant(contact.id, { identityId: "agent-uuid" });
+} catch (e) {
+  if (e instanceof RedundantContactAccessGrantError) {
+    console.log(e.error, e.detailMessage);
+  }
+}
+
+// vCards
+const result = await inkbox.contacts.vcards.import(vcfText);  // bulk, ≤5 MiB, ≤1000 cards
+console.log(result.createdIds);
+for (const item of result.errors) {
+  console.log(item.index, item.error);
+}
+
+const vcf = await inkbox.contacts.vcards.export(contact.id);  // vCard 4.0 string
+```
+
+## Notes
+
+Admin-only free-form notes with per-identity access grants. There is no wildcard for notes — grant identities explicitly.
+
+```typescript
+const note = await inkbox.notes.create({ body: "Customer prefers email follow-up.", title: "Ada" });
+await inkbox.notes.get(note.id);
+await inkbox.notes.list({ q: "email", identityId: "agent-uuid", order: "recent", limit: 50 });
+await inkbox.notes.update(note.id, { body: "Updated body" });
+await inkbox.notes.update(note.id, { title: null });   // clear title; body cannot be null
+await inkbox.notes.delete(note.id);
+
+// Access grants (admin + JWT only)
+await inkbox.notes.access.list(note.id);
+await inkbox.notes.access.grant(note.id, "agent-uuid");
+await inkbox.notes.access.revoke(note.id, "agent-uuid");
+```
+
 ## Whoami
 
 ```typescript
@@ -441,7 +587,21 @@ if (info.authType === "api_key") {
 }
 ```
 
-Returns `WhoamiApiKeyResponse` (with `keyId`, `label`, `creatorType`, etc.) or `WhoamiJwtResponse` (with `email`, `orgRole`, etc.) — discriminated on `authType`.
+Returns `WhoamiApiKeyResponse` (with `keyId`, `label`, `creatorType`, `authSubtype`, etc.) or `WhoamiJwtResponse` (with `email`, `orgRole`, etc.) — discriminated on `authType`.
+
+For branching on API-key scope, compare against the exported constants:
+
+```typescript
+import {
+  AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED,
+  AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED,
+  AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED,
+} from "@inkbox/sdk";
+
+if (info.authType === "api_key" && info.authSubtype === AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED) {
+  // admin-only operations (filter_mode flips, rule updates/deletes, etc.)
+}
+```
 
 ## Webhooks & Signature Verification
 
@@ -467,17 +627,26 @@ Algorithm: HMAC-SHA256 over `"{requestId}.{timestamp}.{body}"`.
 ## Error Handling
 
 ```typescript
-import { InkboxAPIError } from "@inkbox/sdk";
+import {
+  InkboxAPIError,
+  DuplicateContactRuleError,
+  RedundantContactAccessGrantError,
+} from "@inkbox/sdk";
 
 try {
   const identity = await inkbox.getIdentity("unknown");
 } catch (e) {
   if (e instanceof InkboxAPIError) {
     console.log(e.statusCode);   // HTTP status (e.g. 404)
-    console.log(e.detail);       // message from API
+    console.log(e.detail);       // string for legacy errors, object for structured ones
   }
 }
 ```
+
+`InkboxAPIError.detail` is typed as `InkboxAPIErrorDetail` — either a string or a structured object. Catch the narrower subclasses when you need the parsed fields:
+
+- `DuplicateContactRuleError` — 409 when creating a contact rule with an already-taken `(matchType, matchTarget)` on the same resource. Exposes `.existingRuleId: string`.
+- `RedundantContactAccessGrantError` — 409 when a contact-access grant is redundant (e.g. per-identity grant on top of an active wildcard). Exposes `.error` and `.detailMessage`.
 
 ## Key Conventions
 
