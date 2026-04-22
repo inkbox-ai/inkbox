@@ -117,7 +117,7 @@ class PhoneCall:
 
 @dataclass
 class RateLimitInfo:
-    """Rolling 24-hour rate limit snapshot for an organisation."""
+    """Rate limit snapshot for an organisation."""
 
     calls_used: int
     calls_remaining: int

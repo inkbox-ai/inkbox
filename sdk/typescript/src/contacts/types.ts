@@ -92,6 +92,10 @@ export interface ContactImportResult {
   errorCount: number;
   /** Per-card outcome in submission order. */
   results: ContactImportResultItem[];
+  /** Convenience: IDs of contacts that were created, in submission order. */
+  readonly createdIds: string[];
+  /** Convenience: per-card entries where `status === "error"`. */
+  readonly errors: ContactImportResultItem[];
 }
 
 // ---- wire types ----
@@ -104,7 +108,7 @@ export interface RawContactEmail {
 
 export interface RawContactPhone {
   label?: string | null;
-  value: string;
+  value_e164: string;
   is_primary?: boolean;
 }
 
@@ -190,7 +194,7 @@ export function parseContactEmail(r: RawContactEmail): ContactEmail {
 export function parseContactPhone(r: RawContactPhone): ContactPhone {
   return {
     label: r.label ?? null,
-    value: r.value,
+    value: r.value_e164,
     isPrimary: Boolean(r.is_primary),
   };
 }
@@ -270,10 +274,19 @@ export function parseContactImportResultItem(
 export function parseContactImportResult(
   r: RawContactImportResult,
 ): ContactImportResult {
+  const results = (r.results ?? []).map(parseContactImportResultItem);
   return {
     createdCount: r.created_count,
     errorCount: r.error_count,
-    results: (r.results ?? []).map(parseContactImportResultItem),
+    results,
+    get createdIds() {
+      return results
+        .filter((i) => i.status === "created" && i.contact !== null)
+        .map((i) => i.contact!.id);
+    },
+    get errors() {
+      return results.filter((i) => i.status === "error");
+    },
   };
 }
 
@@ -287,7 +300,7 @@ export function contactEmailToWire(e: ContactEmail): RawContactEmail {
 }
 
 export function contactPhoneToWire(p: ContactPhone): RawContactPhone {
-  const out: RawContactPhone = { value: p.value };
+  const out: RawContactPhone = { value_e164: p.value };
   if (p.label !== null) out.label = p.label;
   if (p.isPrimary) out.is_primary = true;
   return out;

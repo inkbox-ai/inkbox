@@ -145,7 +145,7 @@ for (const m of thread.messages) {
 
 ### Thread Folders
 
-Threads carry a `folder` field: `inbox`, `spam`, `archive`, or `blocked` (server-assigned by the contact-rule engine at ingest, never client-set).
+Threads carry a `folder` field: `inbox`, `spam`, `archive`, or `blocked` (server-assigned, never client-set).
 
 ```typescript
 import { ThreadFolder } from "@inkbox/sdk";
@@ -163,7 +163,7 @@ const call = await identity.placeCall({
   clientWebsocketUrl: "wss://your-agent.example.com/ws",
 });
 console.log(call.status);
-console.log(call.rateLimit.callsRemaining);   // rolling 24h budget
+console.log(call.rateLimit.callsRemaining);
 
 // List calls (offset pagination)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
@@ -193,7 +193,7 @@ const unread = await identity.listTexts({ isRead: false });
 // Get a single text message
 const text = await identity.getText("text-uuid");
 console.log(text.type);   // "sms" or "mms"
-if (text.media) {          // MMS media attachments (presigned S3 URLs, 1hr expiry)
+if (text.media) {          // MMS media attachments (temporary signed URLs)
   for (const m of text.media) {
     console.log(m.contentType, m.size, m.url);
   }
@@ -459,7 +459,7 @@ Phone numbers carry the same `filterMode` / `agentIdentityId` / `filterModeChang
 
 ## Contact Rules
 
-Per-mailbox or per-phone-number allow/block lists, enforced at ingest. The active `filterMode` on the owning resource decides whether the rules are a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
+Per-mailbox or per-phone-number allow/block lists, enforced server-side. The active `filterMode` on the owning resource decides whether the rules are a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
 
 ```typescript
 import {
@@ -523,7 +523,7 @@ const contact = await inkbox.contacts.create({
 await inkbox.contacts.get(contact.id);
 await inkbox.contacts.list({ q: "ada", order: "recent", limit: 50, offset: 0 });
 await inkbox.contacts.update(contact.id, { jobTitle: "Analyst" });   // JSON-merge-patch
-await inkbox.contacts.delete(contact.id);                            // soft-delete
+await inkbox.contacts.delete(contact.id);
 
 // Reverse-lookup — exactly one filter required (else thrown before HTTP)
 await inkbox.contacts.lookup({ email: "ada@example.com" });

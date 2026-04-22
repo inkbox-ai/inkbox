@@ -161,7 +161,7 @@ function registerNumberRulesCommands(parent: Command): void {
 
   rules
     .command("delete <rule-id>")
-    .description("Soft-delete a rule (admin-only)")
+    .description("Delete a rule (admin-only)")
     .requiredOption("--number <id>", "Phone number id")
     .action(
       withErrorHandler(async function (

@@ -59,12 +59,12 @@ class ContactPhone:
     def _from_dict(cls, d: dict[str, Any]) -> ContactPhone:
         return cls(
             label=d.get("label"),
-            value=d["value"],
+            value=d["value_e164"],
             is_primary=bool(d.get("is_primary", False)),
         )
 
     def to_wire(self) -> dict[str, Any]:
-        body: dict[str, Any] = {"value": self.value}
+        body: dict[str, Any] = {"value_e164": self.value}
         if self.label is not None:
             body["label"] = self.label
         if self.is_primary:

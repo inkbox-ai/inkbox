@@ -115,7 +115,7 @@ class MailContactRulesResource:
         return MailContactRule._from_dict(data)
 
     def delete(self, email_address: str, rule_id: UUID | str) -> None:
-        """Soft-delete a rule (admin-only)."""
+        """Delete a rule (admin-only)."""
         self._http.delete(_rule_path(email_address, rule_id))
 
     def list_all(

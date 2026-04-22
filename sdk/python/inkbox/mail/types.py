@@ -44,8 +44,8 @@ class ThreadFolder(StrEnum):
     """
     Logical folder a thread lives in.
 
-    ``BLOCKED`` is server-assigned by the contact-rule engine at ingest;
-    clients cannot move a thread into ``BLOCKED``.
+    ``BLOCKED`` is server-assigned; clients cannot move a thread into
+    ``BLOCKED``.
     """
 
     INBOX = "inbox"
@@ -92,7 +92,7 @@ class FilterModeChangeNotice:
             :class:`MailRuleAction` / :class:`PhoneRuleAction` values.
         redundant_rule_count: Count of active rules whose action equals
             ``redundant_rule_action``. ``0`` is a clean flip. Paused and
-            soft-deleted rules are not counted.
+            deleted rules are not counted.
     """
 
     new_filter_mode: FilterMode

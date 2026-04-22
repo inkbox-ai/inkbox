@@ -115,9 +115,9 @@ class ThreadsResource:
             email_address: Full email address of the owning mailbox.
             thread_id: UUID of the thread.
             folder: New folder — ``inbox`` | ``spam`` | ``archive``. The
-                ``blocked`` folder is server-assigned by the contact-rule
-                engine at ingest and cannot be set by clients; passing it
-                raises ``ValueError`` without making an HTTP call.
+                ``blocked`` folder is server-assigned and cannot be set by
+                clients; passing it raises ``ValueError`` without making an
+                HTTP call.
         """
         body: dict[str, Any] = {}
         if folder is not _UNSET:

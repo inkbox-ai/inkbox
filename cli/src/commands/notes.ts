@@ -153,7 +153,7 @@ export function registerNotesCommands(program: Command): void {
 
   notes
     .command("delete <note-id>")
-    .description("Soft-delete a note")
+    .description("Delete a note")
     .action(
       withErrorHandler(async function (this: Command, noteId: string) {
         const opts = getGlobalOpts(this);

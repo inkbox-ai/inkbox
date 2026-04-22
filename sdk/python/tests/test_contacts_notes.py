@@ -35,7 +35,7 @@ CONTACT_DICT = {
     "birthday": "1990-01-01",
     "notes": None,
     "emails": [{"label": "work", "value": "alex@example.com", "is_primary": True}],
-    "phones": [{"value": "+15551234567"}],
+    "phones": [{"value_e164": "+15551234567"}],
     "websites": [],
     "dates": [{"label": "anniversary", "value": "2020-06-15"}],
     "addresses": [],

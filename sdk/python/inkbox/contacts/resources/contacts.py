@@ -248,5 +248,5 @@ class ContactsResource:
         return Contact._from_dict(data)
 
     def delete(self, contact_id: UUID | str) -> None:
-        """Soft-delete a contact."""
+        """Delete a contact."""
         self._http.delete(f"{_BASE}/{contact_id}")

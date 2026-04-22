@@ -76,7 +76,7 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 - `number update --filter-mode ...` (admin-only; same caveat as mailbox)
 - `signing-key create`
 
-Soft-deletes (`contacts delete`, `notes delete`, `mailbox rules delete`, `number rules delete`) are reversible on the server side but still affect downstream filtering — confirm intent before running.
+`contacts delete`, `notes delete`, `mailbox rules delete`, `number rules delete` affect downstream filtering and access — confirm intent before running.
 
 Also confirm before creating or rotating secrets if the values were not explicitly provided by the user.
 
@@ -286,7 +286,7 @@ inkbox contacts list [--q <query>] [--order name|recent] [--limit <n>] [--offset
 inkbox contacts get <contact-id>
 inkbox contacts create --json <payload>            # JSON matching CreateContactOptions
 inkbox contacts update <contact-id> --json <patch>  # JSON-merge-patch
-inkbox contacts delete <contact-id>                # soft-delete
+inkbox contacts delete <contact-id>
 inkbox contacts lookup (--email <email> | --email-contains <s> | --email-domain <d> | --phone <e164> | --phone-contains <s>)
 inkbox contacts import <file.vcf>                  # bulk vCard import (≤5 MiB, ≤1000 cards)
 inkbox contacts export <contact-id> [--out <file>] # vCard 4.0 to stdout or file

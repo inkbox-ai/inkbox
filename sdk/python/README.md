@@ -105,9 +105,9 @@ print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
 
 `signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, and `email_local_part` are optional. All methods accept optional `base_url` and `timeout` keyword arguments.
 
-> **Note:** Unclaimed agents can only send to the `human_email` specified at signup (max 10/day). After verification or human approval in the console, full capabilities are unlocked.
+> **Note:** Unclaimed agents have a limited send quota and can only email the `human_email` specified at signup. After verification or human approval in the console, full capabilities are unlocked.
 
-> **Note:** The `organization_id` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. Always use the `organization_id` from the most recent response (`verify_signup` or `resend_signup_verification`) rather than caching the value from the initial `signup()` call.
+> **Note:** The `organization_id` returned at signup may change after verification or human approval. Always use the `organization_id` from the most recent response (`verify_signup` or `resend_signup_verification`) rather than caching the value from the initial `signup()` call.
 
 ---
 
@@ -262,7 +262,7 @@ unread = identity.list_texts(is_read=False)
 # Get a single text
 text = identity.get_text("text-uuid")
 print(text.type)  # "sms" or "mms"
-if text.media:    # MMS attachments (presigned S3 URLs, 1hr expiry)
+if text.media:    # MMS attachments (temporary signed URLs)
     for m in text.media:
         print(m.content_type, m.size, m.url)
 
@@ -446,7 +446,7 @@ inkbox.messages.unstar("abc@inkboxmail.com", "message-uuid")
 # Delete a message
 inkbox.messages.delete("abc@inkboxmail.com", "message-uuid")
 
-# Get an attachment presigned URL
+# Get a temporary signed URL for an attachment
 attachment = inkbox.messages.get_attachment("abc@inkboxmail.com", "message-uuid", "report.pdf")
 print(attachment["url"])
 

@@ -111,7 +111,7 @@ class PhoneContactRulesResource:
         return PhoneContactRule._from_dict(data)
 
     def delete(self, phone_number_id: UUID | str, rule_id: UUID | str) -> None:
-        """Soft-delete a rule (admin-only)."""
+        """Delete a rule (admin-only)."""
         self._http.delete(_rule_path(phone_number_id, rule_id))
 
     def list_all(

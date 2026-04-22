@@ -163,7 +163,7 @@ export function registerContactsCommands(program: Command): void {
 
   contacts
     .command("delete <contact-id>")
-    .description("Soft-delete a contact")
+    .description("Delete a contact")
     .action(
       withErrorHandler(async function (this: Command, contactId: string) {
         const opts = getGlobalOpts(this);

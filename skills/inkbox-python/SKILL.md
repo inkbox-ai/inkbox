@@ -140,7 +140,7 @@ for m in thread.messages:
 
 ### Thread Folders
 
-Threads carry a `folder` field: `inbox`, `spam`, `archive`, or `blocked` (server-assigned by the contact-rule engine at ingest, never client-set).
+Threads carry a `folder` field: `inbox`, `spam`, `archive`, or `blocked` (server-assigned, never client-set).
 
 ```python
 from inkbox import ThreadFolder
@@ -158,7 +158,7 @@ call = identity.place_call(
     client_websocket_url="wss://your-agent.example.com/ws",
 )
 print(call.status)
-print(call.rate_limit.calls_remaining)   # rolling 24h budget
+print(call.rate_limit.calls_remaining)
 
 # List calls (offset pagination)
 calls = identity.list_calls(limit=10, offset=0)
@@ -184,7 +184,7 @@ unread = identity.list_texts(is_read=False)
 # Get a single text message
 text = identity.get_text("text-uuid")
 print(text.type)   # "sms" or "mms"
-if text.media:     # MMS media attachments (presigned S3 URLs, 1hr expiry)
+if text.media:     # MMS media attachments (temporary signed URLs)
     for m in text.media:
         print(m.content_type, m.size, m.url)
 
@@ -439,7 +439,7 @@ Phone numbers carry the same `filter_mode` / `agent_identity_id` / `filter_mode_
 
 ## Contact Rules
 
-Per-mailbox or per-phone-number allow/block lists, enforced by the server at ingest. The active `filter_mode` on the owning resource controls whether the rules are interpreted as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
+Per-mailbox or per-phone-number allow/block lists, enforced server-side. The active `filter_mode` on the owning resource controls whether the rules are interpreted as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
 
 ```python
 from inkbox import (
@@ -505,7 +505,7 @@ contact = inkbox.contacts.create(
 inkbox.contacts.get(str(contact.id))
 inkbox.contacts.list(q="ada", order="recent", limit=50, offset=0)
 inkbox.contacts.update(str(contact.id), job_title="Analyst")       # JSON-merge-patch via kwargs
-inkbox.contacts.delete(str(contact.id))                            # soft-delete
+inkbox.contacts.delete(str(contact.id))
 
 # Reverse-lookup — exactly one filter required (else ValueError before HTTP)
 inkbox.contacts.lookup(email="ada@example.com")

@@ -161,7 +161,7 @@ Response:
 ```json
 {
   "email_address": "sales-agent-a1b2c3@inkboxmail.com",
-  "organization_id": "org_agent_...",
+  "organization_id": "org_...",
   "api_key": "ik_live_...",
   "agent_handle": "sales-agent-a1b2c3",
   "claim_status": "UNCLAIMED",
@@ -172,7 +172,7 @@ Response:
 
 Save the `api_key` — it is shown only once.
 
-> **Note:** The `organization_id` returned at signup is provisional (`org_agent_...`). It may change to a real organization ID after verification or human approval. The `/verify` and `/resend-verification` endpoints both return the current `organization_id` — always prefer the most recent value over the one from the initial signup.
+> **Note:** The `organization_id` returned at signup may change after verification or human approval. The `/verify` and `/resend-verification` endpoints both return the current `organization_id` — always prefer the most recent value over the one from the initial signup.
 
 ### Verify
 

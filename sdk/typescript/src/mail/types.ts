@@ -25,8 +25,8 @@ export enum FilterMode {
 /**
  * Logical folder a thread lives in.
  *
- * `BLOCKED` is server-assigned at ingest by the contact-rule engine and
- * is not client-settable — PATCH will reject it.
+ * `BLOCKED` is server-assigned and is not client-settable — PATCH will
+ * reject it.
  */
 export enum ThreadFolder {
   INBOX = "inbox",
@@ -64,7 +64,7 @@ export interface FilterModeChangeNotice {
   redundantRuleAction: string;
   /**
    * Count of active rules whose `action` equals `redundantRuleAction`.
-   * `0` is a clean flip. Paused / soft-deleted rules are not counted.
+   * `0` is a clean flip. Paused / deleted rules are not counted.
    */
   redundantRuleCount: number;
 }

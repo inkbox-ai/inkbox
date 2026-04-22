@@ -19,7 +19,7 @@ const CONTACT_DICT = {
   birthday: "1990-01-01",
   notes: null,
   emails: [{ value: "a@b.com", label: "work", is_primary: true }],
-  phones: [{ value: "+15551234567" }],
+  phones: [{ value_e164: "+15551234567" }],
   websites: [],
   dates: [],
   addresses: [],

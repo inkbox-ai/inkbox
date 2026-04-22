@@ -175,7 +175,7 @@ export class MessagesResource {
   }
 
   /**
-   * Get a presigned URL for a message attachment.
+   * Get a temporary signed URL for a message attachment.
    *
    * @param emailAddress - Full email address of the owning mailbox.
    * @param messageId - UUID of the message.

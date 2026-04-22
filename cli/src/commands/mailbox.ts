@@ -170,7 +170,7 @@ function registerMailboxRulesCommands(parent: Command): void {
 
   rules
     .command("delete <rule-id>")
-    .description("Soft-delete a rule (admin-only)")
+    .description("Delete a rule (admin-only)")
     .requiredOption("--mailbox <email>", "Mailbox email address")
     .action(
       withErrorHandler(async function (

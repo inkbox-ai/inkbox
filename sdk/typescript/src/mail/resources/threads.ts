@@ -98,8 +98,8 @@ export class ThreadsResource {
    * refetch the thread with messages attached.
    *
    * @param options.folder - New folder. `ThreadFolder.BLOCKED` is
-   *   server-assigned by the contact-rule engine and cannot be set by
-   *   clients; passing it throws synchronously without making an HTTP call.
+   *   server-assigned and cannot be set by clients; passing it throws
+   *   synchronously without making an HTTP call.
    */
   async update(
     emailAddress: string,
