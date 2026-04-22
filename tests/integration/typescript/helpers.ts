@@ -90,6 +90,28 @@ export async function cleanupTestOrg(
   return resp.json();
 }
 
+// Read bootstrap credentials that globalSetup.ts has stashed in env vars.
+// Lets each test file share the single Clerk org/user that globalSetup
+// provisioned for the whole vitest run.
+export function loadBootstrapFromEnv(): BootstrapResult {
+  const required = {
+    emailAddress: process.env.SDK_INTEGRATION_BOOTSTRAP_EMAIL,
+    password: process.env.SDK_INTEGRATION_BOOTSTRAP_PASSWORD,
+    userId: process.env.SDK_INTEGRATION_BOOTSTRAP_USER_ID,
+    orgId: process.env.SDK_INTEGRATION_BOOTSTRAP_ORG_ID,
+    apiKey: process.env.SDK_INTEGRATION_BOOTSTRAP_API_KEY,
+  };
+  const missing = Object.entries(required)
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing bootstrap env vars from globalSetup: ${missing.join(", ")}`,
+    );
+  }
+  return required as BootstrapResult;
+}
+
 export function logStep(config: SdkIntegrationConfig, message: string): void {
   if (config.verbose) {
     console.log(`[sdk-integration] ${message}`);

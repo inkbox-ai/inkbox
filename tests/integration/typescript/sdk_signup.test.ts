@@ -1,12 +1,11 @@
 // tests/integration/typescript/sdk_signup.test.ts
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Inkbox } from "@inkbox/sdk";
 import { randomUUID } from "node:crypto";
 import {
   loadConfig,
-  bootstrapTestOrg,
-  cleanupTestOrg,
+  loadBootstrapFromEnv,
   logStep,
   type SdkIntegrationConfig,
   type BootstrapResult,
@@ -16,15 +15,13 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
   let config: SdkIntegrationConfig;
   let bootstrap: BootstrapResult;
 
-  beforeAll(async () => {
+  beforeAll(() => {
+    // Bootstrap is provisioned once per vitest run by globalSetup.ts and
+    // shared with the lifecycle test (which runs first and cleans up its
+    // identities). The signup test then approves a fresh agent into the
+    // same org using a random agent_handle, so there's no collision.
     config = loadConfig();
-    bootstrap = await bootstrapTestOrg(config);
-  });
-
-  afterAll(async () => {
-    if (bootstrap) {
-      await cleanupTestOrg(config, bootstrap);
-    }
+    bootstrap = loadBootstrapFromEnv();
   });
 
   it("accepts a custom handle and email local part", async () => {
