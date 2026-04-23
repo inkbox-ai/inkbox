@@ -11,6 +11,19 @@ export enum MessageDirection {
 }
 
 /**
+ * Strategy for embedding the original message in a forward.
+ *
+ * `INLINE` — render the original body inline below a Gmail-style preamble.
+ *   May not perfectly preserve inline images or complex layouts.
+ * `WRAPPED` — attach the original raw MIME as a single `message/rfc822`
+ *   part — semantically preserved.
+ */
+export enum ForwardMode {
+  INLINE = "inline",
+  WRAPPED = "wrapped",
+}
+
+/**
  * Contact-rule filter mode on a mailbox or phone number.
  *
  * `WHITELIST` — only addresses that match an `allow` rule are delivered.

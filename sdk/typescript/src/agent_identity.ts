@@ -13,7 +13,7 @@ import { InkboxAPIError, InkboxError } from "./_http.js";
 import { Credentials } from "./credentials.js";
 import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
-import { MessageDirection } from "./mail/types.js";
+import { ForwardMode, MessageDirection } from "./mail/types.js";
 import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
 import type {
   PhoneCall,
@@ -319,6 +319,54 @@ export class AgentIdentity {
   }): Promise<Message> {
     this._requireMailbox();
     return this._inkbox._messages.send(this._mailbox!.emailAddress, options);
+  }
+
+  /**
+   * Forward a stored message out from this identity's mailbox.
+   *
+   * @param messageId - UUID of the message being forwarded.
+   * @param options.to - Primary recipient addresses.
+   * @param options.cc - Carbon-copy recipients.
+   * @param options.bcc - Blind carbon-copy recipients. At least one address
+   *   is required across `to`, `cc`, and `bcc`.
+   * @param options.mode - `"inline"` (default) or `"wrapped"`.
+   * @param options.subject - Optional override; defaults to
+   *   `"Fwd: " + original.subject`.
+   * @param options.bodyText - Optional caller note prepended above the
+   *   original body (inline) or as a top-level note (wrapped).
+   * @param options.bodyHtml - Optional HTML caller note.
+   * @param options.additionalAttachments - Optional caller-authored
+   *   attachments alongside the forwarded content.
+   * @param options.includeOriginalAttachments - `inline` mode only. When
+   *   `true` (default), original attachments are re-attached. Ignored in
+   *   `wrapped` mode.
+   * @param options.replyTo - Optional Reply-To address.
+   */
+  async forwardEmail(
+    messageId: string,
+    options: {
+      to?: string[];
+      cc?: string[];
+      bcc?: string[];
+      mode?: ForwardMode | "inline" | "wrapped";
+      subject?: string;
+      bodyText?: string;
+      bodyHtml?: string;
+      additionalAttachments?: Array<{
+        filename: string;
+        contentType: string;
+        contentBase64: string;
+      }>;
+      includeOriginalAttachments?: boolean;
+      replyTo?: string;
+    },
+  ): Promise<Message> {
+    this._requireMailbox();
+    return this._inkbox._messages.forward(
+      this._mailbox!.emailAddress,
+      messageId,
+      options,
+    );
   }
 
   /**

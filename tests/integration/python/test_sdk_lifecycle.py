@@ -101,6 +101,40 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         assert thread.subject == subject
         assert len(thread.messages) >= 1
 
+        # ── forward bravo → alpha ─────────────────────────────────
+        forward_subject = f"Fwd: {subject}"
+        log_step(ctx, f"forward inbound message from bravo to alpha: {forward_subject}")
+        forwarded = bravo.forward_email(
+            inbound_msg.id,
+            to=[alpha.email_address],
+            body_text="Forwarded by the Python SDK integration test.",
+        )
+        assert forwarded.direction == "outbound"
+        assert forwarded.subject == forward_subject
+
+        log_step(ctx, "poll for forwarded delivery to alpha")
+
+        def fetch_alpha_inbound():
+            msgs = []
+            for msg in alpha.iter_emails(direction="inbound"):
+                msgs.append(msg)
+                if len(msgs) >= 50:
+                    break
+            return msgs
+
+        alpha_messages = poll_until(
+            "forwarded message delivered to alpha",
+            fetch_alpha_inbound,
+            timeout_seconds=cfg.poll_timeout,
+            interval_seconds=cfg.poll_interval,
+            is_ready=lambda msgs: any(m.subject == forward_subject for m in msgs),
+            verbose=cfg.verbose,
+        )
+        forwarded_inbound = next(
+            m for m in alpha_messages if m.subject == forward_subject
+        )
+        assert forwarded_inbound.direction == "inbound"
+
         # ── vault + credentials ───────────────────────────────────
         vault_key = "IntegrationTest-Key-01!"
         log_step(ctx, "initialize vault")

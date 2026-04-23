@@ -34,6 +34,7 @@ export { verifyWebhook } from "./signing_keys.js";
 export {
   ContactRuleStatus,
   FilterMode,
+  ForwardMode,
   MailRuleAction,
   MailRuleMatchType,
   MessageDirection,

@@ -130,6 +130,36 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     expect(thread.subject).toBe(subject);
     expect(thread.messages.length).toBeGreaterThanOrEqual(1);
 
+    // ── forward bravo → alpha ─────────────────────────────────
+    const forwardSubject = `Fwd: ${subject}`;
+    logStep(
+      config,
+      `forward inbound message from bravo to alpha: ${forwardSubject}`,
+    );
+    const forwarded = inkboxJson<{ id: string; subject: string; status: string }>(
+      `email forward ${inboundMsg.id} -i bravo --to "${alphaMb.emailAddress}" --body-text "Forwarded by CLI integration test!"`,
+      cliOpts,
+    );
+    expect(forwarded.subject).toBe(forwardSubject);
+
+    logStep(config, "poll for forwarded delivery to alpha");
+    const alphaList = await pollUntil<{ id: string; subject: string; direction: string }[]>(
+      "forwarded message delivered to alpha",
+      () =>
+        inkboxJson<{ id: string; subject: string; direction: string }[]>(
+          "email list -i alpha --direction inbound",
+          cliOpts,
+        ),
+      {
+        timeoutMs: config.pollTimeoutMs,
+        intervalMs: config.pollIntervalMs,
+        isReady: (msgs) => msgs.some((m) => m.subject === forwardSubject),
+        verbose: config.verbose,
+      },
+    );
+    const forwardedInbound = alphaList.find((m) => m.subject === forwardSubject)!;
+    expect(forwardedInbound.direction).toBe("inbound");
+
     // ── signing key ───────────────────────────────────────────
     logStep(config, "create signing key");
     const signingKey = inkboxJson<{ signingKey: string }>("signing-key create", cliOpts);

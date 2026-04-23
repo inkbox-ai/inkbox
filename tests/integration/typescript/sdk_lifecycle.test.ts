@@ -112,6 +112,42 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     expect(thread.subject).toBe(subject);
     expect(thread.messages.length).toBeGreaterThanOrEqual(1);
 
+    // ── forward bravo → alpha ─────────────────────────────────
+    const forwardSubject = `Fwd: ${subject}`;
+    logStep(
+      config,
+      `forward inbound message from bravo to alpha: ${forwardSubject}`,
+    );
+    const forwarded = await bravo.forwardEmail(inboundMsg.id, {
+      to: [alpha.emailAddress!],
+      bodyText: "Forwarded by the TypeScript SDK integration test.",
+    });
+    expect(forwarded.direction).toBe("outbound");
+    expect(forwarded.subject).toBe(forwardSubject);
+
+    logStep(config, "poll for forwarded delivery to alpha");
+    const alphaMessages = await pollUntil<Message[]>(
+      "forwarded message delivered to alpha",
+      async () => {
+        const msgs: Message[] = [];
+        for await (const msg of alpha.iterEmails({ direction: "inbound" })) {
+          msgs.push(msg);
+          if (msgs.length >= 50) break;
+        }
+        return msgs;
+      },
+      {
+        timeoutMs: config.pollTimeout,
+        intervalMs: config.pollInterval,
+        isReady: (msgs) => msgs.some((m) => m.subject === forwardSubject),
+        verbose: config.verbose,
+      },
+    );
+    const forwardedInbound = alphaMessages.find(
+      (m) => m.subject === forwardSubject,
+    )!;
+    expect(forwardedInbound.direction).toBe("inbound");
+
     // ── vault + credentials ───────────────────────────────────
     const vaultKey = "IntegrationTest-Key-01!";
     logStep(config, "initialize vault");
