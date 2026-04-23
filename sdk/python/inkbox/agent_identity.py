@@ -23,7 +23,13 @@ from inkbox.identities.types import (
     IdentityPhoneNumber,
 )
 from inkbox.exceptions import InkboxError
-from inkbox.mail.types import Message, MessageDetail, MessageDirection, ThreadDetail
+from inkbox.mail.types import (
+    ForwardMode,
+    Message,
+    MessageDetail,
+    MessageDirection,
+    ThreadDetail,
+)
 from inkbox.phone.types import (
     PhoneCall,
     PhoneCallWithRateLimit,
@@ -363,6 +369,60 @@ class AgentIdentity:
             bcc=bcc,
             in_reply_to_message_id=in_reply_to_message_id,
             attachments=attachments,
+        )
+
+    def forward_email(
+        self,
+        message_id: str,
+        *,
+        to: list[str] | None = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        mode: ForwardMode | str = ForwardMode.INLINE,
+        subject: str | None = None,
+        body_text: str | None = None,
+        body_html: str | None = None,
+        additional_attachments: list[dict] | None = None,
+        include_original_attachments: bool = True,
+        reply_to: str | None = None,
+    ) -> Message:
+        """Forward a stored message out from this identity's mailbox.
+
+        Args:
+            message_id: UUID of the message being forwarded.
+            to: Primary recipient addresses.
+            cc: Carbon-copy recipients.
+            bcc: Blind carbon-copy recipients.
+                At least one address is required across ``to``, ``cc``, and
+                ``bcc``.
+            mode: ``inline`` (default) or ``wrapped``. See :class:`ForwardMode`.
+            subject: Optional override; defaults to ``"Fwd: " + original.subject``.
+            body_text: Optional caller note prepended above the original body
+                (inline mode) or as a top-level note (wrapped mode).
+            body_html: Optional HTML caller note.
+            additional_attachments: Optional caller-authored attachments
+                alongside the forwarded content. Same shape as
+                ``send_email(attachments=...)``.
+            include_original_attachments: ``inline`` mode only. When ``True``
+                (default), original attachments are re-attached as direct
+                outbound parts. Ignored in ``wrapped`` mode.
+            reply_to: Optional Reply-To address for the forward's outer
+                envelope.
+        """
+        self._require_mailbox()
+        return self._inkbox._messages.forward(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            message_id,
+            to=to,
+            cc=cc,
+            bcc=bcc,
+            mode=mode,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            additional_attachments=additional_attachments,
+            include_original_attachments=include_original_attachments,
+            reply_to=reply_to,
         )
 
     def iter_emails(

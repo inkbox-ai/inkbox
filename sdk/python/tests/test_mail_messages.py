@@ -13,6 +13,7 @@ from sample_data_mail import (
     CURSOR_PAGE_MESSAGES_MULTI,
 )
 from inkbox.mail.resources.messages import MessagesResource
+from inkbox.mail.types import ForwardMode
 
 
 MBOX = "aaaa1111-0000-0000-0000-000000000001"
@@ -119,6 +120,87 @@ class TestMessagesSend:
         assert "bcc" not in body["recipients"]
         assert "in_reply_to_message_id" not in body
         assert "attachments" not in body
+
+
+class TestMessagesForward:
+    def test_forward_basic(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+
+        msg = res.forward(MBOX, MSG, to=["fwd@example.com"])
+
+        http.post.assert_called_once_with(
+            f"/mailboxes/{MBOX}/messages/{MSG}/forward",
+            json={
+                "recipients": {"to": ["fwd@example.com"]},
+                "mode": "inline",
+                "include_original_attachments": True,
+            },
+        )
+        assert msg.subject == "Hello from test"
+
+    def test_forward_wrapped_with_all_options(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+
+        res.forward(
+            MBOX,
+            MSG,
+            to=["a@b.com"],
+            cc=["cc@b.com"],
+            bcc=["bcc@b.com"],
+            mode=ForwardMode.WRAPPED,
+            subject="Fwd: see this",
+            body_text="FYI",
+            body_html="<p>FYI</p>",
+            additional_attachments=[
+                {"filename": "n.txt", "content_type": "text/plain", "content_base64": "aGk="}
+            ],
+            include_original_attachments=False,
+            reply_to="me@b.com",
+        )
+
+        _, kwargs = http.post.call_args
+        body = kwargs["json"]
+        assert body["recipients"] == {
+            "to": ["a@b.com"],
+            "cc": ["cc@b.com"],
+            "bcc": ["bcc@b.com"],
+        }
+        assert body["mode"] == "wrapped"
+        assert body["subject"] == "Fwd: see this"
+        assert body["body_text"] == "FYI"
+        assert body["body_html"] == "<p>FYI</p>"
+        assert body["additional_attachments"] == [
+            {"filename": "n.txt", "content_type": "text/plain", "content_base64": "aGk="}
+        ]
+        assert body["include_original_attachments"] is False
+        assert body["reply_to"] == "me@b.com"
+
+    def test_forward_accepts_string_mode(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+
+        res.forward(MBOX, MSG, to=["a@b.com"], mode="wrapped")
+
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["mode"] == "wrapped"
+
+    def test_forward_optional_fields_omitted(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+
+        res.forward(MBOX, MSG, to=["a@b.com"])
+
+        _, kwargs = http.post.call_args
+        body = kwargs["json"]
+        assert "subject" not in body
+        assert "body_text" not in body
+        assert "body_html" not in body
+        assert "additional_attachments" not in body
+        assert "reply_to" not in body
+        assert "cc" not in body["recipients"]
+        assert "bcc" not in body["recipients"]
 
 
 class TestMessagesUpdateFlags:

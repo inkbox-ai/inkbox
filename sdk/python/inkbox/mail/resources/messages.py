@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
-from inkbox.mail.types import Message, MessageDetail, MessageDirection
+from inkbox.mail.types import ForwardMode, Message, MessageDetail, MessageDirection
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -137,6 +137,87 @@ class MessagesResource:
             body["attachments"] = attachments
 
         data = self._http.post(f"/mailboxes/{email_address}/messages", json=body)
+        return Message._from_dict(data)
+
+    def forward(
+        self,
+        email_address: str,
+        message_id: UUID | str,
+        *,
+        to: list[str] | None = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        mode: ForwardMode | str = ForwardMode.INLINE,
+        subject: str | None = None,
+        body_text: str | None = None,
+        body_html: str | None = None,
+        additional_attachments: list[dict[str, str]] | None = None,
+        include_original_attachments: bool = True,
+        reply_to: str | None = None,
+    ) -> Message:
+        """Forward a stored message out from this mailbox.
+
+        Two modes are available — see :class:`ForwardMode`. Forwards start a
+        brand-new thread.
+
+        Args:
+            email_address: Full email address of the forwarding mailbox.
+            message_id: UUID of the message being forwarded.
+            to: Primary recipient addresses.
+            cc: Carbon-copy recipients.
+            bcc: Blind carbon-copy recipients.
+                At least one address is required across ``to``, ``cc``, and
+                ``bcc``.
+            mode: ``inline`` (default) or ``wrapped``. See :class:`ForwardMode`.
+            subject: Optional override; defaults to ``"Fwd: " + original.subject``
+                (idempotent — won't double-prefix if the original already
+                starts with ``Fwd:``/``Fw:``).
+            body_text: Optional caller note prepended above the original body
+                (inline mode) or as a top-level note (wrapped mode).
+            body_html: Optional HTML caller note.
+            additional_attachments: Optional caller-authored attachments that
+                ride alongside the forwarded content. Same shape as
+                ``send(attachments=...)``: each entry must have ``filename``,
+                ``content_type``, and ``content_base64`` keys. Subject to the
+                same blocked-extension and 25 MB limits as ``send``.
+            include_original_attachments: ``inline`` mode only — when ``True``
+                (default) the original attachments are re-attached as direct
+                outbound parts. Ignored in ``wrapped`` mode (originals live
+                inside the wrapped ``.eml``).
+            reply_to: Optional Reply-To address for the forward's outer
+                envelope.
+
+        Returns:
+            The newly forwarded message metadata.
+        """
+        recipients: dict[str, Any] = {}
+        if to:
+            recipients["to"] = to
+        if cc:
+            recipients["cc"] = cc
+        if bcc:
+            recipients["bcc"] = bcc
+
+        body: dict[str, Any] = {
+            "recipients": recipients,
+            "mode": ForwardMode(mode).value,
+            "include_original_attachments": include_original_attachments,
+        }
+        if subject is not None:
+            body["subject"] = subject
+        if body_text is not None:
+            body["body_text"] = body_text
+        if body_html is not None:
+            body["body_html"] = body_html
+        if additional_attachments is not None:
+            body["additional_attachments"] = additional_attachments
+        if reply_to is not None:
+            body["reply_to"] = reply_to
+
+        data = self._http.post(
+            f"/mailboxes/{email_address}/messages/{message_id}/forward",
+            json=body,
+        )
         return Message._from_dict(data)
 
     def update_flags(

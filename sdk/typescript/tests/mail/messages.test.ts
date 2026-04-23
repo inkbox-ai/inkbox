@@ -1,6 +1,7 @@
 // sdk/typescript/tests/mail/messages.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { MessagesResource } from "../../src/mail/resources/messages.js";
+import { ForwardMode } from "../../src/mail/types.js";
 import type { HttpTransport } from "../../src/_http.js";
 import {
   RAW_MESSAGE,
@@ -122,6 +123,99 @@ describe("MessagesResource.send", () => {
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["body_text"]).toBeUndefined();
     expect(body["in_reply_to_message_id"]).toBeUndefined();
+  });
+});
+
+describe("MessagesResource.forward", () => {
+  it("forwards a message with default mode", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    const msg = await res.forward(ADDR, MSG_ID, { to: ["fwd@example.com"] });
+
+    expect(http.post).toHaveBeenCalledWith(
+      `/mailboxes/${ADDR}/messages/${MSG_ID}/forward`,
+      {
+        recipients: { to: ["fwd@example.com"] },
+        mode: ForwardMode.INLINE,
+        include_original_attachments: true,
+      },
+    );
+    expect(msg.id).toBe(RAW_MESSAGE.id);
+  });
+
+  it("includes all optional fields and snake-cases attachment keys", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.forward(ADDR, MSG_ID, {
+      to: ["a@example.com"],
+      cc: ["b@example.com"],
+      bcc: ["c@example.com"],
+      mode: ForwardMode.WRAPPED,
+      subject: "Fwd: see this",
+      bodyText: "FYI",
+      bodyHtml: "<p>FYI</p>",
+      additionalAttachments: [
+        { filename: "n.txt", contentType: "text/plain", contentBase64: "aGk=" },
+      ],
+      includeOriginalAttachments: false,
+      replyTo: "me@example.com",
+    });
+
+    const [path, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(path).toBe(`/mailboxes/${ADDR}/messages/${MSG_ID}/forward`);
+    expect(body["mode"]).toBe(ForwardMode.WRAPPED);
+    expect(body["subject"]).toBe("Fwd: see this");
+    expect(body["body_text"]).toBe("FYI");
+    expect(body["body_html"]).toBe("<p>FYI</p>");
+    expect(body["include_original_attachments"]).toBe(false);
+    expect(body["reply_to"]).toBe("me@example.com");
+    expect(body["additional_attachments"]).toEqual([
+      { filename: "n.txt", content_type: "text/plain", content_base64: "aGk=" },
+    ]);
+    expect(body["recipients"]).toEqual({
+      to: ["a@example.com"],
+      cc: ["b@example.com"],
+      bcc: ["c@example.com"],
+    });
+  });
+
+  it("accepts a string mode literal", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.forward(ADDR, MSG_ID, { to: ["a@example.com"], mode: "wrapped" });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["mode"]).toBe("wrapped");
+  });
+
+  it("omits optional fields when not provided", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.forward(ADDR, MSG_ID, { to: ["a@example.com"] });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["subject"]).toBeUndefined();
+    expect(body["body_text"]).toBeUndefined();
+    expect(body["body_html"]).toBeUndefined();
+    expect(body["additional_attachments"]).toBeUndefined();
+    expect(body["reply_to"]).toBeUndefined();
   });
 });
 

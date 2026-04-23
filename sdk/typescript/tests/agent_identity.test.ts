@@ -54,7 +54,13 @@ function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityDa
 function mockInkbox() {
   return {
     _mailboxes: {},
-    _messages: { send: vi.fn(), list: vi.fn(), markRead: vi.fn(), get: vi.fn() },
+    _messages: {
+      send: vi.fn(),
+      forward: vi.fn(),
+      list: vi.fn(),
+      markRead: vi.fn(),
+      get: vi.fn(),
+    },
     _threads: { get: vi.fn() },
     _numbers: { provision: vi.fn() },
     _calls: { place: vi.fn(), list: vi.fn() },
@@ -209,6 +215,29 @@ describe("AgentIdentity mail helpers", () => {
   it("sendEmail throws when no mailbox", async () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
     await expect(identity.sendEmail({ to: ["x"], subject: "y" })).rejects.toThrow(InkboxError);
+  });
+
+  it("forwardEmail delegates to messages resource", async () => {
+    const ink = mockInkbox();
+    const msg = { id: RAW_MESSAGE.id } as never;
+    vi.mocked(ink._messages.forward).mockResolvedValue(msg);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    const opts = { to: ["fwd@example.com"], subject: "Fwd: x" };
+    await identity.forwardEmail("msg-1", opts);
+
+    expect(ink._messages.forward).toHaveBeenCalledWith(
+      PARSED_MAILBOX.emailAddress,
+      "msg-1",
+      opts,
+    );
+  });
+
+  it("forwardEmail throws when no mailbox", async () => {
+    const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
+    await expect(
+      identity.forwardEmail("msg-1", { to: ["x@example.com"] }),
+    ).rejects.toThrow(InkboxError);
   });
 
   it("iterEmails returns async generator", () => {

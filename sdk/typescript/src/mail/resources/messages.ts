@@ -6,6 +6,7 @@
 
 import { HttpTransport } from "../../_http.js";
 import {
+  ForwardMode,
   Message,
   MessageDetail,
   MessageDirection,
@@ -123,6 +124,83 @@ export class MessagesResource {
 
     const data = await this.http.post<RawMessage>(
       `/mailboxes/${emailAddress}/messages`,
+      body,
+    );
+    return parseMessage(data);
+  }
+
+  /**
+   * Forward a stored message out from this mailbox.
+   *
+   * Two modes are available — see {@link ForwardMode}. Forwards start a
+   * brand-new thread.
+   *
+   * @param emailAddress - Full email address of the forwarding mailbox.
+   * @param messageId - UUID of the message being forwarded.
+   * @param options.to - Primary recipient addresses.
+   * @param options.cc - Carbon-copy recipients.
+   * @param options.bcc - Blind carbon-copy recipients. At least one address
+   *   is required across `to`, `cc`, and `bcc`.
+   * @param options.mode - `"inline"` (default) or `"wrapped"`.
+   * @param options.subject - Optional override; defaults to
+   *   `"Fwd: " + original.subject` (idempotent).
+   * @param options.bodyText - Optional caller note prepended above the
+   *   original body (inline) or as a top-level note (wrapped).
+   * @param options.bodyHtml - Optional HTML caller note.
+   * @param options.additionalAttachments - Optional caller-authored
+   *   attachments alongside the forwarded content. Same shape as
+   *   `send({ attachments })`. Subject to the same blocked-extension and
+   *   25 MB limits.
+   * @param options.includeOriginalAttachments - `inline` mode only. When
+   *   `true` (default), original attachments are re-attached as direct
+   *   outbound parts. Ignored in `wrapped` mode.
+   * @param options.replyTo - Optional Reply-To address for the forward's
+   *   outer envelope.
+   */
+  async forward(
+    emailAddress: string,
+    messageId: string,
+    options: {
+      to?: string[];
+      cc?: string[];
+      bcc?: string[];
+      mode?: ForwardMode | "inline" | "wrapped";
+      subject?: string;
+      bodyText?: string;
+      bodyHtml?: string;
+      additionalAttachments?: Array<{
+        filename: string;
+        contentType: string;
+        contentBase64: string;
+      }>;
+      includeOriginalAttachments?: boolean;
+      replyTo?: string;
+    },
+  ): Promise<Message> {
+    const recipients: Record<string, unknown> = {};
+    if (options.to) recipients["to"] = options.to;
+    if (options.cc) recipients["cc"] = options.cc;
+    if (options.bcc) recipients["bcc"] = options.bcc;
+
+    const body: Record<string, unknown> = {
+      recipients,
+      mode: options.mode ?? ForwardMode.INLINE,
+      include_original_attachments: options.includeOriginalAttachments ?? true,
+    };
+    if (options.subject !== undefined) body["subject"] = options.subject;
+    if (options.bodyText !== undefined) body["body_text"] = options.bodyText;
+    if (options.bodyHtml !== undefined) body["body_html"] = options.bodyHtml;
+    if (options.additionalAttachments !== undefined) {
+      body["additional_attachments"] = options.additionalAttachments.map((a) => ({
+        filename: a.filename,
+        content_type: a.contentType,
+        content_base64: a.contentBase64,
+      }));
+    }
+    if (options.replyTo !== undefined) body["reply_to"] = options.replyTo;
+
+    const data = await this.http.post<RawMessage>(
+      `/mailboxes/${emailAddress}/messages/${messageId}/forward`,
       body,
     );
     return parseMessage(data);

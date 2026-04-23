@@ -21,8 +21,24 @@ class MessageDirection(StrEnum):
         INBOUND: Email received from an external sender.
         OUTBOUND: Email sent by the mailbox.
     """
+
     INBOUND = "inbound"
     OUTBOUND = "outbound"
+
+
+class ForwardMode(StrEnum):
+    """
+    Strategy for embedding the original message in a forward.
+
+    Attributes:
+        INLINE: Render the original body inline below a Gmail-style preamble.
+            May not perfectly preserve inline images or complex layouts.
+        WRAPPED: Attach the original raw MIME as a single ``message/rfc822``
+            part — semantically preserved.
+    """
+
+    INLINE = "inline"
+    WRAPPED = "wrapped"
 
 
 class FilterMode(StrEnum):

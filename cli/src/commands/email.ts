@@ -3,6 +3,7 @@ import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import type { Message, MessageDirection, ThreadDetail } from "@inkbox/sdk";
+import { ForwardMode } from "@inkbox/sdk";
 
 export function registerEmailCommands(program: Command): void {
   const email = program
@@ -45,6 +46,77 @@ export function registerEmailCommands(program: Command): void {
           cc: cmdOpts.cc?.split(",").map((s) => s.trim()),
           bcc: cmdOpts.bcc?.split(",").map((s) => s.trim()),
           inReplyToMessageId: cmdOpts.inReplyTo,
+        });
+        output(
+          {
+            id: msg.id,
+            subject: msg.subject,
+            to: msg.toAddresses.join(", "),
+            status: msg.status,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  email
+    .command("forward <message-id>")
+    .description("Forward an existing email")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--to <addresses>", "Comma-separated recipient addresses")
+    .option("--cc <addresses>", "Comma-separated CC addresses")
+    .option("--bcc <addresses>", "Comma-separated BCC addresses")
+    .option(
+      "--mode <mode>",
+      "Forward mode: 'inline' (default) or 'wrapped'",
+      "inline",
+    )
+    .option("--subject <subject>", "Override subject (default: 'Fwd: <orig>')")
+    .option("--body-text <text>", "Plain text caller note")
+    .option("--body-html <html>", "HTML caller note")
+    .option(
+      "--no-include-original-attachments",
+      "Drop the original attachments (inline mode only)",
+    )
+    .option("--reply-to <address>", "Reply-To address for the forward")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageId: string,
+        cmdOpts: {
+          identity: string;
+          to?: string;
+          cc?: string;
+          bcc?: string;
+          mode: string;
+          subject?: string;
+          bodyText?: string;
+          bodyHtml?: string;
+          includeOriginalAttachments: boolean;
+          replyTo?: string;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        if (!cmdOpts.to && !cmdOpts.cc && !cmdOpts.bcc) {
+          console.error(
+            "At least one of --to, --cc, or --bcc is required.",
+          );
+          process.exit(1);
+        }
+        const split = (s: string | undefined) =>
+          s?.split(",").map((x) => x.trim());
+        const msg = await identity.forwardEmail(messageId, {
+          to: split(cmdOpts.to),
+          cc: split(cmdOpts.cc),
+          bcc: split(cmdOpts.bcc),
+          mode: cmdOpts.mode as ForwardMode,
+          subject: cmdOpts.subject,
+          bodyText: cmdOpts.bodyText,
+          bodyHtml: cmdOpts.bodyHtml,
+          includeOriginalAttachments: cmdOpts.includeOriginalAttachments,
+          replyTo: cmdOpts.replyTo,
         });
         output(
           {

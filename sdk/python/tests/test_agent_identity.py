@@ -14,7 +14,7 @@ from sample_data_mail import MAILBOX_DICT, MESSAGE_DETAIL_DICT, THREAD_DETAIL_DI
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
-from inkbox.mail.types import Mailbox, MessageDetail, ThreadDetail
+from inkbox.mail.types import ForwardMode, Mailbox, MessageDetail, ThreadDetail
 from inkbox.phone.types import TextMessage
 
 
@@ -59,6 +59,45 @@ class TestAgentIdentityGetMessage:
 
         with pytest.raises(InkboxError, match="no mailbox assigned"):
             identity.get_message("bbbb2222-0000-0000-0000-000000000001")
+
+
+class TestAgentIdentityForwardEmail:
+    def test_forward_email_delegates_to_messages_resource(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._messages.forward.return_value = MagicMock()
+
+        identity.forward_email(
+            "bbbb2222-0000-0000-0000-000000000001",
+            to=["fwd@example.com"],
+            mode=ForwardMode.WRAPPED,
+            subject="Fwd: see this",
+            body_text="FYI",
+            include_original_attachments=False,
+        )
+
+        inkbox._messages.forward.assert_called_once_with(
+            "sales-agent@inkbox.ai",
+            "bbbb2222-0000-0000-0000-000000000001",
+            to=["fwd@example.com"],
+            cc=None,
+            bcc=None,
+            mode=ForwardMode.WRAPPED,
+            subject="Fwd: see this",
+            body_text="FYI",
+            body_html=None,
+            additional_attachments=None,
+            include_original_attachments=False,
+            reply_to=None,
+        )
+
+    def test_forward_email_requires_mailbox(self):
+        identity, _ = _identity_without_mailbox()
+
+        with pytest.raises(InkboxError, match="no mailbox assigned"):
+            identity.forward_email(
+                "bbbb2222-0000-0000-0000-000000000001",
+                to=["fwd@example.com"],
+            )
 
 
 class TestAgentIdentityCreateMailbox:
