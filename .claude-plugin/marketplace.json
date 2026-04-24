@@ -1,0 +1,17 @@
+{
+  "name": "inkbox",
+  "owner": {
+    "name": "Inkbox AI",
+    "email": "hello@inkbox.ai"
+  },
+  "metadata": {
+    "description": "Inkbox email and phone SDK skills."
+  },
+  "plugins": [
+    {
+      "name": "inkbox",
+      "source": "./",
+      "description": "Inkbox email and phone SDK skills for Claude Code."
+    }
+  ]
+}

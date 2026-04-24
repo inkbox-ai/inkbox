@@ -192,9 +192,9 @@ inkbox signup status
 | [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
 | [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
 | [`cli/`](./cli/) | CLI (`@inkbox/cli`) |
-| [`skills/inkbox-python/`](./skills/inkbox-python/) | Python agent skill for Claude Code and other coding agents |
-| [`skills/inkbox-ts/`](./skills/inkbox-ts/) | TypeScript agent skill for Claude Code and other coding agents |
-| [`skills/inkbox-openclaw/`](./skills/inkbox-openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
+| [`skills/python/`](./skills/python/) | Python agent skill for Claude Code and other coding agents |
+| [`skills/ts/`](./skills/ts/) | TypeScript agent skill for Claude Code and other coding agents |
+| [`skills/openclaw/`](./skills/openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
 | [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email, phone, and vault |
 | [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
 | [`examples/use-inkbox-cli/`](./examples/use-inkbox-cli/) | Shell script examples for CLI automation and CI pipelines |
@@ -204,7 +204,25 @@ inkbox signup status
 
 ## Agent Skills
 
-Load the Inkbox skills into your coding agent so it automatically knows how to use the SDK:
+Load the Inkbox skills into your coding agent so it automatically knows how to use the SDK.
+
+### Claude Code (plugin)
+
+```
+/plugin marketplace add inkbox-ai/inkbox   # <github-owner>/<repo>
+/plugin install inkbox@inkbox              # <plugin-name>@<marketplace-name>
+/reload-plugins
+```
+
+### Codex (plugin)
+
+```bash
+codex plugin marketplace add inkbox-ai/inkbox
+```
+
+Then install `inkbox` from the Codex plugin UI. Codex has no `codex plugin install` subcommand yet, and the official plugin directory is not open for submissions — see the [Codex plugin docs](https://developers.openai.com/codex/plugins/build).
+
+### Any Agent (individual skills)
 
 ```bash
 npx skills add inkbox-ai/inkbox/skills

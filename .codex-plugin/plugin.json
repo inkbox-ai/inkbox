@@ -1,0 +1,5 @@
+{
+  "name": "inkbox",
+  "description": "Inkbox email and phone SDK skills.",
+  "skills": "./skills/"
+}
