@@ -192,9 +192,9 @@ inkbox signup status
 | [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
 | [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
 | [`cli/`](./cli/) | CLI (`@inkbox/cli`) |
-| [`skills/python/`](./skills/python/) | Python agent skill for Claude Code and other coding agents |
-| [`skills/ts/`](./skills/ts/) | TypeScript agent skill for Claude Code and other coding agents |
-| [`skills/openclaw/`](./skills/openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
+| [`skills/inkbox-python/`](./skills/inkbox-python/) | Python agent skill for Claude Code and other coding agents |
+| [`skills/inkbox-ts/`](./skills/inkbox-ts/) | TypeScript agent skill for Claude Code and other coding agents |
+| [`skills/inkbox-openclaw/`](./skills/inkbox-openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
 | [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email, phone, and vault |
 | [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
 | [`examples/use-inkbox-cli/`](./examples/use-inkbox-cli/) | Shell script examples for CLI automation and CI pipelines |

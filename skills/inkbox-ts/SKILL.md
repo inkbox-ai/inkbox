@@ -1,5 +1,5 @@
 ---
-name: ts
+name: inkbox-ts
 description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: true
 ---
@@ -57,7 +57,7 @@ An identity must have a channel assigned before you can use mail/phone methods. 
 
 For the full agent self-signup flow (register, verify, check status, restrictions, and direct API examples), read the shared reference:
 
-> **See:** `skills/agent-self-signup/SKILL.md`
+> **See:** `skills/inkbox-agent-self-signup/SKILL.md`
 
 TypeScript SDK methods: `Inkbox.signup({...})`, `Inkbox.verifySignup(apiKey, {...})`, `Inkbox.resendSignupVerification(apiKey)`, `Inkbox.getSignupStatus(apiKey)`.
 

@@ -1,5 +1,5 @@
 ---
-name: cli
+name: inkbox-cli
 description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text/SMS, contacts, notes, contact rules, vault, mailbox, phone number, webhook, or signup workflows.
 user-invocable: true
 ---
@@ -84,7 +84,7 @@ Also confirm before creating or rotating secrets if the values were not explicit
 
 For the full self-signup flow and API semantics, read the shared reference:
 
-> **See:** `skills/agent-self-signup/SKILL.md`
+> **See:** `skills/inkbox-agent-self-signup/SKILL.md`
 
 CLI commands:
 

@@ -1,5 +1,5 @@
 ---
-name: openclaw
+name: inkbox-openclaw
 description: Openclaw-distributed Inkbox skill — use when adding email, phone, text/SMS, contacts, notes, contact rules, encrypted vault, or agent identity features via the Inkbox TypeScript SDK (`@inkbox/sdk`) with openclaw environment and dependency provisioning.
 metadata:
   openclaw:
@@ -89,7 +89,7 @@ An identity must have a channel assigned before you can use mail/phone/text meth
 
 For the full agent self-signup flow (register, verify, check status, restrictions, and direct API examples), read the shared reference:
 
-> **See:** `skills/agent-self-signup/SKILL.md`
+> **See:** `skills/inkbox-agent-self-signup/SKILL.md`
 
 SDK methods: `Inkbox.signup({...})`, `Inkbox.verifySignup(apiKey, {...})`, `Inkbox.resendSignupVerification(apiKey)`, `Inkbox.getSignupStatus(apiKey)`.
 

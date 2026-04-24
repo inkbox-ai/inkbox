@@ -1,5 +1,5 @@
 ---
-name: python
+name: inkbox-python
 description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox Python SDK.
 user-invocable: true
 ---
@@ -58,7 +58,7 @@ An identity must have a channel assigned before you can use mail/phone methods. 
 
 For the full agent self-signup flow (register, verify, check status, restrictions, and direct API examples), read the shared reference:
 
-> **See:** `skills/agent-self-signup/SKILL.md`
+> **See:** `skills/inkbox-agent-self-signup/SKILL.md`
 
 Python SDK methods: `Inkbox.signup(...)`, `Inkbox.verify_signup(api_key, ...)`, `Inkbox.resend_signup_verification(api_key)`, `Inkbox.get_signup_status(api_key)`.
 
