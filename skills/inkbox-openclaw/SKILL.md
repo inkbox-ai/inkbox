@@ -1,6 +1,7 @@
 ---
 name: inkbox-openclaw
 description: Openclaw-distributed Inkbox skill — use when adding email, phone, text/SMS, contacts, notes, contact rules, encrypted vault, or agent identity features via the Inkbox TypeScript SDK (`@inkbox/sdk`) with openclaw environment and dependency provisioning.
+user-invocable: false
 metadata:
   openclaw:
     emoji: "📬"
@@ -11,7 +12,6 @@ metadata:
       bins:
         - node
     primaryEnv: INKBOX_API_KEY
-user-invocable: false
 ---
 
 # Inkbox Skill
