@@ -1,7 +1,7 @@
 ---
 name: python
 description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox Python SDK.
-user-invocable: false
+user-invocable: true
 ---
 
 # Inkbox Python SDK

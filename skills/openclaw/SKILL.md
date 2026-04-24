@@ -11,6 +11,7 @@ metadata:
       bins:
         - node
     primaryEnv: INKBOX_API_KEY
+user-invocable: true
 ---
 
 # Inkbox Skill

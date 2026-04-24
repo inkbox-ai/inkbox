@@ -1,6 +1,7 @@
 ---
 name: agent-self-signup
 description: Use when guiding or implementing the Inkbox agent self-signup flow, including verification, resend-verification, signup restrictions, and optional signup fields like agent handles or mailbox local parts.
+user-invocable: true
 ---
 
 # Agent Self-Signup

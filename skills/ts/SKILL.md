@@ -1,7 +1,7 @@
 ---
 name: ts
 description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox TypeScript SDK.
-user-invocable: false
+user-invocable: true
 ---
 
 # Inkbox TypeScript SDK
