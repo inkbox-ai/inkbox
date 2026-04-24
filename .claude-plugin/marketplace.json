@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "inkbox",
-      "source": "./",
+      "source": "./.",
       "description": "Inkbox email and phone SDK skills for Claude Code."
     }
   ]
