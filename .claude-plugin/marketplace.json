@@ -1,0 +1,26 @@
+{
+  "name": "inkbox",
+  "owner": {
+    "name": "Inkbox AI",
+    "email": "hello@inkbox.ai"
+  },
+  "metadata": {
+    "description": "Inkbox email and phone SDK skills."
+  },
+  "plugins": [
+    {
+      "name": "inkbox",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/inkbox-ai/inkbox.git",
+        "ref": "main"
+      },
+      "description": "Inkbox email and phone SDK skills for Claude Code.",
+      "category": "Productivity",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  ]
+}

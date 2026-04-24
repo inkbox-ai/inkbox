@@ -204,7 +204,25 @@ inkbox signup status
 
 ## Agent Skills
 
-Load the Inkbox skills into your coding agent so it automatically knows how to use the SDK:
+Load the Inkbox skills into your coding agent so it automatically knows how to use the SDK.
+
+### Claude Code (plugin)
+
+```
+/plugin marketplace add inkbox-ai/inkbox   # <github-owner>/<repo>
+/plugin install inkbox@inkbox              # <plugin-name>@<marketplace-name>
+/reload-plugins
+```
+
+### Codex (plugin)
+
+```bash
+codex plugin marketplace add inkbox-ai/inkbox
+```
+
+Then install `inkbox` from the Codex plugin UI. Codex has no `codex plugin install` subcommand yet, and the official plugin directory is not open for submissions — see the [Codex plugin docs](https://developers.openai.com/codex/plugins/build).
+
+### Any Agent (individual skills)
 
 ```bash
 npx skills add inkbox-ai/inkbox/skills

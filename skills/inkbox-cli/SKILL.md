@@ -84,7 +84,7 @@ Also confirm before creating or rotating secrets if the values were not explicit
 
 For the full self-signup flow and API semantics, read the shared reference:
 
-> **See:** `skills/agent-self-signup/SKILL.md`
+> **See:** `skills/inkbox-agent-self-signup/SKILL.md`
 
 CLI commands:
 

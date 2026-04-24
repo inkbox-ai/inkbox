@@ -4,13 +4,27 @@ Official AI agent skills from [Inkbox](https://inkbox.ai) — load them into you
 
 ## Installation
 
-### Any Agent
+### Claude Code (plugin — recommended)
+
+```
+/plugin marketplace add inkbox-ai/inkbox
+/plugin install inkbox@inkbox
+/reload-plugins
+```
+
+Installs all six skills at once, namespaced as `/inkbox:<skill>`.
+
+### Codex (plugin)
+
+Codex plugins are distributed via a marketplace catalog. See the [Codex plugin docs](https://developers.openai.com/codex/plugins/build); this repo ships a `.codex-plugin/plugin.json` manifest at the root.
+
+### Any Agent (individual skills)
 
 ```bash
 npx skills add inkbox-ai/inkbox/skills
 ```
 
-### Claude Code (Manual)
+### Claude Code (Manual fallback)
 
 ```bash
 # Python SDK skill
@@ -45,7 +59,7 @@ Once the skills are installed, your coding agent will automatically know how to 
 | **inkbox-openclaw** | TypeScript / Node ≥ 18 | OpenClaw skill — agent signup, email, phone, text, contacts, notes, contact rules, and vault for your OpenClaw agent |
 | **inkbox-cli** | TypeScript / Node ≥ 18 | CLI reference for `inkbox` / `@inkbox/cli` commands covering signup, identities, email, phone, text, contacts, notes, contact rules, vault, mailboxes, numbers, webhooks, and signing keys |
 | **inkbox-all** | Language-agnostic | Index of all Inkbox skills in this repository, including example skills and links for choosing the right one |
-| **agent-self-signup** | Language-agnostic | Shared reference for the agent self-signup flow — SDK examples (Python & TS) and direct API (curl) |
+| **inkbox-agent-self-signup** | Language-agnostic | Shared reference for the agent self-signup flow — SDK examples (Python & TS) and direct API (curl) |
 
 ## Documentation
 

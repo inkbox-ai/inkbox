@@ -1,0 +1,10 @@
+{
+  "name": "inkbox",
+  "description": "Inkbox email and phone SDK skills for Claude Code.",
+  "author": {
+    "name": "Inkbox AI",
+    "email": "hello@inkbox.ai"
+  },
+  "homepage": "https://inkbox.ai",
+  "repository": "https://github.com/inkbox-ai/inkbox"
+}
