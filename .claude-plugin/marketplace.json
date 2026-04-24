@@ -10,8 +10,17 @@
   "plugins": [
     {
       "name": "inkbox",
-      "source": "./.",
-      "description": "Inkbox email and phone SDK skills for Claude Code."
+      "source": {
+        "source": "url",
+        "url": "https://github.com/inkbox-ai/inkbox.git",
+        "ref": "plugins"
+      },
+      "description": "Inkbox email and phone SDK skills for Claude Code.",
+      "category": "Productivity",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
     }
   ]
 }
