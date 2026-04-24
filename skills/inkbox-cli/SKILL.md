@@ -1,7 +1,7 @@
 ---
 name: inkbox-cli
 description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text/SMS, contacts, notes, contact rules, vault, mailbox, phone number, webhook, or signup workflows.
-user-invocable: true
+user-invocable: false
 ---
 
 # Inkbox CLI
