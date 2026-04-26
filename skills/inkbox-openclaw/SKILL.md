@@ -230,6 +230,15 @@ Always confirm before placing a call.
 
 ## Text Messages (SMS/MMS)
 
+**Outbound SMS limits and gates (current):**
+
+- Allowed only from **local** numbers, not toll-free.
+- **15 outbound sends per phone number per rolling 24h.**
+- New local numbers need **~10-15 min** for 10DLC carrier propagation. `identity.phoneNumber.smsStatus` is `SmsStatus.PENDING` until ready; sends in this window return `409 sender_sms_pending`.
+- Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`.
+
+**Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
+
 ```typescript
 // Send an SMS from this identity's phone number.
 // Returns a queued TextMessage; final delivery state arrives via the

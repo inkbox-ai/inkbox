@@ -250,6 +250,18 @@ for t in hits:
 
 Send and receive SMS/MMS through the identity's assigned phone number.
 
+**Outbound SMS rules (read before sending):**
+
+- Outbound SMS is currently allowed only from **local** numbers, not toll-free.
+- Each sender phone number is rate-limited to **15 outbound texts per rolling 24-hour window**.
+- A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phone_number.sms_status` reads `pending` until then, and sends will return `409 sender_sms_pending`.
+- The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`.
+
+**Coming soon:**
+
+- Toll-free SMS sending.
+- Customer-managed 10DLC brands and campaigns, which lift the per-number 24-hour limit dramatically.
+
 ```python
 # Send an SMS. Returns a queued TextMessage; final delivery state arrives
 # via the incoming_text_webhook_url configured on the sender.
