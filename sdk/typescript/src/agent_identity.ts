@@ -478,6 +478,25 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
 
   /**
+   * Send an outbound SMS from this identity's phone number.
+   *
+   * The returned message is in `queued` state. Final delivery state arrives
+   * via the `incomingTextWebhookUrl` configured on the sender.
+   *
+   * @param options.to - E.164 destination number (e.g. `"+15551234567"`).
+   * @param options.text - Message body (1-1600 chars).
+   *
+   * @throws {InkboxError} when this identity has no phone number.
+   * @throws {RecipientBlockedError} when the destination is blocked by an
+   *   outbound contact rule.
+   * @throws {InkboxAPIError} for other send failures.
+   */
+  async sendText(options: { to: string; text: string }): Promise<TextMessage> {
+    this._requirePhone();
+    return this._inkbox._texts.send(this._phoneNumber!.id, options);
+  }
+
+  /**
    * List text messages for this identity's phone number.
    *
    * @param options.limit - Maximum number of results. Defaults to 50.

@@ -5,8 +5,13 @@ import type { HttpTransport } from "../../src/_http.js";
 import {
   RAW_TEXT_MESSAGE,
   RAW_TEXT_MESSAGE_MMS,
+  RAW_TEXT_MESSAGE_OUTBOUND_QUEUED,
   RAW_TEXT_CONVERSATION_SUMMARY,
 } from "../sampleData.js";
+import {
+  SmsDeliveryStatus,
+  TextMessageOrigin,
+} from "../../src/phone/types.js";
 
 function mockHttp() {
   return {
@@ -20,6 +25,36 @@ function mockHttp() {
 const NUM_ID = "aaaa1111-0000-0000-0000-000000000001";
 const TEXT_ID = "dddd4444-0000-0000-0000-000000000001";
 const REMOTE = "+15167251294";
+
+describe("TextsResource.send", () => {
+  it("posts to the correct path with to/text", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_TEXT_MESSAGE_OUTBOUND_QUEUED);
+    const res = new TextsResource(http);
+
+    await res.send(NUM_ID, { to: "+15551234567", text: "Hello" });
+
+    expect(http.post).toHaveBeenCalledWith(
+      `/numbers/${NUM_ID}/texts`,
+      { to: "+15551234567", text: "Hello" },
+    );
+  });
+
+  it("returns parsed message with lifecycle fields", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_TEXT_MESSAGE_OUTBOUND_QUEUED);
+    const res = new TextsResource(http);
+
+    const msg = await res.send(NUM_ID, { to: REMOTE, text: "Hello from Inkbox" });
+
+    expect(msg.direction).toBe("outbound");
+    expect(msg.deliveryStatus).toBe(SmsDeliveryStatus.QUEUED);
+    expect(msg.origin).toBe(TextMessageOrigin.USER_INITIATED);
+    expect(msg.sentAt).toBeNull();
+    expect(msg.deliveredAt).toBeNull();
+    expect(msg.failedAt).toBeNull();
+  });
+});
 
 describe("TextsResource.list", () => {
   it("uses default limit and offset", async () => {

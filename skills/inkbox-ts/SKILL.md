@@ -181,6 +181,15 @@ for (const t of segments) {
 ## Text Messages (SMS/MMS)
 
 ```typescript
+// Send an SMS from this identity's phone number.
+// Returns a queued TextMessage; final delivery state arrives via the
+// incomingTextWebhookUrl configured on the sender.
+const sent = await identity.sendText({
+  to: "+15167251294",
+  text: "Hello from Inkbox",
+});
+console.log(sent.id, sent.deliveryStatus);   // "queued"
+
 // List text messages (offset pagination)
 const texts = await identity.listTexts({ limit: 20, offset: 0 });
 for (const t of texts) {

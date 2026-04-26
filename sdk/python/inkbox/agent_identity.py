@@ -556,6 +556,36 @@ class AgentIdentity:
 
     ## Text message helpers
 
+    def send_text(
+        self,
+        *,
+        to: str,
+        text: str,
+    ) -> TextMessage:
+        """Send an outbound SMS from this identity's phone number.
+
+        Args:
+            to: E.164 destination number (e.g. ``"+15551234567"``).
+            text: Message body (1-1600 chars).
+
+        Returns:
+            The queued ``TextMessage``. Delivery confirmation is delivered
+            via the ``incoming_text_webhook_url`` on the sender, not the
+            return value.
+
+        Raises:
+            InkboxError: when this identity has no phone number.
+            RecipientBlockedError: when the destination is blocked by an
+                outbound contact rule.
+            InkboxAPIError: for other send failures.
+        """
+        self._require_phone()
+        return self._inkbox._texts.send(
+            self._phone_number.id,  # type: ignore[union-attr]
+            to=to,
+            text=text,
+        )
+
     def list_texts(
         self, *, limit: int = 50, offset: int = 0, is_read: bool | None = None
     ) -> list[TextMessage]:

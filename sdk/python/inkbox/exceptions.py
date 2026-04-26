@@ -73,3 +73,26 @@ class RedundantContactAccessGrantError(InkboxAPIError):
         super().__init__(status_code=status_code, detail=detail)
         self.error: str = str(detail.get("error", "redundant_grant"))
         self.detail_message: str = str(detail.get("detail", ""))
+
+
+class RecipientBlockedError(InkboxAPIError):
+    """
+    Raised on 403 when an SMS or call destination is blocked by an
+    outbound contact rule on the sender (or by the sender's
+    ``filter_mode`` default).
+
+    Attributes:
+        matched_rule_id: UUID of the rule that blocked the recipient, or
+            ``None`` when no specific rule matched (i.e. the block came
+            from the phone number's ``filter_mode`` default).
+        address: The blocked counterparty (E.164 phone number).
+        reason: Human-readable explanation from the server.
+        detail: The full structured detail dict from the server.
+    """
+
+    def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        raw_rule = detail.get("matched_rule_id")
+        self.matched_rule_id: UUID | None = UUID(str(raw_rule)) if raw_rule else None
+        self.address: str = str(detail.get("address", ""))
+        self.reason: str = str(detail.get("reason", ""))

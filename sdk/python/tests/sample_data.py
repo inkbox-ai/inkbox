@@ -62,6 +62,26 @@ TEXT_MESSAGE_MMS_DICT = {
     "updated_at": "2026-03-09T00:12:00Z",
 }
 
+TEXT_MESSAGE_OUTBOUND_QUEUED_DICT = {
+    "id": "dddd4444-0000-0000-0000-0000000000ff",
+    "direction": "outbound",
+    "local_phone_number": "+18335794607",
+    "remote_phone_number": "+15167251294",
+    "text": "Hello from Inkbox",
+    "type": "sms",
+    "media": None,
+    "is_read": True,
+    "delivery_status": "queued",
+    "origin": "user_initiated",
+    "error_code": None,
+    "error_detail": None,
+    "sent_at": None,
+    "delivered_at": None,
+    "failed_at": None,
+    "created_at": "2026-03-09T00:20:00Z",
+    "updated_at": "2026-03-09T00:20:00Z",
+}
+
 TEXT_CONVERSATION_SUMMARY_DICT = {
     "remote_phone_number": "+15167251294",
     "latest_text": "Hello, is this support?",

@@ -12,6 +12,7 @@ from inkbox._http import _raise_for_status
 from inkbox.exceptions import (
     DuplicateContactRuleError,
     InkboxAPIError,
+    RecipientBlockedError,
     RedundantContactAccessGrantError,
 )
 from inkbox.mail.exceptions import InkboxAPIError as MailAPIError
@@ -107,6 +108,61 @@ class TestRaiseForStatusStructured:
         err = info.value
         assert err.error == "redundant_grant"
         assert "wildcard" in err.detail_message
+
+
+class TestRaiseForStatusRecipientBlocked:
+    def test_recipient_blocked_with_rule(self):
+        rule_id = "aaaa1111-0000-0000-0000-000000000077"
+        resp = _resp(
+            403,
+            {
+                "detail": {
+                    "error": "recipient_blocked",
+                    "matched_rule_id": rule_id,
+                    "address": "+15551234567",
+                    "reason": "outbound block rule matched",
+                },
+            },
+        )
+        with pytest.raises(RecipientBlockedError) as info:
+            _raise_for_status(resp)
+        err = info.value
+        assert str(err.matched_rule_id) == rule_id
+        assert err.address == "+15551234567"
+        assert err.reason == "outbound block rule matched"
+        assert err.status_code == 403
+
+    def test_recipient_blocked_without_rule(self):
+        # filter_mode default block — no specific rule matched.
+        resp = _resp(
+            403,
+            {
+                "detail": {
+                    "error": "recipient_blocked",
+                    "matched_rule_id": None,
+                    "address": "+15551234567",
+                    "reason": "filter_mode=whitelist with no allow rule",
+                },
+            },
+        )
+        with pytest.raises(RecipientBlockedError) as info:
+            _raise_for_status(resp)
+        assert info.value.matched_rule_id is None
+
+    def test_unrelated_403_stays_base_class(self):
+        # recipient_not_opted_in is NOT subclassed — keeps generic InkboxAPIError.
+        resp = _resp(
+            403,
+            {
+                "detail": {
+                    "error": "recipient_not_opted_in",
+                    "message": "not opted in",
+                },
+            },
+        )
+        with pytest.raises(InkboxAPIError) as info:
+            _raise_for_status(resp)
+        assert type(info.value) is InkboxAPIError
 
 
 class TestRaiseForStatusOtherCodes:

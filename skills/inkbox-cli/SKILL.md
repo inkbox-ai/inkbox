@@ -65,6 +65,7 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 
 - `signup create`
 - `email send`
+- `text send`
 - `phone call`
 - `identity delete`
 - `email delete`
@@ -178,6 +179,7 @@ Before placing a call, confirm the destination number and websocket URL with the
 All text commands are identity-scoped and require `-i <handle>`.
 
 ```bash
+inkbox text send -i <handle> --to +15167251294 --text "Hello from Inkbox"
 inkbox text list -i <handle> --limit 20
 inkbox text get <text-id> -i <handle>
 inkbox text conversations -i <handle> --limit 20

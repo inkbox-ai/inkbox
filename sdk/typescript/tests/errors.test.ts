@@ -6,6 +6,7 @@ import {
   InkboxAPIError,
   InkboxError,
   InkboxVaultKeyError,
+  RecipientBlockedError,
   RedundantContactAccessGrantError,
 } from "../src/_http.js";
 
@@ -133,6 +134,64 @@ describe("HttpTransport 409 routing", () => {
       expect(err).not.toBeInstanceOf(DuplicateContactRuleError);
       expect(err).not.toBeInstanceOf(RedundantContactAccessGrantError);
       expect((err as InkboxAPIError).detail).toBe("Access already granted");
+    }
+  });
+
+  it("routes recipient_blocked 403 to RecipientBlockedError", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(403, {
+        detail: {
+          error: "recipient_blocked",
+          matched_rule_id: "aaaa1111-0000-0000-0000-000000000077",
+          address: "+15551234567",
+          reason: "outbound block rule matched",
+        },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    await expect(http.post("/numbers/x/texts")).rejects.toMatchObject({
+      name: "RecipientBlockedError",
+      matchedRuleId: "aaaa1111-0000-0000-0000-000000000077",
+      address: "+15551234567",
+      reason: "outbound block rule matched",
+      statusCode: 403,
+    });
+  });
+
+  it("recipient_blocked without matched_rule_id has null matchedRuleId", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(403, {
+        detail: {
+          error: "recipient_blocked",
+          matched_rule_id: null,
+          address: "+15551234567",
+          reason: "filter_mode default",
+        },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/numbers/x/texts");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(RecipientBlockedError);
+      expect((err as RecipientBlockedError).matchedRuleId).toBeNull();
+    }
+  });
+
+  it("unrelated 403 (recipient_not_opted_in) stays on InkboxAPIError", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(403, {
+        detail: { error: "recipient_not_opted_in", message: "not opted in" },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/numbers/x/texts");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      expect(err).not.toBeInstanceOf(RecipientBlockedError);
     }
   });
 

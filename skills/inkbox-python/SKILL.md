@@ -173,6 +173,12 @@ for t in identity.list_transcripts(calls[0].id):
 ## Text Messages (SMS/MMS)
 
 ```python
+# Send an SMS from this identity's phone number.
+# Returns a queued TextMessage; final delivery state arrives via the
+# incoming_text_webhook_url configured on the sender.
+sent = identity.send_text(to="+15167251294", text="Hello from Inkbox")
+print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
+
 # List text messages (offset pagination)
 texts = identity.list_texts(limit=20, offset=0)
 for t in texts:

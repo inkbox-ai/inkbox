@@ -16,6 +16,7 @@ export {
   InkboxAPIError,
   InkboxError,
   InkboxVaultKeyError,
+  RecipientBlockedError,
   RedundantContactAccessGrantError,
 } from "./_http.js";
 export type { InkboxAPIErrorDetail } from "./_http.js";
@@ -49,7 +50,12 @@ export type {
   Thread,
   ThreadDetail,
 } from "./mail/types.js";
-export { PhoneRuleAction, PhoneRuleMatchType } from "./phone/types.js";
+export {
+  PhoneRuleAction,
+  PhoneRuleMatchType,
+  SmsDeliveryStatus,
+  TextMessageOrigin,
+} from "./phone/types.js";
 export type {
   PhoneNumber,
   PhoneCall,

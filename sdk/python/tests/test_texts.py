@@ -10,12 +10,39 @@ from sample_data import (
     TEXT_CONVERSATION_SUMMARY_DICT,
     TEXT_MESSAGE_DICT,
     TEXT_MESSAGE_MMS_DICT,
+    TEXT_MESSAGE_OUTBOUND_QUEUED_DICT,
 )
+from inkbox.phone.types import SmsDeliveryStatus, TextMessageOrigin
 
 
 NUM_ID = "aaaa1111-0000-0000-0000-000000000001"
 TEXT_ID = "dddd4444-0000-0000-0000-000000000001"
 REMOTE = "+15167251294"
+
+
+class TestTextsSend:
+    def test_posts_to_correct_path(self, client, transport):
+        transport.post.return_value = TEXT_MESSAGE_OUTBOUND_QUEUED_DICT
+
+        client._texts.send(NUM_ID, to="+15551234567", text="Hello")
+
+        transport.post.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts",
+            json={"to": "+15551234567", "text": "Hello"},
+        )
+
+    def test_returns_parsed_text_with_lifecycle_fields(self, client, transport):
+        transport.post.return_value = TEXT_MESSAGE_OUTBOUND_QUEUED_DICT
+
+        msg = client._texts.send(NUM_ID, to="+15167251294", text="Hello from Inkbox")
+
+        assert msg.direction == "outbound"
+        assert msg.delivery_status is SmsDeliveryStatus.QUEUED
+        assert msg.origin is TextMessageOrigin.USER_INITIATED
+        # Lifecycle timestamps haven't been stamped yet on a queued send.
+        assert msg.sent_at is None
+        assert msg.delivered_at is None
+        assert msg.failed_at is None
 
 
 class TestTextsList:

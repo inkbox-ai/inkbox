@@ -24,6 +24,22 @@ export enum PhoneRuleMatchType {
   EXACT_NUMBER = "exact_number",
 }
 
+/** Carrier-facing outbound delivery lifecycle for a text message. */
+export enum SmsDeliveryStatus {
+  QUEUED = "queued",
+  SENT = "sent",
+  DELIVERED = "delivered",
+  DELIVERY_FAILED = "delivery_failed",
+  DELIVERY_UNCONFIRMED = "delivery_unconfirmed",
+  SENDING_FAILED = "sending_failed",
+}
+
+/** Whether a text was user-initiated or an internal auto-reply. */
+export enum TextMessageOrigin {
+  USER_INITIATED = "user_initiated",
+  AUTO_REPLY = "auto_reply",
+}
+
 export interface PhoneNumber {
   id: string;
   number: string;
@@ -119,6 +135,14 @@ export interface TextMessage {
   type: string;
   media: TextMediaItem[] | null;
   isRead: boolean;
+  /** Outbound delivery lifecycle. `null` on inbound rows. */
+  deliveryStatus: SmsDeliveryStatus | null;
+  origin: TextMessageOrigin;
+  errorCode: string | null;
+  errorDetail: string | null;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  failedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -206,6 +230,13 @@ export interface RawTextMessage {
   type: string;
   media: RawTextMediaItem[] | null;
   is_read: boolean;
+  delivery_status?: string | null;
+  origin?: string;
+  error_code?: string | null;
+  error_detail?: string | null;
+  sent_at?: string | null;
+  delivered_at?: string | null;
+  failed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -333,6 +364,15 @@ export function parseTextMessage(r: RawTextMessage): TextMessage {
     type: r.type,
     media: r.media ? r.media.map(parseTextMediaItem) : null,
     isRead: r.is_read,
+    deliveryStatus: r.delivery_status
+      ? (r.delivery_status as SmsDeliveryStatus)
+      : null,
+    origin: (r.origin as TextMessageOrigin) ?? TextMessageOrigin.USER_INITIATED,
+    errorCode: r.error_code ?? null,
+    errorDetail: r.error_detail ?? null,
+    sentAt: r.sent_at ? new Date(r.sent_at) : null,
+    deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,
+    failedAt: r.failed_at ? new Date(r.failed_at) : null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

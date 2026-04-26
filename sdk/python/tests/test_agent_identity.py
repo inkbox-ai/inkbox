@@ -143,6 +143,24 @@ class TestAgentIdentityGetThread:
 PHONE_NUMBER_ID = UUID("bbbb2222-0000-0000-0000-000000000001")
 
 
+class TestAgentIdentitySendText:
+    def test_send_text_delegates_to_texts_resource(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._texts.send.return_value = MagicMock(spec=TextMessage)
+
+        identity.send_text(to="+15551234567", text="Hello!")
+
+        inkbox._texts.send.assert_called_once_with(
+            PHONE_NUMBER_ID, to="+15551234567", text="Hello!",
+        )
+
+    def test_send_text_requires_phone(self):
+        identity, _ = _identity_without_phone()
+
+        with pytest.raises(InkboxError, match="no phone number assigned"):
+            identity.send_text(to="+15551234567", text="Hello!")
+
+
 class TestAgentIdentityMarkTextRead:
     def test_mark_text_read_delegates_to_texts_resource(self):
         identity, inkbox = _identity_with_mailbox()

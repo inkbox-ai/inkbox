@@ -65,7 +65,7 @@ function mockInkbox() {
     _numbers: { provision: vi.fn() },
     _calls: { place: vi.fn(), list: vi.fn() },
     _transcripts: { list: vi.fn() },
-    _texts: { update: vi.fn(), updateConversation: vi.fn() },
+    _texts: { send: vi.fn(), update: vi.fn(), updateConversation: vi.fn() },
     _idsResource: {
       get: vi.fn(),
       create: vi.fn(),
@@ -368,6 +368,26 @@ describe("AgentIdentity phone helpers", () => {
   it("listTranscripts throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
     await expect(identity.listTranscripts("call-1")).rejects.toThrow(InkboxError);
+  });
+
+  it("sendText delegates to texts resource", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._texts.send).mockResolvedValue({ id: "txt-1" } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.sendText({ to: "+15551234567", text: "Hello!" });
+
+    expect(ink._texts.send).toHaveBeenCalledWith(PARSED_PHONE.id, {
+      to: "+15551234567",
+      text: "Hello!",
+    });
+  });
+
+  it("sendText throws when no phone", async () => {
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
+    await expect(
+      identity.sendText({ to: "+15551234567", text: "Hello!" }),
+    ).rejects.toThrow(InkboxError);
   });
 
   it("markTextRead delegates to texts resource", async () => {

@@ -162,6 +162,26 @@ export const RAW_TEXT_MESSAGE_MMS = {
   updated_at: "2026-03-09T00:12:00Z",
 };
 
+export const RAW_TEXT_MESSAGE_OUTBOUND_QUEUED = {
+  id: "dddd4444-0000-0000-0000-0000000000ff",
+  direction: "outbound",
+  local_phone_number: "+18335794607",
+  remote_phone_number: "+15167251294",
+  text: "Hello from Inkbox",
+  type: "sms",
+  media: null,
+  is_read: true,
+  delivery_status: "queued",
+  origin: "user_initiated",
+  error_code: null,
+  error_detail: null,
+  sent_at: null,
+  delivered_at: null,
+  failed_at: null,
+  created_at: "2026-03-09T00:20:00Z",
+  updated_at: "2026-03-09T00:20:00Z",
+};
+
 export const RAW_TEXT_CONVERSATION_SUMMARY = {
   remote_phone_number: "+15167251294",
   latest_text: "Hello, is this support?",

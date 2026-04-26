@@ -28,6 +28,24 @@ class PhoneRuleMatchType(StrEnum):
     EXACT_NUMBER = "exact_number"
 
 
+class SmsDeliveryStatus(StrEnum):
+    """Carrier-facing outbound delivery lifecycle for a text message."""
+
+    QUEUED = "queued"
+    SENT = "sent"
+    DELIVERED = "delivered"
+    DELIVERY_FAILED = "delivery_failed"
+    DELIVERY_UNCONFIRMED = "delivery_unconfirmed"
+    SENDING_FAILED = "sending_failed"
+
+
+class TextMessageOrigin(StrEnum):
+    """Whether a text was user-initiated or an internal auto-reply."""
+
+    USER_INITIATED = "user_initiated"
+    AUTO_REPLY = "auto_reply"
+
+
 def _dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
@@ -175,7 +193,12 @@ class TextMediaItem:
 
 @dataclass
 class TextMessage:
-    """A text message (SMS or MMS)."""
+    """A text message (SMS or MMS).
+
+    Outbound-only lifecycle fields (``delivery_status``, ``error_code``,
+    ``error_detail``, ``sent_at``, ``delivered_at``, ``failed_at``) are
+    ``None`` on inbound rows.
+    """
 
     id: UUID
     direction: str
@@ -187,11 +210,21 @@ class TextMessage:
     is_read: bool
     created_at: datetime
     updated_at: datetime
+    delivery_status: SmsDeliveryStatus | None = None
+    origin: TextMessageOrigin = TextMessageOrigin.USER_INITIATED
+    error_code: str | None = None
+    error_detail: str | None = None
+    sent_at: datetime | None = None
+    delivered_at: datetime | None = None
+    failed_at: datetime | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextMessage:
         raw_media = d.get("media")
         media = [TextMediaItem._from_dict(m) for m in raw_media] if raw_media else None
+        # Server-shape fields are optional on inbound rows, so fall back gracefully.
+        raw_delivery = d.get("delivery_status")
+        raw_origin = d.get("origin")
         return cls(
             id=UUID(d["id"]),
             direction=d["direction"],
@@ -203,6 +236,17 @@ class TextMessage:
             is_read=d["is_read"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            delivery_status=SmsDeliveryStatus(raw_delivery) if raw_delivery else None,
+            origin=(
+                TextMessageOrigin(raw_origin)
+                if raw_origin
+                else TextMessageOrigin.USER_INITIATED
+            ),
+            error_code=d.get("error_code"),
+            error_detail=d.get("error_detail"),
+            sent_at=_dt(d.get("sent_at")),
+            delivered_at=_dt(d.get("delivered_at")),
+            failed_at=_dt(d.get("failed_at")),
         )
 
 

@@ -14,6 +14,7 @@ from inkbox._cookies import CookieJar
 from inkbox.exceptions import (
     DuplicateContactRuleError,
     InkboxAPIError,
+    RecipientBlockedError,
     RedundantContactAccessGrantError,
 )
 
@@ -139,5 +140,14 @@ def _raise_for_status(resp: httpx.Response) -> None:
             raise RedundantContactAccessGrantError(
                 status_code=resp.status_code, detail=raw_detail,
             )
+
+    if (
+        resp.status_code == 403
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "recipient_blocked"
+    ):
+        raise RecipientBlockedError(
+            status_code=resp.status_code, detail=raw_detail,
+        )
 
     raise InkboxAPIError(status_code=resp.status_code, detail=raw_detail)
