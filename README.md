@@ -44,7 +44,10 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     # Place a phone call
     call = identity.place_call(to_number="+15551234567")
 
-    # Read text messages (SMS/MMS)
+    # Send a text message (SMS/MMS)
+    identity.send_text(to="+15551234567", text="Hi from my agent!")
+
+    # Read text messages
     for t in identity.list_texts():
         print(t.remote_phone_number, t.text)
 ```
@@ -75,7 +78,10 @@ for await (const msg of identity.iterEmails()) {
 // Place a phone call
 const call = await identity.placeCall({ toNumber: "+15551234567" });
 
-// Read text messages (SMS/MMS)
+// Send a text message (SMS/MMS)
+await identity.sendText({ to: "+15551234567", text: "Hi from my agent!" });
+
+// Read text messages
 const texts = await identity.listTexts();
 for (const t of texts) {
   console.log(t.remotePhoneNumber, t.text);
@@ -100,6 +106,9 @@ inkbox email list -i my-agent --limit 10
 # Place a phone call
 inkbox phone call -i my-agent --to +15551234567
 
+# Send a text message (SMS)
+inkbox text send -i my-agent --to +15551234567 --text "Hi from my agent!"
+
 # Read text messages
 inkbox text list -i my-agent
 
@@ -111,6 +120,15 @@ inkbox vault create --name "CRM Login" --type login --username bot@crm.com --pas
 inkbox vault secrets
 inkbox vault get <secret-id>
 ```
+
+### Outbound SMS — current limits
+
+- Outbound SMS works only from **local** numbers (not toll-free).
+- **15 sends per phone number per rolling 24h.**
+- A new local number waits **~10-15 minutes** for the 10DLC campaign to propagate at the carrier; until then `phone_number.sms_status` (Python) / `phoneNumber.smsStatus` (TS) is `"pending"` and sends fail with `409 sender_sms_pending`.
+- Recipients must text **`START`** to any number in your organization to opt in. Unknown recipients fail with `403 recipient_not_opted_in`; opt-outs (`STOP`) return `403 recipient_opted_out`.
+
+**Coming soon:** toll-free SMS sending, and customer-managed 10DLC brands and campaigns to lift the per-number 24-hour limit dramatically.
 
 ---
 

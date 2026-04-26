@@ -6,6 +6,7 @@ import {
   parseRateLimitInfo,
   parsePhoneCallWithRateLimit,
   parsePhoneTranscript,
+  SmsStatus,
 } from "../../src/phone/types.js";
 import {
   RAW_PHONE_NUMBER,
@@ -32,6 +33,40 @@ describe("parsePhoneNumber", () => {
   it("null agentIdentityId for standalone number", () => {
     const n = parsePhoneNumber({ ...RAW_PHONE_NUMBER, agent_identity_id: null });
     expect(n.agentIdentityId).toBeNull();
+  });
+
+  it("parses SMS readiness fields", () => {
+    const n = parsePhoneNumber(RAW_PHONE_NUMBER);
+    expect(n.smsStatus).toBe(SmsStatus.READY);
+    expect(n.smsErrorCode).toBeNull();
+    expect(n.smsErrorDetail).toBeNull();
+    expect(n.smsReadyAt).toBeInstanceOf(Date);
+  });
+
+  it("parses SMS provisioning failure", () => {
+    const n = parsePhoneNumber({
+      ...RAW_PHONE_NUMBER,
+      sms_status: "assignment_failed",
+      sms_error_code: "tcr_campaign_rejected",
+      sms_error_detail: "Campaign brand mismatch",
+      sms_ready_at: null,
+    });
+    expect(n.smsStatus).toBe(SmsStatus.ASSIGNMENT_FAILED);
+    expect(n.smsErrorCode).toBe("tcr_campaign_rejected");
+    expect(n.smsErrorDetail).toBe("Campaign brand mismatch");
+    expect(n.smsReadyAt).toBeNull();
+  });
+
+  it("defaults smsStatus to READY when missing (legacy server)", () => {
+    const {
+      sms_status: _ss,
+      sms_error_code: _sec,
+      sms_error_detail: _sed,
+      sms_ready_at: _sra,
+      ...legacy
+    } = RAW_PHONE_NUMBER;
+    const n = parsePhoneNumber(legacy as typeof RAW_PHONE_NUMBER);
+    expect(n.smsStatus).toBe(SmsStatus.READY);
   });
 });
 

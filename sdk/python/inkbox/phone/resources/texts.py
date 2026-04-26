@@ -20,6 +20,39 @@ class TextsResource:
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
+    def send(
+        self,
+        phone_number_id: UUID | str,
+        *,
+        to: str,
+        text: str,
+    ) -> TextMessage:
+        """Send an outbound SMS from a phone number.
+
+        Args:
+            phone_number_id: UUID of the sending phone number.
+            to: E.164 destination number.
+            text: Message body (1-1600 chars, non-whitespace required).
+
+        Returns:
+            The queued ``TextMessage`` row. Final delivery state arrives via
+            the ``incoming_text_webhook_url`` configured on the sender.
+
+        Raises:
+            RecipientBlockedError: when the destination is blocked by an
+                outbound contact rule on the sender.
+            InkboxAPIError: for other 4xx/5xx errors. Stable ``error`` codes
+                live in ``error.detail["error"]`` (e.g. ``recipient_not_opted_in``,
+                ``sender_sms_pending``, ``toll_free_verification_pending``,
+                ``sender_rate_limited``, ``carrier_rate_limit``).
+        """
+        # Server selects the sender by path param, not body.
+        data = self._http.post(
+            f"/numbers/{phone_number_id}/texts",
+            json={"to": to, "text": text},
+        )
+        return TextMessage._from_dict(data)
+
     def list(
         self,
         phone_number_id: UUID | str,

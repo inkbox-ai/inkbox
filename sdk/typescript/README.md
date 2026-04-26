@@ -259,9 +259,29 @@ for (const t of hits) {
 
 ## Text Messages (SMS/MMS)
 
-Receive and read inbound text messages. Outbound SMS sending is coming soon.
+Send and receive SMS/MMS through the identity's assigned phone number.
+
+**Outbound SMS rules (read before sending):**
+
+- Outbound SMS is currently allowed only from **local** numbers, not toll-free.
+- Each sender phone number is rate-limited to **15 outbound texts per rolling 24-hour window**.
+- A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phoneNumber.smsStatus` reads `"pending"` until then, and sends will return `409 sender_sms_pending`.
+- The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`.
+
+**Coming soon:**
+
+- Toll-free SMS sending.
+- Customer-managed 10DLC brands and campaigns, which lift the per-number 24-hour limit dramatically.
 
 ```ts
+// Send an SMS. Returns a queued TextMessage; final delivery state arrives
+// via the incomingTextWebhookUrl configured on the sender.
+const sent = await identity.sendText({
+  to: "+15167251294",
+  text: "Hello from Inkbox",
+});
+console.log(sent.id, sent.deliveryStatus);   // "queued"
+
 // List text messages
 const texts = await identity.listTexts({ limit: 20 });
 for (const t of texts) {

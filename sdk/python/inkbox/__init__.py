@@ -12,6 +12,7 @@ from inkbox.exceptions import (
     InkboxAPIError,
     InkboxError,
     InkboxVaultKeyError,
+    RecipientBlockedError,
     RedundantContactAccessGrantError,
 )
 
@@ -43,9 +44,12 @@ from inkbox.phone.types import (
     PhoneRuleMatchType,
     PhoneTranscript,
     RateLimitInfo,
+    SmsDeliveryStatus,
+    SmsStatus,
     TextConversationSummary,
     TextMediaItem,
     TextMessage,
+    TextMessageOrigin,
 )
 
 # Identity types
@@ -137,6 +141,7 @@ __all__ = [
     "InkboxAPIError",
     "InkboxVaultKeyError",
     "DuplicateContactRuleError",
+    "RecipientBlockedError",
     "RedundantContactAccessGrantError",
     # Mail types
     "ContactRuleStatus",
@@ -162,9 +167,12 @@ __all__ = [
     "PhoneRuleMatchType",
     "PhoneTranscript",
     "RateLimitInfo",
+    "SmsDeliveryStatus",
+    "SmsStatus",
     "TextConversationSummary",
     "TextMediaItem",
     "TextMessage",
+    "TextMessageOrigin",
     # Identity types
     "AgentIdentitySummary",
     "IdentityMailboxCreateOptions",

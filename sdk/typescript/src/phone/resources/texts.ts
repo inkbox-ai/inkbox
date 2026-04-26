@@ -18,6 +18,34 @@ export class TextsResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
+   * Send an outbound SMS from a phone number.
+   *
+   * The returned message is in `queued` state — final delivery
+   * (`delivered`, `delivery_failed`, `delivery_unconfirmed`) arrives via
+   * the `incomingTextWebhookUrl` configured on the sender.
+   *
+   * @param phoneNumberId - UUID of the sending phone number.
+   * @param options.to - E.164 destination number.
+   * @param options.text - Message body (1-1600 chars, non-whitespace required).
+   *
+   * @throws {RecipientBlockedError} when the destination is blocked by an
+   *   outbound contact rule on the sender.
+   * @throws {InkboxAPIError} for other 4xx/5xx errors. Stable `error` codes
+   *   live on `err.detail.error`.
+   */
+  async send(
+    phoneNumberId: string,
+    options: { to: string; text: string },
+  ): Promise<TextMessage> {
+    // Sender is selected by path param, not body.
+    const data = await this.http.post<RawTextMessage>(
+      `/numbers/${phoneNumberId}/texts`,
+      { to: options.to, text: options.text },
+    );
+    return parseTextMessage(data);
+  }
+
+  /**
    * List text messages for a phone number, newest first.
    *
    * @param phoneNumberId - UUID of the phone number.

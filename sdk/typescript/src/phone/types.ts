@@ -24,6 +24,36 @@ export enum PhoneRuleMatchType {
   EXACT_NUMBER = "exact_number",
 }
 
+/**
+ * Outbound SMS provisioning readiness for a phone number.
+ *
+ * Drives whether `sendText` will be accepted by the server. `pending`
+ * means the 10DLC campaign / TFV propagation is still running on the
+ * carrier side; `ready` means the number can send SMS;
+ * `assignment_failed` means provisioning retries were exhausted.
+ */
+export enum SmsStatus {
+  PENDING = "pending",
+  READY = "ready",
+  ASSIGNMENT_FAILED = "assignment_failed",
+}
+
+/** Carrier-facing outbound delivery lifecycle for a text message. */
+export enum SmsDeliveryStatus {
+  QUEUED = "queued",
+  SENT = "sent",
+  DELIVERED = "delivered",
+  DELIVERY_FAILED = "delivery_failed",
+  DELIVERY_UNCONFIRMED = "delivery_unconfirmed",
+  SENDING_FAILED = "sending_failed",
+}
+
+/** Whether a text was user-initiated or an internal auto-reply. */
+export enum TextMessageOrigin {
+  USER_INITIATED = "user_initiated",
+  AUTO_REPLY = "auto_reply",
+}
+
 export interface PhoneNumber {
   id: string;
   number: string;
@@ -31,6 +61,13 @@ export interface PhoneNumber {
   type: string;
   /** "active" | "paused" | "released" */
   status: string;
+  /** Outbound SMS readiness — gate `sendText` on `ready`. */
+  smsStatus: SmsStatus;
+  /** Last carrier-reported error code from SMS provisioning, if any. */
+  smsErrorCode: string | null;
+  smsErrorDetail: string | null;
+  /** Timestamp when the number first transitioned into `ready`. */
+  smsReadyAt: Date | null;
   /** "auto_accept" | "auto_reject" | "webhook" */
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
@@ -119,6 +156,14 @@ export interface TextMessage {
   type: string;
   media: TextMediaItem[] | null;
   isRead: boolean;
+  /** Outbound delivery lifecycle. `null` on inbound rows. */
+  deliveryStatus: SmsDeliveryStatus | null;
+  origin: TextMessageOrigin;
+  errorCode: string | null;
+  errorDetail: string | null;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  failedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -140,6 +185,10 @@ export interface RawPhoneNumber {
   number: string;
   type: string;
   status: string;
+  sms_status?: string;
+  sms_error_code?: string | null;
+  sms_error_detail?: string | null;
+  sms_ready_at?: string | null;
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_call_webhook_url: string | null;
@@ -206,6 +255,13 @@ export interface RawTextMessage {
   type: string;
   media: RawTextMediaItem[] | null;
   is_read: boolean;
+  delivery_status?: string | null;
+  origin?: string;
+  error_code?: string | null;
+  error_detail?: string | null;
+  sent_at?: string | null;
+  delivered_at?: string | null;
+  failed_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -238,6 +294,12 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     number: r.number,
     type: r.type,
     status: r.status,
+    // Default to READY for backwards compatibility with older server
+    // responses that predate the sms_status field.
+    smsStatus: (r.sms_status as SmsStatus) ?? SmsStatus.READY,
+    smsErrorCode: r.sms_error_code ?? null,
+    smsErrorDetail: r.sms_error_detail ?? null,
+    smsReadyAt: r.sms_ready_at ? new Date(r.sms_ready_at) : null,
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
@@ -333,6 +395,15 @@ export function parseTextMessage(r: RawTextMessage): TextMessage {
     type: r.type,
     media: r.media ? r.media.map(parseTextMediaItem) : null,
     isRead: r.is_read,
+    deliveryStatus: r.delivery_status
+      ? (r.delivery_status as SmsDeliveryStatus)
+      : null,
+    origin: (r.origin as TextMessageOrigin) ?? TextMessageOrigin.USER_INITIATED,
+    errorCode: r.error_code ?? null,
+    errorDetail: r.error_detail ?? null,
+    sentAt: r.sent_at ? new Date(r.sent_at) : null,
+    deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,
+    failedAt: r.failed_at ? new Date(r.failed_at) : null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

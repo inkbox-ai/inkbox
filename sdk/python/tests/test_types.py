@@ -16,6 +16,7 @@ from inkbox.phone.types import (
     PhoneNumber,
     PhoneCall,
     PhoneTranscript,
+    SmsStatus,
 )
 
 
@@ -37,6 +38,32 @@ class TestPhoneNumberParsing:
     def test_agent_identity_id_nullable(self):
         n = PhoneNumber._from_dict({**PHONE_NUMBER_DICT, "agent_identity_id": None})
         assert n.agent_identity_id is None
+
+    def test_sms_readiness_fields(self):
+        n = PhoneNumber._from_dict(PHONE_NUMBER_DICT)
+        assert n.sms_status is SmsStatus.READY
+        assert n.sms_error_code is None
+        assert n.sms_error_detail is None
+        assert isinstance(n.sms_ready_at, datetime)
+
+    def test_sms_pending_with_error(self):
+        n = PhoneNumber._from_dict({
+            **PHONE_NUMBER_DICT,
+            "sms_status": "assignment_failed",
+            "sms_error_code": "tcr_campaign_rejected",
+            "sms_error_detail": "Campaign brand mismatch",
+            "sms_ready_at": None,
+        })
+        assert n.sms_status is SmsStatus.ASSIGNMENT_FAILED
+        assert n.sms_error_code == "tcr_campaign_rejected"
+        assert n.sms_error_detail == "Campaign brand mismatch"
+        assert n.sms_ready_at is None
+
+    def test_sms_status_defaults_to_ready_when_missing(self):
+        # Backwards-compat with older server responses pre-sms_status.
+        legacy = {k: v for k, v in PHONE_NUMBER_DICT.items() if not k.startswith("sms_")}
+        n = PhoneNumber._from_dict(legacy)
+        assert n.sms_status is SmsStatus.READY
 
 
 class TestPhoneCallParsing:

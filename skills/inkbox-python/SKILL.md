@@ -172,7 +172,22 @@ for t in identity.list_transcripts(calls[0].id):
 
 ## Text Messages (SMS/MMS)
 
+**Outbound SMS limits and gates (current):**
+
+- Allowed only from **local** numbers, not toll-free.
+- **15 outbound sends per phone number per rolling 24h.**
+- New local numbers need **~10-15 min** for 10DLC carrier propagation. `identity.phone_number.sms_status` is `SmsStatus.PENDING` until ready; sends in this window return `409 sender_sms_pending`.
+- Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`.
+
+**Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
+
 ```python
+# Send an SMS from this identity's phone number.
+# Returns a queued TextMessage; final delivery state arrives via the
+# incoming_text_webhook_url configured on the sender.
+sent = identity.send_text(to="+15167251294", text="Hello from Inkbox")
+print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
+
 # List text messages (offset pagination)
 texts = identity.list_texts(limit=20, offset=0)
 for t in texts:

@@ -167,7 +167,20 @@ inkbox phone search-transcripts -i <handle>  # Search transcripts
 
 Text message (SMS/MMS) operations, scoped to an identity. Requires `-i <handle>`.
 
+**Outbound SMS rules:**
+
+- Allowed only from **local** numbers (not toll-free).
+- **15 sends per phone number per rolling 24h** — exceeded sends return `429 sender_rate_limited`.
+- A freshly provisioned local number needs **~10-15 minutes** for 10DLC carrier propagation. Check `inkbox number get <id>`: send is gated until `smsStatus` reaches `ready`.
+- Recipients must opt in by texting **`START`** to any number in your organization. Unknown recipients fail with `403 recipient_not_opted_in`; opt-outs (`STOP`) return `403 recipient_opted_out`.
+
+**Coming soon:** toll-free SMS sending, and customer-managed 10DLC brands/campaigns to lift the per-number limit.
+
 ```bash
+inkbox text send -i <handle>                # Send an outbound SMS
+  --to <e164>                               #   E.164 destination (required)
+  --text <body>                             #   Message body, 1-1600 chars (required)
+
 inkbox text list -i <handle>                # List text messages
   --limit <n>                               #   Max results (default: 50)
   --offset <n>                              #   Pagination offset (default: 0)

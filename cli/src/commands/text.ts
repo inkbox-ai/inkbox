@@ -9,6 +9,39 @@ export function registerTextCommands(program: Command): void {
     .description("Text message (SMS/MMS) operations (identity-scoped)");
 
   text
+    .command("send")
+    .description("Send an outbound SMS from this identity's phone number")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .requiredOption("--to <number>", "E.164 destination number (e.g. +15551234567)")
+    .requiredOption("--text <text>", "Message body (1-1600 chars)")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity: string; to: string; text: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const msg = await identity.sendText({
+          to: cmdOpts.to,
+          text: cmdOpts.text,
+        });
+        output(
+          {
+            id: msg.id,
+            direction: msg.direction,
+            local: msg.localPhoneNumber,
+            remote: msg.remotePhoneNumber,
+            text: msg.text,
+            deliveryStatus: msg.deliveryStatus,
+            createdAt: msg.createdAt,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  text
     .command("list")
     .description("List text messages")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

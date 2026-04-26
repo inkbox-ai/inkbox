@@ -54,6 +54,22 @@ export class RedundantContactAccessGrantError extends InkboxAPIError {
   }
 }
 
+export class RecipientBlockedError extends InkboxAPIError {
+  /** UUID of the matched rule, or `null` if blocked by `filter_mode` default. */
+  readonly matchedRuleId: string | null;
+  readonly address: string;
+  readonly reason: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "RecipientBlockedError";
+    const raw = detail["matched_rule_id"];
+    this.matchedRuleId = raw === null || raw === undefined ? null : String(raw);
+    this.address = String(detail["address"] ?? "");
+    this.reason = String(detail["reason"] ?? "");
+  }
+}
+
 function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail): never {
   if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
     if ("existing_rule_id" in rawDetail) {
@@ -62,6 +78,14 @@ function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail):
     if (rawDetail["error"] === "redundant_grant") {
       throw new RedundantContactAccessGrantError(status, rawDetail);
     }
+  }
+  if (
+    status === 403
+    && typeof rawDetail === "object"
+    && rawDetail !== null
+    && rawDetail["error"] === "recipient_blocked"
+  ) {
+    throw new RecipientBlockedError(status, rawDetail);
   }
   throw new InkboxAPIError(status, rawDetail);
 }
