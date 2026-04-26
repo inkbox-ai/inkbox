@@ -248,9 +248,14 @@ for t in hits:
 
 ## Text Messages (SMS/MMS)
 
-Receive and read inbound text messages. Outbound SMS sending is coming soon.
+Send and receive SMS/MMS through the identity's assigned phone number.
 
 ```python
+# Send an SMS. Returns a queued TextMessage; final delivery state arrives
+# via the incoming_text_webhook_url configured on the sender.
+sent = identity.send_text(to="+15167251294", text="Hello from Inkbox")
+print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
+
 # List text messages
 texts = identity.list_texts(limit=20)
 for t in texts:

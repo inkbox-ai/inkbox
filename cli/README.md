@@ -168,6 +168,10 @@ inkbox phone search-transcripts -i <handle>  # Search transcripts
 Text message (SMS/MMS) operations, scoped to an identity. Requires `-i <handle>`.
 
 ```bash
+inkbox text send -i <handle>                # Send an outbound SMS
+  --to <e164>                               #   E.164 destination (required)
+  --text <body>                             #   Message body, 1-1600 chars (required)
+
 inkbox text list -i <handle>                # List text messages
   --limit <n>                               #   Max results (default: 50)
   --offset <n>                              #   Pagination offset (default: 0)
