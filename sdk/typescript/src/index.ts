@@ -54,6 +54,7 @@ export {
   PhoneRuleAction,
   PhoneRuleMatchType,
   SmsDeliveryStatus,
+  SmsStatus,
   TextMessageOrigin,
 } from "./phone/types.js";
 export type {

@@ -12,6 +12,7 @@ from typing import Any, Literal
 from uuid import UUID
 
 from inkbox.mail.types import FilterMode, FilterModeChangeNotice
+from inkbox.phone.types import SmsStatus
 
 
 @dataclass
@@ -138,18 +139,26 @@ class IdentityPhoneNumber:
 
     ``agent_identity_id`` mirrors the same field on :class:`PhoneNumber`;
     on the embedded variant it always equals the owning identity's ID.
+
+    SMS-readiness fields (``sms_status``, ``sms_error_code``,
+    ``sms_error_detail``, ``sms_ready_at``) mirror the same fields on
+    :class:`PhoneNumber` and reflect 10DLC / TFV provisioning progress.
     """
 
     id: UUID
     number: str
     type: str
     status: str
+    sms_status: SmsStatus
     incoming_call_action: str
     client_websocket_url: str | None
     incoming_text_webhook_url: str | None
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    sms_error_code: str | None = None
+    sms_error_detail: str | None = None
+    sms_ready_at: datetime | None = None
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
@@ -157,17 +166,25 @@ class IdentityPhoneNumber:
     def _from_dict(cls, d: dict[str, Any]) -> IdentityPhoneNumber:
         notice = d.get("filter_mode_change_notice")
         agent_identity_id = d.get("agent_identity_id")
+        raw_sms_status = d.get("sms_status")
+        raw_sms_ready_at = d.get("sms_ready_at")
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
             type=d["type"],
             status=d["status"],
+            sms_status=SmsStatus(raw_sms_status) if raw_sms_status else SmsStatus.READY,
             incoming_call_action=d["incoming_call_action"],
             client_websocket_url=d.get("client_websocket_url"),
             incoming_text_webhook_url=d.get("incoming_text_webhook_url"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            sms_error_code=d.get("sms_error_code"),
+            sms_error_detail=d.get("sms_error_detail"),
+            sms_ready_at=(
+                datetime.fromisoformat(raw_sms_ready_at) if raw_sms_ready_at else None
+            ),
             agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
             filter_mode_change_notice=(
                 FilterModeChangeNotice._from_dict(notice) if notice else None

@@ -11,6 +11,7 @@ import {
   FilterMode as FilterModeEnum,
   parseFilterModeChangeNotice,
 } from "../mail/types.js";
+import { SmsStatus } from "../phone/types.js";
 
 export interface IdentityMailboxCreateOptions {
   displayName?: string;
@@ -56,6 +57,11 @@ export interface IdentityPhoneNumber {
   type: string;
   /** "active" | "paused" | "released" */
   status: string;
+  /** Outbound SMS readiness — gate `sendText` on `ready`. */
+  smsStatus: SmsStatus;
+  smsErrorCode: string | null;
+  smsErrorDetail: string | null;
+  smsReadyAt: Date | null;
   /** "auto_accept" | "auto_reject" | "webhook" */
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
@@ -108,6 +114,10 @@ export interface RawIdentityPhoneNumber {
   number: string;
   type: string;
   status: string;
+  sms_status?: string;
+  sms_error_code?: string | null;
+  sms_error_detail?: string | null;
+  sms_ready_at?: string | null;
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_text_webhook_url: string | null;
@@ -155,6 +165,10 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     number: r.number,
     type: r.type,
     status: r.status,
+    smsStatus: (r.sms_status as SmsStatus) ?? SmsStatus.READY,
+    smsErrorCode: r.sms_error_code ?? null,
+    smsErrorDetail: r.sms_error_detail ?? null,
+    smsReadyAt: r.sms_ready_at ? new Date(r.sms_ready_at) : null,
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingTextWebhookUrl: r.incoming_text_webhook_url ?? null,

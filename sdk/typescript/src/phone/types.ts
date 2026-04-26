@@ -24,6 +24,20 @@ export enum PhoneRuleMatchType {
   EXACT_NUMBER = "exact_number",
 }
 
+/**
+ * Outbound SMS provisioning readiness for a phone number.
+ *
+ * Drives whether `sendText` will be accepted by the server. `pending`
+ * means the 10DLC campaign / TFV propagation is still running on the
+ * carrier side; `ready` means the number can send SMS;
+ * `assignment_failed` means provisioning retries were exhausted.
+ */
+export enum SmsStatus {
+  PENDING = "pending",
+  READY = "ready",
+  ASSIGNMENT_FAILED = "assignment_failed",
+}
+
 /** Carrier-facing outbound delivery lifecycle for a text message. */
 export enum SmsDeliveryStatus {
   QUEUED = "queued",
@@ -47,6 +61,13 @@ export interface PhoneNumber {
   type: string;
   /** "active" | "paused" | "released" */
   status: string;
+  /** Outbound SMS readiness — gate `sendText` on `ready`. */
+  smsStatus: SmsStatus;
+  /** Last carrier-reported error code from SMS provisioning, if any. */
+  smsErrorCode: string | null;
+  smsErrorDetail: string | null;
+  /** Timestamp when the number first transitioned into `ready`. */
+  smsReadyAt: Date | null;
   /** "auto_accept" | "auto_reject" | "webhook" */
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
@@ -164,6 +185,10 @@ export interface RawPhoneNumber {
   number: string;
   type: string;
   status: string;
+  sms_status?: string;
+  sms_error_code?: string | null;
+  sms_error_detail?: string | null;
+  sms_ready_at?: string | null;
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_call_webhook_url: string | null;
@@ -269,6 +294,12 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     number: r.number,
     type: r.type,
     status: r.status,
+    // Default to READY for backwards compatibility with older server
+    // responses that predate the sms_status field.
+    smsStatus: (r.sms_status as SmsStatus) ?? SmsStatus.READY,
+    smsErrorCode: r.sms_error_code ?? null,
+    smsErrorDetail: r.sms_error_detail ?? null,
+    smsReadyAt: r.sms_ready_at ? new Date(r.sms_ready_at) : null,
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
