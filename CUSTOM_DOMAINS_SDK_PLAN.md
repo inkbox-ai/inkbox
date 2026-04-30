@@ -38,21 +38,31 @@ now — see "Out of scope" at the end.
 | Endpoint | Purpose | Auth |
 |---|---|---|
 | `GET /api/v1/domains` (optional `?status=verified`) | list domains | any API key / JWT |
-| `POST /api/v1/domains/{domain_name}/set-default` | set org default; pass `inkboxmail.com` to clear | **admin-scoped API key** or JWT org admin |
+| `POST /api/v1/domains/{domain_name}/set-default` | set org default; pass the platform sending domain (e.g. `inkboxmail.com` in prod) to clear | **admin-scoped API key** or JWT org admin |
 | `POST /api/v1/mail/mailboxes` with `sending_domain_id` | create standalone mailbox on a chosen domain | any API key |
 | `POST /api/v1/identities` with `mailbox.sending_domain` | create identity + nested mailbox on a chosen domain | any API key |
 
-Domain-selection semantics (apply equally to both mailbox-create paths, just
-under different field names):
+Domain-selection semantics (apply to both mailbox-create paths, with one
+caveat — see below):
 - **Omitted** → uses org's verified default, falls back to platform.
-- **`null`** → forces platform domain (`inkboxmail.com`), ignoring org default.
-- **String value** → must belong to org and be verified, else 404/409.
+- **`null`** → forces platform sending domain, ignoring org default.
+- **String value** → must belong to org, else 404.
 
 The standalone endpoint takes the **id** (`sending_domain_id`); the identity
 endpoint takes the **bare domain name** (`sending_domain`). This asymmetry is
 intentional on the server and the SDK should mirror it under two distinct
 option names rather than papering over it. Magic-string acceptance ("does this
 look like an id or a name?") is a worse footgun than two clearly-typed fields.
+
+**Error-semantics caveat:** the standalone path goes through
+`resolve_sending_domain` (`mailbox_create.py:89-199`) and rejects
+non-`VERIFIED` domains with 409. The identity path
+(`agent_identity_subapp.py:603-637`) filters on `ownership_validated = True`
+instead of `status == VERIFIED` — so a row that's ownership-validated but not
+yet verified would be accepted by the identity path and rejected by the
+standalone path. Don't promise identical errors in SDK docstrings; describe
+each path's behavior separately or just say "must belong to your org and be
+selectable for sending."
 
 Both nullable-vs-missing cases must round-trip correctly through the SDK.
 Naive `if (opts.sendingDomainId) body.sending_domain_id = ...` collapses `null`
@@ -85,26 +95,53 @@ file lives — but the public accessor is flat. Implementation file paths:
 - Python: `sdk/python/inkbox/mail/resources/domains.py` → `DomainsResource`
 
 Wire-up:
-- TS: build a transport in `Inkbox` constructor (alongside `mailHttp`,
-  `phoneHttp`, etc.) rooted at `${apiRoot}/domains`. Construct
-  `DomainsResource(domainsHttp)`. Expose `get domains()`.
-- Python: same — build `self._domains_http` rooted at `<api_root>/domains`,
-  construct `self._domains = DomainsResource(self._domains_http)`, expose
-  `@property def domains(self)`.
+- TS: declare `readonly _domains: DomainsResource` on the class body next to
+  `_mailboxes` (`inkbox.ts:109`); build `domainsHttp` rooted at
+  `${apiRoot}/domains` in the constructor; assign `this._domains = ...`;
+  expose via `get domains(): DomainsResource`. Match the existing
+  `_mailboxes` / `_numbers` pattern verbatim — easy to miss the field
+  declaration in a tired PR.
+- Python: same — build `self._domains_http` in `__init__`, construct
+  `self._domains = DomainsResource(self._domains_http)`, expose
+  `@property def domains(self)`. **Add `self._domains_http.close()` to
+  `client.close()`** (`client.py:182-188`) alongside the other transports;
+  forgetting this leaks connection pools.
+
+### Package exports
+
+New types must be added to the public exports or callers can call
+`inkbox.domains` but can't import the returned object types.
+
+- TS: `sdk/typescript/src/index.ts` — add `Domain`, `SendingDomainStatus`
+  exports alongside `Mailbox` / `IdentityMailbox`. (`SetDefaultResult` is no
+  longer needed — see method signatures below.)
+- Python: `sdk/python/inkbox/__init__.py` — add `Domain`, `SendingDomainStatus`
+  to the existing import block.
+
+Type files: place `Domain` / `SendingDomainStatus` in a new
+`mail/types.ts` block (or `mail/domain_types.ts` if cleaner) and the Python
+equivalent in `inkbox/mail/types.py`. Co-locating with `Mailbox` is fine
+since they're conceptually paired.
 
 ### Methods (both SDKs, same shape)
 
 ```ts
 // TS
 inkbox.domains.list(opts?: { status?: SendingDomainStatus }): Promise<Domain[]>
-inkbox.domains.setDefault(domainName: string): Promise<{ defaultDomain: string | null }>
+inkbox.domains.setDefault(domainName: string): Promise<string | null>
 ```
 
 ```python
 # Python
 client.domains.list(*, status: SendingDomainStatus | None = None) -> list[Domain]
-client.domains.set_default(domain_name: str) -> SetDefaultResult
+client.domains.set_default(domain_name: str) -> str | None
 ```
+
+`setDefault` returns the bare new default domain (or `null` if the platform
+default was reinstated). The server's `SetDefaultResponse` (`domains.py:285-297`)
+is a single-field model wrapping `default_domain: str | None` — wrapping it in
+an SDK object adds ceremony for one nullable string. If the response shape
+ever grows, expand the SDK return type then.
 
 `SendingDomainStatus` is an enum/literal union. Values transplanted verbatim
 from `~/servers/src/data_models/sending_domain.py:16-52`:
@@ -162,8 +199,10 @@ time in case states have been added since this plan was written.
 
 `setDefault` docstring must call out:
 - Pass the **bare domain name** (e.g. `"mail.acme.com"`), not the id.
-- Pass `"inkboxmail.com"` (the platform default sending domain) to clear and
-  revert to platform default.
+- Pass the **platform sending domain for the target environment** (e.g.
+  `"inkboxmail.com"` in production) to clear the org default and revert to
+  the platform domain. The server only clears when the path matches its
+  configured platform domain, which varies by env.
 - Requires an **admin-scoped API key**. The server returns 403 otherwise — let
   that surface as the SDK's normal auth error; do not pre-check client-side.
 
@@ -185,14 +224,12 @@ The SDK exposes a deliberately narrowed projection — explicit allowlist, not
 | `status` | `status` | `SendingDomainStatus` |
 | `isDefault` / `is_default` | `is_default` | |
 | `verifiedAt` / `verified_at` | `verified_at` | nullable |
-| `failureReason` / `failure_reason` | `failure_reason` | nullable; useful for diagnosing terminal states |
-| `lastCheckedAt` / `last_checked_at` | `last_checked_at` | nullable; useful for polling UIs |
 
 Excluded: `organization_id` (implied by API key), `mail_from_subdomain`
 (always `"mail"` in v1), `dkim_selector` and `ownership_token` (operational
-detail customers don't need from the SDK to send mail).
-
-If callers later ask for the excluded fields, add them — but start small.
+detail), and diagnostic fields `failure_reason` / `last_checked_at` (the
+console is where users debug stuck domains; SDK callers don't need them for
+sending mail). Start skinny — add fields when callers ask for them.
 
 ### Mailbox create signature — standalone
 
@@ -221,13 +258,44 @@ def create(
 ### Identity create signature — nested mailbox
 
 `POST /v1/identities` carries a `mailbox` sub-object with `sending_domain`
-(bare name, not id). Update `IdentityMailboxCreateOptions` accordingly:
+(bare name, not id). This change has three coordinated pieces; missing any one
+will leak the field at one layer of the SDK and hide it at another.
+
+**(a) `IdentityMailboxCreateOptions`:**
 - TS: `sdk/typescript/src/identities/types.ts:16` — add `sendingDomain?: string | null;`
 - Python: `sdk/python/inkbox/identities/types.py:18` — add
   `sending_domain: str | None = _UNSET` (using the same sentinel pattern).
 
-**Do not** add `sendingDomainId` here. The two paths use different field names
-because the server does — keep them aligned.
+**(b) `to_wire` / `identityMailboxCreateOptionsToWire` — must preserve `null`.**
+Current TS impl returns `Record<string, string>` (`identities/types.ts:205-211`)
+and Python `to_wire()` returns `dict[str, str]` (`identities/types.py:33`).
+Both must widen the return type to allow `null` (TS: `Record<string, unknown>`;
+Python: `dict[str, Any]`) and gate on presence rather than truthiness:
+```ts
+if ("sendingDomain" in options) body["sending_domain"] = options.sendingDomain;
+```
+```python
+if self.sending_domain is not _UNSET:
+    body["sending_domain"] = self.sending_domain
+```
+
+**(c) `Inkbox.createIdentity` / `Inkbox.create_identity` high-level helpers.**
+This is the actual public API most users call. Currently `inkbox.ts:254-274`
+synthesizes the nested mailbox from only `displayName` / `emailLocalPart`,
+and `client.py:234-280` does the same. Both also infer "create a mailbox"
+when either of those is provided. Without changes here, `IdentityMailboxCreateOptions`
+gets a field nobody can pass through the front door.
+
+Required updates:
+- TS — `CreateIdentityOptions`: add `sendingDomain?: string | null;` Pass it
+  through to the synthesized mailbox object. Update the gate to also imply
+  mailbox creation when `"sendingDomain" in options`.
+- Python — `create_identity` kwargs: add `sending_domain: str | None = _UNSET`.
+  Pass through to `IdentityMailboxCreateOptions`. Update the gate to imply
+  mailbox creation when `sending_domain is not _UNSET`.
+
+**Do not** add `sendingDomainId` to the identity path. The two paths use
+different field names because the server does — keep them aligned.
 
 ### Mailbox response — parse `sending_domain`
 
@@ -237,26 +305,45 @@ after default resolution. Callers need this to confirm which domain a mailbox
 landed on (especially when they omitted the field and inherited the org
 default).
 
-Update the SDK `Mailbox` type and parser:
-- TS: `sdk/typescript/src/mail/types.ts` — add `sendingDomain: string` to
-  `Mailbox` and map it in `parseMailbox`.
-- Python: `sdk/python/inkbox/mail/types.py` — add `sending_domain: str` to the
-  `Mailbox` dataclass/model.
+The identity-detail response (`agent_identity.py:235`) types its nested
+mailbox as `MailboxResponse | None` — i.e. the same `MailboxResponse` shape
+used by the standalone endpoint, so `sending_domain` is on the wire there
+too.
 
-Apply the same change to the identity-mailbox response shape if it has its
-own type (verify during implementation).
+Update the SDK types and parsers:
+- TS: `sdk/typescript/src/mail/types.ts:169` — add `sending_domain?: string`
+  to `RawMailbox`; in `parseMailbox`, set `sendingDomain` to
+  `r.sending_domain ?? r.email_address.split("@")[1] ?? ""`. Mirror to the
+  exposed `Mailbox` type. The `?` and fallback exist so old test fixtures
+  built without `sending_domain` still parse — server responses always
+  populate it via `_derive_sending_domain` (`mailbox.py:182`), so the
+  fallback is belt-and-suspenders for tests.
+- TS: `sdk/typescript/src/identities/types.ts:101,147` — same change to
+  `RawIdentityMailbox` and `parseIdentityMailbox`, exposing on
+  `IdentityMailbox` (line 38).
+- Python: `sdk/python/inkbox/mail/types.py` — add `sending_domain: str` to
+  the `Mailbox` dataclass; in `_from_dict`, fall back to
+  `d["email_address"].split("@", 1)[1]` when the key is missing.
+- Python: `sdk/python/inkbox/identities/types.py:101,118` — same change to
+  `IdentityMailbox` and its `_from_dict`.
 
 ### Tests
 
 - TS: add unit tests next to existing mailbox/numbers tests covering
   (a) `domains.list()` passes through `?status=`,
-  (b) `domains.setDefault()` posts to the right URL and parses the response,
+  (b) `domains.setDefault()` posts to the right URL and returns the bare
+      string-or-null,
   (c) `mailboxes.create()` serializes `sendingDomainId` correctly for the
       three cases: omitted, `null`, string,
-  (d) identity create serializes `sendingDomain` (name, not id) correctly for
-      the same three cases,
-  (e) `parseMailbox` reads `sending_domain` off the response.
-- Python: parallel tests under `sdk/python/tests/`.
+  (d) `Inkbox.createIdentity` (the high-level helper, not just
+      `identityMailboxCreateOptionsToWire`) serializes `sendingDomain` for
+      omitted / null / string and triggers mailbox creation when only
+      `sendingDomain` is set,
+  (e) `parseMailbox` reads `sending_domain` off the response and falls back
+      to `email_address` split when absent (compat for old fixtures),
+  (f) `parseIdentityMailbox` reads `sending_domain` with the same fallback.
+- Python: parallel tests under `sdk/python/tests/`, including coverage of
+  `create_identity(..., sending_domain=...)` round-tripping null/omitted/string.
 - No live integration tests — server already has
   `tests/api_integration/test_domains_lifecycle.py`.
 
@@ -282,17 +369,13 @@ contract (`agent_signup.py`) has no `mailbox` sub-object and no
 `sending_domain` field — signup is fixed to the platform domain. An earlier
 draft of this plan was wrong about that.
 
-## CLI (open question — recommend deferring)
+## CLI
 
-The CLI currently has no domain commands (`cli/src/commands/mailbox.ts:207`).
-Adding them is straightforward but out of the user's stated scope. Suggest:
-
-- **Defer**: ship SDK + skills now; do CLI in a follow-up.
-- **If we do it**: add `inkbox domain list`, `inkbox domain set-default <name>`,
-  `--domain <id>` flag on `inkbox mailbox create`, and `--domain <name>` flag
-  on identity create. Update `skills/inkbox-cli/SKILL.md` line 246.
-
-Will confirm before touching CLI.
+CLI is out of scope for this work; will be a follow-up if requested. The CLI
+currently has no domain commands (`cli/src/commands/mailbox.ts:207`). When
+we do it: add `inkbox domain list`, `inkbox domain set-default <name>`,
+`--domain <id>` flag on `inkbox mailbox create`, and `--domain <name>` flag
+on identity create. Update `skills/inkbox-cli/SKILL.md` line 246.
 
 ## Out of scope (console-only for now)
 
@@ -304,11 +387,15 @@ little by wrapping them now. Easy to add later if requested.
 ## Suggested PR breakdown
 
 1. **PR 1** — TS + Python `domains` resource (`list`, `setDefault`),
-   `Domain` type, `Mailbox.sendingDomain` parsing, `sendingDomainId` on
-   `mailboxes.create()`, `sendingDomain` on identity create + tests. Folded
-   together because PR 1 (resource only) is shippable but useless until the
-   mailbox-side wiring lands; users can't actually attach a mailbox to a
-   non-default domain without it.
+   `Domain` + `SendingDomainStatus` types and exports, `Mailbox.sendingDomain`
+   + `IdentityMailbox.sendingDomain` parsing (with fallback), `sendingDomainId`
+   on `mailboxes.create()`, `sendingDomain` on `IdentityMailboxCreateOptions`
+   **and** on `Inkbox.createIdentity` / `create_identity` helpers,
+   null-preserving serializers for the identity path, `_domains_http.close()`
+   in Python `client.close()`, plus tests. Folded together because PR 1
+   (resource only) is shippable but useless until the mailbox-side wiring
+   lands; users can't actually attach a mailbox to a non-default domain
+   without it.
 2. **PR 2** — Skill doc updates (inkbox-ts, inkbox-python, inkbox-openclaw,
    inkbox-all if applicable).
 3. **PR 3 (optional)** — CLI `domain list` / `domain set-default` /
@@ -330,3 +417,15 @@ little by wrapping them now. Easy to add later if requested.
   existing `_UNSET = object()` sentinel.
 - **Typed 409 for `default_domain_unavailable`**: skipped — surface as a
   generic API error.
+- **`setDefault` return type**: bare `string | null` / `str | None`, not a
+  wrapped `SetDefaultResult` object. Server response has one nullable field;
+  ceremony not warranted.
+- **Identity-vs-standalone error semantics**: not identical. Standalone
+  rejects non-`VERIFIED`; identity accepts `ownership_validated = True` even
+  if not yet `VERIFIED`. Document each path's behavior separately rather
+  than promising parity.
+- **Identity-mailbox response shape**: server already includes `sending_domain`
+  (typed as `MailboxResponse`) — SDK just needs to parse it on `IdentityMailbox`.
+- **High-level identity helpers** (`createIdentity` / `create_identity`):
+  must also accept `sendingDomain` / `sending_domain`; presence implies
+  mailbox creation, matching how `displayName` / `emailLocalPart` already do.
