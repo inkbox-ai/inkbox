@@ -106,8 +106,59 @@ client.domains.list(*, status: SendingDomainStatus | None = None) -> list[Domain
 client.domains.set_default(domain_name: str) -> SetDefaultResult
 ```
 
-`SendingDomainStatus` is an enum/literal union. Take the values from
-`~/servers/src/data_models/sending_domain.py` to avoid drift.
+`SendingDomainStatus` is an enum/literal union. Values transplanted verbatim
+from `~/servers/src/data_models/sending_domain.py:16-52`:
+
+| Value | Meaning |
+|---|---|
+| `not_started` | Row exists but no provisioning work has begun. Brief transitional state. |
+| `awaiting_ownership` | Waiting for the customer to publish `inkbox-ownership.<domain>` TXT before we'll call SES. |
+| `pending` | Ownership confirmed and SES identity provisioned; DNS records issued but haven't propagated. |
+| `dns_invalid` | DNS records resolve but values disagree with what we asked the customer to publish. |
+| `verifying` | DNS resolves correctly; SES is still verifying. |
+| `verified` | Active, healthy, ready to send and receive. |
+| `failed` | 72h verification window elapsed without success. Purged after 7 days. |
+| `pending_dkim_rotation` | DKIM rotation in flight — new selector in DNS, old key still active in SES. |
+| `degraded` | Previously-verified row regressed; one or more required records no longer match. Re-verifies on next poller pass. |
+| `pending_deletion` | Customer initiated DELETE; reversible for 24h before hard-delete. |
+
+TS shape — string-literal union (the SDK uses literal unions over enums for
+JSON-friendly wire compatibility):
+
+```ts
+export type SendingDomainStatus =
+  | "not_started"
+  | "awaiting_ownership"
+  | "pending"
+  | "dns_invalid"
+  | "verifying"
+  | "verified"
+  | "failed"
+  | "pending_dkim_rotation"
+  | "degraded"
+  | "pending_deletion";
+```
+
+Python shape — `StrEnum`, mirroring server:
+
+```python
+from enum import StrEnum
+
+class SendingDomainStatus(StrEnum):
+    NOT_STARTED = "not_started"
+    AWAITING_OWNERSHIP = "awaiting_ownership"
+    PENDING = "pending"
+    DNS_INVALID = "dns_invalid"
+    VERIFYING = "verifying"
+    VERIFIED = "verified"
+    FAILED = "failed"
+    PENDING_DKIM_ROTATION = "pending_dkim_rotation"
+    DEGRADED = "degraded"
+    PENDING_DELETION = "pending_deletion"
+```
+
+Verify against `~/servers/src/data_models/sending_domain.py` at implementation
+time in case states have been added since this plan was written.
 
 `setDefault` docstring must call out:
 - Pass the **bare domain name** (e.g. `"mail.acme.com"`), not the id.
