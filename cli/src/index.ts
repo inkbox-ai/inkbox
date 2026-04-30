@@ -14,6 +14,7 @@ import { registerSigningKeyCommands } from "./commands/signing-key.js";
 import { registerWebhookCommands } from "./commands/webhook.js";
 import { registerContactsCommands } from "./commands/contacts.js";
 import { registerNotesCommands } from "./commands/notes.js";
+import { registerDomainCommands } from "./commands/domain.js";
 
 const program = new Command()
   .name("inkbox")
@@ -37,5 +38,6 @@ registerSigningKeyCommands(program);
 registerWebhookCommands(program);
 registerContactsCommands(program);
 registerNotesCommands(program);
+registerDomainCommands(program);
 
 program.parse();

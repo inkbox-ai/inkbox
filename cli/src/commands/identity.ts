@@ -48,11 +48,33 @@ export function registerIdentityCommands(program: Command): void {
   identity
     .command("create <handle>")
     .description("Create a new identity")
+    .option(
+      "--sending-domain <name>",
+      "Bare verified custom domain name to use for the agent's mailbox (e.g. 'mail.acme.com'). Implies mailbox creation.",
+    )
+    .option(
+      "--platform-domain",
+      "Force the platform sending domain for the mailbox (implies mailbox creation)",
+      false,
+    )
     .action(
-      withErrorHandler(async function (this: Command, handle: string) {
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { sendingDomain?: string; platformDomain?: boolean },
+      ) {
+        if (cmdOpts.sendingDomain !== undefined && cmdOpts.platformDomain) {
+          throw new Error("--sending-domain and --platform-domain are mutually exclusive");
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        const id = await inkbox.createIdentity(handle);
+        const createOpts: { sendingDomain?: string | null } = {};
+        if (cmdOpts.sendingDomain !== undefined) {
+          createOpts.sendingDomain = cmdOpts.sendingDomain;
+        } else if (cmdOpts.platformDomain) {
+          createOpts.sendingDomain = null;
+        }
+        const id = await inkbox.createIdentity(handle, createOpts);
         output(
           {
             agentHandle: id.agentHandle,

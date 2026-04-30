@@ -103,11 +103,13 @@ inkbox signup status
 ```bash
 inkbox identity list
 inkbox identity get <handle>
-inkbox identity create <handle>
+inkbox identity create <handle> [--sending-domain <name> | --platform-domain]
 inkbox identity delete <handle>
 inkbox identity update <handle> --new-handle <handle>
 inkbox identity refresh <handle>
 ```
+
+`--sending-domain <name>` binds the new agent's mailbox to a verified custom domain (bare name, e.g. `mail.acme.com`). `--platform-domain` forces the platform sending domain. Either flag implies mailbox creation. Omit both to inherit the org default.
 
 Notes:
 
@@ -243,12 +245,23 @@ Secret type flags:
 ```bash
 inkbox mailbox list
 inkbox mailbox get <email-address>
-inkbox mailbox create -i <handle> [--display-name <name>] [--local-part <part>]
+inkbox mailbox create -i <handle> [--display-name <name>] [--local-part <part>] [--domain-id <id> | --platform-domain]
 inkbox mailbox update <email-address> [--display-name <name>] [--webhook-url <url>] [--filter-mode whitelist|blacklist]
 inkbox mailbox delete <email-address>
 ```
 
 `mailbox list` / `get` / `update` rows now include `filterMode` and `agentIdentityId`. `--filter-mode` is admin-only; when the value actually changes, a note is printed to **stderr** telling you how many existing rules are now redundant under the new mode.
+
+`mailbox create` accepts `--domain-id <id>` to bind the mailbox to a verified custom sending-domain row id (`sending_domain_<uuid>`), or `--platform-domain` to force the platform sending domain. Omit both to inherit the org default.
+
+## Custom Sending Domains
+
+```bash
+inkbox domain list [--status verified]
+inkbox domain set-default <domain-name>
+```
+
+`domain list` shows registered custom domains for your org, optionally filtered by status (e.g. `verified`). `domain set-default` requires an admin-scoped API key; pass the bare custom domain name to set it, or pass the platform sending domain (e.g. `inkboxmail.com` in production) to revert. Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
 
 ### Mailbox Contact Rules (`inkbox mailbox rules …`)
 

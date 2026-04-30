@@ -77,6 +77,9 @@ Manage agent identities.
 inkbox identity list                         # List all identities
 inkbox identity get <handle>                 # Get identity details
 inkbox identity create <handle>              # Create a new identity
+  --sending-domain <name>                    #   Bind agent's mailbox to a verified custom domain (bare name)
+  --platform-domain                          #   Force the platform sending domain
+                                             #   (either flag implies mailbox creation; mutually exclusive)
 inkbox identity delete <handle>              # Delete an identity
 inkbox identity update <handle>              # Update an identity
   --new-handle <handle>                      #   New handle
@@ -269,10 +272,24 @@ inkbox mailbox create                        # Create a new mailbox
   -i, --identity <handle>                   #   Agent handle (required)
   --display-name <name>                      #   Display name
   --local-part <part>                        #   Requested email local part (random if omitted)
+  --domain-id <id>                           #   Bind to a verified custom sending-domain row id
+  --platform-domain                          #   Force the platform sending domain
+                                             #   (--domain-id and --platform-domain are mutually exclusive)
 inkbox mailbox update <email-address>        # Update a mailbox
   --display-name <name>                      #   New display name
   --webhook-url <url>                        #   Webhook URL ("" to clear)
 inkbox mailbox delete <email-address>        # Delete a mailbox
+```
+
+### domain
+
+Custom sending-domain management. Registration, DNS, verification, DKIM rotation, and deletion stay in the console; the CLI exposes only the read-and-default surface.
+
+```bash
+inkbox domain list                           # List custom sending domains
+  --status <status>                          #   Filter by status (e.g. 'verified')
+inkbox domain set-default <domain-name>      # Set the org default (admin-scoped API key)
+                                             #   Pass the platform domain (e.g. 'inkboxmail.com') to revert
 ```
 
 ### number

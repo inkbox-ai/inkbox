@@ -11,6 +11,7 @@ import { withErrorHandler } from "../errors.js";
 
 const MAILBOX_LIST_COLUMNS = [
   "emailAddress",
+  "sendingDomain",
   "id",
   "displayName",
   "filterMode",
@@ -209,6 +210,15 @@ export function registerMailboxCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle to link the mailbox to")
     .option("--display-name <name>", "Display name for the mailbox")
     .option("--local-part <part>", "Requested email local part (random if omitted)")
+    .option(
+      "--domain-id <id>",
+      "Bind mailbox to a verified custom sending-domain id (e.g. 'sending_domain_<uuid>')",
+    )
+    .option(
+      "--platform-domain",
+      "Force the platform sending domain (ignores org default custom domain)",
+      false,
+    )
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -216,18 +226,35 @@ export function registerMailboxCommands(program: Command): void {
           identity: string;
           displayName?: string;
           localPart?: string;
+          domainId?: string;
+          platformDomain?: boolean;
         },
       ) {
+        if (cmdOpts.domainId !== undefined && cmdOpts.platformDomain) {
+          throw new Error("--domain-id and --platform-domain are mutually exclusive");
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        const mb = await inkbox.mailboxes.create({
+        const createOpts: {
+          agentHandle: string;
+          displayName?: string;
+          emailLocalPart?: string;
+          sendingDomainId?: string | null;
+        } = {
           agentHandle: cmdOpts.identity,
           displayName: cmdOpts.displayName,
           emailLocalPart: cmdOpts.localPart,
-        });
+        };
+        if (cmdOpts.domainId !== undefined) {
+          createOpts.sendingDomainId = cmdOpts.domainId;
+        } else if (cmdOpts.platformDomain) {
+          createOpts.sendingDomainId = null;
+        }
+        const mb = await inkbox.mailboxes.create(createOpts);
         output(
           {
             emailAddress: mb.emailAddress,
+            sendingDomain: mb.sendingDomain,
             id: mb.id,
             displayName: mb.displayName,
             filterMode: mb.filterMode,
@@ -253,6 +280,7 @@ export function registerMailboxCommands(program: Command): void {
         output(
           {
             emailAddress: mb.emailAddress,
+            sendingDomain: mb.sendingDomain,
             id: mb.id,
             displayName: mb.displayName,
             webhookUrl: mb.webhookUrl ?? null,
