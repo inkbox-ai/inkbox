@@ -112,13 +112,13 @@ from `~/servers/src/data_models/sending_domain.py:16-52`:
 | Value | Meaning |
 |---|---|
 | `not_started` | Row exists but no provisioning work has begun. Brief transitional state. |
-| `awaiting_ownership` | Waiting for the customer to publish `inkbox-ownership.<domain>` TXT before we'll call SES. |
-| `pending` | Ownership confirmed and SES identity provisioned; DNS records issued but haven't propagated. |
+| `awaiting_ownership` | Waiting for the customer to publish `inkbox-ownership.<domain>` TXT before the upstream mail provider is engaged. |
+| `pending` | Ownership confirmed and provider identity provisioned; DNS records issued but haven't propagated. |
 | `dns_invalid` | DNS records resolve but values disagree with what we asked the customer to publish. |
-| `verifying` | DNS resolves correctly; SES is still verifying. |
+| `verifying` | DNS resolves correctly; the upstream mail provider is still verifying. |
 | `verified` | Active, healthy, ready to send and receive. |
 | `failed` | 72h verification window elapsed without success. Purged after 7 days. |
-| `pending_dkim_rotation` | DKIM rotation in flight — new selector in DNS, old key still active in SES. |
+| `pending_dkim_rotation` | DKIM rotation in flight — new selector in DNS, old key still active upstream. |
 | `degraded` | Previously-verified row regressed; one or more required records no longer match. Re-verifies on next poller pass. |
 | `pending_deletion` | Customer initiated DELETE; reversible for 24h before hard-delete. |
 
@@ -162,8 +162,8 @@ time in case states have been added since this plan was written.
 
 `setDefault` docstring must call out:
 - Pass the **bare domain name** (e.g. `"mail.acme.com"`), not the id.
-- Pass `"inkboxmail.com"` (or whatever `EnvConfig.SES_SENDING_DOMAIN` is) to
-  clear and revert to platform default.
+- Pass `"inkboxmail.com"` (the platform default sending domain) to clear and
+  revert to platform default.
 - Requires an **admin-scoped API key**. The server returns 403 otherwise — let
   that surface as the SDK's normal auth error; do not pre-check client-side.
 
