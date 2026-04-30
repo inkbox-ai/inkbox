@@ -143,8 +143,8 @@ is a single-field model wrapping `default_domain: str | None` — wrapping it in
 an SDK object adds ceremony for one nullable string. If the response shape
 ever grows, expand the SDK return type then.
 
-`SendingDomainStatus` is an enum/literal union. Values transplanted verbatim
-from `~/servers/src/data_models/sending_domain.py:16-52`:
+`SendingDomainStatus` is an enum. Values transplanted verbatim from
+`~/servers/src/data_models/sending_domain.py:16-52`:
 
 | Value | Meaning |
 |---|---|
@@ -206,8 +206,15 @@ time in case states have been added since this plan was written.
   `"inkboxmail.com"` in production) to clear the org default and revert to
   the platform domain. The server only clears when the path matches its
   configured platform domain, which varies by env.
+- Returns the **bare new default domain name** (e.g. `"mail.acme.com"`),
+  or `null` when the org has reverted to the platform default. Not a row id.
 - Requires an **admin-scoped API key**. The server returns 403 otherwise — let
   that surface as the SDK's normal auth error; do not pre-check client-side.
+
+URL-encode the path segment when constructing the request
+(`encodeURIComponent(domainName)` in TS; `urllib.parse.quote(domain_name, safe="")`
+in Python). Real domains don't need it, but it disciplines the implementation
+and protects against odd input.
 
 ### `Domain` SDK type — explicit projection
 
@@ -269,6 +276,15 @@ will leak the field at one layer of the SDK and hide it at another.
 - Python: `sdk/python/inkbox/identities/types.py:18` — add
   `sending_domain: str | None = _UNSET` (using the same sentinel pattern).
 
+**Python sentinel typing snag (worth a 30-second heads-up):** `_UNSET` is an
+`object()` instance, so `sending_domain: str | None = _UNSET` will fail
+typecheck. Use the same pattern already in `mail/resources/mailboxes.py:67-69`:
+add `# type: ignore[assignment]` on the field default. This applies to the
+dataclass field, the `to_wire` self-check, **and** the `create_identity`
+kwarg default (see (c) below). Define `_UNSET = object()` at the top of
+`identities/types.py` (or import from a shared location) so it isn't
+re-defined inconsistently across modules.
+
 **(b) `to_wire` / `identityMailboxCreateOptionsToWire` — must preserve `null`.**
 Widen TS return to `Record<string, unknown>` and Python to `dict[str, Any]`
 (matches the dominant idiom — `mailboxes.ts:53`, `identities/types.py:64`).
@@ -296,10 +312,11 @@ Required updates:
   Pass through to `IdentityMailboxCreateOptions`. Update the gate to imply
   mailbox creation when `sending_domain is not _UNSET`.
 
-**Note on `null`:** the gate covers explicit `null` too — a user passing
-`sendingDomain: null` is asking for a platform-domain mailbox and that
-should imply mailbox creation, exactly as `emailLocalPart: ""` would. The
-`"sendingDomain" in options` / `is not _UNSET` checks already do this.
+**Note on `null`:** presence triggers mailbox creation; explicit `null` is
+presence. A caller passing `sendingDomain: null` is asking for a
+platform-domain mailbox and should get one. The `"sendingDomain" in options`
+(TS) and `sending_domain is not _UNSET` (Python) gates already handle this
+correctly.
 
 **Do not** add `sendingDomainId` to the identity path. The two paths use
 different field names because the server does — keep them aligned.
@@ -348,9 +365,16 @@ Update the SDK types and parsers:
       `sendingDomain` is set,
   (e) `parseMailbox` reads `sending_domain` off the response and falls back
       to `email_address` split when absent (compat for old fixtures),
-  (f) `parseIdentityMailbox` reads `sending_domain` with the same fallback.
+  (f) `parseIdentityMailbox` reads `sending_domain` with the same fallback,
+  (g) `parseDomain` handles nullable `verified_at` correctly — null timestamps
+      are where these tiny SDK DTOs tend to break.
 - Python: parallel tests under `sdk/python/tests/`, including coverage of
   `create_identity(..., sending_domain=...)` round-tripping null/omitted/string.
+- Export-surface compile/import smoke: TS should compile
+  `import { Domain, SendingDomainStatus } from "@inkbox/sdk"`; Python should
+  `from inkbox import Domain, SendingDomainStatus`. If the repo has existing
+  export-surface tests, extend them; if not, the type-checker pass on test
+  files using these imports is enough.
 - No live integration tests — server already has
   `tests/api_integration/test_domains_lifecycle.py`.
 
