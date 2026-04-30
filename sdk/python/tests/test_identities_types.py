@@ -17,6 +17,7 @@ from inkbox.identities.types import (
     AgentIdentitySummary,
     _AgentIdentityData,
     IdentityMailbox,
+    IdentityMailboxCreateOptions,
     IdentityPhoneNumber,
 )
 
@@ -60,6 +61,30 @@ class TestIdentityMailboxParsing:
         assert m.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
         assert isinstance(m.created_at, datetime)
         assert isinstance(m.updated_at, datetime)
+
+    def test_reads_sending_domain(self):
+        m = IdentityMailbox._from_dict(
+            {**IDENTITY_MAILBOX_DICT, "sending_domain": "mail.acme.com"}
+        )
+        assert m.sending_domain == "mail.acme.com"
+
+    def test_falls_back_to_email_address_split(self):
+        m = IdentityMailbox._from_dict(IDENTITY_MAILBOX_DICT)
+        assert m.sending_domain == "inkbox.ai"
+
+
+class TestIdentityMailboxCreateOptionsToWire:
+    def test_omits_sending_domain_when_unset(self):
+        opts = IdentityMailboxCreateOptions(display_name="x")
+        assert opts.to_wire() == {"display_name": "x"}
+
+    def test_includes_null_when_explicit(self):
+        opts = IdentityMailboxCreateOptions(sending_domain=None)
+        assert opts.to_wire() == {"sending_domain": None}
+
+    def test_includes_string_when_set(self):
+        opts = IdentityMailboxCreateOptions(sending_domain="mail.acme.com")
+        assert opts.to_wire() == {"sending_domain": "mail.acme.com"}
 
 
 class TestIdentityPhoneNumberParsing:

@@ -1,6 +1,7 @@
 // sdk/typescript/tests/identities/types.test.ts
 import { describe, it, expect } from "vitest";
 import {
+  identityMailboxCreateOptionsToWire,
   parseAgentIdentitySummary,
   parseAgentIdentityData,
   parseIdentityMailbox,
@@ -51,6 +52,39 @@ describe("parseIdentityMailbox", () => {
     expect(m.agentIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
     expect(m.createdAt).toBeInstanceOf(Date);
     expect(m.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it("reads sending_domain when present", () => {
+    const m = parseIdentityMailbox({
+      ...RAW_IDENTITY_MAILBOX,
+      sending_domain: "mail.acme.com",
+    });
+    expect(m.sendingDomain).toBe("mail.acme.com");
+  });
+
+  it("falls back to email_address split when sending_domain absent", () => {
+    const m = parseIdentityMailbox(RAW_IDENTITY_MAILBOX);
+    expect(m.sendingDomain).toBe("inkbox.ai");
+  });
+});
+
+describe("identityMailboxCreateOptionsToWire", () => {
+  it("omits sending_domain when option is omitted", () => {
+    expect(identityMailboxCreateOptionsToWire({ displayName: "x" })).toEqual({
+      display_name: "x",
+    });
+  });
+
+  it("includes null when sendingDomain is explicitly null", () => {
+    expect(
+      identityMailboxCreateOptionsToWire({ sendingDomain: null }),
+    ).toEqual({ sending_domain: null });
+  });
+
+  it("includes string when sendingDomain is a name", () => {
+    expect(
+      identityMailboxCreateOptionsToWire({ sendingDomain: "mail.acme.com" }),
+    ).toEqual({ sending_domain: "mail.acme.com" });
   });
 });
 

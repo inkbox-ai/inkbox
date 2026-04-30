@@ -11,6 +11,7 @@ import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
 import { MailContactRulesResource } from "./mail/resources/contactRules.js";
+import { DomainsResource } from "./mail/resources/domains.js";
 import { SigningKeysResource } from "./signing_keys.js";
 import type { SigningKey } from "./signing_keys.js";
 import { PhoneNumbersResource } from "./phone/resources/numbers.js";
@@ -23,7 +24,11 @@ import { VaultResource } from "./vault/resources/vault.js";
 import { ContactsResource } from "./contacts/resources/contacts.js";
 import { NotesResource } from "./notes/resources/notes.js";
 import { AgentIdentity } from "./agent_identity.js";
-import type { AgentIdentitySummary, CreateIdentityOptions } from "./identities/types.js";
+import type {
+  AgentIdentitySummary,
+  CreateIdentityOptions,
+  IdentityMailboxCreateOptions,
+} from "./identities/types.js";
 import type {
   AgentSignupRequest,
   AgentSignupResponse,
@@ -110,6 +115,7 @@ export class Inkbox {
   readonly _messages: MessagesResource;
   readonly _threads: ThreadsResource;
   readonly _mailContactRules: MailContactRulesResource;
+  readonly _domains: DomainsResource;
   readonly _signingKeys: SigningKeysResource;
   readonly _numbers: PhoneNumbersResource;
   readonly _calls: CallsResource;
@@ -144,6 +150,7 @@ export class Inkbox {
     const phoneHttp    = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms, cookieJar);
     const idsHttp      = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms, cookieJar);
     const vaultHttp    = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms, cookieJar);
+    const domainsHttp  = new HttpTransport(options.apiKey, `${apiRoot}/domains`, ms, cookieJar);
     const rootApiHttp  = new HttpTransport(options.apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar);
     const apiHttp      = new HttpTransport(options.apiKey, apiRoot, ms, cookieJar);
 
@@ -151,6 +158,7 @@ export class Inkbox {
     this._messages         = new MessagesResource(mailHttp);
     this._threads          = new ThreadsResource(mailHttp);
     this._mailContactRules = new MailContactRulesResource(mailHttp);
+    this._domains          = new DomainsResource(domainsHttp);
     this._signingKeys      = new SigningKeysResource(apiHttp);
 
     this._numbers          = new PhoneNumbersResource(phoneHttp);
@@ -233,6 +241,9 @@ export class Inkbox {
   /** Phone per-number allow/block rules (+ org-wide list). */
   get phoneContactRules(): PhoneContactRulesResource { return this._phoneContactRules; }
 
+  /** Custom sending domains (list, set org default). */
+  get domains(): DomainsResource { return this._domains; }
+
   // ------------------------------------------------------------------
   // Org-level operations
   // ------------------------------------------------------------------
@@ -242,10 +253,13 @@ export class Inkbox {
    *
    * @param agentHandle - Unique handle for this identity (e.g. `"sales-bot"`).
    * @param options.createMailbox - Whether to create and link a mailbox in the
-   *   same request. This is also implied when `displayName` or `emailLocalPart`
-   *   is provided.
+   *   same request. This is also implied when `displayName`, `emailLocalPart`,
+   *   or `sendingDomain` is provided.
    * @param options.displayName - Optional human-readable mailbox name.
    * @param options.emailLocalPart - Optional requested mailbox local part.
+   * @param options.sendingDomain - Optional sending-domain selector (bare
+   *   domain name). Omit to inherit the org default; pass `null` to force
+   *   the platform default; pass a verified custom-domain name to bind.
    * @param options.phoneNumber - Optional phone-number provisioning payload.
    * @param options.vaultSecretIds - Optional vault secret selection to attach
    *   to the new identity.
@@ -255,13 +269,19 @@ export class Inkbox {
     agentHandle: string,
     options: CreateIdentityOptions = {},
   ): Promise<AgentIdentity> {
-    const mailbox =
-      options.createMailbox || options.displayName !== undefined || options.emailLocalPart !== undefined
-        ? {
-            displayName: options.displayName,
-            emailLocalPart: options.emailLocalPart,
-          }
-        : undefined;
+    const wantsMailbox =
+      options.createMailbox === true ||
+      options.displayName !== undefined ||
+      options.emailLocalPart !== undefined ||
+      "sendingDomain" in options;
+    let mailbox: IdentityMailboxCreateOptions | undefined;
+    if (wantsMailbox) {
+      mailbox = {
+        displayName: options.displayName,
+        emailLocalPart: options.emailLocalPart,
+      };
+      if ("sendingDomain" in options) mailbox.sendingDomain = options.sendingDomain;
+    }
     await this._idsResource.create({
       agentHandle,
       mailbox,

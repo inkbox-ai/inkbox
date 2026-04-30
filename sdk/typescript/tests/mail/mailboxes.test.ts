@@ -67,6 +67,73 @@ describe("MailboxesResource.create", () => {
       email_local_part: "sales.team",
     });
     expect(mailbox.emailAddress).toBe("agent01@inkbox.ai");
+    expect(mailbox.sendingDomain).toBe("inkbox.ai");
+  });
+
+  it("omits sending_domain_id when sendingDomainId is omitted", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+
+    await res.create({ agentHandle: "sales-agent" });
+
+    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
+      agent_handle: "sales-agent",
+    });
+  });
+
+  it("sends sending_domain_id: null when explicitly null (force platform)", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+
+    await res.create({ agentHandle: "sales-agent", sendingDomainId: null });
+
+    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
+      agent_handle: "sales-agent",
+      sending_domain_id: null,
+    });
+  });
+
+  it("sends sending_domain_id string when explicit", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+
+    await res.create({
+      agentHandle: "sales-agent",
+      sendingDomainId: "sending_domain_xxx",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
+      agent_handle: "sales-agent",
+      sending_domain_id: "sending_domain_xxx",
+    });
+  });
+});
+
+describe("parseMailbox sendingDomain", () => {
+  it("reads sending_domain from response", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      ...RAW_MAILBOX,
+      sending_domain: "mail.acme.com",
+    });
+    const res = new MailboxesResource(http);
+
+    const mailbox = await res.get("agent01@inkbox.ai");
+    expect(mailbox.sendingDomain).toBe("mail.acme.com");
+  });
+
+  it("falls back to email_address split when sending_domain is absent (compat for old fixtures)", async () => {
+    const http = mockHttp();
+    const { sending_domain: _omit, ...withoutSendingDomain } = RAW_MAILBOX;
+    void _omit;
+    vi.mocked(http.get).mockResolvedValue(withoutSendingDomain);
+    const res = new MailboxesResource(http);
+
+    const mailbox = await res.get("agent01@inkbox.ai");
+    expect(mailbox.sendingDomain).toBe("inkbox.ai");
   });
 });
 

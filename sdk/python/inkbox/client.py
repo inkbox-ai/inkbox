@@ -31,6 +31,7 @@ from inkbox.identities.types import (
     IdentityPhoneNumberCreateOptions,
 )
 from inkbox.mail.resources.contact_rules import MailContactRulesResource
+from inkbox.mail.resources.domains import DomainsResource
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
@@ -44,6 +45,11 @@ from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
 _DEFAULT_BASE_URL = "https://inkbox.ai"
+
+# Local sentinel for "kwarg omitted" — distinct from explicit ``None``.
+# Mirrors the pattern in :mod:`inkbox.mail.resources.mailboxes`. This sentinel
+# is module-local; we never forward it across module boundaries.
+_UNSET = object()
 
 
 class Inkbox:
@@ -100,6 +106,7 @@ class Inkbox:
                     "localhost and 127.0.0.1). "
                     "Received a base_url that does not start with 'https://'."
                 )
+        _api_base = f"{base_url.rstrip('/')}/api"
         _api_root = f"{base_url.rstrip('/')}/api/v1"
         _cookie_jar = CookieJar()
 
@@ -133,7 +140,12 @@ class Inkbox:
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
-        _api_base = f"{base_url.rstrip('/')}/api"
+        self._domains_http = HttpTransport(
+            api_key=api_key,
+            base_url=f"{_api_root}/domains",
+            timeout=timeout,
+            cookie_jar=_cookie_jar,
+        )
         self._root_api_http = HttpTransport(
             api_key=api_key,
             base_url=_api_base,
@@ -151,6 +163,7 @@ class Inkbox:
         self._messages = MessagesResource(self._mail_http)
         self._threads = ThreadsResource(self._mail_http)
         self._mail_contact_rules = MailContactRulesResource(self._mail_http)
+        self._domains = DomainsResource(self._domains_http)
 
         self._calls = CallsResource(self._phone_http)
         self._numbers = PhoneNumbersResource(self._phone_http)
@@ -186,6 +199,7 @@ class Inkbox:
         self._root_api_http.close()
         self._api_http.close()
         self._contacts_http.close()
+        self._domains_http.close()
 
     ## Public resource accessors
 
@@ -229,6 +243,11 @@ class Inkbox:
         """Phone per-number allow/block rules (+ org-wide list)."""
         return self._phone_contact_rules
 
+    @property
+    def domains(self) -> DomainsResource:
+        """Custom sending domains (list, set org default)."""
+        return self._domains
+
     ## Org-level operations
 
     def create_identity(
@@ -238,6 +257,7 @@ class Inkbox:
         create_mailbox: bool = False,
         display_name: str | None = None,
         email_local_part: str | None = None,
+        sending_domain: str | None = _UNSET,  # type: ignore[assignment]
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
         vault_secret_ids: UUID | str | list[UUID | str] | Literal["*", "all"] | None = None,
     ) -> AgentIdentity:
@@ -247,10 +267,15 @@ class Inkbox:
         Args:
             agent_handle: Unique handle for this identity (e.g. ``"sales-bot"``).
             create_mailbox: Whether to create and link a mailbox in the same
-                request. This is also implied when ``display_name`` or
-                ``email_local_part`` is provided.
+                request. This is also implied when ``display_name``,
+                ``email_local_part``, or ``sending_domain`` is provided.
             display_name: Optional human-readable mailbox name.
             email_local_part: Optional requested mailbox local part.
+            sending_domain: Optional sending-domain selector by **bare domain
+                name**. Presence (including explicit ``None``) implies mailbox
+                creation. Leave at ``_UNSET`` to inherit the org default;
+                pass ``None`` to force the platform default; pass a verified
+                custom-domain name to bind.
             phone_number: Optional phone-number provisioning payload to create
                 and link a number in the same request.
             vault_secret_ids: Optional vault secret selection to attach to the
@@ -260,12 +285,24 @@ class Inkbox:
         Returns:
             The created :class:`AgentIdentity`.
         """
-        mailbox = None
-        if create_mailbox or display_name is not None or email_local_part is not None:
-            mailbox = IdentityMailboxCreateOptions(
-                display_name=display_name,
-                email_local_part=email_local_part,
-            )
+        sending_domain_provided = sending_domain is not _UNSET
+        wants_mailbox = (
+            create_mailbox
+            or display_name is not None
+            or email_local_part is not None
+            or sending_domain_provided
+        )
+        mailbox: IdentityMailboxCreateOptions | None = None
+        if wants_mailbox:
+            kwargs: dict[str, str | None] = {
+                "display_name": display_name,
+                "email_local_part": email_local_part,
+            }
+            if sending_domain_provided:
+                # `sending_domain` is now narrowed to ``str | None`` (the
+                # _UNSET sentinel was filtered out above).
+                kwargs["sending_domain"] = sending_domain  # type: ignore[assignment]
+            mailbox = IdentityMailboxCreateOptions(**kwargs)
         self._ids_resource.create(
             agent_handle=agent_handle,
             mailbox=mailbox,

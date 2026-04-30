@@ -91,6 +91,28 @@ class ContactRuleStatus(StrEnum):
     PAUSED = "paused"
 
 
+class SendingDomainStatus(StrEnum):
+    """Lifecycle status of a custom sending domain.
+
+    Only ``VERIFIED`` rows are usable for sending; the remaining states
+    are transitional (``NOT_STARTED``, ``AWAITING_OWNERSHIP``, ``PENDING``,
+    ``VERIFYING``), recoverable error states (``DNS_INVALID``, ``DEGRADED``),
+    in-flight admin operations (``PENDING_DKIM_ROTATION``, ``PENDING_DELETION``),
+    or terminal (``FAILED``).
+    """
+
+    NOT_STARTED = "not_started"
+    AWAITING_OWNERSHIP = "awaiting_ownership"
+    PENDING = "pending"
+    DNS_INVALID = "dns_invalid"
+    VERIFYING = "verifying"
+    VERIFIED = "verified"
+    FAILED = "failed"
+    PENDING_DKIM_ROTATION = "pending_dkim_rotation"
+    DEGRADED = "degraded"
+    PENDING_DELETION = "pending_deletion"
+
+
 @dataclass
 class FilterModeChangeNotice:
     """Summary returned on PATCH when ``filter_mode`` actually changed.
@@ -135,6 +157,10 @@ class Mailbox:
     ``agent_identity_id`` is the UUID of the owning agent identity, or
     ``None`` if the mailbox is standalone (not tied to any agent).
     Always populated on every mailbox response.
+
+    ``sending_domain`` is the bare domain the mailbox sends from, derived
+    from ``email_address``. Either the platform default or a verified
+    custom domain registered to your org.
     """
 
     id: UUID
@@ -144,6 +170,7 @@ class Mailbox:
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    sending_domain: str = ""
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
@@ -151,18 +178,63 @@ class Mailbox:
     def _from_dict(cls, d: dict[str, Any]) -> Mailbox:
         notice = d.get("filter_mode_change_notice")
         agent_identity_id = d.get("agent_identity_id")
+        sending_domain = d.get("sending_domain")
+        if not sending_domain:
+            email_address = d["email_address"]
+            _, _, sending_domain = email_address.partition("@")
+
         return cls(
             id=UUID(d["id"]),
             email_address=d["email_address"],
+            sending_domain=sending_domain,
             display_name=d.get("display_name"),
             webhook_url=d.get("webhook_url"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
-            agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
-            filter_mode_change_notice=(
-                FilterModeChangeNotice._from_dict(notice) if notice else None
+            agent_identity_id=(
+                UUID(agent_identity_id)
+                if agent_identity_id
+                else None
             ),
+            filter_mode_change_notice=(
+                FilterModeChangeNotice._from_dict(notice)
+                if notice
+                else None
+            ),
+        )
+
+
+@dataclass
+class Domain:
+    """A custom sending domain registered to your organisation.
+
+    Returned by :meth:`Inkbox.domains.list`. Only ``VERIFIED`` rows
+    are usable for sending mail.
+
+    Attributes:
+        id: Sending-domain row id (e.g. ``"sending_domain_<uuid>"``).
+        domain: Bare registered domain (e.g. ``"mail.acme.com"``).
+        status: Current lifecycle status.
+        is_default: True if this is the org's default sending domain.
+        verified_at: First time this domain reached ``VERIFIED``, or
+            ``None`` if never verified.
+    """
+    id: str
+    domain: str
+    status: SendingDomainStatus
+    is_default: bool
+    verified_at: datetime | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> Domain:
+        verified_at = d.get("verified_at")
+        return cls(
+            id=d["id"],
+            domain=d["domain"],
+            status=SendingDomainStatus(d["status"]),
+            is_default=bool(d["is_default"]),
+            verified_at=datetime.fromisoformat(verified_at) if verified_at else None,
         )
 
 

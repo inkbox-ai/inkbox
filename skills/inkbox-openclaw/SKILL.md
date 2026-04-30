@@ -493,8 +493,39 @@ if (updated.filterModeChangeNotice) {
   console.log(n.redundantRuleCount, n.redundantRuleAction, n.newFilterMode);
 }
 
+// `mailbox.sendingDomain` is the bare domain the mailbox sends from
+// (platform default or a verified custom domain — see "Custom email domains" below).
+
 const results = await inkbox.mailboxes.search(mailbox.emailAddress, { q: "invoice", limit: 20 });
 await inkbox.mailboxes.delete(mailbox.emailAddress);
+```
+
+### Custom email domains (`inkbox.domains`)
+
+If your org has registered custom sending domains in the console, list them
+and (admin-only) set the org default. New mailboxes inherit the org default
+unless you pass `sendingDomainId` (standalone) or `sendingDomain` (identity).
+
+```js
+const verified = await inkbox.domains.list({ status: "verified" });
+
+// Admin-scoped API key only — non-admin keys get 403.
+// Returns the bare new default domain name (or null when reverted to platform).
+const newDefault = await inkbox.domains.setDefault("mail.acme.com");
+// Pass the platform domain (e.g. "inkboxmail.com" in prod) to clear the org default.
+
+// Standalone mailbox: pick by domain id.
+await inkbox.mailboxes.create({
+  agentHandle: "sales-bot",
+  sendingDomainId: verified[0].id,        // verified custom domain
+});
+await inkbox.mailboxes.create({
+  agentHandle: "sales-bot",
+  sendingDomainId: null,                  // force platform default
+});
+
+// Identity create: pick by bare domain name (not id).
+await inkbox.createIdentity("sales-bot", { sendingDomain: "mail.acme.com" });
 ```
 
 ### Phone Numbers (`inkbox.phoneNumbers`)

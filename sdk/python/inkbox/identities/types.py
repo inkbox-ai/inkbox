@@ -14,6 +14,10 @@ from uuid import UUID
 from inkbox.mail.types import FilterMode, FilterModeChangeNotice
 from inkbox.phone.types import SmsStatus
 
+# Sentinel for "field omitted" that's distinct from explicit ``None``.
+# Mirrors the pattern used in :mod:`inkbox.mail.resources.mailboxes`.
+_UNSET = object()
+
 
 @dataclass
 class IdentityMailboxCreateOptions:
@@ -25,18 +29,25 @@ class IdentityMailboxCreateOptions:
             mailbox is created.
         email_local_part: Optional requested local part to use before the
             sending domain. If omitted, the server generates a random one.
+        sending_domain: Optional sending-domain selector by **bare domain
+            name** (not an id). Leave at ``_UNSET`` to inherit the org
+            default; pass ``None`` to force the platform default; pass a
+            verified custom-domain name (e.g. ``"mail.acme.com"``) to bind.
     """
 
     display_name: str | None = None
     email_local_part: str | None = None
+    sending_domain: str | None = _UNSET  # type: ignore[assignment]
 
-    def to_wire(self) -> dict[str, str]:
+    def to_wire(self) -> dict[str, Any]:
         """Return a JSON-serializable dict matching the API schema."""
-        body: dict[str, str] = {}
+        body: dict[str, Any] = {}
         if self.display_name is not None:
             body["display_name"] = self.display_name
         if self.email_local_part is not None:
             body["email_local_part"] = self.email_local_part
+        if self.sending_domain is not _UNSET:
+            body["sending_domain"] = self.sending_domain
         return body
 
 
@@ -104,6 +115,9 @@ class IdentityMailbox:
 
     ``agent_identity_id`` mirrors the same field on :class:`Mailbox`;
     on the embedded variant it always equals the owning identity's ID.
+
+    ``sending_domain`` is the bare domain the mailbox sends from, derived
+    from ``email_address``.
     """
 
     id: UUID
@@ -112,6 +126,7 @@ class IdentityMailbox:
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
+    sending_domain: str = ""
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
@@ -119,9 +134,14 @@ class IdentityMailbox:
     def _from_dict(cls, d: dict[str, Any]) -> IdentityMailbox:
         notice = d.get("filter_mode_change_notice")
         agent_identity_id = d.get("agent_identity_id")
+        sending_domain = d.get("sending_domain")
+        if not sending_domain:
+            email_address = d["email_address"]
+            _, _, sending_domain = email_address.partition("@")
         return cls(
             id=UUID(d["id"]),
             email_address=d["email_address"],
+            sending_domain=sending_domain,
             display_name=d.get("display_name"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),

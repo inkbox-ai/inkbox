@@ -67,6 +67,66 @@ class TestMailboxesCreate:
             },
         )
         assert mailbox.email_address == "agent01@inkbox.ai"
+        assert mailbox.sending_domain == "inkbox.ai"
+
+    def test_create_omits_sending_domain_id_when_unset(self):
+        res, http = _resource()
+        http.post.return_value = MAILBOX_DICT
+
+        res.create(agent_handle="sales-agent")
+
+        http.post.assert_called_once_with(
+            "/mailboxes",
+            json={"agent_handle": "sales-agent"},
+        )
+
+    def test_create_sends_null_sending_domain_id(self):
+        res, http = _resource()
+        http.post.return_value = MAILBOX_DICT
+
+        res.create(agent_handle="sales-agent", sending_domain_id=None)
+
+        http.post.assert_called_once_with(
+            "/mailboxes",
+            json={"agent_handle": "sales-agent", "sending_domain_id": None},
+        )
+
+    def test_create_sends_explicit_sending_domain_id(self):
+        res, http = _resource()
+        http.post.return_value = MAILBOX_DICT
+
+        res.create(
+            agent_handle="sales-agent",
+            sending_domain_id="sending_domain_xxx",
+        )
+
+        http.post.assert_called_once_with(
+            "/mailboxes",
+            json={
+                "agent_handle": "sales-agent",
+                "sending_domain_id": "sending_domain_xxx",
+            },
+        )
+
+
+class TestMailboxParseSendingDomain:
+    def test_reads_sending_domain(self):
+        res, http = _resource()
+        http.get.return_value = {**MAILBOX_DICT, "sending_domain": "mail.acme.com"}
+
+        mailbox = res.get("agent01@inkbox.ai")
+
+        assert mailbox.sending_domain == "mail.acme.com"
+
+    def test_falls_back_to_email_address_split(self):
+        res, http = _resource()
+        d = {**MAILBOX_DICT}
+        d.pop("sending_domain")
+        http.get.return_value = d
+
+        mailbox = res.get("agent01@inkbox.ai")
+
+        assert mailbox.sending_domain == "inkbox.ai"
 
 
 class TestMailboxesUpdate:

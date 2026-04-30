@@ -5,6 +5,7 @@
 export const RAW_MAILBOX = {
   id: "aaaa1111-0000-0000-0000-000000000001",
   email_address: "agent01@inkbox.ai",
+  sending_domain: "inkbox.ai",
   display_name: "Agent 01",
   agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   created_at: "2026-03-09T00:00:00Z",
@@ -233,6 +234,24 @@ export const RAW_IDENTITY_DETAIL = {
   ...RAW_IDENTITY,
   mailbox: RAW_IDENTITY_MAILBOX,
   phone_number: RAW_IDENTITY_PHONE,
+};
+
+// ---- Domains ----
+
+export const RAW_DOMAIN_VERIFIED = {
+  id: "sending_domain_aaaa1111-0000-0000-0000-000000000001",
+  domain: "mail.acme.com",
+  status: "verified",
+  is_default: true,
+  verified_at: "2026-03-09T00:00:00Z",
+};
+
+export const RAW_DOMAIN_PENDING = {
+  id: "sending_domain_bbbb2222-0000-0000-0000-000000000002",
+  domain: "newsletter.acme.com",
+  status: "pending",
+  is_default: false,
+  verified_at: null,
 };
 
 // ---- Signing Keys ----

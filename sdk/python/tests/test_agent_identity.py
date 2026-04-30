@@ -119,6 +119,45 @@ class TestAgentIdentityCreateMailbox:
         assert identity.email_address == MAILBOX_DICT["email_address"]
         assert identity.mailbox is not None
 
+    def test_create_mailbox_copies_sending_domain(self):
+        identity, inkbox = _identity_without_mailbox()
+        inkbox._mailboxes.create.return_value = Mailbox._from_dict(
+            {**MAILBOX_DICT, "sending_domain": "mail.acme.com"},
+        )
+
+        mailbox = identity.create_mailbox()
+
+        assert mailbox.sending_domain == "mail.acme.com"
+        assert identity.mailbox is not None
+        assert identity.mailbox.sending_domain == "mail.acme.com"
+
+    def test_create_mailbox_omits_sending_domain_id_when_unset(self):
+        identity, inkbox = _identity_without_mailbox()
+        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
+
+        identity.create_mailbox()
+
+        _, kwargs = inkbox._mailboxes.create.call_args
+        assert "sending_domain_id" not in kwargs
+
+    def test_create_mailbox_passes_explicit_null(self):
+        identity, inkbox = _identity_without_mailbox()
+        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
+
+        identity.create_mailbox(sending_domain_id=None)
+
+        _, kwargs = inkbox._mailboxes.create.call_args
+        assert kwargs["sending_domain_id"] is None
+
+    def test_create_mailbox_passes_explicit_id(self):
+        identity, inkbox = _identity_without_mailbox()
+        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
+
+        identity.create_mailbox(sending_domain_id="sending_domain_xxx")
+
+        _, kwargs = inkbox._mailboxes.create.call_args
+        assert kwargs["sending_domain_id"] == "sending_domain_xxx"
+
 
 class TestAgentIdentityGetThread:
     def test_get_thread_returns_thread_detail(self):

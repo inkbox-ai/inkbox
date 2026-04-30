@@ -39,9 +39,11 @@ export {
   MailRuleAction,
   MailRuleMatchType,
   MessageDirection,
+  SendingDomainStatus,
   ThreadFolder,
 } from "./mail/types.js";
 export type {
+  Domain,
   FilterModeChangeNotice,
   Mailbox,
   MailContactRule,

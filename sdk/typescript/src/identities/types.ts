@@ -16,6 +16,13 @@ import { SmsStatus } from "../phone/types.js";
 export interface IdentityMailboxCreateOptions {
   displayName?: string;
   emailLocalPart?: string;
+  /**
+   * Optional sending-domain selector by **bare domain name** (not an id).
+   * Omit to inherit the org's default. Pass `null` to force the platform
+   * default. Pass a verified custom-domain name (e.g. `"mail.acme.com"`)
+   * to bind this mailbox to it.
+   */
+  sendingDomain?: string | null;
 }
 
 export interface IdentityPhoneNumberCreateOptions {
@@ -31,6 +38,14 @@ export interface CreateIdentityOptions {
   createMailbox?: boolean;
   displayName?: string;
   emailLocalPart?: string;
+  /**
+   * Optional sending-domain selector by **bare domain name**. Presence
+   * (including explicit `null`) implies mailbox creation, just like
+   * `displayName` and `emailLocalPart`. Omit to inherit the org's default,
+   * `null` to force the platform default, or a verified domain name to
+   * bind to that domain.
+   */
+  sendingDomain?: string | null;
   phoneNumber?: IdentityPhoneNumberCreateOptions;
   vaultSecretIds?: string | string[] | "*" | "all";
 }
@@ -38,6 +53,11 @@ export interface CreateIdentityOptions {
 export interface IdentityMailbox {
   id: string;
   emailAddress: string;
+  /**
+   * Bare domain the mailbox sends from, derived from `emailAddress`.
+   * Either the platform default or a verified custom domain.
+   */
+  sendingDomain: string;
   displayName: string | null;
   filterMode: FilterMode;
   /**
@@ -101,6 +121,7 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
 export interface RawIdentityMailbox {
   id: string;
   email_address: string;
+  sending_domain?: string;
   display_name: string | null;
   filter_mode?: string;
   agent_identity_id?: string | null;
@@ -148,6 +169,7 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
   return {
     id: r.id,
     emailAddress: r.email_address,
+    sendingDomain: r.sending_domain ?? r.email_address.split("@")[1] ?? "",
     displayName: r.display_name,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     agentIdentityId: r.agent_identity_id ?? null,
@@ -203,10 +225,11 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
 
 export function identityMailboxCreateOptionsToWire(
   options: IdentityMailboxCreateOptions,
-): Record<string, string> {
-  const body: Record<string, string> = {};
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
   if (options.displayName !== undefined) body["display_name"] = options.displayName;
   if (options.emailLocalPart !== undefined) body["email_local_part"] = options.emailLocalPart;
+  if ("sendingDomain" in options) body["sending_domain"] = options.sendingDomain;
   return body;
 }
 
