@@ -42,11 +42,12 @@ now — see "Out of scope" at the end.
 | `POST /api/v1/mail/mailboxes` with `sending_domain_id` | create standalone mailbox on a chosen domain | any API key |
 | `POST /api/v1/identities` with `mailbox.sending_domain` | create identity + nested mailbox on a chosen domain | any API key |
 
-Domain-selection semantics (apply to both mailbox-create paths, with one
-caveat — see below):
+Domain-selection semantics (apply to both mailbox-create paths):
 - **Omitted** → uses org's verified default, falls back to platform.
 - **`null`** → forces platform sending domain, ignoring org default.
-- **String value** → must belong to org, else 404.
+- **String value** → must belong to org and be `VERIFIED`. Both paths reject
+  with 4xx otherwise; SDK callers should treat this as "pass a verified
+  domain name."
 
 The standalone endpoint takes the **id** (`sending_domain_id`); the identity
 endpoint takes the **bare domain name** (`sending_domain`). This asymmetry is
@@ -54,15 +55,14 @@ intentional on the server and the SDK should mirror it under two distinct
 option names rather than papering over it. Magic-string acceptance ("does this
 look like an id or a name?") is a worse footgun than two clearly-typed fields.
 
-**Error-semantics caveat:** the standalone path goes through
-`resolve_sending_domain` (`mailbox_create.py:89-199`) and rejects
-non-`VERIFIED` domains with 409. The identity path
-(`agent_identity_subapp.py:603-637`) filters on `ownership_validated = True`
-instead of `status == VERIFIED` — so a row that's ownership-validated but not
-yet verified would be accepted by the identity path and rejected by the
-standalone path. Don't promise identical errors in SDK docstrings; describe
-each path's behavior separately or just say "must belong to your org and be
-selectable for sending."
+**Minor error-boundary divergence (informational, not user-facing):** both
+paths require `VERIFIED` and 409 otherwise via `resolve_sending_domain`
+(`mailbox_create.py:147-155`). The only divergence is the 404 vs 409 boundary
+for very-early-lifecycle rows: the identity path's name→id prelookup
+(`agent_identity_subapp.py:614-623`) filters on `ownership_validated=True`,
+so a not-yet-ownership-validated domain 404s there but would 409 (with a
+status payload) via the standalone path. SDK docstrings can say one thing:
+"the domain must be a verified custom domain registered to your org."
 
 Both nullable-vs-missing cases must round-trip correctly through the SDK.
 Naive `if (opts.sendingDomainId) body.sending_domain_id = ...` collapses `null`
@@ -159,21 +159,24 @@ from `~/servers/src/data_models/sending_domain.py:16-52`:
 | `degraded` | Previously-verified row regressed; one or more required records no longer match. Re-verifies on next poller pass. |
 | `pending_deletion` | Customer initiated DELETE; reversible for 24h before hard-delete. |
 
-TS shape — string-literal union (the SDK uses literal unions over enums for
-JSON-friendly wire compatibility):
+TS shape — `export enum`, matching the existing convention in
+`mail/types.ts` (`FilterMode`, `MessageDirection`, `ForwardMode`,
+`ThreadFolder`, `MailRuleAction`, `MailRuleMatchType`, `ContactRuleStatus`
+are all enums):
 
 ```ts
-export type SendingDomainStatus =
-  | "not_started"
-  | "awaiting_ownership"
-  | "pending"
-  | "dns_invalid"
-  | "verifying"
-  | "verified"
-  | "failed"
-  | "pending_dkim_rotation"
-  | "degraded"
-  | "pending_deletion";
+export enum SendingDomainStatus {
+  NOT_STARTED = "not_started",
+  AWAITING_OWNERSHIP = "awaiting_ownership",
+  PENDING = "pending",
+  DNS_INVALID = "dns_invalid",
+  VERIFYING = "verifying",
+  VERIFIED = "verified",
+  FAILED = "failed",
+  PENDING_DKIM_ROTATION = "pending_dkim_rotation",
+  DEGRADED = "degraded",
+  PENDING_DELETION = "pending_deletion",
+}
 ```
 
 Python shape — `StrEnum`, mirroring server:
@@ -267,10 +270,9 @@ will leak the field at one layer of the SDK and hide it at another.
   `sending_domain: str | None = _UNSET` (using the same sentinel pattern).
 
 **(b) `to_wire` / `identityMailboxCreateOptionsToWire` — must preserve `null`.**
-Current TS impl returns `Record<string, string>` (`identities/types.ts:205-211`)
-and Python `to_wire()` returns `dict[str, str]` (`identities/types.py:33`).
-Both must widen the return type to allow `null` (TS: `Record<string, unknown>`;
-Python: `dict[str, Any]`) and gate on presence rather than truthiness:
+Widen TS return to `Record<string, unknown>` and Python to `dict[str, Any]`
+(matches the dominant idiom — `mailboxes.ts:53`, `identities/types.py:64`).
+Gate on presence, not truthiness:
 ```ts
 if ("sendingDomain" in options) body["sending_domain"] = options.sendingDomain;
 ```
@@ -293,6 +295,11 @@ Required updates:
 - Python — `create_identity` kwargs: add `sending_domain: str | None = _UNSET`.
   Pass through to `IdentityMailboxCreateOptions`. Update the gate to imply
   mailbox creation when `sending_domain is not _UNSET`.
+
+**Note on `null`:** the gate covers explicit `null` too — a user passing
+`sendingDomain: null` is asking for a platform-domain mailbox and that
+should imply mailbox creation, exactly as `emailLocalPart: ""` would. The
+`"sendingDomain" in options` / `is not _UNSET` checks already do this.
 
 **Do not** add `sendingDomainId` to the identity path. The two paths use
 different field names because the server does — keep them aligned.
@@ -420,10 +427,10 @@ little by wrapping them now. Easy to add later if requested.
 - **`setDefault` return type**: bare `string | null` / `str | None`, not a
   wrapped `SetDefaultResult` object. Server response has one nullable field;
   ceremony not warranted.
-- **Identity-vs-standalone error semantics**: not identical. Standalone
-  rejects non-`VERIFIED`; identity accepts `ownership_validated = True` even
-  if not yet `VERIFIED`. Document each path's behavior separately rather
-  than promising parity.
+- **Identity-vs-standalone error semantics**: both require `VERIFIED` (both
+  paths funnel through `resolve_sending_domain` which 409s otherwise). Only
+  divergence is 404 vs 409 boundary for not-yet-`ownership_validated` rows.
+  SDK docstrings can say "must be a verified custom domain" for both.
 - **Identity-mailbox response shape**: server already includes `sending_domain`
   (typed as `MailboxResponse`) — SDK just needs to parse it on `IdentityMailbox`.
 - **High-level identity helpers** (`createIdentity` / `create_identity`):
