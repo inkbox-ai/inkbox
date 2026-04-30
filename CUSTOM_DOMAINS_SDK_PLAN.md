@@ -18,9 +18,14 @@ now — see "Out of scope" at the end.
 
 ### Server (`~/servers/`)
 - Routes: `src/apps/api_server/subapps/domains/routes/domain_routes.py`
-- Contracts: `src/data_models/api_contracts/domains.py`
+- Domain contracts: `src/data_models/api_contracts/domains.py`
 - Mailbox-create domain resolution: `src/mail/mailbox_create.py` (lines 89–199)
-- Mailbox-create request: `src/data_models/api_contracts/mail/mailbox.py`
+- Standalone mailbox request: `src/data_models/api_contracts/mail/mailbox.py`
+  (uses `sending_domain_id`)
+- Identity nested-mailbox request: `src/data_models/api_contracts/agent_identity.py:48`
+  (uses `sending_domain` — a **bare domain name**, not an id)
+- Self-signup contract: `src/data_models/api_contracts/agent_signup.py`
+  (no `sending_domain` / `mailbox` sub-object — signup stays on platform domain)
 
 ### Console (`~/console/`)
 - API client: `src/lib/domain-client.ts`
@@ -32,61 +37,77 @@ now — see "Out of scope" at the end.
 
 | Endpoint | Purpose | Auth |
 |---|---|---|
-| `GET /v1/domains` (optional `?status=verified`) | list domains | any API key / JWT |
-| `POST /v1/domains/{domain_name}/set-default` | set org default; pass `inkboxmail.com` to clear | **admin-scoped API key** or JWT org admin |
-| `POST /v1/mail/mailboxes` with `sending_domain_id` | create mailbox on a chosen domain | any API key |
+| `GET /api/v1/domains` (optional `?status=verified`) | list domains | any API key / JWT |
+| `POST /api/v1/domains/{domain_name}/set-default` | set org default; pass `inkboxmail.com` to clear | **admin-scoped API key** or JWT org admin |
+| `POST /api/v1/mail/mailboxes` with `sending_domain_id` | create standalone mailbox on a chosen domain | any API key |
+| `POST /api/v1/identities` with `mailbox.sending_domain` | create identity + nested mailbox on a chosen domain | any API key |
 
-Mailbox `sending_domain_id` semantics (from `mailbox_create.py`):
+Domain-selection semantics (apply equally to both mailbox-create paths, just
+under different field names):
 - **Omitted** → uses org's verified default, falls back to platform.
 - **`null`** → forces platform domain (`inkboxmail.com`), ignoring org default.
-- **String id** → must belong to org and be verified, else 404/409.
+- **String value** → must belong to org and be verified, else 404/409.
 
-Note both nullable-vs-missing cases must round-trip correctly through the SDK.
+The standalone endpoint takes the **id** (`sending_domain_id`); the identity
+endpoint takes the **bare domain name** (`sending_domain`). This asymmetry is
+intentional on the server and the SDK should mirror it under two distinct
+option names rather than papering over it. Magic-string acceptance ("does this
+look like an id or a name?") is a worse footgun than two clearly-typed fields.
+
+Both nullable-vs-missing cases must round-trip correctly through the SDK.
 Naive `if (opts.sendingDomainId) body.sending_domain_id = ...` collapses `null`
 into "omitted" and breaks the explicit-platform case. Use `'sendingDomainId' in opts`
-in TS and a sentinel (e.g. module-level `UNSET`) in Python.
+in TS (precedent: `webhookUrl` handling at `sdk/typescript/src/mail/resources/mailboxes.ts:82`).
+Use the existing `_UNSET = object()` sentinel pattern in Python (precedent:
+`sdk/python/inkbox/mail/resources/mailboxes.py:17,67-69`) — do not introduce a
+new `_Unset` type.
 
 ## Design
 
-### New `domains` resource
+### New `domains` resource — top-level, not under `mail.*`
 
-TS: `sdk/typescript/src/mail/resources/domains.ts` → `DomainsResource`
-Python: `sdk/python/inkbox/mail/resources/domains.py` → `DomainsResource`
+There is no `mail` namespace on either SDK today. Both expose resources flat:
+- TS: `inkbox.mailboxes` at `sdk/typescript/src/inkbox.ts:207`.
+- Python: `client.mailboxes` at `sdk/python/inkbox/client.py:193`.
 
-Place it under `mail/` since they are *sending* domains used by mail. Mirrors
-how `numbers` lives under `phone/`.
+Domains also live at `/api/v1/domains`, **not** `/api/v1/mail/domains`, so they
+shouldn't share `mailHttp`. They need their own transport rooted at
+`/api/v1/domains` (or reuse the existing `apiHttp` rooted at `/api/v1` and
+prefix paths with `/domains`).
+
+**Public surface:**
+- TS: `inkbox.domains` (top-level getter on `Inkbox`).
+- Python: `client.domains` (top-level property on `Inkbox`).
+
+File layout under `mail/resources/` is fine internally — that's just where the
+file lives — but the public accessor is flat. Implementation file paths:
+- TS: `sdk/typescript/src/mail/resources/domains.ts` → `DomainsResource`
+- Python: `sdk/python/inkbox/mail/resources/domains.py` → `DomainsResource`
 
 Wire-up:
-- TS: register on `Inkbox` class in `sdk/typescript/src/inkbox.ts` (constructor
-  alongside `_mailboxes`, expose via `mail.domains` getter — match how
-  `mail.mailboxes` is exposed).
-- Python: register in `sdk/python/inkbox/client.py` alongside `_mailboxes`,
-  expose via `client.mail.domains` property.
-
-Verify the exact `mail.*` accessor naming when implementing — both SDKs already
-expose mailboxes through a mail namespace; reuse it.
+- TS: build a transport in `Inkbox` constructor (alongside `mailHttp`,
+  `phoneHttp`, etc.) rooted at `${apiRoot}/domains`. Construct
+  `DomainsResource(domainsHttp)`. Expose `get domains()`.
+- Python: same — build `self._domains_http` rooted at `<api_root>/domains`,
+  construct `self._domains = DomainsResource(self._domains_http)`, expose
+  `@property def domains(self)`.
 
 ### Methods (both SDKs, same shape)
 
 ```ts
 // TS
-mail.domains.list(opts?: { status?: SendingDomainStatus }): Promise<Domain[]>
-mail.domains.setDefault(domainName: string): Promise<{ defaultDomain: string | null }>
+inkbox.domains.list(opts?: { status?: SendingDomainStatus }): Promise<Domain[]>
+inkbox.domains.setDefault(domainName: string): Promise<{ defaultDomain: string | null }>
 ```
 
 ```python
 # Python
-client.mail.domains.list(*, status: SendingDomainStatus | None = None) -> list[Domain]
-client.mail.domains.set_default(domain_name: str) -> SetDefaultResult
+client.domains.list(*, status: SendingDomainStatus | None = None) -> list[Domain]
+client.domains.set_default(domain_name: str) -> SetDefaultResult
 ```
 
-`Domain` type mirrors server `DomainResponse`: `id`, `domain`, `status`,
-`isDefault`/`is_default`, `ownershipValidated`, `verifiedAt`, timestamps. Skip
-DKIM / token / KMS fields — they aren't useful for SDK callers and the server
-already excludes private key material.
-
-`SendingDomainStatus` is an enum/literal union of server statuses. Take the
-list directly from `src/data_models/sending_domain.py` to avoid drift.
+`SendingDomainStatus` is an enum/literal union. Take the values from
+`~/servers/src/data_models/sending_domain.py` to avoid drift.
 
 `setDefault` docstring must call out:
 - Pass the **bare domain name** (e.g. `"mail.acme.com"`), not the id.
@@ -95,7 +116,34 @@ list directly from `src/data_models/sending_domain.py` to avoid drift.
 - Requires an **admin-scoped API key**. The server returns 403 otherwise — let
   that surface as the SDK's normal auth error; do not pre-check client-side.
 
-### Mailbox create signature change
+### `Domain` SDK type — explicit projection
+
+The server `DomainResponse` (`domains.py:136+`) actually contains:
+`id`, `organization_id`, `domain`, `mail_from_subdomain`, `is_default`,
+`status`, `failure_reason`, `verified_at`, `last_checked_at`, `dkim_selector`,
+`ownership_token`. There are no `created_at` / `updated_at` / `ownership_validated`
+fields on the wire (those exist on the ORM model but aren't in the contract).
+
+The SDK exposes a deliberately narrowed projection — explicit allowlist, not
+"everything except DKIM/token." Fields:
+
+| SDK field (TS / Python) | Server field | Notes |
+|---|---|---|
+| `id` | `id` | |
+| `domain` | `domain` | bare domain name |
+| `status` | `status` | `SendingDomainStatus` |
+| `isDefault` / `is_default` | `is_default` | |
+| `verifiedAt` / `verified_at` | `verified_at` | nullable |
+| `failureReason` / `failure_reason` | `failure_reason` | nullable; useful for diagnosing terminal states |
+| `lastCheckedAt` / `last_checked_at` | `last_checked_at` | nullable; useful for polling UIs |
+
+Excluded: `organization_id` (implied by API key), `mail_from_subdomain`
+(always `"mail"` in v1), `dkim_selector` and `ownership_token` (operational
+detail customers don't need from the SDK to send mail).
+
+If callers later ask for the excluded fields, add them — but start small.
+
+### Mailbox create signature — standalone
 
 TS — `sdk/typescript/src/mail/resources/mailboxes.ts:48`:
 ```ts
@@ -103,7 +151,7 @@ async create(options: {
   agentHandle: string;
   displayName?: string;
   emailLocalPart?: string;
-  sendingDomainId?: string | null;   // NEW
+  sendingDomainId?: string | null;   // NEW — id, omit/null/string semantics
 }): Promise<Mailbox>
 ```
 
@@ -115,46 +163,73 @@ def create(
     agent_handle: str,
     display_name: str | None = None,
     email_local_part: str | None = None,
-    sending_domain_id: str | None | _Unset = UNSET,  # NEW
+    sending_domain_id: str | None = _UNSET,  # type: ignore[assignment]
 ) -> Mailbox: ...
 ```
 
-Also update the `IdentityMailboxCreateOptions` types used by the agent-signup
-flow (`sdk/typescript/src/identities/types.ts:16` and
-`sdk/python/inkbox/identities/types.py:18`) and any internal call sites that
-forward to mailbox create. Verify whether the identity endpoint takes
-`sending_domain_id` or `sending_domain` (console uses the latter for identity
-mailbox payload — line 36–45 of `domain-selector.tsx`); align with whatever
-the server actually accepts at `POST /v1/identities`.
+### Identity create signature — nested mailbox
+
+`POST /v1/identities` carries a `mailbox` sub-object with `sending_domain`
+(bare name, not id). Update `IdentityMailboxCreateOptions` accordingly:
+- TS: `sdk/typescript/src/identities/types.ts:16` — add `sendingDomain?: string | null;`
+- Python: `sdk/python/inkbox/identities/types.py:18` — add
+  `sending_domain: str | None = _UNSET` (using the same sentinel pattern).
+
+**Do not** add `sendingDomainId` here. The two paths use different field names
+because the server does — keep them aligned.
+
+### Mailbox response — parse `sending_domain`
+
+The mailbox response (`~/servers/src/data_models/api_contracts/mail/mailbox.py:155`)
+includes `sending_domain: str` — the bare domain the server actually picked
+after default resolution. Callers need this to confirm which domain a mailbox
+landed on (especially when they omitted the field and inherited the org
+default).
+
+Update the SDK `Mailbox` type and parser:
+- TS: `sdk/typescript/src/mail/types.ts` — add `sendingDomain: string` to
+  `Mailbox` and map it in `parseMailbox`.
+- Python: `sdk/python/inkbox/mail/types.py` — add `sending_domain: str` to the
+  `Mailbox` dataclass/model.
+
+Apply the same change to the identity-mailbox response shape if it has its
+own type (verify during implementation).
 
 ### Tests
 
-- TS: add unit tests next to existing mailbox/numbers tests covering (a) list
-  passes through `?status=`, (b) `setDefault` posts to the right URL, (c)
-  mailbox create serializes `sendingDomainId` correctly for the three cases:
-  omitted, `null`, string.
+- TS: add unit tests next to existing mailbox/numbers tests covering
+  (a) `domains.list()` passes through `?status=`,
+  (b) `domains.setDefault()` posts to the right URL and parses the response,
+  (c) `mailboxes.create()` serializes `sendingDomainId` correctly for the
+      three cases: omitted, `null`, string,
+  (d) identity create serializes `sendingDomain` (name, not id) correctly for
+      the same three cases,
+  (e) `parseMailbox` reads `sending_domain` off the response.
 - Python: parallel tests under `sdk/python/tests/`.
-- No live integration tests — the server already has
+- No live integration tests — server already has
   `tests/api_integration/test_domains_lifecycle.py`.
 
 ## Skill updates
 
 Add a short "Custom email domains" subsection to each skill that documents
-mailbox creation. Keep it tight: 5–10 lines, one code sample per language.
+mailbox/identity creation. Keep it tight: 5–10 lines, one code sample per
+language.
 
 - `skills/inkbox-ts/SKILL.md` — near line 429 (mailbox section). Document
-  `mail.domains.list()`, `mail.domains.setDefault()`, and the new
-  `sendingDomainId` option on `mailboxes.create()`. Note admin scope for
-  `setDefault`.
+  `inkbox.domains.list()`, `inkbox.domains.setDefault()`, the new
+  `sendingDomainId` option on `mailboxes.create()`, and the new `sendingDomain`
+  option on identity create. Note admin scope for `setDefault`.
 - `skills/inkbox-python/SKILL.md` — parallel section in the mailboxes area.
 - `skills/inkbox-openclaw/SKILL.md` — mirrors `inkbox-ts`; copy the same block.
-- `skills/inkbox-agent-self-signup/SKILL.md` — only mention the
-  `sending_domain_id` / `sendingDomainId` field on the mailbox sub-object;
-  don't document `list`/`setDefault` here (signup flow doesn't need them).
 - `skills/inkbox-cli/SKILL.md` — **only update if we ship the CLI changes
   below**. Otherwise skip.
 - `skills/inkbox-all/SKILL.md` — index file; no content change unless it lists
   resources, in which case add `domains`.
+
+**Do not update `skills/inkbox-agent-self-signup/SKILL.md`.** The self-signup
+contract (`agent_signup.py`) has no `mailbox` sub-object and no
+`sending_domain` field — signup is fixed to the platform domain. An earlier
+draft of this plan was wrong about that.
 
 ## CLI (open question — recommend deferring)
 
@@ -163,8 +238,8 @@ Adding them is straightforward but out of the user's stated scope. Suggest:
 
 - **Defer**: ship SDK + skills now; do CLI in a follow-up.
 - **If we do it**: add `inkbox domain list`, `inkbox domain set-default <name>`,
-  and `--domain <id>` flag on `inkbox mailbox create`. Update
-  `skills/inkbox-cli/SKILL.md` line 246.
+  `--domain <id>` flag on `inkbox mailbox create`, and `--domain <name>` flag
+  on identity create. Update `skills/inkbox-cli/SKILL.md` line 246.
 
 Will confirm before touching CLI.
 
@@ -177,23 +252,30 @@ little by wrapping them now. Easy to add later if requested.
 
 ## Suggested PR breakdown
 
-1. **PR 1** — TS + Python `domains` resource (`list`, `setDefault`) + types +
-   tests. No mailbox change yet.
-2. **PR 2** — `sendingDomainId` / `sending_domain_id` on mailbox create
-   (both SDKs) + identity mailbox options + tests.
-3. **PR 3** — Skill doc updates.
-4. **PR 4 (optional)** — CLI `domain list` / `domain set-default` /
-   `--domain` flag.
+1. **PR 1** — TS + Python `domains` resource (`list`, `setDefault`),
+   `Domain` type, `Mailbox.sendingDomain` parsing, `sendingDomainId` on
+   `mailboxes.create()`, `sendingDomain` on identity create + tests. Folded
+   together because PR 1 (resource only) is shippable but useless until the
+   mailbox-side wiring lands; users can't actually attach a mailbox to a
+   non-default domain without it.
+2. **PR 2** — Skill doc updates (inkbox-ts, inkbox-python, inkbox-openclaw,
+   inkbox-all if applicable).
+3. **PR 3 (optional)** — CLI `domain list` / `domain set-default` /
+   `--domain` flags + inkbox-cli skill update.
 
-Splitting (1) and (2) keeps each PR small and lets the domains resource ship
-even if the mailbox-side change needs revision.
+## Resolved design points
 
-## Open questions to resolve before coding
-
-1. Identity mailbox payload field: is it `sending_domain` (string name, per
-   console) or `sending_domain_id` (per standalone mailbox)? Confirm against
-   `~/servers/src/apps/api_server/subapps/identities/`.
-2. Confirm the exact `mail.*` accessor on each SDK (is it `client.mail.mailboxes`
-   or `client.mailboxes`?) so the new `domains` resource lands in the right place.
-3. Do we want a typed error for the 409 `default_domain_unavailable` case on
-   mailbox create, or let it surface as a generic API error? (Lean: generic.)
+- **Identity payload field name**: `sending_domain` (bare domain name), per
+  `agent_identity.py:48`. SDK exposes this as `sendingDomain` / `sending_domain`.
+- **Standalone mailbox payload field name**: `sending_domain_id` (id), per
+  `mail/mailbox.py`. SDK exposes this as `sendingDomainId` / `sending_domain_id`.
+- **Public accessor location**: top-level (`inkbox.domains` /
+  `client.domains`) — there is no `mail.*` namespace.
+- **Transport**: rooted at `/api/v1/domains`, not `/api/v1/mail`.
+- **Mailbox response**: `sending_domain` is parsed and exposed on the SDK
+  `Mailbox` type so callers can read which domain the server picked.
+- **Self-signup**: not updated; signup has no domain selector.
+- **Sentinels**: TS uses `'key' in opts` (existing pattern); Python uses the
+  existing `_UNSET = object()` sentinel.
+- **Typed 409 for `default_domain_unavailable`**: skipped — surface as a
+  generic API error.
