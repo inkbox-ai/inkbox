@@ -1,6 +1,6 @@
 {
   "name": "@inkbox/cli",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "description": "CLI for the Inkbox API",
   "license": "MIT",
   "type": "module",
@@ -17,7 +17,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@inkbox/sdk": "^0.2.14",
+    "@inkbox/sdk": "^0.2.15",
     "commander": "^13.0.0"
   },
   "devDependencies": {
