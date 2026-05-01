@@ -10,10 +10,31 @@ import httpx
 import pytest
 
 from inkbox import Inkbox
+from inkbox.mail.resources.messages import MessagesResource
+from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.calls import CallsResource
+from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKeysResource
+
+
+class TestInkboxPublicAccessors:
+    def test_exposes_documented_org_level_resources(self):
+        client = Inkbox(api_key="sk-test")
+
+        assert client.messages is client._messages
+        assert isinstance(client.messages, MessagesResource)
+        assert client.threads is client._threads
+        assert isinstance(client.threads, ThreadsResource)
+        assert client.calls is client._calls
+        assert isinstance(client.calls, CallsResource)
+        assert client.texts is client._texts
+        assert isinstance(client.texts, TextsResource)
+        assert client.transcripts is client._transcripts
+        assert isinstance(client.transcripts, TranscriptsResource)
+
+        client.close()
 
 
 class TestInkboxPhoneResources:
