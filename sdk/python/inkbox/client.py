@@ -209,14 +209,34 @@ class Inkbox:
         return self._mailboxes
 
     @property
+    def messages(self) -> MessagesResource:
+        """Access org-level message operations (list, get, send, delete, flags)."""
+        return self._messages
+
+    @property
+    def threads(self) -> ThreadsResource:
+        """Access org-level thread operations (list, get, delete)."""
+        return self._threads
+
+    @property
     def phone_numbers(self) -> PhoneNumbersResource:
         """Access org-level phone number operations (list, get, provision, release)."""
         return self._numbers
 
     @property
+    def calls(self) -> CallsResource:
+        """Access org-level call operations (list, get, place)."""
+        return self._calls
+
+    @property
     def texts(self) -> TextsResource:
         """Access org-level text message operations (list, get, search, conversations)."""
         return self._texts
+
+    @property
+    def transcripts(self) -> TranscriptsResource:
+        """Access org-level call transcript operations."""
+        return self._transcripts
 
     @property
     def vault(self) -> VaultResource:

@@ -2,7 +2,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { Inkbox } from "../src/inkbox.js";
 import { MailboxesResource } from "../src/mail/resources/mailboxes.js";
+import { MessagesResource } from "../src/mail/resources/messages.js";
+import { ThreadsResource } from "../src/mail/resources/threads.js";
 import { PhoneNumbersResource } from "../src/phone/resources/numbers.js";
+import { CallsResource } from "../src/phone/resources/calls.js";
+import { TextsResource } from "../src/phone/resources/texts.js";
+import { TranscriptsResource } from "../src/phone/resources/transcripts.js";
 import { IdentitiesResource } from "../src/identities/resources/identities.js";
 import { AgentIdentity } from "../src/agent_identity.js";
 import { VaultResource } from "../src/vault/resources/vault.js";
@@ -53,9 +58,22 @@ describe("Inkbox constructor", () => {
     expect(ink.mailboxes).toBeInstanceOf(MailboxesResource);
   });
 
+  it("exposes mail messages and threads accessors", () => {
+    const ink = makeInkbox();
+    expect(ink.messages).toBeInstanceOf(MessagesResource);
+    expect(ink.threads).toBeInstanceOf(ThreadsResource);
+  });
+
   it("exposes phoneNumbers accessor", () => {
     const ink = makeInkbox();
     expect(ink.phoneNumbers).toBeInstanceOf(PhoneNumbersResource);
+  });
+
+  it("exposes phone calls, texts, and transcripts accessors", () => {
+    const ink = makeInkbox();
+    expect(ink.calls).toBeInstanceOf(CallsResource);
+    expect(ink.texts).toBeInstanceOf(TextsResource);
+    expect(ink.transcripts).toBeInstanceOf(TranscriptsResource);
   });
 
   it("strips trailing slash from baseUrl", () => {

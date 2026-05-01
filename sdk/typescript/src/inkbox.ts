@@ -223,8 +223,14 @@ export class Inkbox {
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
 
+  /** Call operations (list, get, place). */
+  get calls(): CallsResource { return this._calls; }
+
   /** Text message operations (list, get, search, conversations). */
   get texts(): TextsResource { return this._texts; }
+
+  /** Call transcript operations. */
+  get transcripts(): TranscriptsResource { return this._transcripts; }
 
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }
