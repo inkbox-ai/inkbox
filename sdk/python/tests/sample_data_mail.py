@@ -3,10 +3,27 @@
 MAILBOX_DICT = {
     "id": "aaaa1111-0000-0000-0000-000000000001",
     "email_address": "agent01@inkbox.ai",
+    "sending_domain": "inkbox.ai",
     "display_name": "Agent 01",
     "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:00:00Z",
+}
+
+DOMAIN_VERIFIED_DICT = {
+    "id": "sending_domain_aaaa1111-0000-0000-0000-000000000001",
+    "domain": "mail.acme.com",
+    "status": "verified",
+    "is_default": True,
+    "verified_at": "2026-03-09T00:00:00Z",
+}
+
+DOMAIN_PENDING_DICT = {
+    "id": "sending_domain_bbbb2222-0000-0000-0000-000000000002",
+    "domain": "newsletter.acme.com",
+    "status": "pending",
+    "is_default": False,
+    "verified_at": None,
 }
 
 MESSAGE_DICT = {

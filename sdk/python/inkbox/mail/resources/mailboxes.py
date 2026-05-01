@@ -43,6 +43,7 @@ class MailboxesResource:
         agent_handle: str,
         display_name: str | None = None,
         email_local_part: str | None = None,
+        sending_domain_id: str | None = _UNSET,  # type: ignore[assignment]
     ) -> Mailbox:
         """Create and link a mailbox to an existing identity.
 
@@ -51,12 +52,20 @@ class MailboxesResource:
             display_name: Optional human-readable sender name.
             email_local_part: Optional requested local part. If omitted, the
                 server generates a random address.
+            sending_domain_id: Optional sending-domain selector by **row id**
+                (e.g. ``"sending_domain_<uuid>"``). Omit to inherit the org's
+                default custom domain (or fall through to the platform
+                default if none). Pass ``None`` to force the platform
+                default. Pass a verified domain's id to bind this mailbox
+                to it.
         """
         body: dict[str, Any] = {"agent_handle": agent_handle}
         if display_name is not None:
             body["display_name"] = display_name
         if email_local_part is not None:
             body["email_local_part"] = email_local_part
+        if sending_domain_id is not _UNSET:
+            body["sending_domain_id"] = sending_domain_id
         data = self._http.post(_BASE, json=body)
         return Mailbox._from_dict(data)
 
@@ -92,7 +101,9 @@ class MailboxesResource:
             body["webhook_url"] = webhook_url
         if filter_mode is not _UNSET:
             body["filter_mode"] = (
-                filter_mode.value if isinstance(filter_mode, FilterMode) else filter_mode
+                filter_mode.value
+                if isinstance(filter_mode, FilterMode)
+                else filter_mode
             )
         data = self._http.patch(
             f"{_BASE}/{email_address}",

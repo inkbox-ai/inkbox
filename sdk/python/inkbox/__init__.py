@@ -19,6 +19,7 @@ from inkbox.exceptions import (
 # Mail types
 from inkbox.mail.types import (
     ContactRuleStatus,
+    Domain,
     FilterMode,
     FilterModeChangeNotice,
     ForwardMode,
@@ -29,6 +30,7 @@ from inkbox.mail.types import (
     Message,
     MessageDetail,
     MessageDirection,
+    SendingDomainStatus,
     Thread,
     ThreadDetail,
     ThreadFolder,
@@ -145,6 +147,7 @@ __all__ = [
     "RedundantContactAccessGrantError",
     # Mail types
     "ContactRuleStatus",
+    "Domain",
     "FilterMode",
     "FilterModeChangeNotice",
     "ForwardMode",
@@ -155,6 +158,7 @@ __all__ = [
     "Message",
     "MessageDetail",
     "MessageDirection",
+    "SendingDomainStatus",
     "Thread",
     "ThreadDetail",
     "ThreadFolder",

@@ -123,6 +123,10 @@ phone    = identity.provision_phone_number(type="toll_free")      # provisions +
 print(identity.email_address)
 print(phone.number)
 
+# Pin the identity's mailbox to a verified custom sending domain
+# (bare name; see "Custom Sending Domains" below).
+inkbox.create_identity("sales-bot", sending_domain="mail.acme.com")
+
 # Link an existing mailbox or phone number instead of creating new ones
 identity.assign_mailbox("mailbox-uuid-here")
 identity.assign_phone_number("phone-number-uuid-here")
@@ -525,6 +529,11 @@ mailbox = inkbox.mailboxes.create(
     display_name="Support Inbox",
 )
 print(mailbox.email_address)
+print(mailbox.sending_domain)  # bare domain the mailbox sends from
+
+# Pin a new mailbox to a verified custom sending domain (or platform default)
+inkbox.mailboxes.create(agent_handle="support-agent", sending_domain_id="sending_domain_<uuid>")
+inkbox.mailboxes.create(agent_handle="support-agent", sending_domain_id=None)  # force platform
 
 # Update display name or webhook URL
 inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")
@@ -538,6 +547,28 @@ for msg in results:
 
 # Delete a mailbox
 inkbox.mailboxes.delete(mailbox.email_address)
+```
+
+---
+
+## Custom Sending Domains
+
+If your org has registered custom sending domains in the console, list them and (admin-only) set the org default. New mailboxes inherit the org default unless you pass `sending_domain_id` (`mailboxes.create`) or `sending_domain` (`create_identity`). Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
+
+```python
+from inkbox import SendingDomainStatus
+
+# List custom sending domains for the org (optionally filter by status)
+verified = inkbox.domains.list(status=SendingDomainStatus.VERIFIED)
+for d in verified:
+    print(d.id, d.domain, d.status, d.is_default)
+
+# Set the org default — admin-scoped API key only.
+# Returns the bare new default domain name (or None when reverted to platform).
+new_default = inkbox.domains.set_default("mail.acme.com")
+
+# Pass the platform domain (e.g. "inkboxmail.com" in prod) to revert.
+inkbox.domains.set_default("inkboxmail.com")  # -> None
 ```
 
 ---

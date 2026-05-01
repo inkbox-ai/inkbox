@@ -32,11 +32,11 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 - `inkbox-python`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
-  Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, contacts, notes, contact rules, vault, and signing keys.
+  Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, contacts, notes, contact rules, custom sending domains, vault, and signing keys.
 
 - `inkbox-ts`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-ts/SKILL.md
-  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, phone, text/SMS, contacts, notes, contact rules, vault, and signing keys.
+  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, phone, text/SMS, contacts, notes, contact rules, custom sending domains, vault, and signing keys.
 
 ## Example Skills
 

@@ -201,9 +201,18 @@ export class AgentIdentity {
    *
    * @param options.displayName - Optional human-readable sender name.
    * @param options.emailLocalPart - Optional requested mailbox local part.
+   * @param options.sendingDomainId - Optional sending-domain selector by row id
+   *   (e.g. `"sending_domain_<uuid>"`). Omit to inherit the org's default
+   *   custom domain (or fall through to the platform default if none).
+   *   Pass `null` to force the platform default. Pass a verified domain's id
+   *   to bind this mailbox to it.
    */
   async createMailbox(
-    options: { displayName?: string; emailLocalPart?: string } = {},
+    options: {
+      displayName?: string;
+      emailLocalPart?: string;
+      sendingDomainId?: string | null;
+    } = {},
   ): Promise<IdentityMailbox> {
     const mailbox = await this._inkbox._mailboxes.create({
       agentHandle: this.agentHandle,
@@ -212,6 +221,7 @@ export class AgentIdentity {
     const linked: IdentityMailbox = {
       id: mailbox.id,
       emailAddress: mailbox.emailAddress,
+      sendingDomain: mailbox.sendingDomain,
       displayName: mailbox.displayName,
       filterMode: mailbox.filterMode,
       agentIdentityId: mailbox.agentIdentityId,

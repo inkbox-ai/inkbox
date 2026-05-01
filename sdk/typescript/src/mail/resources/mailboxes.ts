@@ -44,15 +44,22 @@ export class MailboxesResource {
    * @param options.displayName - Optional human-readable sender name.
    * @param options.emailLocalPart - Optional requested local part. If omitted,
    *   the server generates a random address.
+   * @param options.sendingDomainId - Optional sending-domain selector (the
+   *   row id, e.g. `"sending_domain_<uuid>"`). Omit to use the org's default
+   *   custom domain (or fall through to the platform default if none).
+   *   Pass `null` to force the platform default. Pass a verified domain's id
+   *   to bind this mailbox to it.
    */
   async create(options: {
     agentHandle: string;
     displayName?: string;
     emailLocalPart?: string;
+    sendingDomainId?: string | null;
   }): Promise<Mailbox> {
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.emailLocalPart !== undefined) body["email_local_part"] = options.emailLocalPart;
+    if ("sendingDomainId" in options) body["sending_domain_id"] = options.sendingDomainId;
     const data = await this.http.post<RawMailbox>(BASE, body);
     return parseMailbox(data);
   }

@@ -41,6 +41,10 @@ from inkbox.phone.types import (
 if TYPE_CHECKING:
     from inkbox.client import Inkbox
 
+# Local sentinel for "kwarg omitted" — distinct from explicit ``None``.
+# Mirrors the pattern in :mod:`inkbox.mail.resources.mailboxes`.
+_UNSET = object()
+
 
 class AgentIdentity:
     """An agent identity with convenience methods for its assigned channels.
@@ -246,16 +250,29 @@ class AgentIdentity:
         *,
         display_name: str | None = None,
         email_local_part: str | None = None,
+        sending_domain_id: str | None = _UNSET,  # type: ignore[assignment]
     ) -> IdentityMailbox:
-        """Create a new mailbox and link it to this identity."""
-        mailbox = self._inkbox._mailboxes.create(
-            agent_handle=self.agent_handle,
-            display_name=display_name,
-            email_local_part=email_local_part,
-        )
+        """Create a new mailbox and link it to this identity.
+
+        Args:
+            display_name: Optional human-readable sender name.
+            email_local_part: Optional requested local part.
+            sending_domain_id: Optional sending-domain selector by row id.
+                Omit to inherit the org default; pass ``None`` to force the
+                platform default; pass a verified domain's id to bind.
+        """
+        create_kwargs: dict[str, Any] = {
+            "agent_handle": self.agent_handle,
+            "display_name": display_name,
+            "email_local_part": email_local_part,
+        }
+        if sending_domain_id is not _UNSET:
+            create_kwargs["sending_domain_id"] = sending_domain_id
+        mailbox = self._inkbox._mailboxes.create(**create_kwargs)
         linked = IdentityMailbox(
             id=mailbox.id,
             email_address=mailbox.email_address,
+            sending_domain=mailbox.sending_domain,
             display_name=mailbox.display_name,
             filter_mode=mailbox.filter_mode,
             created_at=mailbox.created_at,

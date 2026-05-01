@@ -66,6 +66,40 @@ export enum ContactRuleStatus {
   PAUSED = "paused",
 }
 
+/** Lifecycle status of a custom sending domain. */
+export enum SendingDomainStatus {
+  NOT_STARTED = "not_started",
+  AWAITING_OWNERSHIP = "awaiting_ownership",
+  PENDING = "pending",
+  DNS_INVALID = "dns_invalid",
+  VERIFYING = "verifying",
+  VERIFIED = "verified",
+  FAILED = "failed",
+  PENDING_DKIM_ROTATION = "pending_dkim_rotation",
+  DEGRADED = "degraded",
+  PENDING_DELETION = "pending_deletion",
+}
+
+/**
+ * A custom sending domain registered to your organisation.
+ *
+ * Returned by `inkbox.domains.list()`. Mailboxes can be bound to a
+ * verified domain via the `sendingDomainId` option on
+ * `mailboxes.create()` or `sendingDomain` on `createIdentity`.
+ */
+export interface Domain {
+  /** Sending-domain row id (e.g. `"sending_domain_<uuid>"`). */
+  id: string;
+  /** Bare registered domain (e.g. `"mail.acme.com"`). */
+  domain: string;
+  /** Current lifecycle status. Only `VERIFIED` rows are usable for sending. */
+  status: SendingDomainStatus;
+  /** True if this is the org's default sending domain (at most one). */
+  isDefault: boolean;
+  /** First time this domain reached `VERIFIED`. `null` if never verified. */
+  verifiedAt: Date | null;
+}
+
 export interface FilterModeChangeNotice {
   /** The mode the resource was just flipped to. */
   newFilterMode: FilterMode;
@@ -85,6 +119,12 @@ export interface FilterModeChangeNotice {
 export interface Mailbox {
   id: string;
   emailAddress: string;
+  /**
+   * Bare domain the mailbox sends from, derived from `emailAddress`.
+   * Either the platform default (e.g. `"inkboxmail.com"`) or a
+   * verified custom domain.
+   */
+  sendingDomain: string;
   displayName: string | null;
   webhookUrl: string | null;
   filterMode: FilterMode;
@@ -169,6 +209,7 @@ export interface RawFilterModeChangeNotice {
 export interface RawMailbox {
   id: string;
   email_address: string;
+  sending_domain?: string;
   display_name: string | null;
   webhook_url: string | null;
   filter_mode?: string;
@@ -176,6 +217,18 @@ export interface RawMailbox {
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface RawDomain {
+  id: string;
+  domain: string;
+  status: string;
+  is_default: boolean;
+  verified_at: string | null;
+}
+
+export interface RawSetDefaultDomainResponse {
+  default_domain: string | null;
 }
 
 export interface RawMessage {
@@ -249,6 +302,7 @@ export function parseMailbox(r: RawMailbox): Mailbox {
   return {
     id: r.id,
     emailAddress: r.email_address,
+    sendingDomain: r.sending_domain ?? r.email_address.split("@")[1] ?? "",
     displayName: r.display_name,
     webhookUrl: r.webhook_url,
     filterMode: (r.filter_mode as FilterMode) ?? FilterMode.BLACKLIST,
@@ -258,6 +312,16 @@ export function parseMailbox(r: RawMailbox): Mailbox {
     filterModeChangeNotice: r.filter_mode_change_notice
       ? parseFilterModeChangeNotice(r.filter_mode_change_notice)
       : null,
+  };
+}
+
+export function parseDomain(r: RawDomain): Domain {
+  return {
+    id: r.id,
+    domain: r.domain,
+    status: r.status as SendingDomainStatus,
+    isDefault: r.is_default,
+    verifiedAt: r.verified_at ? new Date(r.verified_at) : null,
   };
 }
 

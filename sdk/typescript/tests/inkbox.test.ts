@@ -174,6 +174,75 @@ describe("Inkbox.createIdentity", () => {
   });
 });
 
+describe("Inkbox.createIdentity sendingDomain", () => {
+  function mockIdsResource(ink: Inkbox) {
+    vi.spyOn(ink._idsResource, "create").mockResolvedValue({
+      id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
+      agentHandle: RAW_IDENTITY.agent_handle,
+      emailAddress: RAW_IDENTITY.email_address,
+      createdAt: RAW_IDENTITY.created_at,
+      updatedAt: RAW_IDENTITY.updated_at,
+    });
+    vi.spyOn(ink._idsResource, "get").mockResolvedValue({
+      id: RAW_IDENTITY_DETAIL.id,
+      organizationId: RAW_IDENTITY_DETAIL.organization_id,
+      agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
+      emailAddress: RAW_IDENTITY_DETAIL.email_address,
+      createdAt: RAW_IDENTITY_DETAIL.created_at,
+      updatedAt: RAW_IDENTITY_DETAIL.updated_at,
+      mailbox: null,
+      phoneNumber: null,
+    });
+  }
+
+  it("does not create a mailbox when only handle is given", async () => {
+    const ink = makeInkbox();
+    mockIdsResource(ink);
+
+    await ink.createIdentity("sales-agent");
+
+    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
+    expect(call.mailbox).toBeUndefined();
+  });
+
+  it("triggers mailbox creation when sendingDomain is the only option (presence implies mailbox)", async () => {
+    const ink = makeInkbox();
+    mockIdsResource(ink);
+
+    await ink.createIdentity("sales-agent", { sendingDomain: "mail.acme.com" });
+
+    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
+    expect(call.mailbox).toEqual({
+      displayName: undefined,
+      emailLocalPart: undefined,
+      sendingDomain: "mail.acme.com",
+    });
+  });
+
+  it("treats explicit null as presence (forces platform default)", async () => {
+    const ink = makeInkbox();
+    mockIdsResource(ink);
+
+    await ink.createIdentity("sales-agent", { sendingDomain: null });
+
+    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
+    expect(call.mailbox).toBeDefined();
+    expect(call.mailbox).toHaveProperty("sendingDomain", null);
+  });
+
+  it("omits sendingDomain entirely when not provided but other mailbox fields are", async () => {
+    const ink = makeInkbox();
+    mockIdsResource(ink);
+
+    await ink.createIdentity("sales-agent", { displayName: "Sales" });
+
+    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
+    expect(call.mailbox).toBeDefined();
+    expect("sendingDomain" in (call.mailbox as object)).toBe(false);
+  });
+});
+
 describe("Inkbox.getIdentity", () => {
   it("returns AgentIdentity", async () => {
     const ink = makeInkbox();

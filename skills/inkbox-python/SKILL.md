@@ -422,9 +422,42 @@ if updated.filter_mode_change_notice:
 
 # Mailbox responses now also carry mailbox.agent_identity_id when the
 # mailbox is linked to an identity.
+# `mailbox.sending_domain` is the bare domain the mailbox sends from
+# (platform default or a verified custom domain — see "Custom email domains" below).
 
 results = inkbox.mailboxes.search(mailbox.email_address, q="invoice", limit=20)
 inkbox.mailboxes.delete(mailbox.email_address)
+```
+
+### Custom email domains (`inkbox.domains`)
+
+If your org has registered custom sending domains in the console, list them
+and (admin-only) set the org default. New mailboxes inherit the org default
+unless you pass ``sending_domain_id`` (standalone) or ``sending_domain``
+(identity).
+
+```python
+from inkbox import SendingDomainStatus
+
+verified = inkbox.domains.list(status=SendingDomainStatus.VERIFIED)
+
+# Admin-scoped API key only — non-admin keys get 403.
+# Returns the bare new default domain name (or None when reverted to platform).
+new_default = inkbox.domains.set_default("mail.acme.com")
+# Pass the platform domain (e.g. "inkboxmail.com" in prod) to clear the org default.
+
+# Standalone mailbox: pick by domain id.
+inkbox.mailboxes.create(
+    agent_handle="sales-bot",
+    sending_domain_id=verified[0].id,         # verified custom domain
+)
+inkbox.mailboxes.create(
+    agent_handle="sales-bot",
+    sending_domain_id=None,                   # force platform default
+)
+
+# Identity create: pick by bare domain name (not id).
+inkbox.create_identity("sales-bot", sending_domain="mail.acme.com")
 ```
 
 ### Phone Numbers (`inkbox.phone_numbers`)

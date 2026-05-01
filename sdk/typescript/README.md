@@ -124,6 +124,10 @@ const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });    
 console.log(identity.emailAddress);
 console.log(phone.number);
 
+// Pin the identity's mailbox to a verified custom sending domain
+// (bare name; see "Custom Sending Domains" below).
+await inkbox.createIdentity("sales-bot", { sendingDomain: "mail.acme.com" });
+
 // Link an existing mailbox or phone number instead of creating new ones
 await identity.assignMailbox("mailbox-uuid-here");
 await identity.assignPhoneNumber("phone-number-uuid-here");
@@ -555,6 +559,11 @@ const mb = await inkbox.mailboxes.create({
   displayName: "Support Inbox",
 });
 console.log(mb.emailAddress);
+console.log(mb.sendingDomain);  // bare domain the mailbox sends from
+
+// Pin a new mailbox to a verified custom sending domain (or platform default)
+await inkbox.mailboxes.create({ agentHandle: "support-agent", sendingDomainId: "sending_domain_<uuid>" });
+await inkbox.mailboxes.create({ agentHandle: "support-agent", sendingDomainId: null }); // force platform
 
 // Update display name or webhook URL
 await inkbox.mailboxes.update(mb.emailAddress, { displayName: "New Name" });
@@ -569,6 +578,29 @@ for (const msg of results) {
 
 // Delete a mailbox
 await inkbox.mailboxes.delete(mb.emailAddress);
+```
+
+---
+
+## Custom Sending Domains
+
+If your org has registered custom sending domains in the console, list them and (admin-only) set the org default. New mailboxes inherit the org default unless you pass `sendingDomainId` (`mailboxes.create`) or `sendingDomain` (`createIdentity`). Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
+
+```ts
+import { SendingDomainStatus } from "@inkbox/sdk";
+
+// List custom sending domains for the org (optionally filter by status)
+const verified = await inkbox.domains.list({ status: SendingDomainStatus.VERIFIED });
+for (const d of verified) {
+  console.log(d.id, d.domain, d.status, d.isDefault);
+}
+
+// Set the org default — admin-scoped API key only.
+// Returns the bare new default domain name (or null when reverted to platform).
+const newDefault = await inkbox.domains.setDefault("mail.acme.com");
+
+// Pass the platform domain (e.g. "inkboxmail.com" in prod) to revert.
+await inkbox.domains.setDefault("inkboxmail.com");  // -> null
 ```
 
 ---
