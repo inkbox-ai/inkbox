@@ -8,6 +8,7 @@ from uuid import UUID
 
 from sample_data import (
     TEXT_CONVERSATION_SUMMARY_DICT,
+    TEXT_MESSAGE_BLOCKED_DICT,
     TEXT_MESSAGE_DICT,
     TEXT_MESSAGE_MMS_DICT,
     TEXT_MESSAGE_OUTBOUND_QUEUED_DICT,
@@ -81,6 +82,39 @@ class TestTextsList:
             params={"limit": 50, "offset": 0, "is_read": False},
         )
 
+    def test_is_blocked_true(self, client, transport):
+        """is_blocked=True surfaces the admin-side blocked-only listing."""
+        transport.get.return_value = [TEXT_MESSAGE_BLOCKED_DICT]
+
+        texts = client._texts.list(NUM_ID, is_blocked=True)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts",
+            params={"limit": 50, "offset": 0, "is_blocked": True},
+        )
+        assert texts[0].is_blocked is True
+
+    def test_is_blocked_false(self, client, transport):
+        """is_blocked=False keeps admin/JWT view clean of blocked spam."""
+        transport.get.return_value = [TEXT_MESSAGE_DICT]
+
+        texts = client._texts.list(NUM_ID, is_blocked=False)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts",
+            params={"limit": 50, "offset": 0, "is_blocked": False},
+        )
+        assert texts[0].is_blocked is False
+
+    def test_is_blocked_default_when_field_missing(self, client, transport):
+        """Older server responses without is_blocked deserialize to False."""
+        old_payload = {k: v for k, v in TEXT_MESSAGE_DICT.items() if k != "is_blocked"}
+        transport.get.return_value = [old_payload]
+
+        texts = client._texts.list(NUM_ID)
+
+        assert texts[0].is_blocked is False
+
     def test_mms_with_media(self, client, transport):
         transport.get.return_value = [TEXT_MESSAGE_MMS_DICT]
 
@@ -138,6 +172,39 @@ class TestTextsSearch:
         )
         assert len(results) == 1
 
+    def test_search_is_blocked_true(self, client, transport):
+        """is_blocked=True searches only the blocked folder (admin/JWT)."""
+        transport.get.return_value = [TEXT_MESSAGE_BLOCKED_DICT]
+
+        results = client._texts.search(NUM_ID, q="crypto", is_blocked=True)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts/search",
+            params={"q": "crypto", "limit": 50, "is_blocked": True},
+        )
+        assert results[0].is_blocked is True
+
+    def test_search_is_blocked_false(self, client, transport):
+        """is_blocked=False keeps admin search clean of blocked spam."""
+        transport.get.return_value = []
+
+        client._texts.search(NUM_ID, q="invoice", is_blocked=False)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts/search",
+            params={"q": "invoice", "limit": 50, "is_blocked": False},
+        )
+
+    def test_search_omits_is_blocked_by_default(self, client, transport):
+        transport.get.return_value = []
+
+        client._texts.search(NUM_ID, q="hello")
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts/search",
+            params={"q": "hello", "limit": 50},
+        )
+
 
 class TestTextsListConversations:
     def test_returns_summaries(self, client, transport):
@@ -154,6 +221,28 @@ class TestTextsListConversations:
         assert convos[0].unread_count == 3
         assert convos[0].total_count == 15
         assert convos[0].latest_direction == "inbound"
+
+    def test_list_conversations_is_blocked_false(self, client, transport):
+        """is_blocked=False hides spam-only counterparties + stops blocked previews from bumping."""
+        transport.get.return_value = []
+
+        client._texts.list_conversations(NUM_ID, is_blocked=False)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts/conversations",
+            params={"limit": 50, "offset": 0, "is_blocked": False},
+        )
+
+    def test_list_conversations_is_blocked_true(self, client, transport):
+        """is_blocked=True narrows summary to conversations made up of blocked rows."""
+        transport.get.return_value = []
+
+        client._texts.list_conversations(NUM_ID, is_blocked=True)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts/conversations",
+            params={"limit": 50, "offset": 0, "is_blocked": True},
+        )
 
 
 class TestTextsGetConversation:

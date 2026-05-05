@@ -465,10 +465,17 @@ export class AgentIdentity {
   /**
    * List calls made to/from this identity's phone number.
    *
+   * Identity-scoped credentials never see contact-rule-blocked rows
+   * regardless of `isBlocked` (server-side access policy).
+   *
    * @param options.limit - Maximum number of results. Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
+   * @param options.isBlocked - Tri-state filter. `true` for only blocked,
+   *   `false` for only non-blocked, omit for all.
    */
-  async listCalls(options: { limit?: number; offset?: number } = {}): Promise<PhoneCall[]> {
+  async listCalls(
+    options: { limit?: number; offset?: number; isBlocked?: boolean } = {},
+  ): Promise<PhoneCall[]> {
     this._requirePhone();
     return this._inkbox._calls.list(this._phoneNumber!.id, options);
   }
@@ -509,12 +516,22 @@ export class AgentIdentity {
   /**
    * List text messages for this identity's phone number.
    *
+   * Identity-scoped credentials never see contact-rule-blocked rows
+   * regardless of `isBlocked` (server-side access policy).
+   *
    * @param options.limit - Maximum number of results. Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isRead - Filter by read state.
+   * @param options.isBlocked - Tri-state filter. `true` for only blocked,
+   *   `false` for only non-blocked, omit for all.
    */
   async listTexts(
-    options?: { limit?: number; offset?: number; isRead?: boolean },
+    options?: {
+      limit?: number;
+      offset?: number;
+      isRead?: boolean;
+      isBlocked?: boolean;
+    },
   ): Promise<TextMessage[]> {
     this._requirePhone();
     return this._inkbox._texts.list(this._phoneNumber!.id, options);
@@ -533,11 +550,18 @@ export class AgentIdentity {
   /**
    * List text conversations (one row per remote number).
    *
+   * Identity-scoped credentials never see blocked rows in conversation
+   * summaries; admin/JWT can pass `isBlocked=false` to hide spam-only
+   * counterparties or `isBlocked=true` to narrow to conversations made
+   * up of blocked rows.
+   *
    * @param options.limit - Maximum number of results. Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
+   * @param options.isBlocked - Tri-state filter. `true` for only blocked,
+   *   `false` for only non-blocked, omit for all.
    */
   async listTextConversations(
-    options?: { limit?: number; offset?: number },
+    options?: { limit?: number; offset?: number; isBlocked?: boolean },
   ): Promise<TextConversationSummary[]> {
     this._requirePhone();
     return this._inkbox._texts.listConversations(this._phoneNumber!.id, options);

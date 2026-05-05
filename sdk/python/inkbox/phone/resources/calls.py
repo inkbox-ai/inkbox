@@ -26,17 +26,30 @@ class CallsResource:
         *,
         limit: int = 50,
         offset: int = 0,
+        is_blocked: bool | None = None,
     ) -> list[PhoneCall]:
         """List calls for a phone number, newest first.
+
+        Identity-scoped API keys never see contact-rule-blocked rows
+        regardless of ``is_blocked`` — the server filters them at the
+        access-policy layer. Admin-scoped keys and JWT humans see
+        everything by default; pass ``is_blocked=True`` to surface the
+        blocked-only listing or ``is_blocked=False`` to exclude blocked
+        rows.
 
         Args:
             phone_number_id: UUID of the phone number.
             limit: Max results to return (1–200).
             offset: Pagination offset.
+            is_blocked: Tri-state filter — ``True`` for only blocked,
+                ``False`` for only non-blocked, ``None`` for all.
         """
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if is_blocked is not None:
+            params["is_blocked"] = is_blocked
         data = self._http.get(
             f"/numbers/{phone_number_id}/calls",
-            params={"limit": limit, "offset": offset},
+            params=params,
         )
         return [PhoneCall._from_dict(c) for c in data]
 

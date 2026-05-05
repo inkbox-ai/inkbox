@@ -6,7 +6,7 @@ Tests for CallsResource.
 
 from uuid import UUID
 
-from sample_data import PHONE_CALL_DICT
+from sample_data import PHONE_CALL_BLOCKED_DICT, PHONE_CALL_DICT
 
 
 NUM_ID = "aaaa1111-0000-0000-0000-000000000001"
@@ -46,6 +46,51 @@ class TestCallsList:
             f"/numbers/{NUM_ID}/calls",
             params={"limit": 10, "offset": 20},
         )
+
+    def test_is_blocked_omitted_by_default(self, client, transport):
+        """When the caller doesn't pass is_blocked, it doesn't appear in the params."""
+        transport.get.return_value = []
+
+        client._calls.list(NUM_ID)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/calls",
+            params={"limit": 50, "offset": 0},
+        )
+
+    def test_is_blocked_true_passes_through(self, client, transport):
+        """is_blocked=True surfaces the admin-side blocked-only listing."""
+        transport.get.return_value = [PHONE_CALL_BLOCKED_DICT]
+
+        calls = client._calls.list(NUM_ID, is_blocked=True)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/calls",
+            params={"limit": 50, "offset": 0, "is_blocked": True},
+        )
+        assert len(calls) == 1
+        assert calls[0].is_blocked is True
+
+    def test_is_blocked_false_passes_through(self, client, transport):
+        """is_blocked=False narrows admin/JWT view to only non-blocked rows."""
+        transport.get.return_value = [PHONE_CALL_DICT]
+
+        calls = client._calls.list(NUM_ID, is_blocked=False)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/calls",
+            params={"limit": 50, "offset": 0, "is_blocked": False},
+        )
+        assert calls[0].is_blocked is False
+
+    def test_is_blocked_default_when_field_missing(self, client, transport):
+        """Older server responses without is_blocked deserialize to False (back-compat)."""
+        old_payload = {k: v for k, v in PHONE_CALL_DICT.items() if k != "is_blocked"}
+        transport.get.return_value = [old_payload]
+
+        calls = client._calls.list(NUM_ID)
+
+        assert calls[0].is_blocked is False
 
 
 class TestCallsGet:

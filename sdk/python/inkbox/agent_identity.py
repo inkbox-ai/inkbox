@@ -545,18 +545,30 @@ class AgentIdentity:
             client_websocket_url=client_websocket_url,
         )
 
-    def list_calls(self, *, limit: int = 50, offset: int = 0) -> list[PhoneCall]:
+    def list_calls(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        is_blocked: bool | None = None,
+    ) -> list[PhoneCall]:
         """List calls made to/from this identity's phone number.
+
+        Identity-scoped credentials never see contact-rule-blocked rows
+        regardless of ``is_blocked`` (server-side access policy).
 
         Args:
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
+            is_blocked: Tri-state filter — ``True`` for only blocked,
+                ``False`` for only non-blocked, ``None`` for all.
         """
         self._require_phone()
         return self._inkbox._calls.list(
             self._phone_number.id,  # type: ignore[union-attr]
             limit=limit,
             offset=offset,
+            is_blocked=is_blocked,
         )
 
     def list_transcripts(self, call_id: str) -> list[PhoneTranscript]:
@@ -604,14 +616,24 @@ class AgentIdentity:
         )
 
     def list_texts(
-        self, *, limit: int = 50, offset: int = 0, is_read: bool | None = None
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        is_read: bool | None = None,
+        is_blocked: bool | None = None,
     ) -> list[TextMessage]:
         """List text messages for this identity's phone number.
+
+        Identity-scoped credentials never see contact-rule-blocked rows
+        regardless of ``is_blocked`` (server-side access policy).
 
         Args:
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
+            is_blocked: Tri-state filter — ``True`` for only blocked,
+                ``False`` for only non-blocked, ``None`` for all.
         """
         self._require_phone()
         return self._inkbox._texts.list(
@@ -619,6 +641,7 @@ class AgentIdentity:
             limit=limit,
             offset=offset,
             is_read=is_read,
+            is_blocked=is_blocked,
         )
 
     def get_text(self, text_id: str) -> TextMessage:
@@ -634,19 +657,31 @@ class AgentIdentity:
         )
 
     def list_text_conversations(
-        self, *, limit: int = 50, offset: int = 0
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        is_blocked: bool | None = None,
     ) -> list[TextConversationSummary]:
         """List text conversations (one row per remote number).
+
+        Identity-scoped credentials never see blocked rows in
+        conversation summaries; admin/JWT can use ``is_blocked=False``
+        to hide spam-only counterparties or ``is_blocked=True`` to
+        narrow to conversations made up of blocked rows.
 
         Args:
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
+            is_blocked: Tri-state filter — ``True`` for only blocked,
+                ``False`` for only non-blocked, ``None`` for all.
         """
         self._require_phone()
         return self._inkbox._texts.list_conversations(
             self._phone_number.id,  # type: ignore[union-attr]
             limit=limit,
             offset=offset,
+            is_blocked=is_blocked,
         )
 
     def get_text_conversation(

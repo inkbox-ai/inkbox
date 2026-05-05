@@ -48,14 +48,26 @@ export class TextsResource {
   /**
    * List text messages for a phone number, newest first.
    *
+   * Identity-scoped API keys never see contact-rule-blocked rows
+   * regardless of `isBlocked` (filtered server-side). Admin/JWT
+   * callers see everything by default; pass `isBlocked=true` for the
+   * blocked-only listing or `isBlocked=false` to exclude blocked rows.
+   *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isRead - Filter by read state.
+   * @param options.isBlocked - Tri-state filter. `true` for only blocked,
+   *   `false` for only non-blocked, omit for all.
    */
   async list(
     phoneNumberId: string,
-    options?: { limit?: number; offset?: number; isRead?: boolean },
+    options?: {
+      limit?: number;
+      offset?: number;
+      isRead?: boolean;
+      isBlocked?: boolean;
+    },
   ): Promise<TextMessage[]> {
     const params: Record<string, string | number | boolean> = {
       limit: options?.limit ?? 50,
@@ -63,6 +75,9 @@ export class TextsResource {
     };
     if (options?.isRead !== undefined) {
       params["is_read"] = options.isRead;
+    }
+    if (options?.isBlocked !== undefined) {
+      params["is_blocked"] = options.isBlocked;
     }
     const data = await this.http.get<RawTextMessage[]>(
       `/numbers/${phoneNumberId}/texts`,
@@ -108,17 +123,31 @@ export class TextsResource {
   /**
    * Full-text search across text messages for a phone number.
    *
+   * Identity-scoped API keys never see contact-rule-blocked rows in
+   * results regardless of `isBlocked`. Admin/JWT callers see everything
+   * by default; `isBlocked=false` keeps search clean of blocked spam,
+   * `isBlocked=true` searches only the blocked folder.
+   *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.q - Search query string.
    * @param options.limit - Max results (1–200). Defaults to 50.
+   * @param options.isBlocked - Tri-state filter. `true` for only blocked,
+   *   `false` for only non-blocked, omit for all.
    */
   async search(
     phoneNumberId: string,
-    options: { q: string; limit?: number },
+    options: { q: string; limit?: number; isBlocked?: boolean },
   ): Promise<TextMessage[]> {
+    const params: Record<string, string | number | boolean> = {
+      q: options.q,
+      limit: options.limit ?? 50,
+    };
+    if (options.isBlocked !== undefined) {
+      params["is_blocked"] = options.isBlocked;
+    }
     const data = await this.http.get<RawTextMessage[]>(
       `/numbers/${phoneNumberId}/texts/search`,
-      { q: options.q, limit: options.limit ?? 50 },
+      params,
     );
     return data.map(parseTextMessage);
   }
@@ -126,17 +155,33 @@ export class TextsResource {
   /**
    * List conversations (one row per remote number) with latest message preview.
    *
+   * Identity-scoped API keys never see blocked rows in conversation
+   * summaries; admin/JWT callers can pass `isBlocked=false` to hide
+   * spam-only counterparties and stop blocked rows from bumping quiet
+   * conversations to the top, or `isBlocked=true` to narrow to
+   * conversations made up of blocked rows.
+   *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
+   * @param options.isBlocked - Tri-state filter applied to the
+   *   underlying messages. `true` for only blocked, `false` for only
+   *   non-blocked, omit for all.
    */
   async listConversations(
     phoneNumberId: string,
-    options?: { limit?: number; offset?: number },
+    options?: { limit?: number; offset?: number; isBlocked?: boolean },
   ): Promise<TextConversationSummary[]> {
+    const params: Record<string, string | number | boolean> = {
+      limit: options?.limit ?? 50,
+      offset: options?.offset ?? 0,
+    };
+    if (options?.isBlocked !== undefined) {
+      params["is_blocked"] = options.isBlocked;
+    }
     const data = await this.http.get<RawTextConversationSummary[]>(
       `/numbers/${phoneNumberId}/texts/conversations`,
-      { limit: options?.limit ?? 50, offset: options?.offset ?? 0 },
+      params,
     );
     return data.map(parseTextConversationSummary);
   }

@@ -105,8 +105,26 @@ export const RAW_PHONE_CALL = {
   hangup_reason: null,
   started_at: "2026-03-09T00:01:00Z",
   ended_at: "2026-03-09T00:05:00Z",
+  is_blocked: false,
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:05:00Z",
+};
+
+export const RAW_PHONE_CALL_BLOCKED = {
+  id: "bbbb2222-0000-0000-0000-0000000000bb",
+  local_phone_number: "+18335794607",
+  remote_phone_number: "+15551234567",
+  direction: "inbound",
+  status: "failed",
+  client_websocket_url: null,
+  use_inkbox_tts: null,
+  use_inkbox_stt: null,
+  hangup_reason: "rejected",
+  started_at: null,
+  ended_at: null,
+  is_blocked: true,
+  created_at: "2026-03-09T00:30:00Z",
+  updated_at: "2026-03-09T00:30:00Z",
 };
 
 export const RAW_RATE_LIMIT = {
@@ -144,8 +162,23 @@ export const RAW_TEXT_MESSAGE = {
   type: "sms",
   media: null,
   is_read: false,
+  is_blocked: false,
   created_at: "2026-03-09T00:10:00Z",
   updated_at: "2026-03-09T00:10:00Z",
+};
+
+export const RAW_TEXT_MESSAGE_BLOCKED = {
+  id: "dddd4444-0000-0000-0000-0000000000bb",
+  direction: "inbound",
+  local_phone_number: "+18335794607",
+  remote_phone_number: "+15551234567",
+  text: "Buy crypto now!!!",
+  type: "sms",
+  media: null,
+  is_read: false,
+  is_blocked: true,
+  created_at: "2026-03-09T00:35:00Z",
+  updated_at: "2026-03-09T00:35:00Z",
 };
 
 export const RAW_TEXT_MESSAGE_MMS = {
