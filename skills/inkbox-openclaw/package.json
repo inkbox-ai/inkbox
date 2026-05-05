@@ -1,9 +1,9 @@
 {
   "name": "inkbox-openclaw",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "type": "module",
   "dependencies": {
-    "@inkbox/sdk": "^0.2.16"
+    "@inkbox/sdk": "^0.2.17"
   },
   "engines": {
     "node": ">=18"
