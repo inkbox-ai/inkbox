@@ -20,17 +20,31 @@ export class CallsResource {
   /**
    * List calls for a phone number, newest first.
    *
+   * Identity-scoped API keys never see contact-rule-blocked rows
+   * regardless of `isBlocked` (filtered server-side). Admin/JWT
+   * callers see everything by default; pass `isBlocked=true` for the
+   * blocked-only listing or `isBlocked=false` to exclude blocked rows.
+   *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
+   * @param options.isBlocked - Tri-state filter. `true` for only blocked,
+   *   `false` for only non-blocked, omit for all.
    */
   async list(
     phoneNumberId: string,
-    options?: { limit?: number; offset?: number },
+    options?: { limit?: number; offset?: number; isBlocked?: boolean },
   ): Promise<PhoneCall[]> {
+    const params: Record<string, string | number | boolean> = {
+      limit: options?.limit ?? 50,
+      offset: options?.offset ?? 0,
+    };
+    if (options?.isBlocked !== undefined) {
+      params["is_blocked"] = options.isBlocked;
+    }
     const data = await this.http.get<RawPhoneCall[]>(
       `/numbers/${phoneNumberId}/calls`,
-      { limit: options?.limit ?? 50, offset: options?.offset ?? 0 },
+      params,
     );
     return data.map(parsePhoneCall);
   }

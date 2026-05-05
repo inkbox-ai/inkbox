@@ -4,6 +4,7 @@ import { TextsResource } from "../../src/phone/resources/texts.js";
 import type { HttpTransport } from "../../src/_http.js";
 import {
   RAW_TEXT_MESSAGE,
+  RAW_TEXT_MESSAGE_BLOCKED,
   RAW_TEXT_MESSAGE_MMS,
   RAW_TEXT_MESSAGE_OUTBOUND_QUEUED,
   RAW_TEXT_CONVERSATION_SUMMARY,
@@ -88,6 +89,48 @@ describe("TextsResource.list", () => {
     });
   });
 
+  it("forwards isBlocked=true for the admin-side blocked listing", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_TEXT_MESSAGE_BLOCKED]);
+    const res = new TextsResource(http);
+
+    const texts = await res.list(NUM_ID, { isBlocked: true });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/texts`, {
+      limit: 50,
+      offset: 0,
+      is_blocked: true,
+    });
+    expect(texts[0].isBlocked).toBe(true);
+  });
+
+  it("forwards isBlocked=false to keep the admin/JWT view clean of blocked spam", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_TEXT_MESSAGE]);
+    const res = new TextsResource(http);
+
+    const texts = await res.list(NUM_ID, { isBlocked: false });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/texts`, {
+      limit: 50,
+      offset: 0,
+      is_blocked: false,
+    });
+    expect(texts[0].isBlocked).toBe(false);
+  });
+
+  it("defaults isBlocked to false when missing from server response (back-compat)", async () => {
+    const http = mockHttp();
+    const { is_blocked: _ignored, ...legacyPayload } = RAW_TEXT_MESSAGE;
+    void _ignored;
+    vi.mocked(http.get).mockResolvedValue([legacyPayload]);
+    const res = new TextsResource(http);
+
+    const texts = await res.list(NUM_ID);
+
+    expect(texts[0].isBlocked).toBe(false);
+  });
+
   it("parses MMS with media", async () => {
     const http = mockHttp();
     vi.mocked(http.get).mockResolvedValue([RAW_TEXT_MESSAGE_MMS]);
@@ -146,6 +189,48 @@ describe("TextsResource.search", () => {
     });
     expect(results).toHaveLength(1);
   });
+
+  it("forwards isBlocked=true to search the blocked folder", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_TEXT_MESSAGE_BLOCKED]);
+    const res = new TextsResource(http);
+
+    const results = await res.search(NUM_ID, { q: "crypto", isBlocked: true });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/texts/search`, {
+      q: "crypto",
+      limit: 50,
+      is_blocked: true,
+    });
+    expect(results[0].isBlocked).toBe(true);
+  });
+
+  it("forwards isBlocked=false to keep admin search clean", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
+    const res = new TextsResource(http);
+
+    await res.search(NUM_ID, { q: "invoice", isBlocked: false });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/texts/search`, {
+      q: "invoice",
+      limit: 50,
+      is_blocked: false,
+    });
+  });
+
+  it("omits is_blocked param when not provided", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
+    const res = new TextsResource(http);
+
+    await res.search(NUM_ID, { q: "hello" });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/texts/search`, {
+      q: "hello",
+      limit: 50,
+    });
+  });
 });
 
 describe("TextsResource.listConversations", () => {
@@ -164,6 +249,32 @@ describe("TextsResource.listConversations", () => {
     expect(convos[0].remotePhoneNumber).toBe(REMOTE);
     expect(convos[0].unreadCount).toBe(3);
     expect(convos[0].totalCount).toBe(15);
+  });
+
+  it("forwards isBlocked=false to hide spam-only counterparties", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
+    const res = new TextsResource(http);
+
+    await res.listConversations(NUM_ID, { isBlocked: false });
+
+    expect(http.get).toHaveBeenCalledWith(
+      `/numbers/${NUM_ID}/texts/conversations`,
+      { limit: 50, offset: 0, is_blocked: false },
+    );
+  });
+
+  it("forwards isBlocked=true to narrow to blocked-only conversations", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
+    const res = new TextsResource(http);
+
+    await res.listConversations(NUM_ID, { isBlocked: true });
+
+    expect(http.get).toHaveBeenCalledWith(
+      `/numbers/${NUM_ID}/texts/conversations`,
+      { limit: 50, offset: 0, is_blocked: true },
+    );
   });
 });
 

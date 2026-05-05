@@ -30,8 +30,26 @@ PHONE_CALL_DICT = {
     "hangup_reason": None,
     "started_at": "2026-03-09T00:01:00Z",
     "ended_at": "2026-03-09T00:05:00Z",
+    "is_blocked": False,
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:05:00Z",
+}
+
+PHONE_CALL_BLOCKED_DICT = {
+    "id": "bbbb2222-0000-0000-0000-0000000000bb",
+    "local_phone_number": "+18335794607",
+    "remote_phone_number": "+15551234567",
+    "direction": "inbound",
+    "status": "failed",
+    "client_websocket_url": None,
+    "use_inkbox_tts": None,
+    "use_inkbox_stt": None,
+    "hangup_reason": "rejected",
+    "started_at": None,
+    "ended_at": None,
+    "is_blocked": True,
+    "created_at": "2026-03-09T00:30:00Z",
+    "updated_at": "2026-03-09T00:30:00Z",
 }
 
 TEXT_MESSAGE_DICT = {
@@ -43,8 +61,23 @@ TEXT_MESSAGE_DICT = {
     "type": "sms",
     "media": None,
     "is_read": False,
+    "is_blocked": False,
     "created_at": "2026-03-09T00:10:00Z",
     "updated_at": "2026-03-09T00:10:00Z",
+}
+
+TEXT_MESSAGE_BLOCKED_DICT = {
+    "id": "dddd4444-0000-0000-0000-0000000000bb",
+    "direction": "inbound",
+    "local_phone_number": "+18335794607",
+    "remote_phone_number": "+15551234567",
+    "text": "Buy crypto now!!!",
+    "type": "sms",
+    "media": None,
+    "is_read": False,
+    "is_blocked": True,
+    "created_at": "2026-03-09T00:35:00Z",
+    "updated_at": "2026-03-09T00:35:00Z",
 }
 
 TEXT_MESSAGE_MMS_DICT = {

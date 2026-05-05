@@ -60,14 +60,24 @@ class TextsResource:
         limit: int = 50,
         offset: int = 0,
         is_read: bool | None = None,
+        is_blocked: bool | None = None,
     ) -> list[TextMessage]:
         """List text messages for a phone number, newest first.
+
+        Identity-scoped API keys never see contact-rule-blocked rows
+        regardless of ``is_blocked`` — the server filters them at the
+        access-policy layer. Admin-scoped keys and JWT humans see
+        everything by default; pass ``is_blocked=True`` to surface the
+        blocked-only listing or ``is_blocked=False`` to exclude blocked
+        rows.
 
         Args:
             phone_number_id: UUID of the phone number.
             limit: Max results to return (1–200).
             offset: Pagination offset.
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
+            is_blocked: Tri-state filter — ``True`` for only blocked,
+                ``False`` for only non-blocked, ``None`` for all.
         """
         params: dict[str, Any] = {
             "limit": limit,
@@ -75,6 +85,8 @@ class TextsResource:
         }
         if is_read is not None:
             params["is_read"] = is_read
+        if is_blocked is not None:
+            params["is_blocked"] = is_blocked
         data = self._http.get(
             f"/numbers/{phone_number_id}/texts",
             params=params,
@@ -124,17 +136,29 @@ class TextsResource:
         *,
         q: str,
         limit: int = 50,
+        is_blocked: bool | None = None,
     ) -> list[TextMessage]:
         """Full-text search across text messages for a phone number.
+
+        Identity-scoped API keys never see contact-rule-blocked rows in
+        results regardless of ``is_blocked``. Admin/JWT callers see
+        everything by default; pass ``is_blocked=False`` to keep search
+        clean of blocked spam, or ``is_blocked=True`` to search only the
+        blocked folder.
 
         Args:
             phone_number_id: UUID of the phone number.
             q: Search query string.
             limit: Max results to return (1–200).
+            is_blocked: Tri-state filter — ``True`` for only blocked,
+                ``False`` for only non-blocked, ``None`` for all.
         """
+        params: dict[str, Any] = {"q": q, "limit": limit}
+        if is_blocked is not None:
+            params["is_blocked"] = is_blocked
         data = self._http.get(
             f"/numbers/{phone_number_id}/texts/search",
-            params={"q": q, "limit": limit},
+            params=params,
         )
         return [TextMessage._from_dict(t) for t in data]
 
@@ -144,17 +168,32 @@ class TextsResource:
         *,
         limit: int = 50,
         offset: int = 0,
+        is_blocked: bool | None = None,
     ) -> list[TextConversationSummary]:
         """List conversations (one row per remote number) with latest message preview.
+
+        Identity-scoped API keys never see blocked rows — both the
+        conversation list and the latest-message previews exclude them
+        automatically. Admin-scoped keys and JWT humans see everything
+        by default; ``is_blocked=False`` hides spam-only counterparties
+        and stops blocked rows from bumping quiet conversations to the
+        top, while ``is_blocked=True`` narrows to conversations made up
+        of blocked rows.
 
         Args:
             phone_number_id: UUID of the phone number.
             limit: Max results to return (1–200).
             offset: Pagination offset.
+            is_blocked: Tri-state filter applied to the underlying
+                messages — ``True`` for only blocked, ``False`` for only
+                non-blocked, ``None`` for all.
         """
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if is_blocked is not None:
+            params["is_blocked"] = is_blocked
         data = self._http.get(
             f"/numbers/{phone_number_id}/texts/conversations",
-            params={"limit": limit, "offset": offset},
+            params=params,
         )
         return [TextConversationSummary._from_dict(c) for c in data]
 

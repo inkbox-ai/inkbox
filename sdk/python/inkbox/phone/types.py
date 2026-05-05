@@ -129,7 +129,15 @@ class PhoneNumber:
 
 @dataclass
 class PhoneCall:
-    """A phone call record."""
+    """A phone call record.
+
+    ``is_blocked`` is ``True`` when this call was rejected by a contact rule
+    or default-block before connect. Identity-scoped (agent) API keys never
+    observe ``is_blocked=True`` rows — the server filters them at the
+    access-policy layer. Admin-scoped API keys and JWT humans see both
+    values mixed by default and can narrow with ``is_blocked`` on
+    ``CallsResource.list``.
+    """
 
     id: UUID
     local_phone_number: str
@@ -144,6 +152,9 @@ class PhoneCall:
     ended_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    # Default False — older server responses without this field were always
+    # non-blocked (predicate hid blocked rows from every caller).
+    is_blocked: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -161,6 +172,7 @@ class PhoneCall:
             ended_at=_dt(d.get("ended_at")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            is_blocked=bool(d.get("is_blocked", False)),
         )
 
 
@@ -229,6 +241,13 @@ class TextMessage:
     Outbound-only lifecycle fields (``delivery_status``, ``error_code``,
     ``error_detail``, ``sent_at``, ``delivered_at``, ``failed_at``) are
     ``None`` on inbound rows.
+
+    ``is_blocked`` is ``True`` when this text was rejected by a contact rule
+    or default-block. Identity-scoped (agent) API keys never observe
+    ``is_blocked=True`` rows — the server filters them at the
+    access-policy layer. Admin-scoped API keys and JWT humans see both
+    values mixed by default and can narrow with ``is_blocked`` on
+    ``TextsResource.list`` / ``search`` / ``list_conversations``.
     """
 
     id: UUID
@@ -248,6 +267,8 @@ class TextMessage:
     sent_at: datetime | None = None
     delivered_at: datetime | None = None
     failed_at: datetime | None = None
+    # Default False for older server responses that predate the field.
+    is_blocked: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextMessage:
@@ -278,6 +299,7 @@ class TextMessage:
             sent_at=_dt(d.get("sent_at")),
             delivered_at=_dt(d.get("delivered_at")),
             failed_at=_dt(d.get("failed_at")),
+            is_blocked=bool(d.get("is_blocked", False)),
         )
 
 

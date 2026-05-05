@@ -81,12 +81,27 @@ describe("parsePhoneCall", () => {
     expect(c.clientWebsocketUrl).toBe("wss://agent.example.com/ws");
     expect(c.startedAt).toBeInstanceOf(Date);
     expect(c.endedAt).toBeInstanceOf(Date);
+    expect(c.isBlocked).toBe(false);
   });
 
   it("handles null timestamps", () => {
     const c = parsePhoneCall({ ...RAW_PHONE_CALL, started_at: null, ended_at: null });
     expect(c.startedAt).toBeNull();
     expect(c.endedAt).toBeNull();
+  });
+
+  it("preserves isBlocked=true (admin/JWT view of a blocked call)", () => {
+    const c = parsePhoneCall({ ...RAW_PHONE_CALL, is_blocked: true });
+    expect(c.isBlocked).toBe(true);
+  });
+
+  it("defaults isBlocked to false when missing from server response", () => {
+    // Older server payloads predate the field — parser must default to false
+    // so existing clients keep working.
+    const { is_blocked: _ignored, ...legacyPayload } = RAW_PHONE_CALL;
+    void _ignored;
+    const c = parsePhoneCall(legacyPayload);
+    expect(c.isBlocked).toBe(false);
   });
 });
 

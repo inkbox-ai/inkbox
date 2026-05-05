@@ -2,7 +2,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { CallsResource } from "../../src/phone/resources/calls.js";
 import type { HttpTransport } from "../../src/_http.js";
-import { RAW_PHONE_CALL, RAW_PHONE_CALL_WITH_RATE_LIMIT } from "../sampleData.js";
+import {
+  RAW_PHONE_CALL,
+  RAW_PHONE_CALL_BLOCKED,
+  RAW_PHONE_CALL_WITH_RATE_LIMIT,
+} from "../sampleData.js";
 
 function mockHttp() {
   return {
@@ -37,6 +41,62 @@ describe("CallsResource.list", () => {
     await res.list(NUM_ID, { limit: 10, offset: 20 });
 
     expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/calls`, { limit: 10, offset: 20 });
+  });
+
+  it("omits is_blocked when not provided", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
+    const res = new CallsResource(http);
+
+    await res.list(NUM_ID);
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/calls`, {
+      limit: 50,
+      offset: 0,
+    });
+  });
+
+  it("forwards isBlocked=true for the admin-side blocked listing", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_PHONE_CALL_BLOCKED]);
+    const res = new CallsResource(http);
+
+    const calls = await res.list(NUM_ID, { isBlocked: true });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/calls`, {
+      limit: 50,
+      offset: 0,
+      is_blocked: true,
+    });
+    expect(calls[0].isBlocked).toBe(true);
+  });
+
+  it("forwards isBlocked=false to narrow admin/JWT view to non-blocked rows", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_PHONE_CALL]);
+    const res = new CallsResource(http);
+
+    const calls = await res.list(NUM_ID, { isBlocked: false });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/calls`, {
+      limit: 50,
+      offset: 0,
+      is_blocked: false,
+    });
+    expect(calls[0].isBlocked).toBe(false);
+  });
+
+  it("defaults isBlocked to false when missing from server response (back-compat)", async () => {
+    const http = mockHttp();
+    // Older server payload without the field — parser must default to false.
+    const { is_blocked: _ignored, ...legacyPayload } = RAW_PHONE_CALL;
+    void _ignored;
+    vi.mocked(http.get).mockResolvedValue([legacyPayload]);
+    const res = new CallsResource(http);
+
+    const calls = await res.list(NUM_ID);
+
+    expect(calls[0].isBlocked).toBe(false);
   });
 });
 

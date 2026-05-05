@@ -111,6 +111,14 @@ export interface PhoneCall {
   hangupReason: string | null;
   startedAt: Date | null;
   endedAt: Date | null;
+  /**
+   * `true` when this call was rejected by a contact rule or default-block
+   * before connect. Identity-scoped (agent) API keys never observe `true`
+   * rows — the server filters them at the access-policy layer. Admin/JWT
+   * callers see both values mixed and can narrow with `isBlocked` on
+   * `CallsResource.list`.
+   */
+  isBlocked: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -164,6 +172,14 @@ export interface TextMessage {
   sentAt: Date | null;
   deliveredAt: Date | null;
   failedAt: Date | null;
+  /**
+   * `true` when this text was rejected by a contact rule or default-block.
+   * Identity-scoped (agent) API keys never observe `true` rows — the
+   * server filters them at the access-policy layer. Admin/JWT callers see
+   * both values mixed and can narrow with `isBlocked` on
+   * `TextsResource.list` / `search` / `listConversations`.
+   */
+  isBlocked: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -223,6 +239,9 @@ export interface RawPhoneCall {
   hangup_reason: string | null;
   started_at: string | null;
   ended_at: string | null;
+  // Optional for back-compat with older server responses that predate
+  // the field; parser defaults missing values to false.
+  is_blocked?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -262,6 +281,9 @@ export interface RawTextMessage {
   sent_at?: string | null;
   delivered_at?: string | null;
   failed_at?: string | null;
+  // Optional for back-compat with older server responses that predate
+  // the field; parser defaults missing values to false.
+  is_blocked?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -340,6 +362,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     hangupReason: r.hangup_reason,
     startedAt: r.started_at ? new Date(r.started_at) : null,
     endedAt: r.ended_at ? new Date(r.ended_at) : null,
+    isBlocked: r.is_blocked ?? false,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -404,6 +427,7 @@ export function parseTextMessage(r: RawTextMessage): TextMessage {
     sentAt: r.sent_at ? new Date(r.sent_at) : null,
     deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,
     failedAt: r.failed_at ? new Date(r.failed_at) : null,
+    isBlocked: r.is_blocked ?? false,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
