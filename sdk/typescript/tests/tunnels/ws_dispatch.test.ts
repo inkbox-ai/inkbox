@@ -150,6 +150,61 @@ describe("WS dispatch — binary base64 round-trip", () => {
   }, 15_000);
 });
 
+describe("WS dispatch — peer-initiated CLOSE", () => {
+  it("delivers a CLOSE envelope from the peer cleanly to the handler iterator", async () => {
+    let iteratorDone = false;
+    const wsHandler = async (
+      ws: import("../../src/tunnels/client/_ws.js").InkboxWebSocket,
+    ): Promise<void> => {
+      await ws.accept();
+      // Iterator should complete (done:true) when the peer sends a
+      // CLOSE envelope, not throw.
+      const it = ws[Symbol.asyncIterator]();
+      const r = await it.next();
+      iteratorDone = r.done === true;
+    };
+
+    fakeServer.setIntakeResponse({
+      status: 200,
+      headers: [
+        ["inkbox-request-id", "req-ws-close"],
+        ["inkbox-method", "GET"],
+        ["inkbox-path", "/ws"],
+        ["inkbox-route-kind", "ws-upgrade"],
+        ["inkbox-ws-id", "ws-close"],
+      ],
+      body: Buffer.alloc(0),
+    });
+
+    const runtime = makeRuntime({ wsHandler });
+    const servePromise = runtime.serveForever();
+    await fakeServer.awaitResponsePost("req-ws-close", 5000);
+    const bridgeStream = await fakeServer.awaitNextBridgeStream(
+      "/_system/ws/ws-close",
+      5000,
+    );
+    bridgeStream.respond({ ":status": 200 });
+
+    // Peer sends a CLOSE envelope inside a WS BINARY frame.
+    const closeEnv = encodeWsEnvelope({
+      type: "websocket.close",
+      code: 1000,
+      reason: "bye",
+    });
+    bridgeStream.write(encodeWsFrame(WS_OPCODE_BINARY, closeEnv, { mask: false }));
+
+    // Wait until the handler's iterator has completed.
+    const start = Date.now();
+    while (!iteratorDone && Date.now() - start < 4000) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    expect(iteratorDone).toBe(true);
+
+    await runtime.aclose();
+    await servePromise;
+  }, 10_000);
+});
+
 describe("WS dispatch — accept deadline", () => {
   it("rejects the upgrade with 504 when the handler doesn't accept in time", async () => {
     // Handler stalls; never calls accept().

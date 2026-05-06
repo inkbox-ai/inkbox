@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
     "ruff>=0.4",
 ]
@@ -33,6 +34,7 @@ Repository = "https://github.com/inkbox-ai/inkbox/tree/main/sdk/python"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "tests"]
+asyncio_mode = "auto"
 
 [tool.hatch.build.targets.wheel]
 packages = ["inkbox"]
