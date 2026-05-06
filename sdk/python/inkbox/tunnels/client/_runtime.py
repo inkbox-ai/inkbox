@@ -59,7 +59,6 @@ from inkbox.tunnels.client._envelope import (
 )
 from inkbox.tunnels.client._tls import TLSTerminator
 from inkbox.tunnels.client._url_forward import (
-    ForwardResult,
     forward_envelope_to_url,
     validate_envelope_path,
 )

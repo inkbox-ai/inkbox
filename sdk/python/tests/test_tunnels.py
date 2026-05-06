@@ -16,7 +16,7 @@ from inkbox.tunnels.exceptions import (
     TunnelTLSModeMismatch,
 )
 from inkbox.tunnels.resources.tunnels import TunnelsResource
-from inkbox.tunnels.types import TLSMode, Tunnel, TunnelStatus
+from inkbox.tunnels.types import Tunnel, TunnelStatus
 
 
 def _server_tunnel(**overrides):
