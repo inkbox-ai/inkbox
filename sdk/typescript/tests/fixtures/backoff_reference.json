@@ -1,0 +1,82 @@
+{
+  "constants": {
+    "backoff_cap": 30.0,
+    "backoff_jitter": 0.25
+  },
+  "rng_inputs": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7
+  ],
+  "schedule": [
+    {
+      "attempt": 0,
+      "rng": 0.0,
+      "backoff_in": 1.0,
+      "jitter": -0.25,
+      "sleep_for": 0.75,
+      "backoff_out": 2.0
+    },
+    {
+      "attempt": 1,
+      "rng": 0.1,
+      "backoff_in": 2.0,
+      "jitter": -0.4,
+      "sleep_for": 1.6,
+      "backoff_out": 4.0
+    },
+    {
+      "attempt": 2,
+      "rng": 0.2,
+      "backoff_in": 4.0,
+      "jitter": -0.6,
+      "sleep_for": 3.4,
+      "backoff_out": 8.0
+    },
+    {
+      "attempt": 3,
+      "rng": 0.3,
+      "backoff_in": 8.0,
+      "jitter": -0.8,
+      "sleep_for": 7.2,
+      "backoff_out": 16.0
+    },
+    {
+      "attempt": 4,
+      "rng": 0.4,
+      "backoff_in": 16.0,
+      "jitter": -0.7999999999999998,
+      "sleep_for": 15.2,
+      "backoff_out": 30.0
+    },
+    {
+      "attempt": 5,
+      "rng": 0.5,
+      "backoff_in": 30.0,
+      "jitter": 0.0,
+      "sleep_for": 30.0,
+      "backoff_out": 30.0
+    },
+    {
+      "attempt": 6,
+      "rng": 0.6,
+      "backoff_in": 30.0,
+      "jitter": 1.4999999999999996,
+      "sleep_for": 31.5,
+      "backoff_out": 30.0
+    },
+    {
+      "attempt": 7,
+      "rng": 0.7,
+      "backoff_in": 30.0,
+      "jitter": 2.999999999999999,
+      "sleep_for": 33.0,
+      "backoff_out": 30.0
+    }
+  ]
+}
