@@ -41,6 +41,7 @@ from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
+from inkbox.tunnels.resources.tunnels import TunnelsResource
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
@@ -179,6 +180,8 @@ class Inkbox:
         self._contacts = ContactsResource(self._contacts_http)
         self._notes = NotesResource(self._contacts_http)
 
+        self._tunnels = TunnelsResource(self._api_http, inkbox=self)
+
         if vault_key is not None:
             self._vault_resource.unlock(vault_key)
 
@@ -267,6 +270,11 @@ class Inkbox:
     def domains(self) -> DomainsResource:
         """Custom sending domains (list, set org default)."""
         return self._domains
+
+    @property
+    def tunnels(self) -> TunnelsResource:
+        """Tunnels (list, get, create, update, delete, restore, rotate_secret, sign_csr)."""
+        return self._tunnels
 
     ## Org-level operations
 

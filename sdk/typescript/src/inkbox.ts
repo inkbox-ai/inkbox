@@ -23,6 +23,7 @@ import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
 import { ContactsResource } from "./contacts/resources/contacts.js";
 import { NotesResource } from "./notes/resources/notes.js";
+import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { AgentIdentity } from "./agent_identity.js";
 import type {
   AgentIdentitySummary,
@@ -126,6 +127,7 @@ export class Inkbox {
   readonly _vaultResource: VaultResource;
   readonly _contacts: ContactsResource;
   readonly _notes: NotesResource;
+  readonly _tunnels: TunnelsResource;
   readonly _rootApiHttp: HttpTransport;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
@@ -171,6 +173,7 @@ export class Inkbox {
 
     this._contacts = new ContactsResource(apiHttp);
     this._notes = new NotesResource(apiHttp);
+    this._tunnels = new TunnelsResource(apiHttp);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
@@ -249,6 +252,9 @@ export class Inkbox {
 
   /** Custom sending domains (list, set org default). */
   get domains(): DomainsResource { return this._domains; }
+
+  /** Tunnels (list, get, create, update, delete, restore, rotateSecret, signCsr). */
+  get tunnels(): TunnelsResource { return this._tunnels; }
 
   // ------------------------------------------------------------------
   // Org-level operations

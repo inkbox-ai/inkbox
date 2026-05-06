@@ -130,6 +130,26 @@ from inkbox.whoami.types import (
     WhoamiResponse,
 )
 
+# Tunnels types + exceptions
+from inkbox.tunnels.types import (
+    CreatedTunnel,
+    RotatedSecret,
+    SignedCert,
+    TLSMode,
+    Tunnel,
+    TunnelStatus,
+)
+from inkbox.tunnels.exceptions import (
+    TunnelCSRStateConflict,
+    TunnelError,
+    TunnelNameInvalid,
+    TunnelNameUnavailable,
+    TunnelRemoved,
+    TunnelSecretUnavailable,
+    TunnelStateConflict,
+    TunnelTLSModeMismatch,
+)
+
 # Signing key + webhook verification
 from inkbox.signing_keys import SigningKey, verify_webhook
 
@@ -235,6 +255,21 @@ __all__ = [
     "WhoamiApiKeyResponse",
     "WhoamiJwtResponse",
     "WhoamiResponse",
+    # Tunnels
+    "CreatedTunnel",
+    "RotatedSecret",
+    "SignedCert",
+    "TLSMode",
+    "Tunnel",
+    "TunnelStatus",
+    "TunnelCSRStateConflict",
+    "TunnelError",
+    "TunnelNameInvalid",
+    "TunnelNameUnavailable",
+    "TunnelRemoved",
+    "TunnelSecretUnavailable",
+    "TunnelStateConflict",
+    "TunnelTLSModeMismatch",
     # Signing key + webhook verification
     "SigningKey",
     "verify_webhook",

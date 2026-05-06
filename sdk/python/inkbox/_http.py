@@ -39,32 +39,70 @@ class HttpTransport:
         )
         self._cookie_jar = cookie_jar or CookieJar()
 
-    def get(self, path: str, *, params: dict[str, Any] | None = None) -> Any:
+    def get(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> Any:
         cleaned = {k: v for k, v in (params or {}).items() if v is not None}
-        resp = self._send("GET", path, params=cleaned)
+        resp = self._send("GET", path, params=cleaned, timeout=timeout)
         _raise_for_status(resp)
         return resp.json()
 
-    def post(self, path: str, *, json: dict[str, Any] | None = None) -> Any:
-        resp = self._send("POST", path, json=json)
+    def post(
+        self,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        resp = self._send("POST", path, json=json, timeout=timeout)
         _raise_for_status(resp)
         if resp.status_code == 204:
             return None
         return resp.json()
 
-    def put(self, path: str, *, json: dict[str, Any]) -> Any:
-        resp = self._send("PUT", path, json=json)
+    def put(
+        self,
+        path: str,
+        *,
+        json: dict[str, Any],
+        timeout: float | None = None,
+    ) -> Any:
+        resp = self._send("PUT", path, json=json, timeout=timeout)
         _raise_for_status(resp)
         return resp.json()
 
-    def patch(self, path: str, *, json: dict[str, Any]) -> Any:
-        resp = self._send("PATCH", path, json=json)
+    def patch(
+        self,
+        path: str,
+        *,
+        json: dict[str, Any],
+        timeout: float | None = None,
+    ) -> Any:
+        resp = self._send("PATCH", path, json=json, timeout=timeout)
         _raise_for_status(resp)
         return resp.json()
 
-    def delete(self, path: str) -> None:
-        resp = self._send("DELETE", path)
+    def delete(self, path: str, *, timeout: float | None = None) -> None:
+        resp = self._send("DELETE", path, timeout=timeout)
         _raise_for_status(resp)
+
+    def delete_with_response(
+        self, path: str, *, timeout: float | None = None,
+    ) -> Any:
+        """``DELETE`` that returns a parsed JSON body.
+
+        Used by endpoints (e.g. tunnels) that respond with a representation
+        of the deleted resource rather than 204 No Content.
+        """
+        resp = self._send("DELETE", path, timeout=timeout)
+        _raise_for_status(resp)
+        if resp.status_code == 204 or not resp.content:
+            return None
+        return resp.json()
 
     def post_bytes(
         self,
@@ -104,6 +142,10 @@ class HttpTransport:
         return resp.content
 
     def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        # Drop a None timeout so httpx falls back to the client-level default
+        # rather than disabling timeouts entirely.
+        if kwargs.get("timeout") is None:
+            kwargs.pop("timeout", None)
         request = self._client.build_request(method, path, **kwargs)
         cookie = self._cookie_jar.header_for_url(str(request.url))
         if cookie:

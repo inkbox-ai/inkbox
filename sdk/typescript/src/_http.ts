@@ -253,24 +253,34 @@ export class HttpTransport {
     this.cookieJar = cookieJar ?? new CookieJar();
   }
 
-  async get<T>(path: string, params?: Params): Promise<T> {
-    return this.request<T>("GET", path, { params });
+  async get<T>(path: string, params?: Params, opts?: { timeoutMs?: number }): Promise<T> {
+    return this.request<T>("GET", path, { params, timeoutMs: opts?.timeoutMs });
   }
 
-  async post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>("POST", path, { body });
+  async post<T>(path: string, body?: unknown, opts?: { timeoutMs?: number }): Promise<T> {
+    return this.request<T>("POST", path, { body, timeoutMs: opts?.timeoutMs });
   }
 
-  async put<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>("PUT", path, { body });
+  async put<T>(path: string, body: unknown, opts?: { timeoutMs?: number }): Promise<T> {
+    return this.request<T>("PUT", path, { body, timeoutMs: opts?.timeoutMs });
   }
 
-  async patch<T>(path: string, body: unknown): Promise<T> {
-    return this.request<T>("PATCH", path, { body });
+  async patch<T>(path: string, body: unknown, opts?: { timeoutMs?: number }): Promise<T> {
+    return this.request<T>("PATCH", path, { body, timeoutMs: opts?.timeoutMs });
   }
 
-  async delete(path: string): Promise<void> {
-    await this.request<void>("DELETE", path);
+  async delete(path: string, opts?: { timeoutMs?: number }): Promise<void> {
+    await this.request<void>("DELETE", path, { timeoutMs: opts?.timeoutMs });
+  }
+
+  /**
+   * `DELETE` that returns a parsed JSON body.
+   *
+   * Used by endpoints (e.g. tunnels) that respond with a representation
+   * of the deleted resource rather than 204 No Content.
+   */
+  async deleteWithResponse<T>(path: string, opts?: { timeoutMs?: number }): Promise<T> {
+    return this.request<T>("DELETE", path, { timeoutMs: opts?.timeoutMs });
   }
 
   /**
@@ -305,6 +315,7 @@ export class HttpTransport {
       contentType?: string;
       accept?: string;
       rawResponse?: "text" | "bytes";
+      timeoutMs?: number;
     } = {},
   ): Promise<T> {
     let url = `${this.baseUrl}${path}`;
@@ -339,7 +350,8 @@ export class HttpTransport {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const effectiveTimeoutMs = opts.timeoutMs ?? this.timeoutMs;
+    const timer = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
     let resp: Response;
     try {

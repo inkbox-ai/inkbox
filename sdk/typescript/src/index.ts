@@ -126,3 +126,26 @@ export {
   generateRecoveryCode,
   vaultKeyMaterialToWire,
 } from "./vault/crypto.js";
+
+// Tunnels
+export { TLSMode, TunnelStatus } from "./tunnels/types.js";
+export type {
+  CreatedTunnel,
+  RotatedSecret,
+  SignedCert,
+  Tunnel,
+} from "./tunnels/types.js";
+export type {
+  CreateTunnelOptions,
+  UpdateTunnelOptions,
+} from "./tunnels/resources/tunnels.js";
+export {
+  TunnelCSRStateConflict,
+  TunnelError,
+  TunnelNameInvalid,
+  TunnelNameUnavailable,
+  TunnelRemoved,
+  TunnelSecretUnavailable,
+  TunnelStateConflict,
+  TunnelTLSModeMismatch,
+} from "./tunnels/exceptions.js";
