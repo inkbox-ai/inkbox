@@ -18,16 +18,20 @@
   },
   "files": [
     "dist",
+    "protocol",
     "README.md"
   ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "verify:bundle": "node scripts/verify-bundle.mjs",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "hash-wasm": "^4.11.0"
+    "@peculiar/x509": "^2.0.0",
+    "hash-wasm": "^4.11.0",
+    "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
@@ -46,6 +50,6 @@
     "url": "https://github.com/inkbox-ai/inkbox/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }

@@ -4,14 +4,21 @@ export default defineConfig({
   test: {
     environment: "node",
     coverage: {
-      // Exclude the data-plane subpath: the runtime is not yet
-      // implemented in TypeScript (see src/tunnels/client/index.ts),
-      // and the bootstrap code preserved as `_unimplementedBootstrap`
-      // is intentionally unreachable. Counting it would drag overall
-      // coverage below threshold for code that is, by design, dead
-      // until the runtime ships.
+      // Per-file overrides for the data-plane runtime: the connection-
+      // lifecycle paths (reconnect with backoff, GOAWAY mid-intake,
+      // owner-token rotation, ping timeout) cannot reach 85% line
+      // coverage without integration test investment. Document the
+      // honest gap rather than forcing shallow tests that pass without
+      // real coverage. Prefer integration tests over these overrides
+      // where feasible.
+      thresholds: {
+        // global stays at the default; per-file overrides relax for
+        // the runtime modules that hit Node-API edge cases
+        // exercisable only against a real h2 stack.
+        "src/tunnels/client/_runtime.ts": { lines: 70, branches: 70 },
+        "src/tunnels/client/_tls.ts": { lines: 60, branches: 60 },
+      },
       exclude: [
-        "src/tunnels/client/**",
         // vitest defaults that we still want to honor
         "**/node_modules/**",
         "**/dist/**",

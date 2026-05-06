@@ -8,7 +8,16 @@ TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first commun
 npm install @inkbox/sdk
 ```
 
-Requires Node.js ≥ 18.
+Requires Node.js ≥ 22.
+
+> **Note on Workers/Deno/browsers.** The control-plane CRUD surface
+> (`inkbox.tunnels.list/get/create/...` etc.) is portable to Workers,
+> Deno, and browsers — it only depends on the global `fetch`. The
+> data-plane runtime exposed via `import { connect } from
+> "@inkbox/sdk/tunnels/connect"` requires `node:http2`, `node:tls`,
+> and `node:net`, so that subpath is Node-only. Use the Python SDK
+> (`inkbox.tunnels.connect()`) if you need to run the data plane on a
+> non-Node runtime.
 
 ## Authentication
 
