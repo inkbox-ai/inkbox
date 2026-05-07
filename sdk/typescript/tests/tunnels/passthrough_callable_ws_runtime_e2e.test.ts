@@ -394,6 +394,11 @@ describe("passthrough + CallableDispatch — runtime-level WS e2e (multi-call)",
       return echoBytes.toString("utf-8");
     };
 
+    let connectedCount = 0;
+    fakeServer.onSessionEvent((kind) => {
+      if (kind === "close") connectedCount += 1;
+    });
+
     try {
       const first = await driveOneCall("req-call-1", "tcp-call-1", "ping1");
       expect(first).toContain("echo1:ping1");
@@ -405,9 +410,21 @@ describe("passthrough + CallableDispatch — runtime-level WS e2e (multi-call)",
       // "push to whichever pool slot is parked" behavior.
       await new Promise<void>((r) => setTimeout(r, 100));
 
+      // **Session-survival assertion.** A successful WS call must NOT
+      // close the runtime's h2 session to the tunnel server. If the
+      // session closed, FakeH2Server's "close" sessionEvent fires
+      // and the connectedCount goes positive. The customer's
+      // production bug is exactly this: every WS call kills the
+      // session and forces a reconnect.
+      expect(connectedCount).toBe(0);
+
       const second = await driveOneCall("req-call-2", "tcp-call-2", "ping2");
       expect(second).toContain("echo2:ping2");
       expect(invocations).toBe(2);
+
+      // After both calls, the session should still be alive — no
+      // reconnect should have occurred between the calls.
+      expect(connectedCount).toBe(0);
 
       // Both bridges should have re-parked their intake slot — the
       // pool size is 1, so two successful calls need two re-parks.

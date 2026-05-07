@@ -420,6 +420,8 @@ export class TunnelRuntime {
     });
     this.session = session;
     session.on("close", () => {
+      // eslint-disable-next-line no-console
+      console.info("tunnel runtime: h2 session closed");
       // Drain all open streams with a synthetic reset event so any
       // awaiters wake up.
       for (const [, bus] of this.streams) {
@@ -430,15 +432,46 @@ export class TunnelRuntime {
         }
       }
     });
-    session.on("error", () => {
-      /* error surfaces via close + stream events */
+    session.on("error", (err: Error) => {
+      // Visibility into session-fatal errors. Stream-level errors
+      // surface separately via stream events; this is genuinely
+      // session-terminal.
+      // eslint-disable-next-line no-console
+      console.warn("tunnel runtime: h2 session error", err);
     });
     session.on("goaway", (errorCode: number, lastStreamId: number) => {
       // eslint-disable-next-line no-console
       console.info(
-        `GOAWAY error_code=${errorCode} last_stream_id=${lastStreamId}`,
+        `tunnel runtime: GOAWAY received error_code=${errorCode} last_stream_id=${lastStreamId}`,
       );
     });
+    // Watch the underlying TCP/TLS socket directly. Node's h2 client
+    // sometimes loses the connection without emitting ``error`` or
+    // ``close`` on the session itself — the underlying socket reliably
+    // emits them. Force-destroy the session on either so
+    // ``waitForSessionClose`` resolves promptly and ``serveForever``
+    // reconnects without waiting for the ``PING_ACK_TIMEOUT_MS`` window.
+    try {
+      const sock = (session as unknown as { socket?: import("node:net").Socket }).socket;
+      const onSocketDeath = (label: string, err?: Error): void => {
+        // eslint-disable-next-line no-console
+        console.info(
+          `tunnel runtime: underlying socket ${label}` +
+            (err !== undefined ? ` err=${err.message}` : ""),
+        );
+        if (!session.closed && !session.destroyed) {
+          try { session.destroy(); } catch { /* swallow */ }
+        }
+      };
+      sock?.once?.("close", (hadError: boolean) => {
+        onSocketDeath(`closed hadError=${hadError}`);
+      });
+      sock?.once?.("error", (err: Error) => {
+        onSocketDeath("error", err);
+      });
+    } catch {
+      /* swallow */
+    }
     await new Promise<void>((resolve, reject) => {
       const onConnect = () => {
         session.off("error", onError);
