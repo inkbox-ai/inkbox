@@ -1751,11 +1751,19 @@ class TunnelRuntime:
                             await _send_ws_frame(WS_OPCODE_BINARY, handshake_out)
                             stats.outbound_frames += 1
                             stats.encrypted_bytes += len(handshake_out)
-                        # Once handshake completes, build the adapter
-                        # (h1 parser or h2 transcoder by ALPN).
-                        if (
-                            plaintext_adapter is None
-                            and tls_session.handshake_done
+                        # Build the plaintext adapter on first
+                        # handshake-complete OR first plaintext byte.
+                        # ssl.MemoryBIO flips ``handshake_done``
+                        # synchronously inside ``feed()`` so this
+                        # second condition is normally redundant for
+                        # Python — symmetric with the TS fix that
+                        # works around Node's async ``secureConnect``
+                        # event ordering. Plaintext can only flow
+                        # after the handshake is materially done, so
+                        # using its presence as a trigger is safe.
+                        if plaintext_adapter is None and (
+                            tls_session.handshake_done
+                            or plaintext_chunks
                         ):
                             plaintext_adapter = _build_adapter()
                             adapter_ready.set()

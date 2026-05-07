@@ -79,6 +79,12 @@ const HTTP2_HEADER_AUTHORITY = http2.constants.HTTP2_HEADER_AUTHORITY;
 const HTTP2_HEADER_STATUS = http2.constants.HTTP2_HEADER_STATUS;
 
 export const PING_INTERVAL_MS = 20_000;
+/**
+ * Force-reconnect window if a PING goes unacked. Long enough to absorb
+ * a slow path's RTT (multi-hop NLB, congested link), short enough that
+ * a dead TCP doesn't strand the runtime past the next intake.
+ */
+export const PING_ACK_TIMEOUT_MS = 10_000;
 export const BACKOFF_CAP_SEC = 30.0;
 export const BACKOFF_JITTER = 0.25;
 
@@ -418,6 +424,18 @@ export class TunnelRuntime {
       session.once("connect", onConnect);
       session.once("error", onError);
     });
+    // OS-level keepalive on the underlying TCP socket so a silently-
+    // dropped connection (NAT timeout, NLB idle eviction, peer power-
+    // off, etc.) eventually surfaces as a socket error even if no
+    // application traffic is flowing. Application-level PING ack
+    // tracking (see startPingLoop) is the load-bearing detector;
+    // this is defense-in-depth.
+    try {
+      const sock = (session as unknown as { socket?: import("node:net").Socket }).socket;
+      sock?.setKeepAlive?.(true, 30_000);
+    } catch {
+      /* swallow */
+    }
   }
 
   private waitForSessionClose(): Promise<void> {
@@ -697,13 +715,44 @@ export class TunnelRuntime {
     this.pingHandle = setInterval(() => {
       const session = this.session;
       if (session === null || session.closed) return;
+      let ackTimer: NodeJS.Timeout | null = null;
+      let acked = false;
       try {
-        session.ping(() => {
-          // ack callback; ignore
+        session.ping((err) => {
+          acked = true;
+          if (ackTimer !== null) {
+            clearTimeout(ackTimer);
+            ackTimer = null;
+          }
+          if (err !== null && err !== undefined) {
+            // Treat any ping error (cancelled / write error) as the
+            // peer being unreachable — destroy so serveForever notices
+            // and reconnects.
+            try { session.destroy(); } catch { /* swallow */ }
+          }
         });
       } catch {
-        /* swallow */
+        // Synchronous ping failure means the session is already in a
+        // bad state. Force-destroy so waitForSessionClose resolves.
+        try { session.destroy(); } catch { /* swallow */ }
+        return;
       }
+      // Application-level liveness check: if the ack doesn't come
+      // back within PING_ACK_TIMEOUT_MS, the underlying TCP is gone
+      // (kernel send buffer absorbing writes silently is the typical
+      // failure mode — Node's high-level h2 session won't notice
+      // without our help). Force-destroy the session; serveForever
+      // observes the close and reconnects.
+      ackTimer = setTimeout(() => {
+        if (acked) return;
+        // eslint-disable-next-line no-console
+        console.warn(
+          `tunnel runtime: PING ack not received within ` +
+            `${PING_ACK_TIMEOUT_MS}ms; assuming dead connection, ` +
+            `forcing reconnect`,
+        );
+        try { session.destroy(); } catch { /* swallow */ }
+      }, PING_ACK_TIMEOUT_MS);
     }, PING_INTERVAL_MS);
     // Do NOT unref(): explicit cancellation in stopPingLoop().
   }
@@ -1443,8 +1492,17 @@ export class TunnelRuntime {
               stats.outboundFrames += 1;
               stats.encryptedBytes += encryptedToSend.length;
             }
-            // Build the plaintext adapter on first handshake-complete.
-            if (adapterHolder.value === null && session.handshakeDone) {
+            // Build the plaintext adapter on first handshake-complete OR
+            // first plaintext byte. Plaintext can only flow after the
+            // handshake is materially done (Node's TLS layer can't
+            // decrypt application data otherwise), but the
+            // ``secureConnect`` event that flips ``handshakeDone``
+            // sometimes lands a tick later than ``feed()`` returns —
+            // gating only on the flag drops the very first request.
+            if (
+              adapterHolder.value === null &&
+              (session.handshakeDone || plaintext.length > 0)
+            ) {
               const alpn = (session as unknown as {
                 tlsSocket?: { alpnProtocol?: string | false | null };
               }).tlsSocket?.alpnProtocol ?? null;
