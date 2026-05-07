@@ -419,6 +419,106 @@ describe("passthrough + CallableDispatch — runtime-level WS e2e (multi-call)",
   }, 30_000);
 });
 
+describe("passthrough + CallableDispatch — runtime survives session death (Finding: ERR_HTTP2_INVALID_SESSION retry-storm)", () => {
+  it("intake loops do NOT retry-storm on a destroyed session; serveForever reconnects", async () => {
+    const { cert, key } = await generateSelfSignedCert();
+
+    type InkboxWebSocket = import("../../src/tunnels/client/_ws.js").InkboxWebSocket;
+    const wsHandler = async (ws: InkboxWebSocket): Promise<void> => {
+      await ws.accept();
+      for await (const msg of ws) {
+        const text = typeof msg === "string" ? msg : msg.toString("utf-8");
+        await ws.send(`echo:${text}`);
+        await ws.close(1000, "");
+        break;
+      }
+    };
+
+    const statusEvents: string[] = [];
+
+    const runtime = new TunnelRuntime({
+      tunnelId: "99999999-9999-9999-9999-999999999999",
+      secret: "sek-test",
+      zone: fakeServer.authority,
+      publicHost: "agent.test",
+      poolSize: null,
+      dispatch: {
+        httpHandler: async () =>
+          new Response("not used", { status: 200 }),
+        wsHandler,
+      },
+      tlsTerminator: new TlsTerminator({
+        certChainPem: cert,
+        keyPem: key,
+        alpnProtocols: ["http/1.1"],
+      }),
+      http2Connect: (authority, options) =>
+        http2.connect(authority, {
+          ...(options as object),
+          rejectUnauthorized: false,
+        } as http2.SecureClientSessionOptions),
+      onStatus: (s) => statusEvents.push(s),
+    });
+    const servePromise = runtime.serveForever();
+
+    // Wait for the initial connect.
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(
+        () => reject(new Error("initial connect timeout")),
+        5_000,
+      );
+      const check = (): void => {
+        if (statusEvents.includes("connected")) {
+          clearTimeout(t);
+          resolve();
+          return;
+        }
+        setTimeout(check, 25);
+      };
+      check();
+    });
+    const connectedCountAfterInitial = statusEvents.filter(
+      (s) => s === "connected",
+    ).length;
+    expect(connectedCountAfterInitial).toBeGreaterThanOrEqual(1);
+
+    // Inject GOAWAY from the server. SDK's session goes terminal.
+    // Intake loops will hit ERR_HTTP2_GOAWAY_SESSION on next openStream;
+    // pre-fix code treats this as transient and retry-storms forever.
+    // Post-fix code exits the slot, lets runOnce return, and
+    // serveForever reconnects — observable via a second "connected".
+    fakeServer.injectGoaway(http2.constants.NGHTTP2_INTERNAL_ERROR);
+
+    // Wait for a SECOND connected event (the reconnect).
+    await new Promise<void>((resolve, reject) => {
+      const t = setTimeout(
+        () => reject(new Error(
+          "did not reconnect within 8s; intake loop retry-storming on dead session",
+        )),
+        8_000,
+      );
+      const check = (): void => {
+        const connectedCount = statusEvents.filter(
+          (s) => s === "connected",
+        ).length;
+        if (connectedCount > connectedCountAfterInitial) {
+          clearTimeout(t);
+          resolve();
+          return;
+        }
+        setTimeout(check, 50);
+      };
+      check();
+    });
+
+    expect(statusEvents.filter((s) => s === "connected").length)
+      .toBeGreaterThanOrEqual(2);
+
+    await runtime.aclose();
+    await servePromise;
+  }, 20_000);
+});
+
 describe("passthrough + CallableDispatch — runtime-level WS e2e (h1 Upgrade)", () => {
   it("h1 Upgrade: websocket through dispatchTcpStream → wsHandler invoked, frames round-trip", async () => {
     const { cert, key } = await generateSelfSignedCert();

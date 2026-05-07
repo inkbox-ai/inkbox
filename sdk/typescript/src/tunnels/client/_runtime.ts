@@ -105,6 +105,33 @@ class OwnerTokenInvalidError extends Error {
   }
 }
 
+/**
+ * True iff the error indicates the h2 session is terminally gone —
+ * any further ``openStream`` against this session will throw the
+ * same error. Caller's responsibility is to STOP retrying and let
+ * ``serveForever`` reconnect, not to spin on the corpse.
+ *
+ * Recognized codes:
+ *   * ``ERR_HTTP2_INVALID_SESSION`` — Node throws this when
+ *     ``ClientHttp2Session.request`` is called after the session has
+ *     been destroyed.
+ *   * ``ERR_HTTP2_GOAWAY_SESSION`` — Node throws this when a stream
+ *     is opened against a session that has received GOAWAY.
+ *   * ``ERR_HTTP2_STREAM_CANCEL`` (less common at session level) —
+ *     surfaces in some teardown races.
+ */
+function isSessionTerminalError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  if (typeof code !== "string") return false;
+  return (
+    code === "ERR_HTTP2_INVALID_SESSION" ||
+    code === "ERR_HTTP2_GOAWAY_SESSION" ||
+    code === "ERR_HTTP2_STREAM_CANCEL" ||
+    code === "ERR_HTTP2_SESSION_ERROR"
+  );
+}
+
 export type StatusCallback = (
   status: "connecting" | "connected" | "reconnecting" | "closed",
 ) => void;
@@ -633,6 +660,21 @@ export class TunnelRuntime {
             `intake slot ${slot}: owner_token rejected; reconnecting`,
           );
           this.session?.destroy();
+          return;
+        }
+        if (isSessionTerminalError(err) || this.session?.destroyed) {
+          // The h2 session is gone — every subsequent openStream will
+          // throw the same error. Don't retry-storm; exit the slot so
+          // ``runOnce`` observes ``waitForSessionClose`` resolve and
+          // ``serveForever`` reconnects. Same shape as Python's
+          // ``_OwnerTokenInvalidError`` retry-storm fix in
+          // ``_intake_loop``: distinguish terminal session errors
+          // before the generic retry handler.
+          // eslint-disable-next-line no-console
+          console.warn(
+            `intake slot ${slot}: h2 session terminal; exiting slot`,
+          );
+          try { this.session?.destroy(); } catch { /* swallow */ }
           return;
         }
         // eslint-disable-next-line no-console
