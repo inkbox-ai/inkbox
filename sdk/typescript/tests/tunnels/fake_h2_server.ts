@@ -119,6 +119,36 @@ export async function startFakeH2Server(
 
   const intakeQueue: Array<IntakeResponse | null> = [];
   let stickyIntake: IntakeResponse | null = null;
+  // Streams currently parked because the queue was empty at POST
+  // time. When a new response is enqueued via setIntakeResponse, the
+  // first parked stream gets delivered to — matching the real tunnel
+  // server's "push envelope to whichever pool slot is parked" semantic.
+  const parkedIntakeStreams: http2.ServerHttp2Stream[] = [];
+
+  const writeIntakeResponse = (
+    stream: http2.ServerHttp2Stream,
+    next: IntakeResponse,
+  ): void => {
+    const respHeaders: http2.OutgoingHttpHeaders = {
+      ":status": next.status,
+    };
+    for (const [k, v] of next.headers) {
+      const existing = respHeaders[k];
+      if (existing === undefined) {
+        respHeaders[k] = v;
+      } else if (Array.isArray(existing)) {
+        existing.push(v);
+      } else {
+        respHeaders[k] = [String(existing), v];
+      }
+    }
+    try {
+      stream.respond(respHeaders);
+      stream.end(next.body);
+    } catch {
+      /* swallow — stream may have been closed */
+    }
+  };
   const sessionEventListeners: Array<(kind: "goaway" | "close") => void> = [];
   let receivedHello: http2.IncomingHttpHeaders | null = null;
   const intakePosts: Array<{ slot: number; ownerToken: string }> = [];
@@ -184,29 +214,22 @@ export async function startFakeH2Server(
         nextUnclaimedIntakeIdx = intakePosts.length;
         waiter.resolve(post);
       }
-      // Emit the queued response (or sticky, or park indefinitely).
+      // Emit the queued response (or sticky). If neither is set, park
+      // the stream — a later setIntakeResponse will deliver to it.
       const queued = intakeQueue.shift();
       const next: IntakeResponse | null | undefined =
         queued !== undefined ? queued : stickyIntake;
       if (next === null || next === undefined) {
-        // Park: do nothing. Caller decides when to close.
+        parkedIntakeStreams.push(stream);
+        const removeFromParked = (): void => {
+          const idx = parkedIntakeStreams.indexOf(stream);
+          if (idx >= 0) parkedIntakeStreams.splice(idx, 1);
+        };
+        stream.once("close", removeFromParked);
+        stream.once("error", removeFromParked);
         return;
       }
-      const respHeaders: http2.OutgoingHttpHeaders = {
-        ":status": next.status,
-      };
-      for (const [k, v] of next.headers) {
-        const existing = respHeaders[k];
-        if (existing === undefined) {
-          respHeaders[k] = v;
-        } else if (Array.isArray(existing)) {
-          existing.push(v);
-        } else {
-          respHeaders[k] = [String(existing), v];
-        }
-      }
-      stream.respond(respHeaders);
-      stream.end(next.body);
+      writeIntakeResponse(stream, next);
       return;
     }
     if (path.startsWith("/_system/response/")) {
@@ -278,6 +301,15 @@ export async function startFakeH2Server(
       // One-shot: the next intake POST consumes this response. Tests
       // that need "respond the same way to every intake" should call
       // `setStickyIntakeResponse` instead.
+      // If there's a stream already parked (the SDK posted before the
+      // response was queued — common in multi-call tests), deliver to
+      // that parked stream NOW, mirroring the real tunnel server's
+      // "push envelope to whichever pool slot is parked" behavior.
+      if (response !== null && parkedIntakeStreams.length > 0) {
+        const stream = parkedIntakeStreams.shift()!;
+        writeIntakeResponse(stream, response);
+        return;
+      }
       intakeQueue.push(response);
     },
     setStickyIntakeResponse(response) {
