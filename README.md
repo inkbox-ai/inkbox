@@ -6,7 +6,7 @@ https://inkbox.ai
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-API-first communication infrastructure for AI agents — email (with custom sending domains), phone, identities, and encrypted vault (login credentials, API keys, key pairs, SSH keys, OTP, etc.).
+API-first communication infrastructure for AI agents — email (with custom sending domains), phone, identities, encrypted vault (login credentials, API keys, key pairs, SSH keys, OTP, etc.), and tunnels (expose a local server at a public URL via outbound HTTP/2).
 
 | Package | Language | Install |
 |---|---|---|
@@ -121,6 +121,31 @@ inkbox vault secrets
 inkbox vault get <secret-id>
 ```
 
+### Tunnels (Python)
+
+```python
+# Bring a local server online at https://my-app.tunnel.inkboxwire.com.
+# Outbound HTTP/2 only — no inbound port to open. POSIX only.
+listener = inkbox.tunnels.connect(name="my-app", forward_to="http://127.0.0.1:8080")
+print(listener.public_url)
+listener.wait()
+```
+
+### Tunnels (TypeScript)
+
+```typescript
+import { connect } from "@inkbox/sdk/tunnels/connect";
+
+const listener = await connect(inkbox, {
+  name: "my-app",
+  forwardTo: "http://127.0.0.1:8080",
+});
+console.log(listener.publicUrl);
+await listener.wait();
+```
+
+Both SDKs also accept an in-process callable (Fetch handler in TS, ASGI app in Python) instead of a `forward_to` URL, and a `tls_mode: "passthrough"` option for end-to-end TLS termination in your process. See [`skills/inkbox-tunnels/`](./skills/inkbox-tunnels/) for the full reference.
+
 ### Outbound SMS — current limits
 
 - Outbound SMS works only from **local** numbers (not toll-free).
@@ -213,6 +238,7 @@ inkbox signup status
 | [`skills/inkbox-python/`](./skills/inkbox-python/) | Python agent skill for Claude Code and other coding agents |
 | [`skills/inkbox-ts/`](./skills/inkbox-ts/) | TypeScript agent skill for Claude Code and other coding agents |
 | [`skills/inkbox-openclaw/`](./skills/inkbox-openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
+| [`skills/inkbox-tunnels/`](./skills/inkbox-tunnels/) | Tunnels skill — bring a local server online at a public Inkbox URL |
 | [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email, phone, and vault |
 | [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
 | [`examples/use-inkbox-cli/`](./examples/use-inkbox-cli/) | Shell script examples for CLI automation and CI pipelines |

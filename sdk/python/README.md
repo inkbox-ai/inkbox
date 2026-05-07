@@ -611,6 +611,48 @@ inkbox.phone_numbers.release(number.id)
 
 ---
 
+## Tunnels
+
+Bring a local Python process online at a public `https://{name}.tunnel.inkboxwire.com` URL via outbound HTTP/2. No inbound port to open, no static IP needed. POSIX only.
+
+```python
+with Inkbox(api_key="ApiKey_...") as inkbox:
+    # Forward to a local HTTP server (edge mode — Inkbox terminates TLS)
+    listener = inkbox.tunnels.connect(
+        name="my-app",
+        forward_to="http://127.0.0.1:8080",
+    )
+    print(listener.public_url)        # https://my-app.tunnel.inkboxwire.com
+    listener.wait()                   # blocks until close()/Ctrl-C
+
+    # Or forward to an in-process ASGI app (FastAPI / Starlette / yours)
+    listener = inkbox.tunnels.connect(name="my-app", forward_to=fastapi_app)
+
+    # Or terminate TLS in-process (passthrough mode — SDK auto-signs cert)
+    listener = inkbox.tunnels.connect(
+        name="my-app",
+        tls_mode="passthrough",
+        forward_to="http://127.0.0.1:8080",
+    )
+```
+
+Async variant (`serve_forever()` / `aclose()`) is available for callers already inside an event loop. Pick one pair; don't mix `wait`/`close` with the async APIs.
+
+CRUD on the resource:
+
+```python
+inkbox.tunnels.list()
+created = inkbox.tunnels.create(name="my-app", tls_mode="edge")
+print(created.connect_secret)          # returned ONCE — save it
+inkbox.tunnels.delete("tunnel-uuid")   # 24h grace before name frees up
+inkbox.tunnels.restore("tunnel-uuid")
+inkbox.tunnels.rotate_secret("tunnel-uuid")
+```
+
+Default TLS mode is `edge`. State (connect secret, passthrough cert/key) lives under `~/.inkbox/tunnels/{name}/`; treat it like an SSH key dir. `forward_to` is loopback-only by default; pass `allow_remote_forwarding=True` after reviewing the SSRF tradeoff.
+
+---
+
 ## Webhooks
 
 Webhooks are configured on the mailbox or phone number resource — no separate registration step.
