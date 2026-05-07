@@ -1,6 +1,6 @@
 ---
 name: inkbox-openclaw
-description: Openclaw-distributed Inkbox skill — use when adding email, phone, text/SMS, contacts, notes, contact rules, encrypted vault, or agent identity features via the Inkbox TypeScript SDK (`@inkbox/sdk`) with openclaw environment and dependency provisioning.
+description: Openclaw-distributed Inkbox skill — use when adding email, phone, text/SMS, contacts, notes, contact rules, encrypted vault, tunnels, or agent identity features via the Inkbox TypeScript SDK (`@inkbox/sdk`) with openclaw environment and dependency provisioning.
 user-invocable: false
 metadata:
   openclaw:
@@ -644,6 +644,64 @@ if (info.authType === "api_key") {
 ```
 
 Returns `WhoamiApiKeyResponse` or `WhoamiJwtResponse` — discriminated on `authType`.
+
+## Tunnels
+
+Bring a local Node process online at a public `https://{name}.tunnel.inkboxwire.com` URL via outbound HTTP/2 — no inbound port required. POSIX only.
+
+> **Lifecycle caveat:** tunnels expect a long-running process and a writable state dir (`~/.inkbox/tunnels/{name}`). One-shot disposable scripts are not the right fit; use this from a sustained service. If you must run from a temporary working directory, pass `stateDir:` to a stable path so the connect secret and (in passthrough) private key persist between invocations.
+
+```js
+import { connect } from "@inkbox/sdk/tunnels/connect";
+
+// Forward to a local URL (edge mode — Inkbox terminates TLS at the edge)
+const listener = await connect(inkbox, {
+  name: "my-app",
+  forwardTo: "http://127.0.0.1:8080",
+});
+console.log(listener.publicUrl);    // https://my-app.tunnel.inkboxwire.com
+await listener.wait();              // until SIGINT/SIGTERM
+
+// In-process Fetch-API HTTP handler
+const handler = async (req) => {
+  return new Response("hi", { headers: { "content-type": "text/plain" } });
+};
+await connect(inkbox, { name: "my-app", handler });
+
+// In-process WebSocket handler (HTTP path still required)
+const wsHandler = async (ws) => {
+  await ws.accept();
+  for await (const msg of ws) {
+    await ws.send(typeof msg === "string" ? `echo: ${msg}` : msg);
+  }
+};
+await connect(inkbox, { name: "my-app", handler, wsHandler });
+
+// Passthrough TLS (SDK terminates; cert auto-signed via the control plane)
+await connect(inkbox, {
+  name: "my-app",
+  tlsMode: "passthrough",
+  forwardTo: "http://127.0.0.1:8080",
+});
+```
+
+CRUD:
+
+```js
+await inkbox.tunnels.list();
+await inkbox.tunnels.get("tunnel-uuid");
+const created = await inkbox.tunnels.create({ tunnelName: "my-app", tlsMode: "edge" });
+console.log(created.connectSecret);            // returned ONCE — save it
+await inkbox.tunnels.delete("tunnel-uuid");    // → pending_removal (24h grace)
+await inkbox.tunnels.restore("tunnel-uuid");
+await inkbox.tunnels.rotateSecret("tunnel-uuid");
+```
+
+If a previous run lost its state dir but the tunnel still exists, call `rotateSecret(id)` and pass `secret:` on the next `connect()`.
+
+Confirm with the user before creating or deleting tunnels on a shared org — names are unique per org and `delete` carries a 24h grace before the name frees up.
+
+For full options and Python examples, see `skills/inkbox-tunnels/SKILL.md`.
 
 ## Webhooks & Signature Verification
 

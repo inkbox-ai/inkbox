@@ -32,11 +32,15 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 - `inkbox-python`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
-  Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, contacts, notes, contact rules, custom sending domains, vault, and signing keys.
+  Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, contacts, notes, contact rules, custom sending domains, vault, signing keys, and tunnels.
 
 - `inkbox-ts`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-ts/SKILL.md
-  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, phone, text/SMS, contacts, notes, contact rules, custom sending domains, vault, and signing keys.
+  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, phone, text/SMS, contacts, notes, contact rules, custom sending domains, vault, signing keys, and tunnels.
+
+- `inkbox-tunnels`
+  GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-tunnels/SKILL.md
+  Tunnels reference for both SDKs — bring a local server online behind a public Inkbox URL via `inkbox.tunnels.connect(...)`. Covers tunnel CRUD, edge vs passthrough TLS, URL forwarding, and in-process Fetch/ASGI/WebSocket handlers.
 
 ## Example Skills
 
@@ -65,6 +69,7 @@ These example directories are useful references, but they are not standalone ski
 - Use `inkbox-python` when writing Python application code against the SDK.
 - Use `inkbox-ts` when writing TypeScript or JavaScript application code against the SDK.
 - Use `inkbox-cli` when the task is operational and best handled with shell commands.
+- Use `inkbox-tunnels` when bringing a local server online at a public Inkbox URL via `inkbox.tunnels.connect(...)`.
 - Use `inkbox-agent-self-signup` when the agent does not have an API key yet and needs to self-register.
 - Use `inkbox-openclaw` when the environment is specifically OpenClaw.
 - Use the example skills when you want a reusable agent prompt rather than SDK integration code.

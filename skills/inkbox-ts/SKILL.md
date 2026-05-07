@@ -1,6 +1,6 @@
 ---
 name: inkbox-ts
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox TypeScript SDK.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, tunnels, or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: false
 ---
 
@@ -652,6 +652,64 @@ if (info.authType === "api_key" && info.authSubtype === AUTH_SUBTYPE_API_KEY_ADM
   // admin-only operations (filter_mode flips, rule updates/deletes, etc.)
 }
 ```
+
+## Tunnels
+
+Bring a local Node process online at a public `https://{name}.tunnel.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. POSIX only; the data-plane runtime lives on a separate package subpath so the main `@inkbox/sdk` entry stays browser-safe.
+
+```typescript
+import { connect } from "@inkbox/sdk/tunnels/connect";
+
+// Forward to a local URL (edge mode — Inkbox terminates TLS at the edge)
+const listener = await connect(inkbox, {
+  name: "my-app",
+  forwardTo: "http://127.0.0.1:8080",
+});
+console.log(listener.publicUrl);    // https://my-app.tunnel.inkboxwire.com
+await listener.wait();              // until SIGINT/SIGTERM
+
+// In-process Fetch-API HTTP handler
+import type { InkboxHandler } from "@inkbox/sdk/tunnels/connect";
+
+const handler: InkboxHandler = async (req, ctx) => {
+  return new Response("hi", { headers: { "content-type": "text/plain" } });
+};
+await connect(inkbox, { name: "my-app", handler });
+
+// In-process WebSocket handler (HTTP path still required)
+import type { InkboxWsHandler } from "@inkbox/sdk/tunnels/connect";
+
+const wsHandler: InkboxWsHandler = async (ws) => {
+  await ws.accept();
+  for await (const msg of ws) {
+    await ws.send(typeof msg === "string" ? `echo: ${msg}` : msg);
+  }
+};
+await connect(inkbox, { name: "my-app", handler, wsHandler });
+
+// Passthrough TLS (SDK terminates; cert auto-signed via the control plane)
+await connect(inkbox, {
+  name: "my-app",
+  tlsMode: "passthrough",
+  forwardTo: "http://127.0.0.1:8080",
+});
+```
+
+CRUD:
+
+```typescript
+await inkbox.tunnels.list();
+await inkbox.tunnels.get("tunnel-uuid");
+const created = await inkbox.tunnels.create({ tunnelName: "my-app", tlsMode: "edge" });
+console.log(created.connectSecret);            // returned ONCE — save it
+await inkbox.tunnels.delete("tunnel-uuid");    // → pending_removal (24h grace)
+await inkbox.tunnels.restore("tunnel-uuid");
+await inkbox.tunnels.rotateSecret("tunnel-uuid");
+```
+
+Selected `connect()` options: `poolSize` (1–32), `stateDir` (default `~/.inkbox/tunnels/{name}`), `onStatus` callback, `allowRemoteForwarding: false` (loopback-only allowlist), `forwardToVerifyTls: true`, `forwardToCaBundle`. The state dir holds the connect secret and (in passthrough) the private key — treat it like an SSH key dir.
+
+For full options, lifecycle notes, and Python examples, see `skills/inkbox-tunnels/SKILL.md`.
 
 ## Webhooks & Signature Verification
 

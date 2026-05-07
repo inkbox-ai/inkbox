@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, contacts, notes, contact rules, vault, tunnels, or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -624,6 +624,59 @@ from inkbox import (
 if info.auth_type == "api_key" and info.auth_subtype == AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED:
     ...   # admin-only operations (filter_mode flips, rule updates/deletes, etc.)
 ```
+
+## Tunnels
+
+Bring a local process online at a public `https://{name}.tunnel.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. POSIX only.
+
+```python
+# Forward to a local URL (edge mode — Inkbox terminates TLS at the edge)
+listener = inkbox.tunnels.connect(
+    name="my-app",
+    forward_to="http://127.0.0.1:8080",
+)
+print(listener.public_url)        # https://my-app.tunnel.inkboxwire.com
+listener.wait()                   # blocks until close()/Ctrl-C
+
+# Forward to an in-process ASGI app (FastAPI / Starlette / your own)
+listener = inkbox.tunnels.connect(name="my-app", forward_to=fastapi_app)
+
+# Passthrough TLS (you terminate; SDK auto-signs a cert via the control plane)
+listener = inkbox.tunnels.connect(
+    name="my-app",
+    tls_mode="passthrough",
+    forward_to="http://127.0.0.1:8080",
+)
+```
+
+Async usage:
+
+```python
+async with ...:
+    listener = inkbox.tunnels.connect(name="my-app", forward_to="http://127.0.0.1:8080")
+    try:
+        await listener.serve_forever()
+    finally:
+        await listener.aclose()
+```
+
+`wait()`/`close()` and `serve_forever()`/`aclose()` are mutually exclusive — pick one pair.
+
+CRUD:
+
+```python
+inkbox.tunnels.list()                       # list[Tunnel]
+inkbox.tunnels.get("tunnel-uuid")
+created = inkbox.tunnels.create(name="my-app", tls_mode="edge")
+print(created.connect_secret)               # returned ONCE — save it
+inkbox.tunnels.delete("tunnel-uuid")        # → pending_removal (24h grace)
+inkbox.tunnels.restore("tunnel-uuid")
+inkbox.tunnels.rotate_secret("tunnel-uuid")
+```
+
+Selected `connect()` kwargs: `pool_size` (1–32), `state_dir` (default `~/.inkbox/tunnels/{name}`), `on_status` callback, `allow_remote_forwarding=False` (loopback-only allowlist), `forward_to_verify_tls=True`. The state dir holds the connect secret and (in passthrough) the private key — treat it like an SSH key dir.
+
+For full options, lifecycle notes, and TS examples, see `skills/inkbox-tunnels/SKILL.md`.
 
 ## Webhooks & Signature Verification
 
