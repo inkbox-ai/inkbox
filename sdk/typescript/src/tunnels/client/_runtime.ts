@@ -460,6 +460,13 @@ export class TunnelRuntime {
             (err !== undefined ? ` err=${err.message}` : ""),
         );
         if (!session.closed && !session.destroyed) {
+          // Forensic — log the stack so we can see which path
+          // triggered this destroy in production.
+          // eslint-disable-next-line no-console
+          console.warn(
+            "tunnel runtime: forcing session.destroy() from socket-death",
+            new Error("trace").stack,
+          );
           try { session.destroy(); } catch { /* swallow */ }
         }
       };
@@ -690,7 +697,8 @@ export class TunnelRuntime {
         if (err instanceof OwnerTokenInvalidError) {
           // eslint-disable-next-line no-console
           console.warn(
-            `intake slot ${slot}: owner_token rejected; reconnecting`,
+            `intake slot ${slot}: owner_token rejected; ` +
+              `forcing session.destroy() and reconnecting`,
           );
           this.session?.destroy();
           return;
@@ -705,7 +713,10 @@ export class TunnelRuntime {
           // before the generic retry handler.
           // eslint-disable-next-line no-console
           console.warn(
-            `intake slot ${slot}: h2 session terminal; exiting slot`,
+            `intake slot ${slot}: h2 session terminal (` +
+              `${(err as { code?: string })?.code ?? "no code"}); ` +
+              `exiting slot`,
+            err,
           );
           try { this.session?.destroy(); } catch { /* swallow */ }
           return;
@@ -800,15 +811,20 @@ export class TunnelRuntime {
             ackTimer = null;
           }
           if (err !== null && err !== undefined) {
-            // Treat any ping error (cancelled / write error) as the
-            // peer being unreachable — destroy so serveForever notices
-            // and reconnects.
+            // eslint-disable-next-line no-console
+            console.warn(
+              "tunnel runtime: PING errored; forcing session.destroy()",
+              err,
+            );
             try { session.destroy(); } catch { /* swallow */ }
           }
         });
-      } catch {
-        // Synchronous ping failure means the session is already in a
-        // bad state. Force-destroy so waitForSessionClose resolves.
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "tunnel runtime: session.ping() threw synchronously; forcing destroy",
+          err,
+        );
         try { session.destroy(); } catch { /* swallow */ }
         return;
       }

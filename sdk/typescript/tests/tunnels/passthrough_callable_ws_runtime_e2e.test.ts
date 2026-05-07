@@ -436,6 +436,347 @@ describe("passthrough + CallableDispatch — runtime-level WS e2e (multi-call)",
   }, 30_000);
 });
 
+describe("passthrough + CallableDispatch — multi-call h2 Extended CONNECT", () => {
+  it("session survives two sequential h2 WS calls (matching the customer's phone backend's transport)", async () => {
+    const { cert, key } = await generateSelfSignedCert();
+
+    let invocations = 0;
+    type InkboxWebSocket = import("../../src/tunnels/client/_ws.js").InkboxWebSocket;
+    const wsHandler = async (ws: InkboxWebSocket): Promise<void> => {
+      invocations += 1;
+      const my = invocations;
+      await ws.accept();
+      for await (const msg of ws) {
+        const text = typeof msg === "string" ? msg : msg.toString("utf-8");
+        await ws.send(`echo${my}:${text}`);
+        await ws.close(1000, "");
+        break;
+      }
+    };
+
+    let sessionDeath = false;
+    fakeServer.onSessionEvent((kind) => {
+      if (kind === "close" || kind === "goaway") sessionDeath = true;
+    });
+
+    const runtime = new TunnelRuntime({
+      tunnelId: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      secret: "sek-test",
+      zone: fakeServer.authority,
+      publicHost: "agent.test",
+      poolSize: null,
+      dispatch: {
+        httpHandler: async () => new Response("not used", { status: 200 }),
+        wsHandler,
+      },
+      tlsTerminator: new TlsTerminator({
+        certChainPem: cert,
+        keyPem: key,
+        alpnProtocols: ["h2", "http/1.1"],
+      }),
+      http2Connect: (authority, options) =>
+        http2.connect(authority, {
+          ...(options as object),
+          rejectUnauthorized: false,
+        } as http2.SecureClientSessionOptions),
+    });
+    const servePromise = runtime.serveForever();
+
+    const driveOne = async (
+      requestId: string,
+      tcpId: string,
+      payload: string,
+    ): Promise<string> => {
+      fakeServer.setIntakeResponse({
+        status: 200,
+        headers: [
+          ["inkbox-request-id", requestId],
+          ["inkbox-route-kind", "tcp-stream"],
+          ["inkbox-tcp-id", tcpId],
+          ["inkbox-sni-host", "agent.test"],
+        ],
+        body: Buffer.alloc(0),
+      });
+
+      const bridgeStream = await fakeServer.awaitNextBridgeStream(
+        `/_system/tcp/${tcpId}`,
+        5000,
+      );
+      bridgeStream.respond({ ":status": 200 });
+
+      const dx = bridgeDuplex(bridgeStream);
+      const tlsSock = tls.connect({
+        socket: dx as unknown as tls.TLSSocket,
+        rejectUnauthorized: false,
+        ALPNProtocols: ["h2"],
+        servername: "agent.test",
+      });
+      await new Promise<void>((resolve, reject) => {
+        tlsSock.once("secureConnect", () => resolve());
+        tlsSock.once("error", reject);
+        setTimeout(() => reject(new Error(`handshake timeout for ${tcpId}`)), 5_000);
+      });
+
+      const h2sess = http2.connect(
+        "https://agent.test",
+        { createConnection: () => tlsSock } as unknown as http2.ClientSessionOptions,
+      );
+      await new Promise<void>((resolve, reject) => {
+        h2sess.once("connect", () => resolve());
+        h2sess.once("error", reject);
+        setTimeout(() => reject(new Error(`h2 connect timeout for ${tcpId}`)), 5_000);
+      });
+
+      const reqStream = h2sess.request({
+        ":method": "CONNECT",
+        ":scheme": "https",
+        ":path": "/ws",
+        ":authority": "agent.test",
+        ":protocol": "websocket",
+        "sec-websocket-version": "13",
+      });
+
+      const status = await new Promise<number>((resolve, reject) => {
+        reqStream.once("response", (h) => resolve(Number(h[":status"] ?? 0)));
+        reqStream.once("error", reject);
+        setTimeout(() => reject(new Error(`upgrade timeout for ${tcpId}`)), 5_000);
+      });
+      if (status !== 200) {
+        throw new Error(`upgrade returned ${status} for ${tcpId}`);
+      }
+
+      const { encodeWsFrame: enc, WS_OPCODE_TEXT } = await import(
+        "../../src/tunnels/client/_wsframe.js"
+      );
+      const text = enc(WS_OPCODE_TEXT, Buffer.from(payload, "utf-8"), {
+        mask: false,
+      });
+      reqStream.write(text);
+
+      const echoChunks: Buffer[] = [];
+      const echoBytes = await new Promise<Buffer>((resolve, reject) => {
+        reqStream.on("data", (c: Buffer | string) => {
+          const buf = Buffer.isBuffer(c) ? c : Buffer.from(c);
+          echoChunks.push(buf);
+          if (Buffer.concat(echoChunks).includes(Buffer.from(`:${payload}`))) {
+            resolve(Buffer.concat(echoChunks));
+          }
+        });
+        reqStream.on("error", reject);
+        setTimeout(() => reject(new Error(`echo timeout for ${tcpId}`)), 5_000);
+      });
+
+      try { reqStream.close(); } catch { /* swallow */ }
+      try { h2sess.close(); } catch { /* swallow */ }
+
+      await new Promise<void>((resolve) => {
+        if (bridgeStream.closed || bridgeStream.destroyed) {
+          resolve();
+          return;
+        }
+        bridgeStream.once("close", () => resolve());
+        setTimeout(resolve, 1_500);
+      });
+
+      return echoBytes.toString("utf-8");
+    };
+
+    try {
+      const first = await driveOne("req-h2-1", "tcp-h2-1", "ping1");
+      expect(first).toContain("echo1:ping1");
+      // Critical: first call must not have killed the session.
+      expect(sessionDeath).toBe(false);
+
+      await new Promise<void>((r) => setTimeout(r, 200));
+
+      const second = await driveOne("req-h2-2", "tcp-h2-2", "ping2");
+      expect(second).toContain("echo2:ping2");
+      expect(sessionDeath).toBe(false);
+      expect(invocations).toBe(2);
+    } finally {
+      await runtime.aclose();
+      await servePromise;
+    }
+  }, 30_000);
+});
+
+describe("passthrough + CallableDispatch — sustained WS traffic does not kill session", () => {
+  it("session survives a long WS call with bidirectional frame flow at 50 fps", async () => {
+    const { cert, key } = await generateSelfSignedCert();
+
+    let sentByHandler = 0;
+    let receivedByHandler = 0;
+    type InkboxWebSocket = import("../../src/tunnels/client/_ws.js").InkboxWebSocket;
+    const wsHandler = async (ws: InkboxWebSocket): Promise<void> => {
+      await ws.accept();
+      // Handler concurrently sends frames at 50 fps for ~2 seconds
+      // while reading whatever the third party sends.
+      const ender = { done: false };
+      const sender = (async () => {
+        for (let i = 0; i < 100 && !ender.done; i += 1) {
+          try {
+            await ws.send(`tick-${i}`);
+            sentByHandler += 1;
+          } catch {
+            return;
+          }
+          await new Promise<void>((r) => setTimeout(r, 20));
+        }
+      })();
+      try {
+        for await (const msg of ws) {
+          receivedByHandler += 1;
+          void msg;
+          if (receivedByHandler >= 50) break;
+        }
+      } finally {
+        ender.done = true;
+        await sender.catch(() => undefined);
+        await ws.close(1000, "");
+      }
+    };
+
+    let sessionDeathLogged = false;
+    fakeServer.onSessionEvent((kind) => {
+      if (kind === "close" || kind === "goaway") sessionDeathLogged = true;
+    });
+
+    const runtime = new TunnelRuntime({
+      tunnelId: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      secret: "sek-test",
+      zone: fakeServer.authority,
+      publicHost: "agent.test",
+      poolSize: null,
+      dispatch: {
+        httpHandler: async () => new Response("not used", { status: 200 }),
+        wsHandler,
+      },
+      tlsTerminator: new TlsTerminator({
+        certChainPem: cert,
+        keyPem: key,
+        alpnProtocols: ["http/1.1"],
+      }),
+      http2Connect: (authority, options) =>
+        http2.connect(authority, {
+          ...(options as object),
+          rejectUnauthorized: false,
+        } as http2.SecureClientSessionOptions),
+    });
+    const servePromise = runtime.serveForever();
+
+    try {
+      fakeServer.setIntakeResponse({
+        status: 200,
+        headers: [
+          ["inkbox-request-id", "req-sustained"],
+          ["inkbox-route-kind", "tcp-stream"],
+          ["inkbox-tcp-id", "tcp-sustained"],
+          ["inkbox-sni-host", "agent.test"],
+        ],
+        body: Buffer.alloc(0),
+      });
+
+      const bridgeStream = await fakeServer.awaitNextBridgeStream(
+        "/_system/tcp/tcp-sustained",
+        5000,
+      );
+      bridgeStream.respond({ ":status": 200 });
+
+      const dx = bridgeDuplex(bridgeStream);
+      const client = tls.connect({
+        socket: dx as unknown as tls.TLSSocket,
+        rejectUnauthorized: false,
+        ALPNProtocols: ["http/1.1"],
+        servername: "agent.test",
+      });
+      await new Promise<void>((resolve, reject) => {
+        client.once("secureConnect", () => resolve());
+        client.once("error", reject);
+        setTimeout(() => reject(new Error("handshake timeout")), 5_000);
+      });
+
+      // WS upgrade.
+      const wsKey = "dGhlIHNhbXBsZSBub25jZQ==";
+      const respChunks: Buffer[] = [];
+      const upgradePromise = new Promise<void>((resolve, reject) => {
+        const checkDone = (): void => {
+          const merged = Buffer.concat(respChunks);
+          if (merged.includes("\r\n\r\n")) resolve();
+        };
+        client.on("data", (c: Buffer) => {
+          respChunks.push(c);
+          checkDone();
+        });
+        client.on("error", reject);
+        setTimeout(() => reject(new Error("upgrade timeout")), 5_000);
+      });
+      client.write(
+        "GET /ws HTTP/1.1\r\n" +
+          "Host: agent.test\r\n" +
+          "Connection: Upgrade\r\n" +
+          "Upgrade: websocket\r\n" +
+          `Sec-WebSocket-Key: ${wsKey}\r\n` +
+          "Sec-WebSocket-Version: 13\r\n\r\n",
+      );
+      await upgradePromise;
+
+      const { encodeWsFrame: enc, WsFrameDecoder, WS_OPCODE_TEXT } = await import(
+        "../../src/tunnels/client/_wsframe.js"
+      );
+
+      // Client sends 50 frames at ~50 fps = 1 second of traffic.
+      const senderPromise = (async () => {
+        for (let i = 0; i < 50; i += 1) {
+          const masked = enc(
+            WS_OPCODE_TEXT, Buffer.from(`audio-${i}`, "utf-8"),
+            { mask: true },
+          );
+          client.write(masked);
+          await new Promise<void>((r) => setTimeout(r, 20));
+        }
+      })();
+
+      // Read frames coming back from the handler concurrently.
+      let receivedByClient = 0;
+      const decoder = new WsFrameDecoder();
+      const readerPromise = new Promise<void>((resolve) => {
+        const onData = (c: Buffer): void => {
+          for (const f of decoder.feed(c)) {
+            if (f.opcode === WS_OPCODE_TEXT) receivedByClient += 1;
+          }
+        };
+        client.on("data", onData);
+        // Resolve when sender has finished all 50.
+        senderPromise.then(() => {
+          // Allow extra time for the last bursts to flush.
+          setTimeout(() => {
+            client.off("data", onData);
+            resolve();
+          }, 500);
+        });
+      });
+
+      await readerPromise;
+      try { client.end(); } catch { /* swallow */ }
+
+      // Allow the handler to wind down and bridge to tear down.
+      await new Promise<void>((r) => setTimeout(r, 300));
+
+      // Both directions saw substantial traffic.
+      expect(sentByHandler).toBeGreaterThan(20);
+      expect(receivedByHandler).toBeGreaterThan(20);
+      expect(receivedByClient).toBeGreaterThan(20);
+
+      // Critical assertion: the runtime's h2 session is still alive.
+      // No GOAWAY, no session close, no underlying socket death.
+      expect(sessionDeathLogged).toBe(false);
+    } finally {
+      await runtime.aclose();
+      await servePromise;
+    }
+  }, 30_000);
+});
+
 describe("passthrough + CallableDispatch — runtime survives session death (Finding: ERR_HTTP2_INVALID_SESSION retry-storm)", () => {
   it("intake loops do NOT retry-storm on a destroyed session; serveForever reconnects", async () => {
     const { cert, key } = await generateSelfSignedCert();
