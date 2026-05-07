@@ -57,6 +57,24 @@ describe("WsFrameDecoder", () => {
     expect(dec.hasPartial()).toBe(false);
   });
 
+  it("preserves the FIN bit when encoded with fin: false (fragmentation)", () => {
+    const part1 = encodeWsFrame(WS_OPCODE_TEXT, Buffer.from("ab"), {
+      mask: false, fin: false,
+    });
+    const part2 = encodeWsFrame(0x0, Buffer.from("cd"), {
+      mask: false, fin: true,
+    });
+    const dec = new WsFrameDecoder();
+    const out = dec.feed(Buffer.concat([part1, part2]));
+    expect(out).toHaveLength(2);
+    expect(out[0].fin).toBe(false);
+    expect(out[0].opcode).toBe(WS_OPCODE_TEXT);
+    expect(out[0].payload.toString()).toBe("ab");
+    expect(out[1].fin).toBe(true);
+    expect(out[1].opcode).toBe(0x0);
+    expect(out[1].payload.toString()).toBe("cd");
+  });
+
   it("decodes multiple frames in a single feed()", () => {
     const f1 = encodeWsFrame(WS_OPCODE_TEXT, Buffer.from("a"), { mask: false });
     const f2 = encodeWsFrame(WS_OPCODE_TEXT, Buffer.from("b"), { mask: false });

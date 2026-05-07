@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildForwardHeaders,
+  createUndiciAgentCache,
   forwardEnvelopeToUrl,
   joinForwardPath,
 } from "../../src/tunnels/client/_url_forward.js";
@@ -154,5 +155,51 @@ describe("forwardEnvelopeToUrl streaming cap", () => {
       maxResponseBytes: 1024,
     });
     expect(observed?.body).toBeUndefined();
+  });
+});
+
+describe("createUndiciAgentCache", () => {
+  it("returns no dispatcher when verifyTls is on and no caBundle is set", async () => {
+    const cache = createUndiciAgentCache();
+    try {
+      const a = await cache.get(true, null);
+      expect(a).toBeUndefined();
+      const b = await cache.get(undefined, undefined);
+      expect(b).toBeUndefined();
+    } finally {
+      await cache.close();
+    }
+  });
+
+  it("returns the same Agent for the same (verifyTls, caBundle) tuple", async () => {
+    const cache = createUndiciAgentCache();
+    try {
+      const ca = Buffer.from("-----BEGIN CERT-----\nAAA\n-----END CERT-----");
+      const a = await cache.get(true, ca);
+      const b = await cache.get(true, ca);
+      expect(a).toBeDefined();
+      expect(a).toBe(b);
+
+      // Different verifyTls => different Agent.
+      const c = await cache.get(false, ca);
+      expect(c).not.toBe(a);
+
+      // Different caBundle bytes => different Agent.
+      const ca2 = Buffer.from("-----BEGIN CERT-----\nBBB\n-----END CERT-----");
+      const d = await cache.get(true, ca2);
+      expect(d).not.toBe(a);
+    } finally {
+      await cache.close();
+    }
+  });
+
+  it("close() makes subsequent get() calls return undefined", async () => {
+    const cache = createUndiciAgentCache();
+    const ca = Buffer.from("ca-bytes");
+    const before = await cache.get(false, ca);
+    expect(before).toBeDefined();
+    await cache.close();
+    const after = await cache.get(false, ca);
+    expect(after).toBeUndefined();
   });
 });

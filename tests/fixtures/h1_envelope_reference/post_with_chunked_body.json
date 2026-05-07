@@ -1,0 +1,16 @@
+{
+  "name": "post_with_chunked_body",
+  "description": "POST with chunked Transfer-Encoding — body bytes reassembled across chunks.",
+  "input_raw_h1": "POST /upload HTTP/1.1\r\nHost: agent.test\r\nTransfer-Encoding: chunked\r\nContent-Type: text/plain\r\n\r\n5\r\nhello\r\n6\r\n-world\r\n0\r\n\r\n",
+  "expected_dispatch_request": {
+    "method": "POST",
+    "path": "/upload",
+    "is_websocket": false,
+    "headers": [
+      ["host", "agent.test"],
+      ["transfer-encoding", "chunked"],
+      ["content-type", "text/plain"]
+    ],
+    "body_bytes_b64": "aGVsbG8td29ybGQ="
+  }
+}

@@ -107,3 +107,52 @@ describe("connect() — synchronous validation failures", () => {
     ).rejects.not.toBeInstanceOf(InvalidConnectOptions);
   });
 });
+
+describe("connect() — passthrough scheme handling", () => {
+  // Passthrough accepts both http:// and https://; UpstreamUrlDispatch
+  // handles upstream TLS via undici when scheme is https. These tests
+  // assert that passthrough validation does not reject either scheme
+  // synchronously — failures come from downstream (the stub Inkbox not
+  // having tunnel methods).
+
+  it("accepts passthrough + http:// forwardTo through synchronous validation", async () => {
+    await expect(
+      connect(stubInkbox, {
+        name: "my-agent",
+        tlsMode: "passthrough",
+        forwardTo: "http://127.0.0.1:8080",
+      }),
+    ).rejects.not.toMatchObject({
+      name: "InvalidConnectOptions",
+      message: expect.stringMatching(/http:\/\//),
+    });
+  });
+
+  it("accepts passthrough + https:// forwardTo", async () => {
+    await expect(
+      connect(stubInkbox, {
+        name: "my-agent",
+        tlsMode: "passthrough",
+        forwardTo: "https://127.0.0.1:8443",
+      }),
+    ).rejects.not.toMatchObject({
+      name: "InvalidConnectOptions",
+      message: expect.stringMatching(/http:\/\//),
+    });
+  });
+
+  it("does NOT reject edge + https:// forwardTo", async () => {
+    // Edge URL forwarding terminates upstream TLS via undici and
+    // supports https:// (regression check: shared validator unchanged).
+    await expect(
+      connect(stubInkbox, {
+        name: "my-agent",
+        tlsMode: "edge",
+        forwardTo: "https://127.0.0.1:8443",
+      }),
+    ).rejects.not.toMatchObject({
+      name: "InvalidConnectOptions",
+      message: expect.stringMatching(/http:\/\//),
+    });
+  });
+});

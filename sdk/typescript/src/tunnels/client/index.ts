@@ -123,6 +123,25 @@ export interface ConnectOptions {
   printSecretToStderr?: boolean | null;
   /** Signal-handler installation policy. */
   installSignalHandlers?: boolean;
+  /**
+   * Default `true`. When `false`, passthrough advertises only
+   * `http/1.1` in ALPN — the h1 parser still handles inbound traffic
+   * uniformly (caps, validation, header injection). This is an
+   * ALPN-only escape hatch; the raw byte-pipe is gone.
+   */
+  enableH2Transcode?: boolean;
+  /**
+   * Verify the upstream's TLS certificate when `forwardTo` is `https://`.
+   * Default `true`. Set `false` for self-signed dev certs on loopback;
+   * pair with `forwardToCaBundle` for private CAs.
+   */
+  forwardToVerifyTls?: boolean;
+  /**
+   * Extra CA certificate(s) (PEM) to trust when verifying the upstream
+   * TLS certificate. Mutually exclusive with `forwardToVerifyTls=false`
+   * for sanity.
+   */
+  forwardToCaBundle?: Buffer | string;
 }
 
 function validatePoolSize(poolSize: number | undefined): void {
@@ -202,6 +221,10 @@ export async function connect(
     (typeof options.tlsMode === "string"
       ? (options.tlsMode as TLSMode)
       : options.tlsMode) ?? TLSMode.EDGE;
+
+  // Passthrough accepts both http:// and https:// forwardTo URLs.
+  // UpstreamUrlDispatch builds undici's tls.connect options from
+  // forwardToVerifyTls / forwardToCaBundle for https:// upstreams.
   const onPendingRemoval = options.onPendingRemoval ?? "auto_restore";
   const stateDirPath = options.stateDir ?? defaultStateDir(options.name);
 
@@ -288,12 +311,9 @@ export async function connect(
   // the forcing function.
   let tlsTerminator: import("./_tls.js").TlsTerminator | null = null;
   if (tunnel.tlsMode === TLSMode.PASSTHROUGH) {
-    if (options.forwardTo === undefined) {
-      throw new InvalidConnectOptions(
-        "tlsMode: 'passthrough' requires forwardTo (URL forwarding); " +
-          "in-process callable dispatch is edge-only.",
-      );
-    }
+    // Passthrough accepts either ``forwardTo`` (URL) or ``handler``
+    // (Fetch-style callable). The runtime constructs UpstreamUrlDispatch
+    // or CallableDispatch accordingly.
     const cert = await import("./_cert.js");
     const tls = await import("./_tls.js");
     const keypair = await cert.loadOrCreateKeypair(stateDirPath);
@@ -309,7 +329,20 @@ export async function connect(
       fs.promises.readFile(certPath),
     );
     const keyPem = await cert.keyPemBytes(keypair);
-    tlsTerminator = new tls.TlsTerminator({ certChainPem, keyPem });
+    // ALPN advertised in passthrough. enableH2Transcode=true (default)
+    // advertises h2 + http/1.1; the runtime selects the h1 parser or
+    // h2 transcoder per-connection by negotiated ALPN. Setting it
+    // false is the ALPN-only escape hatch — h1 parser still services
+    // inbound traffic, but h2 is never offered.
+    const enableH2 = options.enableH2Transcode !== false;
+    const alpnProtocols = enableH2
+      ? ["h2", "http/1.1"]
+      : ["http/1.1"];
+    tlsTerminator = new tls.TlsTerminator({
+      certChainPem,
+      keyPem,
+      alpnProtocols,
+    });
   }
 
   const { zone, publicHost } = resolveZoneAndHost({
@@ -344,6 +377,8 @@ export async function connect(
     maxInboundBodyBytes: options.maxInboundBodyBytes ?? DEFAULT_INBOUND_BODY_BYTES,
     maxResponseBytes: options.maxResponseBytes ?? DEFAULT_OUTBOUND_BODY_BYTES,
     allowRemoteForwarding: options.allowRemoteForwarding,
+    forwardToVerifyTls: options.forwardToVerifyTls,
+    forwardToCaBundle: options.forwardToCaBundle,
     onStatus: options.onStatus,
   });
 

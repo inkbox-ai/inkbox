@@ -65,13 +65,19 @@ def decode_ws_frames(buf: bytearray) -> list[tuple[int, bytes, bool]]:
         frames.append((opcode, payload, fin))
 
 
-def encode_ws_frame(opcode: int, payload: bytes, *, mask: bool = True) -> bytes:
+def encode_ws_frame(
+    opcode: int, payload: bytes, *, mask: bool = True, fin: bool = True,
+) -> bytes:
     """Encode a single WS frame.
 
     ``mask=True`` is required for client→server frames per RFC 6455.
+    ``fin=False`` produces a fragment frame (continuation expected); the
+    URL passthrough bridge needs this so multi-frame messages from the
+    third party are not silently coalesced.
     """
     out = bytearray()
-    out.append(0x80 | (opcode & 0x0F))  # FIN=1
+    fin_bit = 0x80 if fin else 0x00
+    out.append(fin_bit | (opcode & 0x0F))
     plen = len(payload)
     mask_bit = 0x80 if mask else 0x00
     if plen < 126:

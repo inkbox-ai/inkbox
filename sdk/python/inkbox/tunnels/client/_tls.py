@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import ssl
 import tempfile
+from typing import Sequence
 
 
 class TLSTerminator:
@@ -23,11 +24,21 @@ class TLSTerminator:
     tempfiles to feed ``SSLContext.load_cert_chain`` (which only
     accepts paths); the tempfiles are mode 0o600 from creation and
     unlinked in ``finally``.
+
+    ``alpn_protocols`` controls what we advertise to the third party.
+    Default is ``("http/1.1",)`` — we only commit to a protocol the
+    rest of the data plane can actually deliver.
     """
 
-    def __init__(self, *, cert_chain_pem: bytes, key_pem: bytes) -> None:
+    def __init__(
+        self,
+        *,
+        cert_chain_pem: bytes,
+        key_pem: bytes,
+        alpn_protocols: Sequence[str] = ("http/1.1",),
+    ) -> None:
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ctx.set_alpn_protocols(["h2", "http/1.1"])
+        ctx.set_alpn_protocols(list(alpn_protocols))
         cert_path = key_path = None
         try:
             cert_fd, cert_path = tempfile.mkstemp(suffix=".pem")

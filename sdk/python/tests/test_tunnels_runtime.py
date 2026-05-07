@@ -468,6 +468,509 @@ async def test_ws_accept_deadline_trips_when_app_stalls():
 
 
 @pytest.mark.asyncio
+async def test_dispatch_tcp_stream_does_not_drop_callable_envelopes():
+    """Regression: passthrough + callable must not be rejected at the
+    runtime layer. Previously ``_dispatch_tcp_stream`` returned early
+    when ``forward_to`` was not a URL, so callable envelopes were
+    silently dropped despite the listener accepting the configuration.
+    """
+    async def app(scope, receive, send):
+        return None  # never reached in this test
+
+    runtime = _make_runtime(
+        forward_to=app,  # callable, not URL
+        tls_terminator=object(),  # truthy, makes us look like passthrough
+    )
+    # tcp_id None → second early-return; that path is intentional.
+    env_no_tcp = Envelope(
+        request_id="r", method="GET", path="/", route_kind="webhook",
+        ws_id=None, forwarded_headers=[], body=b"", body_uri=None,
+        forwarded_for_ip=None, tcp_id=None, sni_host=None, extra_meta={},
+    )
+    await runtime._dispatch_tcp_stream(env_no_tcp)
+
+    # tcp_id present + callable forward_to: the function must proceed
+    # past the early-return guards. We intercept the bridge-open call
+    # so the test doesn't need a real h2 connection.
+    env_with_tcp = Envelope(
+        request_id="r", method="CONNECT", path="/_system/tcp/abc",
+        route_kind="passthrough-tcp", ws_id=None, forwarded_headers=[],
+        body=b"", body_uri=None, forwarded_for_ip=None, tcp_id="abc",
+        sni_host="agent.test", extra_meta={},
+    )
+    reached_open = asyncio.Event()
+
+    async def _patched_send_lock_acquire(*_a, **_k):
+        # Signal that we got past the early-return guards into the
+        # bridge-open code path, then bail out by raising — we don't
+        # need to actually open a stream.
+        reached_open.set()
+        raise RuntimeError("test bail-out")
+
+    runtime._send_lock = type(  # noqa: SLF001 — test reaches into internals
+        "L", (), {"__aenter__": _patched_send_lock_acquire,
+                  "__aexit__": lambda *a, **k: None}
+    )()
+    try:
+        await runtime._dispatch_tcp_stream(env_with_tcp)
+    except RuntimeError as e:
+        assert "test bail-out" in str(e) or reached_open.is_set()
+    assert reached_open.is_set()
+
+
+@pytest.mark.asyncio
+async def test_ws_upgrade_rejects_path_traversal():
+    """Edge-mode WS upgrades must run validate_envelope_path. Without
+    the guard, a ws-upgrade envelope with /../ would skip HTTP-path
+    validation and reach the upstream raw."""
+    runtime = _make_runtime()
+    captured: list[tuple[str, int, list[tuple[str, str]], bytes]] = []
+
+    async def _capture_post_response(
+        request_id, *, status, headers, body, end_stream=True,
+    ):
+        captured.append((request_id, status, list(headers), body))
+
+    runtime._post_response = _capture_post_response  # type: ignore[assignment]
+
+    env = Envelope(
+        request_id="req-bad-path",
+        method="GET",
+        path="/foo/../etc/passwd",
+        route_kind="ws-upgrade",
+        ws_id="ws-1",
+        forwarded_headers=[],
+        body=b"",
+        body_uri=None,
+        forwarded_for_ip=None,
+        tcp_id=None,
+        sni_host=None,
+        extra_meta={},
+    )
+    await runtime._dispatch_ws_upgrade(env)
+
+    assert len(captured) == 1
+    request_id, status, headers, body = captured[0]
+    assert request_id == "req-bad-path"
+    assert status == 400
+    reason_headers = [v for (k, v) in headers if k == "inkbox-reason"]
+    assert reason_headers == ["invalid-path"]
+
+
+@pytest.mark.asyncio
+async def test_open_ws_upstream_rejects_negotiated_extensions():
+    """If a misbehaving upstream confirms a Sec-WebSocket-Extensions we
+    didn't offer (e.g. permessage-deflate), refuse — we don't have a
+    codec wired and would otherwise forward compressed bytes raw."""
+    import base64
+    import hashlib
+
+    from inkbox.tunnels.client._ws_upstream import (
+        WsUpstreamError,
+        open_ws_upstream,
+    )
+
+    WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+    async def handler(reader, writer):
+        head = bytearray()
+        while b"\r\n\r\n" not in bytes(head):
+            chunk = await reader.read(4096)
+            if not chunk:
+                writer.close()
+                return
+            head.extend(chunk)
+        head_text = bytes(head).split(b"\r\n\r\n", 1)[0].decode("iso-8859-1")
+        ws_key = ""
+        for line in head_text.split("\r\n")[1:]:
+            if ":" in line:
+                k, _, v = line.partition(":")
+                if k.strip().lower() == "sec-websocket-key":
+                    ws_key = v.strip()
+        accept = base64.b64encode(
+            hashlib.sha1((ws_key + WS_GUID).encode("ascii")).digest(),
+        ).decode("ascii")
+        writer.write((
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Accept: {accept}\r\n"
+            "Sec-WebSocket-Extensions: permessage-deflate\r\n\r\n"
+        ).encode("ascii"))
+        await writer.drain()
+        try:
+            await reader.read()
+        finally:
+            writer.close()
+
+    server = await asyncio.start_server(handler, host="127.0.0.1", port=0)
+    serve = asyncio.create_task(server.serve_forever())
+    try:
+        port = server.sockets[0].getsockname()[1]
+        with pytest.raises(WsUpstreamError) as ei:
+            await open_ws_upstream(
+                forward_to=f"http://127.0.0.1:{port}",
+                request_path="/ws",
+                request_headers=[],
+                ws_subprotocol=None,
+                forwarded_for_ip=None,
+                public_host="agent.test",
+            )
+        assert ei.value.status == 502
+        assert "extensions" in ei.value.reason.lower()
+    finally:
+        serve.cancel()
+        try:
+            await serve
+        except (asyncio.CancelledError, Exception):
+            pass
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_open_ws_upstream_rejects_unoffered_subprotocol():
+    """RFC 6455 §4.1: server's selected subprotocol must be one the
+    client offered. A misbehaving upstream that picks an un-offered
+    token must be rejected — otherwise we'd advertise a protocol the
+    third party never asked for."""
+    import base64
+    import hashlib
+
+    from inkbox.tunnels.client._ws_upstream import (
+        WsUpstreamError,
+        open_ws_upstream,
+    )
+
+    WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+    async def handler(reader, writer):
+        head = bytearray()
+        while b"\r\n\r\n" not in bytes(head):
+            chunk = await reader.read(4096)
+            if not chunk:
+                writer.close()
+                return
+            head.extend(chunk)
+        head_text = bytes(head).split(b"\r\n\r\n", 1)[0].decode("iso-8859-1")
+        ws_key = ""
+        for line in head_text.split("\r\n")[1:]:
+            if ":" in line:
+                k, _, v = line.partition(":")
+                if k.strip().lower() == "sec-websocket-key":
+                    ws_key = v.strip()
+        accept = base64.b64encode(
+            hashlib.sha1((ws_key + WS_GUID).encode("ascii")).digest(),
+        ).decode("ascii")
+        writer.write((
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Accept: {accept}\r\n"
+            "Sec-WebSocket-Protocol: admin\r\n\r\n"
+        ).encode("ascii"))
+        await writer.drain()
+        try:
+            await reader.read()
+        finally:
+            writer.close()
+
+    server = await asyncio.start_server(handler, host="127.0.0.1", port=0)
+    serve = asyncio.create_task(server.serve_forever())
+    try:
+        port = server.sockets[0].getsockname()[1]
+        # Client offered nothing.
+        with pytest.raises(WsUpstreamError) as ei:
+            await open_ws_upstream(
+                forward_to=f"http://127.0.0.1:{port}",
+                request_path="/ws",
+                request_headers=[],
+                ws_subprotocol=None,
+                forwarded_for_ip=None,
+                public_host="agent.test",
+            )
+        assert ei.value.status == 502
+        assert "subprotocol" in ei.value.reason.lower()
+
+        # Client offered "chat" but upstream still picked "admin".
+        with pytest.raises(WsUpstreamError) as ei2:
+            await open_ws_upstream(
+                forward_to=f"http://127.0.0.1:{port}",
+                request_path="/ws",
+                request_headers=[],
+                ws_subprotocol="chat",
+                forwarded_for_ip=None,
+                public_host="agent.test",
+            )
+        assert ei2.value.status == 502
+        assert "subprotocol" in ei2.value.reason.lower()
+    finally:
+        serve.cancel()
+        try:
+            await serve
+        except (asyncio.CancelledError, Exception):
+            pass
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_reset_bridge_stream_emits_rst_stream_cancel():
+    """_reset_bridge_stream sends RST_STREAM(CANCEL) on the named
+    stream — used on the bridge-open failure path so the h2 stream
+    doesn't sit half-open server-side."""
+    runtime = _make_runtime()
+    calls: list[tuple[str, tuple, dict]] = []
+
+    class _FakeH2:
+        def reset_stream(self, stream_id, error_code):
+            calls.append(("reset_stream", (stream_id, error_code), {}))
+
+        def send_data(self, *args, **kwargs):
+            calls.append(("send_data", args, kwargs))
+
+    async def _fake_flush():
+        return None
+
+    runtime._h2 = _FakeH2()  # type: ignore[assignment]
+    runtime._flush = _fake_flush  # type: ignore[assignment]
+
+    await runtime._reset_bridge_stream(42)
+
+    import h2.errors
+    assert len(calls) == 1
+    assert calls[0][0] == "reset_stream"
+    assert calls[0][1] == (42, h2.errors.ErrorCodes.CANCEL)
+
+
+@pytest.mark.asyncio
+async def test_end_bridge_stream_emits_empty_end_stream():
+    """_end_bridge_stream sends an empty DATA with END_STREAM so the
+    server sees a clean half-close — used on the WSS pump-exit path."""
+    runtime = _make_runtime()
+    calls: list[tuple[str, tuple, dict]] = []
+
+    class _FakeH2:
+        def send_data(self, stream_id, data, *, end_stream):
+            calls.append(("send_data", (stream_id, data), {"end_stream": end_stream}))
+
+    async def _fake_flush():
+        return None
+
+    runtime._h2 = _FakeH2()  # type: ignore[assignment]
+    runtime._flush = _fake_flush  # type: ignore[assignment]
+
+    await runtime._end_bridge_stream(99)
+
+    assert calls == [("send_data", (99, b""), {"end_stream": True})]
+
+
+@pytest.mark.asyncio
+async def test_end_bridge_stream_swallows_already_closed():
+    """If the pump already sent END_STREAM (e.g. on upstream WS CLOSE
+    propagation), _end_bridge_stream must not raise."""
+    import h2.exceptions
+
+    runtime = _make_runtime()
+
+    class _FakeH2:
+        def send_data(self, *args, **kwargs):
+            raise h2.exceptions.StreamClosedError(stream_id=99)
+
+    async def _fake_flush():
+        return None
+
+    runtime._h2 = _FakeH2()  # type: ignore[assignment]
+    runtime._flush = _fake_flush  # type: ignore[assignment]
+
+    # Must NOT raise — the suppress() inside the helper catches it.
+    await runtime._end_bridge_stream(99)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_ws_upgrade_to_url_resets_bridge_on_open_failure():
+    """When the bridge CONNECT stream fails to reach :status 200,
+    _dispatch_ws_upgrade_to_url must RST the h2 stream (not just pop
+    local state) so it doesn't leak server-side."""
+    import asyncio
+
+    runtime = _make_runtime(forward_to="http://127.0.0.1:1")
+    runtime._response_deadline_seconds = 0.05
+
+    # Stub open_ws_upstream so we don't need a real upstream.
+    class _FakeWriter:
+        def close(self):
+            pass
+
+        async def wait_closed(self):
+            return None
+
+    class _FakeUpstream:
+        reader = None
+        writer = _FakeWriter()
+        subprotocol = None
+        leftover = b""
+        headers: list[tuple[str, str]] = []
+
+    import inkbox.tunnels.client._ws_upstream as _wsu
+
+    async def _fake_open_ws_upstream(**kwargs):
+        return _FakeUpstream()
+
+    monkey_orig = _wsu.open_ws_upstream
+    _wsu.open_ws_upstream = _fake_open_ws_upstream  # type: ignore[assignment]
+
+    try:
+        # Track h2 calls.
+        reset_calls: list[tuple[int, object]] = []
+
+        class _FakeH2:
+            def reset_stream(self, stream_id, error_code):
+                reset_calls.append((stream_id, error_code))
+
+            def send_data(self, *a, **kw):
+                pass
+
+        async def _fake_flush():
+            return None
+
+        async def _fake_open_stream_locked(headers, end_stream):
+            return 7  # arbitrary stream_id
+
+        async def _fake_post_response(request_id, *, status, headers, body, end_stream=True):
+            return None
+
+        # Pre-register the queue so _await_connect_200 can read.
+        runtime._streams[7] = asyncio.Queue()
+        runtime._h2 = _FakeH2()  # type: ignore[assignment]
+        runtime._flush = _fake_flush  # type: ignore[assignment]
+        runtime._open_stream_locked = lambda h, end_stream: 7  # type: ignore[assignment]
+        runtime._post_response = _fake_post_response  # type: ignore[assignment]
+
+        envelope = Envelope(
+            request_id="req-1", method="GET", path="/ws",
+            route_kind="ws-upgrade", ws_id="ws-1",
+            forwarded_headers=[], body=b"", body_uri=None,
+            forwarded_for_ip=None, tcp_id=None, sni_host=None,
+            extra_meta={},
+        )
+
+        # The queue is empty so _await_connect_200 will time out (we
+        # set deadline=0.05s above).
+        await runtime._dispatch_ws_upgrade_to_url(envelope)
+
+        import h2.errors
+        assert reset_calls == [(7, h2.errors.ErrorCodes.CANCEL)], (
+            f"expected reset on stream 7; got {reset_calls!r}"
+        )
+        assert 7 not in runtime._streams
+        assert 7 not in runtime._bridge_stream_ids
+    finally:
+        _wsu.open_ws_upstream = monkey_orig  # type: ignore[assignment]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_ws_upgrade_callable_resets_bridge_on_open_failure():
+    """Callable WSS path must RST the h2 CONNECT stream when the
+    bridge fails to reach :status 200 — matches the URL WSS path so a
+    misbehaving server doesn't leak half-open streams."""
+    import asyncio
+
+    async def app(scope, receive, send):
+        # Accept the websocket scope so dispatch_ws_upgrade gets past
+        # the run_until_accept gate. Then stall.
+        await receive()
+        await send({"type": "websocket.accept"})
+        await asyncio.sleep(60)
+
+    runtime = _make_runtime(forward_to=app)
+    runtime._response_deadline_seconds = 0.05
+
+    reset_calls: list[tuple[int, object]] = []
+
+    class _FakeH2:
+        def reset_stream(self, stream_id, error_code):
+            reset_calls.append((stream_id, error_code))
+
+        def send_data(self, *a, **kw):
+            pass
+
+    async def _fake_flush():
+        return None
+
+    async def _fake_post_response(request_id, *, status, headers, body, end_stream=True):
+        return None
+
+    runtime._h2 = _FakeH2()  # type: ignore[assignment]
+    runtime._flush = _fake_flush  # type: ignore[assignment]
+    runtime._open_stream_locked = lambda h, end_stream: 11  # type: ignore[assignment]
+    runtime._post_response = _fake_post_response  # type: ignore[assignment]
+    # Pre-register the bridge stream queue so _await_connect_200 can
+    # park on it; it will time out at the 0.05s deadline.
+    runtime._streams[11] = asyncio.Queue()
+
+    envelope = Envelope(
+        request_id="req-cb-1", method="GET", path="/ws",
+        route_kind="ws-upgrade", ws_id="ws-cb-1",
+        forwarded_headers=[], body=b"", body_uri=None,
+        forwarded_for_ip=None, tcp_id=None, sni_host=None,
+        extra_meta={},
+    )
+
+    await runtime._dispatch_ws_upgrade(envelope)
+
+    import h2.errors
+    assert reset_calls == [(11, h2.errors.ErrorCodes.CANCEL)], (
+        f"expected reset on stream 11; got {reset_calls!r}"
+    )
+    assert 11 not in runtime._streams
+    assert 11 not in runtime._bridge_stream_ids
+
+
+@pytest.mark.asyncio
+async def test_open_ws_upstream_handshake_timeout():
+    """An upstream that completes TCP but stalls on the response head
+    must trip the handshake timeout instead of wedging the dispatch."""
+    from inkbox.tunnels.client._ws_upstream import (
+        WsUpstreamError,
+        open_ws_upstream,
+    )
+
+    async def stall(reader, writer):
+        # Read the request, then never write anything.
+        try:
+            await reader.read(4096)
+            await asyncio.sleep(60)
+        finally:
+            writer.close()
+
+    server = await asyncio.start_server(stall, host="127.0.0.1", port=0)
+    serve = asyncio.create_task(server.serve_forever())
+    try:
+        port = server.sockets[0].getsockname()[1]
+        with pytest.raises(WsUpstreamError) as ei:
+            await open_ws_upstream(
+                forward_to=f"http://127.0.0.1:{port}",
+                request_path="/ws",
+                request_headers=[],
+                ws_subprotocol=None,
+                forwarded_for_ip=None,
+                public_host="agent.test",
+                handshake_timeout_s=0.3,
+            )
+        assert ei.value.status == 504
+        assert "timeout" in ei.value.reason.lower()
+    finally:
+        serve.cancel()
+        try:
+            await serve
+        except (asyncio.CancelledError, Exception):
+            pass
+        server.close()
+        await server.wait_closed()
+
+
+@pytest.mark.asyncio
 async def test_url_forward_streaming_under_cap_succeeds():
     from inkbox.tunnels.client._url_forward import forward_envelope_to_url
 

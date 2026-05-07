@@ -16,6 +16,12 @@ import * as tls from "node:tls";
 export interface TlsTerminatorOpts {
   certChainPem: Buffer;
   keyPem: Buffer;
+  /**
+   * ALPN protocols advertised to the third party during the handshake.
+   * Default is `["http/1.1"]` — we only commit to a protocol the rest
+   * of the data plane can actually deliver.
+   */
+  alpnProtocols?: readonly string[];
 }
 
 export interface TlsSession {
@@ -43,16 +49,18 @@ export interface TlsSession {
  */
 export class TlsTerminator {
   private readonly secureContext: tls.SecureContext;
+  private readonly alpnProtocols: readonly string[];
 
   constructor(opts: TlsTerminatorOpts) {
     this.secureContext = tls.createSecureContext({
       cert: opts.certChainPem,
       key: opts.keyPem,
     });
+    this.alpnProtocols = opts.alpnProtocols ?? ["http/1.1"];
   }
 
   session(): TlsSession {
-    return new InMemoryTlsSession(this.secureContext);
+    return new InMemoryTlsSession(this.secureContext, this.alpnProtocols);
   }
 }
 
@@ -111,11 +119,17 @@ class InMemoryTlsSession implements TlsSession {
   private _handshakeDone = false;
   private closed = false;
 
-  constructor(secureContext: tls.SecureContext) {
+  constructor(
+    secureContext: tls.SecureContext,
+    alpnProtocols: readonly string[],
+  ) {
     this.wire = new WireDuplex();
     this.tlsSocket = new tls.TLSSocket(this.wire as unknown as tls.TLSSocket, {
       isServer: true,
       secureContext,
+      // ALPN must be set on the socket options bag, not on the secure
+      // context — Node only honors it from here.
+      ALPNProtocols: [...alpnProtocols],
     });
     this.tlsSocket.on("data", (chunk: Buffer | string) => {
       this.plaintextBuffer.push(

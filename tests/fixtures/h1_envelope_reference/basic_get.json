@@ -1,0 +1,16 @@
+{
+  "name": "basic_get",
+  "description": "Plain GET request — verifies header order, lowercasing, and method/path extraction.",
+  "input_raw_h1": "GET /webhook?x=1 HTTP/1.1\r\nHost: agent.test\r\nUser-Agent: probe/1\r\nAccept: */*\r\nX-Custom: hello\r\n\r\n",
+  "expected_dispatch_request": {
+    "method": "GET",
+    "path": "/webhook?x=1",
+    "is_websocket": false,
+    "headers": [
+      ["host", "agent.test"],
+      ["user-agent", "probe/1"],
+      ["accept", "*/*"],
+      ["x-custom", "hello"]
+    ]
+  }
+}

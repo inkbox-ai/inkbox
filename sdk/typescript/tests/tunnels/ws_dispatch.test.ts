@@ -205,6 +205,39 @@ describe("WS dispatch — peer-initiated CLOSE", () => {
   }, 10_000);
 });
 
+describe("WS dispatch — path validation (Finding 2 regression)", () => {
+  it("rejects a ws-upgrade envelope with a path-traversal path with 400 invalid-path", async () => {
+    const wsHandler = async (
+      _ws: import("../../src/tunnels/client/_ws.js").InkboxWebSocket,
+    ): Promise<void> => {
+      // Should not be reached.
+      throw new Error("handler invoked despite invalid path");
+    };
+
+    fakeServer.setIntakeResponse({
+      status: 200,
+      headers: [
+        ["inkbox-request-id", "req-bad-path"],
+        ["inkbox-method", "GET"],
+        ["inkbox-path", "/foo/../etc/passwd"],
+        ["inkbox-route-kind", "ws-upgrade"],
+        ["inkbox-ws-id", "ws-bad-1"],
+      ],
+      body: Buffer.alloc(0),
+    });
+
+    const runtime = makeRuntime({ wsHandler });
+    const servePromise = runtime.serveForever();
+
+    const response = await fakeServer.awaitResponsePost("req-bad-path", 5000);
+    expect(response.headers["inkbox-status"]).toBe("400");
+    expect(response.headers["inkbox-reason"]).toBe("invalid-path");
+
+    await runtime.aclose();
+    await servePromise;
+  }, 10_000);
+});
+
 describe("WS dispatch — accept deadline", () => {
   it("rejects the upgrade with 504 when the handler doesn't accept in time", async () => {
     // Handler stalls; never calls accept().

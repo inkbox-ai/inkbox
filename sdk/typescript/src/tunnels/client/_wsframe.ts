@@ -123,6 +123,12 @@ export class WsFrameDecoder {
 export interface EncodeOptions {
   /** RFC 6455 requires client→server frames to be masked. Default: true. */
   mask?: boolean;
+  /**
+   * RFC 6455 FIN bit. Default: true (single-frame message). Set false to
+   * produce a fragment that expects a continuation; needed by the URL
+   * passthrough bridge so multi-frame messages aren't silently coalesced.
+   */
+  fin?: boolean;
 }
 
 /**
@@ -135,13 +141,14 @@ export function encodeWsFrame(
   options: EncodeOptions = {},
 ): Buffer {
   const mask = options.mask !== false;
+  const fin = options.fin !== false;
   const plen = payload.length;
   let headerLen = 2;
   if (plen >= 126 && plen < 65536) headerLen = 4;
   else if (plen >= 65536) headerLen = 10;
   if (mask) headerLen += 4;
   const out = Buffer.alloc(headerLen + plen);
-  out[0] = 0x80 | (opcode & 0x0f); // FIN=1
+  out[0] = (fin ? 0x80 : 0x00) | (opcode & 0x0f);
   const maskBit = mask ? 0x80 : 0x00;
   let off = 2;
   if (plen < 126) {

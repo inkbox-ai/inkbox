@@ -21,6 +21,7 @@ Responsibilities:
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import random
@@ -29,7 +30,6 @@ import ssl
 import struct
 from contextlib import suppress
 from typing import Any, Callable
-from urllib.parse import urlsplit
 from uuid import UUID
 
 import h2.config
@@ -148,6 +148,8 @@ class TunnelRuntime:
         max_inbound_body_bytes: int = DEFAULT_INBOUND_BODY_BYTES,
         max_outbound_body_bytes: int = DEFAULT_OUTBOUND_BODY_BYTES,
         on_status: StatusCallback | None = None,
+        forward_to_verify_tls: bool = True,
+        forward_to_ca_bundle: bytes | str | None = None,
     ) -> None:
         self._tunnel_id = str(tunnel_id)
         self._secret = secret
@@ -159,6 +161,8 @@ class TunnelRuntime:
         self._max_inbound = max_inbound_body_bytes
         self._max_outbound = max_outbound_body_bytes
         self._on_status = on_status
+        self._forward_to_verify_tls = forward_to_verify_tls
+        self._forward_to_ca_bundle = forward_to_ca_bundle
 
         self._is_url_forward = isinstance(forward_to, str)
 
@@ -184,6 +188,10 @@ class TunnelRuntime:
         # created on first dispatch, closed deterministically in aclose().
         self._http_client: httpx.AsyncClient | None = None
 
+        # Passthrough dispatcher (UpstreamUrlDispatch). Lazy: only
+        # constructed when the first passthrough TCP stream needs it.
+        self._passthrough_dispatch: object | None = None
+
     # --- public lifecycle ----------------------------------------------------
 
     async def aclose(self) -> None:
@@ -194,6 +202,12 @@ class TunnelRuntime:
                 await self._writer.wait_closed()
             except (OSError, ConnectionError):
                 pass
+        if self._passthrough_dispatch is not None:
+            try:
+                await self._passthrough_dispatch.aclose()  # type: ignore[union-attr]
+            except Exception:
+                pass
+            self._passthrough_dispatch = None
         if self._http_client is not None:
             try:
                 await self._http_client.aclose()
@@ -807,24 +821,51 @@ class TunnelRuntime:
 
     def _ensure_http_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
-            self._http_client = httpx.AsyncClient(timeout=30.0)
+            # Honor the forward_to_verify_tls / forward_to_ca_bundle
+            # opts so edge https:// URL forwarding respects the same
+            # knobs as the passthrough path. They're no-ops for http://
+            # upstreams (httpx skips TLS entirely there).
+            from inkbox.tunnels.client._upstream_tls import (
+                build_upstream_tls_context,
+            )
+            verify_arg: bool | str | object = build_upstream_tls_context(
+                verify=self._forward_to_verify_tls,
+                ca_bundle=self._forward_to_ca_bundle,
+            )
+            self._http_client = httpx.AsyncClient(
+                timeout=30.0, verify=verify_arg,
+            )
         return self._http_client
 
     # --- WebSocket bridge ---------------------------------------------------
 
     async def _dispatch_ws_upgrade(self, envelope: Envelope) -> None:
-        """Bridge a third-party WS upgrade end-to-end (in-process app only in v1)."""
-        if self._is_url_forward:
-            # WS bridging requires an in-process app callable today.
-            # Reject gracefully so a third-party WS upgrade doesn't hang.
-            await self._reject_ws(
-                envelope.request_id,
-                status=501,
-                reason="WS upgrade requires forward_to=app callable",
-            )
-            return
+        """Bridge a third-party WS upgrade end-to-end.
+
+        URL forward_to: open an h1 ``Upgrade: websocket`` to the upstream
+        and bridge frames between the bridge stream and the upstream
+        socket. Callable forward_to: drive the user's ASGI websocket app
+        directly (existing path).
+        """
         if envelope.ws_id is None:
             await self._reject_ws(envelope.request_id, status=400, reason="missing ws_id")
+            return
+        # Path-traversal guard. Edge WS upgrades skip _dispatch_http's
+        # validate_envelope_path check, so apply it here too.
+        path_reject_reason = validate_envelope_path(envelope.path)
+        if path_reject_reason is not None:
+            await self._post_response(
+                envelope.request_id,
+                status=400,
+                headers=[
+                    ("content-type", "text/plain"),
+                    ("inkbox-reason", path_reject_reason),
+                ],
+                body=b"invalid path",
+            )
+            return
+        if self._is_url_forward:
+            await self._dispatch_ws_upgrade_to_url(envelope)
             return
 
         ws_session = WSASGISession(
@@ -901,6 +942,7 @@ class TunnelRuntime:
         async with self._send_lock:
             stream_id = self._open_stream_locked(connect_headers, end_stream=False)
             await self._flush()
+        self._bridge_stream_ids.add(stream_id)
 
         queue = self._streams[stream_id]
 
@@ -928,11 +970,17 @@ class TunnelRuntime:
                 "ws-upgrade CONNECT stream did not reach 200 within deadline; "
                 "ws_id=%s", envelope.ws_id,
             )
+            # RST the h2 CONNECT stream so it doesn't sit half-open
+            # server-side; mirror the URL WSS bridge-open failure path.
+            await self._reset_bridge_stream(stream_id)
             await ws_session.close(code=1011)
+            self._bridge_stream_ids.discard(stream_id)
             self._streams.pop(stream_id, None)
             return
         if not ok:
+            await self._reset_bridge_stream(stream_id)
             await ws_session.close(code=1011)
+            self._bridge_stream_ids.discard(stream_id)
             self._streams.pop(stream_id, None)
             return
 
@@ -940,12 +988,453 @@ class TunnelRuntime:
             await self._pump_ws(stream_id, ws_session)
         finally:
             await ws_session.close(code=1000)
+            # Graceful END_STREAM on the bridge so the server sees a
+            # clean half-close. The pump may already have sent
+            # END_STREAM (e.g. on app-side close); the helper
+            # suppresses the resulting StreamClosedError.
+            await self._end_bridge_stream(stream_id)
+            self._bridge_stream_ids.discard(stream_id)
             self._streams.pop(stream_id, None)
+
+    async def _dispatch_ws_upgrade_to_url(self, envelope: Envelope) -> None:
+        """Bridge a third-party WS upgrade to a ``ws://`` / ``wss://``
+        URL upstream.
+
+        Opens an h1 ``Upgrade: websocket`` to the upstream URL, posts a
+        ``:status 200`` upgrade reply on the bridge, then pumps frames
+        in both directions: bridge → length-prefixed JSON envelopes
+        carry text/binary/close from the third party, which we encode
+        as RFC 6455 frames (masked, h1 client-side) and write to the
+        upstream socket; upstream RFC 6455 frames are decoded (server,
+        unmasked) and re-emitted as JSON envelopes back over the
+        bridge.
+        """
+        from inkbox.tunnels.client._ws_upstream import (
+            WsUpstreamError, open_ws_upstream,
+        )
+
+        # Bound the upstream handshake by the same clock the server
+        # uses for the third-party reply. If response_deadline_seconds
+        # is smaller than the helper default, posting a stale reject
+        # after the server already 504'd would just be wasted work.
+        handshake_timeout_s = (
+            float(self._response_deadline_seconds)
+            if self._response_deadline_seconds is not None
+            else 30.0
+        )
+        try:
+            up = await open_ws_upstream(
+                forward_to=self._forward_to,
+                request_path=envelope.path,
+                request_headers=envelope.forwarded_headers,
+                ws_subprotocol=_first_header(
+                    envelope.forwarded_headers, "sec-websocket-protocol",
+                ),
+                forwarded_for_ip=envelope.forwarded_for_ip,
+                public_host=self._public_host,
+                verify=self._forward_to_verify_tls,
+                ca_bundle=self._forward_to_ca_bundle,
+                handshake_timeout_s=handshake_timeout_s,
+            )
+        except WsUpstreamError as e:
+            await self._reject_ws(
+                envelope.request_id, status=e.status, reason=e.reason,
+            )
+            return
+
+        # Tell the third party the upgrade succeeded. Forward the
+        # upstream's 101 response headers — application-defined headers
+        # like X-Use-Inkbox-* opt-out flags, Set-Cookie session
+        # establishment, custom correlation IDs, etc. all live here
+        # and customers expect them to round-trip. Filter out:
+        #   * hop-by-hop (connection, upgrade, transfer-encoding, ...)
+        #   * ws handshake-control headers — these are per-hop.
+        #     sec-websocket-accept is recomputed by the tunnel server
+        #     against the third party's key. sec-websocket-key/version
+        #     are request-only. extensions is already gated above
+        #     (we 502 if upstream confirms one).
+        #   * h2 pseudo-headers (defensive).
+        from inkbox.tunnels.client._envelope import HOP_BY_HOP_RESPONSE
+        ws_handshake_strip = {
+            "sec-websocket-accept",
+            "sec-websocket-extensions",
+            "sec-websocket-key",
+            "sec-websocket-version",
+        }
+        upgrade_reply_headers: list[tuple[str, str]] = []
+        for hk, hv in up.headers:
+            if hk.startswith(":"):
+                continue
+            if hk in HOP_BY_HOP_RESPONSE:
+                continue
+            if hk in ws_handshake_strip:
+                continue
+            upgrade_reply_headers.append((hk, hv))
+        await self._post_response(
+            envelope.request_id, status=200,
+            headers=upgrade_reply_headers, body=b"",
+        )
+
+        # Open the bridge stream.
+        connect_headers: list[tuple[str, str]] = [
+            (":method", "CONNECT"),
+            (":scheme", "https"),
+            (":authority", self._zone),
+            (":path", f"/_system/ws/{envelope.ws_id}"),
+            (":protocol", "inkbox-tunnel-ws"),
+            ("sec-websocket-version", "13"),
+            ("x-tunnel-id", self._tunnel_id),
+            ("x-tunnel-secret", self._secret),
+            ("inkbox-ws-id", envelope.ws_id),
+        ]
+        async with self._send_lock:
+            stream_id = self._open_stream_locked(
+                connect_headers, end_stream=False,
+            )
+            await self._flush()
+        self._bridge_stream_ids.add(stream_id)
+        queue = self._streams[stream_id]
+
+        async def _await_connect_200() -> bool:
+            while True:
+                event = await queue.get()
+                if event.kind == "headers":
+                    status_str = next(
+                        (v for k, v in event.headers if k == ":status"), "0",
+                    )
+                    return status_str == "200"
+                if event.kind in ("end", "reset"):
+                    return False
+
+        try:
+            ok = await self._with_deadline(_await_connect_200())
+        except asyncio.TimeoutError:
+            ok = False
+        if not ok:
+            # Bridge open failed — RST the h2 CONNECT stream so it
+            # doesn't sit half-open server-side. Without this the
+            # stream stays alive until the session GOAWAYs.
+            await self._reset_bridge_stream(stream_id)
+            await _safe_close_stream_writer(up.writer)
+            self._bridge_stream_ids.discard(stream_id)
+            self._streams.pop(stream_id, None)
+            return
+
+        try:
+            await self._pump_ws_url_bridge(stream_id, up.reader, up.writer, up.leftover)
+        finally:
+            await _safe_close_stream_writer(up.writer)
+            # Best-effort graceful END_STREAM on the bridge so the
+            # server sees a clean half-close. The pump may already
+            # have sent END_STREAM (e.g. on upstream WS CLOSE) — the
+            # h2 lib will raise StreamClosedError, which we suppress.
+            await self._end_bridge_stream(stream_id)
+            self._bridge_stream_ids.discard(stream_id)
+            self._streams.pop(stream_id, None)
+
+    async def _pump_ws_url_bridge(
+        self,
+        stream_id: int,
+        upstream_reader: asyncio.StreamReader,
+        upstream_writer: asyncio.StreamWriter,
+        upstream_leftover: bytes,
+    ) -> None:
+        """Bridge frames between the bridge stream and an upstream WS
+        socket. The bridge protocol carries length-prefixed JSON
+        envelopes inside outer WS BINARY frames. Each direction:
+
+        * Bridge → upstream: parse outer WS BINARY → inner JSON
+          envelope (text/binary/close) → encode as RFC 6455 frame
+          (masked, h1 client-side) → write to upstream socket.
+
+        * Upstream → bridge: read RFC 6455 frames (server, unmasked) →
+          encode as JSON envelope → wrap in outer WS BINARY (masked) →
+          send on bridge stream.
+        """
+        from inkbox.tunnels.client._ws_passthrough import decode_client_frame
+        wire_buf = bytearray()
+        env_buf = bytearray()
+        recv_done = False
+        upstream_buf = bytearray(upstream_leftover)
+        upstream_closed = asyncio.Event()
+        # Inbound h2 stream-window flow control: ``_handle_event``
+        # deliberately skips bridge streams in the auto-ack path so the
+        # consumer can credit back as it actually drains. Without this,
+        # the server's per-stream send window (default 65535) depletes
+        # after a few hundred small frames and inbound stalls — see
+        # passthrough TCP for the same pattern.
+        unacked_wire_bytes = 0
+
+        async def _send_outer_binary(payload: bytes, *, end_stream: bool = False) -> None:
+            await self._send_data(
+                stream_id,
+                encode_ws_frame(WS_OPCODE_BINARY, payload, mask=True),
+                end_stream=end_stream,
+            )
+
+        async def upstream_to_bridge() -> None:
+            # The inkbox bridge envelope schema cannot represent
+            # fragmentation. Reassemble RFC 6455 fragments client-side
+            # so we emit one envelope per complete message.
+            message_opcode: int | None = None
+            message_chunks: list[bytes] = []
+            try:
+                while not upstream_closed.is_set():
+                    decoded = decode_client_frame(
+                        upstream_buf, require_mask=False,
+                    )
+                    if decoded is None:
+                        chunk = await upstream_reader.read(4096)
+                        if not chunk:
+                            return
+                        upstream_buf.extend(chunk)
+                        continue
+                    opcode, payload, fin = decoded
+                    if opcode == WS_OPCODE_PING:
+                        # Respond directly to upstream; don't propagate.
+                        try:
+                            upstream_writer.write(
+                                encode_ws_frame(
+                                    WS_OPCODE_PONG, payload, mask=True,
+                                ),
+                            )
+                            await upstream_writer.drain()
+                        except (OSError, ConnectionError):
+                            return
+                        continue
+                    if opcode == WS_OPCODE_PONG:
+                        continue
+                    if opcode == WS_OPCODE_CLOSE:
+                        code = (
+                            int.from_bytes(payload[:2], "big")
+                            if len(payload) >= 2 else 1000
+                        )
+                        env = encode_ws_envelope({
+                            "type": "websocket.close", "code": code, "reason": "",
+                        })
+                        with suppress(Exception):
+                            await _send_outer_binary(env, end_stream=True)
+                        return
+                    if opcode in (WS_OPCODE_TEXT, WS_OPCODE_BINARY):
+                        if message_opcode is not None:
+                            # RFC 6455 §5.4 violation — drop & close.
+                            return
+                        message_opcode = opcode
+                        message_chunks = [payload]
+                    elif opcode == 0x0:  # CONTINUATION
+                        if message_opcode is None:
+                            return
+                        message_chunks.append(payload)
+                    else:
+                        # Unknown opcode — ignore safely.
+                        continue
+                    if fin and message_opcode is not None:
+                        full = b"".join(message_chunks)
+                        started_opcode = message_opcode
+                        message_opcode = None
+                        message_chunks = []
+                        if started_opcode == WS_OPCODE_TEXT:
+                            try:
+                                text = full.decode("utf-8")
+                            except UnicodeDecodeError:
+                                return
+                            env = encode_ws_envelope({
+                                "type": "websocket.send", "text": text,
+                            })
+                            await _send_outer_binary(env)
+                        else:  # BINARY
+                            env = encode_ws_envelope({
+                                "type": "websocket.send", "bytes": full,
+                            })
+                            await _send_outer_binary(env)
+            except (ConnectionError, h2.exceptions.ProtocolError):
+                pass
+            finally:
+                upstream_closed.set()
+
+        sender = self._spawn(upstream_to_bridge())
+
+        async def _await_event_or_close() -> _StreamEvent | None:
+            """Wake on a queue event OR upstream_closed. Returns None
+            when upstream closed (abrupt EOF/RST) so the loop can exit
+            without waiting for a third-party frame that may never
+            arrive."""
+            get_task = asyncio.create_task(self._streams[stream_id].get())
+            close_task = asyncio.create_task(upstream_closed.wait())
+            try:
+                done, _pending = await asyncio.wait(
+                    {get_task, close_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if get_task in done:
+                    return get_task.result()
+                return None
+            finally:
+                for t in (get_task, close_task):
+                    if not t.done():
+                        t.cancel()
+                        with suppress(asyncio.CancelledError, Exception):
+                            await t
+
+        async def _credit_consumed() -> None:
+            """Credit back bytes that have left both wire_buf and
+            env_buf — i.e. WS frame headers we've decoded plus
+            envelopes we've forwarded to upstream. Mirrors the TCP
+            passthrough pump's `consumed = unacked - len(wire_buf) -
+            pending` accounting so end-to-end backpressure (slow
+            upstream → server stops sending) holds."""
+            nonlocal unacked_wire_bytes
+            consumed = unacked_wire_bytes - len(wire_buf) - len(env_buf)
+            if consumed <= 0:
+                return
+            unacked_wire_bytes -= consumed
+            async with self._send_lock:
+                if self._h2 is None:
+                    return
+                with suppress(
+                    h2.exceptions.StreamClosedError,
+                    h2.exceptions.NoSuchStreamError,
+                    h2.exceptions.ProtocolError,
+                ):
+                    self._h2.acknowledge_received_data(consumed, stream_id)
+                    await self._flush()
+
+        try:
+            while not recv_done and not upstream_closed.is_set():
+                event = await _await_event_or_close()
+                if event is None:
+                    break
+                if event.kind == "data":
+                    unacked_wire_bytes += event.flow_controlled_length
+                    wire_buf.extend(event.data)
+                    for opcode, payload, _fin in decode_ws_frames(wire_buf):
+                        if opcode == WS_OPCODE_PING:
+                            await self._send_data(
+                                stream_id,
+                                encode_ws_frame(WS_OPCODE_PONG, payload, mask=True),
+                                end_stream=False,
+                            )
+                            continue
+                        if opcode == WS_OPCODE_PONG:
+                            continue
+                        if opcode == WS_OPCODE_CLOSE:
+                            recv_done = True
+                            break
+                        if opcode in (WS_OPCODE_BINARY, WS_OPCODE_TEXT):
+                            env_buf.extend(payload)
+                    while not recv_done:
+                        if len(env_buf) < 4:
+                            break
+                        (length,) = struct.unpack(">I", bytes(env_buf[:4]))
+                        if len(env_buf) < 4 + length:
+                            break
+                        env_bytes = bytes(env_buf[4:4 + length])
+                        try:
+                            envelope_msg = json.loads(env_bytes.decode("utf-8"))
+                        except (UnicodeDecodeError, json.JSONDecodeError):
+                            del env_buf[:4 + length]
+                            await _credit_consumed()
+                            continue
+                        kind = envelope_msg.get("type")
+                        if kind == "text":
+                            text = envelope_msg.get("data") or ""
+                            try:
+                                upstream_writer.write(
+                                    encode_ws_frame(
+                                        WS_OPCODE_TEXT,
+                                        text.encode("utf-8"),
+                                        mask=True,
+                                    ),
+                                )
+                                await upstream_writer.drain()
+                            except (OSError, ConnectionError):
+                                recv_done = True
+                                break
+                        elif kind == "binary":
+                            data_b64 = envelope_msg.get("data") or ""
+                            try:
+                                payload_bin = base64.b64decode(
+                                    data_b64, validate=True,
+                                )
+                            except (ValueError, base64.binascii.Error):  # type: ignore[attr-defined]
+                                del env_buf[:4 + length]
+                                await _credit_consumed()
+                                continue
+                            try:
+                                upstream_writer.write(
+                                    encode_ws_frame(
+                                        WS_OPCODE_BINARY, payload_bin, mask=True,
+                                    ),
+                                )
+                                await upstream_writer.drain()
+                            except (OSError, ConnectionError):
+                                recv_done = True
+                                break
+                        elif kind == "close":
+                            code = int(envelope_msg.get("code", 1000))
+                            with suppress(OSError, ConnectionError):
+                                upstream_writer.write(
+                                    encode_ws_frame(
+                                        WS_OPCODE_CLOSE,
+                                        code.to_bytes(2, "big"),
+                                        mask=True,
+                                    ),
+                                )
+                                await upstream_writer.drain()
+                            del env_buf[:4 + length]
+                            await _credit_consumed()
+                            recv_done = True
+                            break
+                        # Per-envelope-consumed credit: the envelope
+                        # has been delivered to upstream's socket buffer
+                        # AND drained, so slow upstreams naturally
+                        # propagate backpressure to the server.
+                        del env_buf[:4 + length]
+                        await _credit_consumed()
+                    # Frame-header bytes that left wire_buf during
+                    # decode but didn't correspond to forwarded
+                    # envelopes (e.g. PING/PONG/partial frames) still
+                    # need crediting so a chatty PING storm doesn't
+                    # eat the window.
+                    await _credit_consumed()
+                elif event.kind in ("end", "reset"):
+                    recv_done = True
+        finally:
+            upstream_closed.set()
+            try:
+                await asyncio.wait_for(sender, timeout=2.0)
+            except asyncio.TimeoutError:
+                sender.cancel()
+                with suppress(asyncio.CancelledError, Exception):
+                    await sender
 
     async def _pump_ws(self, stream_id: int, ws_session: WSASGISession) -> None:
         wire_buf = bytearray()
         env_buf = bytearray()
         recv_done = False
+        # See _pump_ws_url_bridge for the full rationale; same bug
+        # was present here. Bridge streams are excluded from
+        # _handle_event's auto-ack so the consumer must credit back
+        # as it drains, otherwise the server's per-stream window
+        # depletes and inbound stalls.
+        unacked_wire_bytes = 0
+
+        async def _credit_consumed() -> None:
+            nonlocal unacked_wire_bytes
+            consumed = unacked_wire_bytes - len(wire_buf) - len(env_buf)
+            if consumed <= 0:
+                return
+            unacked_wire_bytes -= consumed
+            async with self._send_lock:
+                if self._h2 is None:
+                    return
+                with suppress(
+                    h2.exceptions.StreamClosedError,
+                    h2.exceptions.NoSuchStreamError,
+                    h2.exceptions.ProtocolError,
+                ):
+                    self._h2.acknowledge_received_data(consumed, stream_id)
+                    await self._flush()
 
         async def _send_ws_binary(payload: bytes, *, end_stream: bool = False) -> None:
             await self._send_data(
@@ -977,6 +1466,7 @@ class TunnelRuntime:
             while not recv_done:
                 event = await self._streams[stream_id].get()
                 if event.kind == "data":
+                    unacked_wire_bytes += event.flow_controlled_length
                     wire_buf.extend(event.data)
                     for opcode, payload, _fin in decode_ws_frames(wire_buf):
                         if opcode == WS_OPCODE_PING:
@@ -1006,15 +1496,21 @@ class TunnelRuntime:
                         if len(env_buf) < 4 + length:
                             break
                         env_bytes = bytes(env_buf[4:4 + length])
-                        del env_buf[:4 + length]
                         try:
                             envelope_msg = json.loads(env_bytes.decode("utf-8"))
                         except (UnicodeDecodeError, json.JSONDecodeError):
+                            del env_buf[:4 + length]
+                            await _credit_consumed()
                             continue
                         await ws_session.deliver(envelope_msg)
+                        del env_buf[:4 + length]
+                        await _credit_consumed()
                         if envelope_msg.get("type") == "close":
                             recv_done = True
                             break
+                    # Frame-header bytes that left wire_buf still
+                    # need crediting (e.g. PING storms).
+                    await _credit_consumed()
                 elif event.kind in ("end", "reset"):
                     recv_done = True
         finally:
@@ -1038,18 +1534,11 @@ class TunnelRuntime:
                 "dropping (server should not have routed this here)",
             )
             return
-        if not self._is_url_forward:
-            logger.warning(
-                "tcp-stream envelope received but forward_to is not a URL; "
-                "passthrough requires forward_to=URL in v1",
-            )
-            return
         if envelope.tcp_id is None:
             return
 
-        parsed = urlsplit(self._forward_to)
-        host = parsed.hostname or "127.0.0.1"
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        # forward_to is parsed by UpstreamUrlDispatch; no per-bridge URL
+        # parse here after the parser-based refactor.
 
         tcp_id = envelope.tcp_id
         sni_host = envelope.sni_host or ""
@@ -1120,24 +1609,31 @@ class TunnelRuntime:
             self._streams.pop(stream_id, None)
             return
 
-        try:
-            lb_reader, lb_writer = await asyncio.open_connection(host, port)
-        except OSError:
-            logger.exception("loopback dial failed tcp_id=%s", tcp_id)
-            close_payload = (1011).to_bytes(2, "big") + b"loopback-dial-failed"
-            with suppress(Exception, asyncio.TimeoutError):
-                await asyncio.wait_for(
-                    self._send_data(
-                        stream_id,
-                        encode_ws_frame(WS_OPCODE_CLOSE, close_payload, mask=True),
-                        end_stream=True,
-                    ),
-                    timeout=BRIDGE_CLEANUP_SEND_TIMEOUT_SEC,
+        # Build (or reuse) the passthrough dispatcher for this runtime.
+        # UpstreamUrlDispatch owns its own httpx.AsyncClient pool; we
+        # construct it once and share it across bridge streams. The
+        # dispatcher is closed in TunnelRuntime.aclose().
+        from inkbox.tunnels.client._dispatch import (
+            CallableDispatch,
+            UpstreamUrlDispatch,
+        )
+        if self._passthrough_dispatch is None:
+            if self._is_url_forward:
+                self._passthrough_dispatch = UpstreamUrlDispatch(
+                    forward_to=self._forward_to,
+                    public_host=self._public_host,
+                    max_outbound_body_bytes=self._max_outbound,
+                    max_inbound_body_bytes=self._max_inbound,
+                    verify=self._forward_to_verify_tls,
+                    ca_bundle=self._forward_to_ca_bundle,
                 )
-            await self._drain_and_ack_pending(stream_id)
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
-            return
+            else:
+                self._passthrough_dispatch = CallableDispatch(
+                    app=self._forward_to,
+                    public_host=self._public_host,
+                    max_outbound_body_bytes=self._max_outbound,
+                )
+        dispatch = self._passthrough_dispatch
 
         stats = BridgeStats(tcp_id=tcp_id, stream_id=stream_id, sni_host=sni_host)
         tls_session = self._terminator.session()
@@ -1153,10 +1649,6 @@ class TunnelRuntime:
                 tls_closed = True
                 return tls_session.close()
 
-        def _half_close_loopback() -> None:
-            with suppress(OSError, ConnectionError):
-                lb_writer.write_eof()
-
         async def _send_ws_frame(
             opcode: int, payload: bytes, *, end_stream: bool = False,
         ) -> None:
@@ -1166,7 +1658,48 @@ class TunnelRuntime:
                 end_stream=end_stream,
             )
 
+        # Plaintext adapter — picked once after the TLS handshake reports
+        # an ALPN protocol. Until then plaintext is buffered (typically
+        # nothing arrives until handshake completes).
+        plaintext_adapter: object | None = None
+        adapter_ready = asyncio.Event()
+
+        def _build_adapter() -> object:
+            from inkbox.tunnels.client._h1_server import (
+                InProcH1ParserPlaintext,
+            )
+            from inkbox.tunnels.client._h2_transcode import (
+                H2TranscoderPlaintext,
+            )
+            alpn = tls_session._sslobj.selected_alpn_protocol()
+            if alpn == "h2":
+                return H2TranscoderPlaintext(
+                    dispatch=dispatch,
+                    max_inbound_body_bytes=self._max_inbound,
+                )
+            # Default to h1 parser for "http/1.1", None, or anything
+            # else (defensive — unknown ALPN gets the parser path).
+            return InProcH1ParserPlaintext(
+                dispatch=dispatch,
+                max_inbound_body_bytes=self._max_inbound,
+                forwarded_for_ip=None,
+                sni_host=sni_host or None,
+            )
+
+        # Outbound queue: TLS-wrapped plaintext bytes from the adapter,
+        # sent back to the third party as WS BINARY frames.
+        async def _outbound_send(plaintext: bytes) -> None:
+            if not plaintext:
+                return
+            async with tls_lock:
+                encrypted = tls_session.send(plaintext)
+            if encrypted:
+                await _send_ws_frame(WS_OPCODE_BINARY, encrypted)
+                stats.outbound_frames += 1
+                stats.encrypted_bytes += len(encrypted)
+
         async def inbound() -> None:
+            nonlocal plaintext_adapter
             wire_buf = bytearray()
             pending_frags: bytearray | None = None
             unacked_wire_bytes = 0
@@ -1174,7 +1707,6 @@ class TunnelRuntime:
                 while True:
                     event = await self._streams[stream_id].get()
                     if event.kind == "end":
-                        _half_close_loopback()
                         return
                     if event.kind == "reset":
                         raise BridgeStreamReset("inbound stream reset")
@@ -1187,7 +1719,6 @@ class TunnelRuntime:
                             await _send_ws_frame(WS_OPCODE_PONG, payload)
                             continue
                         if opcode == WS_OPCODE_CLOSE:
-                            _half_close_loopback()
                             return
                         if opcode == WS_OPCODE_PONG:
                             continue
@@ -1220,10 +1751,17 @@ class TunnelRuntime:
                             await _send_ws_frame(WS_OPCODE_BINARY, handshake_out)
                             stats.outbound_frames += 1
                             stats.encrypted_bytes += len(handshake_out)
+                        # Once handshake completes, build the adapter
+                        # (h1 parser or h2 transcoder by ALPN).
+                        if (
+                            plaintext_adapter is None
+                            and tls_session.handshake_done
+                        ):
+                            plaintext_adapter = _build_adapter()
+                            adapter_ready.set()
                         for pt in plaintext_chunks:
-                            lb_writer.write(pt)
-                        if plaintext_chunks:
-                            await lb_writer.drain()
+                            if plaintext_adapter is not None:
+                                await plaintext_adapter.feed(pt)  # type: ignore[union-attr]
                         stats.inbound_frames += 1
                         stats.decrypted_bytes += sum(
                             len(pt) for pt in plaintext_chunks
@@ -1270,22 +1808,14 @@ class TunnelRuntime:
                                 await self._flush()
 
         async def outbound() -> None:
-            while True:
-                try:
-                    plaintext = await lb_reader.read(16 * 1024)
-                except (ConnectionError, asyncio.IncompleteReadError):
-                    break
-                if not plaintext:
-                    break
-                async with tls_lock:
-                    encrypted = tls_session.send(plaintext)
-                if encrypted:
-                    await _send_ws_frame(WS_OPCODE_BINARY, encrypted)
-                    stats.outbound_frames += 1
-                    stats.encrypted_bytes += len(encrypted)
-            tail = await maybe_close_tls()
-            if tail:
-                await _send_ws_frame(WS_OPCODE_BINARY, tail)
+            # Wait for the Plaintext adapter to be picked (ALPN known
+            # post-handshake), then run its outbound pump until the
+            # adapter closes. The pump returns when the adapter pushes
+            # its sentinel; we exit cleanly so the bridge wait
+            # completes alongside inbound().
+            await adapter_ready.wait()
+            assert plaintext_adapter is not None
+            await plaintext_adapter.pump_outbound(_outbound_send)  # type: ignore[union-attr]
 
         in_task = asyncio.create_task(inbound())
         out_task = asyncio.create_task(outbound())
@@ -1371,9 +1901,12 @@ class TunnelRuntime:
                 )
             with suppress(Exception):
                 await self._drain_and_ack_pending(stream_id)
-            with suppress(Exception):
-                lb_writer.close()
-                await lb_writer.wait_closed()
+            # Close the per-bridge plaintext adapter (h1 parser or h2
+            # transcoder). The shared UpstreamUrlDispatch lives on the
+            # runtime and is closed in TunnelRuntime.aclose().
+            if plaintext_adapter is not None:
+                with suppress(Exception):
+                    await plaintext_adapter.aclose()  # type: ignore[union-attr]
             self._bridge_stream_ids.discard(stream_id)
             self._streams.pop(stream_id, None)
 
@@ -1433,6 +1966,39 @@ class TunnelRuntime:
             logger.warning("/_system/response/%s timed out", request_id)
         finally:
             self._streams.pop(stream_id, None)
+
+    async def _reset_bridge_stream(self, stream_id: int) -> None:
+        """RST_STREAM(CANCEL) the named stream. No-op if h2 is gone or
+        the stream is already closed. Used on bridge-open failure
+        paths so the h2 stream doesn't sit half-open server-side."""
+        async with self._send_lock:
+            if self._h2 is None:
+                return
+            with suppress(
+                h2.exceptions.StreamClosedError,
+                h2.exceptions.NoSuchStreamError,
+                h2.exceptions.ProtocolError,
+            ):
+                self._h2.reset_stream(
+                    stream_id, error_code=h2.errors.ErrorCodes.CANCEL,
+                )
+                await self._flush()
+
+    async def _end_bridge_stream(self, stream_id: int) -> None:
+        """Send an empty DATA with END_STREAM on the named stream so
+        the server sees a clean half-close. No-op if the stream has
+        already been ended (the pump may have set END_STREAM on the
+        upstream-WS-CLOSE path)."""
+        async with self._send_lock:
+            if self._h2 is None:
+                return
+            with suppress(
+                h2.exceptions.StreamClosedError,
+                h2.exceptions.NoSuchStreamError,
+                h2.exceptions.ProtocolError,
+            ):
+                self._h2.send_data(stream_id, b"", end_stream=True)
+                await self._flush()
 
     async def _send_data(
         self, stream_id: int, data: bytes, *, end_stream: bool,
@@ -1539,3 +2105,20 @@ class TunnelRuntime:
 
 class _BodyTooLarge(Exception):
     pass
+
+
+def _first_header(
+    headers: list[tuple[str, str]] | tuple[tuple[str, str], ...],
+    name: str,
+) -> str | None:
+    name_l = name.lower()
+    for k, v in headers:
+        if k.lower() == name_l:
+            return v
+    return None
+
+
+async def _safe_close_stream_writer(writer: asyncio.StreamWriter) -> None:
+    with suppress(Exception):
+        writer.close()
+        await writer.wait_closed()

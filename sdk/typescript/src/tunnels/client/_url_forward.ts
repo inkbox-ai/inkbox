@@ -42,6 +42,112 @@ export interface ForwardOpts {
   maxResponseBytes: number;
   /** Optional abort signal — runtime ties this to its deadline. */
   signal?: AbortSignal;
+  /**
+   * Verify the upstream's TLS certificate when ``forwardTo`` is
+   * ``https://``. Default ``true``. Has no effect for ``http://``.
+   */
+  verifyTls?: boolean;
+  /** Extra PEM CA bundle to trust for the upstream TLS connection. */
+  caBundle?: Buffer | string | null;
+  /**
+   * Per-runtime cache of undici Agent dispatchers used when TLS
+   * overrides are configured. Reuses connection pools across requests
+   * with the same (verifyTls, caBundle) tuple instead of allocating a
+   * fresh Agent — and timer — per request.
+   */
+  agentCache?: UndiciAgentCache;
+}
+
+/**
+ * Cache of undici ``Agent`` instances keyed by (verifyTls, caBundle).
+ * Returned dispatcher is opaque (`unknown`) so undici stays a
+ * type-only dependency at this surface — the runtime imports lazily.
+ */
+export interface UndiciAgentCache {
+  /**
+   * Return a cached Agent for these TLS settings, or create + cache one.
+   * Returns `null` if no override is needed (default trust + verify on).
+   */
+  get(
+    verifyTls: boolean | undefined,
+    caBundle: Buffer | string | null | undefined,
+  ): Promise<unknown>;
+  /** Close every cached Agent. Idempotent. */
+  close(): Promise<void>;
+}
+
+/**
+ * Build a per-runtime undici Agent cache. Each unique
+ * (verifyTls, caBundle) combination gets one shared Agent. Closed in
+ * `TunnelRuntime.aclose()`.
+ */
+export function createUndiciAgentCache(): UndiciAgentCache {
+  const agents = new Map<string, unknown>();
+  let closed = false;
+
+  const keyFor = (
+    verifyTls: boolean | undefined,
+    caBundle: Buffer | string | null | undefined,
+  ): string => {
+    const v = verifyTls === false ? "off" : "on";
+    let cb = "none";
+    if (caBundle !== null && caBundle !== undefined) {
+      const buf = typeof caBundle === "string"
+        ? Buffer.from(caBundle, "utf-8")
+        : caBundle;
+      // crypto import is lazy below; do a coarse digest via length
+      // initially, then refine with real hash inside `get` after we've
+      // imported `node:crypto`.
+      cb = `len:${buf.length}`;
+    }
+    return `${v}|${cb}`;
+  };
+
+  return {
+    async get(verifyTls, caBundle) {
+      if (closed) return undefined;
+      const noOverride =
+        verifyTls !== false &&
+        (caBundle === null || caBundle === undefined);
+      if (noOverride) return undefined;
+      // Stable hash of caBundle so two distinct CAs of the same length
+      // don't alias.
+      const { createHash } = await import("node:crypto");
+      let cbHash = "none";
+      if (caBundle !== null && caBundle !== undefined) {
+        const buf = typeof caBundle === "string"
+          ? Buffer.from(caBundle, "utf-8")
+          : caBundle;
+        cbHash = createHash("sha256").update(buf).digest("hex").slice(0, 16);
+      }
+      const key = `${verifyTls === false ? "off" : "on"}|${cbHash}`;
+      void keyFor;
+      const existing = agents.get(key);
+      if (existing !== undefined) return existing;
+      const undici = await import("undici");
+      const { buildUpstreamTlsConnectOpts } = await import("./_upstream_tls.js");
+      const connect = buildUpstreamTlsConnectOpts({
+        verify: verifyTls,
+        caBundle: caBundle ?? null,
+      });
+      const agent = new undici.Agent({ connect });
+      agents.set(key, agent);
+      return agent;
+    },
+    async close() {
+      if (closed) return;
+      closed = true;
+      const ps: Promise<unknown>[] = [];
+      for (const a of agents.values()) {
+        const ag = a as { close?: () => Promise<unknown> };
+        if (ag && typeof ag.close === "function") {
+          try { ps.push(ag.close()); } catch { /* swallow */ }
+        }
+      }
+      agents.clear();
+      await Promise.allSettled(ps);
+    },
+  };
 }
 
 /**
@@ -104,7 +210,6 @@ export function buildForwardHeaders(
 export async function forwardEnvelopeToUrl(
   opts: ForwardOpts,
 ): Promise<ForwardResult> {
-  const fetcher = opts.fetcher ?? globalThis.fetch;
   const targetUrl = joinForwardPath(opts.forwardTo, opts.envelope.path);
   const parsedTarget = new URL(opts.forwardTo);
   const targetHost = parsedTarget.host;
@@ -113,6 +218,45 @@ export async function forwardEnvelopeToUrl(
     opts.publicHost,
     targetHost,
   );
+
+  // For https:// upstreams with TLS overrides, get a cached undici
+  // dispatcher (or build one ad-hoc if the runtime didn't supply a
+  // cache, e.g. legacy callers / direct unit tests). Lazy-loaded so
+  // the default http:// path stays out of undici and edge bundles
+  // don't pull undici in unconditionally.
+  const isHttps = parsedTarget.protocol === "https:";
+  const wantsTlsOverride =
+    isHttps &&
+    (opts.verifyTls === false ||
+      (opts.caBundle !== null && opts.caBundle !== undefined));
+  let dispatcher: unknown = undefined;
+  if (wantsTlsOverride && opts.fetcher === undefined) {
+    if (opts.agentCache !== undefined) {
+      dispatcher = await opts.agentCache.get(opts.verifyTls, opts.caBundle ?? null);
+    } else {
+      // No cache supplied — fall back to per-request Agent. Caller is
+      // responsible for closing if it cares; the runtime always passes
+      // a cache, so this branch is only hit by direct callers.
+      const undici = await import("undici");
+      const { buildUpstreamTlsConnectOpts } = await import("./_upstream_tls.js");
+      const connect = buildUpstreamTlsConnectOpts({
+        verify: opts.verifyTls,
+        caBundle: opts.caBundle ?? null,
+      });
+      dispatcher = new undici.Agent({ connect });
+    }
+  }
+  const fetcher =
+    opts.fetcher ?? ((url: string, init?: RequestInit) => {
+      // Node's fetch (undici-backed) honors `dispatcher` on the init.
+      const initWithDispatcher: RequestInit & { dispatcher?: unknown } =
+        dispatcher === undefined ? init ?? {} : { ...(init ?? {}), dispatcher };
+      return globalThis.fetch(
+        url,
+        initWithDispatcher as RequestInit,
+      );
+    });
+
   const reqInit: RequestInit = {
     method: opts.envelope.method,
     headers,

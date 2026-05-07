@@ -204,6 +204,21 @@ def test_ws_frame_masked_decodes_correctly():
     assert frames[0][1] == b"secret"
 
 
+def test_ws_frame_preserves_fin_false_for_fragmentation():
+    """encode_ws_frame must honor ``fin=False`` so a multi-frame TEXT or
+    BINARY message can be re-encoded as fragments instead of being
+    silently coalesced into a single FIN=1 frame on the bridge."""
+    part1 = encode_ws_frame(
+        WS_OPCODE_TEXT, b"ab", mask=False, fin=False,
+    )
+    part2 = encode_ws_frame(0x0, b"cd", mask=False, fin=True)
+    buf = bytearray(part1 + part2)
+    frames = decode_ws_frames(buf)
+    assert len(frames) == 2
+    assert frames[0] == (WS_OPCODE_TEXT, b"ab", False)
+    assert frames[1] == (0x0, b"cd", True)
+
+
 # --- State persistence ---------------------------------------------------
 
 

@@ -41,6 +41,7 @@ import { dispatchHttpInProcess, type InkboxHandler } from "./_handler.js";
 import {
   ControlHeaders,
   ControlPaths,
+  HOP_BY_HOP_RESPONSE,
   INKBOX_FORWARDED_HEADER_PREFIX,
   TunnelMetaHeader,
   TunnelRouteKind,
@@ -48,8 +49,10 @@ import {
 } from "./_protocol.js";
 import { validateEnvelopePath } from "./_validation.js";
 import {
+  createUndiciAgentCache,
   forwardEnvelopeToUrl,
   type ForwardResult,
+  type UndiciAgentCache,
 } from "./_url_forward.js";
 import type { TlsSession, TlsTerminator } from "./_tls.js";
 import {
@@ -129,6 +132,10 @@ export interface TunnelRuntimeOpts {
   maxInboundBodyBytes?: number;
   maxResponseBytes?: number;
   allowRemoteForwarding?: boolean;
+  /** Verify the upstream's TLS cert when `forwardTo` is https://. Default true. */
+  forwardToVerifyTls?: boolean;
+  /** Extra CA bundle (PEM) to trust for the upstream TLS connection. */
+  forwardToCaBundle?: Buffer | string;
   onStatus?: StatusCallback;
   /** Internal injection point for tests; default is `Math.random`. */
   rng?: () => number;
@@ -167,6 +174,8 @@ export class TunnelRuntime {
   private readonly maxInbound: number;
   private readonly maxOutbound: number;
   private readonly tlsTerminator: TlsTerminator | null;
+  private readonly forwardToVerifyTls: boolean;
+  private readonly forwardToCaBundle: Buffer | string | null;
   private readonly onStatus?: StatusCallback;
   private readonly rng: () => number;
   private readonly http2Connect: NonNullable<TunnelRuntimeOpts["http2Connect"]>;
@@ -181,6 +190,13 @@ export class TunnelRuntime {
   private readonly streams = new Map<number, StreamBus>();
   private readonly bridgeStreamIds = new Set<number>();
   private readonly tasks = new Set<Promise<unknown>>();
+  // Lazy: built on first passthrough TCP stream; closed in aclose().
+  private passthroughDispatch: import("./_dispatch.js").Dispatch | null = null;
+  // Cache of undici Agent instances for HTTPS URL-forward with TLS
+  // overrides (verifyTls=false or caBundle set). Avoids constructing a
+  // fresh Agent per request, which would leak sockets/timers. Closed
+  // in aclose().
+  private readonly undiciAgentCache: UndiciAgentCache = createUndiciAgentCache();
   private pingHandle: NodeJS.Timeout | null = null;
   private pingAbort: AbortController | null = null;
   private shutdownAbort: AbortController = new AbortController();
@@ -195,6 +211,8 @@ export class TunnelRuntime {
     this.maxInbound = opts.maxInboundBodyBytes ?? DEFAULT_INBOUND_BODY_BYTES;
     this.maxOutbound = opts.maxResponseBytes ?? DEFAULT_OUTBOUND_BODY_BYTES;
     this.tlsTerminator = opts.tlsTerminator ?? null;
+    this.forwardToVerifyTls = opts.forwardToVerifyTls ?? true;
+    this.forwardToCaBundle = opts.forwardToCaBundle ?? null;
     this.onStatus = opts.onStatus;
     this.rng = opts.rng ?? Math.random;
     this.http2Connect = opts.http2Connect ?? http2.connect.bind(http2);
@@ -258,6 +276,19 @@ export class TunnelRuntime {
     this.stop = true;
     this.shutdownAbort.abort();
     this.pingAbort?.abort();
+    if (this.passthroughDispatch !== null) {
+      try {
+        await this.passthroughDispatch.aclose();
+      } catch {
+        /* swallow */
+      }
+      this.passthroughDispatch = null;
+    }
+    try {
+      await this.undiciAgentCache.close();
+    } catch {
+      /* swallow */
+    }
     if (this.pingHandle !== null) {
       clearInterval(this.pingHandle);
       this.pingHandle = null;
@@ -789,6 +820,9 @@ export class TunnelRuntime {
           publicHost: this.publicHost,
           maxResponseBytes: this.maxOutbound,
           signal: ctrl.signal,
+          verifyTls: this.forwardToVerifyTls,
+          caBundle: this.forwardToCaBundle,
+          agentCache: this.undiciAgentCache,
         });
         if (result.kind === "ok") {
           await this.postResponse(
@@ -847,19 +881,37 @@ export class TunnelRuntime {
   // --- WS dispatch -------------------------------------------------------
 
   private async dispatchWsUpgrade(envelope: Envelope): Promise<void> {
-    if (this.dispatch.wsHandler === undefined) {
-      // No WS handler installed — reject upgrade with 501.
-      await this.postResponse(envelope.requestId, 501, [
-        ["content-type", "text/plain"],
-        [TunnelMetaHeader.REASON, "ws-not-supported"],
-      ], Buffer.from("ws upgrade not supported"));
-      return;
-    }
     if (envelope.wsId === null) {
       await this.postResponse(envelope.requestId, 400, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, "missing-ws-id"],
       ], Buffer.from("missing ws_id"));
+      return;
+    }
+    // Path-traversal guard. Edge WS upgrades skip dispatchHttp's
+    // validateEnvelopePath check, so apply it here too.
+    const reject = validateEnvelopePath(envelope.path);
+    if (reject !== null) {
+      await this.postResponse(envelope.requestId, 400, [
+        ["content-type", "text/plain"],
+        [TunnelMetaHeader.REASON, reject],
+      ], Buffer.from("invalid path"));
+      return;
+    }
+    // URL forward — bridge to the upstream WS via h1 Upgrade.
+    if (
+      this.dispatch.wsHandler === undefined &&
+      this.dispatch.forwardTo !== undefined
+    ) {
+      await this.dispatchWsUpgradeToUrl(envelope, this.dispatch.forwardTo);
+      return;
+    }
+    if (this.dispatch.wsHandler === undefined) {
+      // No URL upstream and no in-process WS handler — reject 501.
+      await this.postResponse(envelope.requestId, 501, [
+        ["content-type", "text/plain"],
+        [TunnelMetaHeader.REASON, "ws-not-supported"],
+      ], Buffer.from("ws upgrade not supported"));
       return;
     }
 
@@ -879,6 +931,131 @@ export class TunnelRuntime {
     }
   }
 
+  private async dispatchWsUpgradeToUrl(
+    envelope: Envelope,
+    forwardTo: string,
+  ): Promise<void> {
+    // Open the upstream WS hop. On failure, surface the upstream-style
+    // status back to the third party so the client sees a clean
+    // non-101 instead of hanging.
+    const { openWsUpstream, WsUpstreamError } = await import(
+      "./_ws_url_bridge.js"
+    );
+    const headersList: Array<[string, string]> = [
+      ...envelope.forwardedHeaders,
+    ];
+    let subprotocol: string | null = null;
+    for (const [k, v] of envelope.forwardedHeaders) {
+      if (k.toLowerCase() === "sec-websocket-protocol") {
+        subprotocol = v;
+      }
+    }
+    let upstream: Awaited<ReturnType<typeof openWsUpstream>>;
+    // Bound the upstream handshake by the same clock the server uses
+    // for the third-party reply. If response_deadline_seconds is
+    // smaller than the helper default, posting a stale reject after
+    // the server already 504'd would just be wasted work.
+    // Floor at 1ms (not 1s) — sub-second response deadlines are valid
+    // and must be honored. Earlier shape clamped 0.1s up to 1s.
+    const handshakeTimeoutMs =
+      this.responseDeadlineSeconds !== null
+        ? Math.max(1, this.responseDeadlineSeconds * 1000)
+        : undefined;
+    try {
+      upstream = await openWsUpstream({
+        forwardTo: new URL(forwardTo),
+        publicHost: this.publicHost,
+        verifyTls: this.forwardToVerifyTls,
+        caBundle: this.forwardToCaBundle,
+        requestPath: envelope.path,
+        requestHeaders: headersList,
+        wsSubprotocol: subprotocol,
+        forwardedForIp: envelope.forwardedForIp,
+        handshakeTimeoutMs,
+      });
+    } catch (e) {
+      const status = e instanceof WsUpstreamError ? e.status : 502;
+      await this.postResponse(envelope.requestId, status, [
+        ["content-type", "text/plain"],
+        [TunnelMetaHeader.REASON, "ws-upstream-failed"],
+      ], Buffer.from("upstream ws upgrade failed"));
+      return;
+    }
+
+    // Forward the upstream's 101 response headers to the third party.
+    // Application-defined headers (Set-Cookie, X-Use-Inkbox-* opt-out
+    // flags, custom correlation IDs) live here; customers expect them
+    // to round-trip. Strip:
+    //   * hop-by-hop (connection, upgrade, transfer-encoding, ...)
+    //   * ws handshake-control headers — these are per-hop. The
+    //     tunnel server recomputes sec-websocket-accept against the
+    //     third party's key. sec-websocket-key/version are
+    //     request-only; sec-websocket-extensions is already gated
+    //     above (we 502 if upstream confirmed one).
+    //   * h2 pseudo-headers (defensive).
+    const wsHandshakeStrip = new Set([
+      "sec-websocket-accept",
+      "sec-websocket-extensions",
+      "sec-websocket-key",
+      "sec-websocket-version",
+    ]);
+    const upgradeReplyHeaders: Array<[string, string]> = [];
+    for (const [hk, hv] of upstream.headers) {
+      if (hk.startsWith(":")) continue;
+      if (HOP_BY_HOP_RESPONSE.has(hk)) continue;
+      if (wsHandshakeStrip.has(hk)) continue;
+      upgradeReplyHeaders.push([hk, hv]);
+    }
+
+    const bridge = await this.openWsBridge(envelope);
+    try {
+      // postUpgradeReply both posts the 200 AND opens the inkbox bridge
+      // CONNECT stream — skipping it (an earlier draft did) leaves
+      // connectStreamId null so recv() returns immediately and sendFrame
+      // throws "bridge stream not open". Pump runs against a real bridge.
+      await bridge.io.postUpgradeReply(upgradeReplyHeaders);
+    } catch (e) {
+      try {
+        upstream.socket.destroy();
+      } catch {
+        /* swallow */
+      }
+      bridge.cleanup();
+      // postUpgradeReply may have already posted 200 before failing on
+      // the bridge open; no good way to retract the 200, so just log.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `ws bridge open failed after upstream 101 request_id=${envelope.requestId}`,
+        e,
+      );
+      return;
+    }
+    const { pumpWsUrlEdgeBridge } = await import(
+      "./_ws_url_edge_bridge.js"
+    );
+    try {
+      await pumpWsUrlEdgeBridge({
+        upstream,
+        bridge: bridge.io,
+      });
+    } finally {
+      try {
+        upstream.socket.destroy();
+      } catch {
+        /* swallow */
+      }
+      // End the bridge stream too so the server-side knows we're done
+      // (esp. on the abrupt-upstream-close path where the pump exits
+      // before either peer sent CLOSE).
+      try {
+        await bridge.io.closeStream();
+      } catch {
+        /* swallow */
+      }
+      bridge.cleanup();
+    }
+  }
+
   private async openWsBridge(
     envelope: Envelope,
   ): Promise<{ io: WsBridgeIO; cleanup: () => void }> {
@@ -886,6 +1063,21 @@ export class TunnelRuntime {
     const requestId = envelope.requestId;
     let connectStreamId: number | null = null;
     let bridgeStream: ClientHttp2Stream | null = null;
+
+    // Pair every successful openStream() inside postUpgradeReply with
+    // a guaranteed close on failure paths. Without it, a timeout /
+    // non-200 / end-before-headers leaves the h2 stream half-open
+    // server-side until the session GOAWAYs. Callers only see the
+    // throw and call ``cleanup``, which is local-bookkeeping only.
+    const abortBridgeStream = (): void => {
+      if (bridgeStream !== null) {
+        try {
+          bridgeStream.close(http2.constants.NGHTTP2_CANCEL);
+        } catch {
+          /* swallow */
+        }
+      }
+    };
 
     const postUpgradeReply = async (
       headers: Array<[string, string]>,
@@ -908,14 +1100,38 @@ export class TunnelRuntime {
       connectStreamId = opened.streamId;
       bridgeStream = opened.stream;
       this.bridgeStreamIds.add(connectStreamId);
-      // Wait for the 200 on the bridge stream.
-      const ev = await this.nextEvent(connectStreamId);
-      if (ev === null || ev.kind !== "headers") {
-        throw new Error("bridge stream closed before headers");
-      }
-      const status = ev.headers.find(([k]) => k === HTTP2_HEADER_STATUS)?.[1];
-      if (status !== "200") {
-        throw new Error(`bridge stream returned ${status}`);
+      try {
+        // Wait for the 200 on the bridge stream — bounded so a server
+        // that never replies can't wedge the dispatch task after the
+        // public side has already seen success. Mirrors Python's
+        // _with_deadline + the TCP passthrough's
+        // BRIDGE_STATUS_TIMEOUT_MS race.
+        const ev = await Promise.race([
+          this.nextEvent(connectStreamId),
+          setTimeoutPromise(BRIDGE_STATUS_TIMEOUT_MS).then(
+            () => "timeout" as const,
+          ),
+        ]);
+        if (ev === "timeout") {
+          throw new Error(
+            "bridge stream did not return :status within deadline",
+          );
+        }
+        if (ev === null || ev.kind !== "headers") {
+          throw new Error("bridge stream closed before headers");
+        }
+        const status = ev.headers.find(
+          ([k]) => k === HTTP2_HEADER_STATUS,
+        )?.[1];
+        if (status !== "200") {
+          throw new Error(`bridge stream returned ${status}`);
+        }
+      } catch (e) {
+        // Best-effort cancel of the just-opened h2 stream so it
+        // doesn't sit half-open server-side. Re-throw so the caller
+        // still sees the failure and tears down the public side.
+        abortBridgeStream();
+        throw e;
       }
     };
 
@@ -956,8 +1172,16 @@ export class TunnelRuntime {
       })();
     };
 
+    // Track whether the caller already requested a graceful close so
+    // cleanup() doesn't convert it into RST_STREAM(CANCEL). h2 doesn't
+    // mark ``bridgeStream.closed`` true until the remote also ends, so
+    // looking at the JS-level state alone races against the server's
+    // matching END_STREAM and would over-cancel every successful WSS
+    // shutdown.
+    let gracefullyClosed = false;
     const closeStream = async (): Promise<void> => {
       if (bridgeStream !== null) {
+        gracefullyClosed = true;
         try {
           bridgeStream.end();
         } catch {
@@ -967,6 +1191,23 @@ export class TunnelRuntime {
     };
 
     const cleanup = (): void => {
+      // Cancel the h2 stream only if the caller didn't already
+      // initiate a graceful close. ``postUpgradeReply`` handles its
+      // own open-time failures separately; this branch only fires
+      // when a mid-pump exception left the stream half-open without
+      // a closeStream() call.
+      if (
+        bridgeStream !== null &&
+        !gracefullyClosed &&
+        !bridgeStream.closed &&
+        !bridgeStream.destroyed
+      ) {
+        try {
+          bridgeStream.close(http2.constants.NGHTTP2_CANCEL);
+        } catch {
+          /* swallow */
+        }
+      }
       if (connectStreamId !== null) {
         this.bridgeStreamIds.delete(connectStreamId);
         this.streams.delete(connectStreamId);
@@ -984,7 +1225,8 @@ export class TunnelRuntime {
   private async dispatchTcpStream(envelope: Envelope): Promise<void> {
     if (
       this.tlsTerminator === null ||
-      this.dispatch.forwardTo === undefined ||
+      (this.dispatch.forwardTo === undefined &&
+        this.dispatch.httpHandler === undefined) ||
       envelope.tcpId === null
     ) {
       // eslint-disable-next-line no-console
@@ -996,14 +1238,6 @@ export class TunnelRuntime {
     }
     const tcpId = envelope.tcpId;
     const sniHost = envelope.sniHost ?? "";
-
-    const target = new URL(this.dispatch.forwardTo);
-    const host = target.hostname || "127.0.0.1";
-    const port = target.port
-      ? parseInt(target.port, 10)
-      : target.protocol === "https:"
-        ? 443
-        : 80;
 
     // 1) Open the extended-CONNECT bridge stream.
     const connectHeaders: http2.OutgoingHttpHeaders = {
@@ -1050,31 +1284,36 @@ export class TunnelRuntime {
       return;
     }
 
-    // 3) Dial loopback.
-    let loopback: net.Socket;
-    try {
-      loopback = await new Promise<net.Socket>((resolve, reject) => {
-        const sock = net.createConnection({ host, port });
-        sock.once("connect", () => resolve(sock));
-        sock.once("error", (err) => reject(err));
-      });
-    } catch {
-      // eslint-disable-next-line no-console
-      console.warn(`loopback dial failed tcp_id=${tcpId}`);
-      const closePayload = Buffer.alloc(2);
-      closePayload.writeUInt16BE(1011, 0);
-      try {
-        await this.writeBridgeFrame(
-          stream,
-          encodeWsFrame(WS_OPCODE_CLOSE, closePayload, { mask: true }),
-        );
-      } catch {
-        /* swallow */
+    // 3) Build (or reuse) the passthrough dispatcher for this runtime.
+    //    UpstreamUrlDispatch owns its own undici Pool; we share it across
+    //    bridge streams. Closed in TunnelRuntime.aclose().
+    if (this.passthroughDispatch === null) {
+      const dispMod = await import("./_dispatch.js");
+      if (this.dispatch.forwardTo !== undefined) {
+        this.passthroughDispatch = new dispMod.UpstreamUrlDispatch({
+          forwardTo: this.dispatch.forwardTo,
+          publicHost: this.publicHost,
+          maxOutboundBodyBytes: this.maxOutbound,
+          maxInboundBodyBytes: this.maxInbound,
+          verifyTls: this.forwardToVerifyTls,
+          caBundle: this.forwardToCaBundle,
+        });
+      } else if (this.dispatch.httpHandler !== undefined) {
+        this.passthroughDispatch = new dispMod.CallableDispatch({
+          handler: this.dispatch.httpHandler,
+          wsHandler: this.dispatch.wsHandler,
+          publicHost: this.publicHost,
+          maxOutboundBodyBytes: this.maxOutbound,
+        });
+      } else {
+        // Defensive: dispatchTcpStream's early guard already requires
+        // at least one of these to be set.
+        // eslint-disable-next-line no-console
+        console.warn("passthrough dispatch has neither forwardTo nor handler");
+        return;
       }
-      this.bridgeStreamIds.delete(streamId);
-      this.streams.delete(streamId);
-      return;
     }
+    const dispatchImpl = this.passthroughDispatch;
 
     // 4) Run the inbound + outbound pumps.
     const stats = makeBridgeStats(tcpId, streamId, sniHost);
@@ -1106,6 +1345,54 @@ export class TunnelRuntime {
     const inboundDone = { value: false };
     const outboundDone = { value: false };
 
+    // Plaintext adapter — picked once after the TLS handshake reports
+    // an ALPN protocol. Held inside an object so TypeScript's
+    // control-flow analysis doesn't narrow it to `never` across the
+    // closures that read and write it.
+    type PlaintextAdapter =
+      | import("./_h1_server.js").InProcH1ParserPlaintext
+      | import("./_h2_transcode.js").H2TranscoderPlaintext;
+    const adapterHolder: { value: PlaintextAdapter | null } = { value: null };
+    const adapterReady = (() => {
+      let resolveFn!: () => void;
+      const p = new Promise<void>((r) => (resolveFn = r));
+      return { promise: p, resolve: resolveFn };
+    })();
+
+    const buildAdapter = async (
+      alpn: string | false | null,
+    ): Promise<PlaintextAdapter> => {
+      if (alpn === "h2") {
+        const mod = await import("./_h2_transcode.js");
+        return new mod.H2TranscoderPlaintext({
+          dispatch: dispatchImpl,
+          maxInboundBodyBytes: this.maxInbound,
+          forwardedForIp: null,
+          sniHost: sniHost || null,
+        });
+      }
+      // Default to h1 parser for "http/1.1", null/false, or anything
+      // else (defensive — unknown ALPN gets the parser path).
+      const mod = await import("./_h1_server.js");
+      return new mod.InProcH1ParserPlaintext({
+        dispatch: dispatchImpl,
+        maxInboundBodyBytes: this.maxInbound,
+        forwardedForIp: null,
+        sniHost: sniHost || null,
+      });
+    };
+
+    // Outbound: TLS-wrap the adapter's plaintext and emit as WS BINARY.
+    const sendPlaintext = async (plaintext: Buffer): Promise<void> => {
+      if (plaintext.length === 0) return;
+      const encrypted = await session.send(plaintext);
+      if (encrypted.length > 0) {
+        await sendFrame(WS_OPCODE_BINARY, encrypted);
+        stats.outboundFrames += 1;
+        stats.encryptedBytes += encrypted.length;
+      }
+    };
+
     const inbound = async (): Promise<void> => {
       const frameDecoder = new WsFrameDecoder();
       let pendingFrags: Buffer | null = null;
@@ -1113,14 +1400,7 @@ export class TunnelRuntime {
         while (true) {
           const ev = await this.nextEvent(streamId);
           if (ev === null) return;
-          if (ev.kind === "end") {
-            try {
-              loopback.end();
-            } catch {
-              /* swallow */
-            }
-            return;
-          }
+          if (ev.kind === "end") return;
           if (ev.kind === "reset") {
             throw new BridgeStreamReset("inbound stream reset");
           }
@@ -1131,14 +1411,7 @@ export class TunnelRuntime {
               await sendFrame(WS_OPCODE_PONG, frame.payload);
               continue;
             }
-            if (frame.opcode === WS_OPCODE_CLOSE) {
-              try {
-                loopback.end();
-              } catch {
-                /* swallow */
-              }
-              return;
-            }
+            if (frame.opcode === WS_OPCODE_CLOSE) return;
             if (frame.opcode === WS_OPCODE_PONG) continue;
             if (frame.opcode === WS_OPCODE_TEXT) {
               throw new BridgeProtocolError("unexpected TEXT frame");
@@ -1170,10 +1443,18 @@ export class TunnelRuntime {
               stats.outboundFrames += 1;
               stats.encryptedBytes += encryptedToSend.length;
             }
-            for (const pt of plaintext) {
-              await new Promise<void>((resolve, reject) => {
-                loopback.write(pt, (err) => (err ? reject(err) : resolve()));
-              });
+            // Build the plaintext adapter on first handshake-complete.
+            if (adapterHolder.value === null && session.handshakeDone) {
+              const alpn = (session as unknown as {
+                tlsSocket?: { alpnProtocol?: string | false | null };
+              }).tlsSocket?.alpnProtocol ?? null;
+              adapterHolder.value = await buildAdapter(alpn);
+              adapterReady.resolve();
+            }
+            if (adapterHolder.value !== null) {
+              for (const pt of plaintext) {
+                await adapterHolder.value.feed(pt);
+              }
             }
             stats.inboundFrames += 1;
             stats.decryptedBytes += plaintext.reduce((a, b) => a + b.length, 0);
@@ -1189,14 +1470,11 @@ export class TunnelRuntime {
 
     const outbound = async (): Promise<void> => {
       try {
-        for await (const chunk of loopback) {
-          if (!Buffer.isBuffer(chunk) || chunk.length === 0) continue;
-          const encrypted = await session.send(chunk);
-          if (encrypted.length > 0) {
-            await sendFrame(WS_OPCODE_BINARY, encrypted);
-            stats.outboundFrames += 1;
-            stats.encryptedBytes += encrypted.length;
-          }
+        // Wait for the adapter to be picked (post-handshake), then run
+        // its outbound pump until the adapter closes.
+        await adapterReady.promise;
+        if (adapterHolder.value !== null) {
+          await adapterHolder.value.pumpOutbound(sendPlaintext);
         }
         const tail = await tlsTail();
         if (tail.length > 0) await sendFrame(WS_OPCODE_BINARY, tail);
@@ -1226,24 +1504,23 @@ export class TunnelRuntime {
       // Asymmetric close grace: if outbound finished cleanly, cancel
       // inbound; otherwise let outbound drain for HALF_CLOSE_GRACE.
       if (outboundDone.value && !inboundDone.value) {
-        try {
-          loopback.destroy();
-        } catch {
-          /* swallow */
-        }
         await Promise.race([
           inTask,
           setTimeoutPromise(BRIDGE_HALF_CLOSE_GRACE_MS),
         ]).catch(() => undefined);
       } else if (inboundDone.value && !outboundDone.value) {
+        // Inbound finished — close the adapter so the outbound pump
+        // exits, then wait briefly for outbound to drain.
+        if (adapterHolder.value !== null) {
+          try {
+            await adapterHolder.value.aclose();
+          } catch {
+            /* swallow */
+          }
+        }
         await Promise.race([
           outTask,
           setTimeoutPromise(BRIDGE_HALF_CLOSE_GRACE_MS).then(() => {
-            try {
-              loopback.destroy();
-            } catch {
-              /* swallow */
-            }
             closeReason = "cancelled";
           }),
         ]).catch(() => undefined);
@@ -1275,10 +1552,14 @@ export class TunnelRuntime {
       } catch {
         /* swallow */
       }
-      try {
-        loopback.destroy();
-      } catch {
-        /* swallow */
+      // Close the per-bridge plaintext adapter. The shared
+      // UpstreamUrlDispatch lives on the runtime and is closed in aclose().
+      if (adapterHolder.value !== null) {
+        try {
+          await adapterHolder.value.aclose();
+        } catch {
+          /* swallow */
+        }
       }
       this.bridgeStreamIds.delete(streamId);
       this.streams.delete(streamId);

@@ -237,6 +237,43 @@ function assertContainsPackage(meta, dep) {
 // `import()`, so a flat-bundled output is NOT representative of Node's
 // real behavior. We check Node directly instead.
 
+step("Node import-time: edge-mode does NOT load undici", () => {
+  const probe = `
+    import { connect } from "@inkbox/sdk/tunnels/connect";
+    if (typeof connect !== "function") throw new Error("connect missing");
+    let leaked = false;
+    try {
+      const { createRequire } = await import("node:module");
+      const req = createRequire(import.meta.url);
+      try {
+        const cached = Object.keys(req.cache ?? {});
+        if (cached.some(k => k.includes("/undici/"))) leaked = true;
+      } catch {}
+    } catch {}
+    if (process.moduleLoadList) {
+      for (const m of process.moduleLoadList) {
+        if (typeof m === "string" && m.includes("/undici/")) {
+          leaked = true;
+          break;
+        }
+      }
+    }
+    if (leaked) {
+      console.error("LEAK: undici loaded by edge-mode import");
+      process.exit(2);
+    }
+    console.log("ok");
+  `;
+  const out = execFileSync(process.execPath, ["--input-type=module", "-e", probe], {
+    cwd: consumerDir,
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (!out.includes("ok")) {
+    throw new Error(`unexpected output: ${out}`);
+  }
+});
+
 step("Node import-time: edge-mode does NOT load @peculiar/x509", () => {
   // Use --experimental-loader-compatible diagnostics: list every
   // module Node has loaded after the import resolves.
@@ -324,9 +361,15 @@ step("esbuild ESM with --splitting: x509 in a separate chunk, not main", () => {
         "lazy-import boundary in index.ts is wired wrong",
     );
   }
+  if (edgeContents.includes("from\"undici\"") || edgeContents.includes("from 'undici'") || edgeContents.includes('from "undici"')) {
+    throw new Error(
+      "edge-mode chunk still references undici by name — the " +
+        "lazy-import boundary that gates _dispatch.ts is wired wrong",
+    );
+  }
   process.stdout.write(
     `  edge-mode chunk: ${(fs.statSync(edgeChunk).size / 1024).toFixed(1)} KB ` +
-      `(no @peculiar/x509 reference)\n`,
+      `(no @peculiar/x509 / undici references)\n`,
   );
 });
 

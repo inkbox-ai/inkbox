@@ -1,0 +1,28 @@
+{
+  "name": "basic_get",
+  "description": "h2 GET — pseudo-headers carried through, ordinary headers lowercased.",
+  "input_h2_pseudo_headers": [
+    [":method", "GET"],
+    [":scheme", "https"],
+    [":authority", "agent.test"],
+    [":path", "/webhook"]
+  ],
+  "input_h2_regular_headers": [
+    ["user-agent", "probe/1"],
+    ["accept", "*/*"]
+  ],
+  "expected_dispatch_request": {
+    "method": "GET",
+    "path": "/webhook",
+    "is_websocket": false,
+    "transport": "h2",
+    "headers_must_contain": [
+      [":method", "GET"],
+      [":scheme", "https"],
+      [":authority", "agent.test"],
+      [":path", "/webhook"],
+      ["user-agent", "probe/1"],
+      ["accept", "*/*"]
+    ]
+  }
+}

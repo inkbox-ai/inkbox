@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 from uuid import UUID
 
 from inkbox.exceptions import InkboxAPIError
@@ -122,6 +123,7 @@ def bootstrap(
     explicit_secret: str | None,
     on_pending_removal: str,
     print_secret_to_stderr: bool | None,
+    alpn_protocols: Sequence[str] = ("http/1.1",),
 ) -> TunnelBundle:
     """Resolve a tunnel for ``connect()``: lookup-or-create + cert."""
     validate_tunnel_name(name)
@@ -294,6 +296,7 @@ def bootstrap(
         terminator = TLSTerminator(
             cert_chain_pem=chain_bytes,
             key_pem=key_pem_bytes(key),
+            alpn_protocols=alpn_protocols,
         )
 
     zone, public_host = resolve_zone_and_host(

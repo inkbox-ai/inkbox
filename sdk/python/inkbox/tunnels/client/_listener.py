@@ -234,6 +234,9 @@ def connect(
     max_outbound_body_bytes: int = DEFAULT_OUTBOUND_BODY_BYTES,
     allow_remote_forwarding: bool = False,
     print_secret_to_stderr: bool | None = None,
+    enable_h2_transcode: bool = True,
+    forward_to_verify_tls: bool = True,
+    forward_to_ca_bundle: bytes | str | None = None,
 ) -> TunnelListener:
     """Bring a tunnel online from this process.
 
@@ -278,18 +281,26 @@ def connect(
         validate_forward_target(
             forward_to, allow_remote_forwarding=allow_remote_forwarding,
         )
-    else:
-        # In-process app dispatch — passthrough requires URL forwarding.
-        if tls_mode == TLSMode.PASSTHROUGH:
-            raise ValueError(
-                "tls_mode='passthrough' requires forward_to=URL; "
-                "in-process app dispatch is edge-only in v1",
-            )
+    # Passthrough accepts either a URL or an ASGI callable as
+    # ``forward_to`` — the runtime constructs UpstreamUrlDispatch or
+    # CallableDispatch accordingly. No additional validation here for
+    # the callable shape.
 
     if state_dir is None:
         state_path = Path.home() / ".inkbox" / "tunnels" / name
     else:
         state_path = Path(state_dir)
+
+    # ALPN advertised in passthrough. enable_h2_transcode=True (default)
+    # advertises h2 + http/1.1 so the third party can negotiate either;
+    # h1 inbound goes through the parser, h2 inbound goes through the
+    # transcoder. Setting this False is the ALPN-only escape hatch:
+    # third parties can only negotiate http/1.1, while the h1 parser
+    # path stays in place — preserving uniform body caps and validation.
+    if tls_mode == TLSMode.PASSTHROUGH and enable_h2_transcode:
+        alpn_protocols: tuple[str, ...] = ("h2", "http/1.1")
+    else:
+        alpn_protocols = ("http/1.1",)
 
     bundle = bootstrap(
         inkbox=inkbox,
@@ -301,6 +312,7 @@ def connect(
         explicit_secret=secret,
         on_pending_removal=on_pending_removal,
         print_secret_to_stderr=print_secret_to_stderr,
+        alpn_protocols=alpn_protocols,
     )
 
     runtime = TunnelRuntime(
@@ -314,5 +326,7 @@ def connect(
         max_inbound_body_bytes=max_inbound_body_bytes,
         max_outbound_body_bytes=max_outbound_body_bytes,
         on_status=on_status,
+        forward_to_verify_tls=forward_to_verify_tls,
+        forward_to_ca_bundle=forward_to_ca_bundle,
     )
     return TunnelListener(bundle=bundle, runtime=runtime)
