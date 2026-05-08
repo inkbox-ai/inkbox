@@ -647,7 +647,7 @@ Returns `WhoamiApiKeyResponse` or `WhoamiJwtResponse` — discriminated on `auth
 
 ## Tunnels
 
-Bring a local Node process online at a public `https://{name}.tunnel.inkboxwire.com` URL via outbound HTTP/2 — no inbound port required. POSIX only.
+Bring a local Node process online at a public `https://{name}.inkboxwire.com` URL via outbound HTTP/2 — no inbound port required. POSIX only.
 
 > **Lifecycle caveat:** tunnels expect a long-running process and a writable state dir (`~/.inkbox/tunnels/{name}`). One-shot disposable scripts are not the right fit; use this from a sustained service. If you must run from a temporary working directory, pass `stateDir:` to a stable path so the connect secret and (in passthrough) private key persist between invocations.
 
@@ -659,7 +659,7 @@ const listener = await connect(inkbox, {
   name: "my-app",
   forwardTo: "http://127.0.0.1:8080",
 });
-console.log(listener.publicUrl);    // https://my-app.tunnel.inkboxwire.com
+console.log(listener.publicUrl);    // https://my-app.inkboxwire.com
 await listener.wait();              // until SIGINT/SIGTERM
 
 // In-process Fetch-API HTTP handler

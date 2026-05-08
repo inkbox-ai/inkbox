@@ -6,7 +6,7 @@ user-invocable: false
 
 # Inkbox Tunnels
 
-Inkbox Tunnels expose a process running on the developer's machine (or any POSIX host) at a public `https://{name}.tunnel.inkboxwire.com` URL. The SDK opens an outbound HTTP/2 connection to the data plane; inbound third-party traffic rides back over that same connection. No inbound port to open, no static IP needed.
+Inkbox Tunnels expose a process running on the developer's machine (or any POSIX host) at a public `https://{name}.inkboxwire.com` URL. The SDK opens an outbound HTTP/2 connection to the data plane; inbound third-party traffic rides back over that same connection. No inbound port to open, no static IP needed.
 
 Two TLS modes:
 
@@ -39,7 +39,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
         name="my-app",
         forward_to="http://127.0.0.1:8080",
     )
-    print(listener.public_url)   # https://my-app.tunnel.inkboxwire.com
+    print(listener.public_url)   # https://my-app.inkboxwire.com
     listener.wait()              # blocks; Ctrl-C to stop
 ```
 
@@ -143,7 +143,7 @@ const listener = await connect(inkbox, {
   name: "my-app",
   forwardTo: "http://127.0.0.1:8080",
 });
-console.log(listener.publicUrl);   // https://my-app.tunnel.inkboxwire.com
+console.log(listener.publicUrl);   // https://my-app.inkboxwire.com
 await listener.wait();              // until Ctrl-C / SIGTERM
 ```
 

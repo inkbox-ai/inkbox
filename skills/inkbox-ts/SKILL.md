@@ -655,7 +655,7 @@ if (info.authType === "api_key" && info.authSubtype === AUTH_SUBTYPE_API_KEY_ADM
 
 ## Tunnels
 
-Bring a local Node process online at a public `https://{name}.tunnel.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. POSIX only; the data-plane runtime lives on a separate package subpath so the main `@inkbox/sdk` entry stays browser-safe.
+Bring a local Node process online at a public `https://{name}.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. POSIX only; the data-plane runtime lives on a separate package subpath so the main `@inkbox/sdk` entry stays browser-safe.
 
 ```typescript
 import { connect } from "@inkbox/sdk/tunnels/connect";
@@ -665,7 +665,7 @@ const listener = await connect(inkbox, {
   name: "my-app",
   forwardTo: "http://127.0.0.1:8080",
 });
-console.log(listener.publicUrl);    // https://my-app.tunnel.inkboxwire.com
+console.log(listener.publicUrl);    // https://my-app.inkboxwire.com
 await listener.wait();              // until SIGINT/SIGTERM
 
 // In-process Fetch-API HTTP handler

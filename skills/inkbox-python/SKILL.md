@@ -627,7 +627,7 @@ if info.auth_type == "api_key" and info.auth_subtype == AUTH_SUBTYPE_API_KEY_ADM
 
 ## Tunnels
 
-Bring a local process online at a public `https://{name}.tunnel.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. POSIX only.
+Bring a local process online at a public `https://{name}.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. POSIX only.
 
 ```python
 # Forward to a local URL (edge mode — Inkbox terminates TLS at the edge)
@@ -635,7 +635,7 @@ listener = inkbox.tunnels.connect(
     name="my-app",
     forward_to="http://127.0.0.1:8080",
 )
-print(listener.public_url)        # https://my-app.tunnel.inkboxwire.com
+print(listener.public_url)        # https://my-app.inkboxwire.com
 listener.wait()                   # blocks until close()/Ctrl-C
 
 # Forward to an in-process ASGI app (FastAPI / Starlette / your own)

@@ -613,7 +613,7 @@ inkbox.phone_numbers.release(number.id)
 
 ## Tunnels
 
-Bring a local Python process online at a public `https://{name}.tunnel.inkboxwire.com` URL via outbound HTTP/2. No inbound port to open, no static IP needed. POSIX only.
+Bring a local Python process online at a public `https://{name}.inkboxwire.com` URL via outbound HTTP/2. No inbound port to open, no static IP needed. POSIX only.
 
 ```python
 with Inkbox(api_key="ApiKey_...") as inkbox:
@@ -622,7 +622,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
         name="my-app",
         forward_to="http://127.0.0.1:8080",
     )
-    print(listener.public_url)        # https://my-app.tunnel.inkboxwire.com
+    print(listener.public_url)        # https://my-app.inkboxwire.com
     listener.wait()                   # blocks until close()/Ctrl-C
 
     # Or forward to an in-process ASGI app (FastAPI / Starlette / yours)
