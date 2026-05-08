@@ -21,7 +21,7 @@ API-first communication infrastructure for AI agents — email, phone, text/SMS,
 ## Requirements
 
 - `INKBOX_API_KEY` — Inkbox API key
-- `node` on `PATH` (Node.js 18+)
+- `node` on `PATH` (Node.js 22+)
 - `INKBOX_AGENT_HANDLE` is optional; use it when already configured, otherwise ask the user which identity handle to use or create
 
 ## Runtime setup
@@ -46,7 +46,7 @@ Use `.mjs` scripts with standard ESM imports. Avoid relying on `tsx --eval` or t
 npm install @inkbox/sdk
 ```
 
-Requires Node.js ≥ 18. ESM module — no context manager needed:
+Requires Node.js ≥ 22. ESM module — no context manager needed:
 
 ```js
 import { Inkbox } from "@inkbox/sdk";

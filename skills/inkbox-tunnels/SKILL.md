@@ -129,7 +129,7 @@ inkbox.tunnels.rotate_secret("tunnel-uuid") # returns RotatedSecret
 npm install @inkbox/sdk
 ```
 
-Node ≥ 18, POSIX only. The data-plane subpath imports `node:http2` / `node:tls`, so it's loaded from a separate entry — `@inkbox/sdk` itself stays browser-safe.
+Node ≥ 22, POSIX only. The data-plane subpath imports `node:http2` / `node:tls`, so it's loaded from a separate entry — `@inkbox/sdk` itself stays browser-safe.
 
 ### Forward to a local URL (edge mode)
 

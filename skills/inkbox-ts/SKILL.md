@@ -14,7 +14,7 @@ API-first communication infrastructure for AI agents — email, phone, encrypted
 npm install @inkbox/sdk
 ```
 
-Requires Node.js ≥ 18. ESM module — no context manager needed:
+Requires Node.js ≥ 22. ESM module — no context manager needed:
 
 ```typescript
 import { Inkbox } from "@inkbox/sdk";

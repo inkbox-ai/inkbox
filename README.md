@@ -11,8 +11,8 @@ API-first communication infrastructure for AI agents — email (with custom send
 | Package | Language | Install |
 |---|---|---|
 | [`inkbox`](./sdk/python/) | Python ≥ 3.11 | `pip install inkbox` |
-| [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 18 | `npm install @inkbox/sdk` |
-| [`@inkbox/cli`](./cli/) | CLI / Node ≥ 18 | `npm install -g @inkbox/cli` |
+| [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 22 | `npm install @inkbox/sdk` |
+| [`@inkbox/cli`](./cli/) | CLI / Node ≥ 22 | `npm install -g @inkbox/cli` |
 
 ---
 

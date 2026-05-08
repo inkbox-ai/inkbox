@@ -19,7 +19,7 @@ Once installed, your OpenClaw agent can:
 
 ## Requirements
 
-- Node.js ≥ 18
+- Node.js ≥ 22
 - An [Inkbox](https://inkbox.ai) account with an API key
 
 ## Setup

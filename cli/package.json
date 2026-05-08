@@ -35,6 +35,6 @@
     "url": "https://github.com/inkbox-ai/inkbox/issues"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }

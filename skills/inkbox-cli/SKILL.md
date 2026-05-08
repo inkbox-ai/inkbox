@@ -44,7 +44,7 @@ Or run without a global install:
 npx @inkbox/cli <command>
 ```
 
-Requires Node.js >= 18.
+Requires Node.js >= 22.
 
 Inside this repository, prefer running the local source instead of assuming a global install:
 

@@ -14,7 +14,7 @@ Or run directly with npx:
 npx @inkbox/cli <command>
 ```
 
-Requires Node.js >= 18.
+Requires Node.js >= 22.
 
 ## Authentication
 
