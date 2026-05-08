@@ -127,6 +127,14 @@ export {
   vaultKeyMaterialToWire,
 } from "./vault/crypto.js";
 
+// API keys
+export type {
+  ApiKey,
+  ApiKeyStatus,
+  CreatedApiKey,
+} from "./api_keys/types.js";
+export type { CreateApiKeyOptions } from "./api_keys/resources/apiKeys.js";
+
 // Tunnels
 export { TLSMode, TunnelStatus } from "./tunnels/types.js";
 export type {

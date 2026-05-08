@@ -15,6 +15,7 @@ import httpx
 from inkbox._http import HttpTransport
 from inkbox._cookies import CookieJar
 from inkbox.agent_identity import AgentIdentity
+from inkbox.api_keys.resources.api_keys import ApiKeysResource
 from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox.notes.resources.notes import NotesResource
 from inkbox.agent_signup.types import (
@@ -175,6 +176,7 @@ class Inkbox:
         self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
 
         self._signing_keys = SigningKeysResource(self._api_http)
+        self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
 
         self._contacts = ContactsResource(self._contacts_http)
@@ -275,6 +277,11 @@ class Inkbox:
     def tunnels(self) -> TunnelsResource:
         """Tunnels (list, get, create, update, delete, restore, rotate_secret, sign_csr)."""
         return self._tunnels
+
+    @property
+    def api_keys(self) -> ApiKeysResource:
+        """Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys."""
+        return self._api_keys
 
     ## Org-level operations
 
