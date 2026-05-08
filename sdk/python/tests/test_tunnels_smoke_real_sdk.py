@@ -23,14 +23,12 @@ deletes the tunnel on teardown.
 
 from __future__ import annotations
 
-import asyncio
 import os
 import socket
 import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import AsyncIterator
 
 import httpx
 import pytest
