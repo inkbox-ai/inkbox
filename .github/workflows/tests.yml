@@ -59,13 +59,5 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      # The 85% bar was set when the SDK was a smaller surface; the
-      # data-plane tunnels runtime (integration-tested end-to-end via 7
-      # dedicated test files) plus several pre-existing resource
-      # modules at 60-80% line coverage make 80% the realistic
-      # sustainable threshold. Per-file relaxations + integration-test
-      # exclusions live in `vitest.config.ts`. Tighten this back up by
-      # adding unit tests to the existing pre-1.0 SDK resource modules
-      # that are dragging the average.
       - name: Run TypeScript tests
         run: npx vitest run --coverage --coverage.thresholds.lines=80
