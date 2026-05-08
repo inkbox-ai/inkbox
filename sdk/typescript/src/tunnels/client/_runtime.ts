@@ -37,7 +37,11 @@ import {
   filterResponseHeaders,
   parseEnvelope,
 } from "./_envelope.js";
-import { dispatchHttpInProcess, type InkboxHandler } from "./_handler.js";
+import {
+  dispatchHttpInProcess,
+  type InkboxHandler,
+  type InProcessHttpResult,
+} from "./_handler.js";
 import {
   ControlHeaders,
   ControlPaths,
@@ -924,12 +928,29 @@ export class TunnelRuntime {
     const deadlineMs = (this.responseDeadlineSeconds ?? 0) * 1000;
     const ctrl = new AbortController();
     let deadlineHandle: NodeJS.Timeout | null = null;
+    // Sentinel resolved by the deadline timer — used as the loser side
+    // of the Promise.race against the dispatch. We use a sentinel
+    // (rather than rejecting) so the race resolves with a discriminable
+    // outcome and the dispatch task can keep running in the background
+    // while we surface a 504 to the server. Mirrors Python's
+    // ``_with_deadline()`` semantics.
+    const TIMEOUT = Symbol("dispatch-deadline-exceeded");
+    type Timeout = typeof TIMEOUT;
+    let deadlinePromise: Promise<Timeout> = new Promise(() => {});
     if (deadlineMs > 0) {
-      deadlineHandle = setTimeout(() => ctrl.abort(), deadlineMs);
+      deadlinePromise = new Promise<Timeout>((resolve) => {
+        deadlineHandle = setTimeout(() => {
+          ctrl.abort();
+          resolve(TIMEOUT);
+        }, deadlineMs);
+      });
     }
 
-    try {
-      let result: ForwardResult | null = null;
+    const dispatchPromise = (async (): Promise<
+      | { kind: "in-process"; result: InProcessHttpResult }
+      | { kind: "url-forward"; result: ForwardResult }
+      | { kind: "no-handler" }
+    > => {
       if (this.dispatch.httpHandler !== undefined) {
         const inProcess = await dispatchHttpInProcess({
           envelope: materialized,
@@ -938,6 +959,46 @@ export class TunnelRuntime {
           maxResponseBytes: this.maxOutbound,
           signal: ctrl.signal,
         });
+        return { kind: "in-process", result: inProcess };
+      }
+      if (this.dispatch.forwardTo !== undefined) {
+        const result = await forwardEnvelopeToUrl({
+          envelope: materialized,
+          forwardTo: this.dispatch.forwardTo,
+          publicHost: this.publicHost,
+          maxResponseBytes: this.maxOutbound,
+          signal: ctrl.signal,
+          verifyTls: this.forwardToVerifyTls,
+          caBundle: this.forwardToCaBundle,
+          agentCache: this.undiciAgentCache,
+        });
+        return { kind: "url-forward", result };
+      }
+      return { kind: "no-handler" };
+    })();
+
+    try {
+      const outcome =
+        deadlineMs > 0
+          ? await Promise.race([dispatchPromise, deadlinePromise])
+          : await dispatchPromise;
+      if (outcome === TIMEOUT) {
+        // Hard deadline tripped: post 504 immediately. The dispatch
+        // promise keeps running in the background — its eventual
+        // result is discarded by the no-op handler attached below.
+        // Without this race, a handler that ignores ``ctx.signal`` or
+        // hangs on a body stream would keep the SDK task alive past
+        // the server-side deadline, and a late ``postResponse`` would
+        // target a request the tunnel server has already 504'd.
+        dispatchPromise.catch(() => undefined);
+        await this.postResponse(envelope.requestId, 504, [
+          ["content-type", "text/plain"],
+          [TunnelMetaHeader.REASON, "response-deadline-exceeded"],
+        ], Buffer.from("local handler too slow"));
+        return;
+      }
+      if (outcome.kind === "in-process") {
+        const inProcess = outcome.result;
         if (inProcess.kind === "ok") {
           await this.postResponse(
             envelope.requestId,
@@ -953,17 +1014,8 @@ export class TunnelRuntime {
         }
         return;
       }
-      if (this.dispatch.forwardTo !== undefined) {
-        result = await forwardEnvelopeToUrl({
-          envelope: materialized,
-          forwardTo: this.dispatch.forwardTo,
-          publicHost: this.publicHost,
-          maxResponseBytes: this.maxOutbound,
-          signal: ctrl.signal,
-          verifyTls: this.forwardToVerifyTls,
-          caBundle: this.forwardToCaBundle,
-          agentCache: this.undiciAgentCache,
-        });
+      if (outcome.kind === "url-forward") {
+        const result = outcome.result;
         if (result.kind === "ok") {
           await this.postResponse(
             envelope.requestId,

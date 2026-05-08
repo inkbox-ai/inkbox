@@ -18,7 +18,9 @@ import asyncio
 import base64
 import json
 import threading
+from contextlib import suppress
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -239,6 +241,117 @@ async def test_with_deadline_times_out_on_slow_dispatch():
 
     with pytest.raises(asyncio.TimeoutError):
         await runtime._with_deadline(slow())
+
+
+# ---------------------------------------------------------------------------
+# PING ACK liveness — silent dead-TCP detection
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ping_loop_force_reconnects_when_ack_misses(monkeypatch):
+    """If a PING was sent and never acked within ``PING_ACK_TIMEOUT``, the
+    next ``_ping_loop`` tick must call ``_force_reconnect()``. Brings
+    Python parity with the TS runtime's PING ack watchdog and protects
+    against silently-dead TCP that the OS hasn't surfaced yet (no FIN
+    received, reads block forever, writes buffer)."""
+    from inkbox.tunnels.client import _runtime as rt_mod
+
+    runtime = _make_runtime()
+    # Fake h2/writer so _ping_loop can call ping()/flush() without a
+    # real connection. Both objects only need the methods the loop
+    # touches; we want this test isolated from the on-the-wire shape.
+    runtime._h2 = MagicMock()
+    runtime._h2.ping = MagicMock(return_value=None)
+    runtime._h2.data_to_send = MagicMock(return_value=b"")
+    fake_writer = MagicMock()
+    fake_writer.write = MagicMock()
+    fake_writer.drain = AsyncMock()
+    fake_writer.close = MagicMock()
+    runtime._writer = fake_writer
+
+    # Stub `_force_reconnect` so we can observe the call without
+    # exercising writer-close side effects.
+    force_reconnect_calls: list[None] = []
+
+    def _spy_force_reconnect() -> None:
+        force_reconnect_calls.append(None)
+
+    monkeypatch.setattr(runtime, "_force_reconnect", _spy_force_reconnect)
+
+    # Compress the loop's cadence so the test runs in <1s. PING_INTERVAL
+    # gates the next tick; PING_ACK_TIMEOUT gates how stale an unacked
+    # ping must be before we force-reconnect.
+    monkeypatch.setattr(rt_mod, "PING_INTERVAL", 0.05)
+    monkeypatch.setattr(rt_mod, "PING_ACK_TIMEOUT", 0.05)
+
+    # Drive the loop in the background.
+    task = asyncio.create_task(runtime._ping_loop())
+    try:
+        # First sleep + ping; sets the outstanding-ping marker.
+        await asyncio.sleep(0.12)
+        # Loop should have sent at least one ping by now.
+        assert runtime._h2.ping.call_count >= 1
+        # The watchdog branch trips on the second iteration: prior ping
+        # is older than PING_ACK_TIMEOUT and no ack arrived.
+        await asyncio.sleep(0.15)
+        assert force_reconnect_calls, (
+            "expected _force_reconnect after missed PING ack"
+        )
+    finally:
+        runtime._stop.set()
+        task.cancel()
+        with suppress(asyncio.CancelledError, Exception):
+            await task
+
+
+@pytest.mark.asyncio
+async def test_intake_loop_force_reconnects_on_owner_token_rejected(monkeypatch):
+    """Intake park returning 401 (``_OwnerTokenInvalidError``) must
+    call ``_force_reconnect()`` and exit the loop. Without this the
+    SDK retry-storms a dead owner_token forever instead of dropping
+    the session and reconnecting with a fresh one."""
+    from inkbox.tunnels.client._runtime import _OwnerTokenInvalidError
+
+    runtime = _make_runtime()
+    runtime._h2 = MagicMock()  # truthy so the loop's guard passes
+
+    async def _fake_park(slot: int):
+        raise _OwnerTokenInvalidError(f"slot={slot} status=401 reason=''")
+
+    monkeypatch.setattr(runtime, "_park_one_intake", _fake_park)
+
+    force_reconnect_calls: list[int] = []
+    monkeypatch.setattr(
+        runtime, "_force_reconnect",
+        lambda: force_reconnect_calls.append(1),
+    )
+
+    # _intake_loop returns once it observes the rejected token. If
+    # ``_force_reconnect`` weren't called the loop would either
+    # retry-storm or raise.
+    await runtime._intake_loop(0)
+    assert force_reconnect_calls == [1]
+
+
+@pytest.mark.asyncio
+async def test_ping_ack_event_clears_outstanding_marker():
+    """``PingAckReceived`` for the outstanding payload must clear the
+    ``_outstanding_ping_*`` markers so the next loop tick doesn't trip
+    the watchdog."""
+    import h2.events
+
+    runtime = _make_runtime()
+    runtime._outstanding_ping_payload = b"\x00" * 8
+    runtime._outstanding_ping_sent_at = 1.0
+
+    # Simulate the h2 library emitting a PingAckReceived event with the
+    # matching ping_data payload.
+    ev = h2.events.PingAckReceived(ping_data=b"\x00" * 8)
+
+    await runtime._handle_event(ev)
+    assert runtime._outstanding_ping_payload is None
+    assert runtime._outstanding_ping_sent_at is None
 
 
 # ---------------------------------------------------------------------------

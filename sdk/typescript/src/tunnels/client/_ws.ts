@@ -389,8 +389,21 @@ class WsSession implements InkboxWebSocket {
         } catch {
           /* swallow */
         }
+        // Mark the session terminal so ``pumpStarter``'s wait loop and
+        // ``recv()`` consumers exit promptly. Without this, a handler
+        // that ignores the deadline would keep ``acceptResolved`` and
+        // ``closeRequested`` both false, leaving ``pumpStarter``
+        // spinning until the runtime finally tore the bridge down.
+        this.closeRequested = true;
+        this.closeResolved = true;
         this.pushInbound({ kind: "error", err });
-        await handlerPromise.catch(() => undefined);
+        // Surface the timeout to caller without blocking on the
+        // handler. Detach with a no-op catch so an unhandled-rejection
+        // doesn't fire if the handler eventually throws (handler is a
+        // user-supplied promise and may take arbitrarily long; we
+        // posted the 504 already, so further work is just observable
+        // bookkeeping).
+        handlerPromise.catch(() => undefined);
       }
       throw err;
     } finally {

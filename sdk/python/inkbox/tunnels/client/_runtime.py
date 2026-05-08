@@ -28,6 +28,7 @@ import random
 import socket
 import ssl
 import struct
+import time
 from contextlib import suppress
 from typing import Any, Callable
 from uuid import UUID
@@ -79,6 +80,19 @@ logger = logging.getLogger("inkbox.tunnels")
 
 
 PING_INTERVAL = 20.0
+# Hard ceiling on how long the runtime will sit on a connection that
+# has not acked a PING. Mirrors the TS runtime's PING_ACK_TIMEOUT_MS.
+# A silently-dead TCP (kernel sees no FIN; reads block, writes buffer)
+# is the failure mode this guards against — without it, ``_read_loop``
+# can park forever on a half-broken socket.
+PING_ACK_TIMEOUT = 10.0
+# OS TCP keepalive cadence applied to the underlying socket. Kicks in
+# below the application-level PING ack timeout when the OS supports it
+# (Linux/macOS); on platforms without per-socket keepalive knobs we
+# silently degrade to PING ack tracking only.
+TCP_KEEPALIVE_IDLE_SECONDS = 30
+TCP_KEEPALIVE_INTERVAL_SECONDS = 10
+TCP_KEEPALIVE_PROBE_COUNT = 3
 BACKOFF_CAP = 30.0
 BACKOFF_JITTER = 0.25  # +- 25%
 
@@ -183,6 +197,13 @@ class TunnelRuntime:
         self._conn_window_event.set()
         self._tasks: set[asyncio.Task[Any]] = set()
         self._bridge_stream_ids: set[int] = set()
+
+        # Application-level liveness — tracks the outstanding PING and
+        # the ts at which we sent it; ``_ping_loop`` arms a watchdog
+        # task that force-closes the writer if no ack arrives within
+        # ``PING_ACK_TIMEOUT``.
+        self._outstanding_ping_payload: bytes | None = None
+        self._outstanding_ping_sent_at: float | None = None
 
         # httpx.AsyncClient for URL forwarding + body-uri GETs. Lazily
         # created on first dispatch, closed deterministically in aclose().
@@ -322,6 +343,33 @@ class TunnelRuntime:
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             except OSError:
                 pass
+            # OS-level TCP keepalive — kicks in below the
+            # application-level PING ack timeout when the OS supports
+            # it. We set SO_KEEPALIVE unconditionally; the per-socket
+            # idle/interval/count knobs are platform-specific so each
+            # one is best-effort.
+            try:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            except OSError:
+                pass
+            for opt_name, value in (
+                ("TCP_KEEPIDLE", TCP_KEEPALIVE_IDLE_SECONDS),
+                ("TCP_KEEPINTVL", TCP_KEEPALIVE_INTERVAL_SECONDS),
+                ("TCP_KEEPCNT", TCP_KEEPALIVE_PROBE_COUNT),
+            ):
+                opt = getattr(socket, opt_name, None)
+                if opt is None:
+                    continue
+                try:
+                    sock.setsockopt(socket.IPPROTO_TCP, opt, value)
+                except OSError:
+                    pass
+
+        # Reset PING ack tracking for the fresh connection so a stale
+        # outstanding-ping marker from a prior session can't trip the
+        # watchdog the moment the new ping_loop starts.
+        self._outstanding_ping_payload = None
+        self._outstanding_ping_sent_at = None
         config = h2.config.H2Configuration(
             client_side=True, header_encoding="utf-8",
         )
@@ -517,16 +565,46 @@ class TunnelRuntime:
     # --- read pump ----------------------------------------------------------
 
     async def _ping_loop(self) -> None:
+        """Send a PING every ``PING_INTERVAL`` and force-reconnect if a
+        prior PING has not been acked within ``PING_ACK_TIMEOUT``.
+
+        Detects silently-dead TCP that the OS hasn't reported yet
+        (carrier loss, firewall idle reap, NAT rebind, etc.). The TS
+        runtime has the same shape; this brings Python to parity.
+        """
         while not self._stop.is_set():
             await asyncio.sleep(PING_INTERVAL)
             if self._h2 is None or self._writer is None:
                 return
+            # Before sending the next PING, fail fast if the previous
+            # one is still unacked past the deadline.
+            if (
+                self._outstanding_ping_payload is not None
+                and self._outstanding_ping_sent_at is not None
+                and (time.monotonic() - self._outstanding_ping_sent_at)
+                > PING_ACK_TIMEOUT
+            ):
+                logger.warning(
+                    "tunnel runtime: PING ack not received within %.1fs; "
+                    "forcing reconnect",
+                    PING_ACK_TIMEOUT,
+                )
+                self._force_reconnect()
+                return
+            payload = struct.pack("!Q", int(time.monotonic_ns()) & ((1 << 64) - 1))
             try:
                 async with self._send_lock:
-                    self._h2.ping(b"keepaliv")
+                    self._h2.ping(payload)
                     await self._flush()
             except Exception:
+                logger.warning(
+                    "tunnel runtime: PING send failed; forcing reconnect",
+                    exc_info=True,
+                )
+                self._force_reconnect()
                 return
+            self._outstanding_ping_payload = payload
+            self._outstanding_ping_sent_at = time.monotonic()
 
     async def _read_loop(self) -> None:
         assert self._h2 is not None and self._reader is not None
@@ -586,6 +664,20 @@ class TunnelRuntime:
                 ev = self._window_events.get(event.stream_id)
                 if ev is not None:
                     ev.set()
+        elif isinstance(event, h2.events.PingAckReceived):
+            # Clear the outstanding-ping marker so ``_ping_loop``'s next
+            # tick doesn't trip the watchdog. ``ping_data`` round-trips
+            # the bytes we sent; we don't strictly require equality
+            # (a single outstanding ping at a time means the only
+            # legitimate ack is for that ping) but we still validate
+            # for sanity.
+            ack_data = getattr(event, "ping_data", None)
+            if (
+                self._outstanding_ping_payload is not None
+                and (ack_data is None or ack_data == self._outstanding_ping_payload)
+            ):
+                self._outstanding_ping_payload = None
+                self._outstanding_ping_sent_at = None
         elif isinstance(event, h2.events.ConnectionTerminated):
             debug = ""
             try:

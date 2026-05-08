@@ -251,6 +251,52 @@ describe("TunnelRuntime — in-process handler dispatch", () => {
     await servePromise;
   }, 10_000);
 
+  it("posts 504 when the handler outlives the response deadline (hard timeout, not advisory)", async () => {
+    // A handler that ignores ``ctx.signal`` and never returns must
+    // not wedge the SDK task: the runtime must race against the
+    // server-advertised ``response_deadline_seconds`` and post 504
+    // immediately when the deadline trips. Without this race a late
+    // ``postResponse`` would target a request the server has already
+    // 504'd. Mirrors Python's ``_with_deadline()`` semantics.
+    fakeServer.setHelloResponse(200, {
+      owner_token: "tok-test",
+      default_pool_size: 1,
+      response_deadline_seconds: 0.3,
+      intake_idle_seconds: 600,
+    });
+    const handler: InkboxHandler = () =>
+      new Promise<Response>(() => {
+        /* never resolves; ignores ctx.signal */
+      });
+    fakeServer.setIntakeResponse({
+      status: 200,
+      headers: [
+        ["inkbox-request-id", "req-deadline-1"],
+        ["inkbox-method", "GET"],
+        ["inkbox-path", "/slow"],
+        ["inkbox-route-kind", "webhook"],
+      ],
+      body: Buffer.alloc(0),
+    });
+    const runtime = makeRuntime({ handler });
+    const servePromise = runtime.serveForever();
+    const t0 = Date.now();
+    const responsePost = await fakeServer.awaitResponsePost(
+      "req-deadline-1",
+      5000,
+    );
+    const elapsedMs = Date.now() - t0;
+    expect(responsePost.headers["inkbox-status"]).toBe("504");
+    expect(responsePost.headers["inkbox-reason"]).toBe(
+      "response-deadline-exceeded",
+    );
+    // Deadline was 300ms; we should post 504 within a reasonable
+    // window after that, NOT after the test's 5s timeout.
+    expect(elapsedMs).toBeLessThan(2_500);
+    await runtime.aclose();
+    await servePromise;
+  }, 10_000);
+
   it("returns 502 response-too-large when the handler exceeds the cap", async () => {
     const handler: InkboxHandler = async () =>
       new Response("x".repeat(1024), { status: 200 });
