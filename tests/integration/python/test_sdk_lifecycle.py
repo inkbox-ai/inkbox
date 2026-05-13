@@ -6,6 +6,8 @@ End-to-end lifecycle test for the Python SDK against a live environment.
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 from inkbox import Inkbox
 from conftest import SdkIntegrationContext, log_step, poll_until
@@ -16,6 +18,13 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
     ctx = sdk_context
     cfg = ctx.config
     api_key = ctx.bootstrap.api_key
+
+    # Globally unique handles (`agent_handle` is now unique across all
+    # orgs and shares its namespace with `tunnel_name`), so parallel CI
+    # runs and any prior runs that left stragglers must not collide.
+    run_suffix = uuid4().hex[:8]
+    alpha_handle = f"py-alpha-{run_suffix}"
+    bravo_handle = f"py-bravo-{run_suffix}"
 
     with Inkbox(api_key=api_key, base_url=cfg.base_url, timeout=cfg.http_timeout) as inkbox:
 
@@ -30,21 +39,21 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         assert len(identities) == 0
 
         # ── create identities ─────────────────────────────────────
-        log_step(ctx, "create identity alpha (mailbox + tunnel atomic)")
+        log_step(ctx, f"create identity {alpha_handle} (mailbox + tunnel atomic)")
         alpha = inkbox.create_identity(
-            "alpha", description="alpha integration-test identity"
+            alpha_handle, description="alpha integration-test identity"
         )
-        assert alpha.agent_handle == "alpha"
+        assert alpha.agent_handle == alpha_handle
         assert alpha.mailbox is not None
         assert alpha.email_address is not None
         assert alpha.tunnel is not None
-        assert alpha.tunnel.public_host.startswith("alpha.")
+        assert alpha.tunnel.public_host.startswith(f"{alpha_handle}.")
         assert alpha.tunnel.public_host.endswith(".inkboxwire.com")
         assert alpha.description == "alpha integration-test identity"
 
-        log_step(ctx, "create identity bravo")
-        bravo = inkbox.create_identity("bravo")
-        assert bravo.agent_handle == "bravo"
+        log_step(ctx, f"create identity {bravo_handle}")
+        bravo = inkbox.create_identity(bravo_handle)
+        assert bravo.agent_handle == bravo_handle
         assert bravo.mailbox is not None
         assert bravo.tunnel is not None
 
@@ -55,12 +64,12 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         # ── tunnel get (smoke) ────────────────────────────────────
         log_step(ctx, "fetch alpha's tunnel from the tunnel surface")
         alpha_tunnel = inkbox.tunnels.get(alpha.tunnel.id)
-        assert alpha_tunnel.tunnel_name == "alpha"
+        assert alpha_tunnel.tunnel_name == alpha_handle
         assert alpha_tunnel.tls_mode.value == "edge"
 
         # ── get identity ──────────────────────────────────────────
-        log_step(ctx, "get identity alpha")
-        alpha_fetched = inkbox.get_identity("alpha")
+        log_step(ctx, f"get identity {alpha_handle}")
+        alpha_fetched = inkbox.get_identity(alpha_handle)
         assert alpha_fetched.id == alpha.id
         assert alpha_fetched.email_address == alpha.email_address
         assert alpha_fetched.tunnel is not None
@@ -70,10 +79,10 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         # ── update description: omit vs explicit-null semantics ───
         log_step(ctx, "update alpha description (set)")
         alpha_fetched.update(description="alpha updated")
-        assert inkbox.get_identity("alpha").description == "alpha updated"
+        assert inkbox.get_identity(alpha_handle).description == "alpha updated"
         log_step(ctx, "update alpha description (clear via explicit None)")
         alpha_fetched.update(description=None)
-        assert inkbox.get_identity("alpha").description is None
+        assert inkbox.get_identity(alpha_handle).description is None
 
         # ── send email alpha → bravo ──────────────────────────────
         subject = f"sdk-integration-{cfg.environment}"
@@ -235,9 +244,9 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         bravo.delete()
 
         # ── immediate re-create (no 24h grace) ────────────────────
-        log_step(ctx, "re-create 'alpha' immediately")
-        alpha_again = inkbox.create_identity("alpha")
-        assert alpha_again.agent_handle == "alpha"
+        log_step(ctx, f"re-create '{alpha_handle}' immediately")
+        alpha_again = inkbox.create_identity(alpha_handle)
+        assert alpha_again.agent_handle == alpha_handle
         assert alpha_again.tunnel is not None
         alpha_again.delete()
 

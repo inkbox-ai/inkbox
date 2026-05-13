@@ -23,7 +23,11 @@ def test_python_sdk_signup_accepts_custom_handle_and_email_local_part(
     cfg = ctx.config
     suffix = uuid4().hex[:10]
     agent_handle = f"sdk-signup-{suffix}"
-    email_local_part = f"sdk.signup.{suffix}"
+    # On the platform sending domain, the server forces
+    # `email_local_part == agent_handle`. Pass the same value through
+    # the SDK call so the wire body still includes `email_local_part`
+    # explicitly (exercising that arg) without triggering the 422.
+    email_local_part = agent_handle
 
     log_step(ctx, "sign up agent with explicit handle and email local part")
     signup = Inkbox.signup(
