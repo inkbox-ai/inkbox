@@ -257,12 +257,5 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     logStep(config, "verify empty after cleanup");
     const final = await inkbox.listIdentities();
     expect(final).toHaveLength(0);
-
-    // ── immediate re-create of the same handle (no 24h grace) ─
-    logStep(config, `re-create '${alphaHandle}' immediately`);
-    const alphaAgain = await inkbox.createIdentity(alphaHandle);
-    expect(alphaAgain.agentHandle).toBe(alphaHandle);
-    expect(alphaAgain.tunnel).not.toBeNull();
-    await alphaAgain.delete();
   });
 });

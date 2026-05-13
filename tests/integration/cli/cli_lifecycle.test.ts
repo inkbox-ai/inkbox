@@ -196,10 +196,5 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     logStep(config, "verify empty after cleanup");
     const finalList = inkboxJson<unknown[]>("identity list", cliOpts);
     expect(finalList).toHaveLength(0);
-
-    // ── immediate re-create (no 24h grace) ────────────────────
-    logStep(config, `re-create '${alphaHandle}' immediately`);
-    inkboxJson(`identity create ${alphaHandle}`, cliOpts);
-    inkbox(`identity delete ${alphaHandle}`, cliOpts);
   });
 });

@@ -27,6 +27,7 @@ from inkbox.agent_signup.types import (
 from inkbox.exceptions import InkboxAPIError
 from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.identities.types import (  # noqa: I001
+    _UNSET,
     IdentityTunnelCreateOptions,
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
@@ -49,10 +50,10 @@ from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
 _DEFAULT_BASE_URL = "https://inkbox.ai"
 
-# Local sentinel for "kwarg omitted" — distinct from explicit ``None``.
-# Mirrors the pattern in :mod:`inkbox.mail.resources.mailboxes`. This sentinel
-# is module-local; we never forward it across module boundaries.
-_UNSET = object()
+# `_UNSET` is imported from inkbox.identities.types above. Identity-based
+# `is not _UNSET` checks must compare against the SAME object across all
+# layers; a module-local `object()` here would leak the sentinel through
+# to the wire body and crash JSON encoding.
 
 
 class Inkbox:

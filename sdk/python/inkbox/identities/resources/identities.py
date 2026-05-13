@@ -13,6 +13,7 @@ from uuid import UUID
 from inkbox.exceptions import InkboxAPIError
 from inkbox.identities.exceptions import map_identity_conflict_error
 from inkbox.identities.types import (
+    _UNSET,
     AgentIdentitySummary,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
@@ -23,13 +24,6 @@ from inkbox.identities.types import (
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
-
-
-# Sentinel for "field omitted" that's distinct from explicit ``None`` —
-# needed so callers can clear a column with ``None`` (e.g.
-# ``update(description=None)`` is "clear the description") vs. leaving
-# it untouched (``update()`` with the field absent).
-_UNSET: Any = object()
 
 
 class IdentitiesResource:

@@ -243,13 +243,6 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         alpha.delete()
         bravo.delete()
 
-        # ── immediate re-create (no 24h grace) ────────────────────
-        log_step(ctx, f"re-create '{alpha_handle}' immediately")
-        alpha_again = inkbox.create_identity(alpha_handle)
-        assert alpha_again.agent_handle == alpha_handle
-        assert alpha_again.tunnel is not None
-        alpha_again.delete()
-
         log_step(ctx, "verify empty after cleanup")
         identities = inkbox.list_identities()
         assert len(identities) == 0

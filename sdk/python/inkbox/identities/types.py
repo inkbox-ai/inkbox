@@ -16,7 +16,13 @@ from inkbox.phone.types import SmsStatus
 from inkbox.tunnels.types import TLSMode, Tunnel
 
 # Sentinel for "field omitted" that's distinct from explicit ``None``.
-# Mirrors the pattern used in :mod:`inkbox.mail.resources.mailboxes`.
+# Exported (intentionally underscore-named but referenced internally
+# from `client.py`, `agent_identity.py`, and
+# `identities/resources/identities.py`) so all three layers compare
+# against the SAME object — `is not _UNSET` is identity-based, and
+# threading the sentinel through three separately-defined module-local
+# `_UNSET = object()` instances would leak it onto the wire as
+# `{"description": <object>}` and crash JSON serialization.
 _UNSET = object()
 
 

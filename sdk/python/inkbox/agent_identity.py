@@ -18,6 +18,7 @@ from inkbox.credentials import Credentials
 from inkbox.vault.totp import TOTPCode, TOTPConfig
 from inkbox.vault.types import DecryptedVaultSecret, SecretPayload, VaultSecret
 from inkbox.identities.types import (
+    _UNSET,
     _AgentIdentityData,
     IdentityMailbox,
     IdentityPhoneNumber,
@@ -42,9 +43,10 @@ from inkbox.phone.types import (
 if TYPE_CHECKING:
     from inkbox.client import Inkbox
 
-# Local sentinel for "kwarg omitted" — distinct from explicit ``None``.
-# Mirrors the pattern in :mod:`inkbox.mail.resources.mailboxes`.
-_UNSET = object()
+# `_UNSET` is imported from inkbox.identities.types above. Identity-based
+# `is not _UNSET` checks must compare against the SAME object across all
+# layers; a module-local `object()` here would leak the sentinel through
+# to the wire body and crash JSON encoding.
 
 
 class AgentIdentity:
