@@ -6,7 +6,7 @@ Tests for Inkbox unified client — identities.
 
 from unittest.mock import MagicMock
 
-from sample_data_identities import IDENTITY_DETAIL_DICT, IDENTITY_DICT
+from sample_data_identities import IDENTITY_DETAIL_DICT
 
 from inkbox import Inkbox
 from inkbox.identities.resources.identities import IdentitiesResource

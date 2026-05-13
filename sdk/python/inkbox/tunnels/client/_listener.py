@@ -32,7 +32,7 @@ from inkbox.tunnels.client._runtime import (
     TunnelRuntime,
 )
 from inkbox.tunnels.client._url_forward import validate_forward_target
-from inkbox.tunnels.types import TLSMode, Tunnel
+from inkbox.tunnels.types import Tunnel
 
 if TYPE_CHECKING:
     from inkbox.client import Inkbox

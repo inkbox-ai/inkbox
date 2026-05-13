@@ -4,9 +4,11 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
-## 1.0.0
+## 0.4.0
 
-Major release. Breaking changes throughout, paired with the servers
+Breaking-changes release. The repo is still sub-1.0 so the version is
+0.4.0 rather than 1.0.0, but the breakage is real — this changeset is
+paired with the servers
 `update-data-models` migration (alembic revision `043`) that locks the
 **identity ↔ mailbox ↔ tunnel** triad into a strict 1:1:1 invariant.
 The handle is now globally unique across all orgs and shares its

@@ -10,7 +10,6 @@ from uuid import UUID
 from sample_data_identities import IDENTITY_DICT, IDENTITY_DETAIL_DICT
 from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.identities.types import (
-    AgentIdentitySummary,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
     IdentityTunnelCreateOptions,

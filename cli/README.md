@@ -76,13 +76,20 @@ Manage agent identities.
 ```bash
 inkbox identity list                         # List all identities
 inkbox identity get <handle>                 # Get identity details
-inkbox identity create <handle>              # Create a new identity
-  --sending-domain <name>                    #   Bind agent's mailbox to a verified custom domain (bare name)
-  --platform-domain                          #   Force the platform sending domain
-                                             #   (either flag implies mailbox creation; mutually exclusive)
-inkbox identity delete <handle>              # Delete an identity
+inkbox identity create <handle>              # Provisions identity + mailbox + tunnel atomically
+  --display-name <name>                      #   Identity-level display name
+  --description <text>                       #   Identity-level free-form description
+  --email-local-part <part>                  #   Requested local part (custom-domain only)
+  --sending-domain <name>                    #   Bind mailbox to a verified custom domain (bare name)
+  --platform-domain                          #   Force the platform sending domain (mutually exclusive)
+  --tls-mode <mode>                          #   edge (default) or passthrough — fixed at create time
+  --tunnel-description <text>                #   Tunnel-level description
+inkbox identity delete <handle>              # Cascades to mailbox + tunnel; revokes scoped API keys
 inkbox identity update <handle>              # Update an identity
   --new-handle <handle>                      #   New handle
+  --display-name <name>                      #   New display name ("" to clear)
+  --description <text>                       #   New description ("" to clear)
+  --clear-description                        #   Explicit null (mutually exclusive with --description)
   --status <status>                          #   active or paused
 inkbox identity refresh <handle>             # Re-fetch identity from API
 
@@ -96,9 +103,6 @@ inkbox identity get-secret <handle> <secret-id>     # Decrypt a secret (vault ke
 inkbox identity delete-secret <handle> <secret-id>  # Delete a secret (vault key)
 inkbox identity revoke-access <handle> <secret-id>  # Revoke credential access
 
-inkbox identity assign-mailbox <handle>              # Assign an existing mailbox
-  --mailbox-id <id>                            #   Mailbox UUID (required)
-inkbox identity unlink-mailbox <handle>              # Unlink mailbox from identity
 inkbox identity assign-phone <handle>                # Assign an existing phone number
   --phone-number-id <id>                       #   Phone number UUID (required)
 inkbox identity unlink-phone <handle>                # Unlink phone number from identity
@@ -263,22 +267,35 @@ Secret type flags:
 
 ### mailbox
 
-Org-level mailbox management.
+Org-level mailbox read + update. Mailboxes are provisioned atomically
+by `inkbox identity create` and tombstoned by `inkbox identity delete`
+(cascade) — there is no standalone create / delete here. `display_name`
+has moved to the identity; mailbox PATCH hard-rejects it with a 422.
 
 ```bash
 inkbox mailbox list                          # List all mailboxes
 inkbox mailbox get <email-address>           # Get mailbox details
-inkbox mailbox create                        # Create a new mailbox
-  -i, --identity <handle>                   #   Agent handle (required)
-  --display-name <name>                      #   Display name
-  --local-part <part>                        #   Requested email local part (random if omitted)
-  --domain-id <id>                           #   Bind to a verified custom sending-domain row id
-  --platform-domain                          #   Force the platform sending domain
-                                             #   (--domain-id and --platform-domain are mutually exclusive)
 inkbox mailbox update <email-address>        # Update a mailbox
-  --display-name <name>                      #   New display name
   --webhook-url <url>                        #   Webhook URL ("" to clear)
-inkbox mailbox delete <email-address>        # Delete a mailbox
+  --filter-mode <mode>                       #   whitelist or blacklist (admin-only)
+```
+
+### tunnel
+
+Tunnel read + update + sign-csr. Tunnels are provisioned atomically by
+`inkbox identity create` and tombstoned by `inkbox identity delete`
+(cascade) — there is no standalone create / delete / restore /
+rotate-secret surface.
+
+```bash
+inkbox tunnel list                                          # List org tunnels
+inkbox tunnel get <id-or-handle>                            # By UUID or agent handle
+inkbox tunnel update <id>                                   # Edit description/metadata
+  --description <text>                                      #   "" to clear
+  --metadata <json>                                         #   JSON object; "{}" to clear
+inkbox tunnel sign-csr <id>                                 # Passthrough cert signing
+  --csr <path-or-pem>                                       #   CSR file path OR inline PEM
+  --out <path>                                              #   Write cert+chain (default: stdout)
 ```
 
 ### domain

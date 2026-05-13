@@ -9,12 +9,12 @@ from unittest.mock import MagicMock
 from uuid import UUID
 
 from sample_data_identities import IDENTITY_DETAIL_DICT
-from sample_data_mail import MAILBOX_DICT, MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
+from sample_data_mail import MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
 
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
-from inkbox.mail.types import ForwardMode, Mailbox, MessageDetail, ThreadDetail
+from inkbox.mail.types import ForwardMode, MessageDetail, ThreadDetail
 from inkbox.phone.types import TextMessage
 
 
