@@ -714,8 +714,8 @@ class AgentIdentity:
             new_handle: New agent handle.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
-            status: ``"active"`` or ``"paused"``. Use :meth:`delete` for
-                tombstoning; ``"deleted"`` is rejected here.
+            status: ``"active"`` or ``"paused"``. Call :meth:`delete`
+                to remove the identity; ``"deleted"`` is rejected here.
         """
         update_kwargs: dict[str, Any] = {}
         if new_handle is not None:
@@ -777,7 +777,7 @@ class AgentIdentity:
         if not self._mailbox:
             raise InkboxError(
                 f"Identity '{self.agent_handle}' has no mailbox — "
-                "this should only be reachable on a tombstoned identity."
+                "this should only be reachable on a deleted identity."
             )
 
     def _require_phone(self) -> None:

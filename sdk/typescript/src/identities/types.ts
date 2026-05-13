@@ -73,7 +73,7 @@ export interface IdentityMailbox {
   filterMode: FilterMode;
   /**
    * UUID of the owning agent identity. Non-null for live customer
-   * mailboxes (1:1 invariant); null only on tombstones and system mailboxes.
+   * mailboxes (1:1 invariant); null only on deleted rows and system mailboxes.
    */
   agentIdentityId: string | null;
   createdAt: Date;
@@ -123,11 +123,11 @@ export interface AgentIdentitySummary {
 
 /** @internal Full identity data with channels — users interact with AgentIdentity (the class) instead. */
 export interface _AgentIdentityData extends AgentIdentitySummary {
-  /** Mailbox assigned to this identity. Non-null for live identities (1:1 invariant); null on tombstones. */
+  /** Mailbox assigned to this identity. Non-null for live identities (1:1 invariant); null only on deleted rows. */
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
-  /** Tunnel assigned to this identity. Non-null for live identities (1:1 invariant); null on tombstones. */
+  /** Tunnel assigned to this identity. Non-null for live identities (1:1 invariant); null only on deleted rows. */
   tunnel: Tunnel | null;
 }
 

@@ -92,7 +92,7 @@ await identity.assignPhoneNumber("phone-number-uuid");
 await identity.unlinkPhoneNumber();
 ```
 
-Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.createIdentity()` to provision both; use `identity.delete()` to cascade-tombstone both.
+Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.createIdentity()` to provision both; use `identity.delete()` to remove both (cascade).
 
 ## Mail
 

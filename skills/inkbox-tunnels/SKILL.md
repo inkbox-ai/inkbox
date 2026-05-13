@@ -271,7 +271,7 @@ Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no 
 - **State dir is sensitive in passthrough mode.** It stores the per-tunnel private key. Default is `0700` under the user's home directory; treat it like an SSH key dir. Edge mode keeps only zone/public-host caching there.
 - **No secret recovery dance.** Data-plane auth is the same API key used for the control plane. Lose the key, mint a new one via `inkbox.api_keys.create(...)` and revoke the old.
 - **TLS mode is fixed at create.** Switching between edge and passthrough requires `identity.delete()` (cascades to the tunnel) + recreating the identity with the desired `tunnel.tls_mode`.
-- **Identity-delete cascades.** Deleting an identity tombstones its tunnel and revokes its scoped API keys. The handle is reclaimable immediately on commit — no grace window.
+- **Identity-delete cascades.** Deleting an identity removes its tunnel and revokes its scoped API keys. The handle is reclaimable immediately on commit — no grace window.
 - **`forward_to` is loopback-only by default.** Pass `allow_remote_forwarding=True` only after reviewing the SSRF tradeoff.
 - **Body caps** apply uniformly across URL forward and in-process handlers (defaults: 50 MiB inbound, 50 MiB response). Configurable per `connect()`.
 

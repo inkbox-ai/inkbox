@@ -220,7 +220,7 @@ export class Inkbox {
   // Public resource accessors
   // ------------------------------------------------------------------
 
-  /** Org-level mailbox operations (list, get, create, update, delete). */
+  /** Org-level mailbox operations (list, get, update, search). Mailboxes are provisioned by `createIdentity` and removed by `identity.delete()` (cascade). */
   get mailboxes(): MailboxesResource { return this._mailboxes; }
 
   /** Message operations (list, get, send, delete, star/unstar). */
@@ -259,7 +259,7 @@ export class Inkbox {
   /** Custom sending domains (list, set org default). */
   get domains(): DomainsResource { return this._domains; }
 
-  /** Tunnels (list, get, create, update, delete, restore, rotateSecret, signCsr). */
+  /** Tunnels (list, get, update, signCsr). Tunnels are provisioned by `createIdentity` and removed by `identity.delete()` (cascade). */
   get tunnels(): TunnelsResource { return this._tunnels; }
 
   /** Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys. */

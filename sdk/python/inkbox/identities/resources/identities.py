@@ -121,8 +121,8 @@ class IdentitiesResource:
             new_handle: New handle value.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
-            status: ``"active"`` or ``"paused"``. Use :meth:`delete` for
-                tombstoning; ``"deleted"`` is rejected here.
+            status: ``"active"`` or ``"paused"``. Call :meth:`delete`
+                to remove an identity; ``"deleted"`` is rejected here.
         """
         body: dict[str, Any] = {}
         if new_handle is not None:

@@ -15,10 +15,9 @@ export enum TLSMode {
  * - `awaiting_cert`: passthrough-only intermediate state. Inbound TLS
  *   will fail until you call `tunnels.signCsr(...)`.
  * - `active`: routable end-to-end.
- * - `deleted`: terminal soft-tombstone. The name is immediately
- *   reclaimable; the row is retained for audit. Tunnels are deleted
- *   exclusively via identity-delete cascade — there is no direct
- *   tunnel-delete surface.
+ * - `deleted`: terminal. The tunnel is offline and its name is
+ *   immediately reclaimable. Tunnels are deleted exclusively via the
+ *   identity-delete cascade — there is no direct tunnel-delete surface.
  */
 export enum TunnelStatus {
   AWAITING_CERT = "awaiting_cert",
@@ -39,9 +38,9 @@ export interface Tunnel {
   lastConnectedAt: Date | null;
   lastConnectedIpAddr: string | null;
   currentlyConnected: boolean;
-  /** Customer-facing hostname (`{handle}.{env}.inkboxwire.com`). Non-null for live tunnels. */
+  /** Customer-facing hostname — e.g. `my-agent.inkboxwire.com` in production. Lower environments use a different tunnel zone. Non-null for live tunnels. */
   publicHost: string;
-  /** Zone endpoint for the data-plane (`{env}.inkboxwire.com`). Agents connect to `https://{zone}/_system/connect`. Non-null for live tunnels. */
+  /** Zone endpoint for the data-plane. Agents connect to `https://{zone}/_system/connect`. In production this is `inkboxwire.com`; lower environments use a different zone. Non-null for live tunnels. */
   zone: string;
   metadata: Record<string, unknown>;
   createdAt: Date;

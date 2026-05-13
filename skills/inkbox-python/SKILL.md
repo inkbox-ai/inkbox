@@ -93,7 +93,7 @@ identity.assign_phone_number("phone-number-uuid")
 identity.unlink_phone_number()
 ```
 
-Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.create_identity()` to provision both; use `identity.delete()` to cascade-tombstone both.
+Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.create_identity()` to provision both; use `identity.delete()` to remove both (cascade).
 
 ## Mail
 

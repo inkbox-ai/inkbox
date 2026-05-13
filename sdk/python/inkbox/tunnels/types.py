@@ -35,10 +35,10 @@ class TunnelStatus(StrEnum):
             exists but no cert has been signed yet. Inbound TLS handshakes
             will fail until you call :meth:`TunnelsResource.sign_csr`.
         ACTIVE: Routable end-to-end.
-        DELETED: Terminal soft-tombstone. The name is immediately
-            reclaimable; the row is retained for audit. Tunnels are
-            deleted exclusively via identity-delete cascade — there is no
-            direct tunnel-delete surface.
+        DELETED: Terminal. The tunnel is offline and its name is
+            immediately reclaimable. Tunnels are deleted exclusively via
+            the identity-delete cascade — there is no direct tunnel-delete
+            surface.
     """
     AWAITING_CERT = "awaiting_cert"
     ACTIVE = "active"

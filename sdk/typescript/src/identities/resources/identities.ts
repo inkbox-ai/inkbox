@@ -95,8 +95,8 @@ export class IdentitiesResource {
    * @param options.newHandle - New handle value.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
-   * @param options.status - `"active"` or `"paused"`. Use `delete()` to
-   *   tombstone an identity; `"deleted"` is rejected here.
+   * @param options.status - `"active"` or `"paused"`. Call `delete()` to
+   *   remove an identity; `"deleted"` is rejected here.
    */
   async update(
     agentHandle: string,

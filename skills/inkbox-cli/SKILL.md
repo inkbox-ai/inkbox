@@ -71,7 +71,6 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 - `email delete`
 - `email delete-thread`
 - `vault delete`
-- `mailbox delete`
 - `mailbox update --filter-mode ...` (admin-only; flips allow/block semantics for that mailbox)
 - `number release`
 - `number update --filter-mode ...` (admin-only; same caveat as mailbox)
@@ -103,18 +102,28 @@ inkbox signup status
 ```bash
 inkbox identity list
 inkbox identity get <handle>
-inkbox identity create <handle> [--sending-domain <name> | --platform-domain]
+inkbox identity create <handle> [--display-name <name>] [--description <text>]
+                                 [--email-local-part <part>]
+                                 [--sending-domain <name> | --platform-domain]
+                                 [--tls-mode edge|passthrough]
+                                 [--tunnel-description <text>]
 inkbox identity delete <handle>
-inkbox identity update <handle> --new-handle <handle>
+inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
+                                 [--description <text> | --clear-description]
+                                 [--status active|paused]
 inkbox identity refresh <handle>
 ```
 
-`--sending-domain <name>` binds the new agent's mailbox to a verified custom domain (bare name, e.g. `mail.acme.com`). `--platform-domain` forces the platform sending domain. Either flag implies mailbox creation. Omit both to inherit the org default.
+`identity create` atomically provisions the mailbox AND the tunnel. The JSON output includes both (`mailbox`, `tunnel.publicHost`, `tunnel.tlsMode`).
+
+`--sending-domain <name>` binds the agent's mailbox to a verified custom domain (bare name, e.g. `mail.acme.com`); `--platform-domain` forces the platform sending domain; the two are mutually exclusive. `--tls-mode` defaults to `edge` and is fixed at create time (changing it later requires deleting the identity + recreating).
+
+For `identity update`, `--description ""` and `--clear-description` both send explicit null to clear; omitting both leaves the field untouched.
 
 Notes:
 
-- Creating an identity creates the agent identity; mailbox creation is handled automatically by the backend flow described in the CLI docs.
-- `identity get` and `identity refresh` return mailbox and phone number assignments when present.
+- `identity delete` cascades to the linked mailbox + tunnel and revokes any identity-scoped API keys. The handle is reclaimable immediately on commit (no grace window).
+- `identity get` and `identity refresh` return mailbox, phone-number, and tunnel assignments when present.
 - Most email, phone, and text commands require `-i, --identity <handle>`.
 
 ### Identity-Scoped Secrets
@@ -240,19 +249,32 @@ Secret type flags:
 --data <json> [--notes <text>]
 ```
 
-## Admin-Only Mailboxes
+## Mailboxes
+
+Mailboxes are provisioned atomically by `inkbox identity create` and removed by `inkbox identity delete` (cascade); there is no standalone create / delete here. The human-readable name lives on the identity now — `inkbox identity update --display-name`; the mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 
 ```bash
 inkbox mailbox list
 inkbox mailbox get <email-address>
-inkbox mailbox create -i <handle> [--display-name <name>] [--local-part <part>] [--domain-id <id> | --platform-domain]
-inkbox mailbox update <email-address> [--display-name <name>] [--webhook-url <url>] [--filter-mode whitelist|blacklist]
-inkbox mailbox delete <email-address>
+inkbox mailbox update <email-address> [--webhook-url <url>] [--filter-mode whitelist|blacklist]
 ```
 
-`mailbox list` / `get` / `update` rows now include `filterMode` and `agentIdentityId`. `--filter-mode` is admin-only; when the value actually changes, a note is printed to **stderr** telling you how many existing rules are now redundant under the new mode.
+`mailbox list` / `get` / `update` rows include `filterMode` and `agentIdentityId`. `--filter-mode` is admin-only; when the value actually changes, a note is printed to **stderr** telling you how many existing rules are now redundant under the new mode.
 
-`mailbox create` accepts `--domain-id <id>` to bind the mailbox to a verified custom sending-domain row id (`sending_domain_<uuid>`), or `--platform-domain` to force the platform sending domain. Omit both to inherit the org default.
+## Tunnels
+
+Tunnels are provisioned atomically by `inkbox identity create` and removed by `inkbox identity delete` (cascade). The `inkbox tunnel` subcommand is read + update + sign-csr only.
+
+```bash
+inkbox tunnel list
+inkbox tunnel get <id-or-handle>
+inkbox tunnel update <id> [--description <text>] [--metadata <json>]
+inkbox tunnel sign-csr <id> --csr <path-or-pem> [--out <path>]
+```
+
+`tunnel get` accepts either a UUID or the owning identity's agent handle. `tunnel update --description ""` clears the description; `--metadata "{}"` clears metadata. `tunnel sign-csr` is passthrough-only and uses an elevated 180-second timeout (the server runs DNS validation + cert issuance synchronously).
+
+Data-plane auth uses the same API key the CLI was invoked with — admin-scoped or identity-scoped (matching the tunnel's identity). There is no per-tunnel connect secret; mint an identity-scoped key via `inkbox api-keys create --identity-id <uuid>` for an agent.
 
 ## Custom Sending Domains
 

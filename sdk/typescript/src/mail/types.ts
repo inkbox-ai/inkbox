@@ -128,7 +128,7 @@ export interface Mailbox {
   filterMode: FilterMode;
   /**
    * UUID of the owning agent identity. Non-null for live customer
-   * mailboxes (1:1 invariant); null only on tombstones and system
+   * mailboxes (1:1 invariant); null only on deleted rows and system
    * mailboxes.
    */
   agentIdentityId: string | null;

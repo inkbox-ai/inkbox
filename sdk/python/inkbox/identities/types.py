@@ -137,7 +137,7 @@ class IdentityMailbox:
 
     ``agent_identity_id`` mirrors the same field on :class:`Mailbox`;
     on the embedded variant it is non-null for live customer mailboxes
-    (1:1 invariant) and null only on tombstones and system mailboxes.
+    (1:1 invariant) and null only on deleted rows and system mailboxes.
 
     ``sending_domain`` is the bare domain the mailbox sends from, derived
     from ``email_address``.

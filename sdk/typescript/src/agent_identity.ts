@@ -573,8 +573,8 @@ export class AgentIdentity {
    * @param options.newHandle - New agent handle.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
-   * @param options.status - `"active"` or `"paused"`. Use `delete()` for
-   *   tombstoning; `"deleted"` is rejected here.
+   * @param options.status - `"active"` or `"paused"`. Call `delete()`
+   *   to remove the identity; `"deleted"` is rejected here.
    */
   async update(options: {
     newHandle?: string;
@@ -637,7 +637,7 @@ export class AgentIdentity {
   private _requireMailbox(): void {
     if (!this._mailbox) {
       throw new InkboxError(
-        `Identity '${this.agentHandle}' has no mailbox — this should only be reachable on a tombstoned identity.`,
+        `Identity '${this.agentHandle}' has no mailbox — this should only be reachable on a deleted identity.`,
       );
     }
   }

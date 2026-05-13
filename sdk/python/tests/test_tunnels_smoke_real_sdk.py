@@ -127,11 +127,13 @@ def deployed_tunnel():
     if _BASE_URL:
         inkbox_kwargs["base_url"] = _BASE_URL
     with Inkbox(**inkbox_kwargs) as inkbox:
+        # Provision the identity (and its atomic mailbox + tunnel) before
+        # bringing the data plane up. tls_mode is fixed at create time;
+        # default is edge.
+        inkbox.create_identity(name)
         listener = inkbox.tunnels.connect(
             name=name,
             forward_to=f"http://127.0.0.1:{upstream_port}",
-            tls_mode="edge",
-            print_secret_to_stderr=False,
         )
         # listener.wait() would block; the sync API runs the runtime in
         # a background thread already, so we just give it a moment to
@@ -146,8 +148,9 @@ def deployed_tunnel():
             }
         finally:
             listener.close()
+            # Identity-delete cascades to the linked mailbox + tunnel.
             try:
-                inkbox.tunnels.delete(str(listener.tunnel.id))
+                inkbox.get_identity(name).delete()
             except Exception:
                 # best-effort cleanup
                 pass

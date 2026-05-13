@@ -215,7 +215,7 @@ class Inkbox:
 
     @property
     def mailboxes(self) -> MailboxesResource:
-        """Access org-level mailbox operations (list, get, create, update, delete)."""
+        """Access org-level mailbox operations (list, get, update, search). Mailboxes are provisioned by ``create_identity`` and removed by ``identity.delete()`` (cascade)."""
         return self._mailboxes
 
     @property
