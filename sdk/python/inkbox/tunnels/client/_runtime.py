@@ -135,7 +135,9 @@ class TunnelRuntime:
 
     Args:
         tunnel_id: Tunnel's UUID (string-coerced for headers).
-        secret: The connect secret (sent on hello + every CONNECT).
+        api_key: The data-plane API key (sent as `x-api-key` on hello +
+            every CONNECT). Must be admin-scoped in the tunnel's org, or
+            identity-scoped to match the tunnel's identity.
         zone: The data-plane h2 endpoint host (e.g. ``inkboxwire.com``).
         public_host: Tunnel's public host (e.g. ``my-agent.inkboxwire.com``).
         pool_size: Requested number of parked intake streams. ``None``
@@ -415,7 +417,9 @@ class TunnelRuntime:
         self._streams.pop(stream_id, None)
         if status in (401, 403):
             raise _TunnelAuthError(
-                f"/_system/hello returned {status}; connect secret is invalid",
+                f"/_system/hello returned {status}; the API key was rejected "
+                "(check the key matches the tunnel's identity scope, or use "
+                "an admin-scoped key in the tunnel's org)",
             )
         if status != 200:
             raise RuntimeError(
