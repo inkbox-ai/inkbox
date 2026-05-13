@@ -1,7 +1,10 @@
 /**
  * inkbox-identities/resources/identities.ts
  *
- * Identity CRUD and channel assignment.
+ * Identity create / list / get / update / delete, plus phone-number
+ * assign / unlink. Mailbox and tunnel are provisioned atomically by
+ * `create()` and removed by `delete()` (cascade); there is no
+ * standalone mailbox or tunnel create / link surface.
  */
 
 import { HttpTransport, InkboxAPIError } from "../../_http.js";

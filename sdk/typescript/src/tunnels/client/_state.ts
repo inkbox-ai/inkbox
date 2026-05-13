@@ -38,7 +38,7 @@ export interface StateEntry {
 interface RawStateEntry {
   tunnel_id?: string;
   name?: string;
-  /** Legacy field, ignored on read. Pre-1.0 SDKs persisted the per-tunnel
+  /** Legacy field, ignored on read. Pre-0.4.0 SDKs persisted the per-tunnel
    *  connect secret here; data-plane auth now uses the client's API key. */
   secret?: string | null;
   mode?: string | null;

@@ -430,7 +430,7 @@ if updated.filter_mode_change_notice:
 
 results = inkbox.mailboxes.search(mailbox.email_address, q="invoice", limit=20)
 # Mailboxes are deleted via the owning identity's cascade — there is no standalone delete:
-#   identity.delete()  # tombstones the mailbox + tunnel atomically
+#   identity.delete()  # removes the mailbox + tunnel atomically (cascade)
 ```
 
 ### Custom email domains (`inkbox.domains`)

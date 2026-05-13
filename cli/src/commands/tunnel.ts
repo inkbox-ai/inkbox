@@ -54,7 +54,7 @@ export function registerTunnelCommands(program: Command): void {
           : (await inkbox.getIdentity(idOrHandle)).tunnel;
         if (!t) {
           throw new Error(
-            `identity '${idOrHandle}' has no tunnel (only reachable on a tombstoned identity)`,
+            `identity '${idOrHandle}' has no tunnel (only reachable on a deleted identity)`,
           );
         }
         output(

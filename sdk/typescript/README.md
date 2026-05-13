@@ -563,7 +563,7 @@ for (const t of segments) {
 ## Org-level Mailboxes
 
 Mailboxes are provisioned atomically by `inkbox.createIdentity(...)` and
-tombstoned by `identity.delete()` (cascade). The `inkbox.mailboxes`
+removed by `identity.delete()` (cascade). The `inkbox.mailboxes`
 surface is read + update + search only.
 
 ```ts

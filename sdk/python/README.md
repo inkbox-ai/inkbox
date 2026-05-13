@@ -528,7 +528,7 @@ for t in segments:
 ## Org-level Mailboxes
 
 Mailboxes are provisioned atomically by `inkbox.create_identity(...)`
-and tombstoned by `identity.delete()` (cascade). The `inkbox.mailboxes`
+and removed by `identity.delete()` (cascade). The `inkbox.mailboxes`
 surface is read + update + search only.
 
 ```python

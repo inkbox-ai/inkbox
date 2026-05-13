@@ -268,7 +268,7 @@ Secret type flags:
 ### mailbox
 
 Org-level mailbox read + update. Mailboxes are provisioned atomically
-by `inkbox identity create` and tombstoned by `inkbox identity delete`
+by `inkbox identity create` and removed by `inkbox identity delete`
 (cascade) — there is no standalone create / delete here. `display_name`
 has moved to the identity; mailbox PATCH hard-rejects it with a 422.
 
@@ -283,7 +283,7 @@ inkbox mailbox update <email-address>        # Update a mailbox
 ### tunnel
 
 Tunnel read + update + sign-csr. Tunnels are provisioned atomically by
-`inkbox identity create` and tombstoned by `inkbox identity delete`
+`inkbox identity create` and removed by `inkbox identity delete`
 (cascade) — there is no standalone create / delete / restore /
 rotate-secret surface.
 

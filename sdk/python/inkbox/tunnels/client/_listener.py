@@ -44,8 +44,8 @@ logger = logging.getLogger("inkbox.tunnels")
 def _check_posix() -> None:
     if sys.platform.startswith("win"):
         raise NotImplementedError(
-            "inkbox.tunnels.connect requires a POSIX platform; CRUD "
-            "operations are supported on Windows",
+            "inkbox.tunnels.connect requires a POSIX platform; "
+            "control-plane reads (list, get, update, sign_csr) work on Windows.",
         )
 
 

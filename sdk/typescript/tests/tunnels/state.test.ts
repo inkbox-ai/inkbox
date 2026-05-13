@@ -80,7 +80,7 @@ describe("loadState parse-error paths", () => {
     expect(loaded!.publicHost).toBeNull();
   });
 
-  it("ignores a legacy 'secret' field on disk (pre-1.0 SDKs persisted one)", () => {
+  it("ignores a legacy 'secret' field on disk (pre-0.4.0 SDKs persisted one)", () => {
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "state.json"),

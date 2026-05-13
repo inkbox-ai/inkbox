@@ -454,7 +454,7 @@ if (updated.filterModeChangeNotice) {
 
 const results = await inkbox.mailboxes.search(mailbox.emailAddress, { q: "invoice", limit: 20 });
 // Mailboxes are deleted via the owning identity's cascade — there is no standalone delete:
-//   await identity.delete();  // tombstones the mailbox + tunnel atomically
+//   await identity.delete();  // removes the mailbox + tunnel atomically (cascade)
 ```
 
 ### Custom email domains (`inkbox.domains`)

@@ -19,8 +19,8 @@ namespace with `tunnel_name`.
 - `tunnels.create()`, `tunnels.delete()`, `tunnels.restore()`,
   `tunnels.forceDelete()` / `force_delete()`, and
   `tunnels.rotateSecret()` / `rotate_secret()` — tunnels are
-  provisioned atomically by identity-create and tombstoned by
-  identity-delete.
+  provisioned atomically by identity-create and removed by
+  identity-delete (cascade).
 - `mailboxes.create()` and `mailboxes.delete()` — same reason.
 - `AgentIdentity.createMailbox()` / `create_mailbox()`,
   `assignMailbox()` / `assign_mailbox()`, and `unlinkMailbox()` /
@@ -43,7 +43,7 @@ namespace with `tunnel_name`.
   `HandleUnavailableError` (see Added).
 - `TunnelSecretUnavailable` and the legacy "rotate via rotateSecret"
   recovery flow.
-- The per-tunnel `connect_secret` field on `state.json`. Pre-1.0 SDKs
+- The per-tunnel `connect_secret` field on `state.json`. Pre-0.4.0 SDKs
   that wrote one are forward-compatible (the field is ignored on read).
 - The `createMailbox` boolean flag on `CreateIdentityOptions` —
   mailbox is always created.

@@ -41,7 +41,7 @@ class TunnelStateError(RuntimeError):
 class StateEntry:
     """Parsed contents of ``state.json`` (forward-compatible).
 
-    Pre-1.0 SDKs persisted the per-tunnel ``connect_secret`` here; the
+    Pre-0.4.0 SDKs persisted the per-tunnel ``connect_secret`` here; the
     field is ignored on read and never written. Data-plane authentication
     now uses the client's API key.
     """
