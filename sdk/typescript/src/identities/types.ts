@@ -269,7 +269,6 @@ export function identityTunnelCreateOptionsToWire(
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if (options.tlsMode !== undefined) body["tls_mode"] = options.tlsMode;
-  if ("description" in options) body["description"] = options.description;
   return body;
 }
 
