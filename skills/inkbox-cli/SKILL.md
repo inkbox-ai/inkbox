@@ -121,7 +121,7 @@ For `identity update`, `--description ""` and `--clear-description` both send ex
 
 Notes:
 
-- `identity delete` cascades to the linked mailbox + tunnel and revokes any identity-scoped API keys. The handle is reclaimable immediately on commit (no grace window).
+- `identity delete` cascades to the linked mailbox + tunnel and revokes any identity-scoped API keys.
 - `identity get` and `identity refresh` return mailbox, phone-number, and tunnel assignments when present.
 - Most email, phone, and text commands require `-i, --identity <handle>`.
 

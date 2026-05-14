@@ -139,7 +139,7 @@ class IdentitiesResource:
         Cascades: flips the linked mailbox to ``deleted``, force-finalizes
         the linked tunnel to ``deleted``, revokes any identity-scoped
         API keys, and unassigns (but does not delete) any linked phone
-        number. The handle is reclaimable immediately on commit.
+        number.
         """
         self._http.delete(f"/{agent_handle}")
 

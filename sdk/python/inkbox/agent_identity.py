@@ -744,6 +744,11 @@ class AgentIdentity:
             phone_number=self._phone_number,
             tunnel=self._tunnel,
         )
+        if new_handle is not None and self._tunnel is not None:
+            # The server renames the linked tunnel in the same transaction
+            # under the unified handle namespace; refresh to pick up the
+            # new tunnel_name / public_host on the cached tunnel.
+            self.refresh()
 
     def refresh(self) -> AgentIdentity:
         """Re-fetch this identity from the API and update cached channels.
@@ -769,7 +774,7 @@ class AgentIdentity:
         Cascades: flips the linked mailbox to ``deleted``, force-finalizes
         the linked tunnel to ``deleted``, revokes any identity-scoped
         API keys, and unassigns (but does not delete) any linked phone
-        number. The handle is reclaimable immediately on commit.
+        number.
         """
         self._inkbox._ids_resource.delete(self.agent_handle)
 

@@ -129,8 +129,7 @@ export class IdentitiesResource {
    *
    * Cascades: flips the linked mailbox to `deleted`, force-finalizes the
    * linked tunnel to `deleted`, revokes any identity-scoped API keys, and
-   * unassigns (but does not delete) any linked phone number. The handle
-   * is reclaimable immediately on commit.
+   * unassigns (but does not delete) any linked phone number.
    *
    * @param agentHandle - Handle of the identity to delete.
    */

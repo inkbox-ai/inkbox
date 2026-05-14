@@ -158,8 +158,7 @@ identity.update(description=None)  # clear
 # Unlink the phone number (without releasing it).
 identity.unlink_phone_number()
 
-# Delete (cascades to mailbox + tunnel; revokes scoped API keys;
-# handle is reclaimable immediately, no 24h grace).
+# Delete (cascades to mailbox + tunnel; revokes scoped API keys).
 identity.delete()
 ```
 

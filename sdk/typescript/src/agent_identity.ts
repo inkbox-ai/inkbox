@@ -589,6 +589,12 @@ export class AgentIdentity {
       phoneNumber:      this._phoneNumber,
       tunnel:           this._tunnel,
     };
+    if (options.newHandle !== undefined && this._tunnel != null) {
+      // The server renames the linked tunnel in the same transaction
+      // under the unified handle namespace; refresh to pick up the
+      // new tunnelName / publicHost on the cached tunnel.
+      await this.refresh();
+    }
   }
 
   /**
@@ -615,8 +621,7 @@ export class AgentIdentity {
    *
    * Cascades: flips the linked mailbox to `deleted`, force-finalizes the
    * linked tunnel to `deleted`, revokes any identity-scoped API keys, and
-   * unassigns (but does not delete) any linked phone number. The handle
-   * is reclaimable immediately on commit.
+   * unassigns (but does not delete) any linked phone number.
    */
   async delete(): Promise<void> {
     await this._inkbox._idsResource.delete(this.agentHandle);

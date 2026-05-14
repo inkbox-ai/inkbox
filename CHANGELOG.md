@@ -127,8 +127,7 @@ namespace with `tunnel_name`.
   and `filterMode` / `filter_mode`. Sending `display_name` is now a
   hard 422 (route's `extra='forbid'` validator).
 - Identity-delete cascades to the linked mailbox and tunnel and
-  revokes any identity-scoped API keys; the handle is reclaimable
-  immediately on commit (no 24-hour grace window).
+  revokes any identity-scoped API keys.
 - `agent_handle` is globally unique across all orgs and shares its
   namespace with `tunnel_name`.
 

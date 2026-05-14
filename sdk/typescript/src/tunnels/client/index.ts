@@ -14,7 +14,11 @@
 
 import type { Inkbox } from "../../inkbox.js";
 import { POOL_SIZE_MAX, POOL_SIZE_MIN } from "../resources/tunnels.js";
-import { TunnelRemoved, TunnelStateConflict } from "../exceptions.js";
+import {
+  TunnelNotProvisioned,
+  TunnelRemoved,
+  TunnelStateConflict,
+} from "../exceptions.js";
 import { validateTunnelName } from "../_validation.js";
 import { TLSMode, Tunnel } from "../types.js";
 import {
@@ -79,17 +83,7 @@ export class InvalidConnectOptions extends Error {
   }
 }
 
-/**
- * Raised by `connect()` when no tunnel exists for the supplied name in
- * the calling org. Tunnels are provisioned atomically as part of
- * `inkbox.createIdentity(...)`; they have no standalone create surface.
- */
-export class TunnelNotProvisioned extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TunnelNotProvisioned";
-  }
-}
+export { TunnelNotProvisioned } from "../exceptions.js";
 
 export interface ConnectOptions {
   /**

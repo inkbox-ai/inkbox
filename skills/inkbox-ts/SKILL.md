@@ -434,7 +434,8 @@ const code = await unlocked.getTotpCode(secretId);
 const mailboxes = await inkbox.mailboxes.list();
 const mailbox   = await inkbox.mailboxes.get("abc@inkboxmail.com");
 
-await inkbox.mailboxes.update(mailbox.emailAddress, { displayName: "New Name" });
+// To rename, use `identity.update({ displayName: "New Name" })` —
+// the mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: "https://example.com/hook" });
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: null });   // remove webhook
 

@@ -51,3 +51,15 @@ export class TunnelCSRStateConflict extends TunnelStateConflict {
     this.name = "TunnelCSRStateConflict";
   }
 }
+
+/**
+ * Raised by `connect()` when no tunnel exists for the supplied name in
+ * the calling org. Tunnels are provisioned atomically as part of
+ * `inkbox.createIdentity(...)`; they have no standalone create surface.
+ */
+export class TunnelNotProvisioned extends TunnelError {
+  constructor(message: string) {
+    super(message);
+    this.name = "TunnelNotProvisioned";
+  }
+}

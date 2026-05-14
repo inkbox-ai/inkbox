@@ -484,7 +484,8 @@ const code = await unlocked.getTotpCode(secretId);
 const mailboxes = await inkbox.mailboxes.list();
 const mailbox   = await inkbox.mailboxes.get("abc@inkboxmail.com");
 
-await inkbox.mailboxes.update(mailbox.emailAddress, { displayName: "New Name" });
+// To rename, use `identity.update({ displayName: "New Name" })` —
+// the mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: "https://example.com/hook" });
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: null });   // remove webhook
 
@@ -499,7 +500,8 @@ if (updated.filterModeChangeNotice) {
 // (platform default or a verified custom domain — see "Custom email domains" below).
 
 const results = await inkbox.mailboxes.search(mailbox.emailAddress, { q: "invoice", limit: 20 });
-await inkbox.mailboxes.delete(mailbox.emailAddress);
+// Mailboxes are atomically provisioned by `createIdentity()` and removed
+// by `identity.delete()` (cascade). There is no standalone create/delete.
 ```
 
 ### Custom email domains (`inkbox.domains`)
@@ -516,18 +518,10 @@ const verified = await inkbox.domains.list({ status: "verified" });
 const newDefault = await inkbox.domains.setDefault("mail.acme.com");
 // Pass the platform domain (e.g. "inkboxmail.com" in prod) to clear the org default.
 
-// Standalone mailbox: pick by domain id.
-await inkbox.mailboxes.create({
-  agentHandle: "sales-bot",
-  sendingDomainId: verified[0].id,        // verified custom domain
-});
-await inkbox.mailboxes.create({
-  agentHandle: "sales-bot",
-  sendingDomainId: null,                  // force platform default
-});
-
-// Identity create: pick by bare domain name (not id).
+// Identity create: pick the mailbox's sending domain by bare name.
+// Omit to inherit the org default; pass `null` to force the platform default.
 await inkbox.createIdentity("sales-bot", { sendingDomain: "mail.acme.com" });
+await inkbox.createIdentity("sales-bot-2", { sendingDomain: null });
 ```
 
 ### Phone Numbers (`inkbox.phoneNumbers`)
@@ -703,7 +697,7 @@ await inkbox.tunnels.signCsr("tunnel-uuid", { csrPem });
 
 Data-plane auth uses the same `apiKey` the `Inkbox` client was constructed with — admin-scoped or identity-scoped (matching the tunnel's identity). Mint a per-agent scoped key via `inkbox.apiKeys.create({ scopedIdentityId })` — there is no per-tunnel secret to rotate.
 
-Confirm with the user before deleting identities on a shared org — `identity.delete()` cascades to the linked mailbox + tunnel and revokes scoped API keys (the handle is reclaimable immediately).
+Confirm with the user before deleting identities on a shared org — `identity.delete()` cascades to the linked mailbox + tunnel and revokes scoped API keys.
 
 For full options and Python examples, see `skills/inkbox-tunnels/SKILL.md`.
 

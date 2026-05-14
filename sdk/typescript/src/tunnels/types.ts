@@ -15,9 +15,9 @@ export enum TLSMode {
  * - `awaiting_cert`: passthrough-only intermediate state. Inbound TLS
  *   will fail until you call `tunnels.signCsr(...)`.
  * - `active`: routable end-to-end.
- * - `deleted`: terminal. The tunnel is offline and its name is
- *   immediately reclaimable. Tunnels are deleted exclusively via the
- *   identity-delete cascade — there is no direct tunnel-delete surface.
+ * - `deleted`: terminal. The tunnel is offline. Tunnels are deleted
+ *   exclusively via the identity-delete cascade — there is no direct
+ *   tunnel-delete surface.
  */
 export enum TunnelStatus {
   AWAITING_CERT = "awaiting_cert",
@@ -33,7 +33,13 @@ export interface Tunnel {
   certPem: string | null;
   certFingerprintSha256: string | null;
   certExpiresAt: Date | null;
-  status: TunnelStatus;
+  /**
+   * One of the known {@link TunnelStatus} values, or — if the server
+   * returns a status the SDK doesn't recognize — the raw string. Future
+   * statuses survive parsing without fail-open coercion; callers should
+   * handle a `string` default branch alongside the enum cases.
+   */
+  status: TunnelStatus | string;
   lastConnectedAt: Date | null;
   lastConnectedIpAddr: string | null;
   currentlyConnected: boolean;
@@ -99,7 +105,7 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
     certPem: raw.cert_pem ?? null,
     certFingerprintSha256: raw.cert_fingerprint_sha256 ?? null,
     certExpiresAt: parseDate(raw.cert_expires_at),
-    status: raw.status as TunnelStatus,
+    status: raw.status,
     lastConnectedAt: parseDate(raw.last_connected_at),
     lastConnectedIpAddr: raw.last_connected_ip_addr ?? null,
     currentlyConnected: Boolean(raw.currently_connected),

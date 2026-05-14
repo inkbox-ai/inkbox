@@ -4,6 +4,7 @@ import { AgentIdentity } from "../src/agent_identity.js";
 import { InkboxError } from "../src/_http.js";
 import type { Inkbox } from "../src/inkbox.js";
 import type { _AgentIdentityData } from "../src/identities/types.js";
+import { TLSMode, TunnelStatus } from "../src/tunnels/types.js";
 import {
   RAW_IDENTITY_DETAIL,
   RAW_IDENTITY_MAILBOX,
@@ -394,6 +395,53 @@ describe("AgentIdentity management", () => {
 
     expect(ink._idsResource.update).toHaveBeenCalledWith("sales-agent", { newHandle: "new-handle" });
     expect(identity.agentHandle).toBe("new-handle");
+  });
+
+  it("update with newHandle refreshes the cached tunnel", async () => {
+    const ink = mockInkbox();
+    const oldTunnel = {
+      id: "tun-1", organizationId: "org-1", tunnelName: "sales-agent",
+      tlsMode: TLSMode.EDGE, certPem: null, certFingerprintSha256: null,
+      certExpiresAt: null, status: TunnelStatus.ACTIVE, lastConnectedAt: null,
+      lastConnectedIpAddr: null, currentlyConnected: false,
+      publicHost: "sales-agent.inkboxwire.com", zone: "inkboxwire.com",
+      metadata: {}, createdAt: new Date(), updatedAt: new Date(),
+    };
+    const renamedTunnel = { ...oldTunnel, tunnelName: "new-handle", publicHost: "new-handle.inkboxwire.com" };
+    vi.mocked(ink._idsResource.update).mockResolvedValue({
+      id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
+      agentHandle: "new-handle",
+      emailAddress: RAW_IDENTITY.email_address,
+      createdAt: RAW_IDENTITY.created_at,
+      updatedAt: RAW_IDENTITY.updated_at,
+    });
+    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({ agentHandle: "new-handle", tunnel: renamedTunnel }));
+    const identity = new AgentIdentity(makeData({ tunnel: oldTunnel }), ink);
+
+    await identity.update({ newHandle: "new-handle" });
+
+    expect(ink._idsResource.get).toHaveBeenCalledWith("new-handle");
+    expect(identity.tunnel?.tunnelName).toBe("new-handle");
+    expect(identity.tunnel?.publicHost).toBe("new-handle.inkboxwire.com");
+  });
+
+  it("update without newHandle does not refresh", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._idsResource.update).mockResolvedValue({
+      id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
+      agentHandle: RAW_IDENTITY.agent_handle,
+      displayName: "New Display",
+      emailAddress: RAW_IDENTITY.email_address,
+      createdAt: RAW_IDENTITY.created_at,
+      updatedAt: RAW_IDENTITY.updated_at,
+    });
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.update({ displayName: "New Display" });
+
+    expect(ink._idsResource.get).not.toHaveBeenCalled();
   });
 
   it("refresh re-fetches identity data", async () => {

@@ -161,8 +161,8 @@ const allIdentities = await inkbox.listIdentities();
 await identity.update({ status: "paused" });
 await identity.update({ newHandle: "sales-bot-v2" });
 
-// Unlink channels (without deleting them)
-await identity.unlinkMailbox();
+// Unlink phone number (without releasing it). Mailbox is 1:1 with the
+// identity and cannot be unlinked — delete the identity instead.
 await identity.unlinkPhoneNumber();
 
 // Delete

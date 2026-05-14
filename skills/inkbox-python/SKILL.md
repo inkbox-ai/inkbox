@@ -411,7 +411,8 @@ code = unlocked.get_totp_code(secret_id)
 mailboxes = inkbox.mailboxes.list()
 mailbox   = inkbox.mailboxes.get("abc@inkboxmail.com")
 
-inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")
+# To rename, use `identity.update(display_name="New Name")` — the
+# mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")
 inkbox.mailboxes.update(mailbox.email_address, webhook_url=None)   # remove webhook
 

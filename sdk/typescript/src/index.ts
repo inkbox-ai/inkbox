@@ -156,6 +156,7 @@ export {
   TunnelCSRStateConflict,
   TunnelError,
   TunnelNameInvalid,
+  TunnelNotProvisioned,
   TunnelRemoved,
   TunnelStateConflict,
   TunnelTLSModeMismatch,
