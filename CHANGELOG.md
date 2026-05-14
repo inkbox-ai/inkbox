@@ -95,6 +95,13 @@ namespace with `tunnel_name`.
   `--description`, `--clear-description`, `--status active|paused`.
 - `examples/use-inkbox-cli/05-tunnel-edge.sh` and
   `06-tunnel-passthrough.sh` (full provisioning + sign-CSR walkthroughs).
+- Response fields that the SDK was previously silently dropping are now
+  surfaced: `IdentityMailbox.webhookUrl` / `webhook_url`,
+  `IdentityPhoneNumber.incomingCallWebhookUrl` /
+  `incoming_call_webhook_url`, and `state` on both `PhoneNumber` and
+  `IdentityPhoneNumber` (2-letter US state abbreviation for LOCAL
+  numbers; `null` for toll-free). The `state` field is also included in
+  `inkbox number get` JSON output.
 
 ### Changed
 

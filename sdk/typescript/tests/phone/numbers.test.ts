@@ -53,6 +53,20 @@ describe("PhoneNumbersResource.get", () => {
 
     expect(number.incomingTextWebhookUrl).toBe("https://example.com/texts");
   });
+
+  it("parses state for local numbers", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      ...RAW_PHONE_NUMBER,
+      type: "local",
+      state: "NY",
+    });
+    const res = new PhoneNumbersResource(http);
+
+    const number = await res.get(NUM_ID);
+
+    expect(number.state).toBe("NY");
+  });
 });
 
 describe("PhoneNumbersResource.update", () => {

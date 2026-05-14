@@ -53,6 +53,18 @@ class TestNumbersGet:
 
         assert number.incoming_text_webhook_url == "https://example.com/texts"
 
+    def test_parses_state_for_local_numbers(self, client, transport):
+        transport.get.return_value = {
+            **PHONE_NUMBER_DICT,
+            "type": "local",
+            "state": "NY",
+        }
+        uid = "aaaa1111-0000-0000-0000-000000000001"
+
+        number = client._numbers.get(uid)
+
+        assert number.state == "NY"
+
 
 class TestNumbersUpdate:
     def test_update_incoming_call_action(self, client, transport):
