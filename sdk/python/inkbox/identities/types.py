@@ -151,6 +151,7 @@ class IdentityMailbox:
 
     id: UUID
     email_address: str
+    webhook_url: str | None
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
@@ -170,6 +171,7 @@ class IdentityMailbox:
             id=UUID(d["id"]),
             email_address=d["email_address"],
             sending_domain=sending_domain,
+            webhook_url=d.get("webhook_url"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
@@ -199,6 +201,7 @@ class IdentityPhoneNumber:
     sms_status: SmsStatus
     incoming_call_action: str
     client_websocket_url: str | None
+    incoming_call_webhook_url: str | None
     incoming_text_webhook_url: str | None
     filter_mode: FilterMode
     created_at: datetime
@@ -206,6 +209,9 @@ class IdentityPhoneNumber:
     sms_error_code: str | None = None
     sms_error_detail: str | None = None
     sms_ready_at: datetime | None = None
+    # 2-letter US state abbreviation for LOCAL numbers (e.g. "NY");
+    # null for TOLL_FREE.
+    state: str | None = None
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
@@ -223,6 +229,7 @@ class IdentityPhoneNumber:
             sms_status=SmsStatus(raw_sms_status) if raw_sms_status else SmsStatus.READY,
             incoming_call_action=d["incoming_call_action"],
             client_websocket_url=d.get("client_websocket_url"),
+            incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
             incoming_text_webhook_url=d.get("incoming_text_webhook_url"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
@@ -232,6 +239,7 @@ class IdentityPhoneNumber:
             sms_ready_at=(
                 datetime.fromisoformat(raw_sms_ready_at) if raw_sms_ready_at else None
             ),
+            state=d.get("state"),
             agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
             filter_mode_change_notice=(
                 FilterModeChangeNotice._from_dict(notice) if notice else None

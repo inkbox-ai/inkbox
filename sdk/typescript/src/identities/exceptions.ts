@@ -35,7 +35,7 @@ export class HandleUnavailableError extends InkboxAPIError {
 /**
  * Inspect a 409 error detail for a `blocking_namespace` field. Returns
  * the parsed value when present, else `null`. (Servers running 1.0+ set
- * this on every `agent_handle_taken` 409 from identity-create or
+ * this on every `agent_handle_unavailable` 409 from identity-create or
  * identity-rename.)
  */
 export function readBlockingNamespace(detail: InkboxAPIErrorDetail): BlockingNamespace {
