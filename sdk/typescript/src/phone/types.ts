@@ -75,6 +75,11 @@ export interface PhoneNumber {
   incomingTextWebhookUrl: string | null;
   filterMode: FilterMode;
   /**
+   * 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`);
+   * `null` for TOLL_FREE.
+   */
+  state: string | null;
+  /**
    * UUID of the owning agent identity, or `null` if the phone number is
    * standalone (not tied to any agent). Always present on every
    * phone-number response shape.
@@ -210,6 +215,7 @@ export interface RawPhoneNumber {
   incoming_call_webhook_url: string | null;
   incoming_text_webhook_url: string | null;
   filter_mode?: string;
+  state?: string | null;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
@@ -327,6 +333,7 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
     incomingTextWebhookUrl: r.incoming_text_webhook_url,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    state: r.state ?? null,
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),

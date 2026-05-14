@@ -69,6 +69,8 @@ export interface IdentityMailbox {
    * Either the platform default or a verified custom domain.
    */
   sendingDomain: string;
+  /** HTTPS webhook URL for mail events, or `null` if not configured. */
+  webhookUrl: string | null;
   filterMode: FilterMode;
   /**
    * UUID of the owning agent identity. Non-null for live customer
@@ -95,8 +97,14 @@ export interface IdentityPhoneNumber {
   /** "auto_accept" | "auto_reject" | "webhook" */
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
+  incomingCallWebhookUrl: string | null;
   incomingTextWebhookUrl: string | null;
   filterMode: FilterMode;
+  /**
+   * 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`);
+   * `null` for TOLL_FREE.
+   */
+  state: string | null;
   /**
    * UUID of the owning agent identity, or `null` if standalone. On the
    * embedded variant this always equals the owning identity's ID.
@@ -136,6 +144,7 @@ export interface RawIdentityMailbox {
   id: string;
   email_address: string;
   sending_domain?: string;
+  webhook_url?: string | null;
   filter_mode?: string;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
@@ -154,8 +163,10 @@ export interface RawIdentityPhoneNumber {
   sms_ready_at?: string | null;
   incoming_call_action: string;
   client_websocket_url: string | null;
+  incoming_call_webhook_url?: string | null;
   incoming_text_webhook_url: string | null;
   filter_mode?: string;
+  state?: string | null;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
@@ -186,6 +197,7 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
     id: r.id,
     emailAddress: r.email_address,
     sendingDomain: r.sending_domain ?? r.email_address.split("@")[1] ?? "",
+    webhookUrl: r.webhook_url ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
@@ -208,8 +220,10 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     smsReadyAt: r.sms_ready_at ? new Date(r.sms_ready_at) : null,
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
+    incomingCallWebhookUrl: r.incoming_call_webhook_url ?? null,
     incomingTextWebhookUrl: r.incoming_text_webhook_url ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    state: r.state ?? null,
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
