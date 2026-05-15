@@ -36,6 +36,7 @@ Inkbox (admin-only client)
 ├── .texts                    → TextsResource
 ├── .mailContactRules         → MailContactRulesResource
 ├── .phoneContactRules        → PhoneContactRulesResource
+├── .smsOptIns                → SmsOptInsResource
 ├── .contacts                 → ContactsResource   (.access, .vcards)
 ├── .notes                    → NotesResource      (.access)
 ├── .vault                    → VaultResource
@@ -187,7 +188,7 @@ for (const t of segments) {
 - Allowed only from **local** numbers, not toll-free.
 - **15 outbound sends per phone number per rolling 24h.**
 - New local numbers need **~10-15 min** for 10DLC carrier propagation. `identity.phoneNumber.smsStatus` is `SmsStatus.PENDING` until ready; sends in this window return `409 sender_sms_pending`.
-- Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`.
+- Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`. Inspect / override consent state via `inkbox.smsOptIns` (see below).
 
 **Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
 
@@ -238,6 +239,26 @@ console.log(readResult.updatedCount);
 // Admin-only: search, update, delete
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
 await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
+```
+
+## SMS Opt-Ins
+
+Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The registry is updated automatically when recipients text `START` / `STOP` to any of your numbers (`source: "sms"`). Reads are admin-only; writes are admin-only **and** require your org to be on its own actively-used 10DLC campaign (Inkbox-default-campaign orgs share consent across the pool and get `409 customer_campaign_required` on writes — `source: "api"` writes record an audit event).
+
+```typescript
+import { SmsOptInStatus } from "@inkbox/sdk";
+
+// List your org's consent rows, newest-updated first (server caps limit at 200)
+const rows = await inkbox.smsOptIns.list({ limit: 50 });
+const optedOut = await inkbox.smsOptIns.list({ status: SmsOptInStatus.OPTED_OUT });
+
+// Look up one recipient — 404 → InkboxAPIError if no row exists
+const row = await inkbox.smsOptIns.get("+15167251294");
+console.log(row.status, row.source, row.optedInAt, row.optedOutAt);
+
+// Programmatic writes (customer-managed 10DLC campaign only)
+await inkbox.smsOptIns.optIn("+15167251294");
+await inkbox.smsOptIns.optOut("+15167251294");
 ```
 
 ## Vault

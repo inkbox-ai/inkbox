@@ -288,7 +288,7 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 - Outbound SMS is currently allowed only from **local** numbers, not toll-free.
 - Each sender phone number is rate-limited to **15 outbound texts per rolling 24-hour window**.
 - A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phoneNumber.smsStatus` reads `"pending"` until then, and sends will return `409 sender_sms_pending`.
-- The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`.
+- The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`. You can inspect consent state directly via `inkbox.smsOptIns` — see [SMS Opt-Ins](#sms-opt-ins).
 
 **Coming soon:**
 
@@ -338,6 +338,41 @@ await identity.markTextConversationRead("+15167251294");
 // Org-level: search and delete
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
 await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
+```
+
+---
+
+## SMS Opt-Ins
+
+Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The
+registry is updated automatically when recipients text `START` / `STOP` to any
+of your numbers (`source: "sms"`).
+
+**Reads** — open to admin API keys and Clerk JWT.
+
+```ts
+import { SmsOptInStatus } from "@inkbox/sdk";
+
+// List the org's consent rows (newest-updated first; server caps limit at 200)
+const rows = await inkbox.smsOptIns.list({ limit: 50 });
+const optedOut = await inkbox.smsOptIns.list({ status: SmsOptInStatus.OPTED_OUT });
+
+// Look up one recipient — 404 → InkboxAPIError if no row exists
+const row = await inkbox.smsOptIns.get("+15167251294");
+console.log(row.status, row.source, row.optedInAt, row.optedOutAt);
+```
+
+**Writes** — admin-only, and only if your org runs its own actively-used 10DLC
+campaign. Orgs on the Inkbox-default campaign share consent state and get a
+`409 customer_campaign_required` on write attempts. Writes record an audit
+event with `source: "api"`.
+
+```ts
+// Record consent captured outside of STOP/START (signup form, paper waiver, etc.)
+await inkbox.smsOptIns.optIn("+15167251294");
+
+// Honor an opt-out collected outside of inbound STOP
+await inkbox.smsOptIns.optOut("+15167251294");
 ```
 
 ---
