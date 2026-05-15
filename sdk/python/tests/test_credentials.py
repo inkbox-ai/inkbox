@@ -174,12 +174,14 @@ def _identity(*, vault_unlocked=True, access_rules=None):
         id=UUID(IDENTITY_ID),
         organization_id="org_test_123",
         agent_handle="test-bot",
-    
+        display_name=None,
+        description=None,
         email_address="test-bot@inkboxmail.com",
         created_at=datetime(2026, 1, 1),
         updated_at=datetime(2026, 1, 1),
         mailbox=None,
         phone_number=None,
+        tunnel=None,
     )
 
     # Wire up VaultResource with stored unlocked vault
@@ -230,12 +232,14 @@ class TestAgentIdentityCredentials:
             id=UUID(IDENTITY_ID),
             organization_id="org_test_123",
             agent_handle="test-bot",
-        
+            display_name=None,
+            description=None,
             email_address="test-bot@inkboxmail.com",
             created_at=datetime(2026, 1, 1),
             updated_at=datetime(2026, 1, 1),
             mailbox=None,
             phone_number=None,
+            tunnel=None,
             )
         identity.refresh()
         assert identity._credentials is None

@@ -127,18 +127,27 @@ console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (cl
 
 ```ts
 // Create and fully provision an identity
-const identity = await inkbox.createIdentity("sales-bot", { displayName: "Sales Bot" });
-const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });      // provisions + links
+// createIdentity atomically provisions the mailbox AND the tunnel —
+// both come back on the response. Phone numbers stay opt-in.
+const identity = await inkbox.createIdentity("sales-bot", {
+  displayName: "Sales Bot",
+  description: "Sales-outreach agent",
+});
+const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });
 
-console.log(identity.emailAddress);
+console.log(identity.emailAddress);            // sales-bot@inkboxmail.com
+console.log(identity.tunnel?.publicHost);      // sales-bot.inkboxwire.com
 console.log(phone.number);
 
 // Pin the identity's mailbox to a verified custom sending domain
 // (bare name; see "Custom Sending Domains" below).
-await inkbox.createIdentity("sales-bot", { sendingDomain: "mail.acme.com" });
+await inkbox.createIdentity("sales-bot-2", { sendingDomain: "mail.acme.com" });
 
-// Link an existing mailbox or phone number instead of creating new ones
-await identity.assignMailbox("mailbox-uuid-here");
+// Provision a passthrough tunnel (tls_mode is fixed at create time)
+await inkbox.createIdentity("sales-bot-pt", { tunnel: { tlsMode: "passthrough" } });
+
+// Link an existing phone number to an identity (mailbox + tunnel are
+// 1:1 with their identity and cannot be relinked).
 await identity.assignPhoneNumber("phone-number-uuid-here");
 
 // Get an existing identity (returned with current channel state)
@@ -152,8 +161,8 @@ const allIdentities = await inkbox.listIdentities();
 await identity.update({ status: "paused" });
 await identity.update({ newHandle: "sales-bot-v2" });
 
-// Unlink channels (without deleting them)
-await identity.unlinkMailbox();
+// Unlink phone number (without releasing it). Mailbox is 1:1 with the
+// identity and cannot be unlinked — delete the identity instead.
 await identity.unlinkPhoneNumber();
 
 // Delete
@@ -553,31 +562,26 @@ for (const t of segments) {
 
 ## Org-level Mailboxes
 
-Manage mailboxes directly without going through an identity. Access via `inkbox.mailboxes`.
+Mailboxes are provisioned atomically by `inkbox.createIdentity(...)` and
+removed by `identity.delete()` (cascade). The `inkbox.mailboxes`
+surface is read + update + search only.
 
 ```ts
 // List all mailboxes in the organisation
 const mailboxes = await inkbox.mailboxes.list();
 
 // Get a specific mailbox
-const mailbox = await inkbox.mailboxes.get("abc-xyz@inkboxmail.com");
-
-// Create a mailbox linked to an agent identity
-const mb = await inkbox.mailboxes.create({
-  agentHandle: "support-agent",
-  displayName: "Support Inbox",
-});
+const mb = await inkbox.mailboxes.get("abc-xyz@inkboxmail.com");
 console.log(mb.emailAddress);
 console.log(mb.sendingDomain);  // bare domain the mailbox sends from
+console.log(mb.agentIdentityId); // non-null for live customer mailboxes (1:1 invariant)
 
-// Pin a new mailbox to a verified custom sending domain (or platform default)
-await inkbox.mailboxes.create({ agentHandle: "support-agent", sendingDomainId: "sending_domain_<uuid>" });
-await inkbox.mailboxes.create({ agentHandle: "support-agent", sendingDomainId: null }); // force platform
-
-// Update display name or webhook URL
-await inkbox.mailboxes.update(mb.emailAddress, { displayName: "New Name" });
+// Update webhook URL or filter mode. Note: display_name has moved to
+// the agent identity — set it via identity.update({ displayName: ... }).
+// The mailbox PATCH endpoint hard-rejects display_name with a 422.
 await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: "https://example.com/hook" });
 await inkbox.mailboxes.update(mb.emailAddress, { webhookUrl: null }); // remove webhook
+await inkbox.mailboxes.update(mb.emailAddress, { filterMode: "whitelist" }); // admin-scoped key only
 
 // Full-text search across messages in a mailbox
 const results = await inkbox.mailboxes.search(mb.emailAddress, { q: "invoice", limit: 20 });
@@ -585,15 +589,16 @@ for (const msg of results) {
   console.log(msg.subject, msg.fromAddress);
 }
 
-// Delete a mailbox
-await inkbox.mailboxes.delete(mb.emailAddress);
+// To remove a mailbox, delete its owning identity (cascades to the
+// linked mailbox AND tunnel; revokes scoped API keys):
+await (await inkbox.getIdentity("support-agent")).delete();
 ```
 
 ---
 
 ## Custom Sending Domains
 
-If your org has registered custom sending domains in the console, list them and (admin-only) set the org default. New mailboxes inherit the org default unless you pass `sendingDomainId` (`mailboxes.create`) or `sendingDomain` (`createIdentity`). Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
+If your org has registered custom sending domains in the console, list them and (admin-only) set the org default. New mailboxes inherit the org default unless you pass `sendingDomain` to `createIdentity`. Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
 
 ```ts
 import { SendingDomainStatus } from "@inkbox/sdk";

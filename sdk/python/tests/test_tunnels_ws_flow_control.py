@@ -51,7 +51,7 @@ def _make_runtime() -> TunnelRuntime:
     from uuid import uuid4
     return TunnelRuntime(
         tunnel_id=uuid4(),
-        secret="sec",
+        api_key="ApiKey_test",
         zone="inkboxwire.example",
         public_host="my-agent.inkboxwire.example",
         pool_size=1,

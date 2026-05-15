@@ -14,19 +14,15 @@ command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required (https://jqlang.g
 cleanup() {
   echo ""
   echo "=> Cleaning up..."
-  inkbox mailbox delete "${HANDLE}@inkbox.ai" 2>/dev/null || true
+  # identity delete cascades to the linked mailbox + tunnel
   inkbox identity delete "$HANDLE" 2>/dev/null || true
   echo "   Done."
 }
 trap cleanup EXIT
 
 # --- workflow ---
-echo "=> Creating identity: $HANDLE"
+echo "=> Creating identity: $HANDLE (mailbox + tunnel provisioned atomically)"
 inkbox identity create "$HANDLE"
-
-echo ""
-echo "=> Creating mailbox for $HANDLE"
-inkbox mailbox create --handle "$HANDLE"
 
 echo ""
 echo "=> Sending a test email"

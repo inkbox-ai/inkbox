@@ -6,7 +6,7 @@
  * loadState parse-error paths.
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -15,7 +15,6 @@ import {
   defaultStateDir,
   ensurePrivateStateDir,
   loadState,
-  printSecretOnce,
   saveState,
   writePrivateFile,
 } from "../../src/tunnels/client/_state.js";
@@ -76,10 +75,20 @@ describe("loadState parse-error paths", () => {
     });
     const loaded = loadState(tmpDir);
     expect(loaded).not.toBeNull();
-    expect(loaded!.secret).toBeNull();
     expect(loaded!.mode).toBeNull();
     expect(loaded!.zone).toBeNull();
     expect(loaded!.publicHost).toBeNull();
+  });
+
+  it("ignores a legacy 'secret' field on disk (pre-0.4.0 SDKs persisted one)", () => {
+    fs.mkdirSync(tmpDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "state.json"),
+      JSON.stringify({ tunnel_id: "abc", name: "n", secret: "legacy-sek" }),
+    );
+    const loaded = loadState(tmpDir);
+    expect(loaded).not.toBeNull();
+    expect((loaded as unknown as Record<string, unknown>).secret).toBeUndefined();
   });
 });
 
@@ -102,71 +111,6 @@ describe("writePrivateFile", () => {
   });
 });
 
-describe("printSecretOnce", () => {
-  it("prints the banner to stderr when forced on", () => {
-    const writes: string[] = [];
-    const spy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation(((chunk: unknown) => {
-        writes.push(String(chunk));
-        return true;
-      }) as unknown as typeof process.stderr.write);
-    printSecretOnce({
-      secret: "sek-123",
-      statePath: "/tmp/x/state.json",
-      printToStderr: true,
-    });
-    spy.mockRestore();
-    const out = writes.join("");
-    expect(out).toContain("ONE-TIME connect_secret disclosure");
-    expect(out).toContain("sek-123");
-  });
-
-  it("is a no-op when printToStderr=false", () => {
-    let wrote = false;
-    const spy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation((() => {
-        wrote = true;
-        return true;
-      }) as unknown as typeof process.stderr.write);
-    printSecretOnce({
-      secret: "sek",
-      statePath: "/tmp/x",
-      printToStderr: false,
-    });
-    spy.mockRestore();
-    expect(wrote).toBe(false);
-  });
-
-  it("falls back to TTY check when printToStderr is null", () => {
-    // process.stderr.isTTY may be undefined in vitest; accept either no-op
-    // or printed-banner. The branch under test is the TTY-gated default.
-    const original = process.stderr.isTTY;
-    Object.defineProperty(process.stderr, "isTTY", {
-      configurable: true,
-      get: () => false,
-    });
-    let wrote = false;
-    const spy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation((() => {
-        wrote = true;
-        return true;
-      }) as unknown as typeof process.stderr.write);
-    printSecretOnce({
-      secret: "sek",
-      statePath: "/tmp/x",
-      printToStderr: null,
-    });
-    spy.mockRestore();
-    Object.defineProperty(process.stderr, "isTTY", {
-      configurable: true,
-      get: () => original,
-    });
-    expect(wrote).toBe(false);
-  });
-});
 
 describe("defaultStateDir", () => {
   it("returns ~/.inkbox/tunnels/{name}", () => {

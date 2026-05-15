@@ -1,8 +1,8 @@
 """
 inkbox/tunnels/client/_state.py
 
-Hardened on-disk persistence for the tunnel state file (tunnel_id, secret,
-zone, public_host, mode) and for the passthrough keypair / cert chain.
+Hardened on-disk persistence for the tunnel state file (tunnel_id, zone,
+public_host, mode) and for the passthrough keypair / cert chain.
 
 The directory layout is:
 
@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import os
 import stat as _stat
-import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,10 +39,14 @@ class TunnelStateError(RuntimeError):
 
 @dataclass(frozen=True)
 class StateEntry:
-    """Parsed contents of ``state.json`` (forward-compatible)."""
+    """Parsed contents of ``state.json`` (forward-compatible).
+
+    Pre-0.4.0 SDKs persisted the per-tunnel ``connect_secret`` here; the
+    field is ignored on read and never written. Data-plane authentication
+    now uses the client's API key.
+    """
     tunnel_id: str
     name: str
-    secret: str | None
     mode: str | None
     zone: str | None
     public_host: str | None
@@ -53,7 +56,6 @@ class StateEntry:
         return cls(
             tunnel_id=str(data.get("tunnel_id", "")),
             name=str(data.get("name", "")),
-            secret=data.get("secret"),
             mode=data.get("mode"),
             zone=data.get("zone"),
             public_host=data.get("public_host"),
@@ -64,8 +66,6 @@ class StateEntry:
             "tunnel_id": self.tunnel_id,
             "name": self.name,
         }
-        if self.secret is not None:
-            out["secret"] = self.secret
         if self.mode is not None:
             out["mode"] = self.mode
         if self.zone is not None:
@@ -76,16 +76,8 @@ class StateEntry:
 
 
 def ensure_private_state_dir(state_dir: Path) -> None:
-    """Create ``state_dir`` (mode 0o700) and refuse symlinked targets.
-
-    The directory is created with ``mkdir`` (mode 0o700, ignoring umask
-    semantics). If it already exists, ``lstat`` is checked: a symlink at
-    ``state_dir`` is rejected (it's a privilege-escalation vector when
-    the SDK runs as root). Mode is re-asserted on every call.
-    """
+    """Create ``state_dir`` (mode 0o700) and refuse symlinked targets."""
     if state_dir.exists() or state_dir.is_symlink():
-        # ``lstat`` does not follow symlinks; this catches the case where
-        # ``state_dir`` is itself a symlink to somewhere world-writable.
         st = os.lstat(state_dir)
         if _stat.S_ISLNK(st.st_mode):
             raise TunnelStateError(
@@ -157,41 +149,3 @@ def _atomic_write(target: Path, content: bytes) -> None:
         os.chmod(target, 0o600)
     except OSError:
         pass
-
-
-def print_secret_once(
-    *,
-    secret: str,
-    state_path: Path,
-    print_to_stderr: bool | None,
-) -> None:
-    """One-time disclosure of the connect secret.
-
-    TTY-gated by default: prints to stderr only when ``stderr.isatty()``
-    is true (interactive runs). Container/daemon/CI runs get only the
-    INFO breadcrumb pointing at the on-disk state file.
-
-    Args:
-        secret: The plaintext connect secret.
-        state_path: Path the secret has been persisted to.
-        print_to_stderr: ``None`` => auto (tty-gated); ``True`` => always;
-            ``False`` => never.
-    """
-    if print_to_stderr is None:
-        try:
-            print_to_stderr = bool(sys.stderr.isatty())
-        except (AttributeError, ValueError):
-            print_to_stderr = False
-    if not print_to_stderr:
-        return
-    banner = (
-        "\n"
-        "=================================================================\n"
-        "  Inkbox tunnel: ONE-TIME connect_secret disclosure\n"
-        "  This will not appear on subsequent runs.\n"
-        f"  Secret persisted at: {state_path} (chmod 600)\n"
-        "=================================================================\n"
-        f"  connect_secret = {secret}\n"
-        "=================================================================\n"
-    )
-    print(banner, file=sys.stderr, flush=True)

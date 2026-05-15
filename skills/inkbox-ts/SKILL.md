@@ -77,20 +77,22 @@ await identity.delete();                             // unlinks channels
 ## Channel Management
 
 ```typescript
-// Identity is created with a mailbox automatically — provision a phone number
-const phone = await identity.provisionPhoneNumber({ type: "toll_free" });   // or type: "local", state: "NY"
+// Identity is created with a mailbox AND tunnel atomically — both are on the response
+console.log(identity.emailAddress);            // e.g. "sales-agent@inkboxmail.com"
+console.log(identity.tunnel?.publicHost);      // e.g. "sales-agent.inkboxwire.com"
 
-console.log(identity.emailAddress);  // e.g. "sales-agent@inkboxmail.com"
-console.log(phone.number);           // e.g. "+18005551234"
+// Phone numbers are still opt-in
+const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
+console.log(phone.number);                     // e.g. "+18005551234"
 
-// Link existing channels
-await identity.assignMailbox("mailbox-uuid");
+// Existing phone number? Link it instead:
 await identity.assignPhoneNumber("phone-number-uuid");
 
-// Unlink without deleting
-await identity.unlinkMailbox();
+// Unlink the phone number without releasing it
 await identity.unlinkPhoneNumber();
 ```
+
+Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.createIdentity()` to provision both; use `identity.delete()` to remove both (cascade).
 
 ## Mail
 
@@ -432,7 +434,8 @@ const code = await unlocked.getTotpCode(secretId);
 const mailboxes = await inkbox.mailboxes.list();
 const mailbox   = await inkbox.mailboxes.get("abc@inkboxmail.com");
 
-await inkbox.mailboxes.update(mailbox.emailAddress, { displayName: "New Name" });
+// To rename, use `identity.update({ displayName: "New Name" })` —
+// the mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: "https://example.com/hook" });
 await inkbox.mailboxes.update(mailbox.emailAddress, { webhookUrl: null });   // remove webhook
 
@@ -451,7 +454,8 @@ if (updated.filterModeChangeNotice) {
 // (platform default or a verified custom domain — see "Custom email domains" below).
 
 const results = await inkbox.mailboxes.search(mailbox.emailAddress, { q: "invoice", limit: 20 });
-await inkbox.mailboxes.delete(mailbox.emailAddress);
+// Mailboxes are deleted via the owning identity's cascade — there is no standalone delete:
+//   await identity.delete();  // removes the mailbox + tunnel atomically (cascade)
 ```
 
 ### Custom email domains (`inkbox.domains`)
@@ -470,18 +474,11 @@ const verified = await inkbox.domains.list({ status: SendingDomainStatus.VERIFIE
 const newDefault = await inkbox.domains.setDefault("mail.acme.com");
 // Pass the platform domain (e.g. "inkboxmail.com" in prod) to clear the org default.
 
-// Standalone mailbox: pick by domain id.
-await inkbox.mailboxes.create({
-  agentHandle: "sales-bot",
-  sendingDomainId: verified[0].id,        // verified custom domain
-});
-await inkbox.mailboxes.create({
-  agentHandle: "sales-bot",
-  sendingDomainId: null,                  // force platform default
-});
-
 // Identity create: pick by bare domain name (not id).
 await inkbox.createIdentity("sales-bot", { sendingDomain: "mail.acme.com" });
+// Force the platform default:
+await inkbox.createIdentity("sales-bot-2", { sendingDomain: null });
+// Standalone mailbox creation is gone — provision via createIdentity above.
 ```
 
 ### Phone Numbers (`inkbox.phoneNumbers`)
@@ -688,26 +685,29 @@ const wsHandler: InkboxWsHandler = async (ws) => {
 await connect(inkbox, { name: "my-app", handler, wsHandler });
 
 // Passthrough TLS (SDK terminates; cert auto-signed via the control plane)
+// Set tls_mode when you create the identity — it's fixed at create time.
+await inkbox.createIdentity("my-app", { tunnel: { tlsMode: "passthrough" } });
 await connect(inkbox, {
   name: "my-app",
-  tlsMode: "passthrough",
   forwardTo: "http://127.0.0.1:8080",
 });
 ```
 
-CRUD:
+Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `rotateSecret` surface.
+
+Reads + edit:
 
 ```typescript
 await inkbox.tunnels.list();
 await inkbox.tunnels.get("tunnel-uuid");
-const created = await inkbox.tunnels.create({ tunnelName: "my-app", tlsMode: "edge" });
-console.log(created.connectSecret);            // returned ONCE — save it
-await inkbox.tunnels.delete("tunnel-uuid");    // → pending_removal (24h grace)
-await inkbox.tunnels.restore("tunnel-uuid");
-await inkbox.tunnels.rotateSecret("tunnel-uuid");
+await inkbox.tunnels.update("tunnel-uuid", {
+  metadata: { team: "gtm" },
+});
+// Passthrough only:
+await inkbox.tunnels.signCsr("tunnel-uuid", { csrPem });
 ```
 
-Selected `connect()` options: `poolSize` (1–32), `stateDir` (default `~/.inkbox/tunnels/{name}`), `onStatus` callback, `allowRemoteForwarding: false` (loopback-only allowlist), `forwardToVerifyTls: true`, `forwardToCaBundle`. The state dir holds the connect secret and (in passthrough) the private key — treat it like an SSH key dir.
+Data-plane auth uses the same `apiKey` the `Inkbox` client was constructed with — admin-scoped or identity-scoped (matching the tunnel's identity). Mint a per-agent identity-scoped key via `inkbox.apiKeys.create({ scopedIdentityId })`. Selected `connect()` options: `poolSize` (1–32), `stateDir` (default `~/.inkbox/tunnels/{name}`), `onStatus` callback, `allowRemoteForwarding: false` (loopback-only allowlist), `forwardToVerifyTls: true`, `forwardToCaBundle`. In passthrough mode the state dir holds the per-tunnel private key — treat it like an SSH key dir.
 
 For full options, lifecycle notes, and Python examples, see `skills/inkbox-tunnels/SKILL.md`.
 

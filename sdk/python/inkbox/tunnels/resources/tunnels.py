@@ -1,7 +1,10 @@
 """
 inkbox/tunnels/resources/tunnels.py
 
-Control-plane CRUD for tunnels. Wraps ``/api/v1/tunnels/*``.
+Control-plane reads + update + sign-csr for tunnels. Tunnels are created
+and deleted exclusively via identity-create / identity-delete cascades;
+there is no standalone create / delete / restore / force-delete /
+rotate-secret surface.
 """
 
 from __future__ import annotations
@@ -10,20 +13,12 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from inkbox.exceptions import InkboxAPIError
-from inkbox.tunnels._validation import validate_tunnel_name
 from inkbox.tunnels.exceptions import (
     TunnelCSRStateConflict,
-    TunnelNameUnavailable,
     TunnelStateConflict,
     TunnelTLSModeMismatch,
 )
-from inkbox.tunnels.types import (
-    CreatedTunnel,
-    RotatedSecret,
-    SignedCert,
-    TLSMode,
-    Tunnel,
-)
+from inkbox.tunnels.types import SignedCert, Tunnel
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -47,46 +42,29 @@ def _detail_text(detail: Any) -> str:
     if isinstance(detail, str):
         return detail
     if isinstance(detail, dict):
-        # The server's tunnel routes still emit string ``detail`` for 409s,
-        # but tolerate dicts with a ``detail`` key just in case.
         inner = detail.get("detail")
         if isinstance(inner, str):
             return inner
     return str(detail)
 
 
-def _map_create_error(err: InkboxAPIError) -> Exception:
-    if err.status_code == 409:
-        return TunnelNameUnavailable(status_code=err.status_code, detail=err.detail)
-    return err
-
-
-def _map_state_error(err: InkboxAPIError) -> Exception:
-    if err.status_code == 409:
-        return TunnelStateConflict(status_code=err.status_code, detail=err.detail)
-    return err
-
-
 def _map_sign_csr_error(err: InkboxAPIError) -> Exception:
     if err.status_code != 409:
         return err
     text = _detail_text(err.detail).lower()
-    # Server emits two distinct 409s: TLS-mode mismatch (edge tunnel) vs.
-    # state conflict (e.g. tunnel already in pending_removal).
     if "edge" in text or "tls_mode" in text or "passthrough" in text:
         return TunnelTLSModeMismatch(status_code=err.status_code, detail=err.detail)
     return TunnelCSRStateConflict(status_code=err.status_code, detail=err.detail)
 
 
 class TunnelsResource:
-    """CRUD wrapper for ``/api/v1/tunnels/*`` plus the ``connect()`` data-plane entry point."""
+    """Read + edit wrapper for ``/api/v1/tunnels/*`` plus the
+    ``connect()`` data-plane entry point. Tunnel lifecycle is owned by
+    identity-create / identity-delete; there is no create / delete /
+    restore / force-delete / rotate-secret surface here."""
 
     def __init__(self, http: HttpTransport, *, inkbox: Any | None = None) -> None:
         self._http = http
-        # Reference back to the Inkbox client. Set by Inkbox.__init__
-        # after construction so connect() can call out to the full SDK
-        # surface (e.g. signing CSRs via the resource-level wrappers
-        # rather than re-implementing them).
         self._inkbox = inkbox
 
     # --- Reads -----------------------------------------------------------
@@ -94,7 +72,6 @@ class TunnelsResource:
     def list(self) -> list[Tunnel]:
         """List all tunnels for your organisation."""
         data = self._http.get(_BASE + "/")
-        # Server returns ``{"tunnels": [...]}``.
         if isinstance(data, dict) and "tunnels" in data:
             items = data["tunnels"]
         else:
@@ -108,111 +85,28 @@ class TunnelsResource:
 
     # --- Writes ----------------------------------------------------------
 
-    def create(
-        self,
-        *,
-        tunnel_name: str,
-        tls_mode: TLSMode | str = TLSMode.EDGE,
-        description: str | None = None,
-    ) -> CreatedTunnel:
-        """Create a new tunnel.
-
-        Args:
-            tunnel_name: Customer-chosen subdomain label. Must be 3-63 chars,
-                lowercase a-z / 0-9 / hyphens, start and end with an
-                alphanumeric, no consecutive hyphens.
-            tls_mode: ``"edge"`` (default — Inkbox terminates TLS) or
-                ``"passthrough"`` (you terminate TLS in your own client).
-                Fixed at creation; cannot be changed later.
-            description: Free-form description, visible only to your org.
-
-        Returns:
-            A :class:`CreatedTunnel` carrying the parsed ``tunnel`` and the
-            one-shot ``connect_secret``. **Persist the secret immediately;
-            the server stores only a hash and cannot recover it.**
-
-        Raises:
-            TunnelNameInvalid: Local validation failed (regex/length).
-            TunnelNameUnavailable: 409 — name is taken or reserved.
-        """
-        validate_tunnel_name(tunnel_name)
-        body: dict[str, Any] = {
-            "tunnel_name": tunnel_name,
-            "tls_mode": tls_mode.value if isinstance(tls_mode, TLSMode) else tls_mode,
-        }
-        if description is not None:
-            body["description"] = description
-        try:
-            data = self._http.post(_BASE + "/", json=body)
-        except InkboxAPIError as err:
-            raise _map_create_error(err) from err
-        return CreatedTunnel._from_dict(data)
-
     def update(
         self,
         tunnel_id: UUID | str,
         *,
-        description: str | None = _UNSET,  # type: ignore[assignment]
         metadata: dict[str, Any] | None = _UNSET,  # type: ignore[assignment]
     ) -> Tunnel:
-        """Update a tunnel.
+        """Update a tunnel's metadata.
 
-        Pass only the fields you want to change; omitted fields are left
-        as-is.
+        ``metadata`` is the only mutable field on the tunnel; other
+        attributes are derived from the owning identity.
 
-        - ``description=None`` clears the description.
         - ``metadata={}`` and ``metadata=None`` both clear to ``{}``
           (the server's column is non-nullable; both forms collapse on
           the wire).
         """
         body: dict[str, Any] = {}
-        if description is not _UNSET:
-            body["description"] = description
         if metadata is not _UNSET:
             if metadata is not None and not isinstance(metadata, dict):
                 raise ValueError("metadata must be a dict or None")
             body["metadata"] = metadata
         data = self._http.patch(f"{_BASE}/{tunnel_id}", json=body)
         return Tunnel._from_dict(data)
-
-    def delete(self, tunnel_id: UUID | str) -> Tunnel:
-        """Schedule a tunnel for removal.
-
-        The name is held for 24 hours, during which :meth:`restore` brings
-        it back online. After 24 hours the tunnel is removed and the name
-        is released.
-        """
-        data = self._http.delete_with_response(f"{_BASE}/{tunnel_id}")
-        return Tunnel._from_dict(data)
-
-    def restore(self, tunnel_id: UUID | str) -> Tunnel:
-        """Bring a scheduled-for-removal tunnel back online."""
-        try:
-            data = self._http.post(f"{_BASE}/{tunnel_id}/restore")
-        except InkboxAPIError as err:
-            raise _map_state_error(err) from err
-        return Tunnel._from_dict(data)
-
-    def force_delete(self, tunnel_id: UUID | str) -> Tunnel:
-        """Remove a scheduled-for-removal tunnel immediately, skipping the 24-hour window.
-
-        Requires an admin-scoped API key.
-        """
-        try:
-            data = self._http.delete_with_response(f"{_BASE}/{tunnel_id}/force")
-        except InkboxAPIError as err:
-            raise _map_state_error(err) from err
-        return Tunnel._from_dict(data)
-
-    def rotate_secret(self, tunnel_id: UUID | str) -> RotatedSecret:
-        """Rotate the per-tunnel connect secret.
-
-        The new secret takes effect on the next agent reconnect (idle drop,
-        deploy roll, network blip). Existing live connections continue
-        serving traffic with the old secret until they reconnect.
-        """
-        data = self._http.post(f"{_BASE}/{tunnel_id}/rotate-secret")
-        return RotatedSecret._from_dict(data)
 
     def sign_csr(
         self,
@@ -258,3 +152,13 @@ class TunnelsResource:
         from inkbox.tunnels.client import connect as _connect
 
         return _connect(self._inkbox, **kwargs)
+
+
+# Reference imports to silence unused-import warnings on the surviving
+# exception surface (still exported through the package __init__).
+__all__ = [
+    "POOL_SIZE_MAX",
+    "POOL_SIZE_MIN",
+    "TunnelStateConflict",
+    "TunnelsResource",
+]

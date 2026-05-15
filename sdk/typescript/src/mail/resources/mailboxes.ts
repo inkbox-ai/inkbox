@@ -1,7 +1,9 @@
 /**
  * inkbox-mail/resources/mailboxes.ts
  *
- * Mailbox CRUD and full-text search.
+ * Mailbox read + update + full-text search. Mailboxes are created and
+ * deleted exclusively via identity-create / identity-delete cascades —
+ * there is no standalone mailbox create or delete surface.
  */
 
 import { HttpTransport } from "../../_http.js";
@@ -38,54 +40,23 @@ export class MailboxesResource {
   }
 
   /**
-   * Create and link a mailbox to an existing identity.
-   *
-   * @param options.agentHandle - Handle of the identity that should own the mailbox.
-   * @param options.displayName - Optional human-readable sender name.
-   * @param options.emailLocalPart - Optional requested local part. If omitted,
-   *   the server generates a random address.
-   * @param options.sendingDomainId - Optional sending-domain selector (the
-   *   row id, e.g. `"sending_domain_<uuid>"`). Omit to use the org's default
-   *   custom domain (or fall through to the platform default if none).
-   *   Pass `null` to force the platform default. Pass a verified domain's id
-   *   to bind this mailbox to it.
-   */
-  async create(options: {
-    agentHandle: string;
-    displayName?: string;
-    emailLocalPart?: string;
-    sendingDomainId?: string | null;
-  }): Promise<Mailbox> {
-    const body: Record<string, unknown> = { agent_handle: options.agentHandle };
-    if (options.displayName !== undefined) body["display_name"] = options.displayName;
-    if (options.emailLocalPart !== undefined) body["email_local_part"] = options.emailLocalPart;
-    if ("sendingDomainId" in options) body["sending_domain_id"] = options.sendingDomainId;
-    const data = await this.http.post<RawMailbox>(BASE, body);
-    return parseMailbox(data);
-  }
-
-  /**
    * Update mutable mailbox fields.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
    * Pass `webhookUrl: null` to unsubscribe from webhooks.
    *
    * @param emailAddress - Full email address of the mailbox to update.
-   * @param options.displayName - New human-readable sender name.
    * @param options.webhookUrl - HTTPS URL to receive webhook events, or `null` to unsubscribe.
+   * @param options.filterMode - Contact-rule filter mode. Mutation requires an admin-scoped key.
    */
   async update(
     emailAddress: string,
     options: {
-      displayName?: string;
       webhookUrl?: string | null;
       filterMode?: FilterMode;
     },
   ): Promise<Mailbox> {
     const body: Record<string, unknown> = {};
-    if (options.displayName !== undefined) {
-      body["display_name"] = options.displayName;
-    }
     if ("webhookUrl" in options) {
       body["webhook_url"] = options.webhookUrl;
     }
@@ -94,15 +65,6 @@ export class MailboxesResource {
     }
     const data = await this.http.patch<RawMailbox>(`${BASE}/${emailAddress}`, body);
     return parseMailbox(data);
-  }
-
-  /**
-   * Delete a mailbox.
-   *
-   * @param emailAddress - Full email address of the mailbox to delete.
-   */
-  async delete(emailAddress: string): Promise<void> {
-    await this.http.delete(`${BASE}/${emailAddress}`);
   }
 
   /**

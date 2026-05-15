@@ -1,10 +1,8 @@
 """
-inkbox.tunnels — Tunnels SDK surface (CRUD + data-plane connect).
+inkbox.tunnels — Tunnels SDK surface (read/update + data-plane connect).
 """
 
 from inkbox.tunnels.types import (
-    CreatedTunnel,
-    RotatedSecret,
     SignedCert,
     TLSMode,
     Tunnel,
@@ -14,17 +12,19 @@ from inkbox.tunnels.exceptions import (
     TunnelCSRStateConflict,
     TunnelError,
     TunnelNameInvalid,
-    TunnelNameUnavailable,
+    TunnelNotProvisioned,
     TunnelRemoved,
-    TunnelSecretUnavailable,
     TunnelStateConflict,
     TunnelTLSModeMismatch,
+)
+from inkbox.tunnels._validation import (
+    normalize_agent_handle,
+    validate_agent_handle,
+    validate_tunnel_name,
 )
 from inkbox.tunnels.resources.tunnels import TunnelsResource
 
 __all__ = [
-    "CreatedTunnel",
-    "RotatedSecret",
     "SignedCert",
     "TLSMode",
     "Tunnel",
@@ -33,9 +33,11 @@ __all__ = [
     "TunnelCSRStateConflict",
     "TunnelError",
     "TunnelNameInvalid",
-    "TunnelNameUnavailable",
+    "TunnelNotProvisioned",
     "TunnelRemoved",
-    "TunnelSecretUnavailable",
     "TunnelStateConflict",
     "TunnelTLSModeMismatch",
+    "normalize_agent_handle",
+    "validate_agent_handle",
+    "validate_tunnel_name",
 ]

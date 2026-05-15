@@ -20,7 +20,7 @@ describe("parseMailbox", () => {
     const m = parseMailbox(RAW_MAILBOX);
     expect(m.id).toBe(RAW_MAILBOX.id);
     expect(m.emailAddress).toBe("agent01@inkbox.ai");
-    expect(m.displayName).toBe("Agent 01");
+    expect(m.agentIdentityId).toBeTruthy();
     expect(m.createdAt).toBeInstanceOf(Date);
     expect(m.updatedAt).toBeInstanceOf(Date);
   });

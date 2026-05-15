@@ -15,12 +15,12 @@
 import type { Inkbox } from "../../inkbox.js";
 import { POOL_SIZE_MAX, POOL_SIZE_MIN } from "../resources/tunnels.js";
 import {
+  TunnelNotProvisioned,
   TunnelRemoved,
-  TunnelSecretUnavailable,
   TunnelStateConflict,
 } from "../exceptions.js";
 import { validateTunnelName } from "../_validation.js";
-import { TLSMode, Tunnel, TunnelStatus } from "../types.js";
+import { TLSMode, Tunnel } from "../types.js";
 import {
   ForwardTargetRefused,
   validateEnvelopePath,
@@ -30,7 +30,6 @@ import {
   defaultStateDir,
   ensurePrivateStateDir,
   loadState,
-  printSecretOnce,
   saveState,
 } from "./_state.js";
 import {
@@ -75,7 +74,7 @@ export const PROD_ZONE = "inkboxwire.com";
  * `wsHandler` set without an HTTP path.
  *
  * Validation runs synchronously before any control-plane writes: a
- * tunnel is never created or restored for an invalid configuration.
+ * tunnel is never opened for an invalid configuration.
  */
 export class InvalidConnectOptions extends Error {
   constructor(message: string) {
@@ -84,8 +83,14 @@ export class InvalidConnectOptions extends Error {
   }
 }
 
+export { TunnelNotProvisioned } from "../exceptions.js";
+
 export interface ConnectOptions {
-  /** Tunnel name (server-side `tunnel_name`). */
+  /**
+   * Tunnel name (= agent handle). The tunnel must already exist for the
+   * calling org; provision one via `inkbox.createIdentity(<handle>, ...)`
+   * if it doesn't.
+   */
   name: string;
   /** URL forward path: forward inbound HTTP traffic to a local URL. */
   forwardTo?: string;
@@ -95,20 +100,12 @@ export interface ConnectOptions {
   wsHandler?: InkboxWsHandler;
   /** Expert-only override for the data-plane h2 endpoint. */
   dataPlaneZone?: string;
-  /** `"edge"` (default) or `"passthrough"`. */
-  tlsMode?: TLSMode | "edge" | "passthrough";
   /** Where state.json (and passthrough key/cert) live. */
   stateDir?: string;
-  /** Free-form description, recorded server-side at create time. */
-  description?: string;
   /** 1-32; omit to let the server decide. */
   poolSize?: number;
-  /** Explicit override; wins over the state file. */
-  secret?: string;
   /** Status transitions. */
   onStatus?: TunnelStatusCallback;
-  /** `"auto_restore"` (default) or `"error"`. */
-  onPendingRemoval?: "auto_restore" | "error";
   /** Cap on materialized inbound bodies. */
   maxInboundBodyBytes?: number;
   /**
@@ -119,8 +116,6 @@ export interface ConnectOptions {
   maxResponseBytes?: number;
   /** Bypass the loopback-only allowlist for `forwardTo`. */
   allowRemoteForwarding?: boolean;
-  /** TTY-gated by default. */
-  printSecretToStderr?: boolean | null;
   /** Signal-handler installation policy. */
   installSignalHandlers?: boolean;
   /**
@@ -185,23 +180,22 @@ function validateDispatchOptions(opts: ConnectOptions): void {
 
 function resolveZoneAndHost(opts: {
   name: string;
-  serverZone: string | null;
-  serverPublicHost: string | null;
-  state: { zone?: string | null; publicHost?: string | null } | null;
+  serverZone: string;
+  serverPublicHost: string;
   dataPlaneZoneOverride: string | null;
 }): { zone: string; publicHost: string } {
-  const publicHost =
-    opts.serverPublicHost ?? opts.state?.publicHost ?? `${opts.name}.${PROD_ZONE}`;
-  const zone =
-    opts.dataPlaneZoneOverride ??
-    opts.serverZone ??
-    opts.state?.zone ??
-    PROD_ZONE;
-  return { zone, publicHost };
+  const zone = opts.dataPlaneZoneOverride ?? opts.serverZone;
+  return { zone, publicHost: opts.serverPublicHost };
 }
 
 /**
  * Bring a tunnel online from this Node process.
+ *
+ * The tunnel must already exist in the calling org (provisioned by
+ * `inkbox.createIdentity(...)`). Data-plane authentication uses the
+ * same API key the `inkbox` client was constructed with — an
+ * identity-scoped key must match the tunnel's identity, or an
+ * admin-scoped key in the same org.
  */
 export async function connect(
   inkbox: Inkbox,
@@ -217,21 +211,10 @@ export async function connect(
     });
   }
 
-  const tlsMode: TLSMode =
-    (typeof options.tlsMode === "string"
-      ? (options.tlsMode as TLSMode)
-      : options.tlsMode) ?? TLSMode.EDGE;
-
-  // Passthrough accepts both http:// and https:// forwardTo URLs.
-  // UpstreamUrlDispatch builds undici's tls.connect options from
-  // forwardToVerifyTls / forwardToCaBundle for https:// upstreams.
-  const onPendingRemoval = options.onPendingRemoval ?? "auto_restore";
   const stateDirPath = options.stateDir ?? defaultStateDir(options.name);
-
   ensurePrivateStateDir(stateDirPath);
   const state = loadState(stateDirPath);
 
-  let secret: string | null = options.secret ?? state?.secret ?? null;
   let tunnel: Tunnel | null = null;
 
   if (state?.tunnelId) {
@@ -242,7 +225,7 @@ export async function connect(
       if (apiErr?.statusCode === 404) {
         throw new TunnelRemoved(
           `tunnel ${options.name} (id=${state.tunnelId}) has been removed; ` +
-            `clear ${stateDirPath} and call inkbox.tunnels.create() to start fresh`,
+            `clear ${stateDirPath} and call inkbox.createIdentity(${JSON.stringify(options.name)}) to start fresh`,
         );
       }
       throw err;
@@ -253,56 +236,11 @@ export async function connect(
     tunnel = list.find((t) => t.tunnelName === options.name) ?? null;
   }
   if (!tunnel) {
-    const created = await inkbox.tunnels.create({
-      tunnelName: options.name,
-      tlsMode,
-      description: options.description,
-    });
-    tunnel = created.tunnel;
-    secret = created.connectSecret;
-    saveState(stateDirPath, {
-      tunnelId: tunnel.id,
-      name: options.name,
-      secret,
-      mode: tlsMode,
-      zone: tunnel.zone,
-      publicHost: tunnel.publicHost,
-    });
-    printSecretOnce({
-      secret,
-      statePath: `${stateDirPath}/state.json`,
-      printToStderr: options.printSecretToStderr ?? null,
-    });
-  } else {
-    if (tunnel.tlsMode !== tlsMode) {
-      throw new TunnelStateConflict(
-        409,
-        `tls_mode mismatch: requested ${tlsMode} but tunnel reports ${tunnel.tlsMode}. ` +
-          "tls_mode is fixed at creation; delete the tunnel and recreate to change it.",
-      );
-    }
-    if (tunnel.status === TunnelStatus.PENDING_REMOVAL) {
-      if (onPendingRemoval === "error") {
-        throw new TunnelStateConflict(
-          409,
-          `tunnel ${options.name} is in pending_removal; pass ` +
-            "onPendingRemoval: 'auto_restore' to bring it back",
-        );
-      }
-      if (!secret) {
-        throw new TunnelSecretUnavailable(
-          `connect_secret not available locally for tunnel ${options.name}; ` +
-            "pass secret explicitly, or rotate via inkbox.tunnels.rotateSecret(id) first.",
-        );
-      }
-      tunnel = await inkbox.tunnels.restore(tunnel.id);
-    }
-    if (!secret) {
-      throw new TunnelSecretUnavailable(
-        `connect_secret not available locally for tunnel ${options.name}; ` +
-          "pass secret explicitly, or rotate via inkbox.tunnels.rotateSecret(id) first.",
-      );
-    }
+    throw new TunnelNotProvisioned(
+      `no tunnel named ${JSON.stringify(options.name)} exists in this org. ` +
+        "Tunnels are provisioned atomically by inkbox.createIdentity(<handle>); " +
+        `call inkbox.createIdentity(${JSON.stringify(options.name)}) first.`,
+    );
   }
 
   // For passthrough, lazy-load _cert.ts so the edge-mode bundle stays
@@ -317,10 +255,8 @@ export async function connect(
     const cert = await import("./_cert.js");
     const tls = await import("./_tls.js");
     const keypair = await cert.loadOrCreateKeypair(stateDirPath);
-    const tunnelPublicHost =
-      tunnel.publicHost ?? `${options.name}.${PROD_ZONE}`;
     if (await cert.certNeedsSign(stateDirPath, keypair)) {
-      const csrPem = await cert.buildCsr(keypair, tunnelPublicHost);
+      const csrPem = await cert.buildCsr(keypair, tunnel.publicHost);
       const signed = await inkbox.tunnels.signCsr(tunnel.id, { csrPem });
       cert.writeCertChain(stateDirPath, signed.certPem, signed.chainPem);
     }
@@ -349,14 +285,12 @@ export async function connect(
     name: options.name,
     serverZone: tunnel.zone,
     serverPublicHost: tunnel.publicHost,
-    state,
     dataPlaneZoneOverride: options.dataPlaneZone ?? null,
   });
 
   saveState(stateDirPath, {
     tunnelId: tunnel.id,
     name: options.name,
-    secret,
     mode: tunnel.tlsMode,
     zone,
     publicHost,
@@ -364,7 +298,7 @@ export async function connect(
 
   const runtime = new TunnelRuntime({
     tunnelId: tunnel.id,
-    secret,
+    apiKey: inkbox._apiKey,
     zone,
     publicHost,
     poolSize: options.poolSize ?? null,
@@ -392,3 +326,5 @@ export async function connect(
     listenerOpts,
   });
 }
+
+void TunnelStateConflict; // retained for re-export breadth on the surviving surface

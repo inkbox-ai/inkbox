@@ -131,10 +131,13 @@ export class Inkbox {
   readonly _tunnels: TunnelsResource;
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
+  /** @internal — used by the tunnel-agent runtime for data-plane auth. */
+  readonly _apiKey: string;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
 
   constructor(options: InkboxOptions) {
+    this._apiKey = options.apiKey;
     const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
     if (!baseUrl.startsWith("https://")) {
       const parsed = new URL(baseUrl);
@@ -217,7 +220,7 @@ export class Inkbox {
   // Public resource accessors
   // ------------------------------------------------------------------
 
-  /** Org-level mailbox operations (list, get, create, update, delete). */
+  /** Org-level mailbox operations (list, get, update, search). Mailboxes are provisioned by `createIdentity` and removed by `identity.delete()` (cascade). */
   get mailboxes(): MailboxesResource { return this._mailboxes; }
 
   /** Message operations (list, get, send, delete, star/unstar). */
@@ -256,7 +259,7 @@ export class Inkbox {
   /** Custom sending domains (list, set org default). */
   get domains(): DomainsResource { return this._domains; }
 
-  /** Tunnels (list, get, create, update, delete, restore, rotateSecret, signCsr). */
+  /** Tunnels (list, get, update, signCsr). Tunnels are provisioned by `createIdentity` and removed by `identity.delete()` (cascade). */
   get tunnels(): TunnelsResource { return this._tunnels; }
 
   /** Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys. */
@@ -267,48 +270,46 @@ export class Inkbox {
   // ------------------------------------------------------------------
 
   /**
-   * Create a new agent identity.
+   * Create a new agent identity. Atomically provisions the linked
+   * mailbox and tunnel as part of the same request.
    *
-   * @param agentHandle - Unique handle for this identity (e.g. `"sales-bot"`).
-   * @param options.createMailbox - Whether to create and link a mailbox in the
-   *   same request. This is also implied when `displayName`, `emailLocalPart`,
-   *   or `sendingDomain` is provided.
-   * @param options.displayName - Optional human-readable mailbox name.
+   * @param agentHandle - Unique handle for this identity. Globally unique
+   *   across all orgs (the handle shares its namespace with tunnel names).
+   * @param options.displayName - Identity-level human-readable name.
+   *   Defaults server-side to `agentHandle`.
+   * @param options.description - Free-form org-internal description.
+   *   Never surfaces in outbound mail. Omit to leave null.
    * @param options.emailLocalPart - Optional requested mailbox local part.
+   *   On the platform domain the server forces it to the handle; only
+   *   meaningful on a custom sending domain.
    * @param options.sendingDomain - Optional sending-domain selector (bare
    *   domain name). Omit to inherit the org default; pass `null` to force
    *   the platform default; pass a verified custom-domain name to bind.
+   * @param options.tunnel - Optional nested tunnel spec (tlsMode only).
+   *   Defaults to edge TLS.
    * @param options.phoneNumber - Optional phone-number provisioning payload.
    * @param options.vaultSecretIds - Optional vault secret selection to attach
    *   to the new identity.
-   * @returns The created {@link AgentIdentity}.
+   * @returns The created {@link AgentIdentity}, with `mailbox` and `tunnel`
+   *   populated from the atomic create response.
    */
   async createIdentity(
     agentHandle: string,
     options: CreateIdentityOptions = {},
   ): Promise<AgentIdentity> {
-    const wantsMailbox =
-      options.createMailbox === true ||
-      options.displayName !== undefined ||
-      options.emailLocalPart !== undefined ||
-      "sendingDomain" in options;
-    let mailbox: IdentityMailboxCreateOptions | undefined;
-    if (wantsMailbox) {
-      mailbox = {
-        displayName: options.displayName,
-        emailLocalPart: options.emailLocalPart,
-      };
-      if ("sendingDomain" in options) mailbox.sendingDomain = options.sendingDomain;
-    }
-    await this._idsResource.create({
+    const mailbox: IdentityMailboxCreateOptions = {};
+    if (options.emailLocalPart !== undefined) mailbox.emailLocalPart = options.emailLocalPart;
+    if ("sendingDomain" in options) mailbox.sendingDomain = options.sendingDomain;
+    const createArgs: Parameters<typeof this._idsResource.create>[0] = {
       agentHandle,
       mailbox,
       phoneNumber: options.phoneNumber,
       vaultSecretIds: options.vaultSecretIds,
-    });
-    // POST /identities returns summary (no channel fields); fetch detail so
-    // AgentIdentity has a fully-populated _AgentIdentityData.
-    const data = await this._idsResource.get(agentHandle);
+    };
+    if (options.displayName !== undefined) createArgs.displayName = options.displayName;
+    if (options.description !== undefined) createArgs.description = options.description;
+    if (options.tunnel !== undefined) createArgs.tunnel = options.tunnel;
+    const data = await this._idsResource.create(createArgs);
     return new AgentIdentity(data, this);
   }
 

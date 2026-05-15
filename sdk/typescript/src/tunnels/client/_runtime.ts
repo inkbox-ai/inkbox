@@ -155,7 +155,8 @@ export interface DispatchConfig {
 
 export interface TunnelRuntimeOpts {
   tunnelId: string;
-  secret: string;
+  /** API key used to authenticate against the data-plane (x-api-key header). */
+  apiKey: string;
   zone: string;
   publicHost: string;
   poolSize: number | null;
@@ -203,7 +204,7 @@ type StreamEvent =
  */
 export class TunnelRuntime {
   private readonly tunnelId: string;
-  private readonly secret: string;
+  private readonly apiKey: string;
   private readonly zone: string;
   private readonly publicHost: string;
   private readonly poolSize: number | null;
@@ -240,7 +241,7 @@ export class TunnelRuntime {
 
   constructor(opts: TunnelRuntimeOpts) {
     this.tunnelId = opts.tunnelId;
-    this.secret = opts.secret;
+    this.apiKey = opts.apiKey;
     this.zone = opts.zone;
     this.publicHost = opts.publicHost;
     this.poolSize = opts.poolSize;
@@ -535,7 +536,7 @@ export class TunnelRuntime {
       [HTTP2_HEADER_AUTHORITY]: this.zone,
       [HTTP2_HEADER_PATH]: ControlPaths.HELLO,
       [ControlHeaders.TUNNEL_ID]: this.tunnelId,
-      [ControlHeaders.TUNNEL_SECRET]: this.secret,
+      [ControlHeaders.API_KEY]: this.apiKey,
       "content-length": "0",
     };
     if (this.poolSize !== null) {
@@ -545,7 +546,7 @@ export class TunnelRuntime {
     const { status, body } = await this.awaitResponse(stream.streamId);
     if (status === 401 || status === 403) {
       throw new TunnelAuthError(
-        `${ControlPaths.HELLO} returned ${status}; connect secret is invalid`,
+        `${ControlPaths.HELLO} returned ${status}; the API key was rejected (check the key matches the tunnel's identity scope, or use an admin-scoped key in the tunnel's org)`,
       );
     }
     if (status !== 200) {
@@ -1285,7 +1286,7 @@ export class TunnelRuntime {
         [":protocol"]: TunnelSubprotocol.WS,
         "sec-websocket-version": "13",
         [ControlHeaders.TUNNEL_ID]: this.tunnelId,
-        [ControlHeaders.TUNNEL_SECRET]: this.secret,
+        [ControlHeaders.API_KEY]: this.apiKey,
         [TunnelMetaHeader.WS_ID]: wsId,
       };
       const opened = this.openStream(connectHeaders, { endStream: false });
@@ -1441,7 +1442,7 @@ export class TunnelRuntime {
       "sec-websocket-version": "13",
       "sec-websocket-protocol": TunnelSubprotocol.TCP,
       [ControlHeaders.TUNNEL_ID]: this.tunnelId,
-      [ControlHeaders.TUNNEL_SECRET]: this.secret,
+      [ControlHeaders.API_KEY]: this.apiKey,
       [TunnelMetaHeader.TCP_ID]: tcpId,
     };
     const { stream, streamId } = this.openStream(connectHeaders, {
@@ -1804,7 +1805,7 @@ export class TunnelRuntime {
       [HTTP2_HEADER_AUTHORITY]: this.zone,
       [HTTP2_HEADER_PATH]: `${ControlPaths.RESPONSE_PREFIX}${requestId}`,
       [ControlHeaders.TUNNEL_ID]: this.tunnelId,
-      [ControlHeaders.TUNNEL_SECRET]: this.secret,
+      [ControlHeaders.API_KEY]: this.apiKey,
       [TunnelMetaHeader.STATUS]: String(status),
       [TunnelMetaHeader.REQUEST_ID]: requestId,
       "content-length": String(body.length),

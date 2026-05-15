@@ -21,7 +21,7 @@ Or run directly with npx (replace `inkbox` with `npx @inkbox/cli` in the scripts
 
 | Script | What it does |
 |--------|-------------|
-| `01-identity-and-email.sh` | Create an identity, set up a mailbox, send and read emails, clean up |
+| `01-identity-and-email.sh` | Create an identity (with mailbox), send and read emails, clean up |
 | `02-vault-totp.sh` | Store a login credential with TOTP, generate one-time codes, clean up |
 | `03-phone-call.sh` | Provision a number, place a call, fetch the transcript, release the number |
 | `04-inbox-monitor.sh` | Poll for unread emails in a loop — demonstrates an ongoing automation pattern |

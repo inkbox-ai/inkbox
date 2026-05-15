@@ -40,7 +40,7 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 - `inkbox-tunnels`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-tunnels/SKILL.md
-  Tunnels reference for both SDKs — bring a local server online behind a public Inkbox URL via `inkbox.tunnels.connect(...)`. Covers tunnel CRUD, edge vs passthrough TLS, URL forwarding, and in-process Fetch/ASGI/WebSocket handlers.
+  Tunnels reference for both SDKs — bring a local server online behind a public Inkbox URL via `inkbox.tunnels.connect(...)`. Tunnels are an identity property (provisioned atomically by `createIdentity`); covers edge vs passthrough TLS, the same-API-key data-plane auth, URL forwarding, and in-process Fetch/ASGI/WebSocket handlers.
 
 ## Example Skills
 

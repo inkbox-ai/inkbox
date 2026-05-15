@@ -6,7 +6,7 @@ Tests for Inkbox unified client — identities.
 
 from unittest.mock import MagicMock
 
-from sample_data_identities import IDENTITY_DETAIL_DICT, IDENTITY_DICT
+from sample_data_identities import IDENTITY_DETAIL_DICT
 
 from inkbox import Inkbox
 from inkbox.identities.resources.identities import IdentitiesResource
@@ -59,10 +59,7 @@ class TestCreateIdentitySendingDomain:
 
     def test_no_mailbox_when_only_handle(self):
         client, mock_ids = self._client()
-        # Drop mailbox from the get-response for this specific case.
-        from inkbox.identities.types import _AgentIdentityData
-
-        mock_ids.get.return_value = _AgentIdentityData._from_dict(IDENTITY_DICT)
+        mock_ids.create.return_value = mock_ids.get.return_value
 
         client.create_identity("sales-agent")
 
@@ -70,31 +67,36 @@ class TestCreateIdentitySendingDomain:
         assert kwargs["mailbox"] is None
         client.close()
 
-    def test_omitted_sending_domain_is_not_sent(self):
-        """Setting only display_name implies a mailbox; sending_domain is omitted."""
+    def test_display_name_is_identity_level_not_mailbox(self):
+        """display_name is an identity-level field; it does NOT imply a mailbox spec."""
         client, mock_ids = self._client()
+        # When the caller returns a fresh detail, the client should use it
+        # directly without a follow-up get().
+        mock_ids.create.return_value = mock_ids.get.return_value
 
         client.create_identity("sales-agent", display_name="Sales Team")
 
         _, kwargs = mock_ids.create.call_args
-        wire = kwargs["mailbox"].to_wire()
-        assert "sending_domain" not in wire
-        assert wire == {"display_name": "Sales Team"}
+        assert kwargs["display_name"] == "Sales Team"
+        # mailbox is None because no mailbox-only field was passed.
+        assert kwargs["mailbox"] is None
         client.close()
 
     def test_explicit_null_forces_platform(self):
         client, mock_ids = self._client()
+        mock_ids.create.return_value = mock_ids.get.return_value
 
         client.create_identity("sales-agent", sending_domain=None)
 
         _, kwargs = mock_ids.create.call_args
-        assert kwargs["mailbox"] is not None  # presence of sending_domain triggers mailbox
+        assert kwargs["mailbox"] is not None
         wire = kwargs["mailbox"].to_wire()
         assert wire == {"sending_domain": None}
         client.close()
 
     def test_explicit_string_binds_to_domain(self):
         client, mock_ids = self._client()
+        mock_ids.create.return_value = mock_ids.get.return_value
 
         client.create_identity("sales-agent", sending_domain="mail.acme.com")
 

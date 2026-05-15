@@ -135,7 +135,9 @@ class TunnelRuntime:
 
     Args:
         tunnel_id: Tunnel's UUID (string-coerced for headers).
-        secret: The connect secret (sent on hello + every CONNECT).
+        api_key: The data-plane API key (sent as `x-api-key` on hello +
+            every CONNECT). Must be admin-scoped in the tunnel's org, or
+            identity-scoped to match the tunnel's identity.
         zone: The data-plane h2 endpoint host (e.g. ``inkboxwire.com``).
         public_host: Tunnel's public host (e.g. ``my-agent.inkboxwire.com``).
         pool_size: Requested number of parked intake streams. ``None``
@@ -153,7 +155,7 @@ class TunnelRuntime:
         self,
         *,
         tunnel_id: UUID | str,
-        secret: str,
+        api_key: str,
         zone: str,
         public_host: str,
         pool_size: int | None,
@@ -166,7 +168,7 @@ class TunnelRuntime:
         forward_to_ca_bundle: bytes | str | None = None,
     ) -> None:
         self._tunnel_id = str(tunnel_id)
-        self._secret = secret
+        self._api_key = api_key
         self._zone = zone
         self._public_host = public_host
         self._pool_size = pool_size
@@ -256,9 +258,9 @@ class TunnelRuntime:
                 raise
             except _TunnelAuthError:
                 logger.error(
-                    "/_system/hello rejected the connect secret — refusing "
-                    "to retry. Rotate via inkbox.tunnels.rotate_secret(id), "
-                    "update the state file, and reconnect.",
+                    "/_system/hello rejected the API key — refusing to retry. "
+                    "Check that the key matches the tunnel's identity scope "
+                    "(or use an admin-scoped key in the tunnel's org).",
                 )
                 self._notify_status("closed")
                 raise
@@ -401,7 +403,7 @@ class TunnelRuntime:
             (":authority", self._zone),
             (":path", "/_system/hello"),
             ("x-tunnel-id", self._tunnel_id),
-            ("x-tunnel-secret", self._secret),
+            ("x-api-key", self._api_key),
             ("content-length", "0"),
         ]
         if self._pool_size is not None:
@@ -415,7 +417,9 @@ class TunnelRuntime:
         self._streams.pop(stream_id, None)
         if status in (401, 403):
             raise _TunnelAuthError(
-                f"/_system/hello returned {status}; connect secret is invalid",
+                f"/_system/hello returned {status}; the API key was rejected "
+                "(check the key matches the tunnel's identity scope, or use "
+                "an admin-scoped key in the tunnel's org)",
             )
         if status != 200:
             raise RuntimeError(
@@ -1027,7 +1031,7 @@ class TunnelRuntime:
             (":protocol", "inkbox-tunnel-ws"),
             ("sec-websocket-version", "13"),
             ("x-tunnel-id", self._tunnel_id),
-            ("x-tunnel-secret", self._secret),
+            ("x-api-key", self._api_key),
             ("inkbox-ws-id", envelope.ws_id),
         ]
 
@@ -1176,7 +1180,7 @@ class TunnelRuntime:
             (":protocol", "inkbox-tunnel-ws"),
             ("sec-websocket-version", "13"),
             ("x-tunnel-id", self._tunnel_id),
-            ("x-tunnel-secret", self._secret),
+            ("x-api-key", self._api_key),
             ("inkbox-ws-id", envelope.ws_id),
         ]
         async with self._send_lock:
@@ -1644,7 +1648,7 @@ class TunnelRuntime:
             ("sec-websocket-version", "13"),
             ("sec-websocket-protocol", "inkbox-tunnel-tcp"),
             ("x-tunnel-id", self._tunnel_id),
-            ("x-tunnel-secret", self._secret),
+            ("x-api-key", self._api_key),
             ("inkbox-tcp-id", tcp_id),
         ]
 
@@ -2036,7 +2040,7 @@ class TunnelRuntime:
             (":authority", self._zone),
             (":path", f"/_system/response/{request_id}"),
             ("x-tunnel-id", self._tunnel_id),
-            ("x-tunnel-secret", self._secret),
+            ("x-api-key", self._api_key),
             ("inkbox-status", str(status)),
             ("inkbox-request-id", request_id),
             ("content-length", str(len(body))),

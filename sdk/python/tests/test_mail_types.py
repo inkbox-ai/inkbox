@@ -29,7 +29,6 @@ class TestMailboxParsing:
 
         assert isinstance(m.id, UUID)
         assert m.email_address == "agent01@inkbox.ai"
-        assert m.display_name == "Agent 01"
         assert m.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
         assert isinstance(m.created_at, datetime)
         assert isinstance(m.updated_at, datetime)

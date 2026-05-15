@@ -64,7 +64,7 @@ export const ControlPaths = {
 /** SDK-side request headers used on every control-plane stream. */
 export const ControlHeaders = {
   TUNNEL_ID: "x-tunnel-id",
-  TUNNEL_SECRET: "x-tunnel-secret",
+  API_KEY: "x-api-key",
   OWNER_TOKEN: "x-owner-token",
   POOL_SLOT: "x-pool-slot",
   POOL_SIZE: "x-pool-size",

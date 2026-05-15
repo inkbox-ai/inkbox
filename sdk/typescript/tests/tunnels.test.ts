@@ -1,15 +1,14 @@
 // sdk/typescript/tests/tunnels.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HttpTransport, InkboxAPIError } from "../src/_http.js";
+import { HttpTransport } from "../src/_http.js";
 import { TunnelsResource } from "../src/tunnels/resources/tunnels.js";
 import {
   TunnelCSRStateConflict,
   TunnelNameInvalid,
-  TunnelNameUnavailable,
-  TunnelStateConflict,
   TunnelTLSModeMismatch,
 } from "../src/tunnels/exceptions.js";
-import { TLSMode, TunnelStatus } from "../src/tunnels/types.js";
+import { TunnelStatus } from "../src/tunnels/types.js";
+import { validateTunnelName } from "../src/tunnels/_validation.js";
 import {
   ForwardTargetRefused,
   validateEnvelopePath,
@@ -24,7 +23,6 @@ function serverTunnel(overrides: Record<string, unknown> = {}) {
     id: "11111111-1111-1111-1111-111111111111",
     organization_id: "org_test",
     tunnel_name: "my-agent",
-    description: null,
     tls_mode: "edge",
     cert_pem: null,
     cert_fingerprint_sha256: null,
@@ -32,7 +30,6 @@ function serverTunnel(overrides: Record<string, unknown> = {}) {
     status: "active",
     last_connected_at: null,
     last_connected_ip_addr: null,
-    restore_deadline_at: null,
     currently_connected: false,
     public_host: "my-agent.inkboxwire.com",
     zone: "inkboxwire.com",
@@ -73,46 +70,47 @@ describe("TunnelsResource", () => {
     return new TunnelsResource(http);
   }
 
-  // --- Local validation ---
+  // --- Local validation (against the standalone validator now) ---
 
-  it("rejects invalid tunnel_name locally before issuing the POST", async () => {
-    const t = tunnels();
-    await expect(t.create({ tunnelName: "--bad" })).rejects.toBeInstanceOf(TunnelNameInvalid);
-    expect(fetch).not.toHaveBeenCalled();
+  it("rejects invalid tunnel_name locally", () => {
+    expect(() => validateTunnelName("--bad")).toThrow(TunnelNameInvalid);
   });
 
-  it("rejects names that are too short", async () => {
-    const t = tunnels();
-    await expect(t.create({ tunnelName: "ab" })).rejects.toBeInstanceOf(TunnelNameInvalid);
+  it("rejects names that are too short", () => {
+    expect(() => validateTunnelName("ab")).toThrow(TunnelNameInvalid);
   });
 
-  it("rejects names with consecutive hyphens", async () => {
-    const t = tunnels();
-    await expect(t.create({ tunnelName: "my--agent" })).rejects.toBeInstanceOf(TunnelNameInvalid);
+  it("rejects names with consecutive hyphens", () => {
+    expect(() => validateTunnelName("my--agent")).toThrow(TunnelNameInvalid);
   });
 
-  // --- Status remap ---
+  it("rejects reserved names", () => {
+    expect(() => validateTunnelName("admin")).toThrow(TunnelNameInvalid);
+    expect(() => validateTunnelName("openai")).toThrow(TunnelNameInvalid);
+  });
 
-  it("remaps delete_pending -> pending_removal", async () => {
+  it("normalizes @prefix and uppercase", () => {
+    expect(validateTunnelName("@MyAgent")).toBe("myagent");
+  });
+
+  // --- Status parsing ---
+
+  it("recognises the three lifecycle states", async () => {
+    const t = tunnels();
     vi.mocked(fetch).mockResolvedValue(
-      makeResponse(200, serverTunnel({ status: "delete_pending" })),
+      makeResponse(200, serverTunnel({ status: "deleted" })),
     );
-    const t = tunnels();
-    const out = await t.get("abc");
-    expect(out.status).toBe(TunnelStatus.PENDING_REMOVAL);
+    expect((await t.get("abc")).status).toBe(TunnelStatus.DELETED);
   });
 
   it("preserves unknown statuses as raw strings (no fail-open)", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      makeResponse(200, serverTunnel({ status: "deleted" })),
+      makeResponse(200, serverTunnel({ status: "quarantined" })),
     );
     const t = tunnels();
     const out = await t.get("abc");
-    // Unknown server-side states flow through unchanged so users don't
-    // silently treat them as active.
-    expect(out.status).toBe("deleted");
+    expect(out.status).toBe("quarantined");
     expect(out.status).not.toBe(TunnelStatus.ACTIVE);
-    expect(out.status).not.toBe(TunnelStatus.PENDING_REMOVAL);
   });
 
   it("treats null metadata as {}", async () => {
@@ -147,14 +145,6 @@ describe("TunnelsResource", () => {
     expect(JSON.parse(init.body as string)).toEqual({});
   });
 
-  it("update with explicit null clears description", async () => {
-    vi.mocked(fetch).mockResolvedValue(makeResponse(200, serverTunnel()));
-    const t = tunnels();
-    await t.update("abc", { description: null });
-    const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
-    expect(JSON.parse(init.body as string)).toEqual({ description: null });
-  });
-
   it("update with metadata={} clears metadata", async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse(200, serverTunnel()));
     const t = tunnels();
@@ -172,33 +162,6 @@ describe("TunnelsResource", () => {
   });
 
   // --- Error mapping ---
-
-  it("create 409 -> TunnelNameUnavailable", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse(409, { detail: "tunnel_name already taken" }),
-    );
-    const t = tunnels();
-    await expect(t.create({ tunnelName: "my-agent" })).rejects.toBeInstanceOf(
-      TunnelNameUnavailable,
-    );
-  });
-
-  it("restore 409 -> TunnelStateConflict and sanitizes detail", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse(409, { detail: "tunnel is not in delete_pending state" }),
-    );
-    const t = tunnels();
-    try {
-      await t.restore("abc");
-      throw new Error("should have thrown");
-    } catch (err) {
-      expect(err).toBeInstanceOf(TunnelStateConflict);
-      const detail = (err as InkboxAPIError).detail;
-      const text = typeof detail === "string" ? detail : JSON.stringify(detail);
-      expect(text).toContain("pending_removal");
-      expect(text).not.toContain("delete_pending");
-    }
-  });
 
   it("sign_csr 409 with edge mention -> TunnelTLSModeMismatch", async () => {
     vi.mocked(fetch).mockResolvedValue(
@@ -222,16 +185,6 @@ describe("TunnelsResource", () => {
     ).rejects.toBeInstanceOf(TunnelCSRStateConflict);
   });
 
-  // --- delete() returns parsed Tunnel ---
-
-  it("delete() parses the response body", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse(200, serverTunnel({ status: "delete_pending" })),
-    );
-    const t = tunnels();
-    const out = await t.delete("abc");
-    expect(out.status).toBe(TunnelStatus.PENDING_REMOVAL);
-  });
 });
 
 // --- Validation helpers (unit) ---

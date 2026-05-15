@@ -260,7 +260,7 @@ async def test_dispatch_ws_upgrade_to_url_forwards_app_headers():
 
         runtime = TunnelRuntime(
             tunnel_id=uuid4(),
-            secret="sec",
+            api_key="ApiKey_test",
             zone="inkboxwire.example",
             public_host="my-agent.inkboxwire.example",
             pool_size=1,

@@ -23,11 +23,11 @@ import type {
   TextMessage,
 } from "./phone/types.js";
 import type {
-  AgentIdentitySummary,
   _AgentIdentityData,
   IdentityMailbox,
   IdentityPhoneNumber,
 } from "./identities/types.js";
+import type { Tunnel } from "./tunnels/types.js";
 import type { Inkbox } from "./inkbox.js";
 
 export class AgentIdentity {
@@ -35,6 +35,7 @@ export class AgentIdentity {
   private readonly _inkbox: Inkbox;
   private _mailbox: IdentityMailbox | null;
   private _phoneNumber: IdentityPhoneNumber | null;
+  private _tunnel: Tunnel | null;
   private _credentials: Credentials | null = null;
   private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
@@ -43,6 +44,7 @@ export class AgentIdentity {
     this._inkbox            = inkbox;
     this._mailbox           = data.mailbox;
     this._phoneNumber       = data.phoneNumber;
+    this._tunnel            = data.tunnel;
   }
 
   // ------------------------------------------------------------------
@@ -52,14 +54,23 @@ export class AgentIdentity {
   get agentHandle(): string { return this._data.agentHandle; }
   get id(): string           { return this._data.id; }
 
+  /** Human-readable display name. Defaults server-side to `agentHandle` if unset. */
+  get displayName(): string | null { return this._data.displayName; }
+
+  /** Free-form org-internal description, or `null` if unset. Never surfaces in outbound mail. */
+  get description(): string | null { return this._data.description; }
+
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   get emailAddress(): string | null { return this._data.emailAddress; }
 
-  /** The mailbox currently assigned to this identity, or `null` if none. */
+  /** The mailbox currently assigned to this identity. Non-null for live identities (1:1 invariant). */
   get mailbox(): IdentityMailbox | null { return this._mailbox; }
 
   /** The phone number currently assigned to this identity, or `null` if none. */
   get phoneNumber(): IdentityPhoneNumber | null { return this._phoneNumber; }
+
+  /** The tunnel currently assigned to this identity. Non-null for live identities (1:1 invariant). */
+  get tunnel(): Tunnel | null { return this._tunnel; }
 
   /**
    * Identity-scoped credential access.
@@ -195,69 +206,6 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
   // Channel management
   // ------------------------------------------------------------------
-
-  /**
-   * Create a new mailbox and link it to this identity.
-   *
-   * @param options.displayName - Optional human-readable sender name.
-   * @param options.emailLocalPart - Optional requested mailbox local part.
-   * @param options.sendingDomainId - Optional sending-domain selector by row id
-   *   (e.g. `"sending_domain_<uuid>"`). Omit to inherit the org's default
-   *   custom domain (or fall through to the platform default if none).
-   *   Pass `null` to force the platform default. Pass a verified domain's id
-   *   to bind this mailbox to it.
-   */
-  async createMailbox(
-    options: {
-      displayName?: string;
-      emailLocalPart?: string;
-      sendingDomainId?: string | null;
-    } = {},
-  ): Promise<IdentityMailbox> {
-    const mailbox = await this._inkbox._mailboxes.create({
-      agentHandle: this.agentHandle,
-      ...options,
-    });
-    const linked: IdentityMailbox = {
-      id: mailbox.id,
-      emailAddress: mailbox.emailAddress,
-      sendingDomain: mailbox.sendingDomain,
-      displayName: mailbox.displayName,
-      filterMode: mailbox.filterMode,
-      agentIdentityId: mailbox.agentIdentityId,
-      createdAt: mailbox.createdAt,
-      updatedAt: mailbox.updatedAt,
-      filterModeChangeNotice: mailbox.filterModeChangeNotice,
-    };
-    this._mailbox = linked;
-    this._data.emailAddress = mailbox.emailAddress;
-    return linked;
-  }
-
-  /**
-   * Link an existing mailbox to this identity.
-   *
-   * @param mailboxId - UUID of the mailbox to link. Obtain via
-   *   `inkbox.mailboxes.list()` or `inkbox.mailboxes.get()`.
-   * @returns The linked {@link IdentityMailbox}.
-   */
-  async assignMailbox(mailboxId: string): Promise<IdentityMailbox> {
-    const data    = await this._inkbox._idsResource.assignMailbox(this.agentHandle, {
-      mailboxId,
-    });
-    this._mailbox  = data.mailbox;
-    this._data     = data;
-    return this._mailbox!;
-  }
-
-  /**
-   * Unlink this identity's mailbox (does not delete the mailbox).
-   */
-  async unlinkMailbox(): Promise<void> {
-    this._requireMailbox();
-    await this._inkbox._idsResource.unlinkMailbox(this.agentHandle);
-    this._mailbox = null;
-  }
 
   /**
    * Provision a new phone number and link it to this identity.
@@ -616,17 +564,37 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
 
   /**
-   * Update this identity's handle.
+   * Update this identity's handle, display name, description, and/or status.
+   *
+   * Only provided fields are applied; omitted fields are left unchanged.
+   * For `displayName` and `description`, explicit `null` clears the column;
+   * omitting the key leaves it untouched.
    *
    * @param options.newHandle - New agent handle.
+   * @param options.displayName - New display name, or `null` to clear.
+   * @param options.description - New description, or `null` to clear.
+   * @param options.status - `"active"` or `"paused"`. Call `delete()`
+   *   to remove the identity; `"deleted"` is rejected here.
    */
-  async update(options: { newHandle?: string }): Promise<void> {
+  async update(options: {
+    newHandle?: string;
+    displayName?: string | null;
+    description?: string | null;
+    status?: "active" | "paused";
+  }): Promise<void> {
     const result = await this._inkbox._idsResource.update(this.agentHandle, options);
     this._data = {
       ...result,
       mailbox:          this._mailbox,
       phoneNumber:      this._phoneNumber,
+      tunnel:           this._tunnel,
     };
+    if (options.newHandle !== undefined && this._tunnel != null) {
+      // The server renames the linked tunnel in the same transaction
+      // under the unified handle namespace; refresh to pick up the
+      // new tunnelName / publicHost on the cached tunnel.
+      await this.refresh();
+    }
   }
 
   /**
@@ -643,11 +611,18 @@ export class AgentIdentity {
     this._data             = data;
     this._mailbox          = data.mailbox;
     this._phoneNumber      = data.phoneNumber;
+    this._tunnel           = data.tunnel;
     this._credentials      = null;
     return this;
   }
 
-  /** Delete this identity (unlinks channels without deleting them). */
+  /**
+   * Delete this identity.
+   *
+   * Cascades: flips the linked mailbox to `deleted`, force-finalizes the
+   * linked tunnel to `deleted`, revokes any identity-scoped API keys, and
+   * unassigns (but does not delete) any linked phone number.
+   */
   async delete(): Promise<void> {
     await this._inkbox._idsResource.delete(this.agentHandle);
   }
@@ -667,7 +642,7 @@ export class AgentIdentity {
   private _requireMailbox(): void {
     if (!this._mailbox) {
       throw new InkboxError(
-        `Identity '${this.agentHandle}' has no mailbox assigned. Call identity.createMailbox() or identity.assignMailbox() first.`,
+        `Identity '${this.agentHandle}' has no mailbox — this should only be reachable on a deleted identity.`,
       );
     }
   }

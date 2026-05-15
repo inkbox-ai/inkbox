@@ -8,13 +8,13 @@ import pytest
 from unittest.mock import MagicMock
 from uuid import UUID
 
-from sample_data_identities import IDENTITY_DETAIL_DICT
-from sample_data_mail import MAILBOX_DICT, MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
+from sample_data_identities import IDENTITY_DETAIL_DICT, IDENTITY_DICT
+from sample_data_mail import MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
 
 from inkbox.agent_identity import AgentIdentity
-from inkbox.identities.types import _AgentIdentityData
+from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
-from inkbox.mail.types import ForwardMode, Mailbox, MessageDetail, ThreadDetail
+from inkbox.mail.types import ForwardMode, MessageDetail, ThreadDetail
 from inkbox.phone.types import TextMessage
 
 
@@ -57,7 +57,7 @@ class TestAgentIdentityGetMessage:
     def test_get_message_requires_mailbox(self):
         identity, _ = _identity_without_mailbox()
 
-        with pytest.raises(InkboxError, match="no mailbox assigned"):
+        with pytest.raises(InkboxError, match="has no mailbox"):
             identity.get_message("bbbb2222-0000-0000-0000-000000000001")
 
 
@@ -93,70 +93,11 @@ class TestAgentIdentityForwardEmail:
     def test_forward_email_requires_mailbox(self):
         identity, _ = _identity_without_mailbox()
 
-        with pytest.raises(InkboxError, match="no mailbox assigned"):
+        with pytest.raises(InkboxError, match="has no mailbox"):
             identity.forward_email(
                 "bbbb2222-0000-0000-0000-000000000001",
                 to=["fwd@example.com"],
             )
-
-
-class TestAgentIdentityCreateMailbox:
-    def test_create_mailbox_links_mailbox(self):
-        identity, inkbox = _identity_without_mailbox()
-        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
-
-        mailbox = identity.create_mailbox(
-            display_name="Sales Team",
-            email_local_part="sales.team",
-        )
-
-        inkbox._mailboxes.create.assert_called_once_with(
-            agent_handle="sales-agent",
-            display_name="Sales Team",
-            email_local_part="sales.team",
-        )
-        assert mailbox.email_address == MAILBOX_DICT["email_address"]
-        assert identity.email_address == MAILBOX_DICT["email_address"]
-        assert identity.mailbox is not None
-
-    def test_create_mailbox_copies_sending_domain(self):
-        identity, inkbox = _identity_without_mailbox()
-        inkbox._mailboxes.create.return_value = Mailbox._from_dict(
-            {**MAILBOX_DICT, "sending_domain": "mail.acme.com"},
-        )
-
-        mailbox = identity.create_mailbox()
-
-        assert mailbox.sending_domain == "mail.acme.com"
-        assert identity.mailbox is not None
-        assert identity.mailbox.sending_domain == "mail.acme.com"
-
-    def test_create_mailbox_omits_sending_domain_id_when_unset(self):
-        identity, inkbox = _identity_without_mailbox()
-        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
-
-        identity.create_mailbox()
-
-        _, kwargs = inkbox._mailboxes.create.call_args
-        assert "sending_domain_id" not in kwargs
-
-    def test_create_mailbox_passes_explicit_null(self):
-        identity, inkbox = _identity_without_mailbox()
-        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
-
-        identity.create_mailbox(sending_domain_id=None)
-
-        _, kwargs = inkbox._mailboxes.create.call_args
-        assert kwargs["sending_domain_id"] is None
-
-    def test_create_mailbox_passes_explicit_id(self):
-        identity, inkbox = _identity_without_mailbox()
-        inkbox._mailboxes.create.return_value = Mailbox._from_dict(MAILBOX_DICT)
-
-        identity.create_mailbox(sending_domain_id="sending_domain_xxx")
-
-        _, kwargs = inkbox._mailboxes.create.call_args
-        assert kwargs["sending_domain_id"] == "sending_domain_xxx"
 
 
 class TestAgentIdentityGetThread:
@@ -175,7 +116,7 @@ class TestAgentIdentityGetThread:
     def test_get_thread_requires_mailbox(self):
         identity, _ = _identity_without_mailbox()
 
-        with pytest.raises(InkboxError, match="no mailbox assigned"):
+        with pytest.raises(InkboxError, match="has no mailbox"):
             identity.get_thread("eeee5555-0000-0000-0000-000000000001")
 
 
@@ -239,3 +180,36 @@ class TestAgentIdentityMarkTextConversationRead:
 
         with pytest.raises(InkboxError, match="no phone number assigned"):
             identity.mark_text_conversation_read("+15551234567")
+
+
+class TestAgentIdentityUpdate:
+    def test_update_with_new_handle_refreshes_cached_tunnel(self):
+        identity, inkbox = _identity_with_mailbox()
+        renamed = {**IDENTITY_DICT, "agent_handle": "new-handle"}
+        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(renamed)
+        refreshed_detail = {
+            **IDENTITY_DETAIL_DICT,
+            "agent_handle": "new-handle",
+            "tunnel": {
+                **IDENTITY_DETAIL_DICT["tunnel"],
+                "tunnel_name": "new-handle",
+                "public_host": "new-handle.inkboxwire.com",
+            },
+        }
+        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(refreshed_detail)
+
+        identity.update(new_handle="new-handle")
+
+        inkbox._ids_resource.get.assert_called_once_with("new-handle")
+        assert identity.tunnel is not None
+        assert identity.tunnel.tunnel_name == "new-handle"
+        assert identity.tunnel.public_host == "new-handle.inkboxwire.com"
+
+    def test_update_without_new_handle_does_not_refresh(self):
+        identity, inkbox = _identity_with_mailbox()
+        renamed = {**IDENTITY_DICT, "display_name": "New Display"}
+        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(renamed)
+
+        identity.update(display_name="New Display")
+
+        inkbox._ids_resource.get.assert_not_called()

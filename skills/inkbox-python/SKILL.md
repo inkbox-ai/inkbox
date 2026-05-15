@@ -78,19 +78,22 @@ identity.delete()                        # unlinks channels
 ## Channel Management
 
 ```python
-# Identity is created with a mailbox automatically — provision a phone number
-phone = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
-print(identity.email_address)  # e.g. "sales-agent@inkboxmail.com"
-print(phone.number)            # e.g. "+18005551234"
+# Identity is created with a mailbox AND tunnel atomically — both come back on the response
+print(identity.email_address)            # e.g. "sales-agent@inkboxmail.com"
+print(identity.tunnel.public_host)       # e.g. "sales-agent.inkboxwire.com"
 
-# Link existing channels
-identity.assign_mailbox("mailbox-uuid")
+# Phone numbers are still opt-in
+phone = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
+print(phone.number)                      # e.g. "+18005551234"
+
+# Existing phone number? Link it instead:
 identity.assign_phone_number("phone-number-uuid")
 
-# Unlink without deleting
-identity.unlink_mailbox()
+# Unlink the phone number without releasing it
 identity.unlink_phone_number()
 ```
+
+Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.create_identity()` to provision both; use `identity.delete()` to remove both (cascade).
 
 ## Mail
 
@@ -408,7 +411,8 @@ code = unlocked.get_totp_code(secret_id)
 mailboxes = inkbox.mailboxes.list()
 mailbox   = inkbox.mailboxes.get("abc@inkboxmail.com")
 
-inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")
+# To rename, use `identity.update(display_name="New Name")` — the
+# mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")
 inkbox.mailboxes.update(mailbox.email_address, webhook_url=None)   # remove webhook
 
@@ -426,7 +430,8 @@ if updated.filter_mode_change_notice:
 # (platform default or a verified custom domain — see "Custom email domains" below).
 
 results = inkbox.mailboxes.search(mailbox.email_address, q="invoice", limit=20)
-inkbox.mailboxes.delete(mailbox.email_address)
+# Mailboxes are deleted via the owning identity's cascade — there is no standalone delete:
+#   identity.delete()  # removes the mailbox + tunnel atomically (cascade)
 ```
 
 ### Custom email domains (`inkbox.domains`)
@@ -446,18 +451,11 @@ verified = inkbox.domains.list(status=SendingDomainStatus.VERIFIED)
 new_default = inkbox.domains.set_default("mail.acme.com")
 # Pass the platform domain (e.g. "inkboxmail.com" in prod) to clear the org default.
 
-# Standalone mailbox: pick by domain id.
-inkbox.mailboxes.create(
-    agent_handle="sales-bot",
-    sending_domain_id=verified[0].id,         # verified custom domain
-)
-inkbox.mailboxes.create(
-    agent_handle="sales-bot",
-    sending_domain_id=None,                   # force platform default
-)
-
 # Identity create: pick by bare domain name (not id).
 inkbox.create_identity("sales-bot", sending_domain="mail.acme.com")
+# Force the platform default:
+inkbox.create_identity("sales-bot-2", sending_domain=None)
+# Standalone mailbox creation is gone — provision via create_identity above.
 ```
 
 ### Phone Numbers (`inkbox.phone_numbers`)
@@ -662,19 +660,22 @@ async with ...:
 
 `wait()`/`close()` and `serve_forever()`/`aclose()` are mutually exclusive — pick one pair.
 
-CRUD:
+Tunnels are provisioned atomically by `inkbox.create_identity(...)`; there is no standalone `create` / `delete` / `restore` / `rotate_secret` surface. For passthrough, opt in at create time: `inkbox.create_identity("my-app", tunnel={"tls_mode": "passthrough"})` — `tls_mode` is fixed at create.
+
+Reads + edit:
 
 ```python
 inkbox.tunnels.list()                       # list[Tunnel]
 inkbox.tunnels.get("tunnel-uuid")
-created = inkbox.tunnels.create(name="my-app", tls_mode="edge")
-print(created.connect_secret)               # returned ONCE — save it
-inkbox.tunnels.delete("tunnel-uuid")        # → pending_removal (24h grace)
-inkbox.tunnels.restore("tunnel-uuid")
-inkbox.tunnels.rotate_secret("tunnel-uuid")
+inkbox.tunnels.update(                      # metadata-only
+    "tunnel-uuid",
+    metadata={"team": "gtm"},
+)
+# Passthrough only:
+inkbox.tunnels.sign_csr("tunnel-uuid", csr_pem=csr_bytes)
 ```
 
-Selected `connect()` kwargs: `pool_size` (1–32), `state_dir` (default `~/.inkbox/tunnels/{name}`), `on_status` callback, `allow_remote_forwarding=False` (loopback-only allowlist), `forward_to_verify_tls=True`. The state dir holds the connect secret and (in passthrough) the private key — treat it like an SSH key dir.
+Data-plane auth uses the same `api_key` the `Inkbox` client was constructed with — admin-scoped or identity-scoped (matching the tunnel's identity). Mint a per-agent identity-scoped key via `inkbox.api_keys.create(scoped_identity_id=...)`. Selected `connect()` kwargs: `pool_size` (1–32), `state_dir` (default `~/.inkbox/tunnels/{name}`), `on_status` callback, `allow_remote_forwarding=False` (loopback-only allowlist), `forward_to_verify_tls=True`. In passthrough mode the state dir holds the per-tunnel private key — treat it like an SSH key dir.
 
 For full options, lifecycle notes, and TS examples, see `skills/inkbox-tunnels/SKILL.md`.
 

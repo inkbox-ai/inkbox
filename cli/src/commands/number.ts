@@ -251,6 +251,7 @@ export function registerNumberCommands(program: Command): void {
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
             incomingTextWebhookUrl: num.incomingTextWebhookUrl ?? null,
             filterMode: num.filterMode,
+            state: num.state,
             agentIdentityId: num.agentIdentityId,
             createdAt: num.createdAt,
           },

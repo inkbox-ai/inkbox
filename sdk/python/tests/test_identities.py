@@ -10,9 +10,9 @@ from uuid import UUID
 from sample_data_identities import IDENTITY_DICT, IDENTITY_DETAIL_DICT
 from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.identities.types import (
-    AgentIdentitySummary,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
+    IdentityTunnelCreateOptions,
     _AgentIdentityData,
 )
 
@@ -28,24 +28,27 @@ HANDLE = "sales-agent"
 class TestIdentitiesCreate:
     def test_creates_identity(self):
         res, http = _resource()
-        http.post.return_value = IDENTITY_DICT
+        http.post.return_value = IDENTITY_DETAIL_DICT
 
         identity = res.create(agent_handle=HANDLE)
 
         http.post.assert_called_once_with("/", json={"agent_handle": HANDLE})
-        assert isinstance(identity, AgentIdentitySummary)
+        assert isinstance(identity, _AgentIdentityData)
         assert identity.agent_handle == HANDLE
+        assert identity.tunnel is not None
 
     def test_creates_identity_with_mailbox_phone_number_and_secret_access(self):
         res, http = _resource()
-        http.post.return_value = {**IDENTITY_DICT, "email_address": "sales.team@inkboxmail.com"}
+        http.post.return_value = {**IDENTITY_DETAIL_DICT, "email_address": "sales.team@inkboxmail.com"}
 
         identity = res.create(
             agent_handle=HANDLE,
+            display_name="Sales Team",
+            description="Sales outreach",
             mailbox=IdentityMailboxCreateOptions(
-                display_name="Sales Team",
                 email_local_part="sales.team",
             ),
+            tunnel=IdentityTunnelCreateOptions(tls_mode="passthrough"),
             phone_number=IdentityPhoneNumberCreateOptions(
                 type="local",
                 state="NY",
@@ -63,10 +66,12 @@ class TestIdentitiesCreate:
             "/",
             json={
                 "agent_handle": HANDLE,
+                "display_name": "Sales Team",
+                "description": "Sales outreach",
                 "mailbox": {
-                    "display_name": "Sales Team",
                     "email_local_part": "sales.team",
                 },
+                "tunnel": {"tls_mode": "passthrough"},
                 "phone_number": {
                     "type": "local",
                     "state": "NY",
@@ -158,29 +163,6 @@ class TestIdentitiesDelete:
         res.delete(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}")
-
-
-class TestIdentitiesAssignMailbox:
-    def test_assigns_mailbox(self):
-        res, http = _resource()
-        mailbox_id = "aaaa1111-0000-0000-0000-000000000001"
-        http.post.return_value = IDENTITY_DETAIL_DICT
-
-        detail = res.assign_mailbox(HANDLE, mailbox_id=mailbox_id)
-
-        http.post.assert_called_once_with(
-            f"/{HANDLE}/mailbox", json={"mailbox_id": mailbox_id}
-        )
-        assert isinstance(detail, _AgentIdentityData)
-
-
-class TestIdentitiesUnlinkMailbox:
-    def test_unlinks_mailbox(self):
-        res, http = _resource()
-
-        res.unlink_mailbox(HANDLE)
-
-        http.delete.assert_called_once_with(f"/{HANDLE}/mailbox")
 
 
 class TestIdentitiesAssignPhoneNumber:

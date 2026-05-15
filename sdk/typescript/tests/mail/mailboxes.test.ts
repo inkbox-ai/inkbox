@@ -2,7 +2,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { MailboxesResource } from "../../src/mail/resources/mailboxes.js";
 import type { HttpTransport } from "../../src/_http.js";
-import { RAW_MAILBOX, RAW_MESSAGE, CURSOR_PAGE_MESSAGES } from "../sampleData.js";
+import { FilterMode } from "../../src/mail/types.js";
+import { RAW_MAILBOX, CURSOR_PAGE_MESSAGES } from "../sampleData.js";
 
 function mockHttp() {
   return {
@@ -45,70 +46,8 @@ describe("MailboxesResource.get", () => {
     const mailbox = await res.get(ADDR);
 
     expect(http.get).toHaveBeenCalledWith(`/mailboxes/${ADDR}`);
-    expect(mailbox.displayName).toBe("Agent 01");
-  });
-});
-
-describe("MailboxesResource.create", () => {
-  it("creates a mailbox for an identity", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
-    const res = new MailboxesResource(http);
-
-    const mailbox = await res.create({
-      agentHandle: "sales-agent",
-      displayName: "Sales Team",
-      emailLocalPart: "sales.team",
-    });
-
-    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
-      agent_handle: "sales-agent",
-      display_name: "Sales Team",
-      email_local_part: "sales.team",
-    });
-    expect(mailbox.emailAddress).toBe("agent01@inkbox.ai");
-    expect(mailbox.sendingDomain).toBe("inkbox.ai");
-  });
-
-  it("omits sending_domain_id when sendingDomainId is omitted", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
-    const res = new MailboxesResource(http);
-
-    await res.create({ agentHandle: "sales-agent" });
-
-    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
-      agent_handle: "sales-agent",
-    });
-  });
-
-  it("sends sending_domain_id: null when explicitly null (force platform)", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
-    const res = new MailboxesResource(http);
-
-    await res.create({ agentHandle: "sales-agent", sendingDomainId: null });
-
-    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
-      agent_handle: "sales-agent",
-      sending_domain_id: null,
-    });
-  });
-
-  it("sends sending_domain_id string when explicit", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_MAILBOX);
-    const res = new MailboxesResource(http);
-
-    await res.create({
-      agentHandle: "sales-agent",
-      sendingDomainId: "sending_domain_xxx",
-    });
-
-    expect(http.post).toHaveBeenCalledWith("/mailboxes", {
-      agent_handle: "sales-agent",
-      sending_domain_id: "sending_domain_xxx",
-    });
+    expect(mailbox.emailAddress).toBe(ADDR);
+    expect(mailbox.agentIdentityId).toBeTruthy();
   });
 });
 
@@ -138,15 +77,27 @@ describe("parseMailbox sendingDomain", () => {
 });
 
 describe("MailboxesResource.update", () => {
-  it("sends displayName", async () => {
+  it("sends webhook_url and filter_mode", async () => {
     const http = mockHttp();
-    vi.mocked(http.patch).mockResolvedValue({ ...RAW_MAILBOX, display_name: "New Name" });
+    vi.mocked(http.patch).mockResolvedValue(RAW_MAILBOX);
     const res = new MailboxesResource(http);
 
-    const mailbox = await res.update(ADDR, { displayName: "New Name" });
+    await res.update(ADDR, { webhookUrl: "https://hooks.example/x", filterMode: FilterMode.WHITELIST });
 
-    expect(http.patch).toHaveBeenCalledWith(`/mailboxes/${ADDR}`, { display_name: "New Name" });
-    expect(mailbox.displayName).toBe("New Name");
+    expect(http.patch).toHaveBeenCalledWith(`/mailboxes/${ADDR}`, {
+      webhook_url: "https://hooks.example/x",
+      filter_mode: "whitelist",
+    });
+  });
+
+  it("forwards webhook_url: null to clear", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+
+    await res.update(ADDR, { webhookUrl: null });
+
+    expect(http.patch).toHaveBeenCalledWith(`/mailboxes/${ADDR}`, { webhook_url: null });
   });
 
   it("sends empty body when no options provided", async () => {
@@ -157,18 +108,6 @@ describe("MailboxesResource.update", () => {
     await res.update(ADDR, {});
 
     expect(http.patch).toHaveBeenCalledWith(`/mailboxes/${ADDR}`, {});
-  });
-});
-
-describe("MailboxesResource.delete", () => {
-  it("calls delete on the correct path", async () => {
-    const http = mockHttp();
-    vi.mocked(http.delete).mockResolvedValue(undefined);
-    const res = new MailboxesResource(http);
-
-    await res.delete(ADDR);
-
-    expect(http.delete).toHaveBeenCalledWith(`/mailboxes/${ADDR}`);
   });
 });
 

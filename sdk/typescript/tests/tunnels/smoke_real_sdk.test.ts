@@ -44,7 +44,6 @@ describeMaybe("Real-SDK smoke against deployed tunnel service", () => {
   let listener: TunnelListener | null = null;
   let publicUrl: string = "";
   let tunnelName: string = "";
-  let tunnelId: string | null = null;
 
   beforeAll(async () => {
     inkbox = new Inkbox({
@@ -86,14 +85,15 @@ describeMaybe("Real-SDK smoke against deployed tunnel service", () => {
     );
     upstreamPort = (upstream.address() as { port: number }).port;
     tunnelName = `smoke-${randomUUID().slice(0, 8)}`;
+    // Provision the identity (and its atomic mailbox + tunnel) before
+    // bringing the data plane up. tls_mode is fixed at create time;
+    // default is edge.
+    await inkbox.createIdentity(tunnelName);
     listener = await connect(inkbox, {
       name: tunnelName,
       forwardTo: `http://127.0.0.1:${upstreamPort}`,
-      tlsMode: "edge",
-      printSecretToStderr: false,
     });
     publicUrl = listener.publicUrl;
-    tunnelId = listener.tunnel.id;
     // serveForever runs in the background (started by connect's listener
     // wrapper). Give it a moment for hello + intake parking.
     await new Promise((r) => setTimeout(r, 1500));
@@ -103,9 +103,11 @@ describeMaybe("Real-SDK smoke against deployed tunnel service", () => {
     if (listener !== null) {
       await listener.aclose();
     }
-    if (tunnelId !== null) {
+    if (tunnelName !== "") {
+      // Identity-delete cascades to the linked mailbox + tunnel.
       try {
-        await inkbox.tunnels.delete(tunnelId);
+        const id = await inkbox.getIdentity(tunnelName);
+        await id.delete();
       } catch {
         /* swallow — best-effort cleanup */
       }

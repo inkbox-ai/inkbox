@@ -102,162 +102,77 @@ describe("Inkbox constructor", () => {
 });
 
 describe("Inkbox.createIdentity", () => {
-  it("creates and fetches full identity detail", async () => {
-    const ink = makeInkbox();
+  function mockCreateReturnsDetail(ink: Inkbox) {
     vi.spyOn(ink._idsResource, "create").mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: RAW_IDENTITY.agent_handle,
-      emailAddress: RAW_IDENTITY.email_address,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
-    vi.spyOn(ink._idsResource, "get").mockResolvedValue({
       id: RAW_IDENTITY_DETAIL.id,
       organizationId: RAW_IDENTITY_DETAIL.organization_id,
       agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
-      emailAddress: RAW_IDENTITY_DETAIL.email_address,
-      createdAt: RAW_IDENTITY_DETAIL.created_at,
-      updatedAt: RAW_IDENTITY_DETAIL.updated_at,
-      mailbox: {
-        id: RAW_IDENTITY_DETAIL.mailbox.id,
-        emailAddress: RAW_IDENTITY_DETAIL.mailbox.email_address,
-        displayName: RAW_IDENTITY_DETAIL.mailbox.display_name,
-        createdAt: RAW_IDENTITY_DETAIL.mailbox.created_at,
-        updatedAt: RAW_IDENTITY_DETAIL.mailbox.updated_at,
-      },
-      phoneNumber: {
-        id: RAW_IDENTITY_DETAIL.phone_number.id,
-        number: RAW_IDENTITY_DETAIL.phone_number.number,
-        type: RAW_IDENTITY_DETAIL.phone_number.type,
-        status: RAW_IDENTITY_DETAIL.phone_number.status,
-        incomingCallAction: RAW_IDENTITY_DETAIL.phone_number.incoming_call_action,
-        clientWebsocketUrl: RAW_IDENTITY_DETAIL.phone_number.client_websocket_url,
-        createdAt: RAW_IDENTITY_DETAIL.phone_number.created_at,
-        updatedAt: RAW_IDENTITY_DETAIL.phone_number.updated_at,
-      },
-    });
-
-    const identity = await ink.createIdentity("sales-agent");
-
-    expect(ink._idsResource.create).toHaveBeenCalledWith({ agentHandle: "sales-agent" });  // displayName omitted
-    expect(ink._idsResource.get).toHaveBeenCalledWith("sales-agent");
-    expect(identity).toBeInstanceOf(AgentIdentity);
-    expect(identity.agentHandle).toBe("sales-agent");
-  });
-
-  it("maps mailbox, phone, and vault secret options into the nested request payload", async () => {
-    const ink = makeInkbox();
-    vi.spyOn(ink._idsResource, "create").mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: RAW_IDENTITY.agent_handle,
-      emailAddress: "sales.team@inkboxmail.com",
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
-    vi.spyOn(ink._idsResource, "get").mockResolvedValue({
-      id: RAW_IDENTITY_DETAIL.id,
-      organizationId: RAW_IDENTITY_DETAIL.organization_id,
-      agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
+      displayName: null,
+      description: null,
       emailAddress: RAW_IDENTITY_DETAIL.email_address,
       createdAt: RAW_IDENTITY_DETAIL.created_at,
       updatedAt: RAW_IDENTITY_DETAIL.updated_at,
       mailbox: null,
       phoneNumber: null,
-    });
-
-    await ink.createIdentity("sales-agent", {
-      displayName: "Sales Team",
-      emailLocalPart: "sales.team",
-      phoneNumber: {
-        incomingCallAction: "webhook",
-        incomingCallWebhookUrl: "https://example.com/calls",
-      },
-      vaultSecretIds: ["secret-1", "secret-2"],
-    });
-
-    expect(ink._idsResource.create).toHaveBeenCalledWith({
-      agentHandle: "sales-agent",
-      mailbox: {
-        displayName: "Sales Team",
-        emailLocalPart: "sales.team",
-      },
-      phoneNumber: {
-        incomingCallAction: "webhook",
-        incomingCallWebhookUrl: "https://example.com/calls",
-      },
-      vaultSecretIds: ["secret-1", "secret-2"],
-    });
-  });
-});
-
-describe("Inkbox.createIdentity sendingDomain", () => {
-  function mockIdsResource(ink: Inkbox) {
-    vi.spyOn(ink._idsResource, "create").mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: RAW_IDENTITY.agent_handle,
-      emailAddress: RAW_IDENTITY.email_address,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
-    vi.spyOn(ink._idsResource, "get").mockResolvedValue({
-      id: RAW_IDENTITY_DETAIL.id,
-      organizationId: RAW_IDENTITY_DETAIL.organization_id,
-      agentHandle: RAW_IDENTITY_DETAIL.agent_handle,
-      emailAddress: RAW_IDENTITY_DETAIL.email_address,
-      createdAt: RAW_IDENTITY_DETAIL.created_at,
-      updatedAt: RAW_IDENTITY_DETAIL.updated_at,
-      mailbox: null,
-      phoneNumber: null,
+      tunnel: null,
     });
   }
 
-  it("does not create a mailbox when only handle is given", async () => {
+  it("creates with a single POST (no follow-up GET) and returns the parsed detail", async () => {
     const ink = makeInkbox();
-    mockIdsResource(ink);
+    mockCreateReturnsDetail(ink);
+    const getSpy = vi.spyOn(ink._idsResource, "get");
 
-    await ink.createIdentity("sales-agent");
+    const identity = await ink.createIdentity("sales-agent");
 
-    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
-    expect(call.mailbox).toBeUndefined();
+    expect(ink._idsResource.create).toHaveBeenCalledTimes(1);
+    expect(getSpy).not.toHaveBeenCalled();
+    expect(identity).toBeInstanceOf(AgentIdentity);
+    expect(identity.agentHandle).toBe(RAW_IDENTITY_DETAIL.agent_handle);
   });
 
-  it("triggers mailbox creation when sendingDomain is the only option (presence implies mailbox)", async () => {
+  it("maps displayName, description, tunnel, phone, and vault secrets into the create payload", async () => {
     const ink = makeInkbox();
-    mockIdsResource(ink);
+    mockCreateReturnsDetail(ink);
+
+    await ink.createIdentity("sales-agent", {
+      displayName: "Sales Team",
+      description: "Sales-outreach agent",
+      emailLocalPart: "sales.team",
+      tunnel: { tlsMode: "passthrough" },
+      phoneNumber: {
+        incomingCallAction: "webhook",
+        incomingCallWebhookUrl: "https://example.com/calls",
+      },
+      vaultSecretIds: ["secret-1", "secret-2"],
+    });
+
+    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
+    expect(call.agentHandle).toBe("sales-agent");
+    expect(call.displayName).toBe("Sales Team");
+    expect(call.description).toBe("Sales-outreach agent");
+    expect(call.mailbox).toEqual({ emailLocalPart: "sales.team" });
+    expect(call.tunnel).toEqual({ tlsMode: "passthrough" });
+    expect(call.phoneNumber).toEqual({
+      incomingCallAction: "webhook",
+      incomingCallWebhookUrl: "https://example.com/calls",
+    });
+    expect(call.vaultSecretIds).toEqual(["secret-1", "secret-2"]);
+  });
+
+  it("forwards sendingDomain when set (string or explicit null)", async () => {
+    const ink = makeInkbox();
+    mockCreateReturnsDetail(ink);
 
     await ink.createIdentity("sales-agent", { sendingDomain: "mail.acme.com" });
+    let call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
+    expect(call.mailbox?.sendingDomain).toBe("mail.acme.com");
 
-    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
-    expect(call.mailbox).toEqual({
-      displayName: undefined,
-      emailLocalPart: undefined,
-      sendingDomain: "mail.acme.com",
-    });
-  });
-
-  it("treats explicit null as presence (forces platform default)", async () => {
-    const ink = makeInkbox();
-    mockIdsResource(ink);
-
+    vi.mocked(ink._idsResource.create).mockClear();
     await ink.createIdentity("sales-agent", { sendingDomain: null });
-
-    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
+    call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
     expect(call.mailbox).toBeDefined();
-    expect(call.mailbox).toHaveProperty("sendingDomain", null);
-  });
-
-  it("omits sendingDomain entirely when not provided but other mailbox fields are", async () => {
-    const ink = makeInkbox();
-    mockIdsResource(ink);
-
-    await ink.createIdentity("sales-agent", { displayName: "Sales" });
-
-    const call = vi.mocked(ink._idsResource.create).mock.calls[0][0];
-    expect(call.mailbox).toBeDefined();
-    expect("sendingDomain" in (call.mailbox as object)).toBe(false);
+    expect(call.mailbox?.sendingDomain).toBeNull();
   });
 });
 

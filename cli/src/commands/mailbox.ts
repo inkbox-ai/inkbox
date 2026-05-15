@@ -13,7 +13,6 @@ const MAILBOX_LIST_COLUMNS = [
   "emailAddress",
   "sendingDomain",
   "id",
-  "displayName",
   "filterMode",
   "agentIdentityId",
   "createdAt",
@@ -205,68 +204,6 @@ export function registerMailboxCommands(program: Command): void {
     );
 
   mailbox
-    .command("create")
-    .description("Create a mailbox")
-    .requiredOption("-i, --identity <handle>", "Agent identity handle to link the mailbox to")
-    .option("--display-name <name>", "Display name for the mailbox")
-    .option("--local-part <part>", "Requested email local part (random if omitted)")
-    .option(
-      "--domain-id <id>",
-      "Bind mailbox to a verified custom sending-domain id (e.g. 'sending_domain_<uuid>')",
-    )
-    .option(
-      "--platform-domain",
-      "Force the platform sending domain (ignores org default custom domain)",
-      false,
-    )
-    .action(
-      withErrorHandler(async function (
-        this: Command,
-        cmdOpts: {
-          identity: string;
-          displayName?: string;
-          localPart?: string;
-          domainId?: string;
-          platformDomain?: boolean;
-        },
-      ) {
-        if (cmdOpts.domainId !== undefined && cmdOpts.platformDomain) {
-          throw new Error("--domain-id and --platform-domain are mutually exclusive");
-        }
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        const createOpts: {
-          agentHandle: string;
-          displayName?: string;
-          emailLocalPart?: string;
-          sendingDomainId?: string | null;
-        } = {
-          agentHandle: cmdOpts.identity,
-          displayName: cmdOpts.displayName,
-          emailLocalPart: cmdOpts.localPart,
-        };
-        if (cmdOpts.domainId !== undefined) {
-          createOpts.sendingDomainId = cmdOpts.domainId;
-        } else if (cmdOpts.platformDomain) {
-          createOpts.sendingDomainId = null;
-        }
-        const mb = await inkbox.mailboxes.create(createOpts);
-        output(
-          {
-            emailAddress: mb.emailAddress,
-            sendingDomain: mb.sendingDomain,
-            id: mb.id,
-            displayName: mb.displayName,
-            filterMode: mb.filterMode,
-            agentIdentityId: mb.agentIdentityId,
-            createdAt: mb.createdAt,
-          },
-          { json: !!opts.json },
-        );
-      }),
-    );
-
-  mailbox
     .command("get <email-address>")
     .description("Get mailbox details")
     .action(
@@ -282,7 +219,6 @@ export function registerMailboxCommands(program: Command): void {
             emailAddress: mb.emailAddress,
             sendingDomain: mb.sendingDomain,
             id: mb.id,
-            displayName: mb.displayName,
             webhookUrl: mb.webhookUrl ?? null,
             filterMode: mb.filterMode,
             agentIdentityId: mb.agentIdentityId,
@@ -295,32 +231,32 @@ export function registerMailboxCommands(program: Command): void {
 
   mailbox
     .command("update <email-address>")
-    .description("Update a mailbox")
-    .option("--display-name <name>", "New display name")
+    .description(
+      "Update a mailbox. Use 'inkbox identity update --display-name' " +
+        "to rename — mailbox PATCH does not accept display_name.",
+    )
     .option("--webhook-url <url>", 'Webhook URL (pass "" to clear)')
     .option("--filter-mode <mode>", "Contact-rule filter mode: whitelist or blacklist (admin-only)")
     .action(
       withErrorHandler(async function (
         this: Command,
         emailAddress: string,
-        cmdOpts: { displayName?: string; webhookUrl?: string; filterMode?: string },
+        cmdOpts: { webhookUrl?: string; filterMode?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        const mb = await inkbox.mailboxes.update(emailAddress, {
-          displayName: cmdOpts.displayName,
-          webhookUrl:
-            cmdOpts.webhookUrl === "" ? null : cmdOpts.webhookUrl,
-          filterMode:
-            cmdOpts.filterMode !== undefined
-              ? assertFilterMode(cmdOpts.filterMode)
-              : undefined,
-        });
+        const updateBody: { webhookUrl?: string | null; filterMode?: FilterMode } = {};
+        if (cmdOpts.webhookUrl !== undefined) {
+          updateBody.webhookUrl = cmdOpts.webhookUrl === "" ? null : cmdOpts.webhookUrl;
+        }
+        if (cmdOpts.filterMode !== undefined) {
+          updateBody.filterMode = assertFilterMode(cmdOpts.filterMode);
+        }
+        const mb = await inkbox.mailboxes.update(emailAddress, updateBody);
         output(
           {
             emailAddress: mb.emailAddress,
             id: mb.id,
-            displayName: mb.displayName,
             webhookUrl: mb.webhookUrl ?? null,
             filterMode: mb.filterMode,
             agentIdentityId: mb.agentIdentityId,
@@ -328,21 +264,6 @@ export function registerMailboxCommands(program: Command): void {
           { json: !!opts.json },
         );
         renderFilterModeChangeNotice(mb);
-      }),
-    );
-
-  mailbox
-    .command("delete <email-address>")
-    .description("Delete a mailbox")
-    .action(
-      withErrorHandler(async function (
-        this: Command,
-        emailAddress: string,
-      ) {
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        await inkbox.mailboxes.delete(emailAddress);
-        console.log(`Deleted mailbox '${emailAddress}'.`);
       }),
     );
 

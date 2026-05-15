@@ -33,7 +33,7 @@ function makeRuntime(opts: {
 }): TunnelRuntime {
   return new TunnelRuntime({
     tunnelId: "11111111-1111-1111-1111-111111111111",
-    secret: "sek-test",
+    apiKey: "ApiKey_test",
     zone: fakeServer.authority,
     publicHost: "my-agent.example.com",
     poolSize: opts.poolSize ?? null,
@@ -67,7 +67,7 @@ describe("TunnelRuntime — happy path", () => {
     expect(hello).not.toBeNull();
     expect(hello![":path"]).toBe("/_system/hello");
     expect(hello!["x-tunnel-id"]).toBe("11111111-1111-1111-1111-111111111111");
-    expect(hello!["x-tunnel-secret"]).toBe("sek-test");
+    expect(hello!["x-api-key"]).toBe("ApiKey_test");
     await runtime.aclose();
     await servePromise;
   });

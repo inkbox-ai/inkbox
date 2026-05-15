@@ -49,7 +49,6 @@ def _make_bundle() -> TunnelBundle:
             id=UUID("11111111-1111-1111-1111-111111111111"),
             organization_id="org",
             tunnel_name="my-agent",
-            description=None,
             tls_mode=TLSMode.EDGE,
             cert_pem=None,
             cert_fingerprint_sha256=None,
@@ -57,7 +56,6 @@ def _make_bundle() -> TunnelBundle:
             status=TunnelStatus.ACTIVE,
             last_connected_at=None,
             last_connected_ip_addr=None,
-            restore_deadline_at=None,
             currently_connected=False,
             public_host="my-agent.inkboxwire.example",
             zone="inkboxwire.example",
@@ -65,7 +63,6 @@ def _make_bundle() -> TunnelBundle:
             created_at=datetime.now(timezone.utc),
             updated_at=datetime.now(timezone.utc),
         ),
-        secret="sec",
         public_host="my-agent.inkboxwire.example",
         zone="inkboxwire.example",
         tls_terminator=None,
@@ -75,7 +72,7 @@ def _make_bundle() -> TunnelBundle:
 def _make_runtime(**kwargs) -> TunnelRuntime:
     base = dict(
         tunnel_id=uuid4(),
-        secret="sec",
+        api_key="ApiKey_test",
         zone="inkboxwire.example",
         public_host="my-agent.inkboxwire.example",
         pool_size=1,
@@ -123,7 +120,7 @@ def test_listener_wait_reraises_captured_runtime_error():
 
     # Simulate what _runner does on a fatal failure: capture and signal.
     listener._runtime_error = _TunnelAuthError(
-        "/_system/hello returned 401; connect secret is invalid",
+        "/_system/hello returned 401; the API key was rejected",
     )
     listener._stopped.set()
 

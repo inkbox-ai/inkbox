@@ -27,7 +27,11 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
   it("accepts a custom handle and email local part", async () => {
     const suffix = randomUUID().replace(/-/g, "").slice(0, 10);
     const agentHandle = `sdk-signup-${suffix}`;
-    const emailLocalPart = `sdk.signup.${suffix}`;
+    // On the platform sending domain, the server forces
+    // `email_local_part == agent_handle`. Pass the same value through
+    // the SDK call so the wire body still includes `emailLocalPart`
+    // explicitly (exercising that arg) without triggering the 422.
+    const emailLocalPart = agentHandle;
 
     logStep(config, "sign up agent with explicit handle and email local part");
     const signup = await Inkbox.signup(

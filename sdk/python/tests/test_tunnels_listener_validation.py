@@ -1,8 +1,9 @@
 """Synchronous validation in ``inkbox.tunnels.client._listener.connect``.
 
-The passthrough-only ``https://`` rejection lives at the listener entry
-point and must not change the shared ``validate_forward_target``
-behavior — edge URL forwarding to ``https://`` upstreams still works.
+`tls_mode` is fixed at identity-create time and no longer a `connect()`
+arg, but the `forward_to` URL validator still gates the loopback-only
+check. The patched bootstrap raises a sentinel so we can confirm the
+URL-validation step let us through.
 """
 
 from __future__ import annotations
@@ -11,10 +12,11 @@ import pytest
 
 from inkbox.tunnels.client import _listener
 from inkbox.tunnels.client._listener import connect
-from inkbox.tunnels.types import TLSMode
 
 
-_INKBOX_SENTINEL = object()
+class _FakeInkbox:
+    """Stand-in for the Inkbox client; the bootstrap stub never reads it."""
+    _api_key = "ApiKey_test"
 
 
 class _BootstrapCalled(Exception):
@@ -27,47 +29,30 @@ def _patch_bootstrap_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(_listener, "bootstrap", _stub)
 
 
-def test_passthrough_accepts_https_forward_to(monkeypatch: pytest.MonkeyPatch):
-    """Passthrough + https:// flows through validation cleanly."""
+def test_forward_to_https_loopback_passes(monkeypatch: pytest.MonkeyPatch):
+    """https:// loopback flows through validation cleanly."""
     _patch_bootstrap_raises(monkeypatch)
-    # Validation passes; the patched bootstrap raises our sentinel.
     with pytest.raises(_BootstrapCalled):
         connect(
-            _INKBOX_SENTINEL,  # type: ignore[arg-type]
+            _FakeInkbox(),  # type: ignore[arg-type]
             name="t",
             forward_to="https://127.0.0.1:8443",
-            tls_mode=TLSMode.PASSTHROUGH,
         )
 
 
-def test_passthrough_accepts_http_forward_to(monkeypatch: pytest.MonkeyPatch):
-    """Passthrough + http:// must pass synchronous validation cleanly."""
+def test_forward_to_http_loopback_passes(monkeypatch: pytest.MonkeyPatch):
+    """http:// loopback passes synchronous validation."""
     _patch_bootstrap_raises(monkeypatch)
     with pytest.raises(_BootstrapCalled):
         connect(
-            _INKBOX_SENTINEL,  # type: ignore[arg-type]
+            _FakeInkbox(),  # type: ignore[arg-type]
             name="t",
             forward_to="http://127.0.0.1:8080",
-            tls_mode=TLSMode.PASSTHROUGH,
         )
 
 
-def test_edge_https_forward_to_still_works(monkeypatch: pytest.MonkeyPatch):
-    """Edge mode + https:// must NOT trip the passthrough-only rejection."""
-    _patch_bootstrap_raises(monkeypatch)
-    # If validation lets us through, the patched bootstrap raises our
-    # sentinel — proving no inline rejection fired.
-    with pytest.raises(_BootstrapCalled):
-        connect(
-            _INKBOX_SENTINEL,  # type: ignore[arg-type]
-            name="t",
-            forward_to="https://127.0.0.1:8443",
-            tls_mode=TLSMode.EDGE,
-        )
-
-
-def test_passthrough_accepts_callable_forward_to(monkeypatch: pytest.MonkeyPatch):
-    """Passthrough + callable is accepted (no URL-only guard)."""
+def test_forward_to_callable_passes(monkeypatch: pytest.MonkeyPatch):
+    """An ASGI callable as `forward_to` is accepted (no URL-only guard)."""
     _patch_bootstrap_raises(monkeypatch)
 
     async def _app(scope, receive, send):  # noqa: ARG001
@@ -75,8 +60,7 @@ def test_passthrough_accepts_callable_forward_to(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(_BootstrapCalled):
         connect(
-            _INKBOX_SENTINEL,  # type: ignore[arg-type]
+            _FakeInkbox(),  # type: ignore[arg-type]
             name="t",
             forward_to=_app,
-            tls_mode=TLSMode.PASSTHROUGH,
         )

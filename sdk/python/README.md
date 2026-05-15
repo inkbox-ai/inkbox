@@ -116,19 +116,29 @@ print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
 `inkbox.create_identity()` and `inkbox.get_identity()` return an `AgentIdentity` object that holds the identity's channels and exposes convenience methods scoped to those channels.
 
 ```python
-# Create and fully provision an identity
-identity = inkbox.create_identity("sales-bot", display_name="Sales Bot")
-phone    = identity.provision_phone_number(type="toll_free")      # provisions + links
+# create_identity atomically provisions the mailbox AND the tunnel —
+# both come back on the response. Phone numbers stay opt-in.
+identity = inkbox.create_identity(
+    "sales-bot",
+    display_name="Sales Bot",
+    description="Sales-outreach agent",
+)
+phone = identity.provision_phone_number(type="toll_free")
 
-print(identity.email_address)
+print(identity.email_address)            # sales-bot@inkboxmail.com
+print(identity.tunnel.public_host)       # sales-bot.inkboxwire.com
 print(phone.number)
 
 # Pin the identity's mailbox to a verified custom sending domain
 # (bare name; see "Custom Sending Domains" below).
-inkbox.create_identity("sales-bot", sending_domain="mail.acme.com")
+inkbox.create_identity("sales-bot-2", sending_domain="mail.acme.com")
 
-# Link an existing mailbox or phone number instead of creating new ones
-identity.assign_mailbox("mailbox-uuid-here")
+# Provision a passthrough tunnel (tls_mode is fixed at create time)
+from inkbox import IdentityTunnelCreateOptions
+inkbox.create_identity("sales-bot-pt", tunnel=IdentityTunnelCreateOptions(tls_mode="passthrough"))
+
+# Link an existing phone number to an identity (mailbox + tunnel are
+# 1:1 with their identity and cannot be relinked).
 identity.assign_phone_number("phone-number-uuid-here")
 
 # Get an existing identity
@@ -138,15 +148,17 @@ identity.refresh()  # re-fetch channels from API
 # List all identities for your org
 all_identities = inkbox.list_identities()
 
-# Update status or handle
+# Update handle, display name, description, status. For description,
+# pass None to clear and omit the kwarg to leave untouched.
 identity.update(status="paused")
 identity.update(new_handle="sales-bot-v2")
+identity.update(display_name="New Name", description="New blurb")
+identity.update(description=None)  # clear
 
-# Unlink channels (without deleting them)
-identity.unlink_mailbox()
+# Unlink the phone number (without releasing it).
 identity.unlink_phone_number()
 
-# Delete
+# Delete (cascades to mailbox + tunnel; revokes scoped API keys).
 identity.delete()
 ```
 
@@ -514,7 +526,9 @@ for t in segments:
 
 ## Org-level Mailboxes
 
-Manage mailboxes directly without going through an identity. Access via `inkbox.mailboxes`.
+Mailboxes are provisioned atomically by `inkbox.create_identity(...)`
+and removed by `identity.delete()` (cascade). The `inkbox.mailboxes`
+surface is read + update + search only.
 
 ```python
 # List all mailboxes in the organisation
@@ -522,38 +536,32 @@ mailboxes = inkbox.mailboxes.list()
 
 # Get a specific mailbox
 mailbox = inkbox.mailboxes.get("abc-xyz@inkboxmail.com")
-
-# Create a mailbox linked to an agent identity
-mailbox = inkbox.mailboxes.create(
-    agent_handle="support-agent",
-    display_name="Support Inbox",
-)
 print(mailbox.email_address)
-print(mailbox.sending_domain)  # bare domain the mailbox sends from
+print(mailbox.sending_domain)        # bare domain the mailbox sends from
+print(mailbox.agent_identity_id)     # non-null for live customer mailboxes (1:1 invariant)
 
-# Pin a new mailbox to a verified custom sending domain (or platform default)
-inkbox.mailboxes.create(agent_handle="support-agent", sending_domain_id="sending_domain_<uuid>")
-inkbox.mailboxes.create(agent_handle="support-agent", sending_domain_id=None)  # force platform
-
-# Update display name or webhook URL
-inkbox.mailboxes.update(mailbox.email_address, display_name="New Name")
+# Update webhook URL or filter mode. display_name has moved to the
+# identity — set it via identity.update(display_name=...). The mailbox
+# PATCH endpoint hard-rejects display_name with a 422.
 inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")
 inkbox.mailboxes.update(mailbox.email_address, webhook_url=None)  # remove webhook
+inkbox.mailboxes.update(mailbox.email_address, filter_mode="whitelist")  # admin-scoped key only
 
 # Full-text search across messages in a mailbox
 results = inkbox.mailboxes.search(mailbox.email_address, q="invoice", limit=20)
 for msg in results:
     print(msg.subject, msg.from_address)
 
-# Delete a mailbox
-inkbox.mailboxes.delete(mailbox.email_address)
+# To remove a mailbox, delete its owning identity (cascades to the
+# linked mailbox AND tunnel; revokes scoped API keys):
+inkbox.get_identity("support-agent").delete()
 ```
 
 ---
 
 ## Custom Sending Domains
 
-If your org has registered custom sending domains in the console, list them and (admin-only) set the org default. New mailboxes inherit the org default unless you pass `sending_domain_id` (`mailboxes.create`) or `sending_domain` (`create_identity`). Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
+If your org has registered custom sending domains in the console, list them and (admin-only) set the org default. New mailboxes inherit the org default unless you pass `sending_domain` to `create_identity`. Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
 
 ```python
 from inkbox import SendingDomainStatus
@@ -628,28 +636,36 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     # Or forward to an in-process ASGI app (FastAPI / Starlette / yours)
     listener = inkbox.tunnels.connect(name="my-app", forward_to=fastapi_app)
 
-    # Or terminate TLS in-process (passthrough mode — SDK auto-signs cert)
+    # Passthrough TLS — tls_mode is fixed at identity-create time:
+    inkbox.create_identity("my-app-pt", tunnel={"tls_mode": "passthrough"})
     listener = inkbox.tunnels.connect(
-        name="my-app",
-        tls_mode="passthrough",
+        name="my-app-pt",
         forward_to="http://127.0.0.1:8080",
     )
 ```
 
 Async variant (`serve_forever()` / `aclose()`) is available for callers already inside an event loop. Pick one pair; don't mix `wait`/`close` with the async APIs.
 
-CRUD on the resource:
+Tunnels are provisioned atomically by `inkbox.create_identity(...)`;
+there is no standalone `create` / `delete` / `restore` /
+`rotate_secret` surface. Read + edit on the resource:
 
 ```python
 inkbox.tunnels.list()
-created = inkbox.tunnels.create(name="my-app", tls_mode="edge")
-print(created.connect_secret)          # returned ONCE — save it
-inkbox.tunnels.delete("tunnel-uuid")   # 24h grace before name frees up
-inkbox.tunnels.restore("tunnel-uuid")
-inkbox.tunnels.rotate_secret("tunnel-uuid")
+inkbox.tunnels.get("tunnel-uuid")
+inkbox.tunnels.update("tunnel-uuid", metadata={"team": "gtm"})
+# Passthrough only:
+inkbox.tunnels.sign_csr("tunnel-uuid", csr_pem=csr_bytes)
 ```
 
-Default TLS mode is `edge`. State (connect secret, passthrough cert/key) lives under `~/.inkbox/tunnels/{name}/`; treat it like an SSH key dir. `forward_to` is loopback-only by default; pass `allow_remote_forwarding=True` after reviewing the SSRF tradeoff.
+Data-plane authentication uses the same `api_key` the `Inkbox` client
+was constructed with — admin-scoped or identity-scoped (matching the
+tunnel's identity). Mint a per-agent scoped key via
+`inkbox.api_keys.create(scoped_identity_id=...)`. There is no
+per-tunnel connect secret to rotate. State (passthrough cert/key,
+cached tunnel id) lives under `~/.inkbox/tunnels/{name}/`; treat it
+like an SSH key dir. `forward_to` is loopback-only by default; pass
+`allow_remote_forwarding=True` after reviewing the SSRF tradeoff.
 
 ---
 

@@ -77,7 +77,17 @@ export type {
   IdentityMailbox,
   IdentityPhoneNumberCreateOptions,
   IdentityPhoneNumber,
+  IdentityTunnelCreateOptions,
 } from "./identities/types.js";
+export {
+  HandleUnavailableError,
+  type BlockingNamespace,
+} from "./identities/exceptions.js";
+export {
+  validateAgentHandle,
+  validateTunnelName,
+  normalizeAgentHandle,
+} from "./tunnels/_validation.js";
 export type {
   Contact,
   ContactAccess,
@@ -138,22 +148,16 @@ export type { CreateApiKeyOptions } from "./api_keys/resources/apiKeys.js";
 // Tunnels
 export { TLSMode, TunnelStatus } from "./tunnels/types.js";
 export type {
-  CreatedTunnel,
-  RotatedSecret,
   SignedCert,
   Tunnel,
 } from "./tunnels/types.js";
-export type {
-  CreateTunnelOptions,
-  UpdateTunnelOptions,
-} from "./tunnels/resources/tunnels.js";
+export type { UpdateTunnelOptions } from "./tunnels/resources/tunnels.js";
 export {
   TunnelCSRStateConflict,
   TunnelError,
   TunnelNameInvalid,
-  TunnelNameUnavailable,
+  TunnelNotProvisioned,
   TunnelRemoved,
-  TunnelSecretUnavailable,
   TunnelStateConflict,
   TunnelTLSModeMismatch,
 } from "./tunnels/exceptions.js";

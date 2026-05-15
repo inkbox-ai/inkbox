@@ -32,7 +32,7 @@ from inkbox.tunnels.client._runtime import (
     TunnelRuntime,
 )
 from inkbox.tunnels.client._url_forward import validate_forward_target
-from inkbox.tunnels.types import TLSMode, Tunnel
+from inkbox.tunnels.types import Tunnel
 
 if TYPE_CHECKING:
     from inkbox.client import Inkbox
@@ -44,8 +44,8 @@ logger = logging.getLogger("inkbox.tunnels")
 def _check_posix() -> None:
     if sys.platform.startswith("win"):
         raise NotImplementedError(
-            "inkbox.tunnels.connect requires a POSIX platform; CRUD "
-            "operations are supported on Windows",
+            "inkbox.tunnels.connect requires a POSIX platform; "
+            "control-plane reads (list, get, update, sign_csr) work on Windows.",
         )
 
 
@@ -223,68 +223,56 @@ def connect(
     name: str,
     forward_to: str | Any,
     data_plane_zone: str | None = None,
-    tls_mode: TLSMode | str = TLSMode.EDGE,
     state_dir: str | Path | None = None,
-    description: str | None = None,
     pool_size: int | None = None,
-    secret: str | None = None,
     on_status: StatusCallback | None = None,
-    on_pending_removal: str = "auto_restore",
     max_inbound_body_bytes: int = DEFAULT_INBOUND_BODY_BYTES,
     max_outbound_body_bytes: int = DEFAULT_OUTBOUND_BODY_BYTES,
     allow_remote_forwarding: bool = False,
-    print_secret_to_stderr: bool | None = None,
     enable_h2_transcode: bool = True,
     forward_to_verify_tls: bool = True,
     forward_to_ca_bundle: bytes | str | None = None,
 ) -> TunnelListener:
     """Bring a tunnel online from this process.
 
+    The tunnel must already exist for the calling org. Provision one via
+    ``inkbox.create_identity(<handle>, ...)`` if it doesn't.
+    Data-plane authentication uses the same API key the ``inkbox``
+    client was constructed with — an identity-scoped key must match
+    the tunnel's identity, or an admin-scoped key in the same org.
+
     Args:
         inkbox: An :class:`Inkbox` SDK client.
-        name: The tunnel name (server-side ``tunnel_name``).
+        name: The tunnel name (= the owning identity's agent handle).
         forward_to: Either a URL string (``"http://localhost:8080"``)
             or an in-process app callable matching
             ``async def app(scope, receive, send)``. URL forwarding is
             required for passthrough mode.
         data_plane_zone: Expert-only override for the data-plane h2
             endpoint. Most users should leave this unset.
-        tls_mode: ``"edge"`` (default — Inkbox terminates TLS) or
-            ``"passthrough"`` (you terminate TLS in this process).
         state_dir: Where ``state.json`` (and passthrough key/cert) live.
             Defaults to ``~/.inkbox/tunnels/{name}``.
-        description: Free-form description, recorded server-side at
-            create time.
         pool_size: Optional override for the parked-intake pool size
             (1-32). Omit to let the server decide.
-        secret: Explicit override for the connect secret. Wins over the
-            state file (recovery from ``rotate_secret``).
         on_status: Callback invoked with status strings
             (``"connecting"``, ``"connected"``, ``"reconnecting"``,
             ``"closed"``).
-        on_pending_removal: ``"auto_restore"`` (default) or ``"error"``.
         max_inbound_body_bytes: Cap on materialized inbound bodies;
             oversize requests get a 413 to the third party.
         max_outbound_body_bytes: Cap on materialized outbound bodies;
             oversize responses get a 502 to the third party.
         allow_remote_forwarding: Bypass the loopback-only allowlist for
             ``forward_to``. Review the SSRF tradeoff before enabling.
-        print_secret_to_stderr: Whether to print the one-shot secret to
-            stderr on first create. ``None`` (default) is TTY-gated.
+        enable_h2_transcode: Default ``True``. When ``False``,
+            passthrough advertises only ``http/1.1`` in ALPN.
     """
     _check_posix()
-    if isinstance(tls_mode, str):
-        tls_mode = TLSMode(tls_mode)
     validate_pool_size(pool_size)
 
     if isinstance(forward_to, str):
         validate_forward_target(
             forward_to, allow_remote_forwarding=allow_remote_forwarding,
         )
-    # Passthrough accepts either a URL or an ASGI callable as
-    # ``forward_to`` — the runtime constructs UpstreamUrlDispatch or
-    # CallableDispatch accordingly. No additional validation here for
-    # the callable shape.
 
     if state_dir is None:
         state_path = Path.home() / ".inkbox" / "tunnels" / name
@@ -294,30 +282,22 @@ def connect(
     # ALPN advertised in passthrough. enable_h2_transcode=True (default)
     # advertises h2 + http/1.1 so the third party can negotiate either;
     # h1 inbound goes through the parser, h2 inbound goes through the
-    # transcoder. Setting this False is the ALPN-only escape hatch:
-    # third parties can only negotiate http/1.1, while the h1 parser
-    # path stays in place — preserving uniform body caps and validation.
-    if tls_mode == TLSMode.PASSTHROUGH and enable_h2_transcode:
-        alpn_protocols: tuple[str, ...] = ("h2", "http/1.1")
-    else:
-        alpn_protocols = ("http/1.1",)
+    # transcoder. Setting this False is the ALPN-only escape hatch.
+    alpn_protocols: tuple[str, ...] = (
+        ("h2", "http/1.1") if enable_h2_transcode else ("http/1.1",)
+    )
 
     bundle = bootstrap(
         inkbox=inkbox,
         name=name,
-        tls_mode=tls_mode,
         state_dir=state_path,
-        description=description,
         data_plane_zone_override=data_plane_zone,
-        explicit_secret=secret,
-        on_pending_removal=on_pending_removal,
-        print_secret_to_stderr=print_secret_to_stderr,
         alpn_protocols=alpn_protocols,
     )
 
     runtime = TunnelRuntime(
         tunnel_id=bundle.tunnel.id,
-        secret=bundle.secret,
+        api_key=inkbox._api_key,  # type: ignore[attr-defined]
         zone=bundle.zone,
         public_host=bundle.public_host,
         pool_size=pool_size,

@@ -30,7 +30,6 @@ export class TunnelStateError extends Error {
 export interface StateEntry {
   tunnelId: string;
   name: string;
-  secret?: string | null;
   mode?: string | null;
   zone?: string | null;
   publicHost?: string | null;
@@ -39,6 +38,8 @@ export interface StateEntry {
 interface RawStateEntry {
   tunnel_id?: string;
   name?: string;
+  /** Legacy field, ignored on read. Pre-0.4.0 SDKs persisted the per-tunnel
+   *  connect secret here; data-plane auth now uses the client's API key. */
   secret?: string | null;
   mode?: string | null;
   zone?: string | null;
@@ -86,7 +87,6 @@ export function loadState(stateDir: string): StateEntry | null {
   return {
     tunnelId: String(parsed.tunnel_id ?? ""),
     name: String(parsed.name ?? ""),
-    secret: parsed.secret ?? null,
     mode: parsed.mode ?? null,
     zone: parsed.zone ?? null,
     publicHost: parsed.public_host ?? null,
@@ -100,7 +100,6 @@ export function saveState(stateDir: string, entry: StateEntry): void {
     tunnel_id: entry.tunnelId,
     name: entry.name,
   };
-  if (entry.secret != null) raw.secret = entry.secret;
   if (entry.mode != null) raw.mode = entry.mode;
   if (entry.zone != null) raw.zone = entry.zone;
   if (entry.publicHost != null) raw.public_host = entry.publicHost;
@@ -149,35 +148,6 @@ function atomicWrite(target: string, content: Buffer | string): void {
     }
     throw err;
   }
-}
-
-/**
- * One-time disclosure of the connect secret.
- *
- * TTY-gated by default: prints to stderr only when stderr is a TTY.
- * Container/daemon/CI runs get only the breadcrumb pointing at the
- * on-disk state file.
- */
-export function printSecretOnce(opts: {
-  secret: string;
-  statePath: string;
-  printToStderr: boolean | null;
-}): void {
-  let shouldPrint = opts.printToStderr;
-  if (shouldPrint === null || shouldPrint === undefined) {
-    shouldPrint = Boolean(process.stderr.isTTY);
-  }
-  if (!shouldPrint) return;
-  const banner =
-    "\n" +
-    "=================================================================\n" +
-    "  Inkbox tunnel: ONE-TIME connect_secret disclosure\n" +
-    "  This will not appear on subsequent runs.\n" +
-    `  Secret persisted at: ${opts.statePath} (chmod 600)\n` +
-    "=================================================================\n" +
-    `  connect_secret = ${opts.secret}\n` +
-    "=================================================================\n";
-  process.stderr.write(banner);
 }
 
 export function defaultStateDir(name: string): string {

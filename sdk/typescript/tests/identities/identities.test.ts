@@ -37,10 +37,12 @@ describe("IdentitiesResource.create", () => {
 
     const identity = await res.create({
       agentHandle: HANDLE,
+      displayName: "Sales Team",
+      description: "Sales outreach",
       mailbox: {
-        displayName: "Sales Team",
         emailLocalPart: "sales.team",
       },
+      tunnel: { tlsMode: "passthrough" },
       phoneNumber: {
         type: "local",
         state: "NY",
@@ -56,10 +58,12 @@ describe("IdentitiesResource.create", () => {
 
     expect(http.post).toHaveBeenCalledWith("/", {
       agent_handle: HANDLE,
+      display_name: "Sales Team",
+      description: "Sales outreach",
       mailbox: {
-        display_name: "Sales Team",
         email_local_part: "sales.team",
       },
+      tunnel: { tls_mode: "passthrough" },
       phone_number: {
         type: "local",
         state: "NY",
@@ -162,31 +166,6 @@ describe("IdentitiesResource.delete", () => {
   });
 });
 
-describe("IdentitiesResource.assignMailbox", () => {
-  it("posts mailbox_id and returns detail", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_DETAIL);
-    const res = new IdentitiesResource(http);
-    const mailboxId = "aaaa1111-0000-0000-0000-000000000001";
-
-    const detail = await res.assignMailbox(HANDLE, { mailboxId });
-
-    expect(http.post).toHaveBeenCalledWith(`/${HANDLE}/mailbox`, { mailbox_id: mailboxId });
-    expect(detail.mailbox!.emailAddress).toBe("sales-agent@inkbox.ai");
-  });
-});
-
-describe("IdentitiesResource.unlinkMailbox", () => {
-  it("deletes mailbox link", async () => {
-    const http = mockHttp();
-    vi.mocked(http.delete).mockResolvedValue(undefined);
-    const res = new IdentitiesResource(http);
-
-    await res.unlinkMailbox(HANDLE);
-
-    expect(http.delete).toHaveBeenCalledWith(`/${HANDLE}/mailbox`);
-  });
-});
 
 describe("IdentitiesResource.assignPhoneNumber", () => {
   it("posts phone_number_id and returns detail", async () => {

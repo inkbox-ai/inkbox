@@ -15,54 +15,41 @@ export enum TLSMode {
  * - `awaiting_cert`: passthrough-only intermediate state. Inbound TLS
  *   will fail until you call `tunnels.signCsr(...)`.
  * - `active`: routable end-to-end.
- * - `pending_removal`: `delete` was called; the name is held for 24h
- *   during which `tunnels.restore(id)` brings it back. After 24h the
- *   tunnel is permanently removed and its name is released. Past that
- *   point a `GET` for the tunnel id returns 404; `TunnelRemoved`
- *   surfaces that condition for clients holding stale state.
+ * - `deleted`: terminal. The tunnel is offline. Tunnels are deleted
+ *   exclusively via the identity-delete cascade — there is no direct
+ *   tunnel-delete surface.
  */
 export enum TunnelStatus {
   AWAITING_CERT = "awaiting_cert",
   ACTIVE = "active",
-  PENDING_REMOVAL = "pending_removal",
+  DELETED = "deleted",
 }
-
-const STATUS_REMAP_TO_PUBLIC: Record<string, TunnelStatus> = {
-  awaiting_cert: TunnelStatus.AWAITING_CERT,
-  active: TunnelStatus.ACTIVE,
-  delete_pending: TunnelStatus.PENDING_REMOVAL,
-};
 
 export interface Tunnel {
   id: string;
   organizationId: string;
   tunnelName: string;
-  description: string | null;
   tlsMode: TLSMode;
   certPem: string | null;
   certFingerprintSha256: string | null;
   certExpiresAt: Date | null;
-  status: TunnelStatus;
+  /**
+   * One of the known {@link TunnelStatus} values, or — if the server
+   * returns a status the SDK doesn't recognize — the raw string. Future
+   * statuses survive parsing without fail-open coercion; callers should
+   * handle a `string` default branch alongside the enum cases.
+   */
+  status: TunnelStatus | string;
   lastConnectedAt: Date | null;
   lastConnectedIpAddr: string | null;
-  restoreDeadlineAt: Date | null;
   currentlyConnected: boolean;
-  publicHost: string | null;
-  zone: string | null;
+  /** Customer-facing hostname — e.g. `my-agent.inkboxwire.com` in production. Lower environments use a different tunnel zone. Non-null for live tunnels. */
+  publicHost: string;
+  /** Zone endpoint for the data-plane. Agents connect to `https://{zone}/_system/connect`. In production this is `inkboxwire.com`; lower environments use a different zone. Non-null for live tunnels. */
+  zone: string;
   metadata: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface CreatedTunnel {
-  tunnel: Tunnel;
-  /** Shown ONCE — persist immediately. */
-  connectSecret: string;
-}
-
-export interface RotatedSecret {
-  /** New secret. Takes effect on the next agent reconnect. */
-  connectSecret: string;
 }
 
 export interface SignedCert {
@@ -76,7 +63,6 @@ export interface RawTunnel {
   id: string;
   organization_id: string;
   tunnel_name: string;
-  description: string | null;
   tls_mode: string;
   cert_pem: string | null;
   cert_fingerprint_sha256: string | null;
@@ -84,22 +70,12 @@ export interface RawTunnel {
   status: string;
   last_connected_at: string | null;
   last_connected_ip_addr: string | null;
-  restore_deadline_at: string | null;
   currently_connected: boolean;
-  public_host?: string | null;
-  zone?: string | null;
+  public_host: string;
+  zone: string;
   metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface RawCreatedTunnel {
-  tunnel: RawTunnel;
-  connect_secret: string;
-}
-
-export interface RawRotatedSecret {
-  connect_secret: string;
 }
 
 export interface RawSignedCert {
@@ -115,37 +91,31 @@ function parseDate(v: string | null | undefined): Date | null {
 }
 
 export function parseTunnel(raw: RawTunnel): Tunnel {
-  const status =
-    STATUS_REMAP_TO_PUBLIC[raw.status] ?? (raw.status as TunnelStatus);
+  if (typeof raw.public_host !== "string" || raw.public_host === "") {
+    throw new Error("tunnel response missing required field 'public_host'");
+  }
+  if (typeof raw.zone !== "string" || raw.zone === "") {
+    throw new Error("tunnel response missing required field 'zone'");
+  }
   return {
     id: String(raw.id),
     organizationId: String(raw.organization_id),
     tunnelName: String(raw.tunnel_name),
-    description: raw.description ?? null,
     tlsMode: raw.tls_mode as TLSMode,
     certPem: raw.cert_pem ?? null,
     certFingerprintSha256: raw.cert_fingerprint_sha256 ?? null,
     certExpiresAt: parseDate(raw.cert_expires_at),
-    status,
+    status: raw.status,
     lastConnectedAt: parseDate(raw.last_connected_at),
     lastConnectedIpAddr: raw.last_connected_ip_addr ?? null,
-    restoreDeadlineAt: parseDate(raw.restore_deadline_at),
     currentlyConnected: Boolean(raw.currently_connected),
-    publicHost: raw.public_host ?? null,
-    zone: raw.zone ?? null,
+    publicHost: raw.public_host,
+    zone: raw.zone,
     metadata:
       raw.metadata && typeof raw.metadata === "object" ? { ...raw.metadata } : {},
     createdAt: new Date(raw.created_at),
     updatedAt: new Date(raw.updated_at),
   };
-}
-
-export function parseCreatedTunnel(raw: RawCreatedTunnel): CreatedTunnel {
-  return { tunnel: parseTunnel(raw.tunnel), connectSecret: raw.connect_secret };
-}
-
-export function parseRotatedSecret(raw: RawRotatedSecret): RotatedSecret {
-  return { connectSecret: raw.connect_secret };
 }
 
 export function parseSignedCert(raw: RawSignedCert): SignedCert {

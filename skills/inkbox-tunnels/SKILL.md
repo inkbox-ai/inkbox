@@ -1,12 +1,14 @@
 ---
 name: inkbox-tunnels
-description: Use when bringing a local server online behind a public Inkbox URL via `inkbox.tunnels.connect(...)` — covers tunnel CRUD, edge vs passthrough TLS, URL forwarding, and in-process Fetch/ASGI/WebSocket handlers in both Python and TypeScript SDKs.
+description: Use when bringing a local server online behind a public Inkbox URL via `inkbox.tunnels.connect(...)` — covers edge vs passthrough TLS, URL forwarding, and in-process Fetch/ASGI/WebSocket handlers in both Python and TypeScript SDKs.
 user-invocable: false
 ---
 
 # Inkbox Tunnels
 
-Inkbox Tunnels expose a process running on the developer's machine (or any POSIX host) at a public `https://{name}.inkboxwire.com` URL. The SDK opens an outbound HTTP/2 connection to the data plane; inbound third-party traffic rides back over that same connection. No inbound port to open, no static IP needed.
+Inkbox Tunnels expose a process running on the developer's machine (or any POSIX host) at a public `https://{handle}.inkboxwire.com` URL. The SDK opens an outbound HTTP/2 connection to the data plane; inbound third-party traffic rides back over that same connection. No inbound port to open, no static IP needed.
+
+Tunnels are an **identity property**: every agent identity owns exactly one tunnel, and `tunnel_name == agent_handle`. There is no standalone "create tunnel" call — the tunnel is provisioned atomically by `inkbox.createIdentity(...)`. Pre-existing identities created before this rollout already have tunnels (the migration backfilled them).
 
 Two TLS modes:
 
@@ -17,7 +19,27 @@ Two TLS modes:
 
 Both modes accept either a **`forward_to` URL** (proxy to a local HTTP server) or an **in-process callable** (Fetch handler in TS, ASGI app in Python). WebSocket upgrades work on either.
 
-Platform: tunnels require POSIX. CRUD works everywhere; `connect()` raises on Windows.
+Platform: tunnels require POSIX. `connect()` raises on Windows; read-only control-plane calls work everywhere.
+
+---
+
+## Authentication
+
+The data plane authenticates with the **same API key** the SDK client was constructed with. Two options:
+
+- **Admin-scoped key** — can connect any tunnel in the org.
+- **Identity-scoped key** — only valid for the tunnel attached to its scoped identity.
+
+For a fresh agent bootstrap, mint an identity-scoped key after `createIdentity`:
+
+```python
+identity = inkbox.create_identity("my-app")
+scoped_key = inkbox.api_keys.create(label="my-app agent", scoped_identity_id=identity.id)
+# Hand `scoped_key.api_key` to the agent process. Its `Inkbox(api_key=...)`
+# will use it for both REST and the tunnel data plane.
+```
+
+The legacy per-tunnel `connect_secret` is gone — there is nothing to print, persist, or rotate per tunnel. To revoke a tunnel's access, revoke the API key.
 
 ---
 
@@ -35,6 +57,9 @@ pip install inkbox
 from inkbox import Inkbox
 
 with Inkbox(api_key="ApiKey_...") as inkbox:
+    # Identity (with tunnel) must already exist — create it once:
+    inkbox.create_identity("my-app")  # idempotent if you catch HandleUnavailableError
+
     listener = inkbox.tunnels.connect(
         name="my-app",
         forward_to="http://127.0.0.1:8080",
@@ -43,7 +68,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     listener.wait()              # blocks; Ctrl-C to stop
 ```
 
-The first call creates the tunnel server-side and prints the connect secret to stderr (TTY-gated). Subsequent calls reuse `~/.inkbox/tunnels/{name}/state.json`.
+Subsequent runs read `~/.inkbox/tunnels/{name}/state.json` for cached tunnel-id / zone / public-host. The state file no longer holds a secret.
 
 ### Forward to an in-process ASGI app (FastAPI, Starlette, …)
 
@@ -67,14 +92,18 @@ The runtime drives the ASGI app directly — no socket, no uvicorn needed. WebSo
 ### Passthrough TLS
 
 ```python
+inkbox.create_identity(
+    "my-app",
+    tunnel={"tls_mode": "passthrough"},
+)
+
 listener = inkbox.tunnels.connect(
     name="my-app",
-    tls_mode="passthrough",
     forward_to="http://127.0.0.1:8080",   # or an ASGI app
 )
 ```
 
-In passthrough mode the SDK auto-generates and signs a certificate via the control plane (stored under `~/.inkbox/tunnels/{name}/`). The third party connects directly to that cert.
+The tunnel's `tls_mode` is fixed at create time. In passthrough mode the SDK auto-generates and signs a certificate via the control plane (stored under `~/.inkbox/tunnels/{name}/`). The third party connects directly to that cert.
 
 ### Async usage
 
@@ -95,29 +124,30 @@ asyncio.run(main())
 
 `wait()`/`close()` and `serve_forever()`/`aclose()` are mutually exclusive — pick one pair.
 
-### CRUD
+### Control-plane reads + edit
 
 ```python
-inkbox.tunnels.list()                       # list[Tunnel]
+inkbox.tunnels.list()                  # list[Tunnel]
 inkbox.tunnels.get("tunnel-uuid")
-created = inkbox.tunnels.create(name="my-app", tls_mode="edge")
-print(created.tunnel.id, created.connect_secret)   # secret returned ONCE — save it
-inkbox.tunnels.delete("tunnel-uuid")        # → pending_removal (24h grace)
-inkbox.tunnels.restore("tunnel-uuid")       # un-delete during grace
-inkbox.tunnels.rotate_secret("tunnel-uuid") # returns RotatedSecret
+inkbox.tunnels.update(                 # metadata-only
+    "tunnel-uuid",
+    metadata={"team": "gtm"},
+)
+# Passthrough only: sign a CSR
+signed = inkbox.tunnels.sign_csr("tunnel-uuid", csr_pem=csr_bytes)
 ```
 
-### Common options
+There is no `create`, `delete`, `restore`, `force_delete`, or `rotate_secret` here — tunnel lifecycle is owned by `create_identity` / `identity.delete()` (which cascades).
+
+### Common `connect()` options
 
 | kwarg | default | notes |
 |---|---|---|
-| `tls_mode` | `"edge"` | or `"passthrough"` (`TLSMode` enum also works) |
 | `pool_size` | server-decided | parked-intake pool, 1–32 |
 | `state_dir` | `~/.inkbox/tunnels/{name}` | where state + passthrough cert live |
 | `on_status` | `None` | callback for `"connecting"` / `"connected"` / `"reconnecting"` / `"closed"` |
 | `allow_remote_forwarding` | `False` | bypass loopback-only allowlist for `forward_to` (review SSRF first) |
 | `forward_to_verify_tls` | `True` | for `https://` upstream forwards |
-| `secret` | from state file | wins over state file; pass after `rotate_secret` |
 
 ---
 
@@ -138,6 +168,7 @@ import { Inkbox } from "@inkbox/sdk";
 import { connect } from "@inkbox/sdk/tunnels/connect";
 
 const inkbox = new Inkbox({ apiKey: process.env.INKBOX_API_KEY! });
+await inkbox.createIdentity("my-app");  // once; the tunnel is provisioned atomically
 
 const listener = await connect(inkbox, {
   name: "my-app",
@@ -195,30 +226,34 @@ await listener.wait();
 ### Passthrough TLS
 
 ```typescript
+await inkbox.createIdentity("my-app", {
+  tunnel: { tlsMode: "passthrough" },
+});
+
 const listener = await connect(inkbox, {
   name: "my-app",
-  tlsMode: "passthrough",
   forwardTo: "http://127.0.0.1:8080",   // or pass `handler` / `wsHandler`
 });
 ```
 
-### CRUD
+### Control-plane reads + edit
 
 ```typescript
 await inkbox.tunnels.list();
 await inkbox.tunnels.get("tunnel-uuid");
-const created = await inkbox.tunnels.create({ tunnelName: "my-app", tlsMode: "edge" });
-console.log(created.tunnel.id, created.connectSecret);   // secret returned ONCE
-await inkbox.tunnels.delete("tunnel-uuid");
-await inkbox.tunnels.restore("tunnel-uuid");
-await inkbox.tunnels.rotateSecret("tunnel-uuid");
+await inkbox.tunnels.update("tunnel-uuid", {
+  metadata: { team: "gtm" },
+});
+// Passthrough only:
+await inkbox.tunnels.signCsr("tunnel-uuid", { csrPem });
 ```
 
-### Common options
+Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `forceDelete` / `rotateSecret` surface.
+
+### Common `connect()` options
 
 | option | default | notes |
 |---|---|---|
-| `tlsMode` | `"edge"` | or `"passthrough"` |
 | `poolSize` | server-decided | 1–32 |
 | `stateDir` | `~/.inkbox/tunnels/{name}` | state.json + passthrough cert |
 | `onStatus` | — | `"connecting"` / `"connected"` / `"reconnecting"` / `"closed"` |
@@ -231,10 +266,10 @@ await inkbox.tunnels.rotateSecret("tunnel-uuid");
 
 ## Operational Notes
 
-- **State dir is sensitive.** It stores the connect secret and (in passthrough) the private key. Default is `0700` under the user's home directory; treat it like an SSH key dir.
-- **Secret recovery.** If you lose the state dir but still own the tunnel, call `rotate_secret(id)` and pass `secret=...` on the next `connect()`.
-- **TLS mode is fixed at create.** Switching between edge and passthrough requires deleting and recreating the tunnel.
-- **Pending removal.** `delete()` sets the tunnel to a 24h grace state; `restore()` un-deletes. By default `connect()` auto-restores; pass `on_pending_removal="error"` (Python) / `onPendingRemoval: "error"` (TS) to fail loudly instead.
+- **State dir is sensitive in passthrough mode.** It stores the per-tunnel private key. Default is `0700` under the user's home directory; treat it like an SSH key dir. Edge mode keeps only zone/public-host caching there.
+- **No secret recovery dance.** Data-plane auth is the same API key used for the control plane. Lose the key, mint a new one via `inkbox.api_keys.create(...)` and revoke the old.
+- **TLS mode is fixed at create.** Switching between edge and passthrough requires `identity.delete()` (cascades to the tunnel) + recreating the identity with the desired `tunnel.tls_mode`.
+- **Identity-delete cascades.** Deleting an identity removes its tunnel and revokes its scoped API keys.
 - **`forward_to` is loopback-only by default.** Pass `allow_remote_forwarding=True` only after reviewing the SSRF tradeoff.
 - **Body caps** apply uniformly across URL forward and in-process handlers (defaults: 50 MiB inbound, 50 MiB response). Configurable per `connect()`.
 

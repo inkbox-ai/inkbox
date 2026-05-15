@@ -57,7 +57,7 @@ class TestIdentityMailboxParsing:
 
         assert isinstance(m.id, UUID)
         assert m.email_address == "sales-agent@inkbox.ai"
-        assert m.display_name == "Sales Agent"
+        assert m.webhook_url is None
         assert m.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
         assert isinstance(m.created_at, datetime)
         assert isinstance(m.updated_at, datetime)
@@ -72,11 +72,21 @@ class TestIdentityMailboxParsing:
         m = IdentityMailbox._from_dict(IDENTITY_MAILBOX_DICT)
         assert m.sending_domain == "inkbox.ai"
 
+    def test_parses_webhook_url(self):
+        m = IdentityMailbox._from_dict(
+            {**IDENTITY_MAILBOX_DICT, "webhook_url": "https://example.com/mail"}
+        )
+        assert m.webhook_url == "https://example.com/mail"
+
 
 class TestIdentityMailboxCreateOptionsToWire:
-    def test_omits_sending_domain_when_unset(self):
-        opts = IdentityMailboxCreateOptions(display_name="x")
-        assert opts.to_wire() == {"display_name": "x"}
+    def test_empty_when_unset(self):
+        opts = IdentityMailboxCreateOptions()
+        assert opts.to_wire() == {}
+
+    def test_email_local_part_when_set(self):
+        opts = IdentityMailboxCreateOptions(email_local_part="alice")
+        assert opts.to_wire() == {"email_local_part": "alice"}
 
     def test_includes_null_when_explicit(self):
         opts = IdentityMailboxCreateOptions(sending_domain=None)
@@ -97,7 +107,9 @@ class TestIdentityPhoneNumberParsing:
         assert p.status == "active"
         assert p.incoming_call_action == "auto_reject"
         assert p.client_websocket_url is None
+        assert p.incoming_call_webhook_url is None
         assert p.incoming_text_webhook_url is None
+        assert p.state is None
         assert p.agent_identity_id == UUID("eeee5555-0000-0000-0000-000000000001")
 
     def test_parses_incoming_text_webhook_url(self):
@@ -109,3 +121,20 @@ class TestIdentityPhoneNumberParsing:
         )
 
         assert p.incoming_text_webhook_url == "https://example.com/texts"
+
+    def test_parses_incoming_call_webhook_url(self):
+        p = IdentityPhoneNumber._from_dict(
+            {
+                **IDENTITY_PHONE_DICT,
+                "incoming_call_webhook_url": "https://example.com/calls",
+            }
+        )
+
+        assert p.incoming_call_webhook_url == "https://example.com/calls"
+
+    def test_parses_state_for_local_numbers(self):
+        p = IdentityPhoneNumber._from_dict(
+            {**IDENTITY_PHONE_DICT, "type": "local", "state": "NY"}
+        )
+
+        assert p.state == "NY"

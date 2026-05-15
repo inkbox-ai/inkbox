@@ -1,7 +1,8 @@
 """
 sdk/python/tests/test_mail_mailboxes.py
 
-Tests for MailboxesResource.
+Tests for MailboxesResource. Mailbox create/delete are gone (cascade
+via identity), and PATCH no longer accepts display_name.
 """
 
 from unittest.mock import MagicMock
@@ -9,6 +10,7 @@ from uuid import UUID
 
 from sample_data_mail import MAILBOX_DICT, CURSOR_PAGE_SEARCH
 from inkbox.mail.resources.mailboxes import MailboxesResource
+from inkbox.mail.types import FilterMode
 
 
 def _resource():
@@ -44,69 +46,7 @@ class TestMailboxesGet:
 
         http.get.assert_called_once_with(f"/mailboxes/{uid}")
         assert mailbox.id == UUID(uid)
-        assert mailbox.display_name == "Agent 01"
-
-
-class TestMailboxesCreate:
-    def test_create_mailbox(self):
-        res, http = _resource()
-        http.post.return_value = MAILBOX_DICT
-
-        mailbox = res.create(
-            agent_handle="sales-agent",
-            display_name="Sales Team",
-            email_local_part="sales.team",
-        )
-
-        http.post.assert_called_once_with(
-            "/mailboxes",
-            json={
-                "agent_handle": "sales-agent",
-                "display_name": "Sales Team",
-                "email_local_part": "sales.team",
-            },
-        )
-        assert mailbox.email_address == "agent01@inkbox.ai"
-        assert mailbox.sending_domain == "inkbox.ai"
-
-    def test_create_omits_sending_domain_id_when_unset(self):
-        res, http = _resource()
-        http.post.return_value = MAILBOX_DICT
-
-        res.create(agent_handle="sales-agent")
-
-        http.post.assert_called_once_with(
-            "/mailboxes",
-            json={"agent_handle": "sales-agent"},
-        )
-
-    def test_create_sends_null_sending_domain_id(self):
-        res, http = _resource()
-        http.post.return_value = MAILBOX_DICT
-
-        res.create(agent_handle="sales-agent", sending_domain_id=None)
-
-        http.post.assert_called_once_with(
-            "/mailboxes",
-            json={"agent_handle": "sales-agent", "sending_domain_id": None},
-        )
-
-    def test_create_sends_explicit_sending_domain_id(self):
-        res, http = _resource()
-        http.post.return_value = MAILBOX_DICT
-
-        res.create(
-            agent_handle="sales-agent",
-            sending_domain_id="sending_domain_xxx",
-        )
-
-        http.post.assert_called_once_with(
-            "/mailboxes",
-            json={
-                "agent_handle": "sales-agent",
-                "sending_domain_id": "sending_domain_xxx",
-            },
-        )
+        assert mailbox.agent_identity_id is not None
 
 
 class TestMailboxParseSendingDomain:
@@ -130,17 +70,31 @@ class TestMailboxParseSendingDomain:
 
 
 class TestMailboxesUpdate:
-    def test_update_display_name(self):
+    def test_update_webhook_url_and_filter_mode(self):
         res, http = _resource()
-        http.patch.return_value = {**MAILBOX_DICT, "display_name": "New Name"}
+        http.patch.return_value = MAILBOX_DICT
         uid = "aaaa1111-0000-0000-0000-000000000001"
 
-        mailbox = res.update(uid, display_name="New Name")
+        res.update(uid, webhook_url="https://hooks.example/x", filter_mode=FilterMode.WHITELIST)
 
         http.patch.assert_called_once_with(
-            f"/mailboxes/{uid}", json={"display_name": "New Name"}
+            f"/mailboxes/{uid}",
+            json={
+                "webhook_url": "https://hooks.example/x",
+                "filter_mode": "whitelist",
+            },
         )
-        assert mailbox.display_name == "New Name"
+
+    def test_update_webhook_url_null_to_clear(self):
+        res, http = _resource()
+        http.patch.return_value = MAILBOX_DICT
+        uid = "aaaa1111-0000-0000-0000-000000000001"
+
+        res.update(uid, webhook_url=None)
+
+        http.patch.assert_called_once_with(
+            f"/mailboxes/{uid}", json={"webhook_url": None},
+        )
 
     def test_update_omits_none_fields(self):
         res, http = _resource()
@@ -151,16 +105,6 @@ class TestMailboxesUpdate:
 
         _, kwargs = http.patch.call_args
         assert kwargs["json"] == {}
-
-
-class TestMailboxesDelete:
-    def test_deletes_mailbox(self):
-        res, http = _resource()
-        uid = "aaaa1111-0000-0000-0000-000000000001"
-
-        res.delete(uid)
-
-        http.delete.assert_called_once_with(f"/mailboxes/{uid}")
 
 
 class TestMailboxesSearch:

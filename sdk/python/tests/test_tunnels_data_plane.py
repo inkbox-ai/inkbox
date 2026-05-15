@@ -226,7 +226,6 @@ def test_save_and_load_state_roundtrip(tmp_path: Path):
     entry = StateEntry(
         tunnel_id="11111111-1111-1111-1111-111111111111",
         name="my-agent",
-        secret="sec_abc",
         mode="edge",
         zone="inkboxwire.com",
         public_host="my-agent.inkboxwire.com",
@@ -240,7 +239,7 @@ def test_save_and_load_state_roundtrip(tmp_path: Path):
 def test_state_file_is_chmod_0600(tmp_path: Path):
     entry = StateEntry(
         tunnel_id="abc", name="my-agent",
-        secret="s", mode="edge", zone=None, public_host=None,
+        mode="edge", zone=None, public_host=None,
     )
     state_dir = tmp_path / "tunnel"
     save_state(state_dir, entry)

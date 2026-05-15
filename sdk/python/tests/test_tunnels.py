@@ -8,11 +8,14 @@ from uuid import uuid4
 import pytest
 
 from inkbox.exceptions import InkboxAPIError
+from inkbox.tunnels._validation import (
+    normalize_agent_handle,
+    validate_agent_handle,
+    validate_tunnel_name,
+)
 from inkbox.tunnels.exceptions import (
     TunnelCSRStateConflict,
     TunnelNameInvalid,
-    TunnelNameUnavailable,
-    TunnelStateConflict,
     TunnelTLSModeMismatch,
 )
 from inkbox.tunnels.resources.tunnels import TunnelsResource
@@ -24,7 +27,6 @@ def _server_tunnel(**overrides):
         "id": str(uuid4()),
         "organization_id": "org_test",
         "tunnel_name": "my-agent",
-        "description": None,
         "tls_mode": "edge",
         "cert_pem": None,
         "cert_fingerprint_sha256": None,
@@ -32,7 +34,6 @@ def _server_tunnel(**overrides):
         "status": "active",
         "last_connected_at": None,
         "last_connected_ip_addr": None,
-        "restore_deadline_at": None,
         "currently_connected": False,
         "public_host": "my-agent.inkboxwire.com",
         "zone": "inkboxwire.com",
@@ -55,65 +56,74 @@ def tunnels(http):
     return TunnelsResource(http)
 
 
-# --- Local validation -----------------------------------------------------
+# --- Local validation (against the standalone validator) ------------------
 
 
-def test_create_rejects_invalid_name_locally(tunnels, http):
+def test_validate_rejects_invalid_name():
     with pytest.raises(TunnelNameInvalid):
-        tunnels.create(tunnel_name="--bad")
-    http.post.assert_not_called()
+        validate_tunnel_name("--bad")
 
 
-def test_create_rejects_too_short_name(tunnels):
+def test_validate_rejects_too_short():
     with pytest.raises(TunnelNameInvalid):
-        tunnels.create(tunnel_name="ab")
+        validate_tunnel_name("ab")
 
 
-def test_create_rejects_too_long_name(tunnels):
+def test_validate_rejects_too_long():
     with pytest.raises(TunnelNameInvalid):
-        tunnels.create(tunnel_name="a" * 64)
+        validate_tunnel_name("a" * 64)
 
 
-def test_create_rejects_consecutive_hyphens(tunnels):
+def test_validate_rejects_consecutive_hyphens():
     with pytest.raises(TunnelNameInvalid):
-        tunnels.create(tunnel_name="my--agent")
+        validate_tunnel_name("my--agent")
 
 
-def test_create_rejects_uppercase(tunnels):
+def test_validate_rejects_reserved_names():
     with pytest.raises(TunnelNameInvalid):
-        tunnels.create(tunnel_name="MyAgent")
+        validate_tunnel_name("admin")
+    with pytest.raises(TunnelNameInvalid):
+        validate_tunnel_name("openai")
 
 
-# --- Status remap ---------------------------------------------------------
+def test_validate_normalizes_at_prefix_and_case():
+    assert validate_tunnel_name("@MyAgent") == "myagent"
+    assert normalize_agent_handle("@FOO") == "foo"
 
 
-def test_status_remap_pending_removal(tunnels, http):
-    http.get.return_value = _server_tunnel(status="delete_pending")
+def test_validate_agent_handle_is_alias_of_tunnel_name():
+    assert validate_agent_handle is validate_tunnel_name
+
+
+# --- Status parsing -------------------------------------------------------
+
+
+def test_status_deleted_recognised(tunnels, http):
+    http.get.return_value = _server_tunnel(status="deleted")
     out = tunnels.get("abc")
-    assert out.status == TunnelStatus.PENDING_REMOVAL
+    assert out.status == TunnelStatus.DELETED
 
 
 def test_unknown_status_preserved_as_raw_string(tunnels, http):
-    """Statuses the SDK doesn't know about (server-only states) flow through unchanged.
-
-    The server filters finalized tunnels out of normal access, so the
-    SDK can't observe ``deleted`` directly via GET in practice — but if
-    a future server-side state appears, the SDK preserves the raw value
-    rather than coercing it to ACTIVE.
-    """
-    http.get.return_value = _server_tunnel(status="deleted")
+    """Server-only states the SDK doesn't know about flow through unchanged."""
+    http.get.return_value = _server_tunnel(status="quarantined")
     out = tunnels.get("abc")
-    assert out.status == "deleted"
-    # Equality against any known TunnelStatus member must fail so users
-    # don't silently treat the unknown state as active.
+    assert out.status == "quarantined"
     assert out.status != TunnelStatus.ACTIVE
-    assert out.status != TunnelStatus.PENDING_REMOVAL
 
 
 def test_metadata_always_dict(tunnels, http):
     http.get.return_value = _server_tunnel(metadata=None)
     out = tunnels.get("abc")
     assert out.metadata == {}
+
+
+def test_missing_public_host_or_zone_raises(tunnels, http):
+    bad = _server_tunnel()
+    bad["public_host"] = ""
+    http.get.return_value = bad
+    with pytest.raises(ValueError, match="public_host"):
+        tunnels.get("abc")
 
 
 # --- list() unwraps {"tunnels": [...]} envelope ---------------------------
@@ -140,13 +150,6 @@ def test_update_omitted_skips_field(tunnels, http):
     tunnels.update("abc")
     body = http.patch.call_args.kwargs["json"]
     assert body == {}
-
-
-def test_update_explicit_none_clears_description(tunnels, http):
-    http.patch.return_value = _server_tunnel()
-    tunnels.update("abc", description=None)
-    body = http.patch.call_args.kwargs["json"]
-    assert body == {"description": None}
 
 
 def test_update_metadata_set(tunnels, http):
@@ -178,30 +181,7 @@ def test_update_metadata_invalid_type_rejected(tunnels, http):
     http.patch.assert_not_called()
 
 
-# --- Error mapping --------------------------------------------------------
-
-
-def test_create_409_maps_to_name_unavailable(tunnels, http):
-    http.post.side_effect = InkboxAPIError(409, "tunnel_name already taken")
-    with pytest.raises(TunnelNameUnavailable):
-        tunnels.create(tunnel_name="my-agent")
-
-
-def test_restore_409_maps_to_state_conflict(tunnels, http):
-    http.post.side_effect = InkboxAPIError(
-        409, "tunnel is not in delete_pending state",
-    )
-    with pytest.raises(TunnelStateConflict) as ei:
-        tunnels.restore("abc")
-    # Sanitization: server detail mentioning delete_pending should be remapped
-    assert "pending_removal" in str(ei.value.detail)
-    assert "delete_pending" not in str(ei.value.detail)
-
-
-def test_force_delete_409_maps_to_state_conflict(tunnels, http):
-    http.delete_with_response.side_effect = InkboxAPIError(409, "wrong state")
-    with pytest.raises(TunnelStateConflict):
-        tunnels.force_delete("abc")
+# --- sign_csr error mapping ----------------------------------------------
 
 
 def test_sign_csr_409_edge_maps_to_tls_mode_mismatch(tunnels, http):
@@ -214,20 +194,10 @@ def test_sign_csr_409_edge_maps_to_tls_mode_mismatch(tunnels, http):
 
 def test_sign_csr_409_state_maps_to_csr_state_conflict(tunnels, http):
     http.post.side_effect = InkboxAPIError(
-        409, "tunnel is in delete_pending state",
+        409, "tunnel is in unexpected state",
     )
     with pytest.raises(TunnelCSRStateConflict):
         tunnels.sign_csr("abc", csr_pem="pem")
-
-
-# --- delete_with_response wiring -----------------------------------------
-
-
-def test_delete_uses_delete_with_response(tunnels, http):
-    http.delete_with_response.return_value = _server_tunnel(status="delete_pending")
-    out = tunnels.delete("abc")
-    assert out.status == TunnelStatus.PENDING_REMOVAL
-    http.delete_with_response.assert_called_once()
 
 
 # --- sign_csr passes elevated timeout -------------------------------------

@@ -78,7 +78,7 @@ class TestMailboxFilterMode:
         transport.patch.return_value = MAILBOX_DICT
         resource = MailboxesResource(transport)
 
-        resource.update("box@inkbox.ai", display_name="New")
+        resource.update("box@inkbox.ai", webhook_url="https://hooks.example/x")
 
         _, kwargs = transport.patch.call_args
         assert "filter_mode" not in kwargs["json"]

@@ -1,7 +1,9 @@
 """
 inkbox/mail/resources/mailboxes.py
 
-Mailbox CRUD and full-text search.
+Mailbox read + update + full-text search. Mailboxes are created and
+deleted exclusively via identity-create / identity-delete cascades —
+there is no standalone mailbox create or delete surface.
 """
 
 from __future__ import annotations
@@ -37,43 +39,10 @@ class MailboxesResource:
         data = self._http.get(f"{_BASE}/{email_address}")
         return Mailbox._from_dict(data)
 
-    def create(
-        self,
-        *,
-        agent_handle: str,
-        display_name: str | None = None,
-        email_local_part: str | None = None,
-        sending_domain_id: str | None = _UNSET,  # type: ignore[assignment]
-    ) -> Mailbox:
-        """Create and link a mailbox to an existing identity.
-
-        Args:
-            agent_handle: Handle of the identity that should own the mailbox.
-            display_name: Optional human-readable sender name.
-            email_local_part: Optional requested local part. If omitted, the
-                server generates a random address.
-            sending_domain_id: Optional sending-domain selector by **row id**
-                (e.g. ``"sending_domain_<uuid>"``). Omit to inherit the org's
-                default custom domain (or fall through to the platform
-                default if none). Pass ``None`` to force the platform
-                default. Pass a verified domain's id to bind this mailbox
-                to it.
-        """
-        body: dict[str, Any] = {"agent_handle": agent_handle}
-        if display_name is not None:
-            body["display_name"] = display_name
-        if email_local_part is not None:
-            body["email_local_part"] = email_local_part
-        if sending_domain_id is not _UNSET:
-            body["sending_domain_id"] = sending_domain_id
-        data = self._http.post(_BASE, json=body)
-        return Mailbox._from_dict(data)
-
     def update(
         self,
         email_address: str,
         *,
-        display_name: str | None = _UNSET,  # type: ignore[assignment]
         webhook_url: str | None = _UNSET,  # type: ignore[assignment]
         filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> Mailbox:
@@ -82,12 +51,16 @@ class MailboxesResource:
         Only provided fields are applied; omitted fields are left unchanged.
         Pass ``webhook_url=None`` to unsubscribe from webhooks.
 
+        Note: ``display_name`` has moved to the agent identity. To change
+        the human-readable name, call ``identity.update(display_name=...)``
+        — the mailbox PATCH endpoint will 422 if ``display_name`` is sent.
+
         Args:
             email_address: Full email address of the mailbox to update.
-            display_name: New human-readable sender name.
-            webhook_url: HTTPS URL to receive webhook events, or ``None`` to unsubscribe.
-            filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on the
-                server — agent-scoped keys will receive 403.
+            webhook_url: HTTPS URL to receive webhook events, or ``None``
+                to unsubscribe.
+            filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on
+                the server — agent-scoped keys will receive 403.
 
         Returns:
             The updated mailbox. When ``filter_mode`` was supplied and the
@@ -95,8 +68,6 @@ class MailboxesResource:
             populated; otherwise it's ``None``.
         """
         body: dict[str, Any] = {}
-        if display_name is not _UNSET:
-            body["display_name"] = display_name
         if webhook_url is not _UNSET:
             body["webhook_url"] = webhook_url
         if filter_mode is not _UNSET:
@@ -110,14 +81,6 @@ class MailboxesResource:
             json=body,
         )
         return Mailbox._from_dict(data)
-
-    def delete(self, email_address: str) -> None:
-        """Delete a mailbox.
-
-        Args:
-            email_address: Full email address of the mailbox to delete.
-        """
-        self._http.delete(f"{_BASE}/{email_address}")
 
     def search(
         self,

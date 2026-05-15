@@ -84,8 +84,7 @@ export enum SendingDomainStatus {
  * A custom sending domain registered to your organisation.
  *
  * Returned by `inkbox.domains.list()`. Mailboxes can be bound to a
- * verified domain via the `sendingDomainId` option on
- * `mailboxes.create()` or `sendingDomain` on `createIdentity`.
+ * verified domain via the `sendingDomain` option on `createIdentity`.
  */
 export interface Domain {
   /** Sending-domain row id (e.g. `"sending_domain_<uuid>"`). */
@@ -125,13 +124,12 @@ export interface Mailbox {
    * verified custom domain.
    */
   sendingDomain: string;
-  displayName: string | null;
   webhookUrl: string | null;
   filterMode: FilterMode;
   /**
-   * UUID of the owning agent identity, or `null` if the mailbox is
-   * standalone (not tied to any agent). Always present on every mailbox
-   * response shape.
+   * UUID of the owning agent identity. Non-null for live customer
+   * mailboxes (1:1 invariant); null only on deleted rows and system
+   * mailboxes.
    */
   agentIdentityId: string | null;
   createdAt: Date;
@@ -210,7 +208,6 @@ export interface RawMailbox {
   id: string;
   email_address: string;
   sending_domain?: string;
-  display_name: string | null;
   webhook_url: string | null;
   filter_mode?: string;
   agent_identity_id?: string | null;
@@ -303,7 +300,6 @@ export function parseMailbox(r: RawMailbox): Mailbox {
     id: r.id,
     emailAddress: r.email_address,
     sendingDomain: r.sending_domain ?? r.email_address.split("@")[1] ?? "",
-    displayName: r.display_name,
     webhookUrl: r.webhook_url,
     filterMode: (r.filter_mode as FilterMode) ?? FilterMode.BLACKLIST,
     agentIdentityId: r.agent_identity_id ?? null,

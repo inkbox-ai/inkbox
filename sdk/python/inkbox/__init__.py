@@ -61,6 +61,7 @@ from inkbox.identities.types import (
     IdentityMailbox,
     IdentityPhoneNumberCreateOptions,
     IdentityPhoneNumber,
+    IdentityTunnelCreateOptions,
 )
 
 # Contacts types
@@ -132,8 +133,6 @@ from inkbox.whoami.types import (
 
 # Tunnels types + exceptions
 from inkbox.tunnels.types import (
-    CreatedTunnel,
-    RotatedSecret,
     SignedCert,
     TLSMode,
     Tunnel,
@@ -143,11 +142,19 @@ from inkbox.tunnels.exceptions import (
     TunnelCSRStateConflict,
     TunnelError,
     TunnelNameInvalid,
-    TunnelNameUnavailable,
+    TunnelNotProvisioned,
     TunnelRemoved,
-    TunnelSecretUnavailable,
     TunnelStateConflict,
     TunnelTLSModeMismatch,
+)
+from inkbox.tunnels._validation import (
+    normalize_agent_handle,
+    validate_agent_handle,
+    validate_tunnel_name,
+)
+from inkbox.identities.exceptions import (
+    BlockingNamespace,
+    HandleUnavailableError,
 )
 
 # Signing key + webhook verification
@@ -206,6 +213,7 @@ __all__ = [
     "IdentityMailbox",
     "IdentityPhoneNumberCreateOptions",
     "IdentityPhoneNumber",
+    "IdentityTunnelCreateOptions",
     # Contacts types
     "Contact",
     "ContactAccess",
@@ -259,8 +267,6 @@ __all__ = [
     "WhoamiJwtResponse",
     "WhoamiResponse",
     # Tunnels
-    "CreatedTunnel",
-    "RotatedSecret",
     "SignedCert",
     "TLSMode",
     "Tunnel",
@@ -268,11 +274,16 @@ __all__ = [
     "TunnelCSRStateConflict",
     "TunnelError",
     "TunnelNameInvalid",
-    "TunnelNameUnavailable",
+    "TunnelNotProvisioned",
     "TunnelRemoved",
-    "TunnelSecretUnavailable",
     "TunnelStateConflict",
     "TunnelTLSModeMismatch",
+    "normalize_agent_handle",
+    "validate_agent_handle",
+    "validate_tunnel_name",
+    # Identity exceptions
+    "BlockingNamespace",
+    "HandleUnavailableError",
     # Signing key + webhook verification
     "SigningKey",
     "verify_webhook",

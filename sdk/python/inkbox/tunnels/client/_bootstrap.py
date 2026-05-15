@@ -1,12 +1,14 @@
 """
 inkbox/tunnels/client/_bootstrap.py
 
-Pre-runtime orchestration: state-file lookup, server lookup-or-create,
-secret resolution, optional CSR + sign for passthrough. Returns a
-fully-resolved bundle the runtime can connect with.
+Pre-runtime orchestration: state-file lookup, server lookup, optional
+CSR + sign for passthrough. Returns a fully-resolved bundle the runtime
+can connect with.
 
-Ordering invariant: NO state-changing call against an existing tunnel
-until the secret is proven. Create is exempt (it produces the secret).
+Tunnels are provisioned atomically by ``inkbox.create_identity(...)``;
+``connect`` is read-only on the control plane (with the exception of
+passthrough CSR signing). Data-plane authentication uses the client's
+API key — no per-tunnel secret is involved.
 """
 
 from __future__ import annotations
@@ -31,13 +33,12 @@ from inkbox.tunnels.client._state import (
     StateEntry,
     ensure_private_state_dir,
     load_state,
-    print_secret_once,
     save_state,
 )
 from inkbox.tunnels.client._tls import TLSTerminator
 from inkbox.tunnels.exceptions import (
+    TunnelNotProvisioned,
     TunnelRemoved,
-    TunnelSecretUnavailable,
     TunnelStateConflict,
 )
 from inkbox.tunnels.resources.tunnels import POOL_SIZE_MAX, POOL_SIZE_MIN
@@ -54,7 +55,6 @@ PROD_ZONE = "inkboxwire.com"
 @dataclass
 class TunnelBundle:
     tunnel: Tunnel
-    secret: str
     public_host: str
     zone: str
     tls_terminator: TLSTerminator | None
@@ -91,8 +91,8 @@ def resolve_zone_and_host(
     """Pick the zone + public host using the documented precedence.
 
     ``data_plane_zone_override`` only overrides the zone (data-plane h2
-    endpoint). public_host always comes from server > state > prod-zone
-    fallback.
+    endpoint). ``public_host`` always comes from server > state >
+    prod-zone fallback.
     """
     if server_public_host:
         public_host = server_public_host
@@ -116,34 +116,17 @@ def bootstrap(
     *,
     inkbox: object,  # Inkbox instance; circular-import-friendly typing
     name: str,
-    tls_mode: TLSMode,
     state_dir: Path,
-    description: str | None,
     data_plane_zone_override: str | None,
-    explicit_secret: str | None,
-    on_pending_removal: str,
-    print_secret_to_stderr: bool | None,
     alpn_protocols: Sequence[str] = ("http/1.1",),
 ) -> TunnelBundle:
-    """Resolve a tunnel for ``connect()``: lookup-or-create + cert."""
+    """Resolve a tunnel for ``connect()``: server lookup + cert dance for
+    passthrough."""
     validate_tunnel_name(name)
-    if on_pending_removal not in ("auto_restore", "error"):
-        raise ValueError(
-            "on_pending_removal must be 'auto_restore' or 'error' "
-            f"(got {on_pending_removal!r})",
-        )
 
     state_dir = Path(state_dir).expanduser()
     ensure_private_state_dir(state_dir)
     state = load_state(state_dir)
-
-    # Secret resolution: explicit kwarg wins (recovery-after-rotate-secret),
-    # then state file's secret. Server hash is one-way — never recoverable.
-    secret: str | None = None
-    if explicit_secret is not None:
-        secret = explicit_secret
-    elif state and state.secret:
-        secret = state.secret
 
     tunnels = inkbox.tunnels  # type: ignore[attr-defined]
 
@@ -162,105 +145,42 @@ def bootstrap(
             if err.status_code == 404:
                 raise TunnelRemoved(
                     f"tunnel {name!r} (id={state_tunnel_id}) has been removed; "
-                    f"clear {state_dir} and call inkbox.tunnels.create() to "
-                    "start fresh",
+                    f"clear {state_dir} and call inkbox.create_identity({name!r}) "
+                    "to start fresh",
                 ) from err
             raise
 
     if tunnel is None:
-        # Look up by name (filtered to non-removed by server policy).
+        # Look up by name (the server lists only live tunnels).
         for t in tunnels.list():
             if t.tunnel_name == name:
                 tunnel = t
                 break
 
     if tunnel is None:
-        # First-time create. This is the call that PRODUCES the secret —
-        # secret-required short-circuit MUST NOT block create.
-        logger.info(
-            "creating tunnel name=%s tls_mode=%s", name, tls_mode.value,
+        raise TunnelNotProvisioned(
+            f"no tunnel named {name!r} exists in this org. "
+            "Tunnels are provisioned atomically by "
+            f"inkbox.create_identity({name!r}); call that first."
         )
-        created = tunnels.create(
-            tunnel_name=name,
-            tls_mode=tls_mode,
-            description=description,
+
+    # Edge tunnels must be ACTIVE before we open the data plane.
+    # Passthrough has its own AWAITING_CERT branch below.
+    if (
+        tunnel.tls_mode == TLSMode.EDGE
+        and tunnel.status != TunnelStatus.ACTIVE
+    ):
+        raise TunnelStateConflict(
+            status_code=409,
+            detail=(
+                f"tunnel {name!r} is in status {_status_repr(tunnel.status)}; "
+                "expected active before opening the data plane"
+            ),
         )
-        tunnel = created.tunnel
-        secret = created.connect_secret
-        # Persist immediately — a crash anywhere in cert/CSR flow below
-        # should not strand us with no on-disk record of the secret.
-        save_state(state_dir, StateEntry(
-            tunnel_id=str(tunnel.id),
-            name=name,
-            secret=secret,
-            mode=tls_mode.value,
-            zone=tunnel.zone,
-            public_host=tunnel.public_host,
-        ))
-        print_secret_once(
-            secret=secret,
-            state_path=state_dir / "state.json",
-            print_to_stderr=print_secret_to_stderr,
-        )
-    else:
-        # Existing tunnel.
-        if tunnel.tls_mode != tls_mode:
-            raise TunnelStateConflict(
-                status_code=409,
-                detail=(
-                    f"tls_mode mismatch: requested {tls_mode.value} but tunnel "
-                    f"reports {tunnel.tls_mode.value}. tls_mode is fixed at "
-                    "creation; delete the tunnel and recreate to change it."
-                ),
-            )
-        if tunnel.status == TunnelStatus.PENDING_REMOVAL:
-            if on_pending_removal == "error":
-                raise TunnelStateConflict(
-                    status_code=409,
-                    detail=(
-                        f"tunnel {name!r} is in pending_removal; pass "
-                        "on_pending_removal='auto_restore' to bring it back"
-                    ),
-                )
-            if not secret:
-                raise TunnelSecretUnavailable(
-                    f"connect_secret not available locally for tunnel {name!r}; "
-                    "pass secret= explicitly, or rotate via "
-                    "inkbox.tunnels.rotate_secret(id) first. Refusing to call "
-                    "restore until the secret is proven."
-                )
-            logger.warning(
-                "tunnel %s is in pending_removal; auto-restoring before connect",
-                name,
-            )
-            tunnel = tunnels.restore(tunnel.id)
-        if not secret:
-            raise TunnelSecretUnavailable(
-                f"connect_secret not available locally for tunnel {name!r}; "
-                "pass secret= explicitly, or rotate via "
-                "inkbox.tunnels.rotate_secret(id) first."
-            )
-        # Edge tunnels must be ACTIVE before we open the data plane.
-        # Passthrough has its own AWAITING_CERT branch below, but for
-        # edge there's no remediation path — surface a clear error rather
-        # than letting an unknown future status (suspended/quarantined/...)
-        # fall through to the runtime.
-        if (
-            tunnel.tls_mode == TLSMode.EDGE
-            and tunnel.status != TunnelStatus.ACTIVE
-        ):
-            raise TunnelStateConflict(
-                status_code=409,
-                detail=(
-                    f"tunnel {name!r} is in status {_status_repr(tunnel.status)}; "
-                    "expected active before opening the data plane"
-                ),
-            )
 
     # Cert dance for passthrough.
     terminator: TLSTerminator | None = None
     if tunnel.tls_mode == TLSMode.PASSTHROUGH:
-        # Need a public_host to build the CSR.
         zone, public_host = resolve_zone_and_host(
             name=name,
             server_zone=tunnel.zone,
@@ -307,11 +227,10 @@ def bootstrap(
         data_plane_zone_override=data_plane_zone_override,
     )
 
-    # Persist final state (including zone/public_host learned from server).
+    # Persist final state (zone/public_host learned from server).
     save_state(state_dir, StateEntry(
         tunnel_id=str(tunnel.id),
         name=name,
-        secret=secret,
         mode=tunnel.tls_mode.value,
         zone=zone,
         public_host=public_host,
@@ -319,7 +238,6 @@ def bootstrap(
 
     return TunnelBundle(
         tunnel=tunnel,
-        secret=secret,
         public_host=public_host,
         zone=zone,
         tls_terminator=terminator,

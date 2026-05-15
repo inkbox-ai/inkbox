@@ -37,8 +37,19 @@ export function registerIdentityCommands(program: Command): void {
           {
             agentHandle: id.agentHandle,
             id: id.id,
+            displayName: id.displayName,
+            description: id.description,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
+            tunnel: id.tunnel
+              ? {
+                  id: id.tunnel.id,
+                  publicHost: id.tunnel.publicHost,
+                  zone: id.tunnel.zone,
+                  tlsMode: id.tunnel.tlsMode,
+                  status: id.tunnel.status,
+                }
+              : null,
           },
           { json: !!opts.json },
         );
@@ -47,38 +58,91 @@ export function registerIdentityCommands(program: Command): void {
 
   identity
     .command("create <handle>")
-    .description("Create a new identity")
+    .description(
+      "Create a new agent identity. Atomically provisions a mailbox " +
+        "and tunnel; both come back on the JSON output.",
+    )
+    .option(
+      "--display-name <name>",
+      "Identity-level human-readable name. Defaults server-side to the handle.",
+    )
+    .option(
+      "--description <text>",
+      "Free-form org-internal description (never surfaces in outbound mail).",
+    )
+    .option(
+      "--email-local-part <part>",
+      "Requested mailbox local part. On the platform domain the server forces this to the handle.",
+    )
     .option(
       "--sending-domain <name>",
-      "Bare verified custom domain name to use for the agent's mailbox (e.g. 'mail.acme.com'). Implies mailbox creation.",
+      "Bare verified custom domain name to use for the agent's mailbox (e.g. 'mail.acme.com').",
     )
     .option(
       "--platform-domain",
-      "Force the platform sending domain for the mailbox (implies mailbox creation)",
+      "Force the platform sending domain for the mailbox.",
       false,
+    )
+    .option(
+      "--tls-mode <mode>",
+      "Tunnel TLS mode: edge (default) or passthrough.",
     )
     .action(
       withErrorHandler(async function (
         this: Command,
         handle: string,
-        cmdOpts: { sendingDomain?: string; platformDomain?: boolean },
+        cmdOpts: {
+          displayName?: string;
+          description?: string;
+          emailLocalPart?: string;
+          sendingDomain?: string;
+          platformDomain?: boolean;
+          tlsMode?: string;
+        },
       ) {
         if (cmdOpts.sendingDomain !== undefined && cmdOpts.platformDomain) {
           throw new Error("--sending-domain and --platform-domain are mutually exclusive");
         }
+        if (cmdOpts.tlsMode !== undefined && cmdOpts.tlsMode !== "edge" && cmdOpts.tlsMode !== "passthrough") {
+          throw new Error("--tls-mode must be 'edge' or 'passthrough'");
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        const createOpts: { sendingDomain?: string | null } = {};
+        const createOpts: {
+          displayName?: string;
+          description?: string | null;
+          emailLocalPart?: string;
+          sendingDomain?: string | null;
+          tunnel?: { tlsMode?: "edge" | "passthrough" };
+        } = {};
+        if (cmdOpts.displayName !== undefined) createOpts.displayName = cmdOpts.displayName;
+        if (cmdOpts.description !== undefined) createOpts.description = cmdOpts.description;
+        if (cmdOpts.emailLocalPart !== undefined) createOpts.emailLocalPart = cmdOpts.emailLocalPart;
         if (cmdOpts.sendingDomain !== undefined) {
           createOpts.sendingDomain = cmdOpts.sendingDomain;
         } else if (cmdOpts.platformDomain) {
           createOpts.sendingDomain = null;
+        }
+        if (cmdOpts.tlsMode !== undefined) {
+          createOpts.tunnel = { tlsMode: cmdOpts.tlsMode as "edge" | "passthrough" };
         }
         const id = await inkbox.createIdentity(handle, createOpts);
         output(
           {
             agentHandle: id.agentHandle,
             id: id.id,
+            displayName: id.displayName,
+            description: id.description,
+            mailbox: id.mailbox?.emailAddress ?? null,
+            tunnel: id.tunnel
+              ? {
+                  id: id.tunnel.id,
+                  publicHost: id.tunnel.publicHost,
+                  zone: id.tunnel.zone,
+                  tlsMode: id.tunnel.tlsMode,
+                  status: id.tunnel.status,
+                }
+              : null,
           },
           { json: !!opts.json },
         );
@@ -87,7 +151,7 @@ export function registerIdentityCommands(program: Command): void {
 
   identity
     .command("delete <handle>")
-    .description("Delete an identity")
+    .description("Delete an identity. Cascades to the linked mailbox + tunnel and revokes scoped API keys.")
     .action(
       withErrorHandler(async function (this: Command, handle: string) {
         const opts = getGlobalOpts(this);
@@ -100,20 +164,56 @@ export function registerIdentityCommands(program: Command): void {
 
   identity
     .command("update <handle>")
-    .description("Update an identity")
+    .description(
+      "Update an identity. For --description, an empty string clears " +
+        "the column (sends explicit null); omit the flag to leave " +
+        "untouched.",
+    )
     .option("--new-handle <name>", "New handle")
+    .option("--display-name <name>", "New display name (pass '' to clear)")
+    .option("--description <text>", "New description (pass '' to clear)")
+    .option("--clear-description", "Explicitly clear the description (sends null)", false)
+    .option("--status <status>", "active or paused")
     .action(
       withErrorHandler(async function (
         this: Command,
         handle: string,
-        cmdOpts: { newHandle?: string },
+        cmdOpts: {
+          newHandle?: string;
+          displayName?: string;
+          description?: string;
+          clearDescription?: boolean;
+          status?: string;
+        },
       ) {
+        if (cmdOpts.description !== undefined && cmdOpts.clearDescription) {
+          throw new Error("--description and --clear-description are mutually exclusive");
+        }
+        if (cmdOpts.status !== undefined && cmdOpts.status !== "active" && cmdOpts.status !== "paused") {
+          throw new Error("--status must be 'active' or 'paused'");
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
-        await id.update({
-          newHandle: cmdOpts.newHandle,
-        });
+        const updateOpts: {
+          newHandle?: string;
+          displayName?: string | null;
+          description?: string | null;
+          status?: "active" | "paused";
+        } = {};
+        if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
+        if (cmdOpts.displayName !== undefined) {
+          updateOpts.displayName = cmdOpts.displayName === "" ? null : cmdOpts.displayName;
+        }
+        if (cmdOpts.description !== undefined) {
+          updateOpts.description = cmdOpts.description === "" ? null : cmdOpts.description;
+        } else if (cmdOpts.clearDescription) {
+          updateOpts.description = null;
+        }
+        if (cmdOpts.status !== undefined) {
+          updateOpts.status = cmdOpts.status as "active" | "paused";
+        }
+        await id.update(updateOpts);
         console.log(`Updated identity '${handle}'.`);
       }),
     );
@@ -131,8 +231,19 @@ export function registerIdentityCommands(program: Command): void {
           {
             agentHandle: id.agentHandle,
             id: id.id,
+            displayName: id.displayName,
+            description: id.description,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
+            tunnel: id.tunnel
+              ? {
+                  id: id.tunnel.id,
+                  publicHost: id.tunnel.publicHost,
+                  zone: id.tunnel.zone,
+                  tlsMode: id.tunnel.tlsMode,
+                  status: id.tunnel.status,
+                }
+              : null,
           },
           { json: !!opts.json },
         );
@@ -471,44 +582,6 @@ export function registerIdentityCommands(program: Command): void {
           },
           { json: !!opts.json },
         );
-      }),
-    );
-
-  identity
-    .command("assign-mailbox <handle>")
-    .description("Assign an existing mailbox to an identity")
-    .requiredOption("--mailbox-id <id>", "UUID of the mailbox to assign")
-    .action(
-      withErrorHandler(async function (
-        this: Command,
-        handle: string,
-        cmdOpts: { mailboxId: string },
-      ) {
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        const id = await inkbox.getIdentity(handle);
-        const mb = await id.assignMailbox(cmdOpts.mailboxId);
-        output(
-          {
-            agentHandle: id.agentHandle,
-            mailboxId: mb.id,
-            emailAddress: mb.emailAddress,
-          },
-          { json: !!opts.json },
-        );
-      }),
-    );
-
-  identity
-    .command("unlink-mailbox <handle>")
-    .description("Unlink the mailbox from an identity (does not delete the mailbox)")
-    .action(
-      withErrorHandler(async function (this: Command, handle: string) {
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        const id = await inkbox.getIdentity(handle);
-        await id.unlinkMailbox();
-        console.log(`Unlinked mailbox from identity '${handle}'.`);
       }),
     );
 
