@@ -253,12 +253,12 @@ const rows = await inkbox.smsOptIns.list({ limit: 50 });
 const optedOut = await inkbox.smsOptIns.list({ status: SmsOptInStatus.OPTED_OUT });
 
 // Look up one recipient — 404 → InkboxAPIError if no row exists
-const row = await inkbox.smsOptIns.get("+15167251294");
+const row = await inkbox.smsOptIns.get("+15551234567");
 console.log(row.status, row.source, row.optedInAt, row.optedOutAt);
 
 // Programmatic writes (customer-managed 10DLC campaign only)
-await inkbox.smsOptIns.optIn("+15167251294");
-await inkbox.smsOptIns.optOut("+15167251294");
+await inkbox.smsOptIns.optIn("+15551234567");
+await inkbox.smsOptIns.optOut("+15551234567");
 ```
 
 ## Vault

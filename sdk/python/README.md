@@ -334,7 +334,7 @@ rows = inkbox.sms_opt_ins.list(limit=50)
 opted_out = inkbox.sms_opt_ins.list(status=SmsOptInStatus.OPTED_OUT)
 
 # Look up one recipient — 404 → InkboxAPIError if no row exists
-row = inkbox.sms_opt_ins.get("+15167251294")
+row = inkbox.sms_opt_ins.get("+15551234567")
 print(row.status, row.source, row.opted_in_at, row.opted_out_at)
 ```
 
@@ -345,10 +345,10 @@ event with `source="api"`.
 
 ```python
 # Record consent captured outside of STOP/START (signup form, paper waiver, etc.)
-inkbox.sms_opt_ins.opt_in("+15167251294")
+inkbox.sms_opt_ins.opt_in("+15551234567")
 
 # Honor an opt-out collected outside of inbound STOP
-inkbox.sms_opt_ins.opt_out("+15167251294")
+inkbox.sms_opt_ins.opt_out("+15551234567")
 ```
 
 ---

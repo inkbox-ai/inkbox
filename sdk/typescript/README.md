@@ -358,7 +358,7 @@ const rows = await inkbox.smsOptIns.list({ limit: 50 });
 const optedOut = await inkbox.smsOptIns.list({ status: SmsOptInStatus.OPTED_OUT });
 
 // Look up one recipient — 404 → InkboxAPIError if no row exists
-const row = await inkbox.smsOptIns.get("+15167251294");
+const row = await inkbox.smsOptIns.get("+15551234567");
 console.log(row.status, row.source, row.optedInAt, row.optedOutAt);
 ```
 
@@ -369,10 +369,10 @@ event with `source: "api"`.
 
 ```ts
 // Record consent captured outside of STOP/START (signup form, paper waiver, etc.)
-await inkbox.smsOptIns.optIn("+15167251294");
+await inkbox.smsOptIns.optIn("+15551234567");
 
 // Honor an opt-out collected outside of inbound STOP
-await inkbox.smsOptIns.optOut("+15167251294");
+await inkbox.smsOptIns.optOut("+15551234567");
 ```
 
 ---

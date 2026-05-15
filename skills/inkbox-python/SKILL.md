@@ -239,12 +239,12 @@ rows = inkbox.sms_opt_ins.list(limit=50)
 opted_out = inkbox.sms_opt_ins.list(status=SmsOptInStatus.OPTED_OUT)
 
 # Look up one recipient — 404 → InkboxAPIError if no row exists
-row = inkbox.sms_opt_ins.get("+15167251294")
+row = inkbox.sms_opt_ins.get("+15551234567")
 print(row.status, row.source, row.opted_in_at, row.opted_out_at)
 
 # Programmatic writes (customer-managed 10DLC campaign only)
-inkbox.sms_opt_ins.opt_in("+15167251294")
-inkbox.sms_opt_ins.opt_out("+15167251294")
+inkbox.sms_opt_ins.opt_in("+15551234567")
+inkbox.sms_opt_ins.opt_out("+15551234567")
 ```
 
 ## Vault
