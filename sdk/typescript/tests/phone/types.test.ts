@@ -75,7 +75,7 @@ describe("parsePhoneCall", () => {
     const c = parsePhoneCall(RAW_PHONE_CALL);
     expect(c.id).toBe(RAW_PHONE_CALL.id);
     expect(c.localPhoneNumber).toBe("+18335794607");
-    expect(c.remotePhoneNumber).toBe("+15167251294");
+    expect(c.remotePhoneNumber).toBe("+15551234567");
     expect(c.direction).toBe("outbound");
     expect(c.status).toBe("completed");
     expect(c.clientWebsocketUrl).toBe("wss://agent.example.com/ws");

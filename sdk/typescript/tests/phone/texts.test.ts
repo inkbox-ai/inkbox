@@ -25,7 +25,7 @@ function mockHttp() {
 
 const NUM_ID = "aaaa1111-0000-0000-0000-000000000001";
 const TEXT_ID = "dddd4444-0000-0000-0000-000000000001";
-const REMOTE = "+15167251294";
+const REMOTE = "+15551234567";
 
 describe("TextsResource.send", () => {
   it("posts to the correct path with to/text", async () => {

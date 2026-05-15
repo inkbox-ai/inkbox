@@ -97,7 +97,7 @@ export const RAW_PHONE_NUMBER = {
 export const RAW_PHONE_CALL = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   local_phone_number: "+18335794607",
-  remote_phone_number: "+15167251294",
+  remote_phone_number: "+15551234567",
   direction: "outbound",
   status: "completed",
   client_websocket_url: "wss://agent.example.com/ws",
@@ -158,7 +158,7 @@ export const RAW_TEXT_MESSAGE = {
   id: "dddd4444-0000-0000-0000-000000000001",
   direction: "inbound",
   local_phone_number: "+18335794607",
-  remote_phone_number: "+15167251294",
+  remote_phone_number: "+15551234567",
   text: "Hello, is this support?",
   type: "sms",
   media: null,
@@ -186,7 +186,7 @@ export const RAW_TEXT_MESSAGE_MMS = {
   id: "dddd4444-0000-0000-0000-000000000002",
   direction: "inbound",
   local_phone_number: "+18335794607",
-  remote_phone_number: "+15167251294",
+  remote_phone_number: "+15551234567",
   text: "Check this out",
   type: "mms",
   media: [
@@ -205,7 +205,7 @@ export const RAW_TEXT_MESSAGE_OUTBOUND_QUEUED = {
   id: "dddd4444-0000-0000-0000-0000000000ff",
   direction: "outbound",
   local_phone_number: "+18335794607",
-  remote_phone_number: "+15167251294",
+  remote_phone_number: "+15551234567",
   text: "Hello from Inkbox",
   type: "sms",
   media: null,
@@ -222,7 +222,7 @@ export const RAW_TEXT_MESSAGE_OUTBOUND_QUEUED = {
 };
 
 export const RAW_TEXT_CONVERSATION_SUMMARY = {
-  remote_phone_number: "+15167251294",
+  remote_phone_number: "+15551234567",
   latest_text: "Hello, is this support?",
   latest_direction: "inbound",
   latest_type: "sms",

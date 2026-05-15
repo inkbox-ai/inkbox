@@ -72,7 +72,7 @@ class TestPhoneCallParsing:
 
         assert isinstance(c.id, UUID)
         assert c.local_phone_number == "+18335794607"
-        assert c.remote_phone_number == "+15167251294"
+        assert c.remote_phone_number == "+15551234567"
         assert c.direction == "outbound"
         assert c.status == "completed"
         assert c.client_websocket_url == "wss://agent.example.com/ws"

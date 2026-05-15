@@ -25,7 +25,7 @@ class TestCallsList:
         )
         assert len(calls) == 1
         assert calls[0].direction == "outbound"
-        assert calls[0].remote_phone_number == "+15167251294"
+        assert calls[0].remote_phone_number == "+15551234567"
 
     def test_default_limit_and_offset(self, client, transport):
         transport.get.return_value = []
@@ -118,7 +118,7 @@ class TestCallsPlace:
 
         call = client._calls.place(
             from_number="+18335794607",
-            to_number="+15167251294",
+            to_number="+15551234567",
             client_websocket_url="wss://agent.example.com/ws",
         )
 
@@ -126,7 +126,7 @@ class TestCallsPlace:
             "/place-call",
             json={
                 "from_number": "+18335794607",
-                "to_number": "+15167251294",
+                "to_number": "+15551234567",
                 "client_websocket_url": "wss://agent.example.com/ws",
             },
         )
@@ -137,7 +137,7 @@ class TestCallsPlace:
 
         client._calls.place(
             from_number="+18335794607",
-            to_number="+15167251294",
+            to_number="+15551234567",
         )
 
         _, kwargs = transport.post.call_args

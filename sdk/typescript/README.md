@@ -238,7 +238,7 @@ for (const m of thread.messages) {
 ```ts
 // Place an outbound call — stream audio over WebSocket
 const call = await identity.placeCall({
-  toNumber: "+15167251294",
+  toNumber: "+15551234567",
   clientWebsocketUrl: "wss://your-agent.example.com/ws",
 });
 console.log(call.status, call.rateLimit.callsRemaining);
@@ -299,7 +299,7 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 // Send an SMS. Returns a queued TextMessage; final delivery state arrives
 // via the incomingTextWebhookUrl configured on the sender.
 const sent = await identity.sendText({
-  to: "+15167251294",
+  to: "+15551234567",
   text: "Hello from Inkbox",
 });
 console.log(sent.id, sent.deliveryStatus);   // "queued"
@@ -329,11 +329,11 @@ for (const c of convos) {
 }
 
 // Get messages in a specific conversation
-const msgs = await identity.getTextConversation("+15167251294", { limit: 50 });
+const msgs = await identity.getTextConversation("+15551234567", { limit: 50 });
 
 // Mark as read
 await identity.markTextRead("text-uuid");
-await identity.markTextConversationRead("+15167251294");
+await identity.markTextConversationRead("+15551234567");
 
 // Org-level: search and delete
 const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 });
@@ -582,7 +582,7 @@ const call = await inkbox.calls.get("phone-number-uuid", "call-uuid");
 // Place an outbound call
 const placed = await inkbox.calls.place({
   fromNumber: "phone-number-uuid",
-  toNumber: "+15167251294",
+  toNumber: "+15551234567",
   clientWebsocketUrl: "wss://example.com/ws",
 });
 

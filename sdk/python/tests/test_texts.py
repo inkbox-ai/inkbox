@@ -18,7 +18,7 @@ from inkbox.phone.types import SmsDeliveryStatus, TextMessageOrigin
 
 NUM_ID = "aaaa1111-0000-0000-0000-000000000001"
 TEXT_ID = "dddd4444-0000-0000-0000-000000000001"
-REMOTE = "+15167251294"
+REMOTE = "+15551234567"
 
 
 class TestTextsSend:
@@ -35,7 +35,7 @@ class TestTextsSend:
     def test_returns_parsed_text_with_lifecycle_fields(self, client, transport):
         transport.post.return_value = TEXT_MESSAGE_OUTBOUND_QUEUED_DICT
 
-        msg = client._texts.send(NUM_ID, to="+15167251294", text="Hello from Inkbox")
+        msg = client._texts.send(NUM_ID, to="+15551234567", text="Hello from Inkbox")
 
         assert msg.direction == "outbound"
         assert msg.delivery_status is SmsDeliveryStatus.QUEUED

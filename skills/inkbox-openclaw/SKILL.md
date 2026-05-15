@@ -209,7 +209,7 @@ This operation requires the identity to already have a mailbox provisioned.
 ```js
 // Place outbound call — stream audio via WebSocket
 const call = await identity.placeCall({
-  toNumber: "+15167251294",
+  toNumber: "+15551234567",
   clientWebsocketUrl: "wss://your-agent.example.com/ws",
 });
 console.log(call.status);
@@ -246,7 +246,7 @@ Always confirm before placing a call.
 // Returns a queued TextMessage; final delivery state arrives via the
 // incomingTextWebhookUrl configured on the sender.
 const sent = await identity.sendText({
-  to: "+15167251294",
+  to: "+15551234567",
   text: "Hello from Inkbox",
 });
 console.log(sent.id, sent.deliveryStatus);   // "queued"
@@ -276,13 +276,13 @@ for (const c of convos) {
 }
 
 // Get messages in a specific conversation
-const msgs = await identity.getTextConversation("+15167251294", { limit: 50 });
+const msgs = await identity.getTextConversation("+15551234567", { limit: 50 });
 
 // Mark a text as read (identity convenience method)
 await identity.markTextRead("text-uuid");
 
 // Mark all messages in a conversation as read
-const readResult = await identity.markTextConversationRead("+15167251294");
+const readResult = await identity.markTextConversationRead("+15551234567");
 console.log(readResult.updatedCount);
 
 // Admin-only: search and delete

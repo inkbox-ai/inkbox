@@ -176,7 +176,7 @@ Before sending, confirm recipients, subject, and body with the user.
 All phone commands are identity-scoped and require `-i <handle>`.
 
 ```bash
-inkbox phone call -i <handle> --to +15167251294 --ws-url wss://example.com/ws
+inkbox phone call -i <handle> --to +15551234567 --ws-url wss://example.com/ws
 inkbox phone calls -i <handle> --limit 10 --offset 0
 inkbox phone transcripts <call-id> -i <handle>
 inkbox phone search-transcripts -i <handle> -q "refund" --party remote
@@ -198,7 +198,7 @@ All text commands are identity-scoped and require `-i <handle>`.
 **Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
 
 ```bash
-inkbox text send -i <handle> --to +15167251294 --text "Hello from Inkbox"
+inkbox text send -i <handle> --to +15551234567 --text "Hello from Inkbox"
 inkbox text list -i <handle> --limit 20
 inkbox text get <text-id> -i <handle>
 inkbox text conversations -i <handle> --limit 20

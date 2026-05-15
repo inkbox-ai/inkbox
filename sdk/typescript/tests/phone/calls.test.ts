@@ -121,12 +121,12 @@ describe("CallsResource.place", () => {
 
     const call = await res.place({
       fromNumber: "+18335794607",
-      toNumber: "+15167251294",
+      toNumber: "+15551234567",
     });
 
     expect(http.post).toHaveBeenCalledWith("/place-call", {
       from_number: "+18335794607",
-      to_number: "+15167251294",
+      to_number: "+15551234567",
     });
     expect(call.rateLimit.callsUsed).toBe(5);
   });
@@ -138,7 +138,7 @@ describe("CallsResource.place", () => {
 
     await res.place({
       fromNumber: "+18335794607",
-      toNumber: "+15167251294",
+      toNumber: "+15551234567",
       clientWebsocketUrl: "wss://agent.example.com/ws",
     });
 
@@ -151,7 +151,7 @@ describe("CallsResource.place", () => {
     vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
     const res = new CallsResource(http);
 
-    await res.place({ fromNumber: "+18335794607", toNumber: "+15167251294" });
+    await res.place({ fromNumber: "+18335794607", toNumber: "+15551234567" });
 
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["client_websocket_url"]).toBeUndefined();

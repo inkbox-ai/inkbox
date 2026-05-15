@@ -158,7 +158,7 @@ Low-level folder listing / per-thread updates (`list(folder=…)`, `list_folders
 ```python
 # Place outbound call — stream audio via WebSocket
 call = identity.place_call(
-    to_number="+15167251294",
+    to_number="+15551234567",
     client_websocket_url="wss://your-agent.example.com/ws",
 )
 print(call.status)
@@ -189,7 +189,7 @@ for t in identity.list_transcripts(calls[0].id):
 # Send an SMS from this identity's phone number.
 # Returns a queued TextMessage; final delivery state arrives via the
 # incoming_text_webhook_url configured on the sender.
-sent = identity.send_text(to="+15167251294", text="Hello from Inkbox")
+sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
 
 # List text messages (offset pagination)
@@ -213,13 +213,13 @@ for c in convos:
     print(c.remote_phone_number, c.latest_text, c.unread_count, c.total_count)
 
 # Get messages in a specific conversation
-msgs = identity.get_text_conversation("+15167251294", limit=50)
+msgs = identity.get_text_conversation("+15551234567", limit=50)
 
 # Mark a text as read (identity convenience method)
 identity.mark_text_read("text-uuid")
 
 # Mark all messages in a conversation as read
-result = identity.mark_text_conversation_read("+15167251294")
+result = identity.mark_text_conversation_read("+15551234567")
 print(result["updated_count"])
 
 # Admin-only: search, update, delete

@@ -225,7 +225,7 @@ for m in thread.messages:
 ```python
 # Place an outbound call — stream audio over WebSocket
 call = identity.place_call(
-    to_number="+15167251294",
+    to_number="+15551234567",
     client_websocket_url="wss://your-agent.example.com/ws",
 )
 print(call.status, call.rate_limit.calls_remaining)
@@ -281,7 +281,7 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 ```python
 # Send an SMS. Returns a queued TextMessage; final delivery state arrives
 # via the incoming_text_webhook_url configured on the sender.
-sent = identity.send_text(to="+15167251294", text="Hello from Inkbox")
+sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
 
 # List text messages
@@ -305,11 +305,11 @@ for c in convos:
     print(c.remote_phone_number, c.latest_text, c.unread_count)
 
 # Get messages in a specific conversation
-msgs = identity.get_text_conversation("+15167251294", limit=50)
+msgs = identity.get_text_conversation("+15551234567", limit=50)
 
 # Mark as read
 identity.mark_text_read("text-uuid")
-identity.mark_text_conversation_read("+15167251294")
+identity.mark_text_conversation_read("+15551234567")
 
 # Org-level: search and delete
 results = inkbox.texts.search(phone.id, q="invoice", limit=20)
@@ -547,7 +547,7 @@ call = inkbox.calls.get("phone-number-uuid", "call-uuid")
 # Place an outbound call
 call = inkbox.calls.place(
     from_number="phone-number-uuid",
-    to_number="+15167251294",
+    to_number="+15551234567",
     client_websocket_url="wss://example.com/ws",
 )
 
