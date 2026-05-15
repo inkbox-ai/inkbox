@@ -23,9 +23,10 @@ export function createClient(opts: GlobalOpts): Inkbox {
     process.exit(1);
   }
   const vaultKey = opts.vaultKey ?? process.env.INKBOX_VAULT_KEY;
+  const baseUrl = opts.baseUrl ?? process.env.INKBOX_BASE_URL;
   return new Inkbox({
     apiKey,
     vaultKey: vaultKey || undefined,
-    baseUrl: opts.baseUrl,
+    baseUrl,
   });
 }
