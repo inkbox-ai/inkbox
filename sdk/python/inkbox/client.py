@@ -41,6 +41,7 @@ from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.contact_rules import PhoneContactRulesResource
 from inkbox.phone.resources.numbers import PhoneNumbersResource
+from inkbox.phone.resources.sms_opt_ins import SmsOptInsResource
 from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
@@ -178,6 +179,7 @@ class Inkbox:
         self._texts = TextsResource(self._phone_http)
         self._transcripts = TranscriptsResource(self._phone_http)
         self._phone_contact_rules = PhoneContactRulesResource(self._phone_http)
+        self._sms_opt_ins = SmsOptInsResource(self._phone_http)
 
         self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
 
@@ -273,6 +275,15 @@ class Inkbox:
     def phone_contact_rules(self) -> PhoneContactRulesResource:
         """Phone per-number allow/block rules (+ org-wide list)."""
         return self._phone_contact_rules
+
+    @property
+    def sms_opt_ins(self) -> SmsOptInsResource:
+        """SMS opt-in / opt-out registry (per-(org, receiver) consent).
+
+        Writes (``opt_in`` / ``opt_out``) require the org to be on its
+        own actively-used 10DLC campaign.
+        """
+        return self._sms_opt_ins
 
     @property
     def domains(self) -> DomainsResource:

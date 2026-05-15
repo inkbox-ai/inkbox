@@ -19,6 +19,7 @@ import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
 import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { PhoneContactRulesResource } from "./phone/resources/contactRules.js";
+import { SmsOptInsResource } from "./phone/resources/smsOptIns.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
 import { ContactsResource } from "./contacts/resources/contacts.js";
@@ -124,6 +125,7 @@ export class Inkbox {
   readonly _texts: TextsResource;
   readonly _transcripts: TranscriptsResource;
   readonly _phoneContactRules: PhoneContactRulesResource;
+  readonly _smsOptIns: SmsOptInsResource;
   readonly _idsResource: IdentitiesResource;
   readonly _vaultResource: VaultResource;
   readonly _contacts: ContactsResource;
@@ -173,6 +175,7 @@ export class Inkbox {
     this._texts            = new TextsResource(phoneHttp);
     this._transcripts      = new TranscriptsResource(phoneHttp);
     this._phoneContactRules = new PhoneContactRulesResource(phoneHttp);
+    this._smsOptIns         = new SmsOptInsResource(phoneHttp);
 
     this._idsResource = new IdentitiesResource(idsHttp);
 
@@ -255,6 +258,13 @@ export class Inkbox {
 
   /** Phone per-number allow/block rules (+ org-wide list). */
   get phoneContactRules(): PhoneContactRulesResource { return this._phoneContactRules; }
+
+  /**
+   * SMS opt-in / opt-out registry (per-(org, receiver) consent).
+   * `optIn` / `optOut` writes require the org to be on its own
+   * actively-used 10DLC campaign.
+   */
+  get smsOptIns(): SmsOptInsResource { return this._smsOptIns; }
 
   /** Custom sending domains (list, set org default). */
   get domains(): DomainsResource { return this._domains; }

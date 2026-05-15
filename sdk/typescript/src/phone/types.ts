@@ -101,6 +101,40 @@ export interface PhoneContactRule {
   updatedAt: Date;
 }
 
+export enum SmsOptInStatus {
+  OPTED_IN = "opted_in",
+  OPTED_OUT = "opted_out",
+}
+
+/**
+ * Channel that recorded the consent transition.
+ *
+ * - `customer_api` — org with its own actively-used 10DLC campaign
+ *   called the opt-in / opt-out endpoints directly.
+ * - `sms` — inbound STOP/START keyword.
+ * - `web_form` — signup / console consent capture.
+ */
+export enum SmsOptInSource {
+  WEB_FORM = "web_form",
+  SMS = "sms",
+  CUSTOMER_API = "customer_api",
+}
+
+export interface SmsOptIn {
+  id: string;
+  organizationId: string;
+  /** E.164, e.g. `+15551234567`. */
+  receiverNumber: string;
+  status: SmsOptInStatus;
+  source: SmsOptInSource;
+  /** Set when `status === OPTED_IN`, null otherwise. */
+  optedInAt: Date | null;
+  /** Set when `status === OPTED_OUT`, null otherwise. */
+  optedOutAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface PhoneCall {
   id: string;
   localPhoneNumber: string;
@@ -233,6 +267,18 @@ export interface RawPhoneContactRule {
   updated_at: string;
 }
 
+export interface RawSmsOptIn {
+  id: string;
+  organization_id: string;
+  receiver_number: string;
+  status: string;
+  source: string;
+  opted_in_at: string | null;
+  opted_out_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RawPhoneCall {
   id: string;
   local_phone_number: string;
@@ -351,6 +397,20 @@ export function parsePhoneContactRule(r: RawPhoneContactRule): PhoneContactRule 
     matchType: r.match_type as PhoneRuleMatchType,
     matchTarget: r.match_target,
     status: (r.status as ContactRuleStatus) ?? ("active" as ContactRuleStatus),
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseSmsOptIn(r: RawSmsOptIn): SmsOptIn {
+  return {
+    id: r.id,
+    organizationId: r.organization_id,
+    receiverNumber: r.receiver_number,
+    status: r.status as SmsOptInStatus,
+    source: r.source as SmsOptInSource,
+    optedInAt: r.opted_in_at ? new Date(r.opted_in_at) : null,
+    optedOutAt: r.opted_out_at ? new Date(r.opted_out_at) : null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

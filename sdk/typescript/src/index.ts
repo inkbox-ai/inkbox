@@ -56,6 +56,8 @@ export {
   PhoneRuleAction,
   PhoneRuleMatchType,
   SmsDeliveryStatus,
+  SmsOptInSource,
+  SmsOptInStatus,
   SmsStatus,
   TextMessageOrigin,
 } from "./phone/types.js";
@@ -66,6 +68,7 @@ export type {
   PhoneContactRule,
   RateLimitInfo,
   PhoneTranscript,
+  SmsOptIn,
   TextMediaItem,
   TextMessage,
   TextConversationSummary,
