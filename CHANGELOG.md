@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
-## Unreleased
+## 0.4.1
 
 ### Added
 
@@ -16,6 +16,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   for default-pool orgs). Writes record an audit event with
   `source=api`.
 - New types: `SmsOptIn`, `SmsOptInStatus`, `SmsOptInSource`.
+- CLI: `inkbox sms-opt-in {list, get, opt-in, opt-out}` — same surface
+  as the SDKs, with `--status` / `--limit` / `--offset` filters on
+  list and `--json` on every command. `--base-url` now also reads
+  `INKBOX_BASE_URL` so the CLI can target dev/beta without threading
+  the flag.
 
 ## 0.4.0
 
