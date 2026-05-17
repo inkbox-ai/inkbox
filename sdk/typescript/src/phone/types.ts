@@ -109,7 +109,7 @@ export enum SmsOptInStatus {
 /**
  * Channel that recorded the consent transition.
  *
- * - `api` — org with its own actively-used 10DLC campaign called the
+ * - `api` — org with its own active, customer-managed 10DLC campaign called the
  *   opt-in / opt-out endpoints directly.
  * - `sms` — inbound STOP/START keyword.
  */

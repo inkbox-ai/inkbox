@@ -338,7 +338,7 @@ row = inkbox.sms_opt_ins.get("+15551234567")
 print(row.status, row.source, row.opted_in_at, row.opted_out_at)
 ```
 
-**Writes** — admin-only, and only if your org runs its own actively-used 10DLC
+**Writes** — admin-only, and only if your org runs its own active, customer-managed 10DLC
 campaign. Orgs on the Inkbox-default campaign share consent state and get a
 `409 customer_campaign_required` on write attempts. Writes record an audit
 event with `source="api"`.

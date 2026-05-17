@@ -9,7 +9,7 @@ export function registerSmsOptInCommands(program: Command): void {
     .command("sms-opt-in")
     .description(
       "SMS opt-in / opt-out registry (per-recipient consent state). " +
-        "Writes require your org to be on its own actively-used 10DLC campaign.",
+        "Writes require your org to be on its own active, customer-managed 10DLC campaign.",
     );
 
   optIn
@@ -65,7 +65,7 @@ export function registerSmsOptInCommands(program: Command): void {
   optIn
     .command("opt-in <receiver-number>")
     .description(
-      "Mark a recipient as opted in (requires customer-managed 10DLC campaign)",
+      "Mark a recipient as opted in (requires active, customer-managed 10DLC campaign)",
     )
     .action(
       withErrorHandler(async function (
@@ -82,7 +82,7 @@ export function registerSmsOptInCommands(program: Command): void {
   optIn
     .command("opt-out <receiver-number>")
     .description(
-      "Mark a recipient as opted out (requires customer-managed 10DLC campaign)",
+      "Mark a recipient as opted out (requires active, customer-managed 10DLC campaign)",
     )
     .action(
       withErrorHandler(async function (

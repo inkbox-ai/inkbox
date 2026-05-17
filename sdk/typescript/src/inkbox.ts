@@ -262,7 +262,7 @@ export class Inkbox {
   /**
    * SMS opt-in / opt-out registry (per-(org, receiver) consent).
    * `optIn` / `optOut` writes require the org to be on its own
-   * actively-used 10DLC campaign.
+   * active, customer-managed 10DLC campaign.
    */
   get smsOptIns(): SmsOptInsResource { return this._smsOptIns; }
 

@@ -5,7 +5,7 @@ SMS opt-in / opt-out registry (per-(org, receiver) consent state).
 
 Reads (``list``, ``get``) are available to any admin or JWT caller.
 Writes (``opt_in``, ``opt_out``) are gated server-side to orgs that
-run their own actively-used 10DLC campaign — orgs on the
+run their own active, customer-managed 10DLC campaign — orgs on the
 Inkbox-default campaign share consent state and can't override it
 through this API. Calling ``opt_in`` / ``opt_out`` from a
 default-campaign org will raise an :class:`InkboxAPIError` with a

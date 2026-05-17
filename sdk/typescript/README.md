@@ -362,7 +362,7 @@ const row = await inkbox.smsOptIns.get("+15551234567");
 console.log(row.status, row.source, row.optedInAt, row.optedOutAt);
 ```
 
-**Writes** — admin-only, and only if your org runs its own actively-used 10DLC
+**Writes** — admin-only, and only if your org runs its own active, customer-managed 10DLC
 campaign. Orgs on the Inkbox-default campaign share consent state and get a
 `409 customer_campaign_required` on write attempts. Writes record an audit
 event with `source: "api"`.

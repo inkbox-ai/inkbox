@@ -243,7 +243,7 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 ## SMS Opt-Ins
 
-Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The registry is updated automatically when recipients text `START` / `STOP` to any of your numbers (`source: "sms"`). Reads are admin-only; writes are admin-only **and** require your org to be on its own actively-used 10DLC campaign (Inkbox-default-campaign orgs share consent state and get `409 customer_campaign_required` on writes — `source: "api"` writes record an audit event).
+Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The registry is updated automatically when recipients text `START` / `STOP` to any of your numbers (`source: "sms"`). Reads are admin-only; writes are admin-only **and** require your org to be on its own active, customer-managed 10DLC campaign (Inkbox-default-campaign orgs share consent state and get `409 customer_campaign_required` on writes — `source: "api"` writes record an audit event).
 
 ```typescript
 import { SmsOptInStatus } from "@inkbox/sdk";

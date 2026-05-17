@@ -281,7 +281,7 @@ class Inkbox:
         """SMS opt-in / opt-out registry (per-(org, receiver) consent).
 
         Writes (``opt_in`` / ``opt_out``) require the org to be on its
-        own actively-used 10DLC campaign.
+        own active, customer-managed 10DLC campaign.
         """
         return self._sms_opt_ins
 

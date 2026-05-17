@@ -5,7 +5,7 @@
  *
  * Reads (`list`, `get`) are available to any admin or JWT caller.
  * Writes (`optIn`, `optOut`) are gated server-side to orgs that run
- * their own actively-used 10DLC campaign — orgs on the Inkbox-default
+ * their own active, customer-managed 10DLC campaign — orgs on the Inkbox-default
  * campaign share consent state and can't override it through this API.
  * Calling `optIn` / `optOut` from a default-campaign org rejects with a
  * 409 (`customer_campaign_required`).
@@ -54,7 +54,7 @@ export class SmsOptInsResource {
 
   /**
    * Mark a recipient as opted in. Admin-only; requires the calling
-   * org to be on its own actively-used 10DLC campaign (409
+   * org to be on its own active, customer-managed 10DLC campaign (409
    * `customer_campaign_required` otherwise). Server records an
    * audit event with `source=api`.
    */
