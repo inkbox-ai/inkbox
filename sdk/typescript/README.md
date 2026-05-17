@@ -718,7 +718,7 @@ The same URL receives all six mail event types:
 | `message.bounced` | Downstream delivery bounced. |
 | `message.failed` | Delivery ultimately failed. |
 
-Every payload uses the standard `{event_type, timestamp, data}` envelope, and `data.contact` carries an optional `{ id, name }` address-book match for the remote party (scoped to the mailbox's identity via `contact_access`). `data.contact` is `null` when no visible contact matches.
+Every payload uses the standard `{event_type, timestamp, data}` envelope, and `data.contact` carries an optional `{ id, name }` address-book match for the remote party — scoped to the identity that owns the receiving mailbox; `null` when no visible address-book entry matches.
 
 ### Phone webhooks
 
