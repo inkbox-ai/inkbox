@@ -138,6 +138,13 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.text_message.failed_at).toBeNull();
     expect(payload.data.contact).not.toBeNull();
   });
+
+  it.each(textEvents)("does not carry is_blocked on %s", (file) => {
+    const payload = loadFixture<TextWebhookPayload>(file);
+    expect(
+      Object.prototype.hasOwnProperty.call(payload.data.text_message, "is_blocked"),
+    ).toBe(false);
+  });
 });
 
 describe("PhoneIncomingCallWebhookPayload", () => {
@@ -150,11 +157,8 @@ describe("PhoneIncomingCallWebhookPayload", () => {
     expect(payload.contact).toBeNull();
   });
 
-  it("does NOT carry is_blocked on the wire (stripped by dispatcher)", () => {
+  it("does not carry is_blocked on the wire", () => {
     const payload = loadFixture<PhoneIncomingCallWebhookPayload>("phone_incoming_call.json");
-    // Server commit 75c56fe8 strips is_blocked via payload.pop()
-    // post-Pydantic-dump. The SDK type omits the field; this asserts
-    // the fixture matches.
     expect(Object.prototype.hasOwnProperty.call(payload, "is_blocked")).toBe(false);
   });
 

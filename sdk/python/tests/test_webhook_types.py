@@ -150,11 +150,17 @@ def test_text_required_fields_present_on_every_event():
         "text", "type", "media", "is_read",
         "delivery_status", "origin", "error_code", "error_detail",
         "sent_at", "delivered_at", "failed_at",
-        "is_blocked", "created_at", "updated_at",
+        "created_at", "updated_at",
     }
     for fixture in TEXT_FIXTURES:
         payload = cast(TextWebhookPayload, _load(fixture))
         assert set(payload["data"]["text_message"].keys()) == required, fixture
+
+
+@pytest.mark.parametrize("fixture", TEXT_FIXTURES)
+def test_text_omits_is_blocked(fixture: str):
+    payload = cast(TextWebhookPayload, _load(fixture))
+    assert "is_blocked" not in payload["data"]["text_message"]
 
 
 # ---- Inbound call ______________________________________________________
@@ -172,9 +178,6 @@ def test_phone_incoming_call_payload_is_flat():
 
 
 def test_phone_incoming_call_omits_is_blocked():
-    # Server commit 75c56fe8 strips is_blocked via payload.pop()
-    # post-Pydantic-dump. The SDK type omits the field; the fixture
-    # must match.
     payload = _load("phone_incoming_call.json")
     assert "is_blocked" not in payload
 

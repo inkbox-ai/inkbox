@@ -3,36 +3,11 @@ inkbox/webhooks.py
 
 Receiver-side webhook payload types.
 
-This module is **wire-shape-only**: every field name is snake_case
-because the customer's HTTP handler receives the raw JSON body
-verbatim. The rest of the SDK's parsed-response types are dataclasses
-with UUID/datetime coercion; the webhook module stays as ``TypedDict``s
-over plain JSON so callers can do
-``payload = cast(MailWebhookPayload, json.loads(body))`` without
-round-tripping through a dataclass.
-
-Two rules followed throughout:
-
-  1. All enum-valued wire fields use ``Literal[...]`` string unions,
-     not the existing ``StrEnum``s from ``inkbox.mail.types`` /
-     ``inkbox.phone``. ``StrEnum`` is nominally typed by mypy / pyright:
-     ``payload["data"]["message"]["direction"] == "inbound"`` would
-     fail strict type-checking when ``direction`` is typed as the enum.
-     Customers who want the enum object can call
-     ``MessageDirection(payload["data"]["message"]["direction"])``
-     themselves.
-
-  2. Nested object types use wire ``TypedDict``s (``TextMediaItemWire``,
-     ``RateLimitInfoWire``), not the existing dataclasses
-     (``TextMediaItem``, ``RateLimitInfo``). The dataclasses have
-     custom ``_from_dict`` classmethods with UUID/datetime coercion —
-     they are not raw JSON dict shapes.
-
-Authoritative server contracts:
-
-  - ``~/servers/src/data_models/api_contracts/webhooks.py``
-  - ``~/servers/src/data_models/api_contracts/phone/text.py``
-  - ``~/servers/src/data_models/api_contracts/phone/call.py``
+Wire-shape only: every field is snake_case so
+``cast(MailWebhookPayload, json.loads(body))`` round-trips without a
+transformer. Enum-valued fields are ``Literal[...]`` string unions
+(e.g. ``Literal["inbound", "outbound"]``) rather than ``StrEnum``s,
+since ``json.loads`` produces bare strings.
 """
 
 from __future__ import annotations
@@ -41,8 +16,6 @@ from typing import Literal, TypedDict
 
 
 # ---- Wire union types ____________________________________________________
-# Members copied verbatim from the corresponding server enums in
-# db/postgres/mail/models.py and db/postgres/phone/models.py.
 
 MessageDirectionWire = Literal["inbound", "outbound"]
 
@@ -94,14 +67,14 @@ HangupReasonWire = Literal[
 # ---- Nested wire shapes __________________________________________________
 
 class TextMediaItemWire(TypedDict):
-    """Snake_case wire shape for ``TextMessageResponse.media[i]``."""
+    """MMS media attachment (snake_case wire shape)."""
     content_type: str
     size: int
     url: str
 
 
 class RateLimitInfoWire(TypedDict):
-    """Snake_case wire shape for the inbound-call payload's ``rate_limit``."""
+    """Org rate-limit snapshot on inbound-call payloads."""
     calls_used: int
     calls_remaining: int
     calls_limit: int
@@ -114,18 +87,9 @@ class RateLimitInfoWire(TypedDict):
 
 class WebhookContact(TypedDict):
     """
-    Address-book match for the remote party on a webhook event.
-
-    Scoped to the receiving channel's ``identity_id`` via the server's
-    ``contact_access`` model (wildcard sentinel or explicit per-identity
-    grant). When multiple contacts share the value, the oldest by
-    ``created_at`` wins. The field is always optional on the wire —
-    treat ``None`` as "no visible address-book entry," never as an error.
-
-    Attributes:
-        id: Matched ``contacts.id``. Pass to ``inkbox.contacts.get(id)``
-            to hydrate.
-        name: Matched ``Contact.preferred_name``.
+    Address-book match for the remote party. Optional on every payload --
+    ``None`` means no contact visible to the receiving identity. Pass
+    ``id`` to ``inkbox.contacts.get()`` to hydrate.
     """
     id: str
     name: str
@@ -145,12 +109,8 @@ MailWebhookEventType = Literal[
 
 class MailWebhookMessage(TypedDict):
     """
-    Field-for-field mirror of ``MailWebhookMessageData``
-    (servers/.../webhooks.py:43).
-
-    ``message_id`` is the RFC 5322 ``Message-ID`` header value, not
-    renamed to ``message_id_header`` despite the naming-collision risk,
-    to stay byte-identical to the wire.
+    Stored mail message. ``message_id`` is the RFC 5322 ``Message-ID``
+    header value (not Inkbox's row id -- that's ``id``).
     """
     id: str
     mailbox_id: str
@@ -191,13 +151,8 @@ TextWebhookEventType = Literal[
 
 class TextWebhookMessage(TypedDict):
     """
-    Field-for-field mirror of ``TextMessageResponse``
-    (servers/.../phone/text.py:39).
-
-    The outbound-lifecycle block (``delivery_status``, ``error_code`` /
-    ``error_detail``, ``sent_at`` / ``delivered_at`` / ``failed_at``)
-    is the payload's headline value for the four ``text.*`` outbound
-    events.
+    Stored text message. ``is_blocked`` is not part of the wire body --
+    blocked texts never reach the webhook.
     """
     id: str
     direction: TextDirectionWire
@@ -214,7 +169,6 @@ class TextWebhookMessage(TypedDict):
     sent_at: str | None
     delivered_at: str | None
     failed_at: str | None
-    is_blocked: bool
     created_at: str
     updated_at: str
 
@@ -234,18 +188,10 @@ class TextWebhookPayload(TypedDict):
 
 class PhoneIncomingCallWebhookPayload(TypedDict):
     """
-    Field-for-field mirror of ``PhoneIncomingCallWebhookPayload``
-    (servers/.../webhooks.py:164).
-
-    This payload is **flat** -- there is no ``{event_type, timestamp,
-    data}`` envelope. ``contact`` sits at the top level alongside the
-    call fields.
-
-    ``is_blocked`` is intentionally absent: the server dispatcher
-    strips it from the wire body via
-    ``payload.pop("is_blocked", None)`` after the Pydantic dump, and
-    the spec model omits it (server commit ``75c56fe8``). Receivers
-    will never see it.
+    Inbound call payload. **Flat** -- no ``{event_type, timestamp,
+    data}`` envelope; ``contact`` sits at the top level. ``is_blocked``
+    is not part of the wire body -- blocked calls never reach the
+    webhook.
     """
     id: str
     local_phone_number: str

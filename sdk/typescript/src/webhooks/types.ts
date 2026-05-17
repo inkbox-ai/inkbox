@@ -1,41 +1,16 @@
 /**
  * Receiver-side webhook payload types.
  *
- * This module is **wire-shape-only**: every field name is snake_case
- * because the customer's HTTP handler receives the raw JSON body
- * verbatim. The rest of the SDK's parsed-response types remain
- * camelCase; the webhook module is the sole snake_case island so that
- * `JSON.parse(body) as MailWebhookPayload` round-trips cleanly without
- * a transformer.
- *
- * Two rules followed throughout:
- *
- *   1. All enum-valued wire fields use string-literal unions, not the
- *      TypeScript `enum` exports from `mail/types.ts` or `phone/types.ts`.
- *      TS `enum` members are nominally typed: a bare string from
- *      `JSON.parse` does NOT structurally satisfy an enum-typed field,
- *      so `{ direction: "inbound" }` would error against
- *      `direction: MessageDirection`. Literal unions parse cleanly.
- *
- *   2. Nested object types use the snake_case `Raw*` wire shapes from
- *      `phone/types.ts` (re-exported from the root `@inkbox/sdk`
- *      entry), not the camelCase parsed-response shapes
- *      (`TextMediaItem`, `RateLimitInfo`) — those have `contentType` /
- *      `rateLimit` etc., not what's on the wire.
- *
- * Authoritative server contracts:
- *   - `~/servers/src/data_models/api_contracts/webhooks.py`
- *   - `~/servers/src/data_models/api_contracts/phone/text.py`
- *     (`TextMessageResponse`, `TextMediaItem`)
- *   - `~/servers/src/data_models/api_contracts/phone/call.py`
- *     (`RateLimitInfo`)
+ * Wire-shape only: every field is snake_case so
+ * `JSON.parse(body) as MailWebhookPayload` round-trips without a
+ * transformer. Enum-valued fields use string-literal unions (e.g.
+ * `"inbound" | "outbound"`) rather than the SDK's TS `enum` exports,
+ * since `JSON.parse` produces bare strings.
  */
 
 import type { RawRateLimitInfo, RawTextMediaItem } from "../phone/types.js";
 
 // ---- Wire union types ------------------------------------------------
-// Members copied verbatim from the corresponding server enums in
-// `db/postgres/mail/models.py` and `db/postgres/phone/models.py`.
 
 export type MessageDirectionWire = "inbound" | "outbound";
 
@@ -82,18 +57,12 @@ export type HangupReasonWire =
 // ---- Shared ----------------------------------------------------------
 
 /**
- * Address-book match for the remote party on a webhook event.
- *
- * Scoped to the receiving channel's `identity_id` via the server's
- * `contact_access` model (wildcard sentinel or explicit per-identity
- * grant). When multiple contacts share the value, the oldest by
- * `created_at` wins. The field is always optional on the wire — treat
- * `null` as "no visible address-book entry," never as an error.
+ * Address-book match for the remote party. Optional on every payload —
+ * `null` means no contact visible to the receiving identity. Pass `id`
+ * to `inkbox.contacts.get()` to hydrate.
  */
 export interface WebhookContact {
-  /** Matched `contacts.id`. Pass to `inkbox.contacts.get(id)` to hydrate. */
   id: string;
-  /** Matched `Contact.preferredName`. */
   name: string;
 }
 
@@ -108,12 +77,8 @@ export type MailWebhookEventType =
   | "message.failed";
 
 /**
- * Field-for-field mirror of `MailWebhookMessageData`
- * (`~/servers/src/data_models/api_contracts/webhooks.py:43`).
- *
- * `message_id` is the RFC 5322 `Message-ID` header value (server
- * docstring) — not renamed to `message_id_header` despite the
- * naming-collision risk, to stay byte-identical to the wire.
+ * Stored mail message. `message_id` is the RFC 5322 `Message-ID`
+ * header value (not Inkbox's row id — that's `id`).
  */
 export interface MailWebhookMessage {
   id: string;
@@ -152,13 +117,8 @@ export type TextWebhookEventType =
   | "text.delivery_unconfirmed";
 
 /**
- * Field-for-field mirror of `TextMessageResponse`
- * (`~/servers/src/data_models/api_contracts/phone/text.py:39`).
- *
- * The outbound-lifecycle block (`delivery_status`, `error_code` /
- * `error_detail`, `sent_at` / `delivered_at` / `failed_at`) is the
- * payload's headline value for the four `text.*` outbound events —
- * inspect those fields when discriminating on `event_type` below.
+ * Stored text message. `is_blocked` is not part of the wire body —
+ * blocked texts never reach the webhook.
  */
 export interface TextWebhookMessage {
   id: string;
@@ -176,7 +136,6 @@ export interface TextWebhookMessage {
   sent_at: string | null;
   delivered_at: string | null;
   failed_at: string | null;
-  is_blocked: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -193,16 +152,9 @@ export interface TextWebhookPayload {
 // ---- Inbound call (FLAT — no envelope) ------------------------------
 
 /**
- * Field-for-field mirror of `PhoneIncomingCallWebhookPayload`
- * (`~/servers/src/data_models/api_contracts/webhooks.py:164`).
- *
- * This payload is **flat** — there is no `{ event_type, timestamp, data }`
- * envelope. `contact` sits at the top level alongside the call fields.
- *
- * `is_blocked` is intentionally absent: the server dispatcher strips it
- * from the wire body via `payload.pop("is_blocked", None)` after the
- * Pydantic dump, and the spec model omits it (server commit
- * `75c56fe8`). Receivers will never see it.
+ * Inbound call payload. **Flat** — no `{ event_type, timestamp, data }`
+ * envelope; `contact` sits at the top level. `is_blocked` is not part
+ * of the wire body — blocked calls never reach the webhook.
  */
 export interface PhoneIncomingCallWebhookPayload {
   id: string;
