@@ -155,7 +155,7 @@ identity.update(new_handle="sales-bot-v2")
 identity.update(display_name="New Name", description="New blurb")
 identity.update(description=None)  # clear
 
-# Release the phone number (carrier release + soft-delete).
+# Release the phone number (vendor + local).
 identity.unlink_phone_number()
 
 # Delete (cascades to mailbox + tunnel; revokes scoped API keys).

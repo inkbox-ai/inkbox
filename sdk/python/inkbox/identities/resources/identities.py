@@ -159,7 +159,7 @@ class IdentitiesResource:
     def unlink_phone_number(self, agent_handle: str) -> None:
         """Release the identity's phone number (vendor + local).
 
-        The number is released at the carrier and marked released
-        server-side; it is not available for reassignment afterwards.
+        Released at the carrier; the number is not available for
+        reassignment afterwards.
         """
         self._http.delete(f"/{agent_handle}/phone_number")

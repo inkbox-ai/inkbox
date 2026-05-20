@@ -155,10 +155,10 @@ export class IdentitiesResource {
   }
 
   /**
-   * Release the identity's phone number (carrier release + soft-delete).
+   * Release the identity's phone number (vendor + local).
    *
-   * The number is released at the carrier and marked released
-   * server-side; it is not available for reassignment afterwards.
+   * Released at the carrier; the number is not available for
+   * reassignment afterwards.
    *
    * @param agentHandle - Handle of the identity.
    */
