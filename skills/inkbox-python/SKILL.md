@@ -90,7 +90,7 @@ print(phone.number)                      # e.g. "+18005551234"
 # Existing phone number? Link it instead:
 identity.assign_phone_number("phone-number-uuid")
 
-# Unlink the phone number without releasing it
+# Release the phone number (vendor + local)
 identity.unlink_phone_number()
 ```
 

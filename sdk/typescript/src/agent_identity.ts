@@ -241,7 +241,7 @@ export class AgentIdentity {
   }
 
   /**
-   * Unlink this identity's phone number (does not release the number).
+   * Release this identity's phone number (vendor + local).
    */
   async unlinkPhoneNumber(): Promise<void> {
     this._requirePhone();

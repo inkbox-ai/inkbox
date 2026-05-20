@@ -89,7 +89,7 @@ console.log(phone.number);                     // e.g. "+18005551234"
 // Existing phone number? Link it instead:
 await identity.assignPhoneNumber("phone-number-uuid");
 
-// Unlink the phone number without releasing it
+// Release the phone number (vendor + local)
 await identity.unlinkPhoneNumber();
 ```
 
