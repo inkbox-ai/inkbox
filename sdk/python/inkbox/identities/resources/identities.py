@@ -138,23 +138,9 @@ class IdentitiesResource:
 
         Cascades: flips the linked mailbox to ``deleted``, force-finalizes
         the linked tunnel to ``deleted``, revokes any identity-scoped
-        API keys, and unassigns (but does not delete) any linked phone
-        number.
+        API keys, and releases any linked phone number (vendor + local).
         """
         self._http.delete(f"/{agent_handle}")
-
-    def assign_phone_number(
-        self,
-        agent_handle: str,
-        *,
-        phone_number_id: UUID | str,
-    ) -> _AgentIdentityData:
-        """Assign a phone number to an identity."""
-        data = self._http.post(
-            f"/{agent_handle}/phone_number",
-            json={"phone_number_id": str(phone_number_id)},
-        )
-        return _AgentIdentityData._from_dict(data)
 
     def unlink_phone_number(self, agent_handle: str) -> None:
         """Release the identity's phone number (vendor + local).

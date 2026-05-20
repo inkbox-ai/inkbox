@@ -137,10 +137,6 @@ inkbox.create_identity("sales-bot-2", sending_domain="mail.acme.com")
 from inkbox import IdentityTunnelCreateOptions
 inkbox.create_identity("sales-bot-pt", tunnel=IdentityTunnelCreateOptions(tls_mode="passthrough"))
 
-# Link an existing phone number to an identity (mailbox + tunnel are
-# 1:1 with their identity and cannot be relinked).
-identity.assign_phone_number("phone-number-uuid-here")
-
 # Get an existing identity
 identity = inkbox.get_identity("sales-bot")
 identity.refresh()  # re-fetch channels from API

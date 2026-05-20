@@ -126,10 +126,7 @@ console.log(identity.tunnel?.publicHost);      // e.g. "sales-agent.inkboxwire.c
 const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 console.log(phone.number);                     // e.g. "+18005551234"
 
-// Existing phone number? Link it instead:
-await identity.assignPhoneNumber("phone-number-uuid");
-
-// Unlink the phone number without releasing it
+// Release the phone number (vendor + local)
 await identity.unlinkPhoneNumber();
 ```
 

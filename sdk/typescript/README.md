@@ -146,10 +146,6 @@ await inkbox.createIdentity("sales-bot-2", { sendingDomain: "mail.acme.com" });
 // Provision a passthrough tunnel (tls_mode is fixed at create time)
 await inkbox.createIdentity("sales-bot-pt", { tunnel: { tlsMode: "passthrough" } });
 
-// Link an existing phone number to an identity (mailbox + tunnel are
-// 1:1 with their identity and cannot be relinked).
-await identity.assignPhoneNumber("phone-number-uuid-here");
-
 // Get an existing identity (returned with current channel state)
 const identity2 = await inkbox.getIdentity("sales-bot");
 await identity2.refresh();  // re-fetch channels from API

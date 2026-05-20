@@ -225,22 +225,6 @@ export class AgentIdentity {
   }
 
   /**
-   * Link an existing phone number to this identity.
-   *
-   * @param phoneNumberId - UUID of the phone number to link. Obtain via
-   *   `inkbox.phoneNumbers.list()` or `inkbox.phoneNumbers.get()`.
-   * @returns The linked {@link IdentityPhoneNumber}.
-   */
-  async assignPhoneNumber(phoneNumberId: string): Promise<IdentityPhoneNumber> {
-    const data   = await this._inkbox._idsResource.assignPhoneNumber(this.agentHandle, {
-      phoneNumberId,
-    });
-    this._phoneNumber = data.phoneNumber;
-    this._data        = data;
-    return this._phoneNumber!;
-  }
-
-  /**
    * Release this identity's phone number (vendor + local).
    */
   async unlinkPhoneNumber(): Promise<void> {
@@ -654,7 +638,7 @@ export class AgentIdentity {
   private _requirePhone(): void {
     if (!this._phoneNumber) {
       throw new InkboxError(
-        `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() or identity.assignPhoneNumber() first.`,
+        `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() first, or pass phoneNumber to createIdentity().`,
       );
     }
   }

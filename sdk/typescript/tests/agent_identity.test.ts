@@ -74,7 +74,6 @@ function mockInkbox() {
       delete: vi.fn(),
       assignMailbox: vi.fn(),
       unlinkMailbox: vi.fn(),
-      assignPhoneNumber: vi.fn(),
       unlinkPhoneNumber: vi.fn(),
     },
   } as unknown as Inkbox;
@@ -115,17 +114,6 @@ describe("AgentIdentity channel management", () => {
       type: "toll_free",
     });
     expect(phone).toEqual(PARSED_PHONE);
-  });
-
-  it("assignPhoneNumber links existing number", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._idsResource.assignPhoneNumber).mockResolvedValue(makeData());
-    const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
-
-    const result = await identity.assignPhoneNumber("phone-id");
-
-    expect(ink._idsResource.assignPhoneNumber).toHaveBeenCalledWith("sales-agent", { phoneNumberId: "phone-id" });
-    expect(result).toEqual(PARSED_PHONE);
   });
 
   it("unlinkPhoneNumber removes phone", async () => {

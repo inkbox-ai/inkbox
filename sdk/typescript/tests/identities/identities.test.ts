@@ -167,22 +167,6 @@ describe("IdentitiesResource.delete", () => {
 });
 
 
-describe("IdentitiesResource.assignPhoneNumber", () => {
-  it("posts phone_number_id and returns detail", async () => {
-    const http = mockHttp();
-    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_DETAIL);
-    const res = new IdentitiesResource(http);
-    const phoneNumberId = "bbbb2222-0000-0000-0000-000000000001";
-
-    const detail = await res.assignPhoneNumber(HANDLE, { phoneNumberId });
-
-    expect(http.post).toHaveBeenCalledWith(`/${HANDLE}/phone_number`, {
-      phone_number_id: phoneNumberId,
-    });
-    expect(detail.phoneNumber!.number).toBe("+18335794607");
-  });
-});
-
 describe("IdentitiesResource.unlinkPhoneNumber", () => {
   it("deletes phone number link", async () => {
     const http = mockHttp();

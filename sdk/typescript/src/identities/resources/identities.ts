@@ -2,9 +2,9 @@
  * inkbox-identities/resources/identities.ts
  *
  * Identity create / list / get / update / delete, plus phone-number
- * assign / unlink. Mailbox and tunnel are provisioned atomically by
- * `create()` and removed by `delete()` (cascade); there is no
- * standalone mailbox or tunnel create / link surface.
+ * release. Mailbox and tunnel are provisioned atomically by `create()`
+ * and removed by `delete()` (cascade); there is no standalone mailbox
+ * or tunnel create / link surface.
  */
 
 import { HttpTransport, InkboxAPIError } from "../../_http.js";
@@ -129,29 +129,12 @@ export class IdentitiesResource {
    *
    * Cascades: flips the linked mailbox to `deleted`, force-finalizes the
    * linked tunnel to `deleted`, revokes any identity-scoped API keys, and
-   * unassigns (but does not delete) any linked phone number.
+   * releases any linked phone number (vendor + local).
    *
    * @param agentHandle - Handle of the identity to delete.
    */
   async delete(agentHandle: string): Promise<void> {
     await this.http.delete(`/${agentHandle}`);
-  }
-
-  /**
-   * Assign a phone number to an identity.
-   *
-   * @param agentHandle - Handle of the identity.
-   * @param options.phoneNumberId - UUID of the phone number to assign.
-   */
-  async assignPhoneNumber(
-    agentHandle: string,
-    options: { phoneNumberId: string },
-  ): Promise<_AgentIdentityData> {
-    const data = await this.http.post<RawAgentIdentityData>(
-      `/${agentHandle}/phone_number`,
-      { phone_number_id: options.phoneNumberId },
-    );
-    return parseAgentIdentityData(data);
   }
 
   /**
