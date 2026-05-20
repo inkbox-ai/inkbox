@@ -80,9 +80,9 @@ export interface PhoneNumber {
    */
   state: string | null;
   /**
-   * UUID of the owning agent identity, or `null` if the phone number is
-   * standalone (not tied to any agent). Always present on every
-   * phone-number response shape.
+   * UUID of the owning agent identity. `null` only for pool / released
+   * states — active org-owned numbers are always bound to an identity.
+   * Always present on every phone-number response shape.
    */
   agentIdentityId: string | null;
   createdAt: Date;

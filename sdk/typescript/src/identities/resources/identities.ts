@@ -145,7 +145,7 @@ export class IdentitiesResource {
    *
    * @param agentHandle - Handle of the identity.
    */
-  async unlinkPhoneNumber(agentHandle: string): Promise<void> {
+  async releasePhoneNumber(agentHandle: string): Promise<void> {
     await this.http.delete(`/${agentHandle}/phone_number`);
   }
 }

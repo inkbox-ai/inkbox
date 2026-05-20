@@ -127,7 +127,7 @@ const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 console.log(phone.number);                     // e.g. "+18005551234"
 
 // Release the phone number (vendor + local)
-await identity.unlinkPhoneNumber();
+await identity.releasePhoneNumber();
 ```
 
 Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.createIdentity()` to provision both; use `identity.delete()` to remove both (cascade).

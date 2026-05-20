@@ -165,10 +165,10 @@ class TestIdentitiesDelete:
         http.delete.assert_called_once_with(f"/{HANDLE}")
 
 
-class TestIdentitiesUnlinkPhoneNumber:
-    def test_unlinks_phone_number(self):
+class TestIdentitiesReleasePhoneNumber:
+    def test_releases_phone_number(self):
         res, http = _resource()
 
-        res.unlink_phone_number(HANDLE)
+        res.release_phone_number(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/phone_number")

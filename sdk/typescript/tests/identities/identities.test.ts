@@ -167,13 +167,13 @@ describe("IdentitiesResource.delete", () => {
 });
 
 
-describe("IdentitiesResource.unlinkPhoneNumber", () => {
-  it("deletes phone number link", async () => {
+describe("IdentitiesResource.releasePhoneNumber", () => {
+  it("releases the identity's phone number", async () => {
     const http = mockHttp();
     vi.mocked(http.delete).mockResolvedValue(undefined);
     const res = new IdentitiesResource(http);
 
-    await res.unlinkPhoneNumber(HANDLE);
+    await res.releasePhoneNumber(HANDLE);
 
     expect(http.delete).toHaveBeenCalledWith(`/${HANDLE}/phone_number`);
   });

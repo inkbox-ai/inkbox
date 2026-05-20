@@ -88,7 +88,7 @@ phone = identity.provision_phone_number(type="toll_free")       # or type="local
 print(phone.number)                      # e.g. "+18005551234"
 
 # Release the phone number (vendor + local)
-identity.unlink_phone_number()
+identity.release_phone_number()
 ```
 
 Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.create_identity()` to provision both; use `identity.delete()` to remove both (cascade).

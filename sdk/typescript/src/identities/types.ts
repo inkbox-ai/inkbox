@@ -106,8 +106,8 @@ export interface IdentityPhoneNumber {
    */
   state: string | null;
   /**
-   * UUID of the owning agent identity, or `null` if standalone. On the
-   * embedded variant this always equals the owning identity's ID.
+   * UUID of the owning agent identity. On the embedded variant this
+   * always equals the owning identity's ID.
    */
   agentIdentityId: string | null;
   createdAt: Date;

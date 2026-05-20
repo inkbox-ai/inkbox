@@ -227,9 +227,9 @@ export class AgentIdentity {
   /**
    * Release this identity's phone number (vendor + local).
    */
-  async unlinkPhoneNumber(): Promise<void> {
+  async releasePhoneNumber(): Promise<void> {
     this._requirePhone();
-    await this._inkbox._idsResource.unlinkPhoneNumber(this.agentHandle);
+    await this._inkbox._idsResource.releasePhoneNumber(this.agentHandle);
     this._phoneNumber = null;
   }
 

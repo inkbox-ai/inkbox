@@ -286,10 +286,10 @@ class AgentIdentity:
         self._data = data
         return self._phone_number  # type: ignore[return-value]
 
-    def unlink_phone_number(self) -> None:
+    def release_phone_number(self) -> None:
         """Release this identity's phone number (vendor + local)."""
         self._require_phone()
-        self._inkbox._ids_resource.unlink_phone_number(self.agent_handle)
+        self._inkbox._ids_resource.release_phone_number(self.agent_handle)
         self._phone_number = None
 
     ## Mail helpers

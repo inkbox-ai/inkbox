@@ -142,7 +142,7 @@ class IdentitiesResource:
         """
         self._http.delete(f"/{agent_handle}")
 
-    def unlink_phone_number(self, agent_handle: str) -> None:
+    def release_phone_number(self, agent_handle: str) -> None:
         """Release the identity's phone number (vendor + local).
 
         Released at the carrier; the number is not available for
