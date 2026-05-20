@@ -6,7 +6,7 @@ An [OpenClaw](https://openclaw.ai) skill for email, phone, and vault via [Inkbox
 
 Once installed, your OpenClaw agent can:
 
-- **Manage identities** — create, list, rename, pause, and delete agent identities; assign and unlink channels
+- **Manage identities** — create, list, rename, pause, and delete agent identities; provision and release phone numbers
 - **Send emails** — compose and send from an Inkbox agent mailbox, with optional CC/BCC
 - **Reply to emails** — thread replies using a message ID
 - **Read inbox** — list recent messages or unread messages only

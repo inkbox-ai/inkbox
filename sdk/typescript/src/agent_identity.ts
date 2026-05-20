@@ -225,27 +225,11 @@ export class AgentIdentity {
   }
 
   /**
-   * Link an existing phone number to this identity.
-   *
-   * @param phoneNumberId - UUID of the phone number to link. Obtain via
-   *   `inkbox.phoneNumbers.list()` or `inkbox.phoneNumbers.get()`.
-   * @returns The linked {@link IdentityPhoneNumber}.
+   * Release this identity's phone number (vendor + local).
    */
-  async assignPhoneNumber(phoneNumberId: string): Promise<IdentityPhoneNumber> {
-    const data   = await this._inkbox._idsResource.assignPhoneNumber(this.agentHandle, {
-      phoneNumberId,
-    });
-    this._phoneNumber = data.phoneNumber;
-    this._data        = data;
-    return this._phoneNumber!;
-  }
-
-  /**
-   * Unlink this identity's phone number (does not release the number).
-   */
-  async unlinkPhoneNumber(): Promise<void> {
+  async releasePhoneNumber(): Promise<void> {
     this._requirePhone();
-    await this._inkbox._idsResource.unlinkPhoneNumber(this.agentHandle);
+    await this._inkbox._idsResource.releasePhoneNumber(this.agentHandle);
     this._phoneNumber = null;
   }
 
@@ -625,7 +609,7 @@ export class AgentIdentity {
    *
    * Cascades: flips the linked mailbox to `deleted`, force-finalizes the
    * linked tunnel to `deleted`, revokes any identity-scoped API keys, and
-   * unassigns (but does not delete) any linked phone number.
+   * releases any linked phone number (vendor + local).
    */
   async delete(): Promise<void> {
     await this._inkbox._idsResource.delete(this.agentHandle);
@@ -654,7 +638,7 @@ export class AgentIdentity {
   private _requirePhone(): void {
     if (!this._phoneNumber) {
       throw new InkboxError(
-        `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() or identity.assignPhoneNumber() first.`,
+        `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() first, or pass phoneNumber to createIdentity().`,
       );
     }
   }

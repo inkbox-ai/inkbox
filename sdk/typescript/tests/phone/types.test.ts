@@ -30,7 +30,7 @@ describe("parsePhoneNumber", () => {
     expect(n.updatedAt).toBeInstanceOf(Date);
   });
 
-  it("null agentIdentityId for standalone number", () => {
+  it("null agentIdentityId on released-state response", () => {
     const n = parsePhoneNumber({ ...RAW_PHONE_NUMBER, agent_identity_id: null });
     expect(n.agentIdentityId).toBeNull();
   });

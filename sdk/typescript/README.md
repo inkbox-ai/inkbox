@@ -146,10 +146,6 @@ await inkbox.createIdentity("sales-bot-2", { sendingDomain: "mail.acme.com" });
 // Provision a passthrough tunnel (tls_mode is fixed at create time)
 await inkbox.createIdentity("sales-bot-pt", { tunnel: { tlsMode: "passthrough" } });
 
-// Link an existing phone number to an identity (mailbox + tunnel are
-// 1:1 with their identity and cannot be relinked).
-await identity.assignPhoneNumber("phone-number-uuid-here");
-
 // Get an existing identity (returned with current channel state)
 const identity2 = await inkbox.getIdentity("sales-bot");
 await identity2.refresh();  // re-fetch channels from API
@@ -161,11 +157,11 @@ const allIdentities = await inkbox.listIdentities();
 await identity.update({ status: "paused" });
 await identity.update({ newHandle: "sales-bot-v2" });
 
-// Unlink phone number (without releasing it). Mailbox is 1:1 with the
-// identity and cannot be unlinked — delete the identity instead.
-await identity.unlinkPhoneNumber();
+// Release the phone number (carrier release + local delete). Mailbox and
+// tunnel are 1:1 with the identity and can only be removed by deleting it.
+await identity.releasePhoneNumber();
 
-// Delete
+// Delete (cascades to mailbox + tunnel + phone-number release; revokes scoped API keys).
 await identity.delete();
 ```
 
@@ -656,7 +652,7 @@ await inkbox.domains.setDefault("inkboxmail.com");  // -> null
 
 ## Org-level Phone Numbers
 
-Manage phone numbers directly without going through an identity. Access via `inkbox.phoneNumbers`.
+Read, search, and release phone numbers org-wide via `inkbox.phoneNumbers`. Provisioning still goes through an identity — pass `agentHandle` so the new number is bound to it from the start.
 
 ```ts
 // List all phone numbers in the organisation
@@ -666,8 +662,8 @@ const numbers = await inkbox.phoneNumbers.list();
 const number = await inkbox.phoneNumbers.get("phone-number-uuid");
 
 // Provision a new number
-const num   = await inkbox.phoneNumbers.provision({ type: "toll_free" });
-const local = await inkbox.phoneNumbers.provision({ type: "local", state: "NY" });
+const num   = await inkbox.phoneNumbers.provision({ agentHandle: "sales-bot", type: "toll_free" });
+const local = await inkbox.phoneNumbers.provision({ agentHandle: "sales-bot", type: "local", state: "NY" });
 
 // Update incoming call behaviour
 await inkbox.phoneNumbers.update(num.id, {

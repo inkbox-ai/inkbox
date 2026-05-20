@@ -73,7 +73,7 @@ identities = inkbox.list_identities()  # → list[AgentIdentitySummary]
 identity.update(new_handle="new-name")   # rename
 identity.update(status="paused")         # or "active"
 identity.refresh()                       # re-fetch from API, updates cached channels
-identity.delete()                        # unlinks channels
+identity.delete()                        # cascades: mailbox + tunnel + phone-number release
 ```
 
 ## Channel Management
@@ -87,11 +87,8 @@ print(identity.tunnel.public_host)       # e.g. "sales-agent.inkboxwire.com"
 phone = identity.provision_phone_number(type="toll_free")       # or type="local", state="NY"
 print(phone.number)                      # e.g. "+18005551234"
 
-# Existing phone number? Link it instead:
-identity.assign_phone_number("phone-number-uuid")
-
-# Unlink the phone number without releasing it
-identity.unlink_phone_number()
+# Release the phone number (vendor + local)
+identity.release_phone_number()
 ```
 
 Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.create_identity()` to provision both; use `identity.delete()` to remove both (cascade).

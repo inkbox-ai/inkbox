@@ -74,8 +74,7 @@ function mockInkbox() {
       delete: vi.fn(),
       assignMailbox: vi.fn(),
       unlinkMailbox: vi.fn(),
-      assignPhoneNumber: vi.fn(),
-      unlinkPhoneNumber: vi.fn(),
+      releasePhoneNumber: vi.fn(),
     },
   } as unknown as Inkbox;
 }
@@ -117,31 +116,20 @@ describe("AgentIdentity channel management", () => {
     expect(phone).toEqual(PARSED_PHONE);
   });
 
-  it("assignPhoneNumber links existing number", async () => {
+  it("releasePhoneNumber releases the linked number", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.assignPhoneNumber).mockResolvedValue(makeData());
-    const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
-
-    const result = await identity.assignPhoneNumber("phone-id");
-
-    expect(ink._idsResource.assignPhoneNumber).toHaveBeenCalledWith("sales-agent", { phoneNumberId: "phone-id" });
-    expect(result).toEqual(PARSED_PHONE);
-  });
-
-  it("unlinkPhoneNumber removes phone", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._idsResource.unlinkPhoneNumber).mockResolvedValue(undefined);
+    vi.mocked(ink._idsResource.releasePhoneNumber).mockResolvedValue(undefined);
     const identity = new AgentIdentity(makeData(), ink);
 
-    await identity.unlinkPhoneNumber();
+    await identity.releasePhoneNumber();
 
-    expect(ink._idsResource.unlinkPhoneNumber).toHaveBeenCalledWith("sales-agent");
+    expect(ink._idsResource.releasePhoneNumber).toHaveBeenCalledWith("sales-agent");
     expect(identity.phoneNumber).toBeNull();
   });
 
-  it("unlinkPhoneNumber throws when no phone", async () => {
+  it("releasePhoneNumber throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
-    await expect(identity.unlinkPhoneNumber()).rejects.toThrow(InkboxError);
+    await expect(identity.releasePhoneNumber()).rejects.toThrow(InkboxError);
   });
 });
 

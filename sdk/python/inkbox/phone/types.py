@@ -69,8 +69,9 @@ class PhoneNumber:
     """A phone number owned by your organisation.
 
     ``agent_identity_id`` is the UUID of the owning agent identity, or
-    ``None`` if the phone number is standalone (not tied to any agent).
-    Always populated on every phone-number response.
+    ``None`` only for the pool / released states. Active org-owned
+    numbers are always bound to an identity. Always populated on
+    every phone-number response.
 
     SMS-readiness fields (``sms_status``, ``sms_error_code``,
     ``sms_error_detail``, ``sms_ready_at``) reflect 10DLC / TFV

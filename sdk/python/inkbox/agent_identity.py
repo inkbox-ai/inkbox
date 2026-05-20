@@ -286,27 +286,10 @@ class AgentIdentity:
         self._data = data
         return self._phone_number  # type: ignore[return-value]
 
-    def assign_phone_number(self, phone_number_id: str) -> IdentityPhoneNumber:
-        """Link an existing phone number to this identity.
-
-        Args:
-            phone_number_id: UUID of the phone number to link. Obtain via
-                ``inkbox.phone_numbers.list()`` or ``inkbox.phone_numbers.get()``.
-
-        Returns:
-            The linked phone number.
-        """
-        data = self._inkbox._ids_resource.assign_phone_number(
-            self.agent_handle, phone_number_id=phone_number_id
-        )
-        self._phone_number = data.phone_number
-        self._data = data
-        return self._phone_number  # type: ignore[return-value]
-
-    def unlink_phone_number(self) -> None:
-        """Unlink this identity's phone number (does not release the number)."""
+    def release_phone_number(self) -> None:
+        """Release this identity's phone number (vendor + local)."""
         self._require_phone()
-        self._inkbox._ids_resource.unlink_phone_number(self.agent_handle)
+        self._inkbox._ids_resource.release_phone_number(self.agent_handle)
         self._phone_number = None
 
     ## Mail helpers
@@ -776,8 +759,7 @@ class AgentIdentity:
 
         Cascades: flips the linked mailbox to ``deleted``, force-finalizes
         the linked tunnel to ``deleted``, revokes any identity-scoped
-        API keys, and unassigns (but does not delete) any linked phone
-        number.
+        API keys, and releases any linked phone number (vendor + local).
         """
         self._inkbox._ids_resource.delete(self.agent_handle)
 
@@ -794,7 +776,7 @@ class AgentIdentity:
         if not self._phone_number:
             raise InkboxError(
                 f"Identity '{self.agent_handle}' has no phone number assigned. "
-                "Call identity.provision_phone_number() or identity.assign_phone_number() first."
+                "Call identity.provision_phone_number() first, or pass phone_number to create_identity()."
             )
 
     def _require_vault_unlocked(self) -> None:

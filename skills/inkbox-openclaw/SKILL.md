@@ -105,7 +105,7 @@ const identities = await inkbox.listIdentities();   // AgentIdentitySummary[]
 await identity.update({ newHandle: "new-name" });   // rename
 await identity.update({ status: "paused" });         // or "active"
 await identity.refresh();                            // re-fetch from API, updates cached channels
-await identity.delete();                             // unlinks channels
+await identity.delete();                             // cascades: mailbox + tunnel + phone-number release
 ```
 
 If `INKBOX_AGENT_HANDLE` is not configured, ask the user for the handle to use.
@@ -126,11 +126,8 @@ console.log(identity.tunnel?.publicHost);      // e.g. "sales-agent.inkboxwire.c
 const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
 console.log(phone.number);                     // e.g. "+18005551234"
 
-// Existing phone number? Link it instead:
-await identity.assignPhoneNumber("phone-number-uuid");
-
-// Unlink the phone number without releasing it
-await identity.unlinkPhoneNumber();
+// Release the phone number (vendor + local)
+await identity.releasePhoneNumber();
 ```
 
 Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.createIdentity()` to provision both; use `identity.delete()` to remove both (cascade).

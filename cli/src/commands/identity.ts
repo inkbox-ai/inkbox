@@ -586,40 +586,15 @@ export function registerIdentityCommands(program: Command): void {
     );
 
   identity
-    .command("assign-phone <handle>")
-    .description("Assign an existing phone number to an identity")
-    .requiredOption("--phone-number-id <id>", "UUID of the phone number to assign")
-    .action(
-      withErrorHandler(async function (
-        this: Command,
-        handle: string,
-        cmdOpts: { phoneNumberId: string },
-      ) {
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        const id = await inkbox.getIdentity(handle);
-        const pn = await id.assignPhoneNumber(cmdOpts.phoneNumberId);
-        output(
-          {
-            agentHandle: id.agentHandle,
-            phoneNumberId: pn.id,
-            number: pn.number,
-          },
-          { json: !!opts.json },
-        );
-      }),
-    );
-
-  identity
-    .command("unlink-phone <handle>")
-    .description("Unlink the phone number from an identity (does not release the number)")
+    .command("release-phone <handle>")
+    .description("Release the identity's phone number back to the carrier (permanent)")
     .action(
       withErrorHandler(async function (this: Command, handle: string) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
-        await id.unlinkPhoneNumber();
-        console.log(`Unlinked phone number from identity '${handle}'.`);
+        await id.releasePhoneNumber();
+        console.log(`Released phone number from identity '${handle}'.`);
       }),
     );
 }

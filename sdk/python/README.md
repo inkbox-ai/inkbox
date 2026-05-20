@@ -137,10 +137,6 @@ inkbox.create_identity("sales-bot-2", sending_domain="mail.acme.com")
 from inkbox import IdentityTunnelCreateOptions
 inkbox.create_identity("sales-bot-pt", tunnel=IdentityTunnelCreateOptions(tls_mode="passthrough"))
 
-# Link an existing phone number to an identity (mailbox + tunnel are
-# 1:1 with their identity and cannot be relinked).
-identity.assign_phone_number("phone-number-uuid-here")
-
 # Get an existing identity
 identity = inkbox.get_identity("sales-bot")
 identity.refresh()  # re-fetch channels from API
@@ -155,10 +151,10 @@ identity.update(new_handle="sales-bot-v2")
 identity.update(display_name="New Name", description="New blurb")
 identity.update(description=None)  # clear
 
-# Unlink the phone number (without releasing it).
-identity.unlink_phone_number()
+# Release the phone number (vendor + local).
+identity.release_phone_number()
 
-# Delete (cascades to mailbox + tunnel; revokes scoped API keys).
+# Delete (cascades to mailbox + tunnel + phone-number release; revokes scoped API keys).
 identity.delete()
 ```
 
@@ -618,7 +614,7 @@ inkbox.domains.set_default("inkboxmail.com")  # -> None
 
 ## Org-level Phone Numbers
 
-Manage phone numbers directly without going through an identity. Access via `inkbox.phone_numbers`.
+Read, search, and release phone numbers org-wide via `inkbox.phone_numbers`. Provisioning still goes through an identity — pass `agent_handle` so the new number is bound to it from the start.
 
 ```python
 # List all phone numbers in the organisation
@@ -628,8 +624,8 @@ numbers = inkbox.phone_numbers.list()
 number = inkbox.phone_numbers.get("phone-number-uuid")
 
 # Provision a new number
-number = inkbox.phone_numbers.provision(type="toll_free")
-local  = inkbox.phone_numbers.provision(type="local", state="NY")
+number = inkbox.phone_numbers.provision(agent_handle="sales-bot", type="toll_free")
+local  = inkbox.phone_numbers.provision(agent_handle="sales-bot", type="local", state="NY")
 
 # Update incoming call behaviour
 inkbox.phone_numbers.update(
@@ -873,7 +869,7 @@ Runnable example scripts are available in the [examples/python](https://github.c
 
 | Script | What it demonstrates |
 |---|---|
-| `register_agent_identity.py` | Create an identity, assign mailbox + phone number |
+| `register_agent_identity.py` | Create an identity with a linked mailbox and phone number |
 | `agent_send_email.py` | Send an email and a threaded reply |
 | `read_agent_messages.py` | List messages and threads |
 | `create_agent_mailbox.py` | Create, update, search, and delete a mailbox |

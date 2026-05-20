@@ -165,24 +165,10 @@ class TestIdentitiesDelete:
         http.delete.assert_called_once_with(f"/{HANDLE}")
 
 
-class TestIdentitiesAssignPhoneNumber:
-    def test_assigns_phone_number(self):
-        res, http = _resource()
-        phone_id = "bbbb2222-0000-0000-0000-000000000001"
-        http.post.return_value = IDENTITY_DETAIL_DICT
-
-        detail = res.assign_phone_number(HANDLE, phone_number_id=phone_id)
-
-        http.post.assert_called_once_with(
-            f"/{HANDLE}/phone_number", json={"phone_number_id": phone_id}
-        )
-        assert isinstance(detail, _AgentIdentityData)
-
-
-class TestIdentitiesUnlinkPhoneNumber:
-    def test_unlinks_phone_number(self):
+class TestIdentitiesReleasePhoneNumber:
+    def test_releases_phone_number(self):
         res, http = _resource()
 
-        res.unlink_phone_number(HANDLE)
+        res.release_phone_number(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/phone_number")

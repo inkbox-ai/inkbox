@@ -102,9 +102,7 @@ inkbox identity get-secret <handle> <secret-id>     # Decrypt a secret (vault ke
 inkbox identity delete-secret <handle> <secret-id>  # Delete a secret (vault key)
 inkbox identity revoke-access <handle> <secret-id>  # Revoke credential access
 
-inkbox identity assign-phone <handle>                # Assign an existing phone number
-  --phone-number-id <id>                       #   Phone number UUID (required)
-inkbox identity unlink-phone <handle>                # Unlink phone number from identity
+inkbox identity release-phone <handle>               # Release phone number back to the carrier
 
 inkbox identity set-totp <handle> <secret-id>       # Add TOTP to login (vault key)
   --uri <otpauth-uri>                        #   otpauth:// URI (required)
