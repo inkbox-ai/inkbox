@@ -240,6 +240,40 @@ class TextMediaItem:
 
 
 @dataclass
+class RecipientStatus:
+    """Per-recipient delivery state inside an outbound group MMS message.
+
+    One entry per recipient. ``delivery_status`` tracks the same
+    lifecycle as the row-level field on 1:1 messages.
+    """
+
+    phone_number: str
+    delivery_status: SmsDeliveryStatus | None = None
+    carrier: str | None = None
+    line_type: str | None = None
+    error_code: str | None = None
+    error_detail: str | None = None
+    sent_at: datetime | None = None
+    delivered_at: datetime | None = None
+    failed_at: datetime | None = None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> RecipientStatus:
+        raw_status = d.get("delivery_status")
+        return cls(
+            phone_number=d["phone_number"],
+            delivery_status=SmsDeliveryStatus(raw_status) if raw_status else None,
+            carrier=d.get("carrier"),
+            line_type=d.get("line_type"),
+            error_code=d.get("error_code"),
+            error_detail=d.get("error_detail"),
+            sent_at=_dt(d.get("sent_at")),
+            delivered_at=_dt(d.get("delivered_at")),
+            failed_at=_dt(d.get("failed_at")),
+        )
+
+
+@dataclass
 class TextMessage:
     """A text message (SMS or MMS).
 
@@ -247,24 +281,32 @@ class TextMessage:
     ``error_detail``, ``sent_at``, ``delivered_at``, ``failed_at``) are
     ``None`` on inbound rows.
 
+    Group MMS messages set ``group_id`` and leave ``remote_phone_number``
+    null on outbound rows; inbound group replies keep
+    ``remote_phone_number`` = sender. Outbound groups populate
+    ``recipients_status`` with one entry per recipient; inbound groups
+    populate ``cc_phone_numbers`` with the other participants.
+
     ``is_blocked`` is ``True`` when this text was rejected by a contact rule
     or default-block. Identity-scoped (agent) API keys never observe
     ``is_blocked=True`` rows — the server filters them at the
-    access-policy layer. Admin-scoped API keys and JWT humans see both
-    values mixed by default and can narrow with ``is_blocked`` on
-    ``TextsResource.list`` / ``search`` / ``list_conversations``.
+    access-policy layer.
     """
 
     id: UUID
     direction: str
     local_phone_number: str
-    remote_phone_number: str
+    remote_phone_number: str | None
     text: str | None
     type: str
     media: list[TextMediaItem] | None
     is_read: bool
     created_at: datetime
     updated_at: datetime
+    # Group fields — all None on 1:1 rows.
+    group_id: UUID | None = None
+    recipients_status: list[RecipientStatus] | None = None
+    cc_phone_numbers: list[str] | None = None
     delivery_status: SmsDeliveryStatus | None = None
     origin: TextMessageOrigin = TextMessageOrigin.USER_INITIATED
     error_code: str | None = None
@@ -282,17 +324,27 @@ class TextMessage:
         # Server-shape fields are optional on inbound rows, so fall back gracefully.
         raw_delivery = d.get("delivery_status")
         raw_origin = d.get("origin")
+        raw_group_id = d.get("group_id")
+        raw_recipients = d.get("recipients_status")
+        recipients = (
+            [RecipientStatus._from_dict(r) for r in raw_recipients]
+            if raw_recipients
+            else None
+        )
         return cls(
             id=UUID(d["id"]),
             direction=d["direction"],
             local_phone_number=d["local_phone_number"],
-            remote_phone_number=d["remote_phone_number"],
+            remote_phone_number=d.get("remote_phone_number"),
             text=d.get("text"),
             type=d["type"],
             media=media,
             is_read=d["is_read"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            group_id=UUID(raw_group_id) if raw_group_id else None,
+            recipients_status=recipients,
+            cc_phone_numbers=d.get("cc_phone_numbers"),
             delivery_status=SmsDeliveryStatus(raw_delivery) if raw_delivery else None,
             origin=(
                 TextMessageOrigin(raw_origin)
@@ -310,20 +362,31 @@ class TextMessage:
 
 @dataclass
 class TextConversationSummary:
-    """One row per conversation — lightweight summary."""
+    """One row per conversation — lightweight summary.
 
-    remote_phone_number: str
+    A summary is either a 1:1 (``remote_phone_number`` set, ``group_id``
+    null) or a group (``group_id`` + ``participants`` set,
+    ``remote_phone_number`` null). Clients render the two shapes
+    distinctly.
+    """
+
     latest_text: str | None
     latest_direction: str
     latest_type: str
     latest_message_at: datetime
     unread_count: int
     total_count: int
+    remote_phone_number: str | None = None
+    group_id: UUID | None = None
+    participants: list[str] | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextConversationSummary:
+        raw_group_id = d.get("group_id")
         return cls(
-            remote_phone_number=d["remote_phone_number"],
+            remote_phone_number=d.get("remote_phone_number"),
+            group_id=UUID(raw_group_id) if raw_group_id else None,
+            participants=d.get("participants"),
             latest_text=d.get("latest_text"),
             latest_direction=d["latest_direction"],
             latest_type=d["latest_type"],

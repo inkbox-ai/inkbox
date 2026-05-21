@@ -150,18 +150,41 @@ export type TextWebhookEventType =
   | "text.delivery_unconfirmed";
 
 /**
+ * Per-recipient lifecycle state inside an outbound group MMS message.
+ */
+export interface WebhookRecipientStatus {
+  phone_number: string;
+  delivery_status: SmsDeliveryStatusWire | null;
+  carrier: string | null;
+  line_type: string | null;
+  error_code: string | null;
+  error_detail: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  failed_at: string | null;
+}
+
+/**
  * Stored text message. `is_blocked` is not part of the wire body —
  * blocked texts never reach the webhook.
+ *
+ * Group MMS messages set `group_id` and (depending on direction)
+ * `recipients_status` (outbound) or `cc_phone_numbers` (inbound). On
+ * outbound group rows `remote_phone_number` is `null`; on inbound
+ * group rows it carries the sender so receivers can attribute replies.
  */
 export interface TextWebhookMessage {
   id: string;
   direction: TextDirectionWire;
   local_phone_number: string;
-  remote_phone_number: string;
+  remote_phone_number: string | null;
   text: string | null;
   type: TextTypeWire;
   media: RawTextMediaItem[] | null;
   is_read: boolean;
+  group_id: string | null;
+  recipients_status: WebhookRecipientStatus[] | null;
+  cc_phone_numbers: string[] | null;
   delivery_status: SmsDeliveryStatusWire | null;
   origin: TextMessageOriginWire;
   error_code: string | null;
@@ -179,6 +202,12 @@ export interface TextWebhookPayload {
   data: {
     text_message: TextWebhookMessage;
     contact: WebhookContact | null;
+    /**
+     * Set only on outbound *group* lifecycle events to name the
+     * specific recipient this event is about. `null` on 1:1 events
+     * and on `text.received`.
+     */
+    recipient_phone_number: string | null;
   };
 }
 

@@ -58,6 +58,52 @@ class TextsResource:
         )
         return TextMessage._from_dict(data)
 
+    def send_group(
+        self,
+        phone_number_id: UUID | str,
+        *,
+        to: list[str],
+        text: str | None = None,
+        media_urls: list[str] | None = None,
+    ) -> TextMessage:
+        """Send a group MMS to 2–8 recipients as a single conversation.
+
+        Group MMS is MMS-only and billed per recipient. All participants
+        must clear opt-in and contact-rule checks together; a single
+        failure rejects the whole send.
+
+        Args:
+            phone_number_id: UUID of the sending phone number.
+            to: 2–8 E.164 recipient phone numbers.
+            text: Optional message body (≤1600 chars).
+            media_urls: Optional list of publicly-fetchable media URLs.
+
+        Returns:
+            TextMessage: The queued group row. ``group_id`` is set;
+                ``remote_phone_number`` is ``None``; ``recipients_status``
+                carries per-recipient lifecycle state. Subsequent
+                ``text.sent`` / ``text.delivered`` / ``text.delivery_failed``
+                / ``text.delivery_unconfirmed`` webhooks fire **per
+                recipient**, with the affected number in the payload's
+                ``recipient_phone_number``.
+
+        Raises:
+            RecipientBlockedError: when any recipient is blocked by an
+                outbound contact rule on the sender.
+            InkboxAPIError: for other 4xx/5xx errors. ``detail.address``
+                identifies the offending recipient when a check fails.
+        """
+        body: dict[str, Any] = {"to": to}
+        if text is not None:
+            body["text"] = text
+        if media_urls is not None:
+            body["media_urls"] = media_urls
+        data = self._http.post(
+            f"/numbers/{phone_number_id}/texts/group",
+            json=body,
+        )
+        return TextMessage._from_dict(data)
+
     def list(
         self,
         phone_number_id: UUID | str,
@@ -243,6 +289,52 @@ class TextsResource:
         """
         data = self._http.patch(
             f"/numbers/{phone_number_id}/texts/conversations/{remote_number}",
+            json={"is_read": is_read},
+        )
+        return data
+
+    def get_group_conversation(
+        self,
+        phone_number_id: UUID | str,
+        group_id: UUID | str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[TextMessage]:
+        """List messages in a group MMS conversation, newest first.
+
+        Args:
+            phone_number_id: UUID of the phone number.
+            group_id: UUID of the group conversation (from
+                ``TextMessage.group_id`` or ``TextConversationSummary.group_id``).
+            limit: Max results to return (1–200).
+            offset: Pagination offset.
+        """
+        data = self._http.get(
+            f"/numbers/{phone_number_id}/texts/conversations/group/{group_id}",
+            params={"limit": limit, "offset": offset},
+        )
+        return [TextMessage._from_dict(t) for t in data]
+
+    def update_group_conversation(
+        self,
+        phone_number_id: UUID | str,
+        group_id: UUID | str,
+        *,
+        is_read: bool,
+    ) -> dict[str, Any]:
+        """Mark all messages in a group conversation read or unread.
+
+        Args:
+            phone_number_id: UUID of the phone number.
+            group_id: UUID of the group conversation.
+            is_read: New read state.
+
+        Returns:
+            Dict with ``group_id``, ``is_read``, and ``updated_count``.
+        """
+        data = self._http.patch(
+            f"/numbers/{phone_number_id}/texts/conversations/group/{group_id}",
             json={"is_read": is_read},
         )
         return data

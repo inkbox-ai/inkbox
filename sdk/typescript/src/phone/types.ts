@@ -190,17 +190,39 @@ export interface TextMediaItem {
   url: string;
 }
 
+export interface RecipientStatus {
+  phoneNumber: string;
+  deliveryStatus: SmsDeliveryStatus | null;
+  carrier: string | null;
+  lineType: string | null;
+  errorCode: string | null;
+  errorDetail: string | null;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  failedAt: Date | null;
+}
+
 export interface TextMessage {
   id: string;
   /** "inbound" | "outbound" */
   direction: string;
   localPhoneNumber: string;
-  remotePhoneNumber: string;
+  /**
+   * Null on outbound group MMS rows (no single remote party). Set to
+   * the other party on 1:1 rows and to the sender on inbound group rows.
+   */
+  remotePhoneNumber: string | null;
   text: string | null;
   /** "sms" | "mms" */
   type: string;
   media: TextMediaItem[] | null;
   isRead: boolean;
+  /** Group threading id. Null on 1:1 messages. */
+  groupId: string | null;
+  /** Outbound group MMS: per-recipient delivery state. Null otherwise. */
+  recipientsStatus: RecipientStatus[] | null;
+  /** Inbound group MMS: other participants from the carrier `cc` list. */
+  ccPhoneNumbers: string[] | null;
   /** Outbound delivery lifecycle. `null` on inbound rows. */
   deliveryStatus: SmsDeliveryStatus | null;
   origin: TextMessageOrigin;
@@ -212,9 +234,7 @@ export interface TextMessage {
   /**
    * `true` when this text was rejected by a contact rule or default-block.
    * Identity-scoped (agent) API keys never observe `true` rows — the
-   * server filters them at the access-policy layer. Admin/JWT callers see
-   * both values mixed and can narrow with `isBlocked` on
-   * `TextsResource.list` / `search` / `listConversations`.
+   * server filters them at the access-policy layer.
    */
   isBlocked: boolean;
   createdAt: Date;
@@ -222,7 +242,12 @@ export interface TextMessage {
 }
 
 export interface TextConversationSummary {
-  remotePhoneNumber: string;
+  /** Set on 1:1 conversations. Null on group conversations. */
+  remotePhoneNumber: string | null;
+  /** Set on group conversations. Null on 1:1. */
+  groupId: string | null;
+  /** Participants list on group conversations (excludes our local number). */
+  participants: string[] | null;
   latestText: string | null;
   latestDirection: string;
   latestType: string;
@@ -315,15 +340,32 @@ export interface RawTextMediaItem {
   url: string;
 }
 
+export interface RawRecipientStatus {
+  phone_number: string;
+  delivery_status?: string | null;
+  carrier?: string | null;
+  line_type?: string | null;
+  error_code?: string | null;
+  error_detail?: string | null;
+  sent_at?: string | null;
+  delivered_at?: string | null;
+  failed_at?: string | null;
+}
+
 export interface RawTextMessage {
   id: string;
   direction: string;
   local_phone_number: string;
-  remote_phone_number: string;
+  // Nullable since v0.7: outbound group MMS rows leave this field empty.
+  remote_phone_number: string | null;
   text: string | null;
   type: string;
   media: RawTextMediaItem[] | null;
   is_read: boolean;
+  // Group fields — optional for back-compat with older servers.
+  group_id?: string | null;
+  recipients_status?: RawRecipientStatus[] | null;
+  cc_phone_numbers?: string[] | null;
   delivery_status?: string | null;
   origin?: string;
   error_code?: string | null;
@@ -339,7 +381,9 @@ export interface RawTextMessage {
 }
 
 export interface RawTextConversationSummary {
-  remote_phone_number: string;
+  remote_phone_number?: string | null;
+  group_id?: string | null;
+  participants?: string[] | null;
   latest_text: string | null;
   latest_direction: string;
   latest_type: string;
@@ -473,16 +517,37 @@ export function parseTextMediaItem(r: RawTextMediaItem): TextMediaItem {
   };
 }
 
+export function parseRecipientStatus(r: RawRecipientStatus): RecipientStatus {
+  return {
+    phoneNumber: r.phone_number,
+    deliveryStatus: r.delivery_status
+      ? (r.delivery_status as SmsDeliveryStatus)
+      : null,
+    carrier: r.carrier ?? null,
+    lineType: r.line_type ?? null,
+    errorCode: r.error_code ?? null,
+    errorDetail: r.error_detail ?? null,
+    sentAt: r.sent_at ? new Date(r.sent_at) : null,
+    deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,
+    failedAt: r.failed_at ? new Date(r.failed_at) : null,
+  };
+}
+
 export function parseTextMessage(r: RawTextMessage): TextMessage {
   return {
     id: r.id,
     direction: r.direction,
     localPhoneNumber: r.local_phone_number,
-    remotePhoneNumber: r.remote_phone_number,
+    remotePhoneNumber: r.remote_phone_number ?? null,
     text: r.text,
     type: r.type,
     media: r.media ? r.media.map(parseTextMediaItem) : null,
     isRead: r.is_read,
+    groupId: r.group_id ?? null,
+    recipientsStatus: r.recipients_status
+      ? r.recipients_status.map(parseRecipientStatus)
+      : null,
+    ccPhoneNumbers: r.cc_phone_numbers ?? null,
     deliveryStatus: r.delivery_status
       ? (r.delivery_status as SmsDeliveryStatus)
       : null,
@@ -502,7 +567,9 @@ export function parseTextConversationSummary(
   r: RawTextConversationSummary,
 ): TextConversationSummary {
   return {
-    remotePhoneNumber: r.remote_phone_number,
+    remotePhoneNumber: r.remote_phone_number ?? null,
+    groupId: r.group_id ?? null,
+    participants: r.participants ?? null,
     latestText: r.latest_text,
     latestDirection: r.latest_direction,
     latestType: r.latest_type,

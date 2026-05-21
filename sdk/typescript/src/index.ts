@@ -98,6 +98,7 @@ export type {
   TextMediaItem,
   TextMessage,
   TextConversationSummary,
+  RecipientStatus,
 } from "./phone/types.js";
 export type {
   AgentIdentitySummary,

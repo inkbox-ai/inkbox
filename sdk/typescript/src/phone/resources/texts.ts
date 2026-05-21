@@ -50,6 +50,44 @@ export class TextsResource {
   }
 
   /**
+   * Send a group MMS to 2–8 recipients as a single conversation.
+   *
+   * Group MMS is MMS-only and billed per recipient. All participants
+   * must clear opt-in and contact-rule checks together; a single
+   * failure rejects the whole send.
+   *
+   * @param phoneNumberId - UUID of the sending phone number.
+   * @param options.to - 2–8 E.164 recipient phone numbers.
+   * @param options.text - Optional message body (≤1600 chars).
+   * @param options.mediaUrls - Optional publicly-fetchable media URLs.
+   *
+   * @returns The queued group `TextMessage`. `groupId` is set;
+   *   `remotePhoneNumber` is `null`; `recipientsStatus` carries
+   *   per-recipient lifecycle state. Subsequent `text.sent` /
+   *   `text.delivered` / `text.delivery_failed` /
+   *   `text.delivery_unconfirmed` webhooks fire **per recipient**,
+   *   with the affected number in the payload's `recipientPhoneNumber`.
+   *
+   * @throws {RecipientBlockedError} when any recipient is blocked by an
+   *   outbound contact rule on the sender.
+   * @throws {InkboxAPIError} for other 4xx/5xx errors. `err.detail.address`
+   *   names the offending recipient when a check fails.
+   */
+  async sendGroup(
+    phoneNumberId: string,
+    options: { to: string[]; text?: string; mediaUrls?: string[] },
+  ): Promise<TextMessage> {
+    const body: Record<string, unknown> = { to: options.to };
+    if (options.text !== undefined) body["text"] = options.text;
+    if (options.mediaUrls !== undefined) body["media_urls"] = options.mediaUrls;
+    const data = await this.http.post<RawTextMessage>(
+      `/numbers/${phoneNumberId}/texts/group`,
+      body,
+    );
+    return parseTextMessage(data);
+  }
+
+  /**
    * List text messages for a phone number, newest first.
    *
    * Identity-scoped API keys never see contact-rule-blocked rows
@@ -233,6 +271,55 @@ export class TextsResource {
     );
     return {
       remotePhoneNumber: data.remote_phone_number,
+      isRead: data.is_read,
+      updatedCount: data.updated_count,
+    };
+  }
+
+  /**
+   * List messages in a group MMS conversation, newest first.
+   *
+   * @param phoneNumberId - UUID of the phone number.
+   * @param groupId - UUID of the group conversation (from
+   *   `TextMessage.groupId` or `TextConversationSummary.groupId`).
+   * @param options.limit - Max results (1–200). Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   */
+  async getGroupConversation(
+    phoneNumberId: string,
+    groupId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<TextMessage[]> {
+    const data = await this.http.get<RawTextMessage[]>(
+      `/numbers/${phoneNumberId}/texts/conversations/group/${groupId}`,
+      { limit: options?.limit ?? 50, offset: options?.offset ?? 0 },
+    );
+    return data.map(parseTextMessage);
+  }
+
+  /**
+   * Mark all messages in a group conversation read or unread.
+   *
+   * @param phoneNumberId - UUID of the phone number.
+   * @param groupId - UUID of the group conversation.
+   * @param options.isRead - New read state.
+   * @returns Object with `groupId`, `isRead`, and `updatedCount`.
+   */
+  async updateGroupConversation(
+    phoneNumberId: string,
+    groupId: string,
+    options: { isRead: boolean },
+  ): Promise<{ groupId: string; isRead: boolean; updatedCount: number }> {
+    const data = await this.http.patch<{
+      group_id: string;
+      is_read: boolean;
+      updated_count: number;
+    }>(
+      `/numbers/${phoneNumberId}/texts/conversations/group/${groupId}`,
+      { is_read: options.isRead },
+    );
+    return {
+      groupId: data.group_id,
       isRead: data.is_read,
       updatedCount: data.updated_count,
     };
