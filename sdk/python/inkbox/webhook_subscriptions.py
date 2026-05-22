@@ -40,8 +40,9 @@ class WebhookSubscription:
 
     Exactly one of ``mailbox_id`` / ``phone_number_id`` is populated.
     ``organization_id`` is an ``"org_..."`` token string, not a UUID.
-    ``status`` is always ``"active"`` for rows callers can observe;
-    removed rows are filtered server-side and never returned.
+    ``status`` is always ``"active"`` for subscriptions callers can
+    observe; deleted subscriptions are not returned by ``list`` /
+    ``get``.
     """
 
     id: UUID
@@ -146,8 +147,8 @@ class WebhookSubscriptionsResource:
         """List webhook subscriptions visible to the caller.
 
         Filters AND-combine. ``mailbox_id`` and ``phone_number_id`` are
-        server-side mutually exclusive -- passing both yields a 422.
-        Removed rows are hidden by the server and never returned.
+        mutually exclusive -- passing both yields a 422. Deleted
+        subscriptions are not returned.
         """
         params: dict[str, Any] = {}
         if mailbox_id is not None:
@@ -162,7 +163,7 @@ class WebhookSubscriptionsResource:
         return [WebhookSubscription._from_dict(d) for d in data["subscriptions"]]
 
     def get(self, sub_id: UUID | str) -> WebhookSubscription:
-        """Fetch a single subscription by id. Returns 404 on removed rows."""
+        """Fetch a single subscription by id. Returns 404 if the subscription has been deleted or is not visible to the caller."""
         data = self._http.get(f"{_BASE}/{_uuid_str(sub_id)}")
         return WebhookSubscription._from_dict(data)
 
@@ -233,5 +234,5 @@ class WebhookSubscriptionsResource:
         return WebhookSubscription._from_dict(data)
 
     def delete(self, sub_id: UUID | str) -> None:
-        """Remove a subscription. The row is hidden from every read surface afterwards."""
+        """Delete a subscription. Subsequent ``list`` / ``get`` calls will not return it."""
         self._http.delete(f"{_BASE}/{_uuid_str(sub_id)}")

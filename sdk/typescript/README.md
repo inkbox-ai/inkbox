@@ -763,8 +763,11 @@ Available event types:
 Server-side validation: exactly one of `mailboxId` / `phoneNumberId`
 must be set; `eventTypes` must be non-empty and distinct; every event
 type must belong to the owner's channel (mailbox → `message.*`, phone
-number → `text.*`). The SDK mirrors all four checks client-side so
-typos surface as `Error` rather than 422.
+number → `text.*`). On `create` the SDK mirrors all four checks
+client-side so typos surface as `Error` rather than 422. On `update`
+the SDK mirrors the non-empty / distinct / no-`phone.incoming_call`
+checks; channel coherence is deferred to the server because the SDK
+doesn't know the owner FK from a sub_id alone.
 
 ### Incoming-call webhooks (still per-number)
 

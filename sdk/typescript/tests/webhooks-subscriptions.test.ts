@@ -86,6 +86,28 @@ describe("WebhookSubscriptionsResource.create", () => {
     ).rejects.toThrow(/Exactly one of/);
   });
 
+  it("treats null mailboxId as no owner (still requires exactly one of)", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        mailboxId: null as unknown as string,
+        url: "https://x/y",
+        eventTypes: ["message.received"],
+      }),
+    ).rejects.toThrow(/Exactly one of/);
+  });
+
+  it("treats null phoneNumberId as no owner (still requires exactly one of)", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        phoneNumberId: null as unknown as string,
+        url: "https://x/y",
+        eventTypes: ["text.received"],
+      }),
+    ).rejects.toThrow(/Exactly one of/);
+  });
+
   it("rejects empty eventTypes", async () => {
     const { resource } = makeResource();
     await expect(

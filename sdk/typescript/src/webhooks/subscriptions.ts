@@ -14,7 +14,7 @@ import { HttpTransport } from "../_http.js";
 
 const PATH = "/webhooks/subscriptions";
 
-/** Server-side row status. Removed rows are filtered server-side; callers should only observe `"active"`. */
+/** Lifecycle status of a subscription row. Callers only ever see `"active"`; deleted subscriptions are not returned by `list` / `get`. */
 export type WebhookSubscriptionStatus = "active" | "deleted";
 
 export interface WebhookSubscription {
@@ -107,7 +107,6 @@ function assertNoIncomingCall(eventTypes: string[]): void {
 
 function assertChannelCoherence(
   hasMailbox: boolean,
-  hasPhoneNumber: boolean,
   eventTypes: string[],
 ): void {
   const expectedPrefix = hasMailbox ? "message." : "text.";
@@ -124,7 +123,6 @@ function assertChannelCoherence(
     throw new Error(`event_type '${e}' does not belong to any known channel`);
   }
   // INCOMING_CALL is rejected by assertNoIncomingCall earlier.
-  void hasPhoneNumber;
 }
 
 export interface CreateWebhookSubscriptionOptions {
@@ -152,8 +150,8 @@ export class WebhookSubscriptionsResource {
   /**
    * List webhook subscriptions visible to the caller. Filters AND-combine;
    * unmatched filters return an empty list. `mailboxId` and `phoneNumberId`
-   * are server-side mutually exclusive — passing both yields a 422.
-   * Removed rows are hidden by the server and never returned.
+   * are mutually exclusive — passing both yields a 422. Deleted
+   * subscriptions are not returned.
    */
   async list(
     filters: ListWebhookSubscriptionsOptions = {},
@@ -167,7 +165,7 @@ export class WebhookSubscriptionsResource {
     return data.subscriptions.map(parseWebhookSubscription);
   }
 
-  /** Fetch a single subscription by id. Returns 404 on removed rows. */
+  /** Fetch a single subscription by id. Returns 404 if the subscription has been deleted or is not visible to the caller. */
   async get(subId: string): Promise<WebhookSubscription> {
     const data = await this.http.get<RawWebhookSubscription>(`${PATH}/${subId}`);
     return parseWebhookSubscription(data);
@@ -182,8 +180,9 @@ export class WebhookSubscriptionsResource {
   async create(
     options: CreateWebhookSubscriptionOptions,
   ): Promise<WebhookSubscription> {
-    const hasMailbox = options.mailboxId !== undefined;
-    const hasPhoneNumber = options.phoneNumberId !== undefined;
+    const hasMailbox = options.mailboxId !== undefined && options.mailboxId !== null;
+    const hasPhoneNumber =
+      options.phoneNumberId !== undefined && options.phoneNumberId !== null;
     if (hasMailbox === hasPhoneNumber) {
       throw new Error(
         "Exactly one of mailboxId or phoneNumberId must be provided",
@@ -193,7 +192,7 @@ export class WebhookSubscriptionsResource {
     assertEventTypesNotNull(options.eventTypes);
     assertEventTypesNonEmptyDistinct(options.eventTypes);
     assertNoIncomingCall(options.eventTypes);
-    assertChannelCoherence(hasMailbox, hasPhoneNumber, options.eventTypes);
+    assertChannelCoherence(hasMailbox, options.eventTypes);
 
     const body: Record<string, unknown> = {
       url: options.url,
@@ -233,7 +232,7 @@ export class WebhookSubscriptionsResource {
     return parseWebhookSubscription(data);
   }
 
-  /** Remove a subscription. The row is hidden from every read surface afterwards. */
+  /** Delete a subscription. Subsequent `list` / `get` calls will not return it. */
   async delete(subId: string): Promise<void> {
     await this.http.delete(`${PATH}/${subId}`);
   }
