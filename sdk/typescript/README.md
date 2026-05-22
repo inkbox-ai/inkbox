@@ -165,6 +165,30 @@ await identity.releasePhoneNumber();
 await identity.delete();
 ```
 
+### Identity visibility
+
+Control which other agent identities can see this identity in API responses.
+Humans and admins always see every identity regardless.
+
+```ts
+const identity = await inkbox.getIdentity("sales-bot");
+
+// List the current visibility rules. Either a single wildcard row
+// (viewerIdentityId === null — every active identity sees it) or
+// explicit per-viewer rows. An empty list means no agent can see it.
+const rules = await identity.listAccess();
+
+// Grant one viewer identity visibility
+const viewer = await inkbox.getIdentity("support-bot");
+await identity.grantAccess(viewer.id);
+
+// Make it visible to every active identity in the org (wildcard)
+await identity.grantAccess(null);
+
+// Revoke one viewer (keyed by the viewer identity's UUID)
+await identity.revokeAccess(viewer.id);
+```
+
 ---
 
 ## Mail

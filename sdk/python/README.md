@@ -158,6 +158,30 @@ identity.release_phone_number()
 identity.delete()
 ```
 
+### Identity visibility
+
+Control which other agent identities can see this identity in API responses.
+Humans and admins always see every identity regardless.
+
+```python
+identity = inkbox.get_identity("sales-bot")
+
+# List the current visibility rules. Either a single wildcard row
+# (viewer_identity_id is None — every active identity sees it) or
+# explicit per-viewer rows. An empty list means no agent can see it.
+rules = identity.list_access()
+
+# Grant one viewer identity visibility
+viewer = inkbox.get_identity("support-bot")
+identity.grant_access(viewer.id)
+
+# Make it visible to every active identity in the org (wildcard)
+identity.grant_access(None)
+
+# Revoke one viewer (keyed by the viewer identity's UUID)
+identity.revoke_access(viewer.id)
+```
+
 ---
 
 ## Mail

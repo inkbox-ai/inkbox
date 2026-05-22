@@ -20,6 +20,7 @@ from inkbox.vault.types import DecryptedVaultSecret, SecretPayload, VaultSecret
 from inkbox.identities.types import (
     _UNSET,
     _AgentIdentityData,
+    IdentityAccess,
     IdentityMailbox,
     IdentityPhoneNumber,
 )
@@ -291,6 +292,40 @@ class AgentIdentity:
         self._require_phone()
         self._inkbox._ids_resource.release_phone_number(self.agent_handle)
         self._phone_number = None
+
+    ## Identity access / visibility
+
+    def list_access(self) -> list[IdentityAccess]:
+        """List who can see this identity.
+
+        See :meth:`IdentitiesResource.list_access`.
+        """
+        return self._inkbox._ids_resource.list_access(self.agent_handle)
+
+    def grant_access(
+        self, viewer_identity_id: UUID | str | None
+    ) -> IdentityAccess:
+        """Grant visibility on this identity.
+
+        Args:
+            viewer_identity_id: UUID of the viewer identity to grant, or
+                ``None`` to reset this identity to the org-wide wildcard
+                (every active identity in the org sees it).
+        """
+        return self._inkbox._ids_resource.grant_access(
+            self.agent_handle, viewer_identity_id
+        )
+
+    def revoke_access(self, viewer_identity_id: UUID | str) -> None:
+        """Revoke one viewer's visibility on this identity.
+
+        Args:
+            viewer_identity_id: UUID of the viewer identity to drop
+                (the viewer identity's UUID, not an access-row id).
+        """
+        self._inkbox._ids_resource.revoke_access(
+            self.agent_handle, viewer_identity_id
+        )
 
     ## Mail helpers
 

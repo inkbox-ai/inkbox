@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.4
+
+### Added
+
+- **`inkbox identity access` command group** for managing agent visibility:
+  - `inkbox identity access list <target-handle>` — list who can see an identity.
+  - `inkbox identity access grant <target-handle> <viewer-handle>` — grant a viewer identity visibility on the target.
+  - `inkbox identity access grant-everyone <target-handle>` — make the target visible to every active identity in the org (wildcard).
+  - `inkbox identity access revoke <target-handle> <viewer-handle>` — revoke a viewer identity's visibility.
+
+  Viewer identities are passed as handles and resolved to UUIDs automatically. This `identity access` group is unrelated to `identity revoke-access`, which manages vault-secret access.
+
 ## 0.4.3
 
 ### Breaking

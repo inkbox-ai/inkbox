@@ -24,6 +24,7 @@ import type {
 } from "./phone/types.js";
 import type {
   _AgentIdentityData,
+  IdentityAccess,
   IdentityMailbox,
   IdentityPhoneNumber,
 } from "./identities/types.js";
@@ -231,6 +232,40 @@ export class AgentIdentity {
     this._requirePhone();
     await this._inkbox._idsResource.releasePhoneNumber(this.agentHandle);
     this._phoneNumber = null;
+  }
+
+  // ------------------------------------------------------------------
+  // Identity access / visibility
+  // ------------------------------------------------------------------
+
+  /**
+   * List who can see this identity.
+   *
+   * See {@link IdentitiesResource.listAccess}.
+   */
+  async listAccess(): Promise<IdentityAccess[]> {
+    return this._inkbox._idsResource.listAccess(this.agentHandle);
+  }
+
+  /**
+   * Grant visibility on this identity.
+   *
+   * @param viewerIdentityId - UUID of the viewer identity to grant, or
+   *   `null` to reset this identity to the org-wide wildcard (every
+   *   active identity in the org sees it).
+   */
+  async grantAccess(viewerIdentityId: string | null): Promise<IdentityAccess> {
+    return this._inkbox._idsResource.grantAccess(this.agentHandle, viewerIdentityId);
+  }
+
+  /**
+   * Revoke one viewer's visibility on this identity.
+   *
+   * @param viewerIdentityId - UUID of the viewer identity to drop
+   *   (the viewer identity's UUID, not an access-row id).
+   */
+  async revokeAccess(viewerIdentityId: string): Promise<void> {
+    await this._inkbox._idsResource.revokeAccess(this.agentHandle, viewerIdentityId);
   }
 
   // ------------------------------------------------------------------

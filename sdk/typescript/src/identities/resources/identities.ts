@@ -11,17 +11,20 @@ import { HttpTransport, InkboxAPIError } from "../../_http.js";
 import { mapIdentityConflictError } from "../exceptions.js";
 import {
   AgentIdentitySummary,
+  IdentityAccess,
   IdentityMailboxCreateOptions,
   IdentityPhoneNumberCreateOptions,
   IdentityTunnelCreateOptions,
   _AgentIdentityData,
   RawAgentIdentitySummary,
   RawAgentIdentityData,
+  RawIdentityAccess,
   identityMailboxCreateOptionsToWire,
   identityPhoneNumberCreateOptionsToWire,
   identityTunnelCreateOptionsToWire,
   parseAgentIdentitySummary,
   parseAgentIdentityData,
+  parseIdentityAccess,
   vaultSecretIdsToWire,
 } from "../types.js";
 
@@ -147,5 +150,56 @@ export class IdentitiesResource {
    */
   async releasePhoneNumber(agentHandle: string): Promise<void> {
     await this.http.delete(`/${agentHandle}/phone_number`);
+  }
+
+  /**
+   * List who can see this identity (agent visibility).
+   *
+   * Returns either a single wildcard row (`viewerIdentityId === null` —
+   * every active identity in the org sees it) or explicit per-viewer
+   * rows. An empty list means no scoped agent can see this identity
+   * (humans and admins always see it).
+   *
+   * @param agentHandle - Handle of the target identity.
+   */
+  async listAccess(agentHandle: string): Promise<IdentityAccess[]> {
+    const data = await this.http.get<RawIdentityAccess[]>(`/${agentHandle}/access`);
+    return data.map(parseIdentityAccess);
+  }
+
+  /**
+   * Grant visibility on this identity.
+   *
+   * @param agentHandle - Handle of the target identity.
+   * @param viewerIdentityId - UUID of the viewer identity to grant, or
+   *   `null` to reset the target to the org-wide wildcard (every active
+   *   identity in the org sees it).
+   * @throws {RedundantContactAccessGrantError} 409 when granting a
+   *   per-viewer UUID against a target that is already a wildcard.
+   * @throws {InkboxAPIError} 409 if the viewer is already granted; 404
+   *   if the viewer identity does not exist; 422 if the viewer is the
+   *   target itself.
+   */
+  async grantAccess(
+    agentHandle: string,
+    viewerIdentityId: string | null,
+  ): Promise<IdentityAccess> {
+    const data = await this.http.post<RawIdentityAccess>(
+      `/${agentHandle}/access`,
+      { viewer_identity_id: viewerIdentityId },
+    );
+    return parseIdentityAccess(data);
+  }
+
+  /**
+   * Revoke one viewer's visibility on this identity.
+   *
+   * @param agentHandle - Handle of the target identity.
+   * @param viewerIdentityId - UUID of the viewer identity to drop. This
+   *   is the viewer identity's UUID, not an access-row id.
+   * @throws {InkboxAPIError} 404 when there is nothing to drop.
+   */
+  async revokeAccess(agentHandle: string, viewerIdentityId: string): Promise<void> {
+    await this.http.delete(`/${agentHandle}/access/${viewerIdentityId}`);
   }
 }

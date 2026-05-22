@@ -4,6 +4,26 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.4
+
+### Added
+
+- **Identity visibility controls** — manage which agent identities can see
+  a given identity in API responses.
+  - SDK: new `IdentityAccess` type plus `listAccess` / `grantAccess` /
+    `revokeAccess` (TypeScript) and `list_access` / `grant_access` /
+    `revoke_access` (Python) on both `IdentitiesResource` and
+    `AgentIdentity`. `grantAccess(viewerIdentityId)` adds a per-viewer
+    grant; `grantAccess(null)` resets the target to the org-wide wildcard
+    (every active identity sees it). `revokeAccess(viewerIdentityId)`
+    drops one viewer, keyed by the viewer identity's UUID.
+  - CLI: new `inkbox identity access` group — `list`, `grant`,
+    `grant-everyone`, and `revoke`. `grant` and `revoke` take a viewer
+    **handle** and resolve it to a UUID automatically.
+  - Granting a viewer against an already-wildcard target returns a 409
+    (`RedundantContactAccessGrantError`); revoking a non-existent grant
+    returns a 404 (`InkboxAPIError`).
+
 ## 0.4.2
 
 ### Added

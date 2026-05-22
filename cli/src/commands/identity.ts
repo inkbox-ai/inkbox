@@ -5,6 +5,93 @@ import { withErrorHandler } from "../errors.js";
 import type { SecretPayload } from "@inkbox/sdk";
 import { parseTotpUri } from "@inkbox/sdk";
 
+function registerIdentityAccessCommands(parent: Command): void {
+  const access = parent
+    .command("access")
+    .description("Manage who can see an identity (agent visibility)");
+
+  access
+    .command("list <target-handle>")
+    .description("List who can see this identity")
+    .action(
+      withErrorHandler(async function (this: Command, targetHandle: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const target = await inkbox.getIdentity(targetHandle);
+        const rows = await target.listAccess();
+        output(rows, {
+          json: !!opts.json,
+          columns: ["id", "targetIdentityId", "viewerIdentityId", "createdAt"],
+        });
+      }),
+    );
+
+  access
+    .command("grant <target-handle> <viewer-handle>")
+    .description("Grant a viewer identity visibility on the target identity")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        targetHandle: string,
+        viewerHandle: string,
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const target = await inkbox.getIdentity(targetHandle);
+        const viewer = await inkbox.getIdentity(viewerHandle);
+        const grant = await target.grantAccess(viewer.id);
+        if (opts.json) {
+          output(grant as unknown as Record<string, unknown>, { json: true });
+        } else {
+          console.log(
+            `Granted '${viewerHandle}' visibility on '${targetHandle}'.`,
+          );
+        }
+      }),
+    );
+
+  access
+    .command("grant-everyone <target-handle>")
+    .description(
+      "Make the target visible to every active identity in the org (wildcard)",
+    )
+    .action(
+      withErrorHandler(async function (this: Command, targetHandle: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const target = await inkbox.getIdentity(targetHandle);
+        const grant = await target.grantAccess(null);
+        if (opts.json) {
+          output(grant as unknown as Record<string, unknown>, { json: true });
+        } else {
+          console.log(
+            `'${targetHandle}' is now visible to every active identity in the org.`,
+          );
+        }
+      }),
+    );
+
+  access
+    .command("revoke <target-handle> <viewer-handle>")
+    .description("Revoke a viewer identity's visibility on the target identity")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        targetHandle: string,
+        viewerHandle: string,
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const target = await inkbox.getIdentity(targetHandle);
+        const viewer = await inkbox.getIdentity(viewerHandle);
+        await target.revokeAccess(viewer.id);
+        console.log(
+          `Revoked '${viewerHandle}' visibility on '${targetHandle}'.`,
+        );
+      }),
+    );
+}
+
 export function registerIdentityCommands(program: Command): void {
   const identity = program
     .command("identity")
@@ -597,4 +684,6 @@ export function registerIdentityCommands(program: Command): void {
         console.log(`Released phone number from identity '${handle}'.`);
       }),
     );
+
+  registerIdentityAccessCommands(identity);
 }
