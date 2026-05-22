@@ -57,7 +57,11 @@ export type {
 // Re-exported from the root entry because package.json#exports only
 // publishes `"."` and `"./tunnels/connect"` — deep imports of
 // `phone/types.js` are not a valid public API.
-export type { RawRateLimitInfo, RawTextMediaItem } from "./phone/types.js";
+export type {
+  RawRateLimitInfo,
+  RawTextMediaItem,
+  RawTextMessageRecipient,
+} from "./phone/types.js";
 export {
   ContactRuleStatus,
   FilterMode,
@@ -97,7 +101,9 @@ export type {
   SmsOptIn,
   TextMediaItem,
   TextMessage,
+  TextMessageRecipient,
   TextConversationSummary,
+  TextConversationUpdateResult,
 } from "./phone/types.js";
 export type {
   AgentIdentitySummary,

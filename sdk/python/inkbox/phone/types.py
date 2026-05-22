@@ -240,6 +240,36 @@ class TextMediaItem:
 
 
 @dataclass
+class TextMessageRecipient:
+    """Per-recipient delivery state for an outbound text message."""
+
+    recipient_phone_number: str
+    delivery_status: SmsDeliveryStatus | None
+    carrier: str | None = None
+    line_type: str | None = None
+    error_code: str | None = None
+    error_detail: str | None = None
+    sent_at: datetime | None = None
+    delivered_at: datetime | None = None
+    failed_at: datetime | None = None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> TextMessageRecipient:
+        raw_delivery = d.get("delivery_status")
+        return cls(
+            recipient_phone_number=d["recipient_phone_number"],
+            delivery_status=SmsDeliveryStatus(raw_delivery) if raw_delivery else None,
+            carrier=d.get("carrier"),
+            line_type=d.get("line_type"),
+            error_code=d.get("error_code"),
+            error_detail=d.get("error_detail"),
+            sent_at=_dt(d.get("sent_at")),
+            delivered_at=_dt(d.get("delivered_at")),
+            failed_at=_dt(d.get("failed_at")),
+        )
+
+
+@dataclass
 class TextMessage:
     """A text message (SMS or MMS).
 
@@ -258,7 +288,7 @@ class TextMessage:
     id: UUID
     direction: str
     local_phone_number: str
-    remote_phone_number: str
+    remote_phone_number: str | None
     text: str | None
     type: str
     media: list[TextMediaItem] | None
@@ -274,25 +304,38 @@ class TextMessage:
     failed_at: datetime | None = None
     # Default False for older server responses that predate the field.
     is_blocked: bool = False
+    conversation_id: UUID | None = None
+    sender_phone_number: str | None = None
+    recipients: list[TextMessageRecipient] | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextMessage:
         raw_media = d.get("media")
         media = [TextMediaItem._from_dict(m) for m in raw_media] if raw_media else None
+        raw_recipients = d.get("recipients")
+        recipients = (
+            [TextMessageRecipient._from_dict(r) for r in raw_recipients]
+            if raw_recipients
+            else None
+        )
         # Server-shape fields are optional on inbound rows, so fall back gracefully.
         raw_delivery = d.get("delivery_status")
         raw_origin = d.get("origin")
+        raw_conversation_id = d.get("conversation_id")
         return cls(
             id=UUID(d["id"]),
             direction=d["direction"],
             local_phone_number=d["local_phone_number"],
-            remote_phone_number=d["remote_phone_number"],
+            remote_phone_number=d.get("remote_phone_number"),
             text=d.get("text"),
             type=d["type"],
             media=media,
             is_read=d["is_read"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            conversation_id=UUID(raw_conversation_id) if raw_conversation_id else None,
+            sender_phone_number=d.get("sender_phone_number"),
+            recipients=recipients,
             delivery_status=SmsDeliveryStatus(raw_delivery) if raw_delivery else None,
             origin=(
                 TextMessageOrigin(raw_origin)
@@ -310,26 +353,33 @@ class TextMessage:
 
 @dataclass
 class TextConversationSummary:
-    """One row per conversation — lightweight summary."""
+    """One row per text conversation."""
 
-    remote_phone_number: str
+    remote_phone_number: str | None
     latest_text: str | None
     latest_direction: str
     latest_type: str
     latest_message_at: datetime
     unread_count: int
     total_count: int
+    id: UUID | None = None
+    participants: list[str] | None = None
+    is_group: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TextConversationSummary:
+        raw_id = d.get("id")
         return cls(
-            remote_phone_number=d["remote_phone_number"],
+            remote_phone_number=d.get("remote_phone_number"),
             latest_text=d.get("latest_text"),
             latest_direction=d["latest_direction"],
             latest_type=d["latest_type"],
             latest_message_at=datetime.fromisoformat(d["latest_message_at"]),
             unread_count=d["unread_count"],
             total_count=d["total_count"],
+            id=UUID(raw_id) if raw_id else None,
+            participants=d.get("participants"),
+            is_group=bool(d.get("is_group", False)),
         )
 
 

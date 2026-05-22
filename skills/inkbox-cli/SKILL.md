@@ -212,13 +212,14 @@ All text commands are identity-scoped and require `-i <handle>`.
 
 ```bash
 inkbox text send -i <handle> --to +15551234567 --text "Hello from Inkbox"
+inkbox text send -i <handle> --to +15551234567,+15557654321 --text "Hello group" --media-url https://example.com/photo.jpg
 inkbox text list -i <handle> --limit 20
 inkbox text get <text-id> -i <handle>
-inkbox text conversations -i <handle> --limit 20
-inkbox text conversation <remote-number> -i <handle> --limit 50
+inkbox text conversations -i <handle> --limit 20 --include-groups
+inkbox text conversation <conversation-key> -i <handle> --limit 50
 inkbox text search -i <handle> -q "invoice"
 inkbox text mark-read <text-id> -i <handle>
-inkbox text mark-conversation-read <remote-number> -i <handle>
+inkbox text mark-conversation-read <conversation-key> -i <handle>
 ```
 
 ## SMS Opt-Ins
@@ -417,10 +418,12 @@ Mail payloads carry `data.contacts`, a list of per-recipient
 outbound: every `to` + `cc` + `bcc`; empty list when nothing matches).
 Outbound mail payloads also include `data.message.bcc_addresses`
 (`null` on inbound). Text and inbound-call payloads carry a singular
-`contact: { id, name } | null` for the single remote party
-(`remote_phone_number`) — `data.contact` on text, top-level `contact`
-on the inbound call. For the typed receiver-side shapes, see the SDK
-skills (`inkbox-ts`, `inkbox-python`).
+`contact: { id, name } | null` when the event has one address-book
+target — `data.contact` on text, top-level `contact` on the inbound
+call. Group text events carry delivery rows in
+`data.text_message.recipients`; per-recipient lifecycle events name the
+event target in `data.recipient_phone_number`. For the typed
+receiver-side shapes, see the SDK skills (`inkbox-ts`, `inkbox-python`).
 
 ## Practical Guidance
 

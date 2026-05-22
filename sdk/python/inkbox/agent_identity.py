@@ -567,14 +567,16 @@ class AgentIdentity:
     def send_text(
         self,
         *,
-        to: str,
-        text: str,
+        to: str | list[str],
+        text: str | None = None,
+        media_urls: list[str] | None = None,
     ) -> TextMessage:
-        """Send an outbound SMS from this identity's phone number.
+        """Send an outbound SMS/MMS from this identity's phone number.
 
         Args:
-            to: E.164 destination number (e.g. ``"+15551234567"``).
-            text: Message body (1-1600 chars).
+            to: E.164 destination number, or a list of numbers for a group send.
+            text: Message body.
+            media_urls: MMS media URLs. Pass with ``text`` or by themselves.
 
         Returns:
             The queued ``TextMessage``. The full outbound lifecycle
@@ -591,10 +593,14 @@ class AgentIdentity:
             InkboxAPIError: for other send failures.
         """
         self._require_phone()
+        send_kwargs: dict[str, Any] = {"to": to}
+        if text is not None:
+            send_kwargs["text"] = text
+        if media_urls is not None:
+            send_kwargs["media_urls"] = media_urls
         return self._inkbox._texts.send(
             self._phone_number.id,  # type: ignore[union-attr]
-            to=to,
-            text=text,
+            **send_kwargs,
         )
 
     def list_texts(
@@ -644,8 +650,9 @@ class AgentIdentity:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
     ) -> list[TextConversationSummary]:
-        """List text conversations (one row per remote number).
+        """List text conversations.
 
         Identity-scoped credentials never see blocked rows in
         conversation summaries; admin/JWT can use ``is_blocked=False``
@@ -657,6 +664,8 @@ class AgentIdentity:
             offset: Pagination offset (default 0).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            include_groups: Include group conversations. Defaults to
+                ``False`` so old clients continue to see one-to-one rows only.
         """
         self._require_phone()
         return self._inkbox._texts.list_conversations(
@@ -664,15 +673,16 @@ class AgentIdentity:
             limit=limit,
             offset=offset,
             is_blocked=is_blocked,
+            include_groups=include_groups,
         )
 
     def get_text_conversation(
-        self, remote_number: str, *, limit: int = 50, offset: int = 0
+        self, remote_number: UUID | str, *, limit: int = 50, offset: int = 0
     ) -> list[TextMessage]:
-        """Get all messages with a specific remote number.
+        """Get all messages in a conversation.
 
         Args:
-            remote_number: E.164 remote phone number.
+            remote_number: E.164 one-to-one remote number, or conversation UUID.
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
         """
@@ -698,15 +708,16 @@ class AgentIdentity:
         )
 
     def mark_text_conversation_read(
-        self, remote_number: str
+        self, remote_number: UUID | str
     ) -> dict[str, Any]:
         """Mark all messages in a conversation as read.
 
         Args:
-            remote_number: E.164 remote phone number.
+            remote_number: E.164 one-to-one remote number, or conversation UUID.
 
         Returns:
-            Dict with ``remote_phone_number``, ``is_read``, and ``updated_count``.
+            Dict with ``conversation_id``, ``remote_phone_number``,
+            ``is_read``, and ``updated_count``.
         """
         self._require_phone()
         return self._inkbox._texts.update_conversation(

@@ -316,13 +316,21 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 - Customer-managed 10DLC brands and campaigns, which lift the per-number 24-hour limit dramatically.
 
 ```ts
-// Send an SMS. Returns a queued TextMessage; final delivery state arrives
+// Send SMS/MMS. Returns a queued TextMessage; final delivery state arrives
 // via the incomingTextWebhookUrl configured on the sender.
 const sent = await identity.sendText({
   to: "+15551234567",
   text: "Hello from Inkbox",
 });
 console.log(sent.id, sent.deliveryStatus);   // "queued"
+
+// Group MMS uses the same method with an array of recipients.
+const group = await identity.sendText({
+  to: ["+15551234567", "+15557654321"],
+  text: "Hello group",
+  mediaUrls: ["https://example.com/photo.jpg"],
+});
+console.log(group.conversationId, group.recipients);
 
 // List text messages
 const texts = await identity.listTexts({ limit: 20 });
@@ -342,13 +350,13 @@ if (text.media) {         // MMS attachments (temporary signed URLs)
   }
 }
 
-// List conversation summaries (one row per remote number)
-const convos = await identity.listTextConversations({ limit: 20 });
+// List one-to-one conversation summaries; opt into groups explicitly.
+const convos = await identity.listTextConversations({ limit: 20, includeGroups: true });
 for (const c of convos) {
-  console.log(c.remotePhoneNumber, c.latestText, c.unreadCount);
+  console.log(c.id, c.remotePhoneNumber, c.participants, c.latestText);
 }
 
-// Get messages in a specific conversation
+// Get messages in a specific conversation by remote number or conversation UUID.
 const msgs = await identity.getTextConversation("+15551234567", { limit: 50 });
 
 // Mark as read
@@ -756,7 +764,7 @@ await inkbox.phoneNumbers.update(number.id, {
 });
 ```
 
-The inbound-call payload is flat — no envelope — and carries a singular `contact: { id, name } | null` at the top level. Text payloads use the standard envelope with `data.contact` (singular) and `data.text_message`. Each phone/text event has exactly one remote party, so the contact shape stays singular there; only mail uses the per-bucket list. The text-message body includes the full delivery-state block (`delivery_status`, `error_code`, `error_detail`, `sent_at`, `delivered_at`, `failed_at`) so receivers can act on outbound failures without a follow-up API call.
+The inbound-call payload is flat — no envelope — and carries a singular `contact: { id, name } | null` at the top level. Text payloads use the standard envelope with `data.contact` and `data.text_message`. One-to-one text events keep `remote_phone_number`; group outbound rows use `conversation_id`, `sender_phone_number`, and `recipients[]`, with per-recipient lifecycle webhooks naming the event target in `data.recipient_phone_number`. The text-message body includes the full delivery-state block (`delivery_status`, `error_code`, `error_detail`, `sent_at`, `delivered_at`, `failed_at`) so receivers can act on outbound failures without a follow-up API call.
 
 ### Receiving webhooks (typed)
 
@@ -789,7 +797,8 @@ app.post("/hooks/text", express.raw({ type: "*/*" }), (req, res) => {
   switch (payload.event_type) {
     case "text.delivery_failed": {
       const m = payload.data.text_message;
-      console.error(`SMS to ${m.remote_phone_number} failed`, m.error_code, m.error_detail);
+      const recipient = payload.data.recipient_phone_number ?? m.remote_phone_number;
+      console.error(`SMS to ${recipient} failed`, m.error_code, m.error_detail);
       break;
     }
     case "text.delivered":

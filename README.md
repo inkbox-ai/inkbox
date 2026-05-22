@@ -44,7 +44,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     # Place a phone call
     call = identity.place_call(to_number="+15551234567")
 
-    # Send a text message (SMS/MMS)
+    # Send a text message (SMS/MMS); pass a list for group MMS.
     identity.send_text(to="+15551234567", text="Hi from my agent!")
 
     # Read text messages
@@ -78,7 +78,7 @@ for await (const msg of identity.iterEmails()) {
 // Place a phone call
 const call = await identity.placeCall({ toNumber: "+15551234567" });
 
-// Send a text message (SMS/MMS)
+// Send a text message (SMS/MMS); pass an array for group MMS.
 await identity.sendText({ to: "+15551234567", text: "Hi from my agent!" });
 
 // Read text messages
@@ -106,7 +106,7 @@ inkbox email list -i my-agent --limit 10
 # Place a phone call
 inkbox phone call -i my-agent --to +15551234567
 
-# Send a text message (SMS)
+# Send a text message (SMS/MMS; comma-separate --to for groups)
 inkbox text send -i my-agent --to +15551234567 --text "Hi from my agent!"
 
 # Read text messages

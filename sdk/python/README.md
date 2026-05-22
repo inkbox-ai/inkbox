@@ -299,10 +299,18 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 - Customer-managed 10DLC brands and campaigns, which lift the per-number 24-hour limit dramatically.
 
 ```python
-# Send an SMS. Returns a queued TextMessage; final delivery state arrives
+# Send SMS/MMS. Returns a queued TextMessage; final delivery state arrives
 # via the incoming_text_webhook_url configured on the sender.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
+
+# Group MMS uses the same method with a list of recipients.
+group = identity.send_text(
+    to=["+15551234567", "+15557654321"],
+    text="Hello group",
+    media_urls=["https://example.com/photo.jpg"],
+)
+print(group.conversation_id, group.recipients)
 
 # List text messages
 texts = identity.list_texts(limit=20)
@@ -319,12 +327,12 @@ if text.media:    # MMS attachments (temporary signed URLs)
     for m in text.media:
         print(m.content_type, m.size, m.url)
 
-# List conversation summaries (one row per remote number)
-convos = identity.list_text_conversations(limit=20)
+# List one-to-one conversation summaries; opt into groups explicitly.
+convos = identity.list_text_conversations(limit=20, include_groups=True)
 for c in convos:
-    print(c.remote_phone_number, c.latest_text, c.unread_count)
+    print(c.id, c.remote_phone_number, c.participants, c.latest_text)
 
-# Get messages in a specific conversation
+# Get messages in a specific conversation by remote number or conversation UUID.
 msgs = identity.get_text_conversation("+15551234567", limit=50)
 
 # Mark as read
@@ -770,7 +778,7 @@ inkbox.phone_numbers.update(
 )
 ```
 
-The inbound-call payload is flat — no envelope — and carries a singular `contact: {"id", "name"} | None` at the top level. Text payloads use the standard envelope with `data["contact"]` (singular) and `data["text_message"]`. Each phone/text event has exactly one remote party, so the contact shape stays singular there; only mail uses the per-bucket list. The text-message body includes the full delivery-state block (`delivery_status`, `error_code`, `error_detail`, `sent_at`, `delivered_at`, `failed_at`) so receivers can act on outbound failures without a follow-up API call.
+The inbound-call payload is flat — no envelope — and carries a singular `contact: {"id", "name"} | None` at the top level. Text payloads use the standard envelope with `data["contact"]` and `data["text_message"]`. One-to-one text events keep `remote_phone_number`; group outbound rows use `conversation_id`, `sender_phone_number`, and `recipients`, with per-recipient lifecycle webhooks naming the event target in `data["recipient_phone_number"]`. The text-message body includes the full delivery-state block (`delivery_status`, `error_code`, `error_detail`, `sent_at`, `delivered_at`, `failed_at`) so receivers can act on outbound failures without a follow-up API call.
 
 ### Receiving webhooks (typed)
 
@@ -809,9 +817,10 @@ async def text_hook(request: Request):
     match payload["event_type"]:
         case "text.delivery_failed":
             msg = payload["data"]["text_message"]
+            recipient = payload["data"]["recipient_phone_number"] or msg["remote_phone_number"]
             logger.error(
                 "SMS to %s failed: %s (%s)",
-                msg["remote_phone_number"], msg["error_code"], msg["error_detail"],
+                recipient, msg["error_code"], msg["error_detail"],
             )
         case "text.delivered":
             # delivery_status, sent_at, delivered_at are all populated.

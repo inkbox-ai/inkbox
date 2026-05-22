@@ -5,8 +5,10 @@ import type { HttpTransport } from "../../src/_http.js";
 import {
   RAW_TEXT_MESSAGE,
   RAW_TEXT_MESSAGE_BLOCKED,
+  RAW_TEXT_MESSAGE_GROUP,
   RAW_TEXT_MESSAGE_MMS,
   RAW_TEXT_MESSAGE_OUTBOUND_QUEUED,
+  RAW_TEXT_CONVERSATION_GROUP_SUMMARY,
   RAW_TEXT_CONVERSATION_SUMMARY,
 } from "../sampleData.js";
 import {
@@ -54,6 +56,33 @@ describe("TextsResource.send", () => {
     expect(msg.sentAt).toBeNull();
     expect(msg.deliveredAt).toBeNull();
     expect(msg.failedAt).toBeNull();
+    expect(msg.conversationId).toBe("eeee1111-0000-0000-0000-000000000001");
+    expect(msg.senderPhoneNumber).toBe("+18335794607");
+    expect(msg.recipients).toHaveLength(1);
+    expect(msg.recipients?.[0].recipientPhoneNumber).toBe(REMOTE);
+  });
+
+  it("posts group MMS payloads", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_TEXT_MESSAGE_GROUP);
+    const res = new TextsResource(http);
+
+    const msg = await res.send(NUM_ID, {
+      to: ["+15551234567", "+15557654321"],
+      text: "Hello group",
+      mediaUrls: ["https://example.com/photo.jpg"],
+    });
+
+    expect(http.post).toHaveBeenCalledWith(
+      `/numbers/${NUM_ID}/texts`,
+      {
+        to: ["+15551234567", "+15557654321"],
+        text: "Hello group",
+        media_urls: ["https://example.com/photo.jpg"],
+      },
+    );
+    expect(msg.remotePhoneNumber).toBeNull();
+    expect(msg.recipients).toHaveLength(2);
   });
 });
 
@@ -249,6 +278,25 @@ describe("TextsResource.listConversations", () => {
     expect(convos[0].remotePhoneNumber).toBe(REMOTE);
     expect(convos[0].unreadCount).toBe(3);
     expect(convos[0].totalCount).toBe(15);
+    expect(convos[0].id).toBe("eeee1111-0000-0000-0000-000000000001");
+    expect(convos[0].participants).toStrictEqual([REMOTE]);
+    expect(convos[0].isGroup).toBe(false);
+  });
+
+  it("can include group conversations", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_TEXT_CONVERSATION_GROUP_SUMMARY]);
+    const res = new TextsResource(http);
+
+    const convos = await res.listConversations(NUM_ID, { includeGroups: true });
+
+    expect(http.get).toHaveBeenCalledWith(
+      `/numbers/${NUM_ID}/texts/conversations`,
+      { limit: 50, offset: 0, include_groups: true },
+    );
+    expect(convos[0].remotePhoneNumber).toBeNull();
+    expect(convos[0].isGroup).toBe(true);
+    expect(convos[0].participants).toStrictEqual(["+15551234567", "+15557654321"]);
   });
 
   it("forwards isBlocked=false to hide spam-only counterparties", async () => {
@@ -299,6 +347,7 @@ describe("TextsResource.updateConversation", () => {
     const http = mockHttp();
     vi.mocked(http.patch).mockResolvedValue({
       remote_phone_number: REMOTE,
+      conversation_id: "eeee1111-0000-0000-0000-000000000001",
       is_read: true,
       updated_count: 5,
     });
@@ -312,5 +361,6 @@ describe("TextsResource.updateConversation", () => {
     );
     expect(result.updatedCount).toBe(5);
     expect(result.remotePhoneNumber).toBe(REMOTE);
+    expect(result.conversationId).toBe("eeee1111-0000-0000-0000-000000000001");
   });
 });

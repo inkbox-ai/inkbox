@@ -4,6 +4,17 @@
 
 ### Added
 
+- **Conversation-centric text messaging.** `send_text()` /
+  `texts.send()` now accept a single destination or a list of
+  destinations plus optional `media_urls`; `list_text_conversations()`
+  / `texts.list_conversations()` accept `include_groups`; and
+  conversation read/list helpers accept either the legacy remote number
+  or the new conversation UUID.
+- New additive text fields: `TextMessage.conversation_id`,
+  `sender_phone_number`, `recipients`, and
+  `TextConversationSummary.id`, `participants`, `is_group`. Existing
+  one-to-one `remote_phone_number` behavior is preserved.
+
 - **Identity visibility controls.** New `IdentityAccess` type and three methods on both `IdentitiesResource` and `AgentIdentity`:
   - `list_access()` — list who can see an identity. Returns either a single wildcard row (`viewer_identity_id=None` — every active identity in the org sees it) or explicit per-viewer rows. An empty list means no scoped agent can see the identity.
   - `grant_access(viewer_identity_id)` — grant a viewer identity visibility on the target. Pass `None` to reset the target to the org-wide wildcard.

@@ -15,6 +15,7 @@ from inkbox.phone.types import (
     TextConversationSummary,
     TextMediaItem,
     TextMessage,
+    TextMessageRecipient,
 )
 from inkbox.signing_keys import SigningKey
 
@@ -33,4 +34,5 @@ __all__ = [
     "TextConversationSummary",
     "TextMediaItem",
     "TextMessage",
+    "TextMessageRecipient",
 ]

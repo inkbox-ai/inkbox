@@ -63,6 +63,9 @@ TEXT_MESSAGE_DICT = {
     "media": None,
     "is_read": False,
     "is_blocked": False,
+    "conversation_id": "eeee1111-0000-0000-0000-000000000001",
+    "sender_phone_number": "+15551234567",
+    "recipients": None,
     "created_at": "2026-03-09T00:10:00Z",
     "updated_at": "2026-03-09T00:10:00Z",
 }
@@ -77,6 +80,9 @@ TEXT_MESSAGE_BLOCKED_DICT = {
     "media": None,
     "is_read": False,
     "is_blocked": True,
+    "conversation_id": "eeee1111-0000-0000-0000-0000000000bb",
+    "sender_phone_number": "+15551234567",
+    "recipients": None,
     "created_at": "2026-03-09T00:35:00Z",
     "updated_at": "2026-03-09T00:35:00Z",
 }
@@ -96,6 +102,9 @@ TEXT_MESSAGE_MMS_DICT = {
         },
     ],
     "is_read": True,
+    "conversation_id": "eeee1111-0000-0000-0000-000000000001",
+    "sender_phone_number": "+15551234567",
+    "recipients": None,
     "created_at": "2026-03-09T00:12:00Z",
     "updated_at": "2026-03-09T00:12:00Z",
 }
@@ -116,18 +125,80 @@ TEXT_MESSAGE_OUTBOUND_QUEUED_DICT = {
     "sent_at": None,
     "delivered_at": None,
     "failed_at": None,
+    "conversation_id": "eeee1111-0000-0000-0000-000000000001",
+    "sender_phone_number": "+18335794607",
+    "recipients": [
+        {
+            "recipient_phone_number": "+15551234567",
+            "delivery_status": "queued",
+            "carrier": None,
+            "line_type": None,
+            "error_code": None,
+            "error_detail": None,
+            "sent_at": None,
+            "delivered_at": None,
+            "failed_at": None,
+        },
+    ],
     "created_at": "2026-03-09T00:20:00Z",
     "updated_at": "2026-03-09T00:20:00Z",
 }
 
+TEXT_MESSAGE_GROUP_DICT = {
+    **TEXT_MESSAGE_OUTBOUND_QUEUED_DICT,
+    "id": "dddd4444-0000-0000-0000-0000000000fa",
+    "remote_phone_number": None,
+    "conversation_id": "eeee1111-0000-0000-0000-0000000000fa",
+    "recipients": [
+        {
+            "recipient_phone_number": "+15551234567",
+            "delivery_status": "queued",
+            "carrier": None,
+            "line_type": None,
+            "error_code": None,
+            "error_detail": None,
+            "sent_at": None,
+            "delivered_at": None,
+            "failed_at": None,
+        },
+        {
+            "recipient_phone_number": "+15557654321",
+            "delivery_status": "queued",
+            "carrier": None,
+            "line_type": None,
+            "error_code": None,
+            "error_detail": None,
+            "sent_at": None,
+            "delivered_at": None,
+            "failed_at": None,
+        },
+    ],
+}
+
 TEXT_CONVERSATION_SUMMARY_DICT = {
     "remote_phone_number": "+15551234567",
+    "id": "eeee1111-0000-0000-0000-000000000001",
+    "participants": ["+15551234567"],
+    "is_group": False,
     "latest_text": "Hello, is this support?",
     "latest_direction": "inbound",
     "latest_type": "sms",
     "latest_message_at": "2026-03-09T00:10:00Z",
     "unread_count": 3,
     "total_count": 15,
+}
+
+TEXT_CONVERSATION_GROUP_SUMMARY_DICT = {
+    "remote_phone_number": None,
+    "id": "eeee1111-0000-0000-0000-0000000000fa",
+    "participants": ["+15551234567", "+15557654321"],
+    "is_group": True,
+    "latest_text": "Hello group",
+    "latest_direction": "outbound",
+    "latest_type": "mms",
+    "latest_message_at": "2026-03-09T00:20:00Z",
+    "unread_count": 0,
+    "total_count": 1,
 }
 
 PHONE_TRANSCRIPT_DICT = {

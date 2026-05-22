@@ -188,9 +188,10 @@ Text message (SMS/MMS) operations, scoped to an identity. Requires `-i <handle>`
 **Coming soon:** toll-free SMS sending, and customer-managed 10DLC brands/campaigns to lift the per-number limit.
 
 ```bash
-inkbox text send -i <handle>                # Send an outbound SMS
-  --to <e164>                               #   E.164 destination (required)
-  --text <body>                             #   Message body, 1-1600 chars (required)
+inkbox text send -i <handle>                # Send an outbound SMS/MMS
+  --to <e164[,e164...]>                     #   One recipient or a comma-separated group
+  --text <body>                             #   Message body
+  --media-url <url>                         #   MMS media URL; repeat for multiple
 
 inkbox text list -i <handle>                # List text messages
   --limit <n>                               #   Max results (default: 50)
@@ -202,8 +203,9 @@ inkbox text get <text-id> -i <handle>       # Get a single text message
 inkbox text conversations -i <handle>       # List conversation summaries
   --limit <n>                               #   Max results (default: 50)
   --offset <n>                              #   Pagination offset (default: 0)
+  --include-groups                          #   Include group conversations
 
-inkbox text conversation <remote-number> -i <handle>  # Get messages in a conversation
+inkbox text conversation <conversation-key> -i <handle>  # Remote number or conversation UUID
   --limit <n>                               #   Max results (default: 50)
   --offset <n>                              #   Pagination offset (default: 0)
 
@@ -211,8 +213,8 @@ inkbox text search -i <handle>              # Search text messages
   -q, --query <query>                       #   Search query (required)
   --limit <n>                               #   Max results (default: 50)
 
-inkbox text mark-read <text-id> -i <handle>                # Mark a text as read
-inkbox text mark-conversation-read <remote-number> -i <handle>  # Mark conversation as read
+inkbox text mark-read <text-id> -i <handle>                     # Mark a text as read
+inkbox text mark-conversation-read <conversation-key> -i <handle>  # Mark conversation as read
 ```
 
 ### vault

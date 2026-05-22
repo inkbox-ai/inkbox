@@ -8,7 +8,11 @@
  * since `JSON.parse` produces bare strings.
  */
 
-import type { RawRateLimitInfo, RawTextMediaItem } from "../phone/types.js";
+import type {
+  RawRateLimitInfo,
+  RawTextMediaItem,
+  RawTextMessageRecipient,
+} from "../phone/types.js";
 
 // ---- Wire union types ------------------------------------------------
 
@@ -157,7 +161,7 @@ export interface TextWebhookMessage {
   id: string;
   direction: TextDirectionWire;
   local_phone_number: string;
-  remote_phone_number: string;
+  remote_phone_number: string | null;
   text: string | null;
   type: TextTypeWire;
   media: RawTextMediaItem[] | null;
@@ -169,6 +173,9 @@ export interface TextWebhookMessage {
   sent_at: string | null;
   delivered_at: string | null;
   failed_at: string | null;
+  conversation_id: string | null;
+  sender_phone_number: string | null;
+  recipients: RawTextMessageRecipient[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -179,6 +186,7 @@ export interface TextWebhookPayload {
   data: {
     text_message: TextWebhookMessage;
     contact: WebhookContact | null;
+    recipient_phone_number: string | null;
   };
 }
 

@@ -155,6 +155,11 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.text_message.sent_at).toBeTypeOf("string");
     expect(payload.data.text_message.failed_at).toBeTypeOf("string");
     expect(payload.data.text_message.delivered_at).toBeNull();
+    expect(payload.data.text_message.conversation_id).toBeTypeOf("string");
+    expect(payload.data.text_message.recipients).toHaveLength(1);
+    expect(payload.data.text_message.recipients?.[0].recipient_phone_number).toBe(
+      payload.data.text_message.remote_phone_number,
+    );
   });
 
   it("inbound text carries no lifecycle timestamps", () => {
@@ -164,6 +169,10 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.text_message.delivered_at).toBeNull();
     expect(payload.data.text_message.failed_at).toBeNull();
     expect(payload.data.contact).not.toBeNull();
+    expect(payload.data.recipient_phone_number).toBeNull();
+    expect(payload.data.text_message.sender_phone_number).toBe(
+      payload.data.text_message.remote_phone_number,
+    );
   });
 
   it.each(textEvents)("does not carry is_blocked on %s", (file) => {

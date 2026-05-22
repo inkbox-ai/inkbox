@@ -209,7 +209,7 @@ for (const t of segments) {
 **Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
 
 ```typescript
-// Send an SMS from this identity's phone number.
+// Send SMS/MMS from this identity's phone number.
 // Returns a queued TextMessage; final delivery state arrives via the
 // incomingTextWebhookUrl configured on the sender.
 const sent = await identity.sendText({
@@ -217,6 +217,14 @@ const sent = await identity.sendText({
   text: "Hello from Inkbox",
 });
 console.log(sent.id, sent.deliveryStatus);   // "queued"
+
+// Group MMS: pass an array of recipients plus optional media URLs.
+const group = await identity.sendText({
+  to: ["+15551234567", "+15557654321"],
+  text: "Hello group",
+  mediaUrls: ["https://example.com/photo.jpg"],
+});
+console.log(group.conversationId, group.recipients);
 
 // List text messages (offset pagination)
 const texts = await identity.listTexts({ limit: 20, offset: 0 });
@@ -236,13 +244,13 @@ if (text.media) {          // MMS media attachments (temporary signed URLs)
   }
 }
 
-// List conversation summaries (one row per remote number)
-const convos = await identity.listTextConversations({ limit: 20 });
+// List one-to-one conversation summaries; opt into groups explicitly.
+const convos = await identity.listTextConversations({ limit: 20, includeGroups: true });
 for (const c of convos) {
-  console.log(c.remotePhoneNumber, c.latestText, c.unreadCount, c.totalCount);
+  console.log(c.id, c.remotePhoneNumber, c.participants, c.latestText);
 }
 
-// Get messages in a specific conversation
+// Get messages in a specific conversation by remote number or conversation UUID.
 const msgs = await identity.getTextConversation("+15551234567", { limit: 50 });
 
 // Mark a text as read (identity convenience method)
@@ -785,7 +793,7 @@ Algorithm: HMAC-SHA256 over `"{requestId}.{timestamp}.{body}"`.
 
 **Mail contact resolution:** `data.contacts` is a list of `{ bucket, address, id, name }` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)` — the same address may appear in multiple buckets on a single send, producing one entry per bucket. Outbound payloads also carry `data.message.bcc_addresses` (`null` on inbound, since BCC is not visible to recipients).
 
-**Phone/text contact resolution:** `data.contact` (text) and top-level `contact` (inbound call) is a singular `{ id, name } | null` for the single remote party (`remote_phone_number`). Scoped to the identity that owns the receiving phone number; `null` when no visible address-book entry matches.
+**Phone/text contact resolution:** `data.contact` (text) and top-level `contact` (inbound call) is a singular `{ id, name } | null` when the event has one address-book target. Group text events carry all delivery rows in `data.text_message.recipients`; per-recipient lifecycle webhooks name the event target in `data.recipient_phone_number`.
 
 Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact` (phone/text), `WebhookMailContact` + `MailContactBucket` (mail), plus event-type string unions (`MailWebhookEventType`, `TextWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case to match the raw JSON body.
 

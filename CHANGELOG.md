@@ -8,6 +8,18 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
+- **Conversation-centric text messaging support** across both SDKs,
+  CLI, and skills. Existing one-to-one methods remain valid, while
+  group-aware callers can now send to multiple recipients, include MMS
+  media URLs, list group conversations with `include_groups` /
+  `includeGroups` / `--include-groups`, and use conversation UUIDs
+  anywhere a remote-number conversation key was accepted.
+- Text message responses now surface additive group fields:
+  `conversation_id` / `conversationId`, `sender_phone_number` /
+  `senderPhoneNumber`, and per-recipient delivery rows in
+  `recipients`. Legacy `remote_phone_number` remains populated for
+  one-to-one traffic and is `null` for group outbound rows.
+
 - **Identity visibility controls** — manage which agent identities can see
   a given identity in API responses.
   - SDK: new `IdentityAccess` type plus `listAccess` / `grantAccess` /

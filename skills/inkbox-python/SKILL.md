@@ -202,11 +202,19 @@ for t in identity.list_transcripts(calls[0].id):
 **Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
 
 ```python
-# Send an SMS from this identity's phone number.
+# Send SMS/MMS from this identity's phone number.
 # Returns a queued TextMessage; final delivery state arrives via the
 # incoming_text_webhook_url configured on the sender.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
+
+# Group MMS: pass a list of recipients plus optional media URLs.
+group = identity.send_text(
+    to=["+15551234567", "+15557654321"],
+    text="Hello group",
+    media_urls=["https://example.com/photo.jpg"],
+)
+print(group.conversation_id, group.recipients)
 
 # List text messages (offset pagination)
 texts = identity.list_texts(limit=20, offset=0)
@@ -223,12 +231,12 @@ if text.media:     # MMS media attachments (temporary signed URLs)
     for m in text.media:
         print(m.content_type, m.size, m.url)
 
-# List conversation summaries (one row per remote number)
-convos = identity.list_text_conversations(limit=20)
+# List one-to-one conversation summaries; opt into groups explicitly.
+convos = identity.list_text_conversations(limit=20, include_groups=True)
 for c in convos:
-    print(c.remote_phone_number, c.latest_text, c.unread_count, c.total_count)
+    print(c.id, c.remote_phone_number, c.participants, c.latest_text)
 
-# Get messages in a specific conversation
+# Get messages in a specific conversation by remote number or conversation UUID.
 msgs = identity.get_text_conversation("+15551234567", limit=50)
 
 # Mark a text as read (identity convenience method)
@@ -750,7 +758,7 @@ Algorithm: HMAC-SHA256 over `"{request_id}.{timestamp}.{body}"`.
 
 **Mail contact resolution:** `data["contacts"]` is a list of `{"bucket", "address", "id", "name"}` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)` — the same address may appear in multiple buckets on a single send, producing one entry per bucket. Outbound payloads also carry `data["message"]["bcc_addresses"]` (`None` on inbound, since BCC is not visible to recipients).
 
-**Phone/text contact resolution:** `data["contact"]` (text) and top-level `contact` (inbound call) is a singular `{"id", "name"} | None` for the single remote party (`remote_phone_number`). Scoped to the identity that owns the receiving phone number; `None` when no visible address-book entry matches.
+**Phone/text contact resolution:** `data["contact"]` (text) and top-level `contact` (inbound call) is a singular `{"id", "name"} | None` when the event has one address-book target. Group text events carry all delivery rows in `data["text_message"]["recipients"]`; per-recipient lifecycle webhooks name the event target in `data["recipient_phone_number"]`.
 
 Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact` (phone/text), `WebhookMailContact` + `MailContactBucket` (mail), plus event-type `Literal` unions (`MailWebhookEventType`, `TextWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case `TypedDict`s to match the raw JSON body.
 
