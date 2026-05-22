@@ -18,9 +18,25 @@
       "sent_at": "2026-04-10T18:25:01.118Z",
       "delivered_at": null,
       "failed_at": "2026-04-10T18:26:02.402Z",
+      "conversation_id": "aaaaaaaa-1111-2222-3333-444444444444",
+      "sender_phone_number": "+14155550100",
+      "recipients": [
+        {
+          "recipient_phone_number": "+14155550999",
+          "delivery_status": "delivery_failed",
+          "carrier": null,
+          "line_type": null,
+          "error_code": "30007",
+          "error_detail": "Message filtered by carrier",
+          "sent_at": "2026-04-10T18:25:01.118Z",
+          "delivered_at": null,
+          "failed_at": "2026-04-10T18:26:02.402Z"
+        }
+      ],
       "created_at": "2026-04-10T18:25:00.842Z",
       "updated_at": "2026-04-10T18:26:02.402Z"
     },
-    "contact": null
+    "contact": null,
+    "recipient_phone_number": null
   }
 }

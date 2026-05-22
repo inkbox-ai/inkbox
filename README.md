@@ -44,7 +44,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     # Place a phone call
     call = identity.place_call(to_number="+15551234567")
 
-    # Send a text message (SMS/MMS)
+    # Send a text message (SMS/MMS); pass a list for group MMS.
     identity.send_text(to="+15551234567", text="Hi from my agent!")
 
     # Read text messages
@@ -78,7 +78,7 @@ for await (const msg of identity.iterEmails()) {
 // Place a phone call
 const call = await identity.placeCall({ toNumber: "+15551234567" });
 
-// Send a text message (SMS/MMS)
+// Send a text message (SMS/MMS); pass an array for group MMS.
 await identity.sendText({ to: "+15551234567", text: "Hi from my agent!" });
 
 // Read text messages
@@ -106,7 +106,7 @@ inkbox email list -i my-agent --limit 10
 # Place a phone call
 inkbox phone call -i my-agent --to +15551234567
 
-# Send a text message (SMS)
+# Send a text message (SMS/MMS; comma-separate --to for groups)
 inkbox text send -i my-agent --to +15551234567 --text "Hi from my agent!"
 
 # Read text messages
@@ -149,11 +149,12 @@ Both SDKs also accept an in-process callable (Fetch handler in TS, ASGI app in P
 ### Outbound SMS — current limits
 
 - Outbound SMS works only from **local** numbers (not toll-free).
-- **15 sends per phone number per rolling 24h.**
+- **100 recipient sends per phone number per rolling 24h.** A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send fails with `429 sender_rate_limited`.
 - A new local number waits **~10-15 minutes** for the 10DLC campaign to propagate at the carrier; until then `phone_number.sms_status` (Python) / `phoneNumber.smsStatus` (TS) is `"pending"` and sends fail with `409 sender_sms_pending`.
 - Recipients must text **`START`** to any number in your organization to opt in. Unknown recipients fail with `403 recipient_not_opted_in`; opt-outs (`STOP`) return `403 recipient_opted_out`.
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:** toll-free SMS sending, and customer-managed 10DLC brands and campaigns to lift the per-number 24-hour limit dramatically.
+Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
 ---
 

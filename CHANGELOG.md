@@ -4,9 +4,30 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
-## 0.4.4
+## 0.4.5
 
 ### Added
+
+- **Conversation-centric text messaging support** across both SDKs,
+  CLI, and skills. Existing one-to-one methods remain valid, while
+  group-aware callers can now send to multiple recipients, include MMS
+  media URLs, reply into existing conversations with `conversation_id` /
+  `conversationId` / `--conversation-id`, list group conversations with
+  `include_groups` / `includeGroups` / `--include-groups`, and use
+  conversation UUIDs anywhere a remote-number conversation key was
+  accepted.
+- Text message responses now surface additive group fields:
+  `conversation_id` / `conversationId`, `sender_phone_number` /
+  `senderPhoneNumber`, and per-recipient delivery rows in
+  `recipients`. Legacy `remote_phone_number` remains populated for
+  one-to-one traffic and is `null` for group outbound rows.
+- Conversation summaries now include `latest_has_media` / `latestHasMedia`
+  so clients can distinguish actual attachments from carrier-level MMS
+  protocol labels.
+- **TypeScript users:** group rows can legitimately have no single remote
+  party, so `remotePhoneNumber` / `remote_phone_number` is now typed as
+  `string | null` on text messages, conversation summaries, webhook
+  messages, raw wire types, and conversation update results.
 
 - **Identity visibility controls** — manage which agent identities can see
   a given identity in API responses.

@@ -52,8 +52,10 @@ from inkbox.phone.types import (
     SmsOptInStatus,
     SmsStatus,
     TextConversationSummary,
+    TextConversationUpdateResult,
     TextMediaItem,
     TextMessage,
+    TextMessageRecipient,
     TextMessageOrigin,
 )
 
@@ -181,6 +183,7 @@ from inkbox.webhooks import (
     SmsDeliveryStatusWire,
     TextDirectionWire,
     TextMediaItemWire,
+    TextMessageRecipientWire,
     TextMessageOriginWire,
     TextTypeWire,
     TextWebhookData,
@@ -238,8 +241,10 @@ __all__ = [
     "SmsOptInStatus",
     "SmsStatus",
     "TextConversationSummary",
+    "TextConversationUpdateResult",
     "TextMediaItem",
     "TextMessage",
+    "TextMessageRecipient",
     "TextMessageOrigin",
     # Identity types
     "AgentIdentitySummary",
@@ -338,6 +343,7 @@ __all__ = [
     "SmsDeliveryStatusWire",
     "TextDirectionWire",
     "TextMediaItemWire",
+    "TextMessageRecipientWire",
     "TextMessageOriginWire",
     "TextTypeWire",
     "TextWebhookData",

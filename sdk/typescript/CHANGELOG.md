@@ -1,8 +1,24 @@
 # Changelog
 
-## 0.4.4
+## 0.4.5
 
 ### Added
+
+- **Conversation-centric text messaging.** `sendText()` /
+  `texts.send()` now accept a single destination, an array of
+  destinations, or `conversationId` plus optional `mediaUrls`;
+  `listTextConversations()` / `texts.listConversations()` accept
+  `includeGroups`; and conversation read/list helpers accept either the
+  legacy remote number or the new conversation UUID.
+- New additive text fields: `TextMessage.conversationId`,
+  `senderPhoneNumber`, `recipients`, and
+  `TextConversationSummary.id`, `participants`, `isGroup`,
+  `latestHasMedia`. Existing one-to-one `remotePhoneNumber` behavior is
+  preserved.
+- **TypeScript users:** group rows can legitimately have no single remote
+  party, so `remotePhoneNumber` / `remote_phone_number` is now typed as
+  `string | null` on text messages, conversation summaries, webhook
+  messages, raw wire types, and conversation update results.
 
 - **Identity visibility controls.** New `IdentityAccess` type and three methods on both `IdentitiesResource` and `AgentIdentity`:
   - `listAccess()` — list who can see an identity. Returns either a single wildcard row (`viewerIdentityId === null` — every active identity in the org sees it) or explicit per-viewer rows. An empty list means no scoped agent can see the identity.

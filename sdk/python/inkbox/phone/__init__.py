@@ -13,8 +13,10 @@ from inkbox.phone.types import (
     SmsOptInSource,
     SmsOptInStatus,
     TextConversationSummary,
+    TextConversationUpdateResult,
     TextMediaItem,
     TextMessage,
+    TextMessageRecipient,
 )
 from inkbox.signing_keys import SigningKey
 
@@ -31,6 +33,8 @@ __all__ = [
     "SmsOptInSource",
     "SmsOptInStatus",
     "TextConversationSummary",
+    "TextConversationUpdateResult",
     "TextMediaItem",
     "TextMessage",
+    "TextMessageRecipient",
 ]

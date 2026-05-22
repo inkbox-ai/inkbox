@@ -40,6 +40,7 @@ EXPECTED_FIXTURES = sorted([
     "text_received.json",
     "text_sent.json",
     "text_delivered.json",
+    "text_group_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
     "phone_incoming_call.json",
@@ -58,6 +59,7 @@ TEXT_FIXTURES = [
     "text_received.json",
     "text_sent.json",
     "text_delivered.json",
+    "text_group_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
 ]
@@ -168,6 +170,9 @@ def test_text_delivery_failed_carries_full_lifecycle_block():
     assert isinstance(text["sent_at"], str)
     assert isinstance(text["failed_at"], str)
     assert text["delivered_at"] is None
+    assert text["conversation_id"] is not None
+    assert text["recipients"] is not None
+    assert text["recipients"][0]["recipient_phone_number"] == text["remote_phone_number"]
 
 
 def test_text_received_has_no_lifecycle_timestamps():
@@ -180,17 +185,35 @@ def test_text_received_has_no_lifecycle_timestamps():
     assert payload["data"]["contact"] is not None
 
 
+def test_text_group_lifecycle_identifies_recipient_that_changed_state():
+    payload = cast(TextWebhookPayload, _load("text_group_delivered.json"))
+    text = payload["data"]["text_message"]
+    assert text["remote_phone_number"] is None
+    assert text["type"] == "mms"
+    assert text["media"] is not None
+    assert len(text["media"]) == 1
+    assert text["recipients"] is not None
+    assert len(text["recipients"]) == 2
+    assert payload["data"]["recipient_phone_number"] == "+14155550999"
+    assert (
+        text["recipients"][0]["recipient_phone_number"]
+        == payload["data"]["recipient_phone_number"]
+    )
+
+
 def test_text_required_fields_present_on_every_event():
     required = {
         "id", "direction", "local_phone_number", "remote_phone_number",
         "text", "type", "media", "is_read",
         "delivery_status", "origin", "error_code", "error_detail",
         "sent_at", "delivered_at", "failed_at",
+        "conversation_id", "sender_phone_number", "recipients",
         "created_at", "updated_at",
     }
     for fixture in TEXT_FIXTURES:
         payload = cast(TextWebhookPayload, _load(fixture))
         assert set(payload["data"]["text_message"].keys()) == required, fixture
+        assert "recipient_phone_number" in payload["data"]
 
 
 @pytest.mark.parametrize("fixture", TEXT_FIXTURES)

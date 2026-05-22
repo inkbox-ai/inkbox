@@ -31,6 +31,7 @@ const EXPECTED_FIXTURES = [
   "text_received.json",
   "text_sent.json",
   "text_delivered.json",
+  "text_group_delivered.json",
   "text_delivery_failed.json",
   "text_delivery_unconfirmed.json",
   "phone_incoming_call.json",
@@ -133,6 +134,7 @@ describe("TextWebhookPayload", () => {
     "text_received.json",
     "text_sent.json",
     "text_delivered.json",
+    "text_group_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
   ] as const;
@@ -155,6 +157,11 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.text_message.sent_at).toBeTypeOf("string");
     expect(payload.data.text_message.failed_at).toBeTypeOf("string");
     expect(payload.data.text_message.delivered_at).toBeNull();
+    expect(payload.data.text_message.conversation_id).toBeTypeOf("string");
+    expect(payload.data.text_message.recipients).toHaveLength(1);
+    expect(payload.data.text_message.recipients?.[0].recipient_phone_number).toBe(
+      payload.data.text_message.remote_phone_number,
+    );
   });
 
   it("inbound text carries no lifecycle timestamps", () => {
@@ -164,6 +171,22 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.text_message.delivered_at).toBeNull();
     expect(payload.data.text_message.failed_at).toBeNull();
     expect(payload.data.contact).not.toBeNull();
+    expect(payload.data.recipient_phone_number).toBeNull();
+    expect(payload.data.text_message.sender_phone_number).toBe(
+      payload.data.text_message.remote_phone_number,
+    );
+  });
+
+  it("group lifecycle events identify the recipient that changed state", () => {
+    const payload = loadFixture<TextWebhookPayload>("text_group_delivered.json");
+    expect(payload.data.text_message.remote_phone_number).toBeNull();
+    expect(payload.data.text_message.type).toBe("mms");
+    expect(payload.data.text_message.media).toHaveLength(1);
+    expect(payload.data.text_message.recipients).toHaveLength(2);
+    expect(payload.data.recipient_phone_number).toBe("+14155550999");
+    expect(payload.data.text_message.recipients?.[0].recipient_phone_number).toBe(
+      payload.data.recipient_phone_number,
+    );
   });
 
   it.each(textEvents)("does not carry is_blocked on %s", (file) => {

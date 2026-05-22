@@ -9,7 +9,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.phone.types import TextConversationSummary, TextMessage
+from inkbox.phone.types import (
+    TextConversationSummary,
+    TextConversationUpdateResult,
+    TextMessage,
+)
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -24,15 +28,22 @@ class TextsResource:
         self,
         phone_number_id: UUID | str,
         *,
-        to: str,
-        text: str,
+        to: str | list[str] | None = None,
+        conversation_id: UUID | str | None = None,
+        text: str | None = None,
+        media_urls: list[str] | None = None,
     ) -> TextMessage:
-        """Send an outbound SMS from a phone number.
+        """Send an outbound SMS/MMS from a phone number.
 
         Args:
             phone_number_id: UUID of the sending phone number.
-            to: E.164 destination number.
-            text: Message body (1-1600 chars, non-whitespace required).
+            to: E.164 destination number, or a list of numbers for a
+                conversation-centric group send. Mutually exclusive with
+                ``conversation_id``.
+            conversation_id: Existing conversation UUID to reply into. The
+                server resolves it to that conversation's participants.
+            text: Message body.
+            media_urls: MMS media URLs. Pass with ``text`` or by themselves.
 
         Returns:
             The queued ``TextMessage`` row. The full outbound lifecycle
@@ -51,10 +62,19 @@ class TextsResource:
                 ``sender_sms_pending``, ``toll_free_verification_pending``,
                 ``sender_rate_limited``, ``carrier_rate_limit``).
         """
-        # Server selects the sender by path param, not body.
+        body: dict[str, Any] = {}
+        if to is not None:
+            body["to"] = to
+        if conversation_id is not None:
+            body["conversation_id"] = str(conversation_id)
+        if text is not None:
+            body["text"] = text
+        if media_urls is not None:
+            body["media_urls"] = media_urls
+
         data = self._http.post(
             f"/numbers/{phone_number_id}/texts",
-            json={"to": to, "text": text},
+            json=body,
         )
         return TextMessage._from_dict(data)
 
@@ -174,8 +194,9 @@ class TextsResource:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
     ) -> list[TextConversationSummary]:
-        """List conversations (one row per remote number) with latest message preview.
+        """List conversation summaries with latest message preview.
 
         Identity-scoped API keys never see blocked rows — both the
         conversation list and the latest-message previews exclude them
@@ -192,10 +213,14 @@ class TextsResource:
             is_blocked: Tri-state filter applied to the underlying
                 messages — ``True`` for only blocked, ``False`` for only
                 non-blocked, ``None`` for all.
+            include_groups: Include group conversations. Defaults to
+                ``False`` so old clients continue to see one-to-one rows only.
         """
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if include_groups:
+            params["include_groups"] = True
         data = self._http.get(
             f"/numbers/{phone_number_id}/texts/conversations",
             params=params,
@@ -205,16 +230,16 @@ class TextsResource:
     def get_conversation(
         self,
         phone_number_id: UUID | str,
-        remote_number: str,
+        remote_number: UUID | str,
         *,
         limit: int = 50,
         offset: int = 0,
     ) -> list[TextMessage]:
-        """Get all messages with a specific remote number, newest first.
+        """Get all messages in a conversation, newest first.
 
         Args:
             phone_number_id: UUID of the phone number.
-            remote_number: E.164 remote phone number.
+            remote_number: E.164 one-to-one remote number, or conversation UUID.
             limit: Max results to return (1–200).
             offset: Pagination offset.
         """
@@ -227,22 +252,23 @@ class TextsResource:
     def update_conversation(
         self,
         phone_number_id: UUID | str,
-        remote_number: str,
+        remote_number: UUID | str,
         *,
         is_read: bool,
-    ) -> dict[str, Any]:
+    ) -> TextConversationUpdateResult:
         """Update the read state for all messages in a conversation.
 
         Args:
             phone_number_id: UUID of the phone number.
-            remote_number: E.164 remote phone number.
+            remote_number: E.164 one-to-one remote number, or conversation UUID.
             is_read: Mark all messages as read (``True``) or unread (``False``).
 
         Returns:
-            Dict with ``remote_phone_number``, ``is_read``, and ``updated_count``.
+            ``TextConversationUpdateResult`` with ``conversation_id``,
+            ``remote_phone_number``, ``is_read``, and ``updated_count``.
         """
         data = self._http.patch(
             f"/numbers/{phone_number_id}/texts/conversations/{remote_number}",
             json={"is_read": is_read},
         )
-        return data
+        return TextConversationUpdateResult._from_dict(data)

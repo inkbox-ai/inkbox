@@ -164,6 +164,9 @@ export const RAW_TEXT_MESSAGE = {
   media: null,
   is_read: false,
   is_blocked: false,
+  conversation_id: "eeee1111-0000-0000-0000-000000000001",
+  sender_phone_number: "+15551234567",
+  recipients: null,
   created_at: "2026-03-09T00:10:00Z",
   updated_at: "2026-03-09T00:10:00Z",
 };
@@ -178,6 +181,9 @@ export const RAW_TEXT_MESSAGE_BLOCKED = {
   media: null,
   is_read: false,
   is_blocked: true,
+  conversation_id: "eeee1111-0000-0000-0000-0000000000bb",
+  sender_phone_number: "+15551234567",
+  recipients: null,
   created_at: "2026-03-09T00:35:00Z",
   updated_at: "2026-03-09T00:35:00Z",
 };
@@ -197,6 +203,9 @@ export const RAW_TEXT_MESSAGE_MMS = {
     },
   ],
   is_read: true,
+  conversation_id: "eeee1111-0000-0000-0000-000000000001",
+  sender_phone_number: "+15551234567",
+  recipients: null,
   created_at: "2026-03-09T00:12:00Z",
   updated_at: "2026-03-09T00:12:00Z",
 };
@@ -217,18 +226,82 @@ export const RAW_TEXT_MESSAGE_OUTBOUND_QUEUED = {
   sent_at: null,
   delivered_at: null,
   failed_at: null,
+  conversation_id: "eeee1111-0000-0000-0000-000000000001",
+  sender_phone_number: "+18335794607",
+  recipients: [
+    {
+      recipient_phone_number: "+15551234567",
+      delivery_status: "queued",
+      carrier: null,
+      line_type: null,
+      error_code: null,
+      error_detail: null,
+      sent_at: null,
+      delivered_at: null,
+      failed_at: null,
+    },
+  ],
   created_at: "2026-03-09T00:20:00Z",
   updated_at: "2026-03-09T00:20:00Z",
 };
 
+export const RAW_TEXT_MESSAGE_GROUP = {
+  ...RAW_TEXT_MESSAGE_OUTBOUND_QUEUED,
+  id: "dddd4444-0000-0000-0000-0000000000fa",
+  remote_phone_number: null,
+  conversation_id: "eeee1111-0000-0000-0000-0000000000fa",
+  recipients: [
+    {
+      recipient_phone_number: "+15551234567",
+      delivery_status: "queued",
+      carrier: null,
+      line_type: null,
+      error_code: null,
+      error_detail: null,
+      sent_at: null,
+      delivered_at: null,
+      failed_at: null,
+    },
+    {
+      recipient_phone_number: "+15557654321",
+      delivery_status: "queued",
+      carrier: null,
+      line_type: null,
+      error_code: null,
+      error_detail: null,
+      sent_at: null,
+      delivered_at: null,
+      failed_at: null,
+    },
+  ],
+};
+
 export const RAW_TEXT_CONVERSATION_SUMMARY = {
   remote_phone_number: "+15551234567",
+  id: "eeee1111-0000-0000-0000-000000000001",
+  participants: ["+15551234567"],
+  is_group: false,
   latest_text: "Hello, is this support?",
   latest_direction: "inbound",
   latest_type: "sms",
+  latest_has_media: false,
   latest_message_at: "2026-03-09T00:10:00Z",
   unread_count: 3,
   total_count: 15,
+};
+
+export const RAW_TEXT_CONVERSATION_GROUP_SUMMARY = {
+  remote_phone_number: null,
+  id: "eeee1111-0000-0000-0000-0000000000fa",
+  participants: ["+15551234567", "+15557654321"],
+  is_group: true,
+  latest_text: "Hello group",
+  latest_direction: "outbound",
+  latest_type: "mms",
+  latest_has_media: true,
+  latest_message_at: "2026-03-09T00:20:00Z",
+  unread_count: 0,
+  total_count: 1,
 };
 
 // ---- Identities ----
