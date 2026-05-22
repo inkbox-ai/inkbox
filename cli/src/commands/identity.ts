@@ -19,8 +19,17 @@ function registerIdentityAccessCommands(parent: Command): void {
         const inkbox = createClient(opts);
         const target = await inkbox.getIdentity(targetHandle);
         const rows = await target.listAccess();
-        output(rows, {
-          json: !!opts.json,
+        if (opts.json) {
+          output(rows, { json: true });
+          return;
+        }
+        // Render the wildcard sentinel (null viewer) as a readable label.
+        const display = rows.map((r) => ({
+          ...r,
+          viewerIdentityId: r.viewerIdentityId ?? "(everyone)",
+        }));
+        output(display, {
+          json: false,
           columns: ["id", "targetIdentityId", "viewerIdentityId", "createdAt"],
         });
       }),

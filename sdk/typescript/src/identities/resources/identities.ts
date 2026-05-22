@@ -160,6 +160,8 @@ export class IdentitiesResource {
    * rows. An empty list means no scoped agent can see this identity
    * (humans and admins always see it).
    *
+   * Requires an admin-scoped API key; agent-scoped keys get a 403.
+   *
    * @param agentHandle - Handle of the target identity.
    */
   async listAccess(agentHandle: string): Promise<IdentityAccess[]> {
@@ -170,20 +172,28 @@ export class IdentitiesResource {
   /**
    * Grant visibility on this identity.
    *
+   * Requires an admin-scoped API key; agent-scoped keys get a 403.
+   *
    * @param agentHandle - Handle of the target identity.
    * @param viewerIdentityId - UUID of the viewer identity to grant, or
    *   `null` to reset the target to the org-wide wildcard (every active
    *   identity in the org sees it).
    * @throws {RedundantContactAccessGrantError} 409 when granting a
    *   per-viewer UUID against a target that is already a wildcard.
-   * @throws {InkboxAPIError} 409 if the viewer is already granted; 404
-   *   if the viewer identity does not exist; 422 if the viewer is the
-   *   target itself.
+   * @throws {InkboxAPIError} 403 if the API key is not admin-scoped; 409
+   *   if the viewer is already granted; 404 if the viewer identity does
+   *   not exist; 422 if the viewer is the target itself.
    */
   async grantAccess(
     agentHandle: string,
     viewerIdentityId: string | null,
   ): Promise<IdentityAccess> {
+    // Deliberately NOT wrapped in mapIdentityConflictError (unlike
+    // create / update): that mapper blind-converts every 409 to
+    // HandleUnavailableError, which is only right when the sole
+    // possible 409 is a handle collision. This route's 409s are not
+    // collisions, and the wrapper would also downgrade the
+    // RedundantContactAccessGrantError the transport already raised.
     const data = await this.http.post<RawIdentityAccess>(
       `/${agentHandle}/access`,
       { viewer_identity_id: viewerIdentityId },
@@ -194,10 +204,13 @@ export class IdentitiesResource {
   /**
    * Revoke one viewer's visibility on this identity.
    *
+   * Requires an admin-scoped API key; agent-scoped keys get a 403.
+   *
    * @param agentHandle - Handle of the target identity.
    * @param viewerIdentityId - UUID of the viewer identity to drop. This
    *   is the viewer identity's UUID, not an access-row id.
-   * @throws {InkboxAPIError} 404 when there is nothing to drop.
+   * @throws {InkboxAPIError} 403 if the API key is not admin-scoped; 404
+   *   when there is nothing to drop.
    */
   async revokeAccess(agentHandle: string, viewerIdentityId: string): Promise<void> {
     await this.http.delete(`/${agentHandle}/access/${viewerIdentityId}`);

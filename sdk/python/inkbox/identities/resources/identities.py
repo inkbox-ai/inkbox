@@ -159,6 +159,8 @@ class IdentitiesResource:
         sees it) or explicit per-viewer rows. An empty list means no
         scoped agent can see this identity (humans and admins always
         see it).
+
+        Requires an admin-scoped API key; agent-scoped keys get a 403.
         """
         data = self._http.get(f"/{agent_handle}/access")
         return [IdentityAccess._from_dict(a) for a in data]
@@ -180,15 +182,22 @@ class IdentitiesResource:
             RedundantContactAccessGrantError: 409 when granting a
                 per-viewer UUID against a target that is already a
                 wildcard.
-            InkboxAPIError: 409 if the viewer is already granted; 404
-                if the viewer identity does not exist; 422 if the
-                viewer is the target itself.
+            InkboxAPIError: 403 if the API key is not admin-scoped; 409
+                if the viewer is already granted; 404 if the viewer
+                identity does not exist; 422 if the viewer is the
+                target itself.
         """
         body = {
             "viewer_identity_id": (
                 str(viewer_identity_id) if viewer_identity_id is not None else None
             ),
         }
+        # Deliberately NOT wrapped in map_identity_conflict_error (unlike
+        # create / update): that mapper blind-converts every 409 to
+        # HandleUnavailableError, which is only right when the sole
+        # possible 409 is a handle collision. This route's 409s are not
+        # collisions, and the wrapper would also catch and downgrade the
+        # RedundantContactAccessGrantError the transport already raised.
         data = self._http.post(f"/{agent_handle}/access", json=body)
         return IdentityAccess._from_dict(data)
 
@@ -205,6 +214,7 @@ class IdentitiesResource:
                 This is the viewer identity's UUID, not an access-row id.
 
         Raises:
-            InkboxAPIError: 404 when there is nothing to drop.
+            InkboxAPIError: 403 if the API key is not admin-scoped;
+                404 when there is nothing to drop.
         """
         self._http.delete(f"/{agent_handle}/access/{viewer_identity_id}")
