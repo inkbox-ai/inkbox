@@ -195,11 +195,12 @@ for t in identity.list_transcripts(calls[0].id):
 **Outbound SMS limits and gates (current):**
 
 - Allowed only from **local** numbers, not toll-free.
-- **15 outbound sends per phone number per rolling 24h.**
+- **100 recipient sends per phone number per rolling 24h.** A 3-recipient group message counts as 3 recipient sends.
 - New local numbers need **~10-15 min** for 10DLC carrier propagation. `identity.phone_number.sms_status` is `SmsStatus.PENDING` until ready; sends in this window return `409 sender_sms_pending`.
 - Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`. Inspect / override consent state via `inkbox.sms_opt_ins` (see below).
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
+Customer-managed 10DLC brands/campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
 ```python
 # Send SMS/MMS from this identity's phone number.
@@ -208,7 +209,7 @@ for t in identity.list_transcripts(calls[0].id):
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
 
-# Group MMS: pass a list of recipients plus optional media URLs.
+# Group MMS beta: pass a list of recipients plus optional media URLs.
 group = identity.send_text(
     to=["+15551234567", "+15557654321"],
     text="Hello group",
