@@ -386,6 +386,26 @@ class TextConversationSummary:
 
 
 @dataclass
+class TextConversationUpdateResult:
+    """Result from updating a text conversation."""
+
+    remote_phone_number: str | None
+    conversation_id: UUID | None
+    is_read: bool
+    updated_count: int
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> TextConversationUpdateResult:
+        raw_conversation_id = d.get("conversation_id")
+        return cls(
+            remote_phone_number=d.get("remote_phone_number"),
+            conversation_id=UUID(raw_conversation_id) if raw_conversation_id else None,
+            is_read=d["is_read"],
+            updated_count=d["updated_count"],
+        )
+
+
+@dataclass
 class PhoneTranscript:
     """A transcript segment from a phone call."""
 

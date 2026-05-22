@@ -40,6 +40,7 @@ EXPECTED_FIXTURES = sorted([
     "text_received.json",
     "text_sent.json",
     "text_delivered.json",
+    "text_group_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
     "phone_incoming_call.json",
@@ -58,6 +59,7 @@ TEXT_FIXTURES = [
     "text_received.json",
     "text_sent.json",
     "text_delivered.json",
+    "text_group_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
 ]
@@ -181,6 +183,22 @@ def test_text_received_has_no_lifecycle_timestamps():
     assert text["delivered_at"] is None
     assert text["failed_at"] is None
     assert payload["data"]["contact"] is not None
+
+
+def test_text_group_lifecycle_identifies_recipient_that_changed_state():
+    payload = cast(TextWebhookPayload, _load("text_group_delivered.json"))
+    text = payload["data"]["text_message"]
+    assert text["remote_phone_number"] is None
+    assert text["type"] == "mms"
+    assert text["media"] is not None
+    assert len(text["media"]) == 1
+    assert text["recipients"] is not None
+    assert len(text["recipients"]) == 2
+    assert payload["data"]["recipient_phone_number"] == "+14155550999"
+    assert (
+        text["recipients"][0]["recipient_phone_number"]
+        == payload["data"]["recipient_phone_number"]
+    )
 
 
 def test_text_required_fields_present_on_every_event():

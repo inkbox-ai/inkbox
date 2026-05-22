@@ -15,7 +15,7 @@ from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
 from inkbox.mail.types import ForwardMode, MessageDetail, ThreadDetail
-from inkbox.phone.types import TextMessage
+from inkbox.phone.types import TextConversationUpdateResult, TextMessage
 
 
 def _identity_with_mailbox():
@@ -173,18 +173,19 @@ class TestAgentIdentityMarkTextRead:
 class TestAgentIdentityMarkTextConversationRead:
     def test_mark_text_conversation_read_delegates_to_texts_resource(self):
         identity, inkbox = _identity_with_mailbox()
-        inkbox._texts.update_conversation.return_value = {
-            "remote_phone_number": "+15551234567",
-            "is_read": True,
-            "updated_count": 3,
-        }
+        inkbox._texts.update_conversation.return_value = TextConversationUpdateResult(
+            remote_phone_number="+15551234567",
+            conversation_id=None,
+            is_read=True,
+            updated_count=3,
+        )
 
         result = identity.mark_text_conversation_read("+15551234567")
 
         inkbox._texts.update_conversation.assert_called_once_with(
             PHONE_NUMBER_ID, "+15551234567", is_read=True,
         )
-        assert result["updated_count"] == 3
+        assert result.updated_count == 3
 
     def test_mark_text_conversation_read_requires_phone(self):
         identity, _ = _identity_without_phone()

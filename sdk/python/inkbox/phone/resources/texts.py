@@ -9,7 +9,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.phone.types import TextConversationSummary, TextMessage
+from inkbox.phone.types import (
+    TextConversationSummary,
+    TextConversationUpdateResult,
+    TextMessage,
+)
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -251,7 +255,7 @@ class TextsResource:
         remote_number: UUID | str,
         *,
         is_read: bool,
-    ) -> dict[str, Any]:
+    ) -> TextConversationUpdateResult:
         """Update the read state for all messages in a conversation.
 
         Args:
@@ -260,11 +264,11 @@ class TextsResource:
             is_read: Mark all messages as read (``True``) or unread (``False``).
 
         Returns:
-            Dict with ``conversation_id``, ``remote_phone_number``,
-            ``is_read``, and ``updated_count``.
+            ``TextConversationUpdateResult`` with ``conversation_id``,
+            ``remote_phone_number``, ``is_read``, and ``updated_count``.
         """
         data = self._http.patch(
             f"/numbers/{phone_number_id}/texts/conversations/{remote_number}",
             json={"is_read": is_read},
         )
-        return data
+        return TextConversationUpdateResult._from_dict(data)

@@ -38,6 +38,7 @@ from inkbox.phone.types import (
     PhoneCallWithRateLimit,
     PhoneTranscript,
     TextConversationSummary,
+    TextConversationUpdateResult,
     TextMessage,
 )
 
@@ -717,15 +718,15 @@ class AgentIdentity:
 
     def mark_text_conversation_read(
         self, remote_number: UUID | str
-    ) -> dict[str, Any]:
+    ) -> TextConversationUpdateResult:
         """Mark all messages in a conversation as read.
 
         Args:
             remote_number: E.164 one-to-one remote number, or conversation UUID.
 
         Returns:
-            Dict with ``conversation_id``, ``remote_phone_number``,
-            ``is_read``, and ``updated_count``.
+            ``TextConversationUpdateResult`` with ``conversation_id``,
+            ``remote_phone_number``, ``is_read``, and ``updated_count``.
         """
         self._require_phone()
         return self._inkbox._texts.update_conversation(

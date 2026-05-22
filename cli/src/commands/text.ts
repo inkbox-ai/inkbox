@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import type { AgentIdentity } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -13,6 +14,51 @@ function parseList(value: string): string[] {
 function collect(value: string, previous: string[]): string[] {
   previous.push(value);
   return previous;
+}
+
+function formatPhoneList(value: string[] | null | undefined): string | undefined {
+  return value?.join(", ");
+}
+
+type SendTextOptions = Parameters<AgentIdentity["sendText"]>[0];
+
+export interface TextSendCommandOptions {
+  identity: string;
+  to?: string;
+  conversationId?: string;
+  text?: string;
+  mediaUrl?: string[];
+}
+
+export function buildTextSendOptions(
+  cmdOpts: TextSendCommandOptions,
+): { sendOptions: SendTextOptions } | { error: string } {
+  const recipients = cmdOpts.to ? parseList(cmdOpts.to) : [];
+  const mediaUrls = cmdOpts.mediaUrl ?? [];
+  if (recipients.length > 0 && cmdOpts.conversationId) {
+    return { error: "Pass either --to or --conversation-id, not both." };
+  }
+  if (recipients.length === 0 && !cmdOpts.conversationId) {
+    return { error: "Pass --to or --conversation-id." };
+  }
+  if (!cmdOpts.text && mediaUrls.length === 0) {
+    return { error: "Pass --text, --media-url, or both." };
+  }
+
+  const sendOptions: SendTextOptions = {};
+  if (recipients.length > 0) {
+    sendOptions.to = recipients.length === 1 ? recipients[0] : recipients;
+  }
+  if (cmdOpts.conversationId) {
+    sendOptions.conversationId = cmdOpts.conversationId;
+  }
+  if (cmdOpts.text) {
+    sendOptions.text = cmdOpts.text;
+  }
+  if (mediaUrls.length > 0) {
+    sendOptions.mediaUrls = mediaUrls;
+  }
+  return { sendOptions };
 }
 
 export function registerTextCommands(program: Command): void {
@@ -39,44 +85,16 @@ export function registerTextCommands(program: Command): void {
           mediaUrl: string[];
         },
       ) {
+        const sendResult = buildTextSendOptions(cmdOpts);
+        if ("error" in sendResult) {
+          console.error(sendResult.error);
+          process.exit(1);
+        }
+
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        const recipients = cmdOpts.to ? parseList(cmdOpts.to) : [];
-        if (recipients.length > 0 && cmdOpts.conversationId) {
-          console.error("Pass either --to or --conversation-id, not both.");
-          process.exit(1);
-        }
-        if (recipients.length === 0 && !cmdOpts.conversationId) {
-          console.error("Pass --to or --conversation-id.");
-          process.exit(1);
-        }
-        if (!cmdOpts.text && cmdOpts.mediaUrl.length === 0) {
-          console.error("Pass --text, --media-url, or both.");
-          process.exit(1);
-        }
-        const sendOptions: {
-          to?: string | string[];
-          conversationId?: string;
-          text?: string;
-          mediaUrls?: string[];
-        } = {};
-        if (recipients.length > 0) {
-          sendOptions.to = recipients.length === 1 ? recipients[0] : recipients;
-        }
-        if (cmdOpts.conversationId) {
-          sendOptions.conversationId = cmdOpts.conversationId;
-        }
-        if (cmdOpts.text) {
-          sendOptions.text = cmdOpts.text;
-        }
-        if (cmdOpts.mediaUrl.length > 0) {
-          sendOptions.mediaUrls = cmdOpts.mediaUrl;
-        }
-
-        const msg = await identity.sendText(
-          sendOptions as unknown as Parameters<typeof identity.sendText>[0],
-        );
+        const msg = await identity.sendText(sendResult.sendOptions);
         output(
           {
             id: msg.id,
@@ -194,7 +212,13 @@ export function registerTextCommands(program: Command): void {
           offset: parseInt(cmdOpts.offset, 10),
           includeGroups: !!cmdOpts.includeGroups,
         });
-        output(convos, {
+        const rows = opts.json
+          ? convos
+          : convos.map((c) => ({
+              ...c,
+              participants: formatPhoneList(c.participants),
+            }));
+        output(rows, {
           json: !!opts.json,
           columns: [
             "id",
@@ -316,8 +340,9 @@ export function registerTextCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const result = await identity.markTextConversationRead(conversationKey);
+        const displayKey = result.remotePhoneNumber ?? result.conversationId ?? conversationKey;
         console.log(
-          `Marked ${result.updatedCount} message(s) in conversation ${conversationKey} as read.`,
+          `Marked ${result.updatedCount} message(s) in conversation ${displayKey} as read.`,
         );
       }),
     );

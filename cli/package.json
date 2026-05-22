@@ -1,6 +1,6 @@
 {
   "name": "@inkbox/cli",
-  "version": "0.4.6",
+  "version": "0.4.5",
   "description": "CLI for the Inkbox API",
   "license": "MIT",
   "type": "module",
@@ -14,10 +14,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@inkbox/sdk": "^0.4.6",
+    "@inkbox/sdk": "^0.4.5",
     "commander": "^13.0.0"
   },
   "devDependencies": {

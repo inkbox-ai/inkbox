@@ -251,7 +251,7 @@ Always confirm before placing a call.
 **Outbound SMS limits and gates (current):**
 
 - Allowed only from **local** numbers, not toll-free.
-- **100 recipient sends per phone number per rolling 24h.** A 3-recipient group message counts as 3 recipient sends.
+- **100 recipient sends per phone number per rolling 24h.** A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - New local numbers need **~10-15 min** for 10DLC carrier propagation. `identity.phoneNumber.smsStatus` is `SmsStatus.PENDING` until ready; sends in this window return `409 sender_sms_pending`.
 - Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`.
 - **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.

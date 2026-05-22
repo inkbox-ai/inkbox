@@ -306,14 +306,14 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 **Outbound SMS rules (read before sending):**
 
 - Outbound SMS is currently allowed only from **local** numbers, not toll-free.
-- Each sender phone number is rate-limited to **15 outbound texts per rolling 24-hour window**.
+- Each sender phone number is rate-limited to **100 recipient sends per rolling 24-hour window**. A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phoneNumber.smsStatus` reads `"pending"` until then, and sends will return `409 sender_sms_pending`.
 - The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`. You can inspect consent state directly via `inkbox.smsOptIns` — see [SMS Opt-Ins](#sms-opt-ins).
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:**
+Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
-- Toll-free SMS sending.
-- Customer-managed 10DLC brands and campaigns, which lift the per-number 24-hour limit dramatically.
+**TypeScript users:** group rows can legitimately have no single remote party, so text/conversation/webhook `remotePhoneNumber` / `remote_phone_number` fields are typed as `string | null`. One-to-one traffic still populates the remote number.
 
 ```ts
 // Send SMS/MMS. Returns a queued TextMessage; final delivery state arrives

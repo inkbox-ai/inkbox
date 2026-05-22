@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
-## 0.4.6
+## 0.4.5
 
 ### Added
 
@@ -24,6 +24,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Conversation summaries now include `latest_has_media` / `latestHasMedia`
   so clients can distinguish actual attachments from carrier-level MMS
   protocol labels.
+- **TypeScript users:** group rows can legitimately have no single remote
+  party, so `remotePhoneNumber` / `remote_phone_number` is now typed as
+  `string | null` on text messages, conversation summaries, webhook
+  messages, raw wire types, and conversation update results.
 
 - **Identity visibility controls** — manage which agent identities can see
   a given identity in API responses.

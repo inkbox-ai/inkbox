@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.6
+## 0.4.5
 
 ### Added
 
@@ -15,6 +15,10 @@
   `TextConversationSummary.id`, `participants`, `isGroup`,
   `latestHasMedia`. Existing one-to-one `remotePhoneNumber` behavior is
   preserved.
+- **TypeScript users:** group rows can legitimately have no single remote
+  party, so `remotePhoneNumber` / `remote_phone_number` is now typed as
+  `string | null` on text messages, conversation summaries, webhook
+  messages, raw wire types, and conversation update results.
 
 - **Identity visibility controls.** New `IdentityAccess` type and three methods on both `IdentitiesResource` and `AgentIdentity`:
   - `listAccess()` — list who can see an identity. Returns either a single wildcard row (`viewerIdentityId === null` — every active identity in the org sees it) or explicit per-viewer rows. An empty list means no scoped agent can see the identity.

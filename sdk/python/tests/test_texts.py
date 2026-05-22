@@ -330,5 +330,6 @@ class TestTextsUpdateConversation:
             f"/numbers/{NUM_ID}/texts/conversations/{REMOTE}",
             json={"is_read": True},
         )
-        assert result["updated_count"] == 5
-        assert result["conversation_id"] == "eeee1111-0000-0000-0000-000000000001"
+        assert result.updated_count == 5
+        assert str(result.conversation_id) == "eeee1111-0000-0000-0000-000000000001"
+        assert result.remote_phone_number == REMOTE
