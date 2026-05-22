@@ -2,7 +2,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { IdentitiesResource } from "../../src/identities/resources/identities.js";
 import type { HttpTransport } from "../../src/_http.js";
-import { RAW_IDENTITY, RAW_IDENTITY_DETAIL } from "../sampleData.js";
+import {
+  RAW_IDENTITY,
+  RAW_IDENTITY_DETAIL,
+  RAW_IDENTITY_ACCESS_WILDCARD,
+  RAW_IDENTITY_ACCESS_VIEWER,
+} from "../sampleData.js";
 
 function mockHttp() {
   return {
@@ -176,5 +181,84 @@ describe("IdentitiesResource.releasePhoneNumber", () => {
     await res.releasePhoneNumber(HANDLE);
 
     expect(http.delete).toHaveBeenCalledWith(`/${HANDLE}/phone_number`);
+  });
+});
+
+describe("IdentitiesResource.listAccess", () => {
+  it("lists per-viewer access rows", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_IDENTITY_ACCESS_VIEWER]);
+    const res = new IdentitiesResource(http);
+
+    const rows = await res.listAccess(HANDLE);
+
+    expect(http.get).toHaveBeenCalledWith(`/${HANDLE}/access`);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].viewerIdentityId).toBe("dddd4444-0000-0000-0000-000000000001");
+    expect(rows[0].targetIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
+    expect(rows[0].createdAt).toBeInstanceOf(Date);
+  });
+
+  it("parses the wildcard row with a null viewer", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_IDENTITY_ACCESS_WILDCARD]);
+    const res = new IdentitiesResource(http);
+
+    const rows = await res.listAccess(HANDLE);
+
+    expect(rows[0].viewerIdentityId).toBeNull();
+  });
+
+  it("returns an empty list when no agent can see the identity", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
+    const res = new IdentitiesResource(http);
+
+    expect(await res.listAccess(HANDLE)).toEqual([]);
+  });
+});
+
+describe("IdentitiesResource.grantAccess", () => {
+  it("grants a per-viewer access row", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_ACCESS_VIEWER);
+    const res = new IdentitiesResource(http);
+
+    const grant = await res.grantAccess(
+      HANDLE,
+      "dddd4444-0000-0000-0000-000000000001",
+    );
+
+    expect(http.post).toHaveBeenCalledWith(`/${HANDLE}/access`, {
+      viewer_identity_id: "dddd4444-0000-0000-0000-000000000001",
+    });
+    expect(grant.viewerIdentityId).toBe("dddd4444-0000-0000-0000-000000000001");
+  });
+
+  it("resets to the org-wide wildcard when viewerIdentityId is null", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_ACCESS_WILDCARD);
+    const res = new IdentitiesResource(http);
+
+    const grant = await res.grantAccess(HANDLE, null);
+
+    expect(http.post).toHaveBeenCalledWith(`/${HANDLE}/access`, {
+      viewer_identity_id: null,
+    });
+    expect(grant.viewerIdentityId).toBeNull();
+  });
+});
+
+describe("IdentitiesResource.revokeAccess", () => {
+  it("revokes a viewer keyed by the viewer identity UUID", async () => {
+    const http = mockHttp();
+    vi.mocked(http.delete).mockResolvedValue(undefined);
+    const res = new IdentitiesResource(http);
+
+    await res.revokeAccess(HANDLE, "dddd4444-0000-0000-0000-000000000001");
+
+    expect(http.delete).toHaveBeenCalledWith(
+      `/${HANDLE}/access/dddd4444-0000-0000-0000-000000000001`,
+    );
   });
 });

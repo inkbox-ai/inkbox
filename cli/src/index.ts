@@ -22,7 +22,7 @@ import { registerDomainCommands } from "./commands/domain.js";
 const program = new Command()
   .name("inkbox")
   .description("CLI for the Inkbox API — email, phone, identities, and vault for AI agents")
-  .version("0.1.0")
+  .version("0.4.4")
   .option("--api-key <key>", "Inkbox API key (or set INKBOX_API_KEY)")
   .option("--vault-key <key>", "Vault key for decrypt operations (or set INKBOX_VAULT_KEY)")
   .option("--base-url <url>", "Override API base URL (or set INKBOX_BASE_URL)")

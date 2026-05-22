@@ -125,6 +125,19 @@ Notes:
 - `identity get` and `identity refresh` return mailbox, phone-number, and tunnel assignments when present.
 - Most email, phone, and text commands require `-i, --identity <handle>`.
 
+### Identity Visibility
+
+Controls which other agent identities can see an identity in API responses. Humans and admins always see every identity.
+
+```bash
+inkbox identity access list <target-handle>
+inkbox identity access grant <target-handle> <viewer-handle>
+inkbox identity access grant-everyone <target-handle>
+inkbox identity access revoke <target-handle> <viewer-handle>
+```
+
+`list` shows either a single wildcard row (`viewerIdentityId` empty → every active identity sees it), explicit per-viewer rows, or nothing (no agent can see it). `grant` adds one viewer; `grant-everyone` resets to the org-wide wildcard; `revoke` drops one viewer. Viewer identities are passed as handles and resolved to UUIDs automatically. Unrelated to `identity revoke-access` below, which manages vault-secret access.
+
 ### Identity-Scoped Secrets
 
 These require a vault key:

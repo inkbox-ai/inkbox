@@ -15,6 +15,7 @@ from inkbox.identities.exceptions import map_identity_conflict_error
 from inkbox.identities.types import (
     _UNSET,
     AgentIdentitySummary,
+    IdentityAccess,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
     IdentityTunnelCreateOptions,
@@ -149,3 +150,71 @@ class IdentitiesResource:
         reassignment afterwards.
         """
         self._http.delete(f"/{agent_handle}/phone_number")
+
+    def list_access(self, agent_handle: str) -> list[IdentityAccess]:
+        """List who can see this identity (agent visibility).
+
+        Returns either a single wildcard row
+        (``viewer_identity_id=None`` — every active identity in the org
+        sees it) or explicit per-viewer rows. An empty list means no
+        scoped agent can see this identity (humans and admins always
+        see it).
+
+        Requires an admin-scoped API key; agent-scoped keys get a 403.
+        """
+        data = self._http.get(f"/{agent_handle}/access")
+        return [IdentityAccess._from_dict(a) for a in data]
+
+    def grant_access(
+        self,
+        agent_handle: str,
+        viewer_identity_id: UUID | str | None,
+    ) -> IdentityAccess:
+        """Grant visibility on this identity.
+
+        Args:
+            agent_handle: Handle of the target identity.
+            viewer_identity_id: UUID of the viewer identity to grant, or
+                ``None`` to reset the target to the org-wide wildcard
+                (every active identity in the org sees it).
+
+        Raises:
+            RedundantContactAccessGrantError: 409 when granting a
+                per-viewer UUID against a target that is already a
+                wildcard.
+            InkboxAPIError: 403 if the API key is not admin-scoped; 409
+                if the viewer is already granted; 404 if the viewer
+                identity does not exist; 422 if the viewer is the
+                target itself.
+        """
+        body = {
+            "viewer_identity_id": (
+                str(viewer_identity_id) if viewer_identity_id is not None else None
+            ),
+        }
+        # Deliberately NOT wrapped in map_identity_conflict_error (unlike
+        # create / update): that mapper blind-converts every 409 to
+        # HandleUnavailableError, which is only right when the sole
+        # possible 409 is a handle collision. This route's 409s are not
+        # collisions, and the wrapper would also catch and downgrade the
+        # RedundantContactAccessGrantError the transport already raised.
+        data = self._http.post(f"/{agent_handle}/access", json=body)
+        return IdentityAccess._from_dict(data)
+
+    def revoke_access(
+        self,
+        agent_handle: str,
+        viewer_identity_id: UUID | str,
+    ) -> None:
+        """Revoke one viewer's visibility on this identity.
+
+        Args:
+            agent_handle: Handle of the target identity.
+            viewer_identity_id: UUID of the viewer identity to drop.
+                This is the viewer identity's UUID, not an access-row id.
+
+        Raises:
+            InkboxAPIError: 403 if the API key is not admin-scoped;
+                404 when there is nothing to drop.
+        """
+        self._http.delete(f"/{agent_handle}/access/{viewer_identity_id}")

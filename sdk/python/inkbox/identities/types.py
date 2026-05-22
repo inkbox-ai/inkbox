@@ -295,3 +295,29 @@ class _AgentIdentityData(AgentIdentitySummary):
             phone_number=IdentityPhoneNumber._from_dict(phone_data) if phone_data else None,
             tunnel=Tunnel._from_dict(tunnel_data) if tunnel_data else None,
         )
+
+
+@dataclass
+class IdentityAccess:
+    """
+    A single identity-visibility grant on a target identity.
+
+    ``viewer_identity_id=None`` is the wildcard sentinel — every active
+    identity in the org can see the target. Otherwise it is a per-viewer
+    grant naming exactly one viewer identity.
+    """
+
+    id: UUID
+    target_identity_id: UUID
+    viewer_identity_id: UUID | None
+    created_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IdentityAccess:
+        viewer = d.get("viewer_identity_id")
+        return cls(
+            id=UUID(d["id"]),
+            target_identity_id=UUID(d["target_identity_id"]),
+            viewer_identity_id=UUID(viewer) if viewer else None,
+            created_at=datetime.fromisoformat(d["created_at"]),
+        )

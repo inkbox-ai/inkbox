@@ -60,3 +60,17 @@ IDENTITY_DETAIL_DICT = {
     "phone_number": IDENTITY_PHONE_DICT,
     "tunnel": IDENTITY_TUNNEL_DICT,
 }
+
+IDENTITY_ACCESS_WILDCARD_DICT = {
+    "id": "cccc3333-0000-0000-0000-000000000001",
+    "target_identity_id": "eeee5555-0000-0000-0000-000000000001",
+    "viewer_identity_id": None,
+    "created_at": "2026-05-21T00:00:00Z",
+}
+
+IDENTITY_ACCESS_VIEWER_DICT = {
+    "id": "cccc3333-0000-0000-0000-000000000002",
+    "target_identity_id": "eeee5555-0000-0000-0000-000000000001",
+    "viewer_identity_id": "dddd4444-0000-0000-0000-000000000001",
+    "created_at": "2026-05-21T00:00:00Z",
+}

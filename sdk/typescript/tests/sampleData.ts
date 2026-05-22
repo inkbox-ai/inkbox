@@ -272,6 +272,20 @@ export const RAW_IDENTITY_DETAIL = {
   phone_number: RAW_IDENTITY_PHONE,
 };
 
+export const RAW_IDENTITY_ACCESS_WILDCARD = {
+  id: "cccc3333-0000-0000-0000-000000000001",
+  target_identity_id: "eeee5555-0000-0000-0000-000000000001",
+  viewer_identity_id: null,
+  created_at: "2026-05-21T00:00:00Z",
+};
+
+export const RAW_IDENTITY_ACCESS_VIEWER = {
+  id: "cccc3333-0000-0000-0000-000000000002",
+  target_identity_id: "eeee5555-0000-0000-0000-000000000001",
+  viewer_identity_id: "dddd4444-0000-0000-0000-000000000001",
+  created_at: "2026-05-21T00:00:00Z",
+};
+
 // ---- Domains ----
 
 export const RAW_DOMAIN_VERIFIED = {

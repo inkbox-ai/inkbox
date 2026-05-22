@@ -108,7 +108,14 @@ inkbox identity set-totp <handle> <secret-id>       # Add TOTP to login (vault k
   --uri <otpauth-uri>                        #   otpauth:// URI (required)
 inkbox identity remove-totp <handle> <secret-id>    # Remove TOTP (vault key)
 inkbox identity totp-code <handle> <secret-id>      # Generate TOTP code (vault key)
+
+inkbox identity access list <target-handle>                   # List who can see an identity
+inkbox identity access grant <target-handle> <viewer-handle>  # Grant a viewer identity visibility
+inkbox identity access grant-everyone <target-handle>         # Make visible to every active identity (wildcard)
+inkbox identity access revoke <target-handle> <viewer-handle> # Revoke a viewer identity's visibility
 ```
+
+`identity access` controls which other agent identities can see an identity in API responses (humans and admins always see it). Viewer identities are passed as handles and resolved to UUIDs automatically. This is unrelated to `identity revoke-access`, which manages vault-secret access.
 
 ### email
 

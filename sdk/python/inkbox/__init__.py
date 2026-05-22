@@ -60,6 +60,7 @@ from inkbox.phone.types import (
 # Identity types
 from inkbox.identities.types import (
     AgentIdentitySummary,
+    IdentityAccess,
     IdentityMailboxCreateOptions,
     IdentityMailbox,
     IdentityPhoneNumberCreateOptions,
@@ -242,6 +243,7 @@ __all__ = [
     "TextMessageOrigin",
     # Identity types
     "AgentIdentitySummary",
+    "IdentityAccess",
     "IdentityMailboxCreateOptions",
     "IdentityMailbox",
     "IdentityPhoneNumberCreateOptions",

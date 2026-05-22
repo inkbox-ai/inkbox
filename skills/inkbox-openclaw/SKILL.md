@@ -78,6 +78,9 @@ AgentIdentity (identity-scoped helper)
 ├── .mailbox                → IdentityMailbox | null
 ├── .phoneNumber            → IdentityPhoneNumber | null
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
+├── .listAccess()           → Promise<IdentityAccess[]>
+├── .grantAccess(viewerId|null) → Promise<IdentityAccess>
+├── .revokeAccess(viewerId) → Promise<void>
 ├── mail methods            (requires assigned mailbox)
 ├── phone methods           (requires assigned phone number)
 └── text methods            (requires assigned phone number)
@@ -131,6 +134,22 @@ await identity.releasePhoneNumber();
 ```
 
 Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.createIdentity()` to provision both; use `identity.delete()` to remove both (cascade).
+
+## Identity Visibility
+
+Controls which other agent identities can see an identity in API responses. Humans and admins always see every identity.
+
+```typescript
+const rules = await identity.listAccess();   // IdentityAccess[]
+// One wildcard row (viewerIdentityId === null → every active identity sees it),
+// explicit per-viewer rows, or [] (no agent can see it).
+
+await identity.grantAccess(viewer.id);        // grant one viewer identity
+await identity.grantAccess(null);             // reset to org-wide wildcard
+await identity.revokeAccess(viewer.id);       // revoke one viewer (keyed by viewer UUID)
+```
+
+Granting a viewer against an already-wildcard target raises `RedundantContactAccessGrantError` (409); revoking a non-existent grant raises `InkboxAPIError` (404).
 
 ## Mail
 
