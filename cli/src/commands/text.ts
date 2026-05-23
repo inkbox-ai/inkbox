@@ -1,7 +1,65 @@
 import { Command } from "commander";
+import type { AgentIdentity } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
+
+function parseList(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function collect(value: string, previous: string[]): string[] {
+  previous.push(value);
+  return previous;
+}
+
+function formatPhoneList(value: string[] | null | undefined): string | undefined {
+  return value?.join(", ");
+}
+
+type SendTextOptions = Parameters<AgentIdentity["sendText"]>[0];
+
+export interface TextSendCommandOptions {
+  identity: string;
+  to?: string;
+  conversationId?: string;
+  text?: string;
+  mediaUrl?: string[];
+}
+
+export function buildTextSendOptions(
+  cmdOpts: TextSendCommandOptions,
+): { sendOptions: SendTextOptions } | { error: string } {
+  const recipients = cmdOpts.to ? parseList(cmdOpts.to) : [];
+  const mediaUrls = cmdOpts.mediaUrl ?? [];
+  if (recipients.length > 0 && cmdOpts.conversationId) {
+    return { error: "Pass either --to or --conversation-id, not both." };
+  }
+  if (recipients.length === 0 && !cmdOpts.conversationId) {
+    return { error: "Pass --to or --conversation-id." };
+  }
+  if (!cmdOpts.text && mediaUrls.length === 0) {
+    return { error: "Pass --text, --media-url, or both." };
+  }
+
+  const sendOptions: SendTextOptions = {};
+  if (recipients.length > 0) {
+    sendOptions.to = recipients.length === 1 ? recipients[0] : recipients;
+  }
+  if (cmdOpts.conversationId) {
+    sendOptions.conversationId = cmdOpts.conversationId;
+  }
+  if (cmdOpts.text) {
+    sendOptions.text = cmdOpts.text;
+  }
+  if (mediaUrls.length > 0) {
+    sendOptions.mediaUrls = mediaUrls;
+  }
+  return { sendOptions };
+}
 
 export function registerTextCommands(program: Command): void {
   const text = program
@@ -10,28 +68,41 @@ export function registerTextCommands(program: Command): void {
 
   text
     .command("send")
-    .description("Send an outbound SMS from this identity's phone number")
+    .description("Send an outbound SMS/MMS from this identity's phone number")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
-    .requiredOption("--to <number>", "E.164 destination number (e.g. +15551234567)")
-    .requiredOption("--text <text>", "Message body (1-1600 chars)")
+    .option("--to <numbers>", "Comma-separated E.164 destination number(s)")
+    .option("--conversation-id <id>", "Existing conversation UUID to reply into")
+    .option("--text <text>", "Message body")
+    .option("--media-url <url>", "MMS media URL; repeat for multiple", collect, [])
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; to: string; text: string },
+        cmdOpts: {
+          identity: string;
+          to?: string;
+          conversationId?: string;
+          text?: string;
+          mediaUrl: string[];
+        },
       ) {
+        const sendResult = buildTextSendOptions(cmdOpts);
+        if ("error" in sendResult) {
+          console.error(sendResult.error);
+          process.exit(1);
+        }
+
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        const msg = await identity.sendText({
-          to: cmdOpts.to,
-          text: cmdOpts.text,
-        });
+        const msg = await identity.sendText(sendResult.sendOptions);
         output(
           {
             id: msg.id,
             direction: msg.direction,
             local: msg.localPhoneNumber,
             remote: msg.remotePhoneNumber,
+            conversationId: msg.conversationId,
+            recipients: msg.recipients?.map((r) => r.recipientPhoneNumber).join(", "),
             text: msg.text,
             deliveryStatus: msg.deliveryStatus,
             createdAt: msg.createdAt,
@@ -71,6 +142,7 @@ export function registerTextCommands(program: Command): void {
           columns: [
             "id",
             "direction",
+            "conversationId",
             "remotePhoneNumber",
             "type",
             "text",
@@ -101,6 +173,9 @@ export function registerTextCommands(program: Command): void {
             direction: msg.direction,
             local: msg.localPhoneNumber,
             remote: msg.remotePhoneNumber,
+            conversationId: msg.conversationId,
+            sender: msg.senderPhoneNumber,
+            recipients: msg.recipients?.map((r) => r.recipientPhoneNumber).join(", "),
             type: msg.type,
             text: msg.text,
             isRead: msg.isRead,
@@ -118,10 +193,16 @@ export function registerTextCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--include-groups", "Include group conversations")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; limit: string; offset: string },
+        cmdOpts: {
+          identity: string;
+          limit: string;
+          offset: string;
+          includeGroups?: boolean;
+        },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
@@ -129,11 +210,22 @@ export function registerTextCommands(program: Command): void {
         const convos = await identity.listTextConversations({
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
+          includeGroups: !!cmdOpts.includeGroups,
         });
-        output(convos, {
+        const rows = opts.json
+          ? convos
+          : convos.map((c) => ({
+              ...c,
+              participants: formatPhoneList(c.participants),
+            }));
+        output(rows, {
           json: !!opts.json,
           columns: [
+            "id",
             "remotePhoneNumber",
+            "participants",
+            "isGroup",
+            "latestHasMedia",
             "latestText",
             "latestDirection",
             "unreadCount",
@@ -145,7 +237,7 @@ export function registerTextCommands(program: Command): void {
     );
 
   text
-    .command("conversation <remote-number>")
+    .command("conversation <conversation-key>")
     .description("Get messages in a conversation")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--limit <n>", "Max results", "50")
@@ -153,13 +245,13 @@ export function registerTextCommands(program: Command): void {
     .action(
       withErrorHandler(async function (
         this: Command,
-        remoteNumber: string,
+        conversationKey: string,
         cmdOpts: { identity: string; limit: string; offset: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        const msgs = await identity.getTextConversation(remoteNumber, {
+        const msgs = await identity.getTextConversation(conversationKey, {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
@@ -168,6 +260,7 @@ export function registerTextCommands(program: Command): void {
           columns: [
             "id",
             "direction",
+            "conversationId",
             "remotePhoneNumber",
             "text",
             "type",
@@ -206,6 +299,7 @@ export function registerTextCommands(program: Command): void {
           columns: [
             "id",
             "direction",
+            "conversationId",
             "remotePhoneNumber",
             "text",
             "createdAt",
@@ -233,21 +327,22 @@ export function registerTextCommands(program: Command): void {
     );
 
   text
-    .command("mark-conversation-read <remote-number>")
+    .command("mark-conversation-read <conversation-key>")
     .description("Mark all messages in a conversation as read")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (
         this: Command,
-        remoteNumber: string,
+        conversationKey: string,
         cmdOpts: { identity: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        const result = await identity.markTextConversationRead(remoteNumber);
+        const result = await identity.markTextConversationRead(conversationKey);
+        const displayKey = result.remotePhoneNumber ?? result.conversationId ?? conversationKey;
         console.log(
-          `Marked ${result.updatedCount} message(s) in conversation with ${remoteNumber} as read.`,
+          `Marked ${result.updatedCount} message(s) in conversation ${displayKey} as read.`,
         );
       }),
     );

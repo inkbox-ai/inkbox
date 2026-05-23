@@ -317,6 +317,20 @@ describe("AgentIdentity phone helpers", () => {
     });
   });
 
+  it("sendText can reply to a conversation", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._texts.send).mockResolvedValue({ id: "txt-1" } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+    const conversationId = "eeee1111-0000-0000-0000-0000000000fa";
+
+    await identity.sendText({ conversationId, text: "Reply all" });
+
+    expect(ink._texts.send).toHaveBeenCalledWith(PARSED_PHONE.id, {
+      conversationId,
+      text: "Reply all",
+    });
+  });
+
   it("sendText throws when no phone", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
     await expect(

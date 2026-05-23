@@ -189,17 +189,32 @@ export interface TextMediaItem {
   url: string;
 }
 
+export interface TextMessageRecipient {
+  recipientPhoneNumber: string;
+  deliveryStatus: SmsDeliveryStatus | null;
+  carrier: string | null;
+  lineType: string | null;
+  errorCode: string | null;
+  errorDetail: string | null;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  failedAt: Date | null;
+}
+
 export interface TextMessage {
   id: string;
   /** "inbound" | "outbound" */
   direction: string;
   localPhoneNumber: string;
-  remotePhoneNumber: string;
+  remotePhoneNumber: string | null;
   text: string | null;
   /** "sms" | "mms" */
   type: string;
   media: TextMediaItem[] | null;
   isRead: boolean;
+  conversationId: string | null;
+  senderPhoneNumber: string | null;
+  recipients: TextMessageRecipient[] | null;
   /** Outbound delivery lifecycle. `null` on inbound rows. */
   deliveryStatus: SmsDeliveryStatus | null;
   origin: TextMessageOrigin;
@@ -221,13 +236,24 @@ export interface TextMessage {
 }
 
 export interface TextConversationSummary {
-  remotePhoneNumber: string;
+  remotePhoneNumber: string | null;
+  id: string | null;
+  participants: string[] | null;
+  isGroup: boolean;
   latestText: string | null;
   latestDirection: string;
   latestType: string;
+  latestHasMedia: boolean;
   latestMessageAt: Date;
   unreadCount: number;
   totalCount: number;
+}
+
+export interface TextConversationUpdateResult {
+  remotePhoneNumber: string | null;
+  conversationId: string | null;
+  isRead: boolean;
+  updatedCount: number;
 }
 
 // ---- internal raw API shapes (snake_case from JSON) ----
@@ -313,15 +339,30 @@ export interface RawTextMediaItem {
   url: string;
 }
 
+export interface RawTextMessageRecipient {
+  recipient_phone_number: string;
+  delivery_status?: string | null;
+  carrier?: string | null;
+  line_type?: string | null;
+  error_code?: string | null;
+  error_detail?: string | null;
+  sent_at?: string | null;
+  delivered_at?: string | null;
+  failed_at?: string | null;
+}
+
 export interface RawTextMessage {
   id: string;
   direction: string;
   local_phone_number: string;
-  remote_phone_number: string;
+  remote_phone_number?: string | null;
   text: string | null;
   type: string;
   media: RawTextMediaItem[] | null;
   is_read: boolean;
+  conversation_id?: string | null;
+  sender_phone_number?: string | null;
+  recipients?: RawTextMessageRecipient[] | null;
   delivery_status?: string | null;
   origin?: string;
   error_code?: string | null;
@@ -337,10 +378,14 @@ export interface RawTextMessage {
 }
 
 export interface RawTextConversationSummary {
-  remote_phone_number: string;
+  remote_phone_number?: string | null;
+  id?: string | null;
+  participants?: string[] | null;
+  is_group?: boolean | null;
   latest_text: string | null;
   latest_direction: string;
   latest_type: string;
+  latest_has_media?: boolean | null;
   latest_message_at: string;
   unread_count: number;
   total_count: number;
@@ -470,16 +515,37 @@ export function parseTextMediaItem(r: RawTextMediaItem): TextMediaItem {
   };
 }
 
+export function parseTextMessageRecipient(
+  r: RawTextMessageRecipient,
+): TextMessageRecipient {
+  return {
+    recipientPhoneNumber: r.recipient_phone_number,
+    deliveryStatus: r.delivery_status
+      ? (r.delivery_status as SmsDeliveryStatus)
+      : null,
+    carrier: r.carrier ?? null,
+    lineType: r.line_type ?? null,
+    errorCode: r.error_code ?? null,
+    errorDetail: r.error_detail ?? null,
+    sentAt: r.sent_at ? new Date(r.sent_at) : null,
+    deliveredAt: r.delivered_at ? new Date(r.delivered_at) : null,
+    failedAt: r.failed_at ? new Date(r.failed_at) : null,
+  };
+}
+
 export function parseTextMessage(r: RawTextMessage): TextMessage {
   return {
     id: r.id,
     direction: r.direction,
     localPhoneNumber: r.local_phone_number,
-    remotePhoneNumber: r.remote_phone_number,
+    remotePhoneNumber: r.remote_phone_number ?? null,
     text: r.text,
     type: r.type,
     media: r.media ? r.media.map(parseTextMediaItem) : null,
     isRead: r.is_read,
+    conversationId: r.conversation_id ?? null,
+    senderPhoneNumber: r.sender_phone_number ?? null,
+    recipients: r.recipients ? r.recipients.map(parseTextMessageRecipient) : null,
     deliveryStatus: r.delivery_status
       ? (r.delivery_status as SmsDeliveryStatus)
       : null,
@@ -499,13 +565,16 @@ export function parseTextConversationSummary(
   r: RawTextConversationSummary,
 ): TextConversationSummary {
   return {
-    remotePhoneNumber: r.remote_phone_number,
+    remotePhoneNumber: r.remote_phone_number ?? null,
+    id: r.id ?? null,
+    participants: r.participants ?? null,
+    isGroup: r.is_group ?? false,
     latestText: r.latest_text,
     latestDirection: r.latest_direction,
     latestType: r.latest_type,
+    latestHasMedia: r.latest_has_media ?? false,
     latestMessageAt: new Date(r.latest_message_at),
     unreadCount: r.unread_count,
     totalCount: r.total_count,
   };
 }
-

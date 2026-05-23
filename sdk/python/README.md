@@ -289,21 +289,33 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 **Outbound SMS rules (read before sending):**
 
 - Outbound SMS is currently allowed only from **local** numbers, not toll-free.
-- Each sender phone number is rate-limited to **15 outbound texts per rolling 24-hour window**.
+- Each sender phone number is rate-limited to **100 recipient sends per rolling 24-hour window**. A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phone_number.sms_status` reads `pending` until then, and sends will return `409 sender_sms_pending`.
 - The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`. You can inspect consent state directly via `inkbox.sms_opt_ins` — see [SMS Opt-Ins](#sms-opt-ins).
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:**
-
-- Toll-free SMS sending.
-- Customer-managed 10DLC brands and campaigns, which lift the per-number 24-hour limit dramatically.
+Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
 ```python
-# Send an SMS. Returns a queued TextMessage; final delivery state arrives
-# via any webhook subscription on the sender's phone number whose
-# event_types include the text.* lifecycle events.
+# Send SMS/MMS. Returns a queued TextMessage; final delivery state
+# arrives via any webhook subscription on the sender's phone number
+# whose event_types include the text.* lifecycle events.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
+
+# Group MMS uses the same method with a list of recipients.
+group = identity.send_text(
+    to=["+15551234567", "+15557654321"],
+    text="Hello group",
+    media_urls=["https://example.com/photo.jpg"],
+)
+print(group.conversation_id, group.recipients)
+
+# Reply to an existing conversation by UUID. Do not pass "to" with this form.
+reply = identity.send_text(
+    conversation_id=group.conversation_id,
+    text="Following up in the same conversation.",
+)
 
 # List text messages
 texts = identity.list_texts(limit=20)
@@ -320,12 +332,12 @@ if text.media:    # MMS attachments (temporary signed URLs)
     for m in text.media:
         print(m.content_type, m.size, m.url)
 
-# List conversation summaries (one row per remote number)
-convos = identity.list_text_conversations(limit=20)
+# List one-to-one conversation summaries; opt into groups explicitly.
+convos = identity.list_text_conversations(limit=20, include_groups=True)
 for c in convos:
-    print(c.remote_phone_number, c.latest_text, c.unread_count)
+    print(c.id, c.participants, c.latest_has_media, c.latest_text)
 
-# Get messages in a specific conversation
+# Get messages in a specific conversation by remote number or conversation UUID.
 msgs = identity.get_text_conversation("+15551234567", limit=50)
 
 # Mark as read
@@ -796,22 +808,22 @@ inkbox.phone_numbers.update(
 ### Wire shapes
 
 Every mail and text payload uses the standard `{event_type,
-timestamp, data}` envelope. `data["contacts"]` (mail) and
-`data["contacts"]` (text) are always present, possibly empty.
-`data["agent_identities"]` mirrors `contacts` but matches active
-agent identities in the same org. On mail, each list entry carries a
+timestamp, data}` envelope. `data["contacts"]` (mail and text) and
+`data["agent_identities"]` are always present, possibly empty.
+`agent_identities` mirrors `contacts` but matches active agent
+identities in the same org. On mail, each list entry carries a
 `bucket: "from" | "to" | "cc" | "bcc"` plus `address`; receivers
 should pair to the source field by `(bucket, address)`.
 `data["message"]["bcc_addresses"]` is populated only on outbound
 events.
 
-Phone-text payloads added several fields for group sends:
+Phone-text payloads carry several fields for group sends:
 
 - `text_message["recipients"]` -- `None` on inbound, a one-element
   list on outbound 1:1, multiple entries on group outbound.
 - `text_message["remote_phone_number"]` -- `None` on group outbound
   (the per-recipient state is in `recipients[]`).
-- `data["recipient_phone_number"]` -- set on outbound lifecycle
+- `data["recipient_phone_number"]` -- set on outbound group lifecycle
   events, names the recipient the event is about. `None` on inbound
   and on 1:1 outbound.
 
@@ -856,9 +868,10 @@ async def text_hook(request: Request):
     match payload["event_type"]:
         case "text.delivery_failed":
             msg = payload["data"]["text_message"]
+            recipient = payload["data"]["recipient_phone_number"] or msg["remote_phone_number"]
             logger.error(
                 "SMS to %s failed: %s (%s)",
-                msg["remote_phone_number"], msg["error_code"], msg["error_detail"],
+                recipient, msg["error_code"], msg["error_detail"],
             )
         case "text.delivered":
             # delivery_status, sent_at, delivered_at are all populated.

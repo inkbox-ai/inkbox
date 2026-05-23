@@ -8,7 +8,11 @@
  * since `JSON.parse` produces bare strings.
  */
 
-import type { RawRateLimitInfo, RawTextMediaItem } from "../phone/types.js";
+import type {
+  RawRateLimitInfo,
+  RawTextMediaItem,
+  RawTextMessageRecipient,
+} from "../phone/types.js";
 
 // ---- Wire union types ------------------------------------------------
 
@@ -181,22 +185,6 @@ export type TextWebhookEventType =
   | "text.delivery_unconfirmed";
 
 /**
- * Per-recipient delivery state inside an outbound `TextWebhookMessage`.
- * Mirrors the public recipient shape returned on REST responses.
- */
-export interface WebhookRecipient {
-  recipient_phone_number: string;
-  delivery_status: SmsDeliveryStatusWire | null;
-  carrier: string | null;
-  line_type: string | null;
-  error_code: string | null;
-  error_detail: string | null;
-  sent_at: string | null;
-  delivered_at: string | null;
-  failed_at: string | null;
-}
-
-/**
  * Stored text message. `is_blocked` is not part of the wire body —
  * blocked texts never reach the webhook.
  *
@@ -214,7 +202,6 @@ export interface TextWebhookMessage {
   id: string;
   direction: TextDirectionWire;
   local_phone_number: string;
-  /** `null` on group outbound; populated on inbound and 1:1 outbound. */
   remote_phone_number: string | null;
   text: string | null;
   type: TextTypeWire;
@@ -235,7 +222,7 @@ export interface TextWebhookMessage {
    * fields above are hoisted from that entry); multiple entries on
    * group outbound.
    */
-  recipients: WebhookRecipient[] | null;
+  recipients: RawTextMessageRecipient[] | null;
   created_at: string;
   updated_at: string;
 }

@@ -73,6 +73,19 @@ class TextMediaItemWire(TypedDict):
     url: str
 
 
+class TextMessageRecipientWire(TypedDict):
+    """Per-recipient outbound SMS/MMS delivery state."""
+    recipient_phone_number: str
+    delivery_status: SmsDeliveryStatusWire | None
+    carrier: str | None
+    line_type: str | None
+    error_code: str | None
+    error_detail: str | None
+    sent_at: str | None
+    delivered_at: str | None
+    failed_at: str | None
+
+
 class RateLimitInfoWire(TypedDict):
     """Org rate-limit snapshot on inbound-call payloads."""
     calls_used: int
@@ -210,23 +223,6 @@ TextWebhookEventType = Literal[
 ]
 
 
-class WebhookRecipient(TypedDict):
-    """
-    Per-recipient delivery state inside an outbound
-    ``TextWebhookMessage``. Mirrors the public recipient shape
-    returned on REST responses.
-    """
-    recipient_phone_number: str
-    delivery_status: SmsDeliveryStatusWire | None
-    carrier: str | None
-    line_type: str | None
-    error_code: str | None
-    error_detail: str | None
-    sent_at: str | None
-    delivered_at: str | None
-    failed_at: str | None
-
-
 class TextWebhookMessage(TypedDict):
     """
     Stored text message. ``is_blocked`` is not part of the wire body
@@ -259,7 +255,7 @@ class TextWebhookMessage(TypedDict):
     failed_at: str | None
     conversation_id: str | None
     sender_phone_number: str | None
-    recipients: list[WebhookRecipient] | None
+    recipients: list[TextMessageRecipientWire] | None
     created_at: str
     updated_at: str
 

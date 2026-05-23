@@ -195,19 +195,34 @@ for t in identity.list_transcripts(calls[0].id):
 **Outbound SMS limits and gates (current):**
 
 - Allowed only from **local** numbers, not toll-free.
-- **15 outbound sends per phone number per rolling 24h.**
+- **100 recipient sends per phone number per rolling 24h.** A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - New local numbers need **~10-15 min** for 10DLC carrier propagation. `identity.phone_number.sms_status` is `SmsStatus.PENDING` until ready; sends in this window return `409 sender_sms_pending`.
 - Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`. Inspect / override consent state via `inkbox.sms_opt_ins` (see below).
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
+Customer-managed 10DLC brands/campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
 ```python
-# Send an SMS from this identity's phone number.
+# Send SMS/MMS from this identity's phone number.
 # Returns a queued TextMessage; final delivery state arrives via any
 # webhook subscription on the sender's phone number whose event_types
 # include the text.* lifecycle events.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
+
+# Group MMS beta: pass a list of recipients plus optional media URLs.
+group = identity.send_text(
+    to=["+15551234567", "+15557654321"],
+    text="Hello group",
+    media_urls=["https://example.com/photo.jpg"],
+)
+print(group.conversation_id, group.recipients)
+
+# Reply to an existing conversation by UUID. Do not pass "to" with this form.
+reply = identity.send_text(
+    conversation_id=group.conversation_id,
+    text="Following up in the same conversation.",
+)
 
 # List text messages (offset pagination)
 texts = identity.list_texts(limit=20, offset=0)
@@ -224,12 +239,12 @@ if text.media:     # MMS media attachments (temporary signed URLs)
     for m in text.media:
         print(m.content_type, m.size, m.url)
 
-# List conversation summaries (one row per remote number)
-convos = identity.list_text_conversations(limit=20)
+# List one-to-one conversation summaries; opt into groups explicitly.
+convos = identity.list_text_conversations(limit=20, include_groups=True)
 for c in convos:
-    print(c.remote_phone_number, c.latest_text, c.unread_count, c.total_count)
+    print(c.id, c.participants, c.latest_has_media, c.latest_text)
 
-# Get messages in a specific conversation
+# Get messages in a specific conversation by remote number or conversation UUID.
 msgs = identity.get_text_conversation("+15551234567", limit=50)
 
 # Mark a text as read (identity convenience method)
@@ -752,9 +767,9 @@ Algorithm: HMAC-SHA256 over `"{request_id}.{timestamp}.{body}"`.
 
 **Mail contact / identity resolution:** `data["contacts"]` and `data["agent_identities"]` are lists of `{"bucket", "address", "id", ...}` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)`. Outbound payloads also carry `data["message"]["bcc_addresses"]` (`None` on inbound, since BCC is not visible to recipients).
 
-**Phone/text contact / identity resolution:** `data["contacts"]` (text) and top-level `contacts` (inbound call) are lists of `{"id", "name"}` matches; `data["agent_identities"]` mirrors that for matched agent identities. Scoped to the identity that owns the receiving phone number; both default to `[]` when nothing matches.
+**Phone/text contact / identity resolution:** `data["contacts"]` (text) and top-level `contacts` (inbound call) are lists of `{"id", "name"}` matches; `data["agent_identities"]` mirrors that for matched agent identities. Scoped to the identity that owns the receiving phone number; both default to `[]` when nothing matches. Group text events carry per-recipient delivery rows in `data["text_message"]["recipients"]`; per-recipient lifecycle webhooks name the event target in `data["recipient_phone_number"]`.
 
-Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `WebhookRecipient`, plus event-type `Literal` unions (`MailWebhookEventType`, `TextWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case `TypedDict`s to match the raw JSON body.
+Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `TextMessageRecipientWire`, plus event-type `Literal` unions (`MailWebhookEventType`, `TextWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case `TypedDict`s to match the raw JSON body.
 
 ## Error Handling
 

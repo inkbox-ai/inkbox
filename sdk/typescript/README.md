@@ -306,24 +306,38 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 **Outbound SMS rules (read before sending):**
 
 - Outbound SMS is currently allowed only from **local** numbers, not toll-free.
-- Each sender phone number is rate-limited to **15 outbound texts per rolling 24-hour window**.
+- Each sender phone number is rate-limited to **100 recipient sends per rolling 24-hour window**. A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phoneNumber.smsStatus` reads `"pending"` until then, and sends will return `409 sender_sms_pending`.
 - The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`. You can inspect consent state directly via `inkbox.smsOptIns` — see [SMS Opt-Ins](#sms-opt-ins).
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:**
+Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
-- Toll-free SMS sending.
-- Customer-managed 10DLC brands and campaigns, which lift the per-number 24-hour limit dramatically.
+**TypeScript users:** group rows can legitimately have no single remote party, so text/conversation/webhook `remotePhoneNumber` / `remote_phone_number` fields are typed as `string | null`. One-to-one traffic still populates the remote number.
 
 ```ts
-// Send an SMS. Returns a queued TextMessage; final delivery state arrives
-// via any webhook subscription on the sender's phone number whose
-// eventTypes include the text.* lifecycle events.
+// Send SMS/MMS. Returns a queued TextMessage; final delivery state
+// arrives via any webhook subscription on the sender's phone number
+// whose eventTypes include the text.* lifecycle events.
 const sent = await identity.sendText({
   to: "+15551234567",
   text: "Hello from Inkbox",
 });
 console.log(sent.id, sent.deliveryStatus);   // "queued"
+
+// Group MMS uses the same method with an array of recipients.
+const group = await identity.sendText({
+  to: ["+15551234567", "+15557654321"],
+  text: "Hello group",
+  mediaUrls: ["https://example.com/photo.jpg"],
+});
+console.log(group.conversationId, group.recipients);
+
+// Reply to an existing conversation by UUID. Do not pass `to` with this form.
+const reply = await identity.sendText({
+  conversationId: group.conversationId,
+  text: "Following up in the same conversation.",
+});
 
 // List text messages
 const texts = await identity.listTexts({ limit: 20 });
@@ -343,13 +357,13 @@ if (text.media) {         // MMS attachments (temporary signed URLs)
   }
 }
 
-// List conversation summaries (one row per remote number)
-const convos = await identity.listTextConversations({ limit: 20 });
+// List one-to-one conversation summaries; opt into groups explicitly.
+const convos = await identity.listTextConversations({ limit: 20, includeGroups: true });
 for (const c of convos) {
-  console.log(c.remotePhoneNumber, c.latestText, c.unreadCount);
+  console.log(c.id, c.participants, c.latestHasMedia, c.latestText);
 }
 
-// Get messages in a specific conversation
+// Get messages in a specific conversation by remote number or conversation UUID.
 const msgs = await identity.getTextConversation("+15551234567", { limit: 50 });
 
 // Mark as read
@@ -782,24 +796,24 @@ await inkbox.phoneNumbers.update(number.id, {
 ### Wire shapes
 
 Every mail and text payload uses the standard `{ event_type,
-timestamp, data }` envelope. `data.contacts` (mail) and
-`data.contacts` (text) are always present, possibly empty.
-`data.agent_identities` mirrors `contacts` but matches active agent
+timestamp, data }` envelope. `data.contacts` (mail and text) and
+`data.agent_identities` are always present, possibly empty.
+`agent_identities` mirrors `contacts` but matches active agent
 identities in the same org. On mail, each list entry carries a
 `bucket: "from" | "to" | "cc" | "bcc"` plus `address`; receivers
 should pair to the source field by `(bucket, address)`.
 `data.message.bcc_addresses` is populated only on outbound events.
 
-Phone-text payloads added several fields for group sends:
+Phone-text payloads carry several fields for group sends:
 
 - `text_message.recipients` — `null` on inbound, a one-element list
   on outbound 1:1, multiple entries on group outbound.
 - `text_message.remote_phone_number` — `null` on group outbound (the
   per-recipient state is in `recipients[]`).
-- `data.recipient_phone_number` — set on outbound lifecycle events,
-  names the recipient the event is about. `null` on inbound and on
-  1:1 outbound (where `remote_phone_number` already identifies the
-  recipient).
+- `data.recipient_phone_number` — set on outbound group lifecycle
+  events, names the recipient the event is about. `null` on inbound
+  and on 1:1 outbound (where `remote_phone_number` already identifies
+  the recipient).
 
 The inbound-call payload is **flat** — no envelope — and carries
 `contacts: WebhookContact[]` and `agent_identities:
@@ -836,7 +850,8 @@ app.post("/hooks/text", express.raw({ type: "*/*" }), (req, res) => {
   switch (payload.event_type) {
     case "text.delivery_failed": {
       const m = payload.data.text_message;
-      console.error(`SMS to ${m.remote_phone_number} failed`, m.error_code, m.error_detail);
+      const recipient = payload.data.recipient_phone_number ?? m.remote_phone_number;
+      console.error(`SMS to ${recipient} failed`, m.error_code, m.error_detail);
       break;
     }
     case "text.delivered":

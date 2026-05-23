@@ -12,9 +12,16 @@
 
 - **`inkbox webhook subscription` subcommand group**: `list`, `get`, `create`, `update`, `delete`. Routes to the new server `/webhooks/subscriptions` endpoint via `inkbox.webhooks.subscriptions`. `--event-type` is repeatable on `create` (≥1 required) and `update` (presence replaces the stored list; absence is no-op).
 
-## 0.4.4
+## 0.4.5
 
 ### Added
+
+- **Group text/MMS support.** `inkbox text send` accepts comma-separated
+  `--to` recipients, `--conversation-id` for replies into existing
+  conversations, and repeatable `--media-url`; `inkbox text
+  conversations` accepts `--include-groups` and displays
+  `latestHasMedia`; conversation read commands accept either the legacy
+  remote number or a conversation UUID.
 
 - **`inkbox identity access` command group** for managing agent visibility:
   - `inkbox identity access list <target-handle>` — list who can see an identity.

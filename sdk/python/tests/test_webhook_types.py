@@ -45,7 +45,7 @@ EXPECTED_FIXTURES = sorted([
     "text_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
-    "text_group_outbound.json",
+    "text_group_delivered.json",
     "phone_incoming_call.json",
 ])
 
@@ -64,7 +64,7 @@ TEXT_FIXTURES = [
     "text_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
-    "text_group_outbound.json",
+    "text_group_delivered.json",
 ]
 
 
@@ -217,6 +217,9 @@ def test_text_delivery_failed_carries_full_lifecycle_block():
     assert isinstance(text["sent_at"], str)
     assert isinstance(text["failed_at"], str)
     assert text["delivered_at"] is None
+    assert text["conversation_id"] is not None
+    assert text["recipients"] is not None
+    assert text["recipients"][0]["recipient_phone_number"] == text["remote_phone_number"]
 
 
 def test_text_received_has_no_lifecycle_timestamps():
@@ -243,16 +246,13 @@ def test_text_sent_1on1_has_single_entry_recipients():
     assert payload["data"]["recipient_phone_number"] is None
 
 
-def test_text_group_outbound_carries_per_recipient_state_and_top_level_recipient():
-    payload = cast(TextWebhookPayload, _load("text_group_outbound.json"))
+def test_text_group_lifecycle_identifies_recipient_that_changed_state():
+    payload = cast(TextWebhookPayload, _load("text_group_delivered.json"))
     text = payload["data"]["text_message"]
     assert text["remote_phone_number"] is None
-    assert text["delivery_status"] is None
-    assert text["sent_at"] is None
-    assert text["delivered_at"] is None
-    assert text["failed_at"] is None
-    assert text["error_code"] is None
-    assert text["error_detail"] is None
+    assert text["type"] == "mms"
+    assert text["media"] is not None
+    assert len(text["media"]) == 1
     assert isinstance(text["conversation_id"], str)
     assert isinstance(text["sender_phone_number"], str)
     recipients = text["recipients"]
@@ -272,7 +272,7 @@ def test_text_group_outbound_carries_per_recipient_state_and_top_level_recipient
     for entry in recipients:
         assert set(entry.keys()) == required, entry
     top_level = payload["data"]["recipient_phone_number"]
-    assert isinstance(top_level, str)
+    assert top_level == "+14155550999"
     assert top_level in {e["recipient_phone_number"] for e in recipients}
 
 
@@ -288,6 +288,7 @@ def test_text_required_fields_present_on_every_event():
     for fixture in TEXT_FIXTURES:
         payload = cast(TextWebhookPayload, _load(fixture))
         assert set(payload["data"]["text_message"].keys()) == required, fixture
+        assert "recipient_phone_number" in payload["data"]
 
 
 @pytest.mark.parametrize("fixture", TEXT_FIXTURES)

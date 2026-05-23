@@ -181,16 +181,19 @@ Text message (SMS/MMS) operations, scoped to an identity. Requires `-i <handle>`
 **Outbound SMS rules:**
 
 - Allowed only from **local** numbers (not toll-free).
-- **15 sends per phone number per rolling 24h** — exceeded sends return `429 sender_rate_limited`.
+- **100 recipient sends per phone number per rolling 24h** — a 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - A freshly provisioned local number needs **~10-15 minutes** for 10DLC carrier propagation. Check `inkbox number get <id>`: send is gated until `smsStatus` reaches `ready`.
 - Recipients must opt in by texting **`START`** to any number in your organization. Unknown recipients fail with `403 recipient_not_opted_in`; opt-outs (`STOP`) return `403 recipient_opted_out`.
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:** toll-free SMS sending, and customer-managed 10DLC brands/campaigns to lift the per-number limit.
+Customer-managed 10DLC brands/campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
 ```bash
-inkbox text send -i <handle>                # Send an outbound SMS
-  --to <e164>                               #   E.164 destination (required)
-  --text <body>                             #   Message body, 1-1600 chars (required)
+inkbox text send -i <handle>                # Send an outbound SMS/MMS
+  --to <e164[,e164...]>                     #   One recipient or a comma-separated group
+  --conversation-id <uuid>                  #   Reply into an existing conversation instead of --to
+  --text <body>                             #   Message body
+  --media-url <url>                         #   MMS media URL; repeat for multiple
 
 inkbox text list -i <handle>                # List text messages
   --limit <n>                               #   Max results (default: 50)
@@ -202,8 +205,9 @@ inkbox text get <text-id> -i <handle>       # Get a single text message
 inkbox text conversations -i <handle>       # List conversation summaries
   --limit <n>                               #   Max results (default: 50)
   --offset <n>                              #   Pagination offset (default: 0)
+  --include-groups                          #   Include group conversations
 
-inkbox text conversation <remote-number> -i <handle>  # Get messages in a conversation
+inkbox text conversation <conversation-key> -i <handle>  # Remote number or conversation UUID
   --limit <n>                               #   Max results (default: 50)
   --offset <n>                              #   Pagination offset (default: 0)
 
@@ -211,8 +215,8 @@ inkbox text search -i <handle>              # Search text messages
   -q, --query <query>                       #   Search query (required)
   --limit <n>                               #   Max results (default: 50)
 
-inkbox text mark-read <text-id> -i <handle>                # Mark a text as read
-inkbox text mark-conversation-read <remote-number> -i <handle>  # Mark conversation as read
+inkbox text mark-read <text-id> -i <handle>                     # Mark a text as read
+inkbox text mark-conversation-read <conversation-key> -i <handle>  # Mark conversation as read
 ```
 
 ### vault

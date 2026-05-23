@@ -20,6 +20,7 @@ import type {
   PhoneCallWithRateLimit,
   PhoneTranscript,
   TextConversationSummary,
+  TextConversationUpdateResult,
   TextMessage,
 } from "./phone/types.js";
 import type {
@@ -462,7 +463,7 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
 
   /**
-   * Send an outbound SMS from this identity's phone number.
+   * Send an outbound SMS/MMS from this identity's phone number.
    *
    * The returned message is in `queued` state. The full outbound
    * lifecycle (`text.sent` → `text.delivered` / `text.delivery_failed`
@@ -473,15 +474,24 @@ export class AgentIdentity {
    * eventTypes })`). See `TextWebhookEventType` and `TextWebhookPayload`
    * for the typed receiver-side shapes.
    *
-   * @param options.to - E.164 destination number (e.g. `"+15551234567"`).
-   * @param options.text - Message body (1-1600 chars).
+   * @param options.to - E.164 destination number, or numbers for a group send.
+   *   Mutually exclusive with `conversationId`.
+   * @param options.conversationId - Existing conversation UUID to reply into.
+   *   The server resolves it to that conversation's participants.
+   * @param options.text - Message body.
+   * @param options.mediaUrls - MMS media URLs.
    *
    * @throws {InkboxError} when this identity has no phone number.
    * @throws {RecipientBlockedError} when the destination is blocked by an
    *   outbound contact rule.
    * @throws {InkboxAPIError} for other send failures.
    */
-  async sendText(options: { to: string; text: string }): Promise<TextMessage> {
+  async sendText(options: {
+    to?: string | string[] | null;
+    conversationId?: string | null;
+    text?: string | null;
+    mediaUrls?: string[] | null;
+  }): Promise<TextMessage> {
     this._requirePhone();
     return this._inkbox._texts.send(this._phoneNumber!.id, options);
   }
@@ -521,7 +531,7 @@ export class AgentIdentity {
   }
 
   /**
-   * List text conversations (one row per remote number).
+   * List text conversations.
    *
    * Identity-scoped credentials never see blocked rows in conversation
    * summaries; admin/JWT can pass `isBlocked=false` to hide spam-only
@@ -532,27 +542,38 @@ export class AgentIdentity {
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isBlocked - Tri-state filter. `true` for only blocked,
    *   `false` for only non-blocked, omit for all.
+   * @param options.includeGroups - Include group conversations. Defaults to
+   *   false so old clients continue to see one-to-one rows only.
    */
   async listTextConversations(
-    options?: { limit?: number; offset?: number; isBlocked?: boolean },
+    options?: {
+      limit?: number;
+      offset?: number;
+      isBlocked?: boolean;
+      includeGroups?: boolean;
+    },
   ): Promise<TextConversationSummary[]> {
     this._requirePhone();
     return this._inkbox._texts.listConversations(this._phoneNumber!.id, options);
   }
 
   /**
-   * Get all messages with a specific remote number.
+   * Get all messages in a conversation.
    *
-   * @param remoteNumber - E.164 remote phone number.
+   * @param conversationKey - E.164 one-to-one remote number, or conversation UUID.
    * @param options.limit - Maximum number of results. Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    */
   async getTextConversation(
-    remoteNumber: string,
+    conversationKey: string,
     options?: { limit?: number; offset?: number },
   ): Promise<TextMessage[]> {
     this._requirePhone();
-    return this._inkbox._texts.getConversation(this._phoneNumber!.id, remoteNumber, options);
+    return this._inkbox._texts.getConversation(
+      this._phoneNumber!.id,
+      conversationKey,
+      options,
+    );
   }
 
   /**
@@ -570,16 +591,16 @@ export class AgentIdentity {
   /**
    * Mark all messages in a conversation as read.
    *
-   * @param remoteNumber - E.164 remote phone number.
-   * @returns Object with `remotePhoneNumber`, `isRead`, and `updatedCount`.
+   * @param conversationKey - E.164 one-to-one remote number, or conversation UUID.
+   * @returns Object with `conversationId`, `remotePhoneNumber`, `isRead`, and `updatedCount`.
    */
   async markTextConversationRead(
-    remoteNumber: string,
-  ): Promise<{ remotePhoneNumber: string; isRead: boolean; updatedCount: number }> {
+    conversationKey: string,
+  ): Promise<TextConversationUpdateResult> {
     this._requirePhone();
     return this._inkbox._texts.updateConversation(
       this._phoneNumber!.id,
-      remoteNumber,
+      conversationKey,
       { isRead: true },
     );
   }

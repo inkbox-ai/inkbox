@@ -10,7 +10,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - **Per-resource webhook URLs are gone for mail and phone-text events.** `Mailbox.webhook_url` / `webhookUrl` and `PhoneNumber.incoming_text_webhook_url` / `incomingTextWebhookUrl` were removed from every SDK type, builder, request body, and CLI flag. Sending the legacy fields server-side returns 422. Replace each with a row on the new `webhooks.subscriptions` resource.
 - **Phone-text and inbound-call webhook payloads — `contact` (singular) → `contacts` (plural) + new `agent_identities` list.** Always-present lists; both default to `[]` when nothing matches.
-- **`TextWebhookMessage.remote_phone_number` is now nullable** (`null` on group outbound rows, where per-recipient state lives in `recipients[]`). Mail payloads gained `data.agent_identities` alongside existing `data.contacts`.
 
 ### Added
 
@@ -19,12 +18,33 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   - Python: `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`.
   - CLI: `inkbox webhook subscription {list,get,create,update,delete}` with a repeatable `--event-type`.
   Each subscription names exactly one owner (mailbox **or** phone number), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently. `phone.incoming_call` is intentionally not subscribable; that URL stays on the phone number's `incomingCallWebhookUrl` because its response body controls call routing. The SDK mirrors all four server validators client-side so typos surface as a thrown error.
-- **`WebhookAgentIdentity`, `WebhookMailAgentIdentity`, `WebhookRecipient`** exported types covering identity matches and per-recipient group-text state.
-- **Group-text additions to `TextWebhookMessage`:** `conversation_id`, `sender_phone_number`, `recipients`. Plus top-level `data.recipient_phone_number` on `TextWebhookPayload` identifying which recipient an outbound lifecycle event is about.
+- **`WebhookAgentIdentity`, `WebhookMailAgentIdentity`** exported types covering identity matches on mail / text / call payloads.
+- Mail webhook payloads gained `data.agent_identities` alongside existing `data.contacts`.
 
-## 0.4.4
+## 0.4.5
 
 ### Added
+
+- **Conversation-centric text messaging support** across both SDKs,
+  CLI, and skills. Existing one-to-one methods remain valid, while
+  group-aware callers can now send to multiple recipients, include MMS
+  media URLs, reply into existing conversations with `conversation_id` /
+  `conversationId` / `--conversation-id`, list group conversations with
+  `include_groups` / `includeGroups` / `--include-groups`, and use
+  conversation UUIDs anywhere a remote-number conversation key was
+  accepted.
+- Text message responses now surface additive group fields:
+  `conversation_id` / `conversationId`, `sender_phone_number` /
+  `senderPhoneNumber`, and per-recipient delivery rows in
+  `recipients`. Legacy `remote_phone_number` remains populated for
+  one-to-one traffic and is `null` for group outbound rows.
+- Conversation summaries now include `latest_has_media` / `latestHasMedia`
+  so clients can distinguish actual attachments from carrier-level MMS
+  protocol labels.
+- **TypeScript users:** group rows can legitimately have no single remote
+  party, so `remotePhoneNumber` / `remote_phone_number` is now typed as
+  `string | null` on text messages, conversation summaries, webhook
+  messages, raw wire types, and conversation update results.
 
 - **Identity visibility controls** — manage which agent identities can see
   a given identity in API responses.

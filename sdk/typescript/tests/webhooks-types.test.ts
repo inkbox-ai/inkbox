@@ -13,10 +13,10 @@ import { describe, expect, it } from "vitest";
 import type {
   MailWebhookPayload,
   PhoneIncomingCallWebhookPayload,
+  RawTextMessageRecipient,
   TextWebhookPayload,
   WebhookMailContact,
   WebhookMailAgentIdentity,
-  WebhookRecipient,
 } from "../src/index.js";
 
 const FIXTURES_DIR = join(__dirname, "..", "..", "..", "tests", "fixtures", "webhook_payloads");
@@ -35,7 +35,7 @@ const EXPECTED_FIXTURES = [
   "text_delivered.json",
   "text_delivery_failed.json",
   "text_delivery_unconfirmed.json",
-  "text_group_outbound.json",
+  "text_group_delivered.json",
   "phone_incoming_call.json",
 ] as const;
 
@@ -154,7 +154,7 @@ describe("TextWebhookPayload", () => {
     "text_delivered.json",
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
-    "text_group_outbound.json",
+    "text_group_delivered.json",
   ] as const;
 
   it.each(textEvents)("parses %s into TextWebhookPayload", (file) => {
@@ -179,6 +179,11 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.text_message.sent_at).toBeTypeOf("string");
     expect(payload.data.text_message.failed_at).toBeTypeOf("string");
     expect(payload.data.text_message.delivered_at).toBeNull();
+    expect(payload.data.text_message.conversation_id).toBeTypeOf("string");
+    expect(payload.data.text_message.recipients).toHaveLength(1);
+    expect(payload.data.text_message.recipients?.[0].recipient_phone_number).toBe(
+      payload.data.text_message.remote_phone_number,
+    );
   });
 
   it("inbound text carries no lifecycle timestamps and recipients: null", () => {
@@ -189,6 +194,9 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.text_message.failed_at).toBeNull();
     expect(payload.data.text_message.recipients).toBeNull();
     expect(payload.data.text_message.remote_phone_number).toBeTypeOf("string");
+    expect(payload.data.text_message.sender_phone_number).toBe(
+      payload.data.text_message.remote_phone_number,
+    );
     expect(payload.data.recipient_phone_number).toBeNull();
     expect(payload.data.contacts).toHaveLength(1);
     expect(payload.data.contacts[0].id).toBeTypeOf("string");
@@ -203,21 +211,17 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.recipient_phone_number).toBeNull();
   });
 
-  it("group outbound: text_message.remote_phone_number is null, recipients[] is populated, and data.recipient_phone_number names the recipient", () => {
-    const payload = loadFixture<TextWebhookPayload>("text_group_outbound.json");
+  it("group lifecycle events identify the recipient that changed state", () => {
+    const payload = loadFixture<TextWebhookPayload>("text_group_delivered.json");
     const message = payload.data.text_message;
     expect(message.remote_phone_number).toBeNull();
-    expect(message.delivery_status).toBeNull();
-    expect(message.sent_at).toBeNull();
-    expect(message.delivered_at).toBeNull();
-    expect(message.failed_at).toBeNull();
-    expect(message.error_code).toBeNull();
-    expect(message.error_detail).toBeNull();
+    expect(message.type).toBe("mms");
+    expect(message.media).toHaveLength(1);
     expect(message.conversation_id).toBeTypeOf("string");
     expect(message.sender_phone_number).toBeTypeOf("string");
     expect(Array.isArray(message.recipients)).toBe(true);
     expect(message.recipients!.length).toBeGreaterThanOrEqual(2);
-    const required: (keyof WebhookRecipient)[] = [
+    const required: (keyof RawTextMessageRecipient)[] = [
       "recipient_phone_number",
       "delivery_status",
       "carrier",
@@ -233,7 +237,7 @@ describe("TextWebhookPayload", () => {
         expect(Object.prototype.hasOwnProperty.call(entry, key)).toBe(true);
       }
     }
-    expect(payload.data.recipient_phone_number).toBeTypeOf("string");
+    expect(payload.data.recipient_phone_number).toBe("+14155550999");
     expect(
       message.recipients!.map((r) => r.recipient_phone_number),
     ).toContain(payload.data.recipient_phone_number);

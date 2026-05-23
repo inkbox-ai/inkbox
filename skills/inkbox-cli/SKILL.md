@@ -204,21 +204,24 @@ All text commands are identity-scoped and require `-i <handle>`.
 **Outbound SMS limits and gates (current):**
 
 - Allowed only from **local** numbers, not toll-free.
-- **15 sends per phone number per rolling 24h.**
+- **100 recipient sends per phone number per rolling 24h.** A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - A freshly provisioned local number needs **~10-15 min** for 10DLC carrier propagation. Inspect with `inkbox number get <id>`; sending is gated until `smsStatus` reads `ready` (otherwise `409 sender_sms_pending`).
 - Recipient must have texted **`START`** to any number in the org. Unknown → `403 recipient_not_opted_in`. `STOP` → `403 recipient_opted_out`. Inspect / override consent state via `inkbox sms-opt-in` (see below).
+- **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-**Coming soon:** toll-free SMS sending, customer-managed 10DLC brands/campaigns (drastically higher per-number limits).
+Customer-managed 10DLC brands/campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
 ```bash
 inkbox text send -i <handle> --to +15551234567 --text "Hello from Inkbox"
+inkbox text send -i <handle> --to +15551234567,+15557654321 --text "Hello group" --media-url https://example.com/photo.jpg
+inkbox text send -i <handle> --conversation-id <conversation-uuid> --text "Reply all"
 inkbox text list -i <handle> --limit 20
 inkbox text get <text-id> -i <handle>
-inkbox text conversations -i <handle> --limit 20
-inkbox text conversation <remote-number> -i <handle> --limit 50
+inkbox text conversations -i <handle> --limit 20 --include-groups
+inkbox text conversation <conversation-key> -i <handle> --limit 50
 inkbox text search -i <handle> -q "invoice"
 inkbox text mark-read <text-id> -i <handle>
-inkbox text mark-conversation-read <remote-number> -i <handle>
+inkbox text mark-conversation-read <conversation-key> -i <handle>
 ```
 
 ## SMS Opt-Ins
@@ -427,10 +430,15 @@ any of:
   Not subscribable; URL stays on the phone-number resource as
   `incomingCallWebhookUrl`.
 
-Mail and text payloads carry `data.contacts` and `data.agent_identities`
-(both always-present lists; mail entries also carry `bucket` +
-`address`). Inbound-call payloads carry both lists at the top level.
-For the typed receiver-side shapes, see the SDK skills (`inkbox-ts`,
+Mail and text payloads carry `data.contacts` and
+`data.agent_identities` (both always-present lists; mail entries also
+carry `bucket` + `address`). Outbound mail payloads also include
+`data.message.bcc_addresses` (`null` on inbound). Group text events
+carry per-recipient delivery rows in `data.text_message.recipients`;
+per-recipient lifecycle events name the event target in
+`data.recipient_phone_number`. Inbound-call payloads carry `contacts`
+and `agent_identities` at the top level (no envelope). For the typed
+receiver-side shapes, see the SDK skills (`inkbox-ts`,
 `inkbox-python`).
 
 ## Practical Guidance

@@ -7,9 +7,11 @@ Tests for TextsResource.
 from uuid import UUID
 
 from sample_data import (
+    TEXT_CONVERSATION_GROUP_SUMMARY_DICT,
     TEXT_CONVERSATION_SUMMARY_DICT,
     TEXT_MESSAGE_BLOCKED_DICT,
     TEXT_MESSAGE_DICT,
+    TEXT_MESSAGE_GROUP_DICT,
     TEXT_MESSAGE_MMS_DICT,
     TEXT_MESSAGE_OUTBOUND_QUEUED_DICT,
 )
@@ -44,6 +46,43 @@ class TestTextsSend:
         assert msg.sent_at is None
         assert msg.delivered_at is None
         assert msg.failed_at is None
+        assert msg.conversation_id is not None
+        assert msg.sender_phone_number == "+18335794607"
+        assert msg.recipients is not None
+        assert msg.recipients[0].recipient_phone_number == REMOTE
+
+    def test_posts_group_mms_payload(self, client, transport):
+        transport.post.return_value = TEXT_MESSAGE_GROUP_DICT
+
+        msg = client._texts.send(
+            NUM_ID,
+            to=["+15551234567", "+15557654321"],
+            text="Hello group",
+            media_urls=["https://example.com/photo.jpg"],
+        )
+
+        transport.post.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts",
+            json={
+                "to": ["+15551234567", "+15557654321"],
+                "text": "Hello group",
+                "media_urls": ["https://example.com/photo.jpg"],
+            },
+        )
+        assert msg.remote_phone_number is None
+        assert msg.recipients is not None
+        assert len(msg.recipients) == 2
+
+    def test_posts_conversation_reply_payload(self, client, transport):
+        transport.post.return_value = TEXT_MESSAGE_GROUP_DICT
+        conv_id = "eeee1111-0000-0000-0000-0000000000fa"
+
+        client._texts.send(NUM_ID, conversation_id=conv_id, text="Reply all")
+
+        transport.post.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts",
+            json={"conversation_id": conv_id, "text": "Reply all"},
+        )
 
 
 class TestTextsList:
@@ -221,6 +260,24 @@ class TestTextsListConversations:
         assert convos[0].unread_count == 3
         assert convos[0].total_count == 15
         assert convos[0].latest_direction == "inbound"
+        assert convos[0].latest_has_media is False
+        assert convos[0].id is not None
+        assert convos[0].participants == [REMOTE]
+        assert convos[0].is_group is False
+
+    def test_list_conversations_can_include_groups(self, client, transport):
+        transport.get.return_value = [TEXT_CONVERSATION_GROUP_SUMMARY_DICT]
+
+        convos = client._texts.list_conversations(NUM_ID, include_groups=True)
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts/conversations",
+            params={"limit": 50, "offset": 0, "include_groups": True},
+        )
+        assert convos[0].remote_phone_number is None
+        assert convos[0].is_group is True
+        assert convos[0].latest_has_media is True
+        assert convos[0].participants == ["+15551234567", "+15557654321"]
 
     def test_list_conversations_is_blocked_false(self, client, transport):
         """is_blocked=False hides spam-only counterparties + stops blocked previews from bumping."""
@@ -262,6 +319,7 @@ class TestTextsUpdateConversation:
     def test_mark_conversation_read(self, client, transport):
         transport.patch.return_value = {
             "remote_phone_number": REMOTE,
+            "conversation_id": "eeee1111-0000-0000-0000-000000000001",
             "is_read": True,
             "updated_count": 5,
         }
@@ -272,4 +330,6 @@ class TestTextsUpdateConversation:
             f"/numbers/{NUM_ID}/texts/conversations/{REMOTE}",
             json={"is_read": True},
         )
-        assert result["updated_count"] == 5
+        assert result.updated_count == 5
+        assert str(result.conversation_id) == "eeee1111-0000-0000-0000-000000000001"
+        assert result.remote_phone_number == REMOTE

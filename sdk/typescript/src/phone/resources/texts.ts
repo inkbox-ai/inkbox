@@ -8,6 +8,7 @@ import { HttpTransport } from "../../_http.js";
 import {
   TextMessage,
   TextConversationSummary,
+  TextConversationUpdateResult,
   RawTextMessage,
   RawTextConversationSummary,
   parseTextMessage,
@@ -18,7 +19,7 @@ export class TextsResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
-   * Send an outbound SMS from a phone number.
+   * Send an outbound SMS/MMS from a phone number.
    *
    * The returned message is in `queued` state. The full outbound
    * lifecycle (`text.sent` → `text.delivered` / `text.delivery_failed`
@@ -29,8 +30,12 @@ export class TextsResource {
    * `TextWebhookPayload` for the typed receiver-side shapes.
    *
    * @param phoneNumberId - UUID of the sending phone number.
-   * @param options.to - E.164 destination number.
-   * @param options.text - Message body (1-1600 chars, non-whitespace required).
+   * @param options.to - E.164 destination number, or numbers for a group send.
+   *   Mutually exclusive with `conversationId`.
+   * @param options.conversationId - Existing conversation UUID to reply into.
+   *   The server resolves it to that conversation's participants.
+   * @param options.text - Message body.
+   * @param options.mediaUrls - MMS media URLs.
    *
    * @throws {RecipientBlockedError} when the destination is blocked by an
    *   outbound contact rule on the sender.
@@ -39,12 +44,34 @@ export class TextsResource {
    */
   async send(
     phoneNumberId: string,
-    options: { to: string; text: string },
+    options: {
+      to?: string | string[] | null;
+      conversationId?: string | null;
+      text?: string | null;
+      mediaUrls?: string[] | null;
+    },
   ): Promise<TextMessage> {
-    // Sender is selected by path param, not body.
+    const body: {
+      to?: string | string[];
+      conversation_id?: string;
+      text?: string;
+      media_urls?: string[];
+    } = {};
+    if (options.to != null) {
+      body.to = options.to;
+    }
+    if (options.conversationId != null) {
+      body.conversation_id = options.conversationId;
+    }
+    if (options.text != null) {
+      body.text = options.text;
+    }
+    if (options.mediaUrls != null) {
+      body.media_urls = options.mediaUrls;
+    }
     const data = await this.http.post<RawTextMessage>(
       `/numbers/${phoneNumberId}/texts`,
-      { to: options.to, text: options.text },
+      body,
     );
     return parseTextMessage(data);
   }
@@ -157,7 +184,7 @@ export class TextsResource {
   }
 
   /**
-   * List conversations (one row per remote number) with latest message preview.
+   * List conversations with latest message preview.
    *
    * Identity-scoped API keys never see blocked rows in conversation
    * summaries; admin/JWT callers can pass `isBlocked=false` to hide
@@ -171,10 +198,17 @@ export class TextsResource {
    * @param options.isBlocked - Tri-state filter applied to the
    *   underlying messages. `true` for only blocked, `false` for only
    *   non-blocked, omit for all.
+   * @param options.includeGroups - Include group conversations. Defaults to
+   *   false so old clients continue to see one-to-one rows only.
    */
   async listConversations(
     phoneNumberId: string,
-    options?: { limit?: number; offset?: number; isBlocked?: boolean },
+    options?: {
+      limit?: number;
+      offset?: number;
+      isBlocked?: boolean;
+      includeGroups?: boolean;
+    },
   ): Promise<TextConversationSummary[]> {
     const params: Record<string, string | number | boolean> = {
       limit: options?.limit ?? 50,
@@ -182,6 +216,9 @@ export class TextsResource {
     };
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
+    }
+    if (options?.includeGroups) {
+      params["include_groups"] = true;
     }
     const data = await this.http.get<RawTextConversationSummary[]>(
       `/numbers/${phoneNumberId}/texts/conversations`,
@@ -191,20 +228,20 @@ export class TextsResource {
   }
 
   /**
-   * Get all messages with a specific remote number, newest first.
+   * Get all messages in a conversation, newest first.
    *
    * @param phoneNumberId - UUID of the phone number.
-   * @param remoteNumber - E.164 remote phone number.
+   * @param conversationKey - E.164 one-to-one remote number, or conversation UUID.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    */
   async getConversation(
     phoneNumberId: string,
-    remoteNumber: string,
+    conversationKey: string,
     options?: { limit?: number; offset?: number },
   ): Promise<TextMessage[]> {
     const data = await this.http.get<RawTextMessage[]>(
-      `/numbers/${phoneNumberId}/texts/conversations/${remoteNumber}`,
+      `/numbers/${phoneNumberId}/texts/conversations/${conversationKey}`,
       { limit: options?.limit ?? 50, offset: options?.offset ?? 0 },
     );
     return data.map(parseTextMessage);
@@ -214,25 +251,27 @@ export class TextsResource {
    * Update the read state for all messages in a conversation.
    *
    * @param phoneNumberId - UUID of the phone number.
-   * @param remoteNumber - E.164 remote phone number.
+   * @param conversationKey - E.164 one-to-one remote number, or conversation UUID.
    * @param options.isRead - Mark all messages as read or unread.
-   * @returns Object with `remotePhoneNumber`, `isRead`, and `updatedCount`.
+   * @returns Object with `conversationId`, `remotePhoneNumber`, `isRead`, and `updatedCount`.
    */
   async updateConversation(
     phoneNumberId: string,
-    remoteNumber: string,
+    conversationKey: string,
     options: { isRead: boolean },
-  ): Promise<{ remotePhoneNumber: string; isRead: boolean; updatedCount: number }> {
+  ): Promise<TextConversationUpdateResult> {
     const data = await this.http.patch<{
-      remote_phone_number: string;
+      remote_phone_number?: string | null;
+      conversation_id?: string | null;
       is_read: boolean;
       updated_count: number;
     }>(
-      `/numbers/${phoneNumberId}/texts/conversations/${remoteNumber}`,
+      `/numbers/${phoneNumberId}/texts/conversations/${conversationKey}`,
       { is_read: options.isRead },
     );
     return {
-      remotePhoneNumber: data.remote_phone_number,
+      remotePhoneNumber: data.remote_phone_number ?? null,
+      conversationId: data.conversation_id ?? null,
       isRead: data.is_read,
       updatedCount: data.updated_count,
     };
