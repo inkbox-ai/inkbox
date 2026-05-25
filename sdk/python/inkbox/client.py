@@ -46,10 +46,7 @@ from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.tunnels.resources.tunnels import TunnelsResource
-from inkbox.webhook_subscriptions import (
-    WebhookSubscription,
-    WebhookSubscriptionsResource,
-)
+from inkbox.webhook_subscriptions import WebhookSubscriptionsResource
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
