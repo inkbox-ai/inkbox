@@ -19,7 +19,7 @@
       "delivered_at": "2026-04-10T18:25:14.318Z",
       "failed_at": null,
       "conversation_id": "aaaaaaaa-1111-2222-3333-444444444444",
-      "sender_phone_number": "+14155550100",
+      "sender_phone_number": null,
       "recipients": [
         {
           "recipient_phone_number": "+14155550999",

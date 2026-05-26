@@ -47,7 +47,9 @@ class TestTextsSend:
         assert msg.delivered_at is None
         assert msg.failed_at is None
         assert msg.conversation_id is not None
-        assert msg.sender_phone_number == "+18335794607"
+        # Outbound rows carry sender_phone_number=None; the implicit sender is
+        # the local phone number. Only inbound rows have a non-null sender.
+        assert msg.sender_phone_number is None
         assert msg.recipients is not None
         assert msg.recipients[0].recipient_phone_number == REMOTE
 

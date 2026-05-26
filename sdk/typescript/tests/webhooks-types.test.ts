@@ -218,7 +218,9 @@ describe("TextWebhookPayload", () => {
     expect(message.type).toBe("mms");
     expect(message.media).toHaveLength(1);
     expect(message.conversation_id).toBeTypeOf("string");
-    expect(message.sender_phone_number).toBeTypeOf("string");
+    // Outbound rows carry sender_phone_number=null; the implicit sender is
+    // local_phone_number. Inbound rows are the only ones with a non-null sender.
+    expect(message.sender_phone_number).toBeNull();
     expect(Array.isArray(message.recipients)).toBe(true);
     expect(message.recipients!.length).toBeGreaterThanOrEqual(2);
     const required: (keyof RawTextMessageRecipient)[] = [

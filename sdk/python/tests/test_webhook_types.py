@@ -254,7 +254,9 @@ def test_text_group_lifecycle_identifies_recipient_that_changed_state():
     assert text["media"] is not None
     assert len(text["media"]) == 1
     assert isinstance(text["conversation_id"], str)
-    assert isinstance(text["sender_phone_number"], str)
+    # Outbound rows carry sender_phone_number=null; the implicit sender is
+    # local_phone_number. Inbound rows are the only ones with a non-null sender.
+    assert text["sender_phone_number"] is None
     recipients = text["recipients"]
     assert isinstance(recipients, list)
     assert len(recipients) >= 2

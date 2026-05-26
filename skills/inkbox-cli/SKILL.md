@@ -435,11 +435,14 @@ Mail and text payloads carry `data.contacts` and
 carry `bucket` + `address`). Outbound mail payloads also include
 `data.message.bcc_addresses` (`null` on inbound). Group text events
 carry per-recipient delivery rows in `data.text_message.recipients`;
-per-recipient lifecycle events name the event target in
-`data.recipient_phone_number`. Inbound-call payloads carry `contacts`
-and `agent_identities` at the top level (no envelope). For the typed
-receiver-side shapes, see the SDK skills (`inkbox-ts`,
-`inkbox-python`).
+**outbound group lifecycle** events name the event target in
+`data.recipient_phone_number` (one webhook per recipient leg). Inbound
+and outbound 1:1 events leave `data.recipient_phone_number` as `null`
+— the singular peer is already in `data.text_message.remote_phone_number`
+(inbound) or `data.text_message.recipients[0]` (outbound 1:1).
+Inbound-call payloads carry `contacts` and `agent_identities` at the
+top level (no envelope). For the typed receiver-side shapes, see the
+SDK skills (`inkbox-ts`, `inkbox-python`).
 
 ## Practical Guidance
 

@@ -226,7 +226,7 @@ export const RAW_TEXT_MESSAGE_OUTBOUND_QUEUED = {
   delivered_at: null,
   failed_at: null,
   conversation_id: "eeee1111-0000-0000-0000-000000000001",
-  sender_phone_number: "+18335794607",
+  sender_phone_number: null,
   recipients: [
     {
       recipient_phone_number: "+15551234567",

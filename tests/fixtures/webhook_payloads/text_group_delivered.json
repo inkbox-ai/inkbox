@@ -25,7 +25,7 @@
       "delivered_at": "2026-04-10T18:26:14.318Z",
       "failed_at": null,
       "conversation_id": "bbbbbbbb-1111-2222-3333-444444444444",
-      "sender_phone_number": "+14155550100",
+      "sender_phone_number": null,
       "recipients": [
         {
           "recipient_phone_number": "+14155550999",
@@ -40,13 +40,13 @@
         },
         {
           "recipient_phone_number": "+14155550888",
-          "delivery_status": "sent",
+          "delivery_status": "delivered",
           "carrier": null,
           "line_type": null,
           "error_code": null,
           "error_detail": null,
           "sent_at": "2026-04-10T18:26:01.118Z",
-          "delivered_at": null,
+          "delivered_at": "2026-04-10T18:26:14.318Z",
           "failed_at": null
         }
       ],
