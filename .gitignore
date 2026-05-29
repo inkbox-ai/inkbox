@@ -19,7 +19,7 @@ coverage/
 *.js.map
 *.ts.map
 package-lock.json
-# Python testing and linting
+# Python testing asnd linting
 .pytest_cache/
 .ruff_cache/
 .coverage

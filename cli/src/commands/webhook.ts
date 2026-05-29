@@ -1,8 +1,161 @@
 import { Command } from "commander";
-import { getGlobalOpts } from "../client.js";
+import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import { verifyWebhook } from "@inkbox/sdk";
+import type { WebhookSubscription } from "@inkbox/sdk";
+
+const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
+  "id",
+  "mailboxId",
+  "phoneNumberId",
+  "url",
+  "eventTypes",
+  "status",
+  "createdAt",
+];
+
+function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
+  return {
+    id: sub.id,
+    organizationId: sub.organizationId,
+    mailboxId: sub.mailboxId,
+    phoneNumberId: sub.phoneNumberId,
+    url: sub.url,
+    eventTypes: sub.eventTypes.join(", "),
+    status: sub.status,
+    createdAt: sub.createdAt,
+    updatedAt: sub.updatedAt,
+  };
+}
+
+function registerSubscriptionCommands(parent: Command): void {
+  const sub = parent
+    .command("subscription")
+    .description("Manage webhook subscriptions (fan-out per (owner, url, event_types))");
+
+  sub
+    .command("list")
+    .description("List webhook subscriptions in the caller's org (filters AND-combine)")
+    .option("--mailbox-id <id>", "Filter by owning mailbox id")
+    .option("--phone-number-id <id>", "Filter by owning phone number id")
+    .option("--url <url>", "Filter by destination URL (exact match)")
+    .option("--event-type <type>", "Filter by event type wire value")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          mailboxId?: string;
+          phoneNumberId?: string;
+          url?: string;
+          eventType?: string;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const subs = await inkbox.webhooks.subscriptions.list({
+          mailboxId: cmdOpts.mailboxId,
+          phoneNumberId: cmdOpts.phoneNumberId,
+          url: cmdOpts.url,
+          eventType: cmdOpts.eventType,
+        });
+        output(subs.map(flattenForOutput), {
+          json: !!opts.json,
+          columns: WEBHOOK_SUBSCRIPTION_LIST_COLUMNS,
+        });
+      }),
+    );
+
+  sub
+    .command("get <sub-id>")
+    .description("Get a webhook subscription by id")
+    .action(
+      withErrorHandler(async function (this: Command, subId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const row = await inkbox.webhooks.subscriptions.get(subId);
+        output(flattenForOutput(row), { json: !!opts.json });
+      }),
+    );
+
+  sub
+    .command("create")
+    .description("Create a webhook subscription. Exactly one of --mailbox-id / --phone-number-id is required.")
+    .option("--mailbox-id <id>", "Owning mailbox id")
+    .option("--phone-number-id <id>", "Owning phone number id")
+    .requiredOption("--url <url>", "HTTPS destination for delivered events")
+    .requiredOption(
+      "--event-type <type>",
+      "Event type to subscribe (repeatable; at least one required)",
+      (val: string, acc: string[]) => {
+        acc.push(val);
+        return acc;
+      },
+      [] as string[],
+    )
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          mailboxId?: string;
+          phoneNumberId?: string;
+          url: string;
+          eventType: string[];
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const row = await inkbox.webhooks.subscriptions.create({
+          mailboxId: cmdOpts.mailboxId,
+          phoneNumberId: cmdOpts.phoneNumberId,
+          url: cmdOpts.url,
+          eventTypes: cmdOpts.eventType,
+        });
+        output(flattenForOutput(row), { json: !!opts.json });
+      }),
+    );
+
+  sub
+    .command("update <sub-id>")
+    .description("Update url and/or event_types on a subscription. --event-type replaces the stored list.")
+    .option("--url <url>", "New HTTPS destination")
+    .option(
+      "--event-type <type>",
+      "Event type to subscribe (repeatable; presence replaces stored list)",
+      (val: string, acc: string[] | undefined) => {
+        return acc === undefined ? [val] : [...acc, val];
+      },
+      // intentionally no default: undefined distinguishes "not provided"
+      // from "explicitly empty" (the latter is invalid and the SDK throws).
+    )
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        subId: string,
+        cmdOpts: { url?: string; eventType?: string[] },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const body: { url?: string; eventTypes?: string[] } = {};
+        if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
+        if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
+        const row = await inkbox.webhooks.subscriptions.update(subId, body);
+        output(flattenForOutput(row), { json: !!opts.json });
+      }),
+    );
+
+  sub
+    .command("delete <sub-id>")
+    .description("Remove a webhook subscription")
+    .action(
+      withErrorHandler(async function (this: Command, subId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        await inkbox.webhooks.subscriptions.delete(subId);
+        console.log(`Deleted webhook subscription '${subId}'.`);
+      }),
+    );
+}
 
 export function registerWebhookCommands(program: Command): void {
   const webhook = program
@@ -61,4 +214,6 @@ export function registerWebhookCommands(program: Command): void {
         }
       }),
     );
+
+  registerSubscriptionCommands(webhook);
 }

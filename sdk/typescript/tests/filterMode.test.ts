@@ -15,7 +15,6 @@ const MAILBOX_DICT = {
   id: "aaaa1111-0000-0000-0000-000000000001",
   email_address: "box@inkbox.ai",
   display_name: "Agent",
-  webhook_url: null,
   agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   created_at: "2026-04-20T00:00:00Z",
   updated_at: "2026-04-20T00:00:00Z",

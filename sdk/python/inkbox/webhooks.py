@@ -100,13 +100,23 @@ class RateLimitInfoWire(TypedDict):
 
 class WebhookContact(TypedDict):
     """
-    Address-book match for the single remote party on a phone or text
-    webhook event. Optional -- ``None`` means no contact visible to the
-    receiving identity. Pass ``id`` to ``inkbox.contacts.get()`` to
-    hydrate.
+    Address-book match for a remote party on a phone or text webhook
+    event. Surfaced as a list -- pass ``id`` to
+    ``inkbox.contacts.get()`` to hydrate.
     """
     id: str
     name: str
+
+
+class WebhookAgentIdentity(TypedDict):
+    """
+    Identity match for a remote party on a phone or text webhook
+    event. Set when the remote party is an active agent identity in
+    the same org that is visible to the receiver.
+    """
+    id: str
+    agent_handle: str
+    display_name: str | None
 
 
 # ---- Mail ________________________________________________________________
@@ -121,7 +131,7 @@ MailWebhookEventType = Literal[
 ]
 
 MailContactBucket = Literal["from", "to", "cc", "bcc"]
-"""Which recipient list a mail webhook contact was matched from."""
+"""Which recipient list a mail webhook contact/identity was matched from."""
 
 
 class WebhookMailContact(TypedDict):
@@ -142,6 +152,19 @@ class WebhookMailContact(TypedDict):
     address: str
     id: str
     name: str
+
+
+class WebhookMailAgentIdentity(TypedDict):
+    """
+    Per-recipient identity match on a mail webhook event. Same shape
+    as ``WebhookMailContact`` but with ``agent_handle`` /
+    ``display_name`` instead of ``name``.
+    """
+    bucket: MailContactBucket
+    address: str
+    id: str
+    agent_handle: str
+    display_name: str | None
 
 
 class MailWebhookMessage(TypedDict):
@@ -171,15 +194,16 @@ class MailWebhookData(TypedDict):
     """
     Wrapper under ``MailWebhookPayload.data``.
 
-    ``contacts`` is always present, possibly empty. Wire order is
-    ``from`` -> ``to`` -> ``cc`` -> ``bcc``, then within each bucket by
-    source-field order; receivers should pair by ``(bucket, address)``
-    rather than relying on the order. Up to 50 distinct normalized
-    addresses are resolved per event; over-cap inputs and resolver
-    failures both fall back to an empty list.
+    ``contacts`` and ``agent_identities`` are both always present,
+    possibly empty. Wire order is ``from`` -> ``to`` -> ``cc`` ->
+    ``bcc``, then within each bucket by source-field order; receivers
+    should pair by ``(bucket, address)`` rather than relying on the
+    order. A peer can match both a contact and an agent identity --
+    two rows are emitted; receivers decide precedence.
     """
     message: MailWebhookMessage
     contacts: list[WebhookMailContact]
+    agent_identities: list[WebhookMailAgentIdentity]
 
 
 class MailWebhookPayload(TypedDict):
@@ -201,8 +225,21 @@ TextWebhookEventType = Literal[
 
 class TextWebhookMessage(TypedDict):
     """
-    Stored text message. ``is_blocked`` is not part of the wire body --
-    blocked texts never reach the webhook.
+    Stored text message. ``is_blocked`` is not part of the wire body
+    -- blocked texts never reach the webhook.
+
+    Field population by traffic shape:
+      * ``remote_phone_number``: populated on inbound and on outbound
+        1:1; ``None`` on group outbound (per-recipient state lives in
+        ``recipients``).
+      * ``delivery_status``: populated on outbound. On group outbound this
+        is the message-level rollup across ``recipients``; on inbound it
+        is ``None``.
+      * Legacy top-level lifecycle details (``error_code``,
+        ``error_detail``, ``sent_at``, ``delivered_at``, ``failed_at``):
+        populated only on outbound 1:1. On group outbound the
+        per-recipient values live in ``recipients``; on inbound there
+        is no carrier lifecycle to track, so all five are ``None``.
     """
     id: str
     direction: TextDirectionWire
@@ -228,7 +265,8 @@ class TextWebhookMessage(TypedDict):
 
 class TextWebhookData(TypedDict):
     text_message: TextWebhookMessage
-    contact: WebhookContact | None
+    contacts: list[WebhookContact]
+    agent_identities: list[WebhookAgentIdentity]
     recipient_phone_number: str | None
 
 
@@ -243,9 +281,9 @@ class TextWebhookPayload(TypedDict):
 class PhoneIncomingCallWebhookPayload(TypedDict):
     """
     Inbound call payload. **Flat** -- no ``{event_type, timestamp,
-    data}`` envelope; ``contact`` sits at the top level. ``is_blocked``
-    is not part of the wire body -- blocked calls never reach the
-    webhook.
+    data}`` envelope; ``contacts`` / ``agent_identities`` sit at the
+    top level. ``is_blocked`` is not part of the wire body -- blocked
+    calls never reach the webhook.
     """
     id: str
     local_phone_number: str
@@ -261,4 +299,5 @@ class PhoneIncomingCallWebhookPayload(TypedDict):
     created_at: str
     updated_at: str
     rate_limit: RateLimitInfoWire | None
-    contact: WebhookContact | None
+    contacts: list[WebhookContact]
+    agent_identities: list[WebhookAgentIdentity]

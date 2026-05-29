@@ -32,7 +32,6 @@ export interface IdentityPhoneNumberCreateOptions {
   incomingCallAction?: string;
   clientWebsocketUrl?: string;
   incomingCallWebhookUrl?: string;
-  incomingTextWebhookUrl?: string;
 }
 
 export interface IdentityTunnelCreateOptions {
@@ -69,8 +68,6 @@ export interface IdentityMailbox {
    * Either the platform default or a verified custom domain.
    */
   sendingDomain: string;
-  /** HTTPS webhook URL for mail events, or `null` if not configured. */
-  webhookUrl: string | null;
   filterMode: FilterMode;
   /**
    * UUID of the owning agent identity. Non-null for live customer
@@ -98,7 +95,6 @@ export interface IdentityPhoneNumber {
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
-  incomingTextWebhookUrl: string | null;
   filterMode: FilterMode;
   /**
    * 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`);
@@ -160,7 +156,6 @@ export interface RawIdentityMailbox {
   id: string;
   email_address: string;
   sending_domain?: string;
-  webhook_url?: string | null;
   filter_mode?: string;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
@@ -180,7 +175,6 @@ export interface RawIdentityPhoneNumber {
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_call_webhook_url?: string | null;
-  incoming_text_webhook_url: string | null;
   filter_mode?: string;
   state?: string | null;
   agent_identity_id?: string | null;
@@ -220,7 +214,6 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
     id: r.id,
     emailAddress: r.email_address,
     sendingDomain: r.sending_domain ?? r.email_address.split("@")[1] ?? "",
-    webhookUrl: r.webhook_url ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
@@ -244,7 +237,6 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url ?? null,
-    incomingTextWebhookUrl: r.incoming_text_webhook_url ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     state: r.state ?? null,
     agentIdentityId: r.agent_identity_id ?? null,
@@ -323,7 +315,6 @@ export function identityPhoneNumberCreateOptionsToWire(
   if (options.incomingCallAction !== undefined) body["incoming_call_action"] = options.incomingCallAction;
   if (options.clientWebsocketUrl !== undefined) body["client_websocket_url"] = options.clientWebsocketUrl;
   if (options.incomingCallWebhookUrl !== undefined) body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
-  if (options.incomingTextWebhookUrl !== undefined) body["incoming_text_webhook_url"] = options.incomingTextWebhookUrl;
   return body;
 }
 

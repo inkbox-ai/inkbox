@@ -57,7 +57,9 @@ describe("TextsResource.send", () => {
     expect(msg.deliveredAt).toBeNull();
     expect(msg.failedAt).toBeNull();
     expect(msg.conversationId).toBe("eeee1111-0000-0000-0000-000000000001");
-    expect(msg.senderPhoneNumber).toBe("+18335794607");
+    // Outbound rows carry senderPhoneNumber=null; the implicit sender is the
+    // local phone number. Only inbound rows have a non-null sender.
+    expect(msg.senderPhoneNumber).toBeNull();
     expect(msg.recipients).toHaveLength(1);
     expect(msg.recipients?.[0].recipientPhoneNumber).toBe(REMOTE);
   });

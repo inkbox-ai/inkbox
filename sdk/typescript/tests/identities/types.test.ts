@@ -48,7 +48,6 @@ describe("parseIdentityMailbox", () => {
     const m = parseIdentityMailbox(RAW_IDENTITY_MAILBOX);
     expect(m.id).toBe(RAW_IDENTITY_MAILBOX.id);
     expect(m.emailAddress).toBe("sales-agent@inkbox.ai");
-    expect(m.webhookUrl).toBeNull();
     expect(m.agentIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
     expect(m.createdAt).toBeInstanceOf(Date);
     expect(m.updatedAt).toBeInstanceOf(Date);
@@ -67,13 +66,6 @@ describe("parseIdentityMailbox", () => {
     expect(m.sendingDomain).toBe("inkbox.ai");
   });
 
-  it("parses webhook_url when set", () => {
-    const m = parseIdentityMailbox({
-      ...RAW_IDENTITY_MAILBOX,
-      webhook_url: "https://example.com/mail",
-    });
-    expect(m.webhookUrl).toBe("https://example.com/mail");
-  });
 });
 
 describe("identityMailboxCreateOptionsToWire", () => {
@@ -109,18 +101,9 @@ describe("parseIdentityPhoneNumber", () => {
     expect(p.incomingCallAction).toBe("auto_reject");
     expect(p.clientWebsocketUrl).toBeNull();
     expect(p.incomingCallWebhookUrl).toBeNull();
-    expect(p.incomingTextWebhookUrl).toBeNull();
     expect(p.state).toBeNull();
     expect(p.agentIdentityId).toBe("eeee5555-0000-0000-0000-000000000001");
     expect(p.createdAt).toBeInstanceOf(Date);
-  });
-
-  it("parses incomingTextWebhookUrl", () => {
-    const p = parseIdentityPhoneNumber({
-      ...RAW_IDENTITY_PHONE,
-      incoming_text_webhook_url: "https://example.com/texts",
-    });
-    expect(p.incomingTextWebhookUrl).toBe("https://example.com/texts");
   });
 
   it("parses incomingCallWebhookUrl", () => {

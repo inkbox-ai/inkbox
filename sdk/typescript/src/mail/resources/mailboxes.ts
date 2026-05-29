@@ -43,23 +43,19 @@ export class MailboxesResource {
    * Update mutable mailbox fields.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
-   * Pass `webhookUrl: null` to unsubscribe from webhooks.
+   * To attach a webhook receiver, use
+   * `inkbox.webhooks.subscriptions.create({ mailboxId, url, eventTypes })`.
    *
    * @param emailAddress - Full email address of the mailbox to update.
-   * @param options.webhookUrl - HTTPS URL to receive webhook events, or `null` to unsubscribe.
    * @param options.filterMode - Contact-rule filter mode. Mutation requires an admin-scoped key.
    */
   async update(
     emailAddress: string,
     options: {
-      webhookUrl?: string | null;
       filterMode?: FilterMode;
     },
   ): Promise<Mailbox> {
     const body: Record<string, unknown> = {};
-    if ("webhookUrl" in options) {
-      body["webhook_url"] = options.webhookUrl;
-    }
     if (options.filterMode !== undefined) {
       body["filter_mode"] = options.filterMode;
     }

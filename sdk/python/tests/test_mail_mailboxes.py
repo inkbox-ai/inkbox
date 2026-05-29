@@ -70,30 +70,16 @@ class TestMailboxParseSendingDomain:
 
 
 class TestMailboxesUpdate:
-    def test_update_webhook_url_and_filter_mode(self):
+    def test_update_filter_mode(self):
         res, http = _resource()
         http.patch.return_value = MAILBOX_DICT
         uid = "aaaa1111-0000-0000-0000-000000000001"
 
-        res.update(uid, webhook_url="https://hooks.example/x", filter_mode=FilterMode.WHITELIST)
+        res.update(uid, filter_mode=FilterMode.WHITELIST)
 
         http.patch.assert_called_once_with(
             f"/mailboxes/{uid}",
-            json={
-                "webhook_url": "https://hooks.example/x",
-                "filter_mode": "whitelist",
-            },
-        )
-
-    def test_update_webhook_url_null_to_clear(self):
-        res, http = _resource()
-        http.patch.return_value = MAILBOX_DICT
-        uid = "aaaa1111-0000-0000-0000-000000000001"
-
-        res.update(uid, webhook_url=None)
-
-        http.patch.assert_called_once_with(
-            f"/mailboxes/{uid}", json={"webhook_url": None},
+            json={"filter_mode": "whitelist"},
         )
 
     def test_update_omits_none_fields(self):

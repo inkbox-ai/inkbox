@@ -60,7 +60,6 @@ class TestIdentitiesCreate:
                 state="NY",
                 incoming_call_action="webhook",
                 incoming_call_webhook_url="https://example.com/calls",
-                incoming_text_webhook_url="https://example.com/texts",
             ),
             vault_secret_ids=[
                 UUID("11111111-1111-1111-1111-111111111111"),
@@ -83,7 +82,6 @@ class TestIdentitiesCreate:
                     "state": "NY",
                     "incoming_call_action": "webhook",
                     "incoming_call_webhook_url": "https://example.com/calls",
-                    "incoming_text_webhook_url": "https://example.com/texts",
                 },
                 "vault_secret_ids": [
                     "11111111-1111-1111-1111-111111111111",

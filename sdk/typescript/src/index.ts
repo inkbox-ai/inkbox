@@ -35,6 +35,8 @@ export { verifyWebhook } from "./signing_keys.js";
 export type {
   WebhookContact,
   WebhookMailContact,
+  WebhookAgentIdentity,
+  WebhookMailAgentIdentity,
   MailContactBucket,
   MailWebhookPayload,
   MailWebhookEventType,
@@ -53,6 +55,14 @@ export type {
   HangupReasonWire,
   CallDirectionWire,
 } from "./webhooks/types.js";
+export type {
+  WebhookSubscription,
+  WebhookSubscriptionStatus,
+  CreateWebhookSubscriptionOptions,
+  UpdateWebhookSubscriptionOptions,
+  ListWebhookSubscriptionsOptions,
+} from "./webhooks/subscriptions.js";
+export type { WebhookSubscriptionsResource } from "./webhooks/subscriptions.js";
 // Snake_case wire shapes referenced by the webhook payload types above.
 // Re-exported from the root entry because package.json#exports only
 // publishes `"."` and `"./tunnels/connect"` — deep imports of

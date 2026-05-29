@@ -85,7 +85,6 @@ class IdentityPhoneNumberCreateOptions:
         incoming_call_action: How to handle inbound calls on the provisioned number.
         client_websocket_url: WebSocket URL for ``"auto_accept"`` call handling.
         incoming_call_webhook_url: Webhook URL for ``"webhook"`` call handling.
-        incoming_text_webhook_url: Webhook URL for inbound text notifications.
     """
 
     type: str = "toll_free"
@@ -93,7 +92,6 @@ class IdentityPhoneNumberCreateOptions:
     incoming_call_action: str = "auto_reject"
     client_websocket_url: str | None = None
     incoming_call_webhook_url: str | None = None
-    incoming_text_webhook_url: str | None = None
 
     def to_wire(self) -> dict[str, Any]:
         """Return a JSON-serializable dict matching the API schema."""
@@ -114,8 +112,6 @@ class IdentityPhoneNumberCreateOptions:
             body["client_websocket_url"] = self.client_websocket_url
         if self.incoming_call_webhook_url is not None:
             body["incoming_call_webhook_url"] = self.incoming_call_webhook_url
-        if self.incoming_text_webhook_url is not None:
-            body["incoming_text_webhook_url"] = self.incoming_text_webhook_url
         return body
 
 
@@ -146,7 +142,6 @@ class IdentityMailbox:
 
     id: UUID
     email_address: str
-    webhook_url: str | None
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
@@ -166,7 +161,6 @@ class IdentityMailbox:
             id=UUID(d["id"]),
             email_address=d["email_address"],
             sending_domain=sending_domain,
-            webhook_url=d.get("webhook_url"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
@@ -197,7 +191,6 @@ class IdentityPhoneNumber:
     incoming_call_action: str
     client_websocket_url: str | None
     incoming_call_webhook_url: str | None
-    incoming_text_webhook_url: str | None
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
@@ -225,7 +218,6 @@ class IdentityPhoneNumber:
             incoming_call_action=d["incoming_call_action"],
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
-            incoming_text_webhook_url=d.get("incoming_text_webhook_url"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),

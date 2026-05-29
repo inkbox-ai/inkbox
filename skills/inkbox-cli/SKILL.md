@@ -289,7 +289,9 @@ Mailboxes are provisioned atomically by `inkbox identity create` and removed by 
 ```bash
 inkbox mailbox list
 inkbox mailbox get <email-address>
-inkbox mailbox update <email-address> [--webhook-url <url>] [--filter-mode whitelist|blacklist]
+inkbox mailbox update <email-address> [--filter-mode whitelist|blacklist]
+# To attach a webhook receiver, use `inkbox webhook subscription create
+# --mailbox-id <id> --url <url> --event-type message.received ...`.
 ```
 
 `mailbox list` / `get` / `update` rows include `filterMode` and `agentIdentityId`. `--filter-mode` is admin-only; when the value actually changes, a note is printed to **stderr** telling you how many existing rules are now redundant under the new mode.
@@ -401,31 +403,46 @@ inkbox notes access revoke <note-id> <identity-id>
 inkbox whoami
 inkbox signing-key create
 inkbox webhook verify --payload <payload> --secret <secret> -H "X-Header: value"
+
+# Webhook subscriptions (fan-out per (owner, url, event_types)):
+inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>]
+inkbox webhook subscription create --mailbox-id <id> --url <url> --event-type message.received
+inkbox webhook subscription create --phone-number-id <id> --url <url> \
+  --event-type text.received --event-type text.delivered
+inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...]
+inkbox webhook subscription delete <sub-id>
 ```
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 
-`inkbox webhook verify` is event-type-agnostic — it operates on raw bytes
-and only checks the `X-Inkbox-Signature` HMAC. The body can be any of:
+`inkbox webhook verify` is event-type-agnostic — it operates on raw
+bytes and only checks the `X-Inkbox-Signature` HMAC. The body can be
+any of:
 
 - **Mail** (envelope): `message.received`, `message.sent`,
   `message.forwarded`, `message.delivered`, `message.bounced`,
-  `message.failed`.
+  `message.failed`. Subscribe via `inkbox webhook subscription create
+  --mailbox-id ...`.
 - **Text** (envelope): `text.received`, `text.sent`, `text.delivered`,
-  `text.delivery_failed`, `text.delivery_unconfirmed`.
+  `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
+  `inkbox webhook subscription create --phone-number-id ...`.
 - **Inbound call** (flat, no envelope; response controls call routing).
+  Not subscribable; URL stays on the phone-number resource as
+  `incomingCallWebhookUrl`.
 
-Mail payloads carry `data.contacts`, a list of per-recipient
-`{ bucket, address, id, name }` matches (inbound: `from` + every `cc`;
-outbound: every `to` + `cc` + `bcc`; empty list when nothing matches).
-Outbound mail payloads also include `data.message.bcc_addresses`
-(`null` on inbound). Text and inbound-call payloads carry a singular
-`contact: { id, name } | null` when the event has one address-book
-target — `data.contact` on text, top-level `contact` on the inbound
-call. Group text events carry delivery rows in
-`data.text_message.recipients`; per-recipient lifecycle events name the
-event target in `data.recipient_phone_number`. For the typed
-receiver-side shapes, see the SDK skills (`inkbox-ts`, `inkbox-python`).
+Mail and text payloads carry `data.contacts` and
+`data.agent_identities` (both always-present lists; mail entries also
+carry `bucket` + `address`). Outbound mail payloads also include
+`data.message.bcc_addresses` (`null` on inbound). Group text events
+carry per-recipient delivery rows in `data.text_message.recipients`;
+**outbound group lifecycle** events name the event target in
+`data.recipient_phone_number` (one webhook per recipient leg). Inbound
+and outbound 1:1 events leave `data.recipient_phone_number` as `null`
+— the singular peer is already in `data.text_message.remote_phone_number`
+(inbound) or `data.text_message.recipients[0]` (outbound 1:1).
+Inbound-call payloads carry `contacts` and `agent_identities` at the
+top level (no envelope). For the typed receiver-side shapes, see the
+SDK skills (`inkbox-ts`, `inkbox-python`).
 
 ## Practical Guidance
 

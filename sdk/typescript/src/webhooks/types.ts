@@ -61,13 +61,24 @@ export type HangupReasonWire =
 // ---- Shared ----------------------------------------------------------
 
 /**
- * Address-book match for the single remote party on a phone or text
- * webhook event. Optional — `null` means no contact visible to the
- * receiving identity. Pass `id` to `inkbox.contacts.get()` to hydrate.
+ * Address-book match for a remote party on a phone or text webhook
+ * event. Surfaced as a list — pass `id` to `inkbox.contacts.get()` to
+ * hydrate.
  */
 export interface WebhookContact {
   id: string;
   name: string;
+}
+
+/**
+ * Identity match for a remote party on a phone or text webhook event.
+ * Set when the remote party is an active agent identity in the same
+ * org that is visible to the receiver.
+ */
+export interface WebhookAgentIdentity {
+  id: string;
+  agent_handle: string;
+  display_name: string | null;
 }
 
 // ---- Mail ------------------------------------------------------------
@@ -80,7 +91,7 @@ export type MailWebhookEventType =
   | "message.bounced"
   | "message.failed";
 
-/** Which recipient list a mail webhook contact was matched from. */
+/** Which recipient list a mail webhook contact/identity was matched from. */
 export type MailContactBucket = "from" | "to" | "cc" | "bcc";
 
 /**
@@ -100,6 +111,19 @@ export interface WebhookMailContact {
   address: string;
   id: string;
   name: string;
+}
+
+/**
+ * Per-recipient identity match on a mail webhook event. Same shape as
+ * `WebhookMailContact` but with `agent_handle` / `display_name`
+ * instead of `name`.
+ */
+export interface WebhookMailAgentIdentity {
+  bucket: MailContactBucket;
+  address: string;
+  id: string;
+  agent_handle: string;
+  display_name: string | null;
 }
 
 /**
@@ -133,14 +157,21 @@ export interface MailWebhookPayload {
   data: {
     message: MailWebhookMessage;
     /**
-     * Per-recipient matches. Always present, possibly empty. Wire
-     * order is `from` → `to` → `cc` → `bcc`, then within each bucket
-     * by source-field order; receivers should pair by
+     * Per-recipient address-book matches. Always present, possibly
+     * empty. Wire order is `from` → `to` → `cc` → `bcc`, then within
+     * each bucket by source-field order; receivers should pair by
      * `(bucket, address)` rather than relying on the order. Up to 50
      * distinct normalized addresses are resolved per event; over-cap
      * inputs and resolver failures both fall back to an empty list.
      */
     contacts: WebhookMailContact[];
+    /**
+     * Per-recipient identity matches. Always present, possibly empty.
+     * Same matching rules as `contacts`. A peer can match both a
+     * contact and an agent identity — two rows are emitted; receivers
+     * decide precedence.
+     */
+    agent_identities: WebhookMailAgentIdentity[];
   };
 }
 
@@ -156,6 +187,19 @@ export type TextWebhookEventType =
 /**
  * Stored text message. `is_blocked` is not part of the wire body —
  * blocked texts never reach the webhook.
+ *
+ * Field population by traffic shape:
+ *   - `remote_phone_number`: populated on inbound and on outbound 1:1;
+ *     `null` on group outbound (per-recipient state lives in
+ *     `recipients[]`).
+ *   - `delivery_status`: populated on outbound. On group outbound this
+ *     is the message-level rollup across `recipients[]`; on inbound it
+ *     is `null`.
+ *   - Legacy top-level lifecycle details (`error_code`, `error_detail`,
+ *     `sent_at`, `delivered_at`, `failed_at`): populated only on
+ *     outbound 1:1. On group outbound the per-recipient values live in
+ *     `recipients[]`; on inbound there is no carrier lifecycle to track,
+ *     so all five are `null`.
  */
 export interface TextWebhookMessage {
   id: string;
@@ -175,6 +219,12 @@ export interface TextWebhookMessage {
   failed_at: string | null;
   conversation_id: string | null;
   sender_phone_number: string | null;
+  /**
+   * `null` on inbound (and rows that didn't eager-load recipients);
+   * a one-element list on outbound 1:1 (the legacy 1:1 lifecycle
+   * fields above are hoisted from that entry); multiple entries on
+   * group outbound.
+   */
   recipients: RawTextMessageRecipient[] | null;
   created_at: string;
   updated_at: string;
@@ -185,7 +235,16 @@ export interface TextWebhookPayload {
   timestamp: string;
   data: {
     text_message: TextWebhookMessage;
-    contact: WebhookContact | null;
+    /** Address-book matches for the remote party (or parties). Always present, possibly empty. */
+    contacts: WebhookContact[];
+    /** Identity matches for the remote party (or parties). Always present, possibly empty. */
+    agent_identities: WebhookAgentIdentity[];
+    /**
+     * For outbound group lifecycle events, the specific recipient this
+     * event is about. `null` on inbound and on 1:1 outbound (where
+     * `text_message.remote_phone_number` already identifies the
+     * recipient).
+     */
     recipient_phone_number: string | null;
   };
 }
@@ -194,8 +253,9 @@ export interface TextWebhookPayload {
 
 /**
  * Inbound call payload. **Flat** — no `{ event_type, timestamp, data }`
- * envelope; `contact` sits at the top level. `is_blocked` is not part
- * of the wire body — blocked calls never reach the webhook.
+ * envelope; `contacts` / `agent_identities` sit at the top level.
+ * `is_blocked` is not part of the wire body — blocked calls never
+ * reach the webhook.
  */
 export interface PhoneIncomingCallWebhookPayload {
   id: string;
@@ -212,5 +272,8 @@ export interface PhoneIncomingCallWebhookPayload {
   created_at: string;
   updated_at: string;
   rate_limit: RawRateLimitInfo | null;
-  contact: WebhookContact | null;
+  /** Address-book matches for the remote party. Always present, possibly empty. */
+  contacts: WebhookContact[];
+  /** Identity matches for the remote party. Always present, possibly empty. */
+  agent_identities: WebhookAgentIdentity[];
 }

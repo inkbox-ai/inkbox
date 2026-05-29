@@ -161,11 +161,19 @@ class Mailbox:
     ``sending_domain`` is the bare domain the mailbox sends from, derived
     from ``email_address``. Either the platform default or a verified
     custom domain registered to your org.
+
+    **Webhooks.** To deliver ``message.*`` events to an HTTPS endpoint,
+    create a row on the channel-agnostic subscription resource:
+    ``inkbox.webhooks.subscriptions.create(mailbox_id=..., url=..., event_types=[...])``.
+    Up to 20 active subscriptions per mailbox.
+
+    See Also:
+        :class:`inkbox.WebhookSubscriptionsResource` on
+        ``inkbox.webhooks.subscriptions``.
     """
 
     id: UUID
     email_address: str
-    webhook_url: str | None
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
@@ -186,7 +194,6 @@ class Mailbox:
             id=UUID(d["id"]),
             email_address=d["email_address"],
             sending_domain=sending_domain,
-            webhook_url=d.get("webhook_url"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),

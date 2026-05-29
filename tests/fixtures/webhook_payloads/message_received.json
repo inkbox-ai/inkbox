@@ -9,7 +9,7 @@
       "message_id": "<abc123@example.com>",
       "from_address": "customer@example.com",
       "to_addresses": ["support@inkboxmail.com"],
-      "cc_addresses": ["legal@example.com"],
+      "cc_addresses": ["legal@example.com", "billing@inkboxmail.com"],
       "bcc_addresses": null,
       "subject": "Question about pricing",
       "snippet": "Can you help me understand...",
@@ -21,6 +21,9 @@
     "contacts": [
       {"bucket": "from", "address": "customer@example.com", "id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe"},
       {"bucket": "cc", "address": "legal@example.com", "id": "550e8400-e29b-41d4-a716-446655440001", "name": "Legal Team"}
+    ],
+    "agent_identities": [
+      {"bucket": "cc", "address": "billing@inkboxmail.com", "id": "550e8400-e29b-41d4-a716-446655440010", "agent_handle": "billing", "display_name": "Billing"}
     ]
   }
 }

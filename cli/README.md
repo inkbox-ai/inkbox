@@ -284,8 +284,9 @@ has moved to the identity; mailbox PATCH hard-rejects it with a 422.
 inkbox mailbox list                          # List all mailboxes
 inkbox mailbox get <email-address>           # Get mailbox details
 inkbox mailbox update <email-address>        # Update a mailbox
-  --webhook-url <url>                        #   Webhook URL ("" to clear)
   --filter-mode <mode>                       #   whitelist or blacklist (admin-only)
+# To attach a webhook receiver, use `inkbox webhook subscription create
+# --mailbox-id <id> --url <url> --event-type message.received ...`.
 ```
 
 ### tunnel
@@ -327,13 +328,13 @@ inkbox number provision                      # Provision a new number
   --handle <handle>                          #   Agent handle (required)
   --type <type>                              #   toll_free or local (default: toll_free)
   --state <state>                            #   US state abbreviation (for local)
-  --incoming-text-webhook-url <url>          #   Webhook URL for incoming texts
 inkbox number update <id>                    # Update phone number config
   --incoming-call-action <action>            #   auto_accept, auto_reject, or webhook
   --client-websocket-url <url>               #   WebSocket URL for audio bridging
   --incoming-call-webhook-url <url>          #   Webhook URL for incoming calls
-  --incoming-text-webhook-url <url>          #   Webhook URL for incoming texts
 inkbox number release <number-id>             # Release a phone number
+# To attach a text-webhook receiver, use `inkbox webhook subscription
+# create --phone-number-id <id> --url <url> --event-type text.received ...`.
 ```
 
 ### whoami
@@ -362,6 +363,22 @@ inkbox webhook verify                        # Verify a webhook signature (local
   --payload <payload>                        #   Raw request body (required)
   --secret <secret>                          #   Signing key (required)
   -H, --header <header>                      #   Header in Key: Value format (repeatable)
+
+inkbox webhook subscription list             # List webhook subscriptions
+  --mailbox-id <id>                          #   Filter by owning mailbox id
+  --phone-number-id <id>                     #   Filter by owning phone number id
+  --url <url>                                #   Filter by destination URL (exact)
+  --event-type <type>                        #   Filter by event_type wire value
+inkbox webhook subscription get <sub-id>     # Get one subscription
+inkbox webhook subscription create           # Create a subscription
+  --mailbox-id <id>                          #   Owning mailbox id (exactly one of these
+  --phone-number-id <id>                     #     two FKs is required)
+  --url <url>                                #   HTTPS destination (required)
+  --event-type <type>                        #   Event type (repeatable; ≥1 required)
+inkbox webhook subscription update <sub-id>  # Update url and/or event_types
+  --url <url>                                #   New HTTPS destination
+  --event-type <type>                        #   Replacement event-type list (repeatable)
+inkbox webhook subscription delete <sub-id>  # Remove a subscription
 ```
 
 ## Global options

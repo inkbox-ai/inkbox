@@ -87,7 +87,6 @@ export const RAW_PHONE_NUMBER = {
   incoming_call_action: "auto_reject",
   client_websocket_url: null,
   incoming_call_webhook_url: null,
-  incoming_text_webhook_url: null,
   state: null,
   agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   created_at: "2026-03-09T00:00:00Z",
@@ -227,7 +226,7 @@ export const RAW_TEXT_MESSAGE_OUTBOUND_QUEUED = {
   delivered_at: null,
   failed_at: null,
   conversation_id: "eeee1111-0000-0000-0000-000000000001",
-  sender_phone_number: "+18335794607",
+  sender_phone_number: null,
   recipients: [
     {
       recipient_phone_number: "+15551234567",
@@ -309,7 +308,6 @@ export const RAW_TEXT_CONVERSATION_GROUP_SUMMARY = {
 export const RAW_IDENTITY_MAILBOX = {
   id: "aaaa1111-0000-0000-0000-000000000001",
   email_address: "sales-agent@inkbox.ai",
-  webhook_url: null,
   agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:00:00Z",
@@ -323,7 +321,6 @@ export const RAW_IDENTITY_PHONE = {
   incoming_call_action: "auto_reject",
   client_websocket_url: null,
   incoming_call_webhook_url: null,
-  incoming_text_webhook_url: null,
   state: null,
   agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   created_at: "2026-03-09T00:00:00Z",

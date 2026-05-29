@@ -46,6 +46,7 @@ from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.tunnels.resources.tunnels import TunnelsResource
+from inkbox.webhook_subscriptions import WebhookSubscriptionsResource
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
@@ -55,6 +56,18 @@ _DEFAULT_BASE_URL = "https://inkbox.ai"
 # `is not _UNSET` checks must compare against the SAME object across all
 # layers; a module-local `object()` here would leak the sentinel through
 # to the wire body and crash JSON encoding.
+
+
+class _WebhooksNamespace:
+    """Typed namespace for ``inkbox.webhooks.*`` resources.
+
+    Single allocation per ``Inkbox`` instance so identity checks
+    (``client.webhooks is client.webhooks``) hold.
+    """
+    __slots__ = ("subscriptions",)
+
+    def __init__(self, subscriptions: WebhookSubscriptionsResource) -> None:
+        self.subscriptions = subscriptions
 
 
 class Inkbox:
@@ -184,6 +197,8 @@ class Inkbox:
         self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
 
         self._signing_keys = SigningKeysResource(self._api_http)
+        self._webhook_subscriptions = WebhookSubscriptionsResource(self._api_http)
+        self._webhooks = _WebhooksNamespace(self._webhook_subscriptions)
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
 
@@ -299,6 +314,18 @@ class Inkbox:
     def api_keys(self) -> ApiKeysResource:
         """Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys."""
         return self._api_keys
+
+    @property
+    def webhooks(self) -> "_WebhooksNamespace":
+        """Webhook subscription management.
+
+        Use ``inkbox.webhooks.subscriptions`` to attach HTTPS receivers
+        to mail (``message.*``) or phone-text (``text.*``) events.
+        Incoming-call webhooks still live on the phone-number resource
+        (``incoming_call_webhook_url``) because the response body
+        controls call routing.
+        """
+        return self._webhooks
 
     ## Org-level operations
 

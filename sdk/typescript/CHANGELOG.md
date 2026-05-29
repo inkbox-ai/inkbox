@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.6 — webhook subscriptions refactor
+
+### Breaking
+
+- **`Mailbox.webhookUrl` removed.** Mailbox PATCH no longer accepts `webhookUrl`; sending it returns 422. Migration: create a `webhooks.subscriptions` row for each mailbox that needs delivery (see Added below).
+- **`PhoneNumber.incomingTextWebhookUrl` removed** from every shape that carried it (`PhoneNumber`, `IdentityPhoneNumber`, `IdentityPhoneNumberCreateOptions`, `phoneNumbers.update`, `phoneNumbers.provision`, identity-create's nested `phoneNumber`). Sending it returns 422 server-side. Replace with a `text.*` subscription on the phone number.
+- **Phone-text webhook payload — `data.contact` → `data.contacts` + `data.agent_identities`.** `contact` is gone. `contacts` is always a list (possibly empty); `agent_identities` is a new always-present list of matched agent identities. Destructuring `const { contact } = data` silently breaks.
+- **Inbound-call webhook payload — top-level `contact` → `contacts` + `agent_identities`.** Same shape swap at the top level of the flat payload.
+- **Mail webhook payload — `data.agent_identities` is now required on the wire** alongside the existing `data.contacts` (both default `[]`). Receivers that previously did `Object.keys(data)` or strict shape checks will see a new key.
+
+### Added
+
+- **`inkbox.webhooks.subscriptions` resource** — full CRUD for the new `/webhooks/subscriptions` endpoint surface. `list`, `get`, `create`, `update`, `delete`. The SDK runs structural + prefix validation client-side (exactly-one FK, non-empty distinct events, no `phone.incoming_call`, `message.` / `text.` prefix matching the owner's channel) so most shape mistakes surface as thrown errors rather than 422 round-trips. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server. New exports: `WebhookSubscription`, `WebhookSubscriptionsResource`, `WebhookSubscriptionStatus`, plus option types for create/update/list.
+- **`WebhookAgentIdentity` / `WebhookMailAgentIdentity`** types covering identity matches on text/call and mail payloads. Same shape as the contact types but with `agent_handle` / `display_name` instead of `name`. Mail variant also carries `bucket` + `address`.
+
 ## 0.4.5
 
 ### Added

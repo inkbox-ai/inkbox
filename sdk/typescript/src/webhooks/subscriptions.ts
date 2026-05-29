@@ -1,0 +1,239 @@
+/**
+ * Webhook subscriptions — fan-out per (owner, url, event_types).
+ *
+ * Replaces the legacy per-resource `webhook_url` columns on mailboxes
+ * and phone numbers. Use this resource to attach HTTPS receivers to
+ * mail (`message.*`) or phone-text (`text.*`) events. Incoming-call
+ * webhooks (`phone.incoming_call`) are still set on the phone-number
+ * resource itself — that channel is a synchronous control-plane
+ * callback whose response body drives call routing, so fan-out is not
+ * meaningful.
+ */
+
+import { HttpTransport } from "../_http.js";
+
+const PATH = "/webhooks/subscriptions";
+
+/** Lifecycle status of a subscription row. Callers only ever see `"active"`; deleted subscriptions are not returned by `list` / `get`. */
+export type WebhookSubscriptionStatus = "active" | "deleted";
+
+export interface WebhookSubscription {
+  id: string;
+  /** `"org_..."` token; not a UUID. */
+  organizationId: string;
+  /** Owning mailbox. Exactly one of `mailboxId` / `phoneNumberId` is non-null. */
+  mailboxId: string | null;
+  /** Owning phone number. Exactly one of `mailboxId` / `phoneNumberId` is non-null. */
+  phoneNumberId: string | null;
+  url: string;
+  /** Wire event-type strings (e.g. `"message.received"`, `"text.sent"`). Not narrowed to a literal union — the catalog is the source of truth. */
+  eventTypes: string[];
+  status: WebhookSubscriptionStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RawWebhookSubscription {
+  id: string;
+  organization_id: string;
+  mailbox_id: string | null;
+  phone_number_id: string | null;
+  url: string;
+  event_types: string[];
+  status: WebhookSubscriptionStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+interface RawListWebhookSubscriptionsResponse {
+  subscriptions: RawWebhookSubscription[];
+}
+
+export function parseWebhookSubscription(
+  r: RawWebhookSubscription,
+): WebhookSubscription {
+  return {
+    id: r.id,
+    organizationId: r.organization_id,
+    mailboxId: r.mailbox_id,
+    phoneNumberId: r.phone_number_id,
+    url: r.url,
+    eventTypes: r.event_types,
+    status: r.status,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
+const INCOMING_CALL = "phone.incoming_call";
+
+function assertUrlNotNull(url: unknown): void {
+  if (url === null) {
+    throw new Error(
+      "url must not be null; pass a string, or omit the field to leave it unchanged",
+    );
+  }
+}
+
+function assertEventTypesNotNull(eventTypes: unknown): void {
+  if (eventTypes === null) {
+    throw new Error(
+      "eventTypes must not be null; pass a non-empty array, or omit the field to leave it unchanged",
+    );
+  }
+}
+
+function assertEventTypesNonEmptyDistinct(eventTypes: string[]): void {
+  if (eventTypes.length === 0) {
+    throw new Error("eventTypes must be a non-empty list");
+  }
+  const seen = new Set<string>();
+  for (const e of eventTypes) {
+    if (seen.has(e)) {
+      throw new Error(`eventTypes contains duplicate value: '${e}'`);
+    }
+    seen.add(e);
+  }
+}
+
+function assertNoIncomingCall(eventTypes: string[]): void {
+  if (eventTypes.includes(INCOMING_CALL)) {
+    throw new Error(
+      `event_type '${INCOMING_CALL}' is not stored in webhook subscriptions; ` +
+      "set it on the phone number's `incomingCallWebhookUrl` field instead",
+    );
+  }
+}
+
+function assertChannelCoherence(
+  hasMailbox: boolean,
+  eventTypes: string[],
+): void {
+  const expectedPrefix = hasMailbox ? "message." : "text.";
+  const otherPrefix = hasMailbox ? "text." : "message.";
+  const otherChannel = hasMailbox ? "phone_number" : "mailbox";
+  for (const e of eventTypes) {
+    if (e.startsWith(expectedPrefix)) continue;
+    if (e.startsWith(otherPrefix)) {
+      throw new Error(
+        `event_type '${e}' does not belong to the ${hasMailbox ? "mailbox" : "phone_number"} ` +
+        `channel (it belongs to ${otherChannel})`,
+      );
+    }
+    throw new Error(`event_type '${e}' does not belong to any known channel`);
+  }
+  // INCOMING_CALL is rejected by assertNoIncomingCall earlier.
+}
+
+export interface CreateWebhookSubscriptionOptions {
+  mailboxId?: string;
+  phoneNumberId?: string;
+  url: string;
+  eventTypes: string[];
+}
+
+export interface UpdateWebhookSubscriptionOptions {
+  url?: string;
+  eventTypes?: string[];
+}
+
+export interface ListWebhookSubscriptionsOptions {
+  mailboxId?: string;
+  phoneNumberId?: string;
+  url?: string;
+  eventType?: string;
+}
+
+export class WebhookSubscriptionsResource {
+  constructor(private readonly http: HttpTransport) {}
+
+  /**
+   * List webhook subscriptions visible to the caller. Filters AND-combine;
+   * unmatched filters return an empty list. `mailboxId` and `phoneNumberId`
+   * are mutually exclusive — passing both yields a 422. Deleted
+   * subscriptions are not returned.
+   */
+  async list(
+    filters: ListWebhookSubscriptionsOptions = {},
+  ): Promise<WebhookSubscription[]> {
+    const params: Record<string, string> = {};
+    if (filters.mailboxId !== undefined) params["mailbox_id"] = filters.mailboxId;
+    if (filters.phoneNumberId !== undefined) params["phone_number_id"] = filters.phoneNumberId;
+    if (filters.url !== undefined) params["url"] = filters.url;
+    if (filters.eventType !== undefined) params["event_type"] = filters.eventType;
+    const data = await this.http.get<RawListWebhookSubscriptionsResponse>(PATH, params);
+    return data.subscriptions.map(parseWebhookSubscription);
+  }
+
+  /** Fetch a single subscription by id. Returns 404 if the subscription has been deleted or is not visible to the caller. */
+  async get(subId: string): Promise<WebhookSubscription> {
+    const data = await this.http.get<RawWebhookSubscription>(`${PATH}/${subId}`);
+    return parseWebhookSubscription(data);
+  }
+
+  /**
+   * Create a webhook subscription. Exactly one of `mailboxId` /
+   * `phoneNumberId` is required; `eventTypes` must be a non-empty list
+   * of distinct values belonging to the owner's channel (mailbox →
+   * `message.*`, phone number → `text.*`).
+   */
+  async create(
+    options: CreateWebhookSubscriptionOptions,
+  ): Promise<WebhookSubscription> {
+    const hasMailbox = options.mailboxId !== undefined && options.mailboxId !== null;
+    const hasPhoneNumber =
+      options.phoneNumberId !== undefined && options.phoneNumberId !== null;
+    if (hasMailbox === hasPhoneNumber) {
+      throw new Error(
+        "Exactly one of mailboxId or phoneNumberId must be provided",
+      );
+    }
+    assertUrlNotNull(options.url);
+    assertEventTypesNotNull(options.eventTypes);
+    assertEventTypesNonEmptyDistinct(options.eventTypes);
+    assertNoIncomingCall(options.eventTypes);
+    assertChannelCoherence(hasMailbox, options.eventTypes);
+
+    const body: Record<string, unknown> = {
+      url: options.url,
+      event_types: options.eventTypes,
+    };
+    if (hasMailbox) body["mailbox_id"] = options.mailboxId;
+    if (hasPhoneNumber) body["phone_number_id"] = options.phoneNumberId;
+    const data = await this.http.post<RawWebhookSubscription>(PATH, body);
+    return parseWebhookSubscription(data);
+  }
+
+  /**
+   * Update the destination URL and/or event-type list of a subscription.
+   * Omitting both is a no-op. `eventTypes`, if supplied, replaces the
+   * stored list and must be non-empty and distinct. Owner FKs are not
+   * mutable.
+   */
+  async update(
+    subId: string,
+    options: UpdateWebhookSubscriptionOptions,
+  ): Promise<WebhookSubscription> {
+    const body: Record<string, unknown> = {};
+    if (options.url !== undefined) {
+      assertUrlNotNull(options.url);
+      body["url"] = options.url;
+    }
+    if (options.eventTypes !== undefined) {
+      assertEventTypesNotNull(options.eventTypes);
+      assertEventTypesNonEmptyDistinct(options.eventTypes);
+      assertNoIncomingCall(options.eventTypes);
+      body["event_types"] = options.eventTypes;
+    }
+    const data = await this.http.patch<RawWebhookSubscription>(
+      `${PATH}/${subId}`,
+      body,
+    );
+    return parseWebhookSubscription(data);
+  }
+
+  /** Delete a subscription. Subsequent `list` / `get` calls will not return it. */
+  async delete(subId: string): Promise<void> {
+    await this.http.delete(`${PATH}/${subId}`);
+  }
+}

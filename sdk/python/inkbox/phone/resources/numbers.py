@@ -41,20 +41,21 @@ class PhoneNumbersResource:
         incoming_call_action: str | None = _UNSET,  # type: ignore[assignment]
         client_websocket_url: str | None = _UNSET,  # type: ignore[assignment]
         incoming_call_webhook_url: str | None = _UNSET,  # type: ignore[assignment]
-        incoming_text_webhook_url: str | None = _UNSET,  # type: ignore[assignment]
         filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> PhoneNumber:
         """Update phone number settings.
 
-        Pass only the fields you want to change; omitted fields are left as-is.
-        Pass a field as ``None`` to clear it.
+        Pass only the fields you want to change; omitted fields are
+        left as-is. Pass a field as ``None`` to clear it. To attach a
+        text-webhook receiver, use
+        ``inkbox.webhooks.subscriptions.create(phone_number_id=...,
+        url=..., event_types=[...])``.
 
         Args:
             phone_number_id: UUID of the phone number.
             incoming_call_action: ``"auto_accept"``, ``"auto_reject"``, or ``"webhook"``.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             incoming_call_webhook_url: Webhook URL called for incoming calls when action is ``"webhook"``.
-            incoming_text_webhook_url: Webhook URL called for incoming text messages.
             filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on
                 the server; agent-scoped keys receive 403. A single value
                 governs both inbound voice and SMS.
@@ -71,8 +72,6 @@ class PhoneNumbersResource:
             body["client_websocket_url"] = client_websocket_url
         if incoming_call_webhook_url is not _UNSET:
             body["incoming_call_webhook_url"] = incoming_call_webhook_url
-        if incoming_text_webhook_url is not _UNSET:
-            body["incoming_text_webhook_url"] = incoming_text_webhook_url
         if filter_mode is not _UNSET:
             body["filter_mode"] = (
                 filter_mode.value if isinstance(filter_mode, FilterMode) else filter_mode
@@ -86,7 +85,6 @@ class PhoneNumbersResource:
         agent_handle: str,
         type: str = "toll_free",
         state: str | None = None,
-        incoming_text_webhook_url: str | None = None,
     ) -> PhoneNumber:
         """Provision a new phone number and link it to an agent identity.
 
@@ -94,7 +92,6 @@ class PhoneNumbersResource:
             agent_handle: Handle of the agent identity to assign this number to.
             type: ``"toll_free"`` or ``"local"``. Defaults to ``"toll_free"``.
             state: US state abbreviation (e.g. ``"NY"``). Only valid for ``local`` numbers.
-            incoming_text_webhook_url: Webhook URL called for incoming text messages.
 
         Returns:
             The provisioned phone number.
@@ -102,8 +99,6 @@ class PhoneNumbersResource:
         body: dict[str, Any] = {"agent_handle": agent_handle, "type": type}
         if state is not None:
             body["state"] = state
-        if incoming_text_webhook_url is not None:
-            body["incoming_text_webhook_url"] = incoming_text_webhook_url
         data = self._http.post(_BASE, json=body)
         return PhoneNumber._from_dict(data)
 

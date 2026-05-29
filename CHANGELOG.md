@@ -4,6 +4,23 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.6 — webhook subscriptions refactor
+
+### Breaking
+
+- **Per-resource webhook URLs are gone for mail and phone-text events.** `Mailbox.webhook_url` / `webhookUrl` and `PhoneNumber.incoming_text_webhook_url` / `incomingTextWebhookUrl` were removed from every SDK type, builder, request body, and CLI flag. Sending the legacy fields server-side returns 422. Replace each with a row on the new `webhooks.subscriptions` resource.
+- **Phone-text and inbound-call webhook payloads — `contact` (singular) → `contacts` (plural) + new `agent_identities` list.** Always-present lists; both default to `[]` when nothing matches.
+
+### Added
+
+- **Webhook subscriptions resource** — full CRUD over `/webhooks/subscriptions`:
+  - TypeScript: `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`.
+  - Python: `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`.
+  - CLI: `inkbox webhook subscription {list,get,create,update,delete}` with a repeatable `--event-type`.
+  Each subscription names exactly one owner (mailbox **or** phone number), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently. `phone.incoming_call` is intentionally not subscribable; that URL stays on the phone number's `incomingCallWebhookUrl` because its response body controls call routing. The SDK runs structural + prefix validation client-side (exactly-one FK, non-empty distinct events, no `phone.incoming_call`, `message.` / `text.` prefix matching the owner's channel) so most shape mistakes surface as a thrown error rather than 422 round-trips. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
+- **`WebhookAgentIdentity`, `WebhookMailAgentIdentity`** exported types covering identity matches on mail / text / call payloads.
+- Mail webhook payloads gained `data.agent_identities` alongside existing `data.contacts`.
+
 ## 0.4.5
 
 ### Added

@@ -14,6 +14,7 @@ import { MailContactRulesResource } from "./mail/resources/contactRules.js";
 import { DomainsResource } from "./mail/resources/domains.js";
 import { SigningKeysResource } from "./signing_keys.js";
 import type { SigningKey } from "./signing_keys.js";
+import { WebhookSubscriptionsResource } from "./webhooks/subscriptions.js";
 import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
@@ -120,6 +121,8 @@ export class Inkbox {
   readonly _mailContactRules: MailContactRulesResource;
   readonly _domains: DomainsResource;
   readonly _signingKeys: SigningKeysResource;
+  readonly _webhookSubscriptions: WebhookSubscriptionsResource;
+  private readonly _webhooks: { readonly subscriptions: WebhookSubscriptionsResource };
   readonly _numbers: PhoneNumbersResource;
   readonly _calls: CallsResource;
   readonly _texts: TextsResource;
@@ -169,6 +172,8 @@ export class Inkbox {
     this._mailContactRules = new MailContactRulesResource(mailHttp);
     this._domains          = new DomainsResource(domainsHttp);
     this._signingKeys      = new SigningKeysResource(apiHttp);
+    this._webhookSubscriptions = new WebhookSubscriptionsResource(apiHttp);
+    this._webhooks = Object.freeze({ subscriptions: this._webhookSubscriptions });
 
     this._numbers          = new PhoneNumbersResource(phoneHttp);
     this._calls            = new CallsResource(phoneHttp);
@@ -274,6 +279,17 @@ export class Inkbox {
 
   /** Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys. */
   get apiKeys(): ApiKeysResource { return this._apiKeys; }
+
+  /**
+   * Webhook subscription management. Use `inkbox.webhooks.subscriptions`
+   * to attach HTTPS receivers to mail (`message.*`) or phone-text
+   * (`text.*`) events. Incoming-call webhooks still live on the
+   * phone-number resource (`incomingCallWebhookUrl`) because the
+   * response body controls call routing.
+   */
+  get webhooks(): { readonly subscriptions: WebhookSubscriptionsResource } {
+    return this._webhooks;
+  }
 
   // ------------------------------------------------------------------
   // Org-level operations

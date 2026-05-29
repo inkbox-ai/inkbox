@@ -1,0 +1,310 @@
+"""
+sdk/python/tests/test_webhook_subscriptions.py
+
+Round-trip + validation coverage for WebhookSubscriptionsResource.
+Mocks the HTTP transport with a MagicMock (same pattern as
+test_signing_keys.py).
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
+from uuid import UUID
+
+import pytest
+
+from inkbox.webhook_subscriptions import (
+    WebhookSubscription,
+    WebhookSubscriptionsResource,
+)
+
+_SUB_ID = "11111111-1111-1111-1111-111111111111"
+_MAILBOX_ID = "22222222-2222-2222-2222-222222222222"
+_PHONE_ID = "33333333-3333-3333-3333-333333333333"
+
+RAW_SUBSCRIPTION = {
+    "id": _SUB_ID,
+    "organization_id": "org_test",
+    "mailbox_id": _MAILBOX_ID,
+    "phone_number_id": None,
+    "url": "https://customer.example.com/hook",
+    "event_types": ["message.received", "message.bounced"],
+    "status": "active",
+    "created_at": "2026-04-10T18:00:00+00:00",
+    "updated_at": "2026-04-10T18:00:00+00:00",
+}
+
+
+def _resource():
+    http = MagicMock()
+    return WebhookSubscriptionsResource(http), http
+
+
+class TestCreate:
+    def test_round_trip_with_mailbox(self):
+        res, http = _resource()
+        http.post.return_value = RAW_SUBSCRIPTION
+
+        sub = res.create(
+            mailbox_id=_MAILBOX_ID,
+            url="https://customer.example.com/hook",
+            event_types=["message.received", "message.bounced"],
+        )
+
+        http.post.assert_called_once_with(
+            "/webhooks/subscriptions",
+            json={
+                "url": "https://customer.example.com/hook",
+                "event_types": ["message.received", "message.bounced"],
+                "mailbox_id": _MAILBOX_ID,
+            },
+        )
+        assert isinstance(sub, WebhookSubscription)
+        assert sub.id == UUID(_SUB_ID)
+        assert sub.organization_id == "org_test"
+        assert sub.mailbox_id == UUID(_MAILBOX_ID)
+        assert sub.phone_number_id is None
+        assert sub.event_types == ["message.received", "message.bounced"]
+        assert sub.status == "active"
+        assert sub.created_at == datetime(2026, 4, 10, 18, 0, 0, tzinfo=timezone.utc)
+
+    def test_accepts_uuid_object_for_mailbox_id(self):
+        res, http = _resource()
+        http.post.return_value = RAW_SUBSCRIPTION
+
+        res.create(
+            mailbox_id=UUID(_MAILBOX_ID),
+            url="https://x/y",
+            event_types=["message.received"],
+        )
+
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["mailbox_id"] == _MAILBOX_ID
+
+    def test_accepts_phone_number_for_text_channel(self):
+        res, http = _resource()
+        http.post.return_value = {
+            **RAW_SUBSCRIPTION,
+            "mailbox_id": None,
+            "phone_number_id": _PHONE_ID,
+            "event_types": ["text.received", "text.delivered"],
+        }
+
+        sub = res.create(
+            phone_number_id=_PHONE_ID,
+            url="https://x/y",
+            event_types=["text.received", "text.delivered"],
+        )
+
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["phone_number_id"] == _PHONE_ID
+        assert "mailbox_id" not in kwargs["json"]
+        assert sub.phone_number_id == UUID(_PHONE_ID)
+
+    def test_rejects_when_both_fks_provided(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="Exactly one of"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                phone_number_id=_PHONE_ID,
+                url="https://x/y",
+                event_types=["message.received"],
+            )
+
+    def test_rejects_when_no_fk_provided(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="Exactly one of"):
+            res.create(
+                url="https://x/y",
+                event_types=["message.received"],
+            )
+
+    def test_rejects_empty_event_types(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="non-empty"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url="https://x/y",
+                event_types=[],
+            )
+
+    def test_rejects_duplicate_event_types(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="duplicate"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url="https://x/y",
+                event_types=["message.received", "message.received"],
+            )
+
+    def test_rejects_incoming_call_event_type(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="incoming_call_webhook_url"):
+            res.create(
+                phone_number_id=_PHONE_ID,
+                url="https://x/y",
+                event_types=["phone.incoming_call"],
+            )
+
+    def test_rejects_channel_mismatch_mailbox_with_text(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="does not belong"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url="https://x/y",
+                event_types=["text.received"],
+            )
+
+    def test_rejects_channel_mismatch_phone_with_message(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="does not belong"):
+            res.create(
+                phone_number_id=_PHONE_ID,
+                url="https://x/y",
+                event_types=["message.received"],
+            )
+
+    def test_rejects_none_url(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="url must not be None"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url=None,  # type: ignore[arg-type]
+                event_types=["message.received"],
+            )
+
+    def test_rejects_none_event_types(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="event_types must not be None"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url="https://x/y",
+                event_types=None,  # type: ignore[arg-type]
+            )
+
+
+class TestUpdate:
+    def test_sends_only_url_when_only_url_provided(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+
+        res.update(_SUB_ID, url="https://new/hook")
+
+        http.patch.assert_called_once_with(
+            f"/webhooks/subscriptions/{_SUB_ID}",
+            json={"url": "https://new/hook"},
+        )
+
+    def test_sends_event_types_replacement(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+
+        res.update(_SUB_ID, event_types=["message.received"])
+
+        http.patch.assert_called_once_with(
+            f"/webhooks/subscriptions/{_SUB_ID}",
+            json={"event_types": ["message.received"]},
+        )
+
+    def test_omits_unset_kwargs(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+
+        res.update(_SUB_ID)
+
+        http.patch.assert_called_once_with(
+            f"/webhooks/subscriptions/{_SUB_ID}",
+            json={},
+        )
+
+    def test_rejects_empty_event_types(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="non-empty"):
+            res.update(_SUB_ID, event_types=[])
+
+    def test_rejects_duplicate_event_types(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="duplicate"):
+            res.update(_SUB_ID, event_types=["text.sent", "text.sent"])
+
+    def test_rejects_incoming_call(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="incoming_call_webhook_url"):
+            res.update(_SUB_ID, event_types=["phone.incoming_call"])
+
+    def test_does_not_run_channel_coherence(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+        # Mixed channels would fail create, but update does not check
+        # because the owner FK is not available client-side.
+        res.update(_SUB_ID, event_types=["message.received", "text.received"])
+        assert http.patch.called
+
+    def test_rejects_none_url_on_update(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="url must not be None"):
+            res.update(_SUB_ID, url=None)  # type: ignore[arg-type]
+
+    def test_rejects_none_event_types_on_update(self):
+        res, _ = _resource()
+        with pytest.raises(ValueError, match="event_types must not be None"):
+            res.update(_SUB_ID, event_types=None)  # type: ignore[arg-type]
+
+
+class TestList:
+    def test_unwraps_subscriptions_envelope_and_passes_filters(self):
+        res, http = _resource()
+        http.get.return_value = {
+            "subscriptions": [
+                RAW_SUBSCRIPTION,
+                {**RAW_SUBSCRIPTION, "id": "44444444-4444-4444-4444-444444444444"},
+            ],
+        }
+
+        subs = res.list(
+            mailbox_id=_MAILBOX_ID,
+            url="https://x/y",
+            event_type="message.received",
+        )
+
+        http.get.assert_called_once_with(
+            "/webhooks/subscriptions",
+            params={
+                "mailbox_id": _MAILBOX_ID,
+                "url": "https://x/y",
+                "event_type": "message.received",
+            },
+        )
+        assert len(subs) == 2
+        assert subs[0].id == UUID(_SUB_ID)
+
+    def test_empty_envelope_returns_empty_list(self):
+        res, http = _resource()
+        http.get.return_value = {"subscriptions": []}
+        assert res.list() == []
+
+
+class TestGetDelete:
+    def test_get_passes_id_and_parses_response(self):
+        res, http = _resource()
+        http.get.return_value = RAW_SUBSCRIPTION
+        sub = res.get(_SUB_ID)
+        http.get.assert_called_once_with(f"/webhooks/subscriptions/{_SUB_ID}")
+        assert sub.id == UUID(_SUB_ID)
+
+    def test_delete_calls_delete_on_path(self):
+        res, http = _resource()
+        res.delete(_SUB_ID)
+        http.delete.assert_called_once_with(f"/webhooks/subscriptions/{_SUB_ID}")
+
+
+class TestClientWiring:
+    def test_inkbox_exposes_webhooks_subscriptions(self, client):
+        # The conftest `client` fixture wires _webhook_subscriptions._http
+        # to the MagicMock transport.
+        assert isinstance(
+            client.webhooks.subscriptions,
+            WebhookSubscriptionsResource,
+        )
+        assert client.webhooks is client.webhooks

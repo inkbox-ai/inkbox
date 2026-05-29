@@ -219,7 +219,6 @@ export function registerMailboxCommands(program: Command): void {
             emailAddress: mb.emailAddress,
             sendingDomain: mb.sendingDomain,
             id: mb.id,
-            webhookUrl: mb.webhookUrl ?? null,
             filterMode: mb.filterMode,
             agentIdentityId: mb.agentIdentityId,
             createdAt: mb.createdAt,
@@ -235,20 +234,16 @@ export function registerMailboxCommands(program: Command): void {
       "Update a mailbox. Use 'inkbox identity update --display-name' " +
         "to rename — mailbox PATCH does not accept display_name.",
     )
-    .option("--webhook-url <url>", 'Webhook URL (pass "" to clear)')
     .option("--filter-mode <mode>", "Contact-rule filter mode: whitelist or blacklist (admin-only)")
     .action(
       withErrorHandler(async function (
         this: Command,
         emailAddress: string,
-        cmdOpts: { webhookUrl?: string; filterMode?: string },
+        cmdOpts: { filterMode?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        const updateBody: { webhookUrl?: string | null; filterMode?: FilterMode } = {};
-        if (cmdOpts.webhookUrl !== undefined) {
-          updateBody.webhookUrl = cmdOpts.webhookUrl === "" ? null : cmdOpts.webhookUrl;
-        }
+        const updateBody: { filterMode?: FilterMode } = {};
         if (cmdOpts.filterMode !== undefined) {
           updateBody.filterMode = assertFilterMode(cmdOpts.filterMode);
         }
@@ -257,7 +252,6 @@ export function registerMailboxCommands(program: Command): void {
           {
             emailAddress: mb.emailAddress,
             id: mb.id,
-            webhookUrl: mb.webhookUrl ?? null,
             filterMode: mb.filterMode,
             agentIdentityId: mb.agentIdentityId,
           },

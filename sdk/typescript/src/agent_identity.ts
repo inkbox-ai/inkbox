@@ -467,10 +467,12 @@ export class AgentIdentity {
    *
    * The returned message is in `queued` state. The full outbound
    * lifecycle (`text.sent` → `text.delivered` / `text.delivery_failed`
-   * / `text.delivery_unconfirmed`) arrives via the
-   * `incomingTextWebhookUrl` configured on the sender. See
-   * `TextWebhookEventType` and `TextWebhookPayload` for the typed
-   * receiver-side shapes.
+   * / `text.delivery_unconfirmed`) arrives via any webhook
+   * subscription on the sender's phone number whose `eventTypes`
+   * include those lifecycle events
+   * (`inkbox.webhooks.subscriptions.create({ phoneNumberId, url,
+   * eventTypes })`). See `TextWebhookEventType` and `TextWebhookPayload`
+   * for the typed receiver-side shapes.
    *
    * @param options.to - E.164 destination number, or numbers for a group send.
    *   Mutually exclusive with `conversationId`.

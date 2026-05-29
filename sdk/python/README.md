@@ -297,8 +297,9 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
 
 ```python
-# Send SMS/MMS. Returns a queued TextMessage; final delivery state arrives
-# via the incoming_text_webhook_url configured on the sender.
+# Send SMS/MMS. Returns a queued TextMessage; final delivery state
+# arrives via any webhook subscription on the sender's phone number
+# whose event_types include the text.* lifecycle events.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
 
@@ -607,11 +608,10 @@ print(mailbox.email_address)
 print(mailbox.sending_domain)        # bare domain the mailbox sends from
 print(mailbox.agent_identity_id)     # non-null for live customer mailboxes (1:1 invariant)
 
-# Update webhook URL or filter mode. display_name has moved to the
-# identity — set it via identity.update(display_name=...). The mailbox
-# PATCH endpoint hard-rejects display_name with a 422.
-inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")
-inkbox.mailboxes.update(mailbox.email_address, webhook_url=None)  # remove webhook
+# Update filter mode. display_name has moved to the identity — set
+# it via identity.update(display_name=...). The mailbox PATCH
+# endpoint hard-rejects display_name with a 422. To attach a webhook
+# receiver, see "Webhooks" below.
 inkbox.mailboxes.update(mailbox.email_address, filter_mode="whitelist")  # admin-scoped key only
 
 # Full-text search across messages in a mailbox
@@ -738,51 +738,103 @@ like an SSH key dir. `forward_to` is loopback-only by default; pass
 
 ## Webhooks
 
-Webhooks are configured on the mailbox or phone number resource — no separate registration step.
+Webhook delivery uses a dedicated subscription resource. Each
+subscription names exactly one owner (a mailbox **or** a phone
+number), one HTTPS destination URL, and a non-empty subset of the
+catalog's event types. Multiple subscriptions on the same owner fan
+out independently.
 
-### Mailbox webhooks
+The one exception is `phone.incoming_call`, which is a synchronous
+control-plane callback (the response body decides whether Inkbox
+answers). That URL still lives on the phone-number resource as
+`incoming_call_webhook_url`.
 
-Set a URL on a mailbox to receive every mail event for that mailbox.
+### Subscribing to mail or text events
 
 ```python
-# Set webhook
-inkbox.mailboxes.update("abc@inkboxmail.com", webhook_url="https://example.com/hook")
+# Mail subscription: pick the message.* events you want.
+inkbox.webhooks.subscriptions.create(
+    mailbox_id=mailbox.id,
+    url="https://example.com/hook",
+    event_types=["message.received", "message.bounced"],
+)
 
-# Remove webhook
-inkbox.mailboxes.update("abc@inkboxmail.com", webhook_url=None)
+# Text subscription: pick the text.* events you want.
+inkbox.webhooks.subscriptions.create(
+    phone_number_id=number.id,
+    url="https://example.com/texts",
+    event_types=[
+        "text.received",
+        "text.sent",
+        "text.delivered",
+        "text.delivery_failed",
+        "text.delivery_unconfirmed",
+    ],
+)
+
+# List, update, remove.
+subs = inkbox.webhooks.subscriptions.list(mailbox_id=mailbox.id)
+inkbox.webhooks.subscriptions.update(subs[0].id, url="https://new/hook")
+inkbox.webhooks.subscriptions.delete(subs[0].id)
 ```
 
-The same URL receives all six mail event types:
+Available event types:
 
-| `event_type` | When |
+| Channel | `event_type` values |
 |---|---|
-| `message.received` | A new inbound message was stored. |
-| `message.sent` | An outbound message was accepted for delivery. |
-| `message.forwarded` | A stored message was forwarded out. |
-| `message.delivered` | Downstream delivery succeeded. |
-| `message.bounced` | Downstream delivery bounced. |
-| `message.failed` | Delivery ultimately failed. |
+| Mail | `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed` |
+| Phone text | `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed` |
 
-Every payload uses the standard `{event_type, timestamp, data}` envelope. `data["contacts"]` is a list of address-book matches (always present, possibly empty) — inbound events resolve the sender plus every CC, outbound events resolve every To + CC + BCC. Each entry is `{"bucket": "from" | "to" | "cc" | "bcc", "address", "id", "name"}`; receivers should pair to the source field by `(bucket, address)` since the same address may legally appear in multiple buckets on a single send. `data["message"]["bcc_addresses"]` is populated only on outbound events (the sending mailbox owner already knows the BCC list); inbound payloads carry `None` (BCC is not visible to recipients).
+Server-side validation: exactly one of `mailbox_id` /
+`phone_number_id` must be set; `event_types` must be non-empty and
+distinct; every event type must belong to the owner's channel (mailbox
+-> `message.*`, phone number -> `text.*`). On `create` the SDK mirrors
+the structural checks (XOR owner, non-empty, distinct, no
+`phone.incoming_call`) plus the `message.` / `text.` prefix check, so
+most shape mistakes surface as `ValueError` before the request leaves
+the client. The server remains authoritative for the exact event-name
+enum, so a typo with a valid prefix (e.g. `message.received_typo`)
+passes the SDK's check and is rejected as 422 by the server. On
+`update` the SDK mirrors the non-empty / distinct /
+no-`phone.incoming_call` checks; channel coherence is deferred to the
+server because the SDK doesn't know the owner FK from a sub_id alone.
 
-### Phone webhooks
-
-Phone numbers have two independent webhook URLs:
-
-- `incoming_call_webhook_url` — receives the **flat, synchronous** inbound-call payload. Your response (`action: "answer" | "reject"` plus optional `client_websocket_url`) decides what happens to the call. Non-200 responses, invalid bodies, and timeouts are treated as "decline routing" by Inkbox.
-- `incoming_text_webhook_url` — receives **all five** text lifecycle events: `text.received` (inbound), and the four outbound transitions `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed`. Fire-and-forget.
+### Incoming-call webhooks (still per-number)
 
 ```python
-# Route incoming calls to a webhook
+# Route incoming calls to a webhook. The response body controls call routing.
 inkbox.phone_numbers.update(
     number.id,
     incoming_call_action="webhook",
     incoming_call_webhook_url="https://example.com/calls",
-    incoming_text_webhook_url="https://example.com/texts",
 )
 ```
 
-The inbound-call payload is flat — no envelope — and carries a singular `contact: {"id", "name"} | None` at the top level. Text payloads use the standard envelope with `data["contact"]` and `data["text_message"]`. One-to-one text events keep `remote_phone_number`; group outbound rows use `conversation_id`, `sender_phone_number`, and `recipients`, with per-recipient lifecycle webhooks naming the event target in `data["recipient_phone_number"]`. The text-message body includes the full delivery-state block (`delivery_status`, `error_code`, `error_detail`, `sent_at`, `delivered_at`, `failed_at`) so receivers can act on outbound failures without a follow-up API call.
+### Wire shapes
+
+Every mail and text payload uses the standard `{event_type,
+timestamp, data}` envelope. `data["contacts"]` (mail and text) and
+`data["agent_identities"]` are always present, possibly empty.
+`agent_identities` mirrors `contacts` but matches active agent
+identities in the same org. On mail, each list entry carries a
+`bucket: "from" | "to" | "cc" | "bcc"` plus `address`; receivers
+should pair to the source field by `(bucket, address)`.
+`data["message"]["bcc_addresses"]` is populated only on outbound
+events.
+
+Phone-text payloads carry several fields for group sends:
+
+- `text_message["recipients"]` -- `None` on inbound, a one-element
+  list on outbound 1:1, multiple entries on group outbound.
+- `text_message["remote_phone_number"]` -- `None` on group outbound
+  (the per-recipient state is in `recipients[]`).
+- `data["recipient_phone_number"]` -- set on outbound group lifecycle
+  events, names the recipient the event is about. `None` on inbound
+  and on 1:1 outbound.
+
+The inbound-call payload is **flat** -- no envelope -- and carries
+`contacts: list[WebhookContact]` and `agent_identities:
+list[WebhookAgentIdentity]` at the top level.
 
 ### Receiving webhooks (typed)
 
@@ -830,9 +882,10 @@ async def text_hook(request: Request):
             # delivery_status, sent_at, delivered_at are all populated.
             ...
         case "text.received":
-            contact = payload["data"]["contact"]
-            if contact is not None:
+            for contact in payload["data"]["contacts"]:
                 logger.info("inbound from known contact %s", contact["id"])
+            for agent in payload["data"]["agent_identities"]:
+                logger.info("inbound from agent identity %s", agent["agent_handle"])
 ```
 
 Wire shapes are intentionally **snake_case** (the raw JSON body, not the SDK's parsed dataclasses) so `json.loads(body)` round-trips into the `TypedDict` without a transformer. Enum-valued fields like `direction`, `status`, and `delivery_status` are `Literal[...]` string unions rather than the SDK's `StrEnum`s — `json.loads` produces bare strings, and `Literal` unions narrow cleanly under mypy / pyright.

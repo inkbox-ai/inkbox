@@ -54,6 +54,21 @@ export enum TextMessageOrigin {
   AUTO_REPLY = "auto_reply",
 }
 
+/**
+ * A phone number owned by your organization.
+ *
+ * **Webhook setup** splits across two surfaces:
+ * - **Text events** (`text.received`, `text.sent`, `text.delivered`,
+ *   `text.delivery_failed`, `text.delivery_unconfirmed`) — managed via
+ *   `inkbox.webhooks.subscriptions.create({ phoneNumberId, url, eventTypes })`.
+ *   Up to 20 active subscriptions per number.
+ * - **Incoming-call event** (`phone.incoming_call`) — managed via the
+ *   `incomingCallWebhookUrl` field on this resource (synchronous control
+ *   plane: the response body decides answer/reject/ignore, so it can't
+ *   fan out).
+ *
+ * @see {@link WebhookSubscriptionsResource} on `inkbox.webhooks.subscriptions` for text events
+ */
 export interface PhoneNumber {
   id: string;
   number: string;
@@ -72,7 +87,6 @@ export interface PhoneNumber {
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
-  incomingTextWebhookUrl: string | null;
   filterMode: FilterMode;
   /**
    * 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`);
@@ -271,7 +285,6 @@ export interface RawPhoneNumber {
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_call_webhook_url: string | null;
-  incoming_text_webhook_url: string | null;
   filter_mode?: string;
   state?: string | null;
   agent_identity_id?: string | null;
@@ -420,7 +433,6 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
-    incomingTextWebhookUrl: r.incoming_text_webhook_url,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     state: r.state ?? null,
     agentIdentityId: r.agent_identity_id ?? null,

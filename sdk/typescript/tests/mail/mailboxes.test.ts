@@ -77,27 +77,16 @@ describe("parseMailbox sendingDomain", () => {
 });
 
 describe("MailboxesResource.update", () => {
-  it("sends webhook_url and filter_mode", async () => {
+  it("sends filter_mode", async () => {
     const http = mockHttp();
     vi.mocked(http.patch).mockResolvedValue(RAW_MAILBOX);
     const res = new MailboxesResource(http);
 
-    await res.update(ADDR, { webhookUrl: "https://hooks.example/x", filterMode: FilterMode.WHITELIST });
+    await res.update(ADDR, { filterMode: FilterMode.WHITELIST });
 
     expect(http.patch).toHaveBeenCalledWith(`/mailboxes/${ADDR}`, {
-      webhook_url: "https://hooks.example/x",
       filter_mode: "whitelist",
     });
-  });
-
-  it("forwards webhook_url: null to clear", async () => {
-    const http = mockHttp();
-    vi.mocked(http.patch).mockResolvedValue(RAW_MAILBOX);
-    const res = new MailboxesResource(http);
-
-    await res.update(ADDR, { webhookUrl: null });
-
-    expect(http.patch).toHaveBeenCalledWith(`/mailboxes/${ADDR}`, { webhook_url: null });
   });
 
   it("sends empty body when no options provided", async () => {

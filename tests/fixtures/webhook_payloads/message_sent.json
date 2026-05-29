@@ -22,6 +22,9 @@
       {"bucket": "to", "address": "customer@example.com", "id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe"},
       {"bucket": "cc", "address": "legal@example.com", "id": "550e8400-e29b-41d4-a716-446655440001", "name": "Legal Team"},
       {"bucket": "bcc", "address": "audit@inkboxmail.com", "id": "550e8400-e29b-41d4-a716-446655440002", "name": "Audit"}
+    ],
+    "agent_identities": [
+      {"bucket": "to", "address": "customer@example.com", "id": "550e8400-e29b-41d4-a716-446655440011", "agent_handle": "customer-agent", "display_name": null}
     ]
   }
 }

@@ -43,13 +43,14 @@ class MailboxesResource:
         self,
         email_address: str,
         *,
-        webhook_url: str | None = _UNSET,  # type: ignore[assignment]
         filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> Mailbox:
         """Update mutable mailbox fields.
 
-        Only provided fields are applied; omitted fields are left unchanged.
-        Pass ``webhook_url=None`` to unsubscribe from webhooks.
+        Only provided fields are applied; omitted fields are left
+        unchanged. To attach a webhook receiver, use
+        ``inkbox.webhooks.subscriptions.create(mailbox_id=..., url=...,
+        event_types=[...])``.
 
         Note: ``display_name`` has moved to the agent identity. To change
         the human-readable name, call ``identity.update(display_name=...)``
@@ -57,8 +58,6 @@ class MailboxesResource:
 
         Args:
             email_address: Full email address of the mailbox to update.
-            webhook_url: HTTPS URL to receive webhook events, or ``None``
-                to unsubscribe.
             filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on
                 the server — agent-scoped keys will receive 403.
 
@@ -68,8 +67,6 @@ class MailboxesResource:
             populated; otherwise it's ``None``.
         """
         body: dict[str, Any] = {}
-        if webhook_url is not _UNSET:
-            body["webhook_url"] = webhook_url
         if filter_mode is not _UNSET:
             body["filter_mode"] = (
                 filter_mode.value

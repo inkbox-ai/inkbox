@@ -204,8 +204,9 @@ Customer-managed 10DLC brands/campaigns lift the default per-number cap to the c
 
 ```python
 # Send SMS/MMS from this identity's phone number.
-# Returns a queued TextMessage; final delivery state arrives via the
-# incoming_text_webhook_url configured on the sender.
+# Returns a queued TextMessage; final delivery state arrives via any
+# webhook subscription on the sender's phone number whose event_types
+# include the text.* lifecycle events.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
 
@@ -464,9 +465,8 @@ mailboxes = inkbox.mailboxes.list()
 mailbox   = inkbox.mailboxes.get("abc@inkboxmail.com")
 
 # To rename, use `identity.update(display_name="New Name")` — the
-# mailbox PATCH endpoint hard-rejects `display_name` with a 422.
-inkbox.mailboxes.update(mailbox.email_address, webhook_url="https://example.com/hook")
-inkbox.mailboxes.update(mailbox.email_address, webhook_url=None)   # remove webhook
+# mailbox PATCH endpoint hard-rejects `display_name` with a 422. To
+# attach a webhook receiver, see "Webhooks" below.
 
 # Switch contact-rule filter mode (admin-only — agent-scoped keys get 403)
 updated = inkbox.mailboxes.update(mailbox.email_address, filter_mode="whitelist")
@@ -759,15 +759,17 @@ Algorithm: HMAC-SHA256 over `"{request_id}.{timestamp}.{body}"`.
 
 **Event taxonomy:**
 
-- **Mail** (envelope, fire-and-forget): `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed`. All six fire on a mailbox's `webhook_url`.
-- **Text** (envelope, fire-and-forget) — all five fire on a phone number's `incoming_text_webhook_url`: `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed`. The text-message body carries the full delivery-state block (`delivery_status`, `error_code`, `error_detail`, `sent_at`, `delivered_at`, `failed_at`).
-- **Inbound call** (flat, synchronous): `PhoneIncomingCallWebhookPayload` on a phone number's `incoming_call_webhook_url`. No `event_type`/`timestamp`/`data` envelope. The response (`action: "answer" | "reject"` + optional `client_websocket_url`) decides the call's fate. Non-200 responses, invalid bodies, and timeouts are treated as "decline routing" by Inkbox.
+- **Mail** (envelope, fire-and-forget) — `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed`. Subscribe via `inkbox.webhooks.subscriptions.create(mailbox_id=..., url=..., event_types=[...])`.
+- **Text** (envelope, fire-and-forget) — `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via `inkbox.webhooks.subscriptions.create(phone_number_id=..., url=..., event_types=[...])`. The text-message body carries `delivery_status` as an outbound message-level rollup; 1:1 traffic also hoists `error_code`, `error_detail`, `sent_at`, `delivered_at`, and `failed_at`. On group outbound those legacy detail fields are `None` and per-recipient state lives in `recipients[]`.
+- **Inbound call** (flat, synchronous) — `PhoneIncomingCallWebhookPayload` on a phone number's `incoming_call_webhook_url`. Not subscribable; the URL stays on the phone-number resource because the response (`action: "answer" | "reject"` + optional `client_websocket_url`) decides the call's fate. Non-200, invalid bodies, and timeouts are treated as "decline routing" by Inkbox.
 
-**Mail contact resolution:** `data["contacts"]` is a list of `{"bucket", "address", "id", "name"}` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)` — the same address may appear in multiple buckets on a single send, producing one entry per bucket. Outbound payloads also carry `data["message"]["bcc_addresses"]` (`None` on inbound, since BCC is not visible to recipients).
+**Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox **or** phone number), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, `message.` / `text.` prefix matching the owner's channel) so most shape mistakes surface as `ValueError` before the request leaves the client. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
 
-**Phone/text contact resolution:** `data["contact"]` (text) and top-level `contact` (inbound call) is a singular `{"id", "name"} | None` when the event has one address-book target. Group text events carry all delivery rows in `data["text_message"]["recipients"]`; per-recipient lifecycle webhooks name the event target in `data["recipient_phone_number"]`.
+**Mail contact / identity resolution:** `data["contacts"]` and `data["agent_identities"]` are lists of `{"bucket", "address", "id", ...}` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)`. Outbound payloads also carry `data["message"]["bcc_addresses"]` (`None` on inbound, since BCC is not visible to recipients).
 
-Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact` (phone/text), `WebhookMailContact` + `MailContactBucket` (mail), plus event-type `Literal` unions (`MailWebhookEventType`, `TextWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case `TypedDict`s to match the raw JSON body.
+**Phone/text contact / identity resolution:** `data["contacts"]` (text) and top-level `contacts` (inbound call) are lists of `{"id", "name"}` matches; `data["agent_identities"]` mirrors that for matched agent identities. Scoped to the identity that owns the receiving phone number; both default to `[]` when nothing matches. Group text events carry per-recipient delivery rows in `data["text_message"]["recipients"]`; **outbound group lifecycle** events name the event target in `data["recipient_phone_number"]` (one webhook per recipient leg). Inbound and outbound 1:1 events leave `data["recipient_phone_number"]` as `None` — the singular peer is already in `data["text_message"]["remote_phone_number"]` (inbound) or `data["text_message"]["recipients"][0]` (outbound 1:1).
+
+Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `TextMessageRecipientWire`, plus event-type `Literal` unions (`MailWebhookEventType`, `TextWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case `TypedDict`s to match the raw JSON body.
 
 ## Error Handling
 

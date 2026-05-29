@@ -200,11 +200,10 @@ export function registerNumberCommands(program: Command): void {
     .requiredOption("--handle <handle>", "Agent handle to provision for")
     .option("--type <type>", "Number type: toll_free or local", "toll_free")
     .option("--state <state>", "US state abbreviation (for local numbers)")
-    .option("--incoming-text-webhook-url <url>", "Webhook URL for incoming text messages")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { handle: string; type: string; state?: string; incomingTextWebhookUrl?: string },
+        cmdOpts: { handle: string; type: string; state?: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
@@ -212,7 +211,6 @@ export function registerNumberCommands(program: Command): void {
           agentHandle: cmdOpts.handle,
           type: cmdOpts.type,
           state: cmdOpts.state,
-          incomingTextWebhookUrl: cmdOpts.incomingTextWebhookUrl,
         });
         output(
           {
@@ -249,7 +247,6 @@ export function registerNumberCommands(program: Command): void {
             incomingCallAction: num.incomingCallAction ?? null,
             clientWebsocketUrl: num.clientWebsocketUrl ?? null,
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
-            incomingTextWebhookUrl: num.incomingTextWebhookUrl ?? null,
             filterMode: num.filterMode,
             state: num.state,
             agentIdentityId: num.agentIdentityId,
@@ -269,7 +266,6 @@ export function registerNumberCommands(program: Command): void {
     )
     .option("--client-websocket-url <url>", "Client WebSocket URL for audio bridging")
     .option("--incoming-call-webhook-url <url>", "Webhook URL for incoming calls")
-    .option("--incoming-text-webhook-url <url>", "Webhook URL for incoming text messages")
     .option("--filter-mode <mode>", "Contact-rule filter mode: whitelist or blacklist (admin-only)")
     .action(
       withErrorHandler(async function (
@@ -279,7 +275,6 @@ export function registerNumberCommands(program: Command): void {
           incomingCallAction?: string;
           clientWebsocketUrl?: string;
           incomingCallWebhookUrl?: string;
-          incomingTextWebhookUrl?: string;
           filterMode?: string;
         },
       ) {
@@ -289,7 +284,6 @@ export function registerNumberCommands(program: Command): void {
           incomingCallAction: cmdOpts.incomingCallAction,
           clientWebsocketUrl: cmdOpts.clientWebsocketUrl,
           incomingCallWebhookUrl: cmdOpts.incomingCallWebhookUrl,
-          incomingTextWebhookUrl: cmdOpts.incomingTextWebhookUrl,
           filterMode:
             cmdOpts.filterMode !== undefined
               ? assertFilterMode(cmdOpts.filterMode)
@@ -304,7 +298,6 @@ export function registerNumberCommands(program: Command): void {
             incomingCallAction: num.incomingCallAction ?? null,
             clientWebsocketUrl: num.clientWebsocketUrl ?? null,
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
-            incomingTextWebhookUrl: num.incomingTextWebhookUrl ?? null,
             filterMode: num.filterMode,
             agentIdentityId: num.agentIdentityId,
           },
