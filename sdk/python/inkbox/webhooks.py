@@ -232,11 +232,14 @@ class TextWebhookMessage(TypedDict):
       * ``remote_phone_number``: populated on inbound and on outbound
         1:1; ``None`` on group outbound (per-recipient state lives in
         ``recipients``).
-      * Top-level lifecycle block (``delivery_status``, ``error_code``,
+      * ``delivery_status``: populated on outbound. On group outbound this
+        is the message-level rollup across ``recipients``; on inbound it
+        is ``None``.
+      * Legacy top-level lifecycle details (``error_code``,
         ``error_detail``, ``sent_at``, ``delivered_at``, ``failed_at``):
         populated only on outbound 1:1. On group outbound the
         per-recipient values live in ``recipients``; on inbound there
-        is no carrier lifecycle to track, so all six are ``None``.
+        is no carrier lifecycle to track, so all five are ``None``.
     """
     id: str
     direction: TextDirectionWire
