@@ -26,10 +26,6 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-cli/SKILL.md
   Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text, vault, mailbox, number, signing key, and webhook operations.
 
-- `inkbox-openclaw`
-  GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-openclaw/SKILL.md
-  OpenClaw-oriented Inkbox skill for TypeScript usage with environment and dependency setup guidance.
-
 - `inkbox-python`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
   Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, contacts, notes, contact rules, custom sending domains, vault, signing keys, and tunnels.
@@ -71,6 +67,5 @@ These example directories are useful references, but they are not standalone ski
 - Use `inkbox-cli` when the task is operational and best handled with shell commands.
 - Use `inkbox-tunnels` when bringing a local server online at a public Inkbox URL via `inkbox.tunnels.connect(...)`.
 - Use `inkbox-agent-self-signup` when the agent does not have an API key yet and needs to self-register.
-- Use `inkbox-openclaw` when the environment is specifically OpenClaw.
 - Use the example skills when you want a reusable agent prompt rather than SDK integration code.
 - Use the related examples when you want runnable scripts or end-to-end sample workflows instead of a reusable skill prompt.

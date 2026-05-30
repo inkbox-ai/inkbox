@@ -238,7 +238,6 @@ inkbox signup status
 | [`cli/`](./cli/) | CLI (`@inkbox/cli`) |
 | [`skills/inkbox-python/`](./skills/inkbox-python/) | Python agent skill for Claude Code and other coding agents |
 | [`skills/inkbox-ts/`](./skills/inkbox-ts/) | TypeScript agent skill for Claude Code and other coding agents |
-| [`skills/inkbox-openclaw/`](./skills/inkbox-openclaw/) | Inkbox OpenClaw skill — email and phone for your OpenClaw agent |
 | [`skills/inkbox-tunnels/`](./skills/inkbox-tunnels/) | Tunnels skill — bring a local server online at a public Inkbox URL |
 | [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email, phone, and vault |
 | [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
