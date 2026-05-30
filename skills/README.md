@@ -56,7 +56,6 @@ Once the skills are installed, your coding agent will automatically know how to 
 |-------|----------|-------------|
 | **inkbox-python** | Python ≥ 3.11 | Agent signup, identities, email, phone, text, contacts, notes, contact rules, vault, and webhooks using the `inkbox` Python SDK |
 | **inkbox-ts** | TypeScript / Node ≥ 22 | Agent signup, identities, email, phone, text, contacts, notes, contact rules, vault, and webhooks using the `@inkbox/sdk` TypeScript SDK |
-| **inkbox-openclaw** | TypeScript / Node ≥ 22 | OpenClaw skill — agent signup, email, phone, text, contacts, notes, contact rules, and vault for your OpenClaw agent |
 | **inkbox-cli** | TypeScript / Node ≥ 22 | CLI reference for `inkbox` / `@inkbox/cli` commands covering signup, identities, email, phone, text, contacts, notes, contact rules, vault, mailboxes, numbers, webhooks, and signing keys |
 | **inkbox-all** | Language-agnostic | Index of all Inkbox skills in this repository, including example skills and links for choosing the right one |
 | **inkbox-agent-self-signup** | Language-agnostic | Shared reference for the agent self-signup flow — SDK examples (Python & TS) and direct API (curl) |
