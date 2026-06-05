@@ -72,6 +72,7 @@ import {
 } from "./_wsframe.js";
 import {
   dispatchWsUpgradeInProcess,
+  WsServerDraining,
   type InkboxWsHandler,
   type WsBridgeIO,
 } from "./_ws.js";
@@ -91,6 +92,21 @@ export const PING_INTERVAL_MS = 20_000;
 export const PING_ACK_TIMEOUT_MS = 10_000;
 export const BACKOFF_CAP_SEC = 30.0;
 export const BACKOFF_JITTER = 0.25;
+// On drain, keep a post-GOAWAY connection alive for its in-flight bridges
+// up to this long, then force it closed. Bounds the handoff tail.
+export const DRAINING_CONNECTION_CLOSE_TIMEOUT_MS = 90_000;
+// Budget for re-dialing the replacement connection during a handoff (the
+// server may bounce the first hello while it drains). Must stay below the
+// close timeout so a stuck handoff still resolves.
+export const HANDOFF_REDIAL_BUDGET_MS = 30_000;
+// Minimum spacing between handoffs. A real drain rollout spaces GOAWAYs
+// seconds apart per task; this rate-limit keeps a stray/rapid GOAWAY from
+// chaining handoffs in a tight loop (e.g. a fresh conn signalled at once).
+export const HANDOFF_SETTLE_MS = 2_000;
+// How long an HTTP reply waits for an in-flight handoff to publish the new
+// active connection before giving up (the server response deadline + the
+// third-party retry recover a dropped reply).
+export const POST_ACTIVE_WAIT_MS = 5_000;
 
 export const DEFAULT_INBOUND_BODY_BYTES = 32 * 1024 * 1024;
 export const DEFAULT_OUTBOUND_BODY_BYTES = 32 * 1024 * 1024;
@@ -198,6 +214,34 @@ type StreamEvent =
   | { kind: "reset"; code: number };
 
 /**
+ * One persistent h2 connection's state. The runtime holds a single
+ * `active` Connection (the pool that parks new intakes) plus zero-or-more
+ * `draining` ones during a make-before-break handoff. State is
+ * per-connection because two live h2 sessions each allocate stream ids
+ * 1,3,5… — a shared streams map would collide across them.
+ */
+class Connection {
+  session: ClientHttp2Session | null = null;
+  ownerToken: string | null = null;
+  serverPoolSize: number | null = null;
+  intakeIdleSeconds: number | null = null;
+  responseDeadlineSeconds: number | null = null;
+  // Stop parking new intakes once this conn has received GOAWAY.
+  draining = false;
+  readonly streams = new Map<number, StreamBus>();
+  readonly bridgeStreamIds = new Set<number>();
+  pingHandle: NodeJS.Timeout | null = null;
+  pingAbort: AbortController | null = null;
+
+  constructor(readonly id: number) {}
+
+  /** Live WS/TCP bridge count — drives the drain-quiescent check. */
+  get liveBridges(): number {
+    return this.bridgeStreamIds.size;
+  }
+}
+
+/**
  * The data-plane runtime. Construct with the bootstrap-derived
  * tunnelId/secret/zone/publicHost; call `serveForever()` to drive it,
  * `aclose()` to shut down.
@@ -218,15 +262,24 @@ export class TunnelRuntime {
   private readonly rng: () => number;
   private readonly http2Connect: NonNullable<TunnelRuntimeOpts["http2Connect"]>;
 
-  private session: ClientHttp2Session | null = null;
-  private ownerToken: string | null = null;
-  private serverPoolSize: number | null = null;
-  private intakeIdleSeconds: number | null = null;
-  private responseDeadlineSeconds: number | null = null;
+  // The pool that parks new intakes. Swapped atomically on handoff.
+  private active: Connection | null = null;
+  // Post-GOAWAY connections finishing in-flight work before close.
+  private readonly draining = new Set<Connection>();
+  private nextConnId = 1;
+  // True while a make-before-break handoff is dialing the replacement.
+  private handoffInFlight = false;
+  // When the last handoff began (rate-limit, see HANDOFF_SETTLE_MS).
+  private lastHandoffAt = 0;
+  // The in-flight handoff, so the supervisor can await it instead of
+  // hot-spinning if the old session closes mid-dial.
+  private handoffPromise: Promise<void> | null = null;
+  // Resolves the supervisor's wait when the active conn is swapped.
+  private wakeSupervisor: (() => void) | null = null;
 
   private stop = false;
-  private readonly streams = new Map<number, StreamBus>();
-  private readonly bridgeStreamIds = new Set<number>();
+  // Dispatch tasks are runtime-scoped (not per-connection): a handoff must
+  // let an in-flight handler finish and post its reply on the NEW conn.
   private readonly tasks = new Set<Promise<unknown>>();
   // Lazy: built on first passthrough TCP stream; closed in aclose().
   private passthroughDispatch: import("./_dispatch.js").Dispatch | null = null;
@@ -235,8 +288,6 @@ export class TunnelRuntime {
   // fresh Agent per request, which would leak sockets/timers. Closed
   // in aclose().
   private readonly undiciAgentCache: UndiciAgentCache = createUndiciAgentCache();
-  private pingHandle: NodeJS.Timeout | null = null;
-  private pingAbort: AbortController | null = null;
   private shutdownAbort: AbortController = new AbortController();
 
   constructor(opts: TunnelRuntimeOpts) {
@@ -309,11 +360,10 @@ export class TunnelRuntime {
     this.notifyStatus("closed");
   }
 
-  /** Graceful shutdown. Signals all loops to exit; closes the h2 session. */
+  /** Graceful shutdown. Signals all loops to exit; closes every conn. */
   async aclose(): Promise<void> {
     this.stop = true;
     this.shutdownAbort.abort();
-    this.pingAbort?.abort();
     if (this.passthroughDispatch !== null) {
       try {
         await this.passthroughDispatch.aclose();
@@ -327,93 +377,226 @@ export class TunnelRuntime {
     } catch {
       /* swallow */
     }
-    if (this.pingHandle !== null) {
-      clearInterval(this.pingHandle);
-      this.pingHandle = null;
+    // Close active + every draining conn; stop each one's ping loop so no
+    // ping loop leaks across the handoff set.
+    const conns = [this.active, ...this.draining].filter(
+      (c): c is Connection => c !== null,
+    );
+    for (const conn of conns) {
+      this.stopPingLoop(conn);
+      await this.closeConnection(conn);
     }
-    const session = this.session;
-    if (session !== null && !session.closed) {
-      // Tier 1 of the GOAWAY fallback ladder: high-level close().
-      // Node's `Http2Session.close()` waits for in-flight streams to
-      // drain before emitting `close`. The intake pool parks streams
-      // indefinitely, so we explicitly emit GOAWAY and then destroy
-      // after a short grace — this is Tier 4 of the ladder
-      // (bounded drain timeout) and is a known divergence from
-      // Python's no-timeout aclose().
-      try {
-        session.goaway();
-      } catch {
-        /* swallow */
-      }
-      // Cancel parked intake streams: best-effort.
-      for (const sid of this.streams.keys()) {
+  }
+
+  /**
+   * Emit GOAWAY then close/destroy a connection's session, bounded by a
+   * short grace. The intake pool parks streams indefinitely, so a plain
+   * `close()` would never resolve; we GOAWAY then destroy after 250ms.
+   */
+  private async closeConnection(conn: Connection): Promise<void> {
+    const session = conn.session;
+    conn.session = null;
+    if (session === null || session.closed) return;
+    try {
+      session.goaway();
+    } catch {
+      /* swallow */
+    }
+    await new Promise<void>((resolve) => {
+      const t = setTimeout(() => {
         try {
-          // node:http2 does not surface a per-stream cancel from the
-          // session-level alone; ignore — destroy below tears down all
-          // streams atomically.
-          void sid;
+          session.destroy();
         } catch {
           /* swallow */
         }
-      }
-      // Bounded drain: 250ms. Then destroy.
-      await new Promise<void>((resolve) => {
-        const t = setTimeout(() => {
-          try {
-            session.destroy();
-          } catch {
-            /* swallow */
-          }
-          resolve();
-        }, 250);
-        session.once("close", () => {
-          clearTimeout(t);
-          resolve();
-        });
-        try {
-          session.close();
-        } catch {
-          clearTimeout(t);
-          try {
-            session.destroy();
-          } catch {
-            /* swallow */
-          }
-          resolve();
-        }
+        resolve();
+      }, 250);
+      session.once("close", () => {
+        clearTimeout(t);
+        resolve();
       });
-    }
+      try {
+        session.close();
+      } catch {
+        clearTimeout(t);
+        try {
+          session.destroy();
+        } catch {
+          /* swallow */
+        }
+        resolve();
+      }
+    });
   }
 
   // --- per-connection lifecycle -----------------------------------------
 
   private async runOnce(): Promise<void> {
-    await this.openConnection();
+    const first = new Connection(this.nextConnId++);
+    let conn = first;
+    this.active = first;
     try {
-      await this.sendHello();
+      await this.openConnection(first);
+      await this.sendHello(first);
       this.notifyStatus("connected");
-      const effectivePool =
-        this.serverPoolSize ?? this.poolSize ?? 1;
-      const intakes: Array<Promise<void>> = [];
-      for (let slot = 0; slot < effectivePool; slot++) {
-        intakes.push(this.intakeLoop(slot));
+      this.startServing(first);
+      // Supervise the active connection. A GOAWAY handoff swaps in a new
+      // active conn out-of-band; follow it without going through the
+      // backoff loop. Only a cold death (active conn closed with no
+      // successor) returns, so serveForever reconnects with backoff.
+      while (!this.stop) {
+        await this.waitCloseOrHandoff(conn);
+        if (this.stop) break;
+        // If a handoff is dialing the replacement, wait for it to resolve
+        // before deciding — yields to the event loop so the dial's IO
+        // isn't starved by re-racing an already-closed old session.
+        if (this.handoffInFlight && this.handoffPromise !== null) {
+          await this.handoffPromise;
+        }
+        const next = this.active;
+        if (next !== null && next !== conn && !next.draining) {
+          conn = next;
+          continue;
+        }
+        const session = conn.session;
+        if (session === null || session.closed || session.destroyed) break;
       }
-      this.startPingLoop();
-      // Wait for the session to close (read pump implicitly drives via
-      // `session.on('close', ...)`).
-      await this.waitForSessionClose();
-      // Cancel intake loops; they exit when stop is set or session
-      // closes (read pump drains queue events).
-      await Promise.allSettled(intakes);
     } finally {
-      this.stopPingLoop();
-      this.streams.clear();
-      this.bridgeStreamIds.clear();
-      this.session = null;
+      this.stopPingLoop(conn);
+      conn.streams.clear();
+      conn.bridgeStreamIds.clear();
+      conn.session = null;
+      if (this.active === conn) this.active = null;
     }
   }
 
-  private async openConnection(): Promise<void> {
+  /** Spawn a connection's intake pool + ping loop (cold open or handoff). */
+  private startServing(conn: Connection): void {
+    const effectivePool = conn.serverPoolSize ?? this.poolSize ?? 1;
+    for (let slot = 0; slot < effectivePool; slot++) {
+      // Fire-and-forget: each slot self-terminates when the conn closes
+      // or starts draining.
+      void this.intakeLoop(conn, slot).catch(() => undefined);
+    }
+    this.startPingLoop(conn);
+  }
+
+  /** Resolve once the supervised conn closes OR a handoff swaps active. */
+  private waitCloseOrHandoff(conn: Connection): Promise<void> {
+    const closed = new Promise<void>((resolve) => {
+      const session = conn.session;
+      if (session === null || session.closed) {
+        resolve();
+        return;
+      }
+      session.once("close", () => resolve());
+    });
+    const woken = new Promise<void>((resolve) => {
+      this.wakeSupervisor = resolve;
+    });
+    return Promise.race([closed, woken]).finally(() => {
+      this.wakeSupervisor = null;
+    });
+  }
+
+  private signalSupervisor(): void {
+    const w = this.wakeSupervisor;
+    this.wakeSupervisor = null;
+    if (w !== null) w();
+  }
+
+  // --- make-before-break handoff ----------------------------------------
+
+  /**
+   * On a NO_ERROR GOAWAY, mark the old conn draining and stand up a fresh
+   * connection before closing it. In-band: never trips the backoff loop.
+   */
+  private beginHandoff(oldConn: Connection): void {
+    if (
+      this.stop ||
+      oldConn.draining ||
+      this.active !== oldConn ||
+      this.handoffInFlight ||
+      Date.now() - this.lastHandoffAt < HANDOFF_SETTLE_MS
+    ) {
+      return;
+    }
+    this.handoffInFlight = true;
+    this.lastHandoffAt = Date.now();
+    oldConn.draining = true;
+    this.draining.add(oldConn);
+    // Stop the draining conn's ping loop: it's expected to close, and we
+    // don't want two ping loops racing across the handoff set.
+    this.stopPingLoop(oldConn);
+    this.handoffPromise = this.runHandoff(oldConn);
+  }
+
+  private async runHandoff(oldConn: Connection): Promise<void> {
+    try {
+      const newConn = await this.makeReplacementConnection();
+      this.active = newConn;
+      // Supervisor was watching oldConn; wake it to follow newConn.
+      this.signalSupervisor();
+    } catch (err) {
+      // Redial budget exhausted (or auth failure): give up on
+      // make-before-break and fall to the cold reconnect path by forcing
+      // the old session closed so the supervisor returns.
+      // eslint-disable-next-line no-console
+      console.warn("tunnel runtime: handoff failed; reconnecting cold", err);
+      try { oldConn.session?.destroy(); } catch { /* swallow */ }
+      this.signalSupervisor();
+    } finally {
+      this.handoffInFlight = false;
+      this.handoffPromise = null;
+      // Close the old conn once its bridges finish (or the deadline hits).
+      void this.drainOldConnection(oldConn);
+    }
+  }
+
+  /** Dial + hello + park a replacement, retrying transient hello failures. */
+  private async makeReplacementConnection(): Promise<Connection> {
+    let backoff = 0.1;
+    const start = Date.now();
+    while (!this.stop) {
+      const conn = new Connection(this.nextConnId++);
+      try {
+        await this.openConnection(conn);
+        await this.sendHello(conn);
+        this.startServing(conn);
+        return conn;
+      } catch (err) {
+        try { await this.closeConnection(conn); } catch { /* swallow */ }
+        if (err instanceof TunnelAuthError) throw err;
+        if (Date.now() - start > HANDOFF_REDIAL_BUDGET_MS) {
+          throw new Error("handoff redial budget exhausted");
+        }
+        // A drain 503 on the new hello means the NLB landed us back on the
+        // draining task; back off (jittered) so it re-routes us elsewhere.
+        const jitter = backoff * BACKOFF_JITTER * (2 * this.rng() - 1);
+        await setTimeoutPromise(Math.max(50, (backoff + jitter) * 1000), undefined, {
+          signal: this.shutdownAbort.signal,
+        }).catch(() => undefined);
+        backoff = Math.min(backoff * 2, 5.0);
+      }
+    }
+    throw new Error("runtime stopped during handoff");
+  }
+
+  /** Wait for a draining conn's bridges to finish, then close it. */
+  private async drainOldConnection(oldConn: Connection): Promise<void> {
+    const deadline = Date.now() + DRAINING_CONNECTION_CLOSE_TIMEOUT_MS;
+    // Node keeps existing streams running after a NO_ERROR GOAWAY, so let
+    // live WS/TCP bridges finish until they drain or the deadline hits.
+    while (oldConn.liveBridges > 0 && Date.now() < deadline && !this.stop) {
+      await setTimeoutPromise(250).catch(() => undefined);
+    }
+    await this.closeConnection(oldConn);
+    oldConn.streams.clear();
+    oldConn.bridgeStreamIds.clear();
+    this.draining.delete(oldConn);
+  }
+
+  private async openConnection(conn: Connection): Promise<void> {
     const authority = `https://${this.zone}`;
     const session = this.http2Connect(authority, {
       ALPNProtocols: ["h2"],
@@ -423,13 +606,13 @@ export class TunnelRuntime {
       // workaround. Node http2 either accepts `:protocol` or doesn't
       // (Spike 1) — the setting line doesn't translate.
     });
-    this.session = session;
+    conn.session = session;
     session.on("close", () => {
       // eslint-disable-next-line no-console
       console.info("tunnel runtime: h2 session closed");
       // Drain all open streams with a synthetic reset event so any
       // awaiters wake up.
-      for (const [, bus] of this.streams) {
+      for (const [, bus] of conn.streams) {
         if (!bus.ended) {
           bus.events.push({ kind: "reset", code: 0 });
           bus.ended = true;
@@ -449,6 +632,12 @@ export class TunnelRuntime {
       console.info(
         `tunnel runtime: GOAWAY received error_code=${errorCode} last_stream_id=${lastStreamId}`,
       );
+      // NO_ERROR GOAWAY is the server's drain signal: stand up a fresh
+      // connection make-before-break. A non-zero code is a real fault —
+      // let the session close and reconnect cold.
+      if (errorCode === 0) {
+        this.beginHandoff(conn);
+      }
     });
     // Watch the underlying TCP/TLS socket directly. Node's h2 client
     // sometimes loses the connection without emitting ``error`` or
@@ -510,8 +699,8 @@ export class TunnelRuntime {
     }
   }
 
-  private waitForSessionClose(): Promise<void> {
-    const session = this.session;
+  private waitForSessionClose(conn: Connection): Promise<void> {
+    const session = conn.session;
     if (session === null) return Promise.resolve();
     return new Promise<void>((resolve) => {
       if (session.closed) {
@@ -524,11 +713,11 @@ export class TunnelRuntime {
 
   // --- handshake ---------------------------------------------------------
 
-  private async sendHello(): Promise<void> {
-    this.ownerToken = null;
-    this.serverPoolSize = null;
-    this.intakeIdleSeconds = null;
-    this.responseDeadlineSeconds = null;
+  private async sendHello(conn: Connection): Promise<void> {
+    conn.ownerToken = null;
+    conn.serverPoolSize = null;
+    conn.intakeIdleSeconds = null;
+    conn.responseDeadlineSeconds = null;
 
     const helloHeaders: http2.OutgoingHttpHeaders = {
       [HTTP2_HEADER_METHOD]: "POST",
@@ -542,8 +731,8 @@ export class TunnelRuntime {
     if (this.poolSize !== null) {
       helloHeaders[ControlHeaders.POOL_SIZE] = String(this.poolSize);
     }
-    const stream = this.openStream(helloHeaders, { endStream: true });
-    const { status, body } = await this.awaitResponse(stream.streamId);
+    const stream = this.openStream(conn, helloHeaders, { endStream: true });
+    const { status, body } = await this.awaitResponse(conn, stream.streamId);
     if (status === 401 || status === 403) {
       throw new TunnelAuthError(
         `${ControlPaths.HELLO} returned ${status}; the API key was rejected (check the key matches the tunnel's identity scope, or use an admin-scoped key in the tunnel's org)`,
@@ -568,15 +757,15 @@ export class TunnelRuntime {
         `${ControlPaths.HELLO} response missing owner_token; cannot park intake`,
       );
     }
-    this.ownerToken = ownerToken;
+    conn.ownerToken = ownerToken;
     if (typeof payload["default_pool_size"] === "number") {
-      this.serverPoolSize = payload["default_pool_size"] as number;
+      conn.serverPoolSize = payload["default_pool_size"] as number;
     }
     if (typeof payload["intake_idle_seconds"] === "number") {
-      this.intakeIdleSeconds = payload["intake_idle_seconds"] as number;
+      conn.intakeIdleSeconds = payload["intake_idle_seconds"] as number;
     }
     if (typeof payload["response_deadline_seconds"] === "number") {
-      this.responseDeadlineSeconds = payload[
+      conn.responseDeadlineSeconds = payload[
         "response_deadline_seconds"
       ] as number;
     }
@@ -585,10 +774,11 @@ export class TunnelRuntime {
   // --- stream helpers ----------------------------------------------------
 
   private openStream(
+    conn: Connection,
     headers: http2.OutgoingHttpHeaders,
     opts: { endStream: boolean },
   ): { stream: ClientHttp2Stream; streamId: number } {
-    const session = this.session;
+    const session = conn.session;
     if (session === null) throw new Error("h2 connection not open");
     const stream = session.request(headers, { endStream: opts.endStream });
     const bus: StreamBus = {
@@ -604,7 +794,7 @@ export class TunnelRuntime {
       // In practice Node assigns the id synchronously; this is a guard.
       throw new Error("h2 stream id not assigned synchronously");
     }
-    this.streams.set(streamId, bus);
+    conn.streams.set(streamId, bus);
     stream.on("response", (responseHeaders) => {
       const flat: Array<[string, string]> = [];
       for (const k of Object.keys(responseHeaders)) {
@@ -649,8 +839,11 @@ export class TunnelRuntime {
     }
   }
 
-  private async nextEvent(streamId: number): Promise<StreamEvent | null> {
-    const bus = this.streams.get(streamId);
+  private async nextEvent(
+    conn: Connection,
+    streamId: number,
+  ): Promise<StreamEvent | null> {
+    const bus = conn.streams.get(streamId);
     if (bus === undefined) return null;
     while (true) {
       const ev = bus.events.shift();
@@ -666,15 +859,16 @@ export class TunnelRuntime {
   }
 
   private async awaitResponse(
+    conn: Connection,
     streamId: number,
   ): Promise<{ status: number; body: Buffer }> {
     const chunks: Buffer[] = [];
     let status = 0;
     let gotHeaders = false;
     while (true) {
-      const ev = await this.nextEvent(streamId);
+      const ev = await this.nextEvent(conn, streamId);
       if (ev === null) {
-        this.streams.delete(streamId);
+        conn.streams.delete(streamId);
         return { status, body: Buffer.concat(chunks) };
       }
       if (ev.kind === "headers" && !gotHeaders) {
@@ -685,7 +879,7 @@ export class TunnelRuntime {
       } else if (ev.kind === "data") {
         chunks.push(ev.data);
       } else if (ev.kind === "end" || ev.kind === "reset") {
-        this.streams.delete(streamId);
+        conn.streams.delete(streamId);
         return { status, body: Buffer.concat(chunks) };
       }
     }
@@ -693,11 +887,16 @@ export class TunnelRuntime {
 
   // --- intake pool -------------------------------------------------------
 
-  private async intakeLoop(slot: number): Promise<void> {
-    while (!this.stop && this.session !== null && !this.session.closed) {
+  private async intakeLoop(conn: Connection, slot: number): Promise<void> {
+    while (
+      !this.stop &&
+      !conn.draining &&
+      conn.session !== null &&
+      !conn.session.closed
+    ) {
       let envelope: Envelope | null;
       try {
-        envelope = await this.parkOneIntake(slot);
+        envelope = await this.parkOneIntake(conn, slot);
       } catch (err) {
         if (err instanceof OwnerTokenInvalidError) {
           // eslint-disable-next-line no-console
@@ -705,10 +904,10 @@ export class TunnelRuntime {
             `intake slot ${slot}: owner_token rejected; ` +
               `forcing session.destroy() and reconnecting`,
           );
-          this.session?.destroy();
+          conn.session?.destroy();
           return;
         }
-        if (isSessionTerminalError(err) || this.session?.destroyed) {
+        if (isSessionTerminalError(err) || conn.session?.destroyed) {
           // The h2 session is gone — every subsequent openStream will
           // throw the same error. Don't retry-storm; exit the slot so
           // ``runOnce`` observes ``waitForSessionClose`` resolve and
@@ -723,7 +922,7 @@ export class TunnelRuntime {
               `exiting slot`,
             err,
           );
-          try { this.session?.destroy(); } catch { /* swallow */ }
+          try { conn.session?.destroy(); } catch { /* swallow */ }
           return;
         }
         // eslint-disable-next-line no-console
@@ -732,8 +931,10 @@ export class TunnelRuntime {
         continue;
       }
       if (envelope === null) continue;
-      // Fire-and-forget dispatch; tracked so we can join on shutdown.
-      const task = this.dispatchEnvelope(envelope).catch((err) => {
+      // Fire-and-forget dispatch; tracked on the runtime (not the conn) so
+      // an in-flight handler survives this conn draining and can post its
+      // reply on the new active conn during a handoff.
+      const task = this.dispatchEnvelope(conn, envelope).catch((err) => {
         // eslint-disable-next-line no-console
         console.warn(`dispatch failed request_id=${envelope!.requestId}`, err);
       });
@@ -742,8 +943,11 @@ export class TunnelRuntime {
     }
   }
 
-  private async parkOneIntake(slot: number): Promise<Envelope | null> {
-    if (this.ownerToken === null) {
+  private async parkOneIntake(
+    conn: Connection,
+    slot: number,
+  ): Promise<Envelope | null> {
+    if (conn.ownerToken === null) {
       throw new Error(
         "intake parked before /_system/hello returned an owner_token",
       );
@@ -754,17 +958,17 @@ export class TunnelRuntime {
       [HTTP2_HEADER_AUTHORITY]: this.zone,
       [HTTP2_HEADER_PATH]: ControlPaths.INTAKE,
       [ControlHeaders.TUNNEL_ID]: this.tunnelId,
-      [ControlHeaders.OWNER_TOKEN]: this.ownerToken,
+      [ControlHeaders.OWNER_TOKEN]: conn.ownerToken,
       [ControlHeaders.POOL_SLOT]: String(slot),
       "content-length": "0",
     };
-    const { streamId } = this.openStream(headers, { endStream: true });
+    const { streamId } = this.openStream(conn, headers, { endStream: true });
     let recvHeaders: Array<[string, string]> | null = null;
     const chunks: Buffer[] = [];
     while (true) {
-      const ev = await this.nextEvent(streamId);
+      const ev = await this.nextEvent(conn, streamId);
       if (ev === null) {
-        this.streams.delete(streamId);
+        conn.streams.delete(streamId);
         return null;
       }
       if (ev.kind === "headers" && recvHeaders === null) {
@@ -774,11 +978,11 @@ export class TunnelRuntime {
       } else if (ev.kind === "end") {
         break;
       } else if (ev.kind === "reset") {
-        this.streams.delete(streamId);
+        conn.streams.delete(streamId);
         return null;
       }
     }
-    this.streams.delete(streamId);
+    conn.streams.delete(streamId);
     if (recvHeaders === null) return null;
     const status =
       recvHeaders.find(([k]) => k === HTTP2_HEADER_STATUS)?.[1] ?? "0";
@@ -801,10 +1005,10 @@ export class TunnelRuntime {
 
   // --- ping loop ---------------------------------------------------------
 
-  private startPingLoop(): void {
-    this.pingAbort = new AbortController();
-    this.pingHandle = setInterval(() => {
-      const session = this.session;
+  private startPingLoop(conn: Connection): void {
+    conn.pingAbort = new AbortController();
+    conn.pingHandle = setInterval(() => {
+      const session = conn.session;
       if (session === null || session.closed) return;
       let ackTimer: NodeJS.Timeout | null = null;
       let acked = false;
@@ -853,21 +1057,24 @@ export class TunnelRuntime {
     // Do NOT unref(): explicit cancellation in stopPingLoop().
   }
 
-  private stopPingLoop(): void {
-    if (this.pingHandle !== null) {
-      clearInterval(this.pingHandle);
-      this.pingHandle = null;
+  private stopPingLoop(conn: Connection): void {
+    if (conn.pingHandle !== null) {
+      clearInterval(conn.pingHandle);
+      conn.pingHandle = null;
     }
-    this.pingAbort?.abort();
-    this.pingAbort = null;
+    conn.pingAbort?.abort();
+    conn.pingAbort = null;
   }
 
   // --- envelope dispatch -------------------------------------------------
 
-  private async dispatchEnvelope(envelope: Envelope): Promise<void> {
+  private async dispatchEnvelope(
+    conn: Connection,
+    envelope: Envelope,
+  ): Promise<void> {
     if (envelope.routeKind === TunnelRouteKind.WS_UPGRADE) {
       try {
-        await this.dispatchWsUpgrade(envelope);
+        await this.dispatchWsUpgrade(conn, envelope);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn(`ws dispatch failed request_id=${envelope.requestId}`, err);
@@ -877,7 +1084,7 @@ export class TunnelRuntime {
     if (envelope.routeKind === TunnelRouteKind.TCP_STREAM) {
       // Passthrough TCP bridge — defer until M4 lands here.
       try {
-        await this.dispatchTcpStream(envelope);
+        await this.dispatchTcpStream(conn, envelope);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn(
@@ -888,12 +1095,12 @@ export class TunnelRuntime {
       return;
     }
     try {
-      await this.dispatchHttp(envelope);
+      await this.dispatchHttp(conn, envelope);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn(`dispatch failed request_id=${envelope.requestId}`, err);
       try {
-        await this.postResponse(envelope.requestId, 500, [["content-type", "text/plain"]], Buffer.from("internal error"));
+        await this.postHttpResponse(conn, envelope.requestId, 500, [["content-type", "text/plain"]], Buffer.from("internal error"));
       } catch {
         /* swallow */
       }
@@ -902,10 +1109,10 @@ export class TunnelRuntime {
 
   // --- HTTP dispatch -----------------------------------------------------
 
-  private async dispatchHttp(envelope: Envelope): Promise<void> {
+  private async dispatchHttp(conn: Connection, envelope: Envelope): Promise<void> {
     const reject = validateEnvelopePath(envelope.path);
     if (reject !== null) {
-      await this.postResponse(envelope.requestId, 400, [
+      await this.postHttpResponse(conn, envelope.requestId, 400, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, reject],
       ], Buffer.from("invalid path"));
@@ -919,14 +1126,14 @@ export class TunnelRuntime {
     } catch (err) {
       const reason = err instanceof BodyTooLargeError ? "request-body-too-large" : "body-fetch-failed";
       const status = err instanceof BodyTooLargeError ? 413 : 502;
-      await this.postResponse(envelope.requestId, status, [
+      await this.postHttpResponse(conn, envelope.requestId, status, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, reason],
       ], Buffer.from(reason));
       return;
     }
 
-    const deadlineMs = (this.responseDeadlineSeconds ?? 0) * 1000;
+    const deadlineMs = (conn.responseDeadlineSeconds ?? 0) * 1000;
     const ctrl = new AbortController();
     let deadlineHandle: NodeJS.Timeout | null = null;
     // Sentinel resolved by the deadline timer — used as the loser side
@@ -992,7 +1199,7 @@ export class TunnelRuntime {
         // the server-side deadline, and a late ``postResponse`` would
         // target a request the tunnel server has already 504'd.
         dispatchPromise.catch(() => undefined);
-        await this.postResponse(envelope.requestId, 504, [
+        await this.postHttpResponse(conn, envelope.requestId, 504, [
           ["content-type", "text/plain"],
           [TunnelMetaHeader.REASON, "response-deadline-exceeded"],
         ], Buffer.from("local handler too slow"));
@@ -1001,14 +1208,14 @@ export class TunnelRuntime {
       if (outcome.kind === "in-process") {
         const inProcess = outcome.result;
         if (inProcess.kind === "ok") {
-          await this.postResponse(
+          await this.postHttpResponse(conn, 
             envelope.requestId,
             inProcess.status,
             filterResponseHeaders(inProcess.headers),
             inProcess.body,
           );
         } else {
-          await this.postResponse(envelope.requestId, inProcess.status, [
+          await this.postHttpResponse(conn, envelope.requestId, inProcess.status, [
             ["content-type", "text/plain"],
             [TunnelMetaHeader.REASON, inProcess.inkboxReason],
           ], Buffer.from(inProcess.inkboxReason));
@@ -1018,14 +1225,14 @@ export class TunnelRuntime {
       if (outcome.kind === "url-forward") {
         const result = outcome.result;
         if (result.kind === "ok") {
-          await this.postResponse(
+          await this.postHttpResponse(conn, 
             envelope.requestId,
             result.status,
             filterResponseHeaders(result.headers),
             result.body,
           );
         } else {
-          await this.postResponse(envelope.requestId, result.status, [
+          await this.postHttpResponse(conn, envelope.requestId, result.status, [
             ["content-type", "text/plain"],
             [TunnelMetaHeader.REASON, result.inkboxReason],
           ], Buffer.from(result.inkboxReason));
@@ -1034,7 +1241,7 @@ export class TunnelRuntime {
       }
       // No HTTP path configured — should be impossible if connect()
       // validation is correct, but defend.
-      await this.postResponse(envelope.requestId, 501, [
+      await this.postHttpResponse(conn, envelope.requestId, 501, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, "no-http-handler"],
       ], Buffer.from("no http handler"));
@@ -1073,9 +1280,9 @@ export class TunnelRuntime {
 
   // --- WS dispatch -------------------------------------------------------
 
-  private async dispatchWsUpgrade(envelope: Envelope): Promise<void> {
+  private async dispatchWsUpgrade(conn: Connection, envelope: Envelope): Promise<void> {
     if (envelope.wsId === null) {
-      await this.postResponse(envelope.requestId, 400, [
+      await this.postResponse(conn, envelope.requestId, 400, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, "missing-ws-id"],
       ], Buffer.from("missing ws_id"));
@@ -1085,7 +1292,7 @@ export class TunnelRuntime {
     // validateEnvelopePath check, so apply it here too.
     const reject = validateEnvelopePath(envelope.path);
     if (reject !== null) {
-      await this.postResponse(envelope.requestId, 400, [
+      await this.postResponse(conn, envelope.requestId, 400, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, reject],
       ], Buffer.from("invalid path"));
@@ -1096,20 +1303,20 @@ export class TunnelRuntime {
       this.dispatch.wsHandler === undefined &&
       this.dispatch.forwardTo !== undefined
     ) {
-      await this.dispatchWsUpgradeToUrl(envelope, this.dispatch.forwardTo);
+      await this.dispatchWsUpgradeToUrl(conn, envelope, this.dispatch.forwardTo);
       return;
     }
     if (this.dispatch.wsHandler === undefined) {
       // No URL upstream and no in-process WS handler — reject 501.
-      await this.postResponse(envelope.requestId, 501, [
+      await this.postResponse(conn, envelope.requestId, 501, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, "ws-not-supported"],
       ], Buffer.from("ws upgrade not supported"));
       return;
     }
 
-    const acceptDeadlineMs = (this.responseDeadlineSeconds ?? 30) * 1000;
-    const bridge = await this.openWsBridge(envelope);
+    const acceptDeadlineMs = (conn.responseDeadlineSeconds ?? 30) * 1000;
+    const bridge = await this.openWsBridge(conn, envelope);
 
     try {
       await dispatchWsUpgradeInProcess({
@@ -1125,6 +1332,7 @@ export class TunnelRuntime {
   }
 
   private async dispatchWsUpgradeToUrl(
+    conn: Connection,
     envelope: Envelope,
     forwardTo: string,
   ): Promise<void> {
@@ -1151,8 +1359,8 @@ export class TunnelRuntime {
     // Floor at 1ms (not 1s) — sub-second response deadlines are valid
     // and must be honored. Earlier shape clamped 0.1s up to 1s.
     const handshakeTimeoutMs =
-      this.responseDeadlineSeconds !== null
-        ? Math.max(1, this.responseDeadlineSeconds * 1000)
+      conn.responseDeadlineSeconds !== null
+        ? Math.max(1, conn.responseDeadlineSeconds * 1000)
         : undefined;
     try {
       upstream = await openWsUpstream({
@@ -1168,7 +1376,7 @@ export class TunnelRuntime {
       });
     } catch (e) {
       const status = e instanceof WsUpstreamError ? e.status : 502;
-      await this.postResponse(envelope.requestId, status, [
+      await this.postResponse(conn, envelope.requestId, status, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, "ws-upstream-failed"],
       ], Buffer.from("upstream ws upgrade failed"));
@@ -1200,7 +1408,7 @@ export class TunnelRuntime {
       upgradeReplyHeaders.push([hk, hv]);
     }
 
-    const bridge = await this.openWsBridge(envelope);
+    const bridge = await this.openWsBridge(conn, envelope);
     try {
       // postUpgradeReply both posts the 200 AND opens the inkbox bridge
       // CONNECT stream — skipping it (an earlier draft did) leaves
@@ -1250,6 +1458,7 @@ export class TunnelRuntime {
   }
 
   private async openWsBridge(
+    conn: Connection,
     envelope: Envelope,
   ): Promise<{ io: WsBridgeIO; cleanup: () => void }> {
     const wsId = envelope.wsId!;
@@ -1275,7 +1484,7 @@ export class TunnelRuntime {
     const postUpgradeReply = async (
       headers: Array<[string, string]>,
     ): Promise<void> => {
-      await this.postResponse(requestId, 200, headers, Buffer.alloc(0));
+      await this.postResponse(conn, requestId, 200, headers, Buffer.alloc(0));
       // Open the extended-CONNECT bridge stream after the upgrade reply.
       const connectHeaders: http2.OutgoingHttpHeaders = {
         [HTTP2_HEADER_METHOD]: "CONNECT",
@@ -1289,10 +1498,10 @@ export class TunnelRuntime {
         [ControlHeaders.API_KEY]: this.apiKey,
         [TunnelMetaHeader.WS_ID]: wsId,
       };
-      const opened = this.openStream(connectHeaders, { endStream: false });
+      const opened = this.openStream(conn, connectHeaders, { endStream: false });
       connectStreamId = opened.streamId;
       bridgeStream = opened.stream;
-      this.bridgeStreamIds.add(connectStreamId);
+      conn.bridgeStreamIds.add(connectStreamId);
       try {
         // Wait for the 200 on the bridge stream — bounded so a server
         // that never replies can't wedge the dispatch task after the
@@ -1300,7 +1509,7 @@ export class TunnelRuntime {
         // _with_deadline + the TCP passthrough's
         // BRIDGE_STATUS_TIMEOUT_MS race.
         const ev = await Promise.race([
-          this.nextEvent(connectStreamId),
+          this.nextEvent(conn, connectStreamId),
           setTimeoutPromise(BRIDGE_STATUS_TIMEOUT_MS).then(
             () => "timeout" as const,
           ),
@@ -1332,7 +1541,7 @@ export class TunnelRuntime {
       status: number,
       reason: string,
     ): Promise<void> => {
-      await this.postResponse(requestId, status, [
+      await this.postResponse(conn, requestId, status, [
         ["content-type", "text/plain"],
         [TunnelMetaHeader.REASON, reason],
       ], Buffer.from(reason));
@@ -1351,14 +1560,24 @@ export class TunnelRuntime {
       return (async function* () {
         while (true) {
           const id = sid();
-          if (id === null) return;
-          const ev = await self.nextEvent(id);
-          if (ev === null) return;
+          if (id === null) {
+            if (conn.draining) throw new WsServerDraining();
+            return;
+          }
+          const ev = await self.nextEvent(conn, id);
+          if (ev === null) {
+            if (conn.draining) throw new WsServerDraining();
+            return;
+          }
           if (ev.kind === "data") {
             yield ev.data;
           } else if (ev.kind === "end") {
+            if (conn.draining) throw new WsServerDraining();
             return;
           } else if (ev.kind === "reset") {
+            // A reset while the conn is draining is the redeploy drain, not
+            // a peer error — surface it typed so the handler can reconnect.
+            if (conn.draining) throw new WsServerDraining();
             throw new Error(`bridge stream reset code=${ev.code}`);
           }
         }
@@ -1402,8 +1621,8 @@ export class TunnelRuntime {
         }
       }
       if (connectStreamId !== null) {
-        this.bridgeStreamIds.delete(connectStreamId);
-        this.streams.delete(connectStreamId);
+        conn.bridgeStreamIds.delete(connectStreamId);
+        conn.streams.delete(connectStreamId);
       }
     };
 
@@ -1415,7 +1634,7 @@ export class TunnelRuntime {
 
   // --- TCP-stream bridge (passthrough) ----------------------------------
 
-  private async dispatchTcpStream(envelope: Envelope): Promise<void> {
+  private async dispatchTcpStream(conn: Connection, envelope: Envelope): Promise<void> {
     if (
       this.tlsTerminator === null ||
       (this.dispatch.forwardTo === undefined &&
@@ -1445,16 +1664,16 @@ export class TunnelRuntime {
       [ControlHeaders.API_KEY]: this.apiKey,
       [TunnelMetaHeader.TCP_ID]: tcpId,
     };
-    const { stream, streamId } = this.openStream(connectHeaders, {
+    const { stream, streamId } = this.openStream(conn, connectHeaders, {
       endStream: false,
     });
-    this.bridgeStreamIds.add(streamId);
+    conn.bridgeStreamIds.add(streamId);
 
     // 2) Wait for status 200 with timeout.
     let openOk = false;
     try {
       const ev = await Promise.race([
-        this.nextEvent(streamId),
+        this.nextEvent(conn, streamId),
         setTimeoutPromise(BRIDGE_STATUS_TIMEOUT_MS).then(() => "timeout"),
       ]);
       if (ev !== null && ev !== "timeout" && typeof ev !== "string" && ev.kind === "headers") {
@@ -1472,8 +1691,8 @@ export class TunnelRuntime {
       } catch {
         /* swallow */
       }
-      this.bridgeStreamIds.delete(streamId);
-      this.streams.delete(streamId);
+      conn.bridgeStreamIds.delete(streamId);
+      conn.streams.delete(streamId);
       return;
     }
 
@@ -1591,7 +1810,7 @@ export class TunnelRuntime {
       let pendingFrags: Buffer | null = null;
       try {
         while (true) {
-          const ev = await this.nextEvent(streamId);
+          const ev = await this.nextEvent(conn, streamId);
           if (ev === null) return;
           if (ev.kind === "end") return;
           if (ev.kind === "reset") {
@@ -1763,8 +1982,8 @@ export class TunnelRuntime {
           /* swallow */
         }
       }
-      this.bridgeStreamIds.delete(streamId);
-      this.streams.delete(streamId);
+      conn.bridgeStreamIds.delete(streamId);
+      conn.streams.delete(streamId);
     }
   }
 
@@ -1793,7 +2012,50 @@ export class TunnelRuntime {
 
   // --- response posting --------------------------------------------------
 
+  /**
+   * Post an HTTP webhook reply on the CURRENT active connection (not the
+   * connection the envelope arrived on). After a GOAWAY the old connection
+   * refuses new streams, so an in-flight reply must ride the new one, which
+   * lands on the new task. `origin` is the fallback if no handoff is active.
+   * If a handoff is mid-dial, wait (bounded) for it to publish the new
+   * active; if none is healthy in time, drop the reply (the server deadline
+   * + third-party retry recover it).
+   */
+  private async postHttpResponse(
+    origin: Connection,
+    requestId: string,
+    status: number,
+    userHeaders: Array<[string, string]>,
+    body: Buffer,
+  ): Promise<void> {
+    if (this.handoffInFlight && this.handoffPromise !== null) {
+      await Promise.race([
+        this.handoffPromise,
+        setTimeoutPromise(POST_ACTIVE_WAIT_MS),
+      ]);
+    }
+    const target = this.pickReplyConnection(origin);
+    if (target === null) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `no live connection to post reply request_id=${requestId}; dropping`,
+      );
+      return;
+    }
+    await this.postResponse(target, requestId, status, userHeaders, body);
+  }
+
+  /** The active conn if it can take new streams, else the origin if it can. */
+  private pickReplyConnection(origin: Connection): Connection | null {
+    const usable = (c: Connection | null): c is Connection =>
+      c !== null && !c.draining && c.session !== null && !c.session.closed;
+    if (usable(this.active)) return this.active;
+    if (usable(origin)) return origin;
+    return null;
+  }
+
   private async postResponse(
+    conn: Connection,
     requestId: string,
     status: number,
     userHeaders: Array<[string, string]>,
@@ -1835,7 +2097,7 @@ export class TunnelRuntime {
         reqHeaders[TunnelMetaHeader.REASON] = v;
       }
     }
-    const { streamId, stream } = this.openStream(reqHeaders, {
+    const { streamId, stream } = this.openStream(conn, reqHeaders, {
       endStream: body.length === 0,
     });
     if (body.length > 0) {
@@ -1850,11 +2112,11 @@ export class TunnelRuntime {
     // block forever; cleanup either way.
     try {
       await Promise.race([
-        this.awaitResponse(streamId),
+        this.awaitResponse(conn, streamId),
         setTimeoutPromise(30_000),
       ]);
     } finally {
-      this.streams.delete(streamId);
+      conn.streams.delete(streamId);
     }
   }
 

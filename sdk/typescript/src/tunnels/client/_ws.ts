@@ -52,6 +52,23 @@ export class WsClosed extends Error {
   }
 }
 
+/** Application close code surfaced when the server is draining for a redeploy. */
+export const SERVER_DRAINING_WS_CLOSE_CODE = 4500;
+
+/**
+ * Thrown from the inbound iterator when the connection is being drained for
+ * a server redeploy. The session cannot migrate; reconnect is advised. The
+ * third-party peer's fresh connection lands cleanly on the new task.
+ */
+export class WsServerDraining extends WsClosed {
+  readonly code = SERVER_DRAINING_WS_CLOSE_CODE;
+  readonly reconnectAdvised = true;
+  constructor(message = "server draining; reconnect advised") {
+    super(message);
+    this.name = "WsServerDraining";
+  }
+}
+
 // --- Public InkboxWebSocket interface ------------------------------------
 
 export interface InkboxWebSocketAcceptOpts {

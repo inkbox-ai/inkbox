@@ -59,9 +59,11 @@ export type {
   InkboxWsHandler,
 } from "./_ws.js";
 export {
+  SERVER_DRAINING_WS_CLOSE_CODE,
   WsAcceptDeadlineExceeded,
   WsClosed,
   WsProtocolMismatch,
+  WsServerDraining,
 } from "./_ws.js";
 export { TunnelAuthError } from "./_runtime.js";
 

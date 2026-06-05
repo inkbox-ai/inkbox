@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.7 — graceful tunnel reconnect on redeploy
+
+### Added
+
+- **Make-before-break tunnel reconnect.** When the tunnel server signals a graceful drain (a NO_ERROR `GOAWAY`) during a redeploy, the client now opens a new persistent connection and parks a fresh intake pool **before** closing the draining one, instead of tearing down and reconnecting cold. In-flight HTTP webhook replies are posted on the new connection so they round-trip across the handoff. The reconnect is in-band — it does not surface as a `reconnecting` status or wait out the backoff schedule.
+- **Typed `server_draining` WebSocket close.** When the draining connection drops a live WebSocket bridge, the handler now receives a `websocket.disconnect` carrying close code `4500` (the `server_draining` code) instead of a generic reset, so it can reconnect promptly.
+
+### Notes / limits
+
+- In-progress WebSocket and passthrough-TCP sessions **cannot** migrate across a redeploy — the third-party socket lives on the dying task, and the client's HTTP/2 connection closes the moment it receives the `GOAWAY`. The client surfaces a clean typed close and reconnects fast; the third-party peer reconnects onto the new task. Idempotent reconnect is the right client pattern.
+
 ## 0.4.6 — webhook subscriptions refactor
 
 ### Breaking

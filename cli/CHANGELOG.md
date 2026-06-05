@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.7 — graceful tunnel reconnect on redeploy
+
+### Changed
+
+- Bundles `@inkbox/sdk` `0.4.7`, which adds make-before-break tunnel reconnect: a long-running `inkbox tunnel` survives a server redeploy by standing up a fresh connection before closing the draining one, so short HTTP requests see no gap and live WebSocket sessions close cleanly (typed `server_draining`) and reconnect. In-progress WS/TCP sessions still end on redeploy — the peer reconnects onto the new task.
+
 ## 0.4.6 — webhook subscriptions refactor
 
 ### Breaking

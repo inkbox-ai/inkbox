@@ -17,7 +17,11 @@
  * PING / PONG control frames are answered locally and not propagated.
  */
 
-import type { WsBridgeIO } from "./_ws.js";
+import {
+  SERVER_DRAINING_WS_CLOSE_CODE,
+  WsServerDraining,
+  type WsBridgeIO,
+} from "./_ws.js";
 import type { WsUpstreamHandle } from "./_ws_url_bridge.js";
 import {
   WS_OPCODE_BINARY,
@@ -270,8 +274,21 @@ export async function pumpWsUrlEdgeBridge(
       }
       if (bridgeClosed) break;
     }
-  } catch {
-    /* bridge stream closed */
+  } catch (err) {
+    // On a server-drain close, give the SDK-owned upstream leg a clean,
+    // typed WS CLOSE (server_draining) instead of the abrupt RST the
+    // caller's socket.destroy() would otherwise send. `end(frame)` flushes
+    // the frame before the FIN so the upstream sees the code.
+    if (err instanceof WsServerDraining) {
+      try {
+        const codeBuf = Buffer.alloc(2);
+        codeBuf.writeUInt16BE(SERVER_DRAINING_WS_CLOSE_CODE, 0);
+        socket.end(encodeWsFrame(WS_OPCODE_CLOSE, codeBuf, { mask: true }));
+      } catch {
+        /* swallow */
+      }
+    }
+    /* otherwise: bridge stream closed */
   } finally {
     bridgeClosed = true;
     // Release the recv iterator (esp. when we exited via the

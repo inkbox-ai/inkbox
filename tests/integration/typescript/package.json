@@ -9,7 +9,7 @@
     "@inkbox/sdk": "file:../../../sdk/typescript"
   },
   "devDependencies": {
-    "vitest": "^3.2.1",
+    "vitest": "^4.1.0",
     "typescript": "^5.4.0"
   }
 }

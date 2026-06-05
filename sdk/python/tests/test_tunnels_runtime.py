@@ -313,15 +313,15 @@ async def test_intake_loop_force_reconnects_on_owner_token_rejected(monkeypatch)
     runtime = _make_runtime()
     runtime._h2 = MagicMock()  # truthy so the loop's guard passes
 
-    async def _fake_park(slot: int):
+    async def _fake_park(conn=None, slot=0):
         raise _OwnerTokenInvalidError(f"slot={slot} status=401 reason=''")
 
     monkeypatch.setattr(runtime, "_park_one_intake", _fake_park)
 
     force_reconnect_calls: list[int] = []
     monkeypatch.setattr(
-        runtime, "_force_reconnect",
-        lambda: force_reconnect_calls.append(1),
+        runtime, "_force_reconnect_conn",
+        lambda conn: force_reconnect_calls.append(1),
     )
 
     # _intake_loop returns once it observes the rejected token. If
@@ -637,7 +637,7 @@ async def test_ws_upgrade_rejects_path_traversal():
     captured: list[tuple[str, int, list[tuple[str, str]], bytes]] = []
 
     async def _capture_post_response(
-        request_id, *, status, headers, body, end_stream=True,
+        request_id, *, status, headers, body, end_stream=True, target=None,
     ):
         captured.append((request_id, status, list(headers), body))
 
@@ -941,20 +941,23 @@ async def test_dispatch_ws_upgrade_to_url_resets_bridge_on_open_failure():
             def send_data(self, *a, **kw):
                 pass
 
+            def data_to_send(self):
+                return b""
+
         async def _fake_flush():
             return None
 
         async def _fake_open_stream_locked(headers, end_stream):
             return 7  # arbitrary stream_id
 
-        async def _fake_post_response(request_id, *, status, headers, body, end_stream=True):
+        async def _fake_post_response(request_id, *, status, headers, body, end_stream=True, target=None):
             return None
 
         # Pre-register the queue so _await_connect_200 can read.
         runtime._streams[7] = asyncio.Queue()
         runtime._h2 = _FakeH2()  # type: ignore[assignment]
         runtime._flush = _fake_flush  # type: ignore[assignment]
-        runtime._open_stream_locked = lambda h, end_stream: 7  # type: ignore[assignment]
+        runtime._open_stream_locked = lambda h, end_stream, conn=None: 7  # type: ignore[assignment]
         runtime._post_response = _fake_post_response  # type: ignore[assignment]
 
         envelope = Envelope(
@@ -1005,15 +1008,18 @@ async def test_dispatch_ws_upgrade_callable_resets_bridge_on_open_failure():
         def send_data(self, *a, **kw):
             pass
 
+        def data_to_send(self):
+            return b""
+
     async def _fake_flush():
         return None
 
-    async def _fake_post_response(request_id, *, status, headers, body, end_stream=True):
+    async def _fake_post_response(request_id, *, status, headers, body, end_stream=True, target=None):
         return None
 
     runtime._h2 = _FakeH2()  # type: ignore[assignment]
     runtime._flush = _fake_flush  # type: ignore[assignment]
-    runtime._open_stream_locked = lambda h, end_stream: 11  # type: ignore[assignment]
+    runtime._open_stream_locked = lambda h, end_stream, conn=None: 11  # type: ignore[assignment]
     runtime._post_response = _fake_post_response  # type: ignore[assignment]
     # Pre-register the bridge stream queue so _await_connect_200 can
     # park on it; it will time out at the 0.05s deadline.
@@ -1114,3 +1120,415 @@ async def test_url_forward_streaming_under_cap_succeeds():
     assert result.status == 201
     assert result.body == b"hello world"
     assert result.inkbox_reason is None
+
+
+# ---------------------------------------------------------------------------
+# Make-before-break handoff (GOAWAY drain)
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_conn(runtime, conn_id: int):
+    """Build a _Connection with a fake h2/writer so handoff helpers can
+    run without a real socket."""
+    from inkbox.tunnels.client._runtime import _Connection
+
+    conn = _Connection(conn_id)
+    h2 = MagicMock()
+    h2.data_to_send = MagicMock(return_value=b"")
+    conn.h2 = h2
+    writer = MagicMock()
+    writer.close = MagicMock()
+    writer.wait_closed = AsyncMock()
+    conn.writer = writer
+    return conn
+
+
+@pytest.mark.asyncio
+async def test_handoff_sequence_ordering(monkeypatch):
+    """A NO_ERROR GOAWAY on the active conn marks it draining, builds a
+    new conn (hello + pool), swaps active, and only THEN closes the old
+    writer — asserted via a recorded event log."""
+    runtime = _make_runtime()
+    old = _make_fake_conn(runtime, 1)
+    runtime._active = old
+    runtime._next_conn_id = 2
+
+    events: list[str] = []
+
+    new_conn = _make_fake_conn(runtime, 2)
+
+    async def _fake_make_replacement():
+        events.append("new-conn-built+hello+pool")
+        # New conn becomes active only after this returns.
+        return new_conn
+
+    # Record when the old writer is closed.
+    orig_close = old.writer.close
+
+    def _record_close():
+        events.append("old-writer-closed")
+        orig_close()
+
+    old.writer.close = _record_close
+
+    monkeypatch.setattr(
+        runtime, "_make_replacement_connection", _fake_make_replacement,
+    )
+
+    # Fire the handoff (simulating a GOAWAY trigger).
+    runtime._begin_handoff(old, reason="drain")
+    assert old.draining is True, "old conn must be marked draining"
+    assert runtime._active is old, "active not swapped until new conn ready"
+
+    # Let the handoff task run to completion.
+    await runtime._handoff_task
+
+    assert runtime._active is new_conn, "active must swap to the new conn"
+    # Ordering: new conn built+hello'd before the old writer is closed.
+    assert events == ["new-conn-built+hello+pool", "old-writer-closed"], (
+        f"unexpected ordering: {events!r}"
+    )
+    assert old not in runtime._draining
+
+
+@pytest.mark.asyncio
+async def test_draining_conn_stops_re_parking(monkeypatch):
+    """Once a conn is draining, _intake_loop must exit (stop re-parking)."""
+    runtime = _make_runtime()
+    conn = _make_fake_conn(runtime, 1)
+    runtime._active = conn
+    conn.draining = True
+
+    park_calls: list[int] = []
+
+    async def _fake_park(c=None, slot=0):
+        park_calls.append(slot)
+        return None
+
+    monkeypatch.setattr(runtime, "_park_one_intake", _fake_park)
+
+    # Loop must return immediately because conn.draining is True.
+    await asyncio.wait_for(runtime._intake_loop(conn, 0), timeout=1.0)
+    assert park_calls == [], "draining conn must not park new intakes"
+
+
+@pytest.mark.asyncio
+async def test_bridges_drop_at_goaway_with_typed_close():
+    """A live bridge on the draining conn receives a server_draining
+    typed disconnect; no further send_* on the old (CLOSED) h2."""
+    from inkbox.tunnels.client._runtime import (
+        WS_CLOSE_SERVER_DRAINING,
+        _StreamEvent,
+    )
+
+    runtime = _make_runtime()
+    conn = _make_fake_conn(runtime, 1)
+    # Register a live bridge stream.
+    conn.bridge_stream_ids.add(3)
+    conn.streams[3] = asyncio.Queue()
+
+    runtime._surface_draining_to_bridges(conn)
+
+    ev: _StreamEvent = conn.streams[3].get_nowait()
+    assert ev.kind == "reset"
+    assert ev.reset_code == WS_CLOSE_SERVER_DRAINING
+    # No send_* attempted on the old h2 — surfacing is queue-only.
+    conn.h2.send_data.assert_not_called()
+    conn.h2.send_headers.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ws_pump_surfaces_server_draining_close_code():
+    """When the bridge stream is reset with the server_draining code,
+    _pump_ws surfaces that close code (not 1000) to the WS app."""
+    from inkbox.tunnels.client._runtime import (
+        WS_CLOSE_SERVER_DRAINING,
+        _StreamEvent,
+    )
+
+    runtime = _make_runtime()
+    conn = _make_fake_conn(runtime, 1)
+    runtime._active = conn
+    conn.streams[5] = asyncio.Queue()
+
+    # WS session whose outbound finishes immediately (no app frames).
+    session = WSASGISession(
+        app=lambda *_: None, path="/ws", headers=[],
+        public_host="my-agent.inkboxwire.example",
+        forwarded_for_ip="1.2.3.4",
+    )
+    session.signal_outbound_eof()
+
+    # Push a drain reset onto the bridge stream so the pump's inbound
+    # loop reads it and records the typed close code.
+    conn.streams[5].put_nowait(
+        _StreamEvent("reset", reset_code=WS_CLOSE_SERVER_DRAINING),
+    )
+
+    close_code = await asyncio.wait_for(
+        runtime._pump_ws(5, session, conn), timeout=2.0,
+    )
+    assert close_code == WS_CLOSE_SERVER_DRAINING
+
+
+@pytest.mark.asyncio
+async def test_ws_url_bridge_sends_server_draining_close_to_upstream():
+    """On a drain reset, the URL-forward pump gives the SDK-owned upstream
+    leg a clean typed WS CLOSE (server_draining) rather than an abrupt RST."""
+    from inkbox.tunnels.client._runtime import (
+        WS_CLOSE_SERVER_DRAINING,
+        _StreamEvent,
+    )
+    from inkbox.tunnels.client._ws_passthrough import decode_client_frame
+    from inkbox.tunnels.client._wsframe import WS_OPCODE_CLOSE
+
+    received = bytearray()
+    got_data = asyncio.Event()
+
+    async def _on_conn(reader, writer):
+        chunk = await reader.read(64)
+        received.extend(chunk)
+        got_data.set()
+        writer.close()
+
+    server = await asyncio.start_server(_on_conn, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    up_reader, up_writer = await asyncio.open_connection("127.0.0.1", port)
+
+    runtime = _make_runtime()
+    conn = _make_fake_conn(runtime, 1)
+    runtime._active = conn
+    conn.streams[5] = asyncio.Queue()
+    conn.streams[5].put_nowait(
+        _StreamEvent("reset", reset_code=WS_CLOSE_SERVER_DRAINING),
+    )
+
+    await asyncio.wait_for(
+        runtime._pump_ws_url_bridge(5, up_reader, up_writer, b"", conn),
+        timeout=3.0,
+    )
+    await asyncio.wait_for(got_data.wait(), timeout=2.0)
+
+    decoded = decode_client_frame(bytearray(received), require_mask=True)
+    assert decoded is not None
+    opcode, payload, _fin = decoded
+    assert opcode == WS_OPCODE_CLOSE
+    assert int.from_bytes(payload[:2], "big") == WS_CLOSE_SERVER_DRAINING
+
+    server.close()
+    await server.wait_closed()
+
+
+@pytest.mark.asyncio
+async def test_webhook_reply_rides_new_active_conn():
+    """An in-flight HTTP webhook reply targets the CURRENT active conn's
+    writer (the new one), not the old (draining) origin."""
+    runtime = _make_runtime()
+    old = _make_fake_conn(runtime, 1)
+    new = _make_fake_conn(runtime, 2)
+    # Simulate post-handoff state: old draining + goaway, new is active.
+    old.draining = True
+    old.goaway_received = True
+    runtime._active = new
+
+    opened_on: list[int] = []
+
+    def _fake_open(headers, *, end_stream, conn=None):
+        opened_on.append(conn.conn_id)
+        conn.streams[99] = asyncio.Queue()
+        # Immediately signal the response so _post_response returns.
+        conn.streams[99].put_nowait(
+            _make_stream_end_event(),
+        )
+        return 99
+
+    runtime._open_stream_locked = _fake_open  # type: ignore[assignment]
+
+    await runtime._post_response(
+        "req-mid-drain",
+        status=200,
+        headers=[("content-type", "text/plain")],
+        body=b"",
+    )
+    # The reply must have been opened on the new (active) conn, not old.
+    assert opened_on == [new.conn_id], (
+        f"reply opened on {opened_on}, expected new conn {new.conn_id}"
+    )
+
+
+def _make_stream_end_event():
+    from inkbox.tunnels.client._runtime import _StreamEvent
+    return _StreamEvent("end")
+
+
+@pytest.mark.asyncio
+async def test_ws_upgrade_reply_does_not_migrate():
+    """A WS-upgrade reply rides the origin conn only (target=origin),
+    even if a different conn is active — it must NOT migrate."""
+    runtime = _make_runtime()
+    origin = _make_fake_conn(runtime, 1)
+    other_active = _make_fake_conn(runtime, 2)
+    runtime._active = other_active
+
+    opened_on: list[int] = []
+
+    def _fake_open(headers, *, end_stream, conn=None):
+        opened_on.append(conn.conn_id)
+        conn.streams[7] = asyncio.Queue()
+        conn.streams[7].put_nowait(_make_stream_end_event())
+        return 7
+
+    runtime._open_stream_locked = _fake_open  # type: ignore[assignment]
+
+    # target=origin pins the reply to the origin conn.
+    await runtime._post_response(
+        "ws-req",
+        status=200,
+        headers=[],
+        body=b"",
+        target=origin,
+    )
+    assert opened_on == [origin.conn_id], (
+        "WS-upgrade reply must ride the origin conn, not the active one"
+    )
+
+
+@pytest.mark.asyncio
+async def test_aclose_cancels_ping_loops_on_every_conn():
+    """aclose() must cancel the ping loop on every conn in
+    active ∪ draining — no ping-loop leak across the handoff set."""
+    runtime = _make_runtime()
+    active = _make_fake_conn(runtime, 1)
+    draining = _make_fake_conn(runtime, 2)
+    runtime._active = active
+    runtime._draining.add(draining)
+
+    async def _idle() -> None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            raise
+
+    active_ping = asyncio.create_task(_idle())
+    draining_ping = asyncio.create_task(_idle())
+    active.ping_task = active_ping
+    draining.ping_task = draining_ping
+
+    await runtime.aclose()
+
+    assert active.ping_task is None
+    assert draining.ping_task is None
+    # Both ping tasks were cancelled (await them so they don't leak into
+    # the shared event loop and poison later tests).
+    for t in (active_ping, draining_ping):
+        with suppress(asyncio.CancelledError, Exception):
+            await t
+        assert t.cancelled() or t.done()
+    # Both writers were closed.
+    active.writer.close.assert_called()
+    draining.writer.close.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_goaway_no_error_triggers_handoff_and_decodes_reason(monkeypatch):
+    """A ConnectionTerminated (error_code 0) with structured debug data
+    {"reason":"drain"} must trigger the handoff and surface the parsed
+    reason; the read loop's conn is marked goaway_received."""
+    import h2.events
+
+    runtime = _make_runtime()
+    conn = _make_fake_conn(runtime, 1)
+    runtime._active = conn
+
+    captured_reason: list[str] = []
+
+    def _fake_begin_handoff(c, *, reason):
+        captured_reason.append(reason)
+
+    monkeypatch.setattr(runtime, "_begin_handoff", _fake_begin_handoff)
+
+    ev = h2.events.ConnectionTerminated()
+    ev.error_code = 0
+    ev.last_stream_id = 7
+    ev.additional_data = b'{"reason":"drain"}'
+
+    await runtime._handle_event(ev, conn)
+
+    assert conn.goaway_received is True
+    assert captured_reason == ["drain"], (
+        f"expected parsed reason 'drain', got {captured_reason!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_goaway_nonzero_error_does_not_handoff(monkeypatch):
+    """A non-zero error-code GOAWAY is a real fault: no handoff, just
+    mark the conn goaway_received so the read loop winds down (cold
+    reconnect)."""
+    import h2.events
+
+    runtime = _make_runtime()
+    conn = _make_fake_conn(runtime, 1)
+    runtime._active = conn
+
+    handoff_calls: list[str] = []
+    monkeypatch.setattr(
+        runtime, "_begin_handoff",
+        lambda c, *, reason: handoff_calls.append(reason),
+    )
+
+    ev = h2.events.ConnectionTerminated()
+    ev.error_code = 2  # INTERNAL_ERROR — a real fault
+    ev.last_stream_id = 7
+    ev.additional_data = b""
+
+    await runtime._handle_event(ev, conn)
+
+    assert conn.goaway_received is True
+    assert handoff_calls == [], "non-zero GOAWAY must not trigger handoff"
+
+
+@pytest.mark.asyncio
+async def test_handoff_redial_503_then_succeeds(monkeypatch):
+    """A drain 503 on the new hello is expected (NLB lands back on the
+    draining task); the replacement dial retries within budget and
+    succeeds rather than falling to the cold backoff path."""
+    runtime = _make_runtime()
+    runtime._active = _make_fake_conn(runtime, 1)
+    runtime._next_conn_id = 2
+
+    attempts = {"n": 0}
+
+    async def _fake_open(conn):
+        return None
+
+    async def _fake_hello(conn):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            # First dial lands back on the draining task -> drain 503.
+            raise RuntimeError("/_system/hello returned 503; transient")
+        return None
+
+    monkeypatch.setattr(runtime, "_open_connection", _fake_open)
+    monkeypatch.setattr(runtime, "_send_hello", _fake_hello)
+    monkeypatch.setattr(runtime, "_start_serving", lambda conn: None)
+    # Read loop is a no-op task for the fake conn.
+
+    async def _noop_read(conn):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(runtime, "_read_loop", _noop_read)
+    # Speed up the jittered redial.
+    import inkbox.tunnels.client._runtime as rt_mod
+    monkeypatch.setattr(rt_mod, "HANDOFF_REDIAL_BUDGET_SEC", 5.0)
+
+    new_conn = await asyncio.wait_for(
+        runtime._make_replacement_connection(), timeout=5.0,
+    )
+    assert attempts["n"] == 2, "expected one 503 retry then success"
+    assert new_conn is not None
+    # Clean up the no-op read task.
+    if new_conn.read_task is not None:
+        new_conn.read_task.cancel()
+        with suppress(asyncio.CancelledError, Exception):
+            await new_conn.read_task

@@ -22,7 +22,11 @@ interface IntakeResponse {
 }
 
 interface PendingResponsePost {
-  resolve: (v: { headers: http2.IncomingHttpHeaders; body: Buffer }) => void;
+  resolve: (v: {
+    headers: http2.IncomingHttpHeaders;
+    body: Buffer;
+    sessionIdx: number;
+  }) => void;
   reject: (err: Error) => void;
   timer: NodeJS.Timeout;
 }
@@ -68,6 +72,10 @@ export interface FakeH2Server {
   setStickyIntakeResponse(response: IntakeResponse | null): void;
   /** Subscribe to session-level events (`goaway`, `close`) for ordering tests. */
   onSessionEvent(cb: (kind: "goaway" | "close") => void): void;
+  /** Live (not-yet-closed) client session count — for make-before-break tests. */
+  sessionCount(): number;
+  /** Total `/_system/hello` POSTs seen since start. */
+  helloCount(): number;
   injectGoaway(errorCode?: number): void;
   injectRstStream(streamId: number, errorCode: number): void;
   receivedHelloHeaders(): http2.IncomingHttpHeaders | null;
@@ -75,7 +83,11 @@ export interface FakeH2Server {
   awaitResponsePost(
     requestId: string,
     timeoutMs?: number,
-  ): Promise<{ headers: http2.IncomingHttpHeaders; body: Buffer }>;
+  ): Promise<{
+    headers: http2.IncomingHttpHeaders;
+    body: Buffer;
+    sessionIdx: number;
+  }>;
   awaitNextIntakePost(timeoutMs?: number): Promise<{ slot: number; ownerToken: string }>;
   /**
    * Resolve when an extended-CONNECT stream arrives at the given path
@@ -156,6 +168,11 @@ export async function startFakeH2Server(
   const intakeWaiters: PendingIntakePost[] = [];
   let nextUnclaimedIntakeIdx = 0;
   const sessions = new Set<http2.ServerHttp2Session>();
+  // Stable per-session index (creation order) so response-post tests can
+  // assert which connection a reply rode in on (0 = first, 1 = second…).
+  const sessionIndex = new Map<http2.ServerHttp2Session, number>();
+  let nextSessionIndex = 0;
+  let helloCounter = 0;
   // Bridge-stream waiters. The map is keyed by exact path string.
   const bridgeWaiters = new Map<
     string,
@@ -168,6 +185,7 @@ export async function startFakeH2Server(
 
   server.on("session", (session) => {
     sessions.add(session);
+    sessionIndex.set(session, nextSessionIndex++);
     session.on("goaway", () => {
       for (const cb of sessionEventListeners) cb("goaway");
     });
@@ -186,6 +204,7 @@ export async function startFakeH2Server(
     }
     if (path === "/_system/hello") {
       receivedHello = headers;
+      helloCounter += 1;
       const computed = helloFn !== null
         ? helloFn()
         : { status: helloStatus, body: helloBody };
@@ -244,7 +263,8 @@ export async function startFakeH2Server(
         if (pending !== undefined) {
           clearTimeout(pending.timer);
           pendingResponses.delete(requestId);
-          pending.resolve({ headers, body });
+          const sessionIdx = sessionIndex.get(stream.session!) ?? -1;
+          pending.resolve({ headers, body, sessionIdx });
         }
         stream.respond({ ":status": 200 });
         stream.end();
@@ -317,6 +337,12 @@ export async function startFakeH2Server(
     },
     onSessionEvent(cb) {
       sessionEventListeners.push(cb);
+    },
+    sessionCount() {
+      return sessions.size;
+    },
+    helloCount() {
+      return helloCounter;
     },
     injectGoaway(errorCode = http2.constants.NGHTTP2_NO_ERROR) {
       for (const session of sessions) {
@@ -396,10 +422,11 @@ export async function startFakeH2Server(
       });
     },
     async close() {
-      // Close active sessions first to break the runtime's read pump.
+      // Destroy (not graceful close) so a session with a parked, never-
+      // ending intake stream can't wedge server.close() on teardown.
       for (const session of sessions) {
         try {
-          session.close();
+          session.destroy();
         } catch {
           /* swallow */
         }

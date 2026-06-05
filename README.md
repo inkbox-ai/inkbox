@@ -146,6 +146,8 @@ await listener.wait();
 
 Both SDKs also accept an in-process callable (Fetch handler in TS, ASGI app in Python) instead of a `forward_to` URL, and a `tls_mode: "passthrough"` option for end-to-end TLS termination in your process. See [`skills/inkbox-tunnels/`](./skills/inkbox-tunnels/) for the full reference.
 
+**Redeploys are graceful.** When the tunnel service redeploys, a long-running listener reconnects make-before-break: it stands up a fresh connection before closing the draining one, so short HTTP requests see no gap. In-progress WebSocket and passthrough-TCP sessions cannot migrate across a redeploy — they end with a typed `server_draining` close and the third-party peer reconnects onto the new task. Write handlers to reconnect idempotently.
+
 ### Outbound SMS — current limits
 
 - Outbound SMS works only from **local** numbers (not toll-free).

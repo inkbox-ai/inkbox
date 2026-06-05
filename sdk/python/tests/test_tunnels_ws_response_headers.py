@@ -276,7 +276,7 @@ async def test_dispatch_ws_upgrade_to_url_forwards_app_headers():
         captured: list[tuple[int, list[tuple[str, str]]]] = []
 
         async def _capture_post_response(
-            request_id, *, status, headers, body, end_stream=True,
+            request_id, *, status, headers, body, end_stream=True, target=None,
         ):
             captured.append((status, list(headers)))
 
@@ -294,7 +294,7 @@ async def test_dispatch_ws_upgrade_to_url_forwards_app_headers():
         async def _fake_flush(): return None
         runtime._h2 = _FakeH2()  # type: ignore[assignment]
         runtime._flush = _fake_flush  # type: ignore[assignment]
-        runtime._open_stream_locked = lambda h, end_stream: 99  # type: ignore[assignment]
+        runtime._open_stream_locked = lambda h, end_stream, conn=None: 99  # type: ignore[assignment]
         runtime._streams[99] = asyncio.Queue()
         # Make the bridge wait fail fast — we only care about the
         # _post_response call that happened BEFORE the wait.

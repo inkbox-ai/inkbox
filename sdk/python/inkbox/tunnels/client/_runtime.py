@@ -96,6 +96,24 @@ TCP_KEEPALIVE_PROBE_COUNT = 3
 BACKOFF_CAP = 30.0
 BACKOFF_JITTER = 0.25  # +- 25%
 
+# Budget for re-dialing the replacement connection during a handoff. The
+# server may bounce the first hello while it drains (the NLB can land us
+# back on the draining task), so retry with jittered backoff up to here.
+HANDOFF_REDIAL_BUDGET_SEC = 30.0
+# Minimum spacing between handoffs so a stray/rapid GOAWAY can't chain
+# handoffs in a tight loop.
+HANDOFF_SETTLE_SEC = 2.0
+# How long an HTTP reply waits for an in-flight handoff to publish the
+# new active connection before giving up (the server response deadline +
+# the third-party retry recover a dropped reply).
+POST_ACTIVE_WAIT_SEC = 5.0
+
+# WS/passthrough close code surfaced to live bridges when the server
+# drains (NO_ERROR GOAWAY). In the 4500 application range; must not
+# collide with AGENT_TIMEOUT (4504).
+WS_CLOSE_SERVER_DRAINING = 4500
+WS_CLOSE_AGENT_TIMEOUT = 4504
+
 DEFAULT_INBOUND_BODY_BYTES = 32 * 1024 * 1024
 DEFAULT_OUTBOUND_BODY_BYTES = 32 * 1024 * 1024
 
@@ -110,7 +128,9 @@ class _OwnerTokenInvalidError(RuntimeError):
 
 # Inbound stream events surfaced by the read loop.
 class _StreamEvent:
-    __slots__ = ("kind", "headers", "data", "flow_controlled_length")
+    __slots__ = (
+        "kind", "headers", "data", "flow_controlled_length", "reset_code",
+    )
 
     def __init__(
         self,
@@ -119,15 +139,82 @@ class _StreamEvent:
         headers: list[tuple[str, str]] | None = None,
         data: bytes = b"",
         flow_controlled_length: int = 0,
+        reset_code: int | None = None,
     ) -> None:
         self.kind = kind
         self.headers = headers or []
         self.data = data
         self.flow_controlled_length = flow_controlled_length
+        # For "reset" events, an optional application close code that the
+        # WS/TCP bridge surfaces to the customer's handler (e.g. the
+        # server_draining code on a drain).
+        self.reset_code = reset_code
 
 
 # Type for status callbacks.
 StatusCallback = Callable[[str], None]
+
+
+class _Connection:
+    """One persistent h2 connection's state.
+
+    The runtime holds a single ``active`` connection (the pool that parks
+    new intakes) plus zero-or-more ``draining`` ones during a
+    make-before-break handoff. State is per-connection because two live
+    h2 sessions each allocate stream ids 1,3,5… — a shared streams map
+    would collide across them.
+    """
+
+    __slots__ = (
+        "conn_id",
+        "reader",
+        "writer",
+        "h2",
+        "send_lock",
+        "owner_token",
+        "server_pool_size",
+        "intake_idle_seconds",
+        "response_deadline_seconds",
+        "streams",
+        "bridge_stream_ids",
+        "window_events",
+        "conn_window_event",
+        "draining",
+        "ping_task",
+        "read_task",
+        "outstanding_ping_payload",
+        "outstanding_ping_sent_at",
+        "goaway_received",
+    )
+
+    def __init__(self, conn_id: int) -> None:
+        self.conn_id = conn_id
+        self.reader: asyncio.StreamReader | None = None
+        self.writer: asyncio.StreamWriter | None = None
+        self.h2: h2.connection.H2Connection | None = None
+        self.send_lock = asyncio.Lock()
+        self.owner_token: str | None = None
+        self.server_pool_size: int | None = None
+        self.intake_idle_seconds: float | None = None
+        self.response_deadline_seconds: float | None = None
+        self.streams: dict[int, asyncio.Queue[_StreamEvent]] = {}
+        self.bridge_stream_ids: set[int] = set()
+        self.window_events: dict[int, asyncio.Event] = {}
+        self.conn_window_event = asyncio.Event()
+        self.conn_window_event.set()
+        # Stop parking new intakes once this conn has received GOAWAY.
+        self.draining = False
+        self.ping_task: asyncio.Task[None] | None = None
+        self.read_task: asyncio.Task[None] | None = None
+        self.outstanding_ping_payload: bytes | None = None
+        self.outstanding_ping_sent_at: float | None = None
+        # Set once a GOAWAY (ConnectionTerminated) lands; the read loop
+        # winds down because hyper-h2 is now CLOSED.
+        self.goaway_received = False
+
+    @property
+    def live_bridges(self) -> int:
+        return len(self.bridge_stream_ids)
 
 
 class TunnelRuntime:
@@ -182,30 +269,24 @@ class TunnelRuntime:
 
         self._is_url_forward = isinstance(forward_to, str)
 
-        # Per-connection state — reset on every reconnect.
-        self._owner_token: str | None = None
-        self._server_pool_size: int | None = None
-        self._intake_idle_seconds: float | None = None
-        self._response_deadline_seconds: float | None = None
-
-        self._reader: asyncio.StreamReader | None = None
-        self._writer: asyncio.StreamWriter | None = None
-        self._h2: h2.connection.H2Connection | None = None
         self._stop = asyncio.Event()
-        self._send_lock = asyncio.Lock()
-        self._streams: dict[int, asyncio.Queue[_StreamEvent]] = {}
-        self._window_events: dict[int, asyncio.Event] = {}
-        self._conn_window_event = asyncio.Event()
-        self._conn_window_event.set()
+        # The connection that parks new intakes. Swapped atomically on a
+        # make-before-break handoff. ``_draining`` holds post-GOAWAY
+        # connections finishing in-flight work before they close.
+        self._active: _Connection | None = None
+        self._draining: set[_Connection] = set()
+        self._next_conn_id = 1
+        # True while a make-before-break handoff is dialing the
+        # replacement; the supervisor + HTTP-reply gate key off it.
+        self._handoff_in_flight = False
+        self._handoff_task: asyncio.Task[None] | None = None
+        self._last_handoff_at = 0.0
+        # Wakes the supervisor when active is swapped mid-handoff.
+        self._supervisor_wake: asyncio.Event = asyncio.Event()
+        # Dispatch tasks are runtime-scoped (not per-connection): a
+        # handoff must let an in-flight handler finish and post its reply
+        # on the NEW conn. Only a cold reconnect cancels them.
         self._tasks: set[asyncio.Task[Any]] = set()
-        self._bridge_stream_ids: set[int] = set()
-
-        # Application-level liveness — tracks the outstanding PING and
-        # the ts at which we sent it; ``_ping_loop`` arms a watchdog
-        # task that force-closes the writer if no ack arrives within
-        # ``PING_ACK_TIMEOUT``.
-        self._outstanding_ping_payload: bytes | None = None
-        self._outstanding_ping_sent_at: float | None = None
 
         # httpx.AsyncClient for URL forwarding + body-uri GETs. Lazily
         # created on first dispatch, closed deterministically in aclose().
@@ -215,16 +296,144 @@ class TunnelRuntime:
         # constructed when the first passthrough TCP stream needs it.
         self._passthrough_dispatch: object | None = None
 
+    # --- active-connection delegation ---------------------------------------
+    # The dispatch/pump code reads these per-connection fields off the
+    # runtime; they resolve to the active connection. In steady state
+    # (no drain) active is the only connection, so this preserves the
+    # original single-connection behavior. Handoff-aware paths pass an
+    # explicit connection instead of going through these.
+
+    def _ensure_active(self) -> _Connection:
+        if self._active is None:
+            self._active = _Connection(self._next_conn_id)
+            self._next_conn_id += 1
+        return self._active
+
+    @property
+    def _h2(self) -> h2.connection.H2Connection | None:
+        return self._active.h2 if self._active is not None else None
+
+    @_h2.setter
+    def _h2(self, value: h2.connection.H2Connection | None) -> None:
+        self._ensure_active().h2 = value
+
+    @property
+    def _writer(self) -> asyncio.StreamWriter | None:
+        return self._active.writer if self._active is not None else None
+
+    @_writer.setter
+    def _writer(self, value: asyncio.StreamWriter | None) -> None:
+        self._ensure_active().writer = value
+
+    @property
+    def _reader(self) -> asyncio.StreamReader | None:
+        return self._active.reader if self._active is not None else None
+
+    @_reader.setter
+    def _reader(self, value: asyncio.StreamReader | None) -> None:
+        self._ensure_active().reader = value
+
+    @property
+    def _send_lock(self) -> asyncio.Lock:
+        return self._ensure_active().send_lock
+
+    @_send_lock.setter
+    def _send_lock(self, value: asyncio.Lock) -> None:
+        self._ensure_active().send_lock = value
+
+    @property
+    def _streams(self) -> dict[int, "asyncio.Queue[_StreamEvent]"]:
+        return self._ensure_active().streams
+
+    @property
+    def _bridge_stream_ids(self) -> set[int]:
+        return self._ensure_active().bridge_stream_ids
+
+    @property
+    def _window_events(self) -> dict[int, asyncio.Event]:
+        return self._ensure_active().window_events
+
+    @property
+    def _conn_window_event(self) -> asyncio.Event:
+        return self._ensure_active().conn_window_event
+
+    @property
+    def _owner_token(self) -> str | None:
+        return self._active.owner_token if self._active is not None else None
+
+    @_owner_token.setter
+    def _owner_token(self, value: str | None) -> None:
+        self._ensure_active().owner_token = value
+
+    @property
+    def _server_pool_size(self) -> int | None:
+        return (
+            self._active.server_pool_size if self._active is not None else None
+        )
+
+    @_server_pool_size.setter
+    def _server_pool_size(self, value: int | None) -> None:
+        self._ensure_active().server_pool_size = value
+
+    @property
+    def _intake_idle_seconds(self) -> float | None:
+        return (
+            self._active.intake_idle_seconds
+            if self._active is not None else None
+        )
+
+    @_intake_idle_seconds.setter
+    def _intake_idle_seconds(self, value: float | None) -> None:
+        self._ensure_active().intake_idle_seconds = value
+
+    @property
+    def _response_deadline_seconds(self) -> float | None:
+        return (
+            self._active.response_deadline_seconds
+            if self._active is not None else None
+        )
+
+    @_response_deadline_seconds.setter
+    def _response_deadline_seconds(self, value: float | None) -> None:
+        self._ensure_active().response_deadline_seconds = value
+
+    @property
+    def _outstanding_ping_payload(self) -> bytes | None:
+        return (
+            self._active.outstanding_ping_payload
+            if self._active is not None else None
+        )
+
+    @_outstanding_ping_payload.setter
+    def _outstanding_ping_payload(self, value: bytes | None) -> None:
+        self._ensure_active().outstanding_ping_payload = value
+
+    @property
+    def _outstanding_ping_sent_at(self) -> float | None:
+        return (
+            self._active.outstanding_ping_sent_at
+            if self._active is not None else None
+        )
+
+    @_outstanding_ping_sent_at.setter
+    def _outstanding_ping_sent_at(self, value: float | None) -> None:
+        self._ensure_active().outstanding_ping_sent_at = value
+
     # --- public lifecycle ----------------------------------------------------
 
     async def aclose(self) -> None:
         self._stop.set()
-        if self._writer is not None:
-            try:
-                self._writer.close()
-                await self._writer.wait_closed()
-            except (OSError, ConnectionError):
-                pass
+        # Cancel the ping loop on every connection (active + draining) so
+        # no ping loop leaks across a handoff set, and close each writer.
+        conns = [c for c in [self._active, *self._draining] if c is not None]
+        for conn in conns:
+            self._stop_ping_loop(conn)
+            if conn.writer is not None:
+                try:
+                    conn.writer.close()
+                    await conn.writer.wait_closed()
+                except (OSError, ConnectionError):
+                    pass
         if self._passthrough_dispatch is not None:
             try:
                 await self._passthrough_dispatch.aclose()  # type: ignore[union-attr]
@@ -286,45 +495,97 @@ class TunnelRuntime:
     # --- connection lifecycle -----------------------------------------------
 
     async def _run_once(self) -> None:
-        await self._open_connection()
-        read_task = asyncio.create_task(self._read_loop())
-        ping_task: asyncio.Task[None] | None = None
+        conn = _Connection(self._next_conn_id)
+        self._next_conn_id += 1
+        self._active = conn
+        await self._open_connection(conn)
+        conn.read_task = asyncio.create_task(self._read_loop(conn))
         try:
             try:
-                await self._send_hello()
+                await self._send_hello(conn)
             except Exception:
-                read_task.cancel()
+                conn.read_task.cancel()
                 raise
             self._notify_status("connected")
-            effective_pool = self._server_pool_size or self._pool_size or 1
-            for slot in range(effective_pool):
-                self._spawn(self._intake_loop(slot))
-            ping_task = asyncio.create_task(self._ping_loop())
-            await read_task
+            self._start_serving(conn)
+            # Supervise the active connection. A NO_ERROR GOAWAY swaps in
+            # a fresh active out-of-band (make-before-break); follow it
+            # without going through the backoff loop. Only a cold death
+            # (active closed with no successor) returns so serve_forever
+            # reconnects with backoff.
+            while not self._stop.is_set():
+                await self._wait_close_or_handoff(conn)
+                if self._stop.is_set():
+                    break
+                if self._handoff_in_flight and self._handoff_task is not None:
+                    with suppress(asyncio.CancelledError, Exception):
+                        await self._handoff_task
+                nxt = self._active
+                if nxt is not None and nxt is not conn and not nxt.draining:
+                    conn = nxt
+                    continue
+                if conn.read_task is None or conn.read_task.done():
+                    break
         finally:
-            if ping_task is not None:
-                ping_task.cancel()
+            await self._teardown_cold(conn)
+
+    def _start_serving(self, conn: _Connection) -> None:
+        """Spawn a connection's intake pool + ping loop."""
+        effective_pool = conn.server_pool_size or self._pool_size or 1
+        for slot in range(effective_pool):
+            self._spawn(self._intake_loop(conn, slot))
+        conn.ping_task = asyncio.create_task(self._ping_loop(conn))
+
+    async def _wait_close_or_handoff(self, conn: _Connection) -> None:
+        """Resolve once the supervised conn's read loop ends OR a handoff
+        swaps the active connection."""
+        self._supervisor_wake.clear()
+        read_task = conn.read_task
+        wake_task = asyncio.create_task(self._supervisor_wake.wait())
+        waits: set[asyncio.Task[Any]] = {wake_task}
+        if read_task is not None:
+            waits.add(read_task)
+        try:
+            await asyncio.wait(waits, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            if not wake_task.done():
+                wake_task.cancel()
                 with suppress(asyncio.CancelledError, Exception):
-                    await ping_task
-            if not read_task.done():
-                read_task.cancel()
+                    await wake_task
+
+    async def _teardown_cold(self, conn: _Connection) -> None:
+        """Cold teardown of the supervised conn + any draining conns +
+        all runtime dispatch tasks. The cold path (no live successor) is
+        the only one that cancels in-flight dispatch tasks."""
+        for c in [conn, *list(self._draining)]:
+            self._stop_ping_loop(c)
+            rt = c.read_task
+            if rt is not None and not rt.done():
+                rt.cancel()
                 with suppress(asyncio.CancelledError, Exception):
-                    await read_task
-            for task in list(self._tasks):
-                task.cancel()
-            for task in list(self._tasks):
-                with suppress(asyncio.CancelledError, Exception):
-                    await task
-            self._tasks.clear()
-            self._streams.clear()
-            self._window_events.clear()
-            if self._writer is not None:
-                with suppress(OSError, ConnectionError):
-                    self._writer.close()
-                    await self._writer.wait_closed()
-            self._writer = None
-            self._reader = None
-            self._h2 = None
+                    await rt
+        for task in list(self._tasks):
+            task.cancel()
+        for task in list(self._tasks):
+            with suppress(asyncio.CancelledError, Exception):
+                await task
+        self._tasks.clear()
+        for c in [conn, *list(self._draining)]:
+            await self._close_connection_writer(c)
+        self._draining.clear()
+        if self._active is conn:
+            self._active = None
+
+    async def _close_connection_writer(self, conn: _Connection) -> None:
+        conn.streams.clear()
+        conn.window_events.clear()
+        if conn.writer is not None:
+            with suppress(OSError, ConnectionError):
+                conn.writer.close()
+                await conn.writer.wait_closed()
+        conn.writer = None
+        conn.reader = None
+        conn.h2 = None
 
     def _spawn(self, coro: Any) -> asyncio.Task[Any]:
         task = asyncio.create_task(coro)
@@ -332,14 +593,136 @@ class TunnelRuntime:
         task.add_done_callback(self._tasks.discard)
         return task
 
-    async def _open_connection(self) -> None:
+    # --- make-before-break handoff ------------------------------------------
+
+    def _begin_handoff(self, old_conn: _Connection, *, reason: str) -> None:
+        """On a NO_ERROR GOAWAY, stand up a fresh connection before the
+        old one is torn down. In-band: never trips the backoff loop."""
+        if (
+            self._stop.is_set()
+            or old_conn.draining
+            or self._active is not old_conn
+            or self._handoff_in_flight
+            or (time.monotonic() - self._last_handoff_at) < HANDOFF_SETTLE_SEC
+        ):
+            return
+        logger.info("tunnel runtime: starting handoff (reason=%r)", reason)
+        self._handoff_in_flight = True
+        self._last_handoff_at = time.monotonic()
+        old_conn.draining = True
+        self._draining.add(old_conn)
+        # The old h2 is CLOSED at GOAWAY; pinging it is meaningless.
+        self._stop_ping_loop(old_conn)
+        self._handoff_task = asyncio.create_task(self._run_handoff(old_conn))
+
+    async def _run_handoff(self, old_conn: _Connection) -> None:
+        try:
+            new_conn = await self._make_replacement_connection()
+            self._active = new_conn
+            # Supervisor was watching old_conn; wake it to follow new.
+            self._supervisor_wake.set()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning(
+                "tunnel runtime: handoff failed; reconnecting cold",
+                exc_info=True,
+            )
+            # Force the old conn's read loop to end so the supervisor
+            # returns to the cold backoff path.
+            self._force_reconnect_conn(old_conn)
+            self._supervisor_wake.set()
+        finally:
+            self._handoff_in_flight = False
+            self._handoff_task = None
+            await self._drain_old_connection(old_conn)
+
+    async def _make_replacement_connection(self) -> _Connection:
+        """Dial + hello + park a replacement, retrying transient hello
+        failures (a drain 503 back on the still-draining task) within a
+        bounded jittered budget."""
+        backoff = 0.1
+        start = time.monotonic()
+        while not self._stop.is_set():
+            conn = _Connection(self._next_conn_id)
+            self._next_conn_id += 1
+            try:
+                await self._open_connection(conn)
+                conn.read_task = asyncio.create_task(self._read_loop(conn))
+                await self._send_hello(conn)
+                self._start_serving(conn)
+                return conn
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                self._force_reconnect_conn(conn)
+                rt = conn.read_task
+                if rt is not None and not rt.done():
+                    rt.cancel()
+                    with suppress(asyncio.CancelledError, Exception):
+                        await rt
+                await self._close_connection_writer(conn)
+                if isinstance(exc, _TunnelAuthError):
+                    raise
+                if (time.monotonic() - start) > HANDOFF_REDIAL_BUDGET_SEC:
+                    raise RuntimeError("handoff redial budget exhausted")
+                jitter = backoff * BACKOFF_JITTER * (2 * random.random() - 1)
+                await asyncio.sleep(max(0.05, backoff + jitter))
+                backoff = min(backoff * 2, 5.0)
+        raise RuntimeError("runtime stopped during handoff")
+
+    async def _drain_old_connection(self, old_conn: _Connection) -> None:
+        """Python's old h2 is CLOSED at GOAWAY, so its bridges can't keep
+        running. Surface the typed server_draining close to each live
+        bridge, then close the old writer. No bridge-drain window to wait
+        on (unlike Node)."""
+        self._surface_draining_to_bridges(old_conn)
+        self._stop_ping_loop(old_conn)
+        rt = old_conn.read_task
+        if rt is not None and not rt.done():
+            rt.cancel()
+            with suppress(asyncio.CancelledError, Exception):
+                await rt
+        await self._close_connection_writer(old_conn)
+        self._draining.discard(old_conn)
+
+    def _surface_draining_to_bridges(self, conn: _Connection) -> None:
+        """Push a typed server_draining disconnect to every live bridge
+        on the draining conn so the customer's handler/ASGI app sees a
+        clean close instead of a hang. No send_* on the old (CLOSED) h2."""
+        for stream_id in list(conn.bridge_stream_ids):
+            queue = conn.streams.get(stream_id)
+            if queue is not None:
+                with suppress(asyncio.QueueFull):
+                    queue.put_nowait(_StreamEvent(
+                        "reset", reset_code=WS_CLOSE_SERVER_DRAINING,
+                    ))
+
+    def _wake_streams_on_close(self, conn: _Connection) -> None:
+        """Wake non-bridge stream awaiters on a closed conn with a plain
+        reset so in-flight intake/response waits don't hang. Bridges get
+        the typed server_draining close via _surface_draining_to_bridges."""
+        for stream_id, queue in list(conn.streams.items()):
+            if stream_id in conn.bridge_stream_ids:
+                continue
+            with suppress(asyncio.QueueFull):
+                queue.put_nowait(_StreamEvent("reset"))
+
+    def _force_reconnect_conn(self, conn: _Connection) -> None:
+        writer = conn.writer
+        if writer is None:
+            return
+        with suppress(Exception):
+            writer.close()
+
+    async def _open_connection(self, conn: _Connection) -> None:
         ctx = ssl.create_default_context()
         ctx.set_alpn_protocols(["h2"])
         logger.info("connecting to https://%s/_system/connect", self._zone)
-        self._reader, self._writer = await asyncio.open_connection(
+        conn.reader, conn.writer = await asyncio.open_connection(
             host=self._zone, port=443, ssl=ctx, server_hostname=self._zone,
         )
-        sock = self._writer.get_extra_info("socket")
+        sock = conn.writer.get_extra_info("socket")
         if sock is not None:
             try:
                 sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -370,32 +753,38 @@ class TunnelRuntime:
         # Reset PING ack tracking for the fresh connection so a stale
         # outstanding-ping marker from a prior session can't trip the
         # watchdog the moment the new ping_loop starts.
-        self._outstanding_ping_payload = None
-        self._outstanding_ping_sent_at = None
+        conn.outstanding_ping_payload = None
+        conn.outstanding_ping_sent_at = None
         config = h2.config.H2Configuration(
             client_side=True, header_encoding="utf-8",
         )
-        self._h2 = h2.connection.H2Connection(config=config)
-        self._h2.local_settings.update({
+        conn.h2 = h2.connection.H2Connection(config=config)
+        conn.h2.local_settings.update({
             h2.settings.SettingCodes.ENABLE_CONNECT_PROTOCOL: 1,
         })
-        self._h2.initiate_connection()
-        await self._flush()
+        conn.h2.initiate_connection()
+        await self._flush_conn(conn)
 
     async def _flush(self) -> None:
-        assert self._h2 is not None and self._writer is not None
-        data = self._h2.data_to_send()
+        await self._flush_conn(self._active)
+
+    async def _flush_conn(self, conn: _Connection | None) -> None:
+        if conn is None or conn.h2 is None or conn.writer is None:
+            return
+        data = conn.h2.data_to_send()
         if data:
-            self._writer.write(data)
-            await self._writer.drain()
+            conn.writer.write(data)
+            await conn.writer.drain()
 
     # --- handshake -----------------------------------------------------------
 
-    async def _send_hello(self) -> None:
-        self._owner_token = None
-        self._server_pool_size = None
-        self._intake_idle_seconds = None
-        self._response_deadline_seconds = None
+    async def _send_hello(self, conn: _Connection | None = None) -> None:
+        conn = conn if conn is not None else self._active
+        assert conn is not None
+        conn.owner_token = None
+        conn.server_pool_size = None
+        conn.intake_idle_seconds = None
+        conn.response_deadline_seconds = None
 
         hello_headers: list[tuple[str, str]] = [
             (":method", "POST"),
@@ -409,12 +798,12 @@ class TunnelRuntime:
         if self._pool_size is not None:
             hello_headers.append(("x-pool-size", str(self._pool_size)))
 
-        async with self._send_lock:
-            stream_id = self._open_stream_locked(hello_headers, end_stream=True)
-            await self._flush()
+        async with conn.send_lock:
+            stream_id = self._open_stream_locked(hello_headers, end_stream=True, conn=conn)
+            await self._flush_conn(conn)
 
-        status, body = await self._await_response(stream_id)
-        self._streams.pop(stream_id, None)
+        status, body = await self._await_response(stream_id, conn=conn)
+        conn.streams.pop(stream_id, None)
         if status in (401, 403):
             raise _TunnelAuthError(
                 f"/_system/hello returned {status}; the API key was rejected "
@@ -437,35 +826,46 @@ class TunnelRuntime:
                 "/_system/hello response missing owner_token; cannot park "
                 "intake streams without it",
             )
-        self._owner_token = str(owner_token)
+        conn.owner_token = str(owner_token)
         if isinstance(payload.get("default_pool_size"), int):
-            self._server_pool_size = int(payload["default_pool_size"])
+            conn.server_pool_size = int(payload["default_pool_size"])
         if (val := payload.get("intake_idle_seconds")) is not None:
             try:
-                self._intake_idle_seconds = float(val)
+                conn.intake_idle_seconds = float(val)
             except (TypeError, ValueError):
                 pass
         if (val := payload.get("response_deadline_seconds")) is not None:
             try:
-                self._response_deadline_seconds = float(val)
+                conn.response_deadline_seconds = float(val)
             except (TypeError, ValueError):
                 pass
 
     def _open_stream_locked(
-        self, headers: list[tuple[str, str]], *, end_stream: bool,
+        self,
+        headers: list[tuple[str, str]],
+        *,
+        end_stream: bool,
+        conn: _Connection | None = None,
     ) -> int:
-        assert self._h2 is not None
-        stream_id = self._h2.get_next_available_stream_id()
-        self._h2.send_headers(stream_id, headers, end_stream=end_stream)
-        self._streams[stream_id] = asyncio.Queue()
+        conn = conn if conn is not None else self._active
+        assert conn is not None and conn.h2 is not None
+        stream_id = conn.h2.get_next_available_stream_id()
+        conn.h2.send_headers(stream_id, headers, end_stream=end_stream)
+        conn.streams[stream_id] = asyncio.Queue()
         return stream_id
 
-    async def _await_response_status(self, stream_id: int) -> int:
-        status, _ = await self._await_response(stream_id)
+    async def _await_response_status(
+        self, stream_id: int, conn: _Connection | None = None,
+    ) -> int:
+        status, _ = await self._await_response(stream_id, conn=conn)
         return status
 
-    async def _await_response(self, stream_id: int) -> tuple[int, bytes]:
-        queue = self._streams[stream_id]
+    async def _await_response(
+        self, stream_id: int, conn: _Connection | None = None,
+    ) -> tuple[int, bytes]:
+        conn = conn if conn is not None else self._active
+        assert conn is not None
+        queue = conn.streams[stream_id]
         status: int = 0
         body = bytearray()
         got_headers = False
@@ -487,17 +887,29 @@ class TunnelRuntime:
 
     # --- intake pool --------------------------------------------------------
 
-    async def _intake_loop(self, slot: int) -> None:
-        while not self._stop.is_set() and self._h2 is not None:
+    async def _intake_loop(
+        self, conn: _Connection | None = None, slot: int = 0,
+    ) -> None:
+        # Back-compat: a positional ``slot`` (no conn) targets active.
+        if isinstance(conn, int):
+            slot = conn
+            conn = None
+        conn = conn if conn is not None else self._active
+        assert conn is not None
+        while (
+            not self._stop.is_set()
+            and not conn.draining
+            and conn.h2 is not None
+        ):
             try:
-                envelope = await self._park_one_intake(slot)
+                envelope = await self._park_one_intake(conn, slot)
             except asyncio.CancelledError:
                 raise
             except _OwnerTokenInvalidError:
                 logger.warning(
                     "intake slot %d: owner_token rejected; reconnecting", slot,
                 )
-                self._force_reconnect()
+                self._force_reconnect_conn(conn)
                 return
             except Exception:
                 logger.exception(
@@ -507,14 +919,24 @@ class TunnelRuntime:
                 continue
             if envelope is None:
                 continue
-            self._spawn(self._dispatch(envelope))
+            # Dispatch tasks are runtime-scoped and survive a handoff.
+            # ``conn`` is the origin connection for bridge binds; HTTP
+            # replies migrate to the active conn (see _post_response).
+            self._spawn(self._dispatch(envelope, conn))
 
-    async def _park_one_intake(self, slot: int) -> Envelope | None:
-        if not self._owner_token:
+    async def _park_one_intake(
+        self, conn: _Connection | None = None, slot: int = 0,
+    ) -> Envelope | None:
+        if isinstance(conn, int):
+            slot = conn
+            conn = None
+        conn = conn if conn is not None else self._active
+        assert conn is not None
+        if not conn.owner_token:
             raise RuntimeError(
                 "intake parked before /_system/hello returned an owner_token",
             )
-        async with self._send_lock:
+        async with conn.send_lock:
             stream_id = self._open_stream_locked(
                 [
                     (":method", "POST"),
@@ -522,15 +944,16 @@ class TunnelRuntime:
                     (":authority", self._zone),
                     (":path", "/_system/intake"),
                     ("x-tunnel-id", self._tunnel_id),
-                    ("x-owner-token", self._owner_token),
+                    ("x-owner-token", conn.owner_token),
                     ("x-pool-slot", str(slot)),
                     ("content-length", "0"),
                 ],
                 end_stream=True,
+                conn=conn,
             )
-            await self._flush()
+            await self._flush_conn(conn)
 
-        queue = self._streams[stream_id]
+        queue = conn.streams[stream_id]
         headers: list[tuple[str, str]] | None = None
         body = bytearray()
         try:
@@ -545,7 +968,7 @@ class TunnelRuntime:
                 elif event.kind == "reset":
                     return None
         finally:
-            self._streams.pop(stream_id, None)
+            conn.streams.pop(stream_id, None)
 
         if headers is None:
             return None
@@ -568,7 +991,13 @@ class TunnelRuntime:
 
     # --- read pump ----------------------------------------------------------
 
-    async def _ping_loop(self) -> None:
+    def _stop_ping_loop(self, conn: _Connection) -> None:
+        task = conn.ping_task
+        conn.ping_task = None
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _ping_loop(self, conn: _Connection | None = None) -> None:
         """Send a PING every ``PING_INTERVAL`` and force-reconnect if a
         prior PING has not been acked within ``PING_ACK_TIMEOUT``.
 
@@ -576,16 +1005,27 @@ class TunnelRuntime:
         (carrier loss, firewall idle reap, NAT rebind, etc.). The TS
         runtime has the same shape; this brings Python to parity.
         """
+        conn = conn if conn is not None else self._active
+        assert conn is not None
+
+        def _force() -> None:
+            # Back-compat: when pinging the active conn, route through
+            # _force_reconnect (the existing watchdog test patches it).
+            if conn is self._active:
+                self._force_reconnect()
+            else:
+                self._force_reconnect_conn(conn)
+
         while not self._stop.is_set():
             await asyncio.sleep(PING_INTERVAL)
-            if self._h2 is None or self._writer is None:
+            if conn.h2 is None or conn.writer is None:
                 return
             # Before sending the next PING, fail fast if the previous
             # one is still unacked past the deadline.
             if (
-                self._outstanding_ping_payload is not None
-                and self._outstanding_ping_sent_at is not None
-                and (time.monotonic() - self._outstanding_ping_sent_at)
+                conn.outstanding_ping_payload is not None
+                and conn.outstanding_ping_sent_at is not None
+                and (time.monotonic() - conn.outstanding_ping_sent_at)
                 > PING_ACK_TIMEOUT
             ):
                 logger.warning(
@@ -593,42 +1033,53 @@ class TunnelRuntime:
                     "forcing reconnect",
                     PING_ACK_TIMEOUT,
                 )
-                self._force_reconnect()
+                _force()
                 return
             payload = struct.pack("!Q", int(time.monotonic_ns()) & ((1 << 64) - 1))
             try:
-                async with self._send_lock:
-                    self._h2.ping(payload)
-                    await self._flush()
+                async with conn.send_lock:
+                    conn.h2.ping(payload)
+                    await self._flush_conn(conn)
             except Exception:
                 logger.warning(
                     "tunnel runtime: PING send failed; forcing reconnect",
                     exc_info=True,
                 )
-                self._force_reconnect()
+                _force()
                 return
-            self._outstanding_ping_payload = payload
-            self._outstanding_ping_sent_at = time.monotonic()
+            conn.outstanding_ping_payload = payload
+            conn.outstanding_ping_sent_at = time.monotonic()
 
-    async def _read_loop(self) -> None:
-        assert self._h2 is not None and self._reader is not None
+    async def _read_loop(self, conn: _Connection | None = None) -> None:
+        conn = conn if conn is not None else self._active
+        assert conn is not None and conn.h2 is not None and conn.reader is not None
         while not self._stop.is_set():
-            chunk = await self._reader.read(65536)
+            chunk = await conn.reader.read(65536)
             if not chunk:
                 return
             try:
-                events = self._h2.receive_data(chunk)
+                events = conn.h2.receive_data(chunk)
             except h2.exceptions.ProtocolError:
                 logger.exception("h2 protocol error")
                 return
             for event in events:
-                await self._handle_event(event)
-            async with self._send_lock:
-                await self._flush()
+                await self._handle_event(event, conn)
+            if conn.goaway_received:
+                # hyper-h2 is CLOSED; nothing more will arrive on this
+                # conn. Surface a synthetic reset to any pending stream
+                # awaiters so they wake instead of hanging.
+                self._wake_streams_on_close(conn)
+                return
+            async with conn.send_lock:
+                await self._flush_conn(conn)
 
-    async def _handle_event(self, event: h2.events.Event) -> None:
+    async def _handle_event(
+        self, event: h2.events.Event, conn: _Connection | None = None,
+    ) -> None:
+        conn = conn if conn is not None else self._active
+        assert conn is not None
         if isinstance(event, h2.events.ResponseReceived):
-            queue = self._streams.get(event.stream_id)
+            queue = conn.streams.get(event.stream_id)
             if queue is not None:
                 await queue.put(_StreamEvent(
                     "headers", headers=list(event.headers),
@@ -636,7 +1087,7 @@ class TunnelRuntime:
         elif isinstance(event, h2.events.InformationalResponseReceived):
             pass
         elif isinstance(event, h2.events.DataReceived):
-            queue = self._streams.get(event.stream_id)
+            queue = conn.streams.get(event.stream_id)
             if queue is not None:
                 await queue.put(_StreamEvent(
                     "data",
@@ -644,28 +1095,28 @@ class TunnelRuntime:
                     flow_controlled_length=event.flow_controlled_length,
                 ))
             if (
-                self._h2 is not None
-                and event.stream_id not in self._bridge_stream_ids
+                conn.h2 is not None
+                and event.stream_id not in conn.bridge_stream_ids
             ):
-                self._h2.acknowledge_received_data(
+                conn.h2.acknowledge_received_data(
                     event.flow_controlled_length, event.stream_id,
                 )
         elif isinstance(event, h2.events.StreamEnded):
-            queue = self._streams.get(event.stream_id)
+            queue = conn.streams.get(event.stream_id)
             if queue is not None:
                 await queue.put(_StreamEvent("end"))
         elif isinstance(event, h2.events.StreamReset):
-            queue = self._streams.get(event.stream_id)
+            queue = conn.streams.get(event.stream_id)
             if queue is not None:
                 await queue.put(_StreamEvent("reset"))
-            ev = self._window_events.pop(event.stream_id, None)
+            ev = conn.window_events.pop(event.stream_id, None)
             if ev is not None:
                 ev.set()
         elif isinstance(event, h2.events.WindowUpdated):
             if event.stream_id == 0:
-                self._conn_window_event.set()
+                conn.conn_window_event.set()
             else:
-                ev = self._window_events.get(event.stream_id)
+                ev = conn.window_events.get(event.stream_id)
                 if ev is not None:
                     ev.set()
         elif isinstance(event, h2.events.PingAckReceived):
@@ -677,11 +1128,11 @@ class TunnelRuntime:
             # for sanity.
             ack_data = getattr(event, "ping_data", None)
             if (
-                self._outstanding_ping_payload is not None
-                and (ack_data is None or ack_data == self._outstanding_ping_payload)
+                conn.outstanding_ping_payload is not None
+                and (ack_data is None or ack_data == conn.outstanding_ping_payload)
             ):
-                self._outstanding_ping_payload = None
-                self._outstanding_ping_sent_at = None
+                conn.outstanding_ping_payload = None
+                conn.outstanding_ping_sent_at = None
         elif isinstance(event, h2.events.ConnectionTerminated):
             debug = ""
             try:
@@ -689,18 +1140,32 @@ class TunnelRuntime:
                     debug = event.additional_data.decode("utf-8", errors="replace")
             except AttributeError:
                 pass
+            reason = _parse_goaway_reason(debug)
+            # Log the parsed reason + length only; the raw debug field is
+            # peer-controlled, so don't echo it verbatim at info level.
             logger.info(
-                "GOAWAY error_code=%s last_stream_id=%s debug=%r",
-                event.error_code, event.last_stream_id, debug,
+                "GOAWAY error_code=%s last_stream_id=%s reason=%r debug_len=%d",
+                event.error_code, event.last_stream_id, reason, len(debug),
             )
-            raise ConnectionError("tunnel server sent GOAWAY")
+            # hyper-h2 flips the whole connection to CLOSED on GOAWAY
+            # regardless of error code, so we cannot keep live bridges
+            # running on this conn (unlike Node). A NO_ERROR (0) GOAWAY
+            # is the server's drain signal: hand off make-before-break
+            # instead of raising. A non-zero code is a real fault — let
+            # the read loop end and reconnect cold.
+            conn.goaway_received = True
+            if event.error_code == 0 and conn is self._active:
+                self._begin_handoff(conn, reason=reason or "drain")
 
     # --- envelope dispatch --------------------------------------------------
 
-    async def _dispatch(self, envelope: Envelope) -> None:
+    async def _dispatch(
+        self, envelope: Envelope, origin: _Connection | None = None,
+    ) -> None:
+        origin = origin if origin is not None else self._active
         if envelope.route_kind == "ws-upgrade":
             try:
-                await self._dispatch_ws_upgrade(envelope)
+                await self._dispatch_ws_upgrade(envelope, origin)
             except Exception:
                 logger.exception(
                     "ws dispatch failed request_id=%s", envelope.request_id,
@@ -708,7 +1173,7 @@ class TunnelRuntime:
             return
         if envelope.route_kind == "tcp-stream":
             try:
-                await self._dispatch_tcp_stream(envelope)
+                await self._dispatch_tcp_stream(envelope, origin)
             except Exception:
                 logger.exception(
                     "tcp-stream dispatch failed tcp_id=%s", envelope.tcp_id,
@@ -935,14 +1400,22 @@ class TunnelRuntime:
 
     # --- WebSocket bridge ---------------------------------------------------
 
-    async def _dispatch_ws_upgrade(self, envelope: Envelope) -> None:
+    async def _dispatch_ws_upgrade(
+        self, envelope: Envelope, origin: _Connection | None = None,
+    ) -> None:
         """Bridge a third-party WS upgrade end-to-end.
 
         URL forward_to: open an h1 ``Upgrade: websocket`` to the upstream
         and bridge frames between the bridge stream and the upstream
         socket. Callable forward_to: drive the user's ASGI websocket app
         directly (existing path).
+
+        ``origin`` is the connection the upgrade arrived on; the bridge
+        bind + pump ride it (they do NOT migrate on a handoff). The
+        upgrade reply also rides origin — a WS upgrade caught mid-drain
+        cannot complete via make-before-break (the bind is task-local).
         """
+        origin = origin if origin is not None else self._active
         if envelope.ws_id is None:
             await self._reject_ws(envelope.request_id, status=400, reason="missing ws_id")
             return
@@ -961,7 +1434,7 @@ class TunnelRuntime:
             )
             return
         if self._is_url_forward:
-            await self._dispatch_ws_upgrade_to_url(envelope)
+            await self._dispatch_ws_upgrade_to_url(envelope, origin)
             return
 
         ws_session = WSASGISession(
@@ -1016,11 +1489,13 @@ class TunnelRuntime:
         if subprotocol:
             upgrade_reply_headers.append(("sec-websocket-protocol", subprotocol))
         upgrade_reply_headers.extend(accept_headers)
+        # WS-upgrade reply rides the origin conn only (never migrates).
         await self._post_response(
             envelope.request_id,
             status=200,
             headers=upgrade_reply_headers,
             body=b"",
+            target=origin,
         )
 
         connect_headers: list[tuple[str, str]] = [
@@ -1035,12 +1510,14 @@ class TunnelRuntime:
             ("inkbox-ws-id", envelope.ws_id),
         ]
 
-        async with self._send_lock:
-            stream_id = self._open_stream_locked(connect_headers, end_stream=False)
-            await self._flush()
-        self._bridge_stream_ids.add(stream_id)
+        async with origin.send_lock:
+            stream_id = self._open_stream_locked(
+                connect_headers, end_stream=False, conn=origin,
+            )
+            await self._flush_conn(origin)
+        origin.bridge_stream_ids.add(stream_id)
 
-        queue = self._streams[stream_id]
+        queue = origin.streams[stream_id]
 
         async def _await_connect_200() -> bool:
             while True:
@@ -1068,31 +1545,34 @@ class TunnelRuntime:
             )
             # RST the h2 CONNECT stream so it doesn't sit half-open
             # server-side; mirror the URL WSS bridge-open failure path.
-            await self._reset_bridge_stream(stream_id)
+            await self._reset_bridge_stream(stream_id, conn=origin)
             await ws_session.close(code=1011)
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
+            origin.bridge_stream_ids.discard(stream_id)
+            origin.streams.pop(stream_id, None)
             return
         if not ok:
-            await self._reset_bridge_stream(stream_id)
+            await self._reset_bridge_stream(stream_id, conn=origin)
             await ws_session.close(code=1011)
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
+            origin.bridge_stream_ids.discard(stream_id)
+            origin.streams.pop(stream_id, None)
             return
 
+        close_code = 1000
         try:
-            await self._pump_ws(stream_id, ws_session)
+            close_code = await self._pump_ws(stream_id, ws_session, origin)
         finally:
-            await ws_session.close(code=1000)
+            await ws_session.close(code=close_code)
             # Graceful END_STREAM on the bridge so the server sees a
             # clean half-close. The pump may already have sent
             # END_STREAM (e.g. on app-side close); the helper
             # suppresses the resulting StreamClosedError.
-            await self._end_bridge_stream(stream_id)
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
+            await self._end_bridge_stream(stream_id, conn=origin)
+            origin.bridge_stream_ids.discard(stream_id)
+            origin.streams.pop(stream_id, None)
 
-    async def _dispatch_ws_upgrade_to_url(self, envelope: Envelope) -> None:
+    async def _dispatch_ws_upgrade_to_url(
+        self, envelope: Envelope, origin: _Connection | None = None,
+    ) -> None:
         """Bridge a third-party WS upgrade to a ``ws://`` / ``wss://``
         URL upstream.
 
@@ -1108,6 +1588,9 @@ class TunnelRuntime:
         from inkbox.tunnels.client._ws_upstream import (
             WsUpstreamError, open_ws_upstream,
         )
+
+        origin = origin if origin is not None else self._active
+        assert origin is not None
 
         # Bound the upstream handshake by the same clock the server
         # uses for the third-party reply. If response_deadline_seconds
@@ -1166,9 +1649,11 @@ class TunnelRuntime:
             if hk in ws_handshake_strip:
                 continue
             upgrade_reply_headers.append((hk, hv))
+        # WS-upgrade reply rides the origin conn only (never migrates).
         await self._post_response(
             envelope.request_id, status=200,
             headers=upgrade_reply_headers, body=b"",
+            target=origin,
         )
 
         # Open the bridge stream.
@@ -1183,13 +1668,13 @@ class TunnelRuntime:
             ("x-api-key", self._api_key),
             ("inkbox-ws-id", envelope.ws_id),
         ]
-        async with self._send_lock:
+        async with origin.send_lock:
             stream_id = self._open_stream_locked(
-                connect_headers, end_stream=False,
+                connect_headers, end_stream=False, conn=origin,
             )
-            await self._flush()
-        self._bridge_stream_ids.add(stream_id)
-        queue = self._streams[stream_id]
+            await self._flush_conn(origin)
+        origin.bridge_stream_ids.add(stream_id)
+        queue = origin.streams[stream_id]
 
         async def _await_connect_200() -> bool:
             while True:
@@ -1210,23 +1695,25 @@ class TunnelRuntime:
             # Bridge open failed — RST the h2 CONNECT stream so it
             # doesn't sit half-open server-side. Without this the
             # stream stays alive until the session GOAWAYs.
-            await self._reset_bridge_stream(stream_id)
+            await self._reset_bridge_stream(stream_id, conn=origin)
             await _safe_close_stream_writer(up.writer)
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
+            origin.bridge_stream_ids.discard(stream_id)
+            origin.streams.pop(stream_id, None)
             return
 
         try:
-            await self._pump_ws_url_bridge(stream_id, up.reader, up.writer, up.leftover)
+            await self._pump_ws_url_bridge(
+                stream_id, up.reader, up.writer, up.leftover, origin,
+            )
         finally:
             await _safe_close_stream_writer(up.writer)
             # Best-effort graceful END_STREAM on the bridge so the
             # server sees a clean half-close. The pump may already
             # have sent END_STREAM (e.g. on upstream WS CLOSE) — the
             # h2 lib will raise StreamClosedError, which we suppress.
-            await self._end_bridge_stream(stream_id)
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
+            await self._end_bridge_stream(stream_id, conn=origin)
+            origin.bridge_stream_ids.discard(stream_id)
+            origin.streams.pop(stream_id, None)
 
     async def _pump_ws_url_bridge(
         self,
@@ -1234,6 +1721,7 @@ class TunnelRuntime:
         upstream_reader: asyncio.StreamReader,
         upstream_writer: asyncio.StreamWriter,
         upstream_leftover: bytes,
+        origin: _Connection | None = None,
     ) -> None:
         """Bridge frames between the bridge stream and an upstream WS
         socket. The bridge protocol carries length-prefixed JSON
@@ -1248,6 +1736,8 @@ class TunnelRuntime:
           send on bridge stream.
         """
         from inkbox.tunnels.client._ws_passthrough import decode_client_frame
+        origin = origin if origin is not None else self._active
+        assert origin is not None
         wire_buf = bytearray()
         env_buf = bytearray()
         recv_done = False
@@ -1266,6 +1756,7 @@ class TunnelRuntime:
                 stream_id,
                 encode_ws_frame(WS_OPCODE_BINARY, payload, mask=True),
                 end_stream=end_stream,
+                conn=origin,
             )
 
         async def upstream_to_bridge() -> None:
@@ -1355,7 +1846,7 @@ class TunnelRuntime:
             when upstream closed (abrupt EOF/RST) so the loop can exit
             without waiting for a third-party frame that may never
             arrive."""
-            get_task = asyncio.create_task(self._streams[stream_id].get())
+            get_task = asyncio.create_task(origin.streams[stream_id].get())
             close_task = asyncio.create_task(upstream_closed.wait())
             try:
                 done, _pending = await asyncio.wait(
@@ -1384,16 +1875,16 @@ class TunnelRuntime:
             if consumed <= 0:
                 return
             unacked_wire_bytes -= consumed
-            async with self._send_lock:
-                if self._h2 is None:
+            async with origin.send_lock:
+                if origin.h2 is None:
                     return
                 with suppress(
                     h2.exceptions.StreamClosedError,
                     h2.exceptions.NoSuchStreamError,
                     h2.exceptions.ProtocolError,
                 ):
-                    self._h2.acknowledge_received_data(consumed, stream_id)
-                    await self._flush()
+                    origin.h2.acknowledge_received_data(consumed, stream_id)
+                    await self._flush_conn(origin)
 
         try:
             while not recv_done and not upstream_closed.is_set():
@@ -1409,6 +1900,7 @@ class TunnelRuntime:
                                 stream_id,
                                 encode_ws_frame(WS_OPCODE_PONG, payload, mask=True),
                                 end_stream=False,
+                                conn=origin,
                             )
                             continue
                         if opcode == WS_OPCODE_PONG:
@@ -1494,6 +1986,18 @@ class TunnelRuntime:
                     # eat the window.
                     await _credit_consumed()
                 elif event.kind in ("end", "reset"):
+                    # On a server-drain reset, give the SDK-owned upstream
+                    # leg a clean typed WS CLOSE instead of an abrupt RST.
+                    if event.kind == "reset" and event.reset_code is not None:
+                        with suppress(OSError, ConnectionError):
+                            upstream_writer.write(
+                                encode_ws_frame(
+                                    WS_OPCODE_CLOSE,
+                                    event.reset_code.to_bytes(2, "big"),
+                                    mask=True,
+                                ),
+                            )
+                            await upstream_writer.drain()
                     recv_done = True
         finally:
             upstream_closed.set()
@@ -1504,10 +2008,20 @@ class TunnelRuntime:
                 with suppress(asyncio.CancelledError, Exception):
                     await sender
 
-    async def _pump_ws(self, stream_id: int, ws_session: WSASGISession) -> None:
+    async def _pump_ws(
+        self,
+        stream_id: int,
+        ws_session: WSASGISession,
+        origin: _Connection | None = None,
+    ) -> int:
+        origin = origin if origin is not None else self._active
+        assert origin is not None
         wire_buf = bytearray()
         env_buf = bytearray()
         recv_done = False
+        # Close code surfaced to the app on bridge teardown; a drain
+        # reset carries WS_CLOSE_SERVER_DRAINING.
+        close_code = 1000
         # See _pump_ws_url_bridge for the full rationale; same bug
         # was present here. Bridge streams are excluded from
         # _handle_event's auto-ack so the consumer must credit back
@@ -1521,22 +2035,23 @@ class TunnelRuntime:
             if consumed <= 0:
                 return
             unacked_wire_bytes -= consumed
-            async with self._send_lock:
-                if self._h2 is None:
+            async with origin.send_lock:
+                if origin.h2 is None:
                     return
                 with suppress(
                     h2.exceptions.StreamClosedError,
                     h2.exceptions.NoSuchStreamError,
                     h2.exceptions.ProtocolError,
                 ):
-                    self._h2.acknowledge_received_data(consumed, stream_id)
-                    await self._flush()
+                    origin.h2.acknowledge_received_data(consumed, stream_id)
+                    await self._flush_conn(origin)
 
         async def _send_ws_binary(payload: bytes, *, end_stream: bool = False) -> None:
             await self._send_data(
                 stream_id,
                 encode_ws_frame(WS_OPCODE_BINARY, payload, mask=True),
                 end_stream=end_stream,
+                conn=origin,
             )
 
         async def app_to_wire() -> None:
@@ -1553,6 +2068,7 @@ class TunnelRuntime:
                     stream_id,
                     encode_ws_frame(WS_OPCODE_CLOSE, close_frame_payload, mask=True),
                     end_stream=True,
+                    conn=origin,
                 )
             except (ConnectionError, h2.exceptions.ProtocolError):
                 pass
@@ -1560,7 +2076,7 @@ class TunnelRuntime:
         sender = self._spawn(app_to_wire())
         try:
             while not recv_done:
-                event = await self._streams[stream_id].get()
+                event = await origin.streams[stream_id].get()
                 if event.kind == "data":
                     unacked_wire_bytes += event.flow_controlled_length
                     wire_buf.extend(event.data)
@@ -1570,6 +2086,7 @@ class TunnelRuntime:
                                 stream_id,
                                 encode_ws_frame(WS_OPCODE_PONG, payload, mask=True),
                                 end_stream=False,
+                                conn=origin,
                             )
                             continue
                         if opcode == WS_OPCODE_PONG:
@@ -1580,6 +2097,7 @@ class TunnelRuntime:
                                     stream_id,
                                     encode_ws_frame(WS_OPCODE_CLOSE, payload, mask=True),
                                     end_stream=True,
+                                    conn=origin,
                                 )
                             recv_done = True
                             break
@@ -1608,6 +2126,10 @@ class TunnelRuntime:
                     # need crediting (e.g. PING storms).
                     await _credit_consumed()
                 elif event.kind in ("end", "reset"):
+                    if event.kind == "reset" and event.reset_code is not None:
+                        # A server-drain reset carries the typed close
+                        # code; surface it to the app instead of 1000.
+                        close_code = event.reset_code
                     recv_done = True
         finally:
             ws_session.signal_outbound_eof()
@@ -1619,10 +2141,13 @@ class TunnelRuntime:
                     await sender
             except (asyncio.CancelledError, Exception):
                 pass
+        return close_code
 
     # --- TCP-stream bridge (passthrough) ------------------------------------
 
-    async def _dispatch_tcp_stream(self, envelope: Envelope) -> None:
+    async def _dispatch_tcp_stream(
+        self, envelope: Envelope, origin: _Connection | None = None,
+    ) -> None:
         """Bridge a passthrough TCP stream end-to-end."""
         if self._terminator is None:
             logger.warning(
@@ -1632,6 +2157,9 @@ class TunnelRuntime:
             return
         if envelope.tcp_id is None:
             return
+
+        origin = origin if origin is not None else self._active
+        assert origin is not None
 
         # forward_to is parsed by UpstreamUrlDispatch; no per-bridge URL
         # parse here after the parser-based refactor.
@@ -1652,20 +2180,20 @@ class TunnelRuntime:
             ("inkbox-tcp-id", tcp_id),
         ]
 
-        async with self._send_lock:
+        async with origin.send_lock:
             stream_id = self._open_stream_locked(
-                connect_headers, end_stream=False,
+                connect_headers, end_stream=False, conn=origin,
             )
-            self._bridge_stream_ids.add(stream_id)
+            origin.bridge_stream_ids.add(stream_id)
             try:
-                await self._flush()
+                await self._flush_conn(origin)
             except Exception:
-                self._bridge_stream_ids.discard(stream_id)
-                self._streams.pop(stream_id, None)
+                origin.bridge_stream_ids.discard(stream_id)
+                origin.streams.pop(stream_id, None)
                 raise
 
         async def _await_bridge_status_200() -> None:
-            queue = self._streams[stream_id]
+            queue = origin.streams[stream_id]
             while True:
                 event = await queue.get()
                 if event.kind == "headers":
@@ -1688,21 +2216,21 @@ class TunnelRuntime:
             )
         except (asyncio.TimeoutError, BridgeOpenFailed, BridgeProtocolError):
             logger.exception("bridge open failed tcp_id=%s", tcp_id)
-            await self._drain_and_ack_pending(stream_id)
-            async with self._send_lock:
-                if self._h2 is not None:
+            await self._drain_and_ack_pending(stream_id, conn=origin)
+            async with origin.send_lock:
+                if origin.h2 is not None:
                     with suppress(
                         h2.exceptions.StreamClosedError,
                         h2.exceptions.NoSuchStreamError,
                         h2.exceptions.ProtocolError,
                     ):
-                        self._h2.reset_stream(
+                        origin.h2.reset_stream(
                             stream_id,
                             error_code=h2.errors.ErrorCodes.CANCEL,
                         )
-                        await self._flush()
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
+                        await self._flush_conn(origin)
+            origin.bridge_stream_ids.discard(stream_id)
+            origin.streams.pop(stream_id, None)
             return
 
         # Build (or reuse) the passthrough dispatcher for this runtime.
@@ -1752,6 +2280,7 @@ class TunnelRuntime:
                 stream_id,
                 encode_ws_frame(opcode, payload, mask=True),
                 end_stream=end_stream,
+                conn=origin,
             )
 
         # Plaintext adapter — picked once after the TLS handshake reports
@@ -1801,7 +2330,7 @@ class TunnelRuntime:
             unacked_wire_bytes = 0
             try:
                 while True:
-                    event = await self._streams[stream_id].get()
+                    event = await origin.streams[stream_id].get()
                     if event.kind == "end":
                         return
                     if event.kind == "reset":
@@ -1886,30 +2415,30 @@ class TunnelRuntime:
                     )
                     if consumed > 0:
                         unacked_wire_bytes -= consumed
-                        async with self._send_lock:
-                            if self._h2 is not None:
+                        async with origin.send_lock:
+                            if origin.h2 is not None:
                                 with suppress(
                                     h2.exceptions.StreamClosedError,
                                     h2.exceptions.NoSuchStreamError,
                                     h2.exceptions.ProtocolError,
                                 ):
-                                    self._h2.acknowledge_received_data(
+                                    origin.h2.acknowledge_received_data(
                                         consumed, stream_id,
                                     )
-                                    await self._flush()
+                                    await self._flush_conn(origin)
             finally:
                 if unacked_wire_bytes:
-                    async with self._send_lock:
-                        if self._h2 is not None:
+                    async with origin.send_lock:
+                        if origin.h2 is not None:
                             with suppress(
                                 h2.exceptions.StreamClosedError,
                                 h2.exceptions.NoSuchStreamError,
                                 h2.exceptions.ProtocolError,
                             ):
-                                self._h2.acknowledge_received_data(
+                                origin.h2.acknowledge_received_data(
                                     unacked_wire_bytes, stream_id,
                                 )
-                                await self._flush()
+                                await self._flush_conn(origin)
 
         async def outbound() -> None:
             # Wait for the Plaintext adapter to be picked (ALPN known
@@ -2004,15 +2533,15 @@ class TunnelRuntime:
                     timeout=BRIDGE_CLEANUP_SEND_TIMEOUT_SEC,
                 )
             with suppress(Exception):
-                await self._drain_and_ack_pending(stream_id)
+                await self._drain_and_ack_pending(stream_id, conn=origin)
             # Close the per-bridge plaintext adapter (h1 parser or h2
             # transcoder). The shared UpstreamUrlDispatch lives on the
             # runtime and is closed in TunnelRuntime.aclose().
             if plaintext_adapter is not None:
                 with suppress(Exception):
                     await plaintext_adapter.aclose()  # type: ignore[union-attr]
-            self._bridge_stream_ids.discard(stream_id)
-            self._streams.pop(stream_id, None)
+            origin.bridge_stream_ids.discard(stream_id)
+            origin.streams.pop(stream_id, None)
 
     async def _reject_ws(
         self, request_id: str, *, status: int, reason: str,
@@ -2026,6 +2555,25 @@ class TunnelRuntime:
 
     # --- response posting ---------------------------------------------------
 
+    def _pick_reply_connection(
+        self, origin: _Connection | None,
+    ) -> _Connection | None:
+        """The active conn if it can take new streams, else origin if it
+        can. After a GOAWAY the origin refuses new streams, so an HTTP
+        webhook reply migrates to the new active conn."""
+        def usable(c: _Connection | None) -> bool:
+            return (
+                c is not None
+                and not c.draining
+                and c.h2 is not None
+                and not c.goaway_received
+            )
+        if usable(self._active):
+            return self._active
+        if usable(origin):
+            return origin
+        return None
+
     async def _post_response(
         self,
         request_id: str,
@@ -2033,7 +2581,30 @@ class TunnelRuntime:
         status: int,
         headers: list[tuple[str, str]],
         body: bytes,
+        target: _Connection | None = None,
     ) -> None:
+        # HTTP webhook replies migrate to the current active conn; pass
+        # an explicit ``target`` (the origin) for replies that must NOT
+        # migrate (WS-upgrade reply). A webhook can finish in the window
+        # after the old conn is marked draining but before the new active
+        # has parked — wait (bounded) for the handoff to publish it.
+        if target is None:
+            if self._handoff_in_flight and self._handoff_task is not None:
+                with suppress(asyncio.CancelledError, Exception):
+                    await asyncio.wait_for(
+                        asyncio.shield(self._handoff_task),
+                        timeout=POST_ACTIVE_WAIT_SEC,
+                    )
+            conn = self._pick_reply_connection(self._active)
+            if conn is None:
+                logger.warning(
+                    "no live connection to post reply request_id=%s; dropping",
+                    request_id,
+                )
+                return
+        else:
+            conn = target
+
         req_headers: list[tuple[str, str]] = [
             (":method", "POST"),
             (":scheme", "https"),
@@ -2051,16 +2622,16 @@ class TunnelRuntime:
                 continue
             req_headers.append((f"inkbox-h-{kl}", v))
 
-        async with self._send_lock:
+        async with conn.send_lock:
             stream_id = self._open_stream_locked(
-                req_headers, end_stream=(len(body) == 0),
+                req_headers, end_stream=(len(body) == 0), conn=conn,
             )
-            await self._flush()
+            await self._flush_conn(conn)
         if body:
-            await self._send_data(stream_id, body, end_stream=True)
+            await self._send_data(stream_id, body, end_stream=True, conn=conn)
         try:
             status_code = await asyncio.wait_for(
-                self._await_response_status(stream_id), timeout=30.0,
+                self._await_response_status(stream_id, conn=conn), timeout=30.0,
             )
             if status_code >= 400:
                 logger.warning(
@@ -2069,86 +2640,112 @@ class TunnelRuntime:
         except asyncio.TimeoutError:
             logger.warning("/_system/response/%s timed out", request_id)
         finally:
-            self._streams.pop(stream_id, None)
+            conn.streams.pop(stream_id, None)
 
-    async def _reset_bridge_stream(self, stream_id: int) -> None:
+    async def _reset_bridge_stream(
+        self, stream_id: int, conn: _Connection | None = None,
+    ) -> None:
         """RST_STREAM(CANCEL) the named stream. No-op if h2 is gone or
         the stream is already closed. Used on bridge-open failure
         paths so the h2 stream doesn't sit half-open server-side."""
-        async with self._send_lock:
-            if self._h2 is None:
+        conn = conn if conn is not None else self._active
+        if conn is None:
+            return
+        async with conn.send_lock:
+            if conn.h2 is None:
                 return
             with suppress(
                 h2.exceptions.StreamClosedError,
                 h2.exceptions.NoSuchStreamError,
                 h2.exceptions.ProtocolError,
             ):
-                self._h2.reset_stream(
+                conn.h2.reset_stream(
                     stream_id, error_code=h2.errors.ErrorCodes.CANCEL,
                 )
-                await self._flush()
+                await self._flush_conn(conn)
 
-    async def _end_bridge_stream(self, stream_id: int) -> None:
+    async def _end_bridge_stream(
+        self, stream_id: int, conn: _Connection | None = None,
+    ) -> None:
         """Send an empty DATA with END_STREAM on the named stream so
         the server sees a clean half-close. No-op if the stream has
         already been ended (the pump may have set END_STREAM on the
         upstream-WS-CLOSE path)."""
-        async with self._send_lock:
-            if self._h2 is None:
+        conn = conn if conn is not None else self._active
+        if conn is None:
+            return
+        async with conn.send_lock:
+            if conn.h2 is None:
                 return
             with suppress(
                 h2.exceptions.StreamClosedError,
                 h2.exceptions.NoSuchStreamError,
                 h2.exceptions.ProtocolError,
             ):
-                self._h2.send_data(stream_id, b"", end_stream=True)
-                await self._flush()
+                conn.h2.send_data(stream_id, b"", end_stream=True)
+                await self._flush_conn(conn)
 
     async def _send_data(
-        self, stream_id: int, data: bytes, *, end_stream: bool,
+        self,
+        stream_id: int,
+        data: bytes,
+        *,
+        end_stream: bool,
+        conn: _Connection | None = None,
     ) -> None:
-        assert self._h2 is not None
+        conn = conn if conn is not None else self._active
+        assert conn is not None and conn.h2 is not None
         offset = 0
         total = len(data)
         while offset < total:
-            await self._await_window(stream_id)
-            async with self._send_lock:
-                if self._h2 is None:
+            await self._await_window(stream_id, conn=conn)
+            async with conn.send_lock:
+                if conn.h2 is None:
                     raise ConnectionError("h2 connection torn down")
                 window = min(
-                    self._h2.local_flow_control_window(stream_id),
-                    self._h2.max_outbound_frame_size,
+                    conn.h2.local_flow_control_window(stream_id),
+                    conn.h2.max_outbound_frame_size,
                 )
                 if window <= 0:
-                    self._mark_window_blocked(stream_id)
+                    self._mark_window_blocked(stream_id, conn=conn)
                     continue
                 chunk = data[offset:offset + window]
                 end = end_stream and (offset + len(chunk) >= total)
-                self._h2.send_data(stream_id, chunk, end_stream=end)
+                conn.h2.send_data(stream_id, chunk, end_stream=end)
                 offset += len(chunk)
-                await self._flush()
+                await self._flush_conn(conn)
         if end_stream and offset == 0:
-            async with self._send_lock:
-                if self._h2 is not None:
-                    self._h2.send_data(stream_id, b"", end_stream=True)
-                    await self._flush()
+            async with conn.send_lock:
+                if conn.h2 is not None:
+                    conn.h2.send_data(stream_id, b"", end_stream=True)
+                    await self._flush_conn(conn)
 
-    def _mark_window_blocked(self, stream_id: int) -> None:
-        ev = self._window_events.setdefault(stream_id, asyncio.Event())
+    def _mark_window_blocked(
+        self, stream_id: int, conn: _Connection | None = None,
+    ) -> None:
+        conn = conn if conn is not None else self._active
+        if conn is None:
+            return
+        ev = conn.window_events.setdefault(stream_id, asyncio.Event())
         if (
-            self._h2 is not None
-            and self._h2.local_flow_control_window(stream_id) <= 0
+            conn.h2 is not None
+            and conn.h2.local_flow_control_window(stream_id) <= 0
         ):
             ev.clear()
         if (
-            self._h2 is not None
-            and self._h2.outbound_flow_control_window <= 0
+            conn.h2 is not None
+            and conn.h2.outbound_flow_control_window <= 0
         ):
-            self._conn_window_event.clear()
+            conn.conn_window_event.clear()
 
-    async def _drain_and_ack_pending(self, stream_id: int) -> None:
-        queue = self._streams.get(stream_id)
-        if queue is None or self._h2 is None:
+    async def _drain_and_ack_pending(
+        self, stream_id: int, conn: _Connection | None = None,
+    ) -> None:
+        conn = conn if conn is not None else self._active
+        if conn is None:
+            return
+        queue = conn.streams.get(stream_id)
+        if queue is None or conn.h2 is None:
             return
         total = 0
         while not queue.empty():
@@ -2157,31 +2754,35 @@ class TunnelRuntime:
                 total += event.flow_controlled_length
         if not total:
             return
-        async with self._send_lock:
-            if self._h2 is None:
+        async with conn.send_lock:
+            if conn.h2 is None:
                 return
             with suppress(
                 h2.exceptions.StreamClosedError,
                 h2.exceptions.NoSuchStreamError,
                 h2.exceptions.ProtocolError,
             ):
-                self._h2.acknowledge_received_data(total, stream_id)
-                await self._flush()
+                conn.h2.acknowledge_received_data(total, stream_id)
+                await self._flush_conn(conn)
 
-    async def _await_window(self, stream_id: int) -> None:
-        async with self._send_lock:
-            if self._h2 is None:
+    async def _await_window(
+        self, stream_id: int, conn: _Connection | None = None,
+    ) -> None:
+        conn = conn if conn is not None else self._active
+        assert conn is not None
+        async with conn.send_lock:
+            if conn.h2 is None:
                 raise ConnectionError("h2 connection torn down")
-            stream_window = self._h2.local_flow_control_window(stream_id)
-            conn_window = self._h2.outbound_flow_control_window
+            stream_window = conn.h2.local_flow_control_window(stream_id)
+            conn_window = conn.h2.outbound_flow_control_window
             if stream_window > 0 and conn_window > 0:
                 return
         wait_tasks: list[asyncio.Task[Any]] = []
         if stream_window <= 0:
-            ev = self._window_events.setdefault(stream_id, asyncio.Event())
+            ev = conn.window_events.setdefault(stream_id, asyncio.Event())
             wait_tasks.append(asyncio.create_task(ev.wait()))
         if conn_window <= 0:
-            wait_tasks.append(asyncio.create_task(self._conn_window_event.wait()))
+            wait_tasks.append(asyncio.create_task(conn.conn_window_event.wait()))
         if not wait_tasks:
             return
         try:
@@ -2209,6 +2810,25 @@ class TunnelRuntime:
 
 class _BodyTooLarge(Exception):
     pass
+
+
+def _parse_goaway_reason(debug: str) -> str | None:
+    """Decode the GOAWAY debug data into a structured reason if present.
+
+    The server may attach ``{"reason": "drain"}`` to a NO_ERROR GOAWAY.
+    The handoff behaves the same either way today; this is the seam an
+    app-level advance-notice would hang off of."""
+    if not debug:
+        return None
+    try:
+        parsed = json.loads(debug)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if isinstance(parsed, dict):
+        reason = parsed.get("reason")
+        if isinstance(reason, str):
+            return reason
+    return None
 
 
 def _first_header(
