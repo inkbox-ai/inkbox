@@ -1044,6 +1044,96 @@ async def test_dispatch_ws_upgrade_callable_resets_bridge_on_open_failure():
 
 
 @pytest.mark.asyncio
+async def test_dispatch_ws_upgrade_callable_closes_session_on_reply_failure():
+    """If the origin-bound upgrade reply raises mid-drain, the ASGI session
+    is closed (disconnect delivered) so its task isn't orphaned."""
+    import asyncio
+
+    disconnected = asyncio.Event()
+
+    async def app(scope, receive, send):
+        await receive()  # websocket.connect
+        await send({"type": "websocket.accept"})
+        msg = await receive()  # disconnect after the reply failure
+        if msg.get("type") == "websocket.disconnect":
+            disconnected.set()
+
+    runtime = _make_runtime(forward_to=app)
+    runtime._response_deadline_seconds = 5.0
+
+    async def _raise_post_response(
+        request_id, *, status, headers, body, end_stream=True, target=None,
+    ):
+        raise ConnectionError("origin draining")
+
+    runtime._post_response = _raise_post_response  # type: ignore[assignment]
+
+    envelope = Envelope(
+        request_id="req-cb-drain", method="GET", path="/ws",
+        route_kind="ws-upgrade", ws_id="ws-cb-drain",
+        forwarded_headers=[], body=b"", body_uri=None,
+        forwarded_for_ip=None, tcp_id=None, sni_host=None,
+        extra_meta={},
+    )
+
+    with pytest.raises(ConnectionError):
+        await runtime._dispatch_ws_upgrade(envelope)
+    await asyncio.wait_for(disconnected.wait(), timeout=2.0)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_ws_upgrade_to_url_closes_upstream_on_reply_failure():
+    """If the origin-bound upgrade reply raises mid-drain, the SDK-owned
+    upstream socket is closed rather than leaked."""
+    runtime = _make_runtime(forward_to="http://127.0.0.1:1")
+    runtime._response_deadline_seconds = 5.0
+
+    closed = {"v": False}
+
+    class _FakeWriter:
+        def close(self):
+            closed["v"] = True
+
+        async def wait_closed(self):
+            return None
+
+    class _FakeUpstream:
+        reader = None
+        writer = _FakeWriter()
+        subprotocol = None
+        leftover = b""
+        headers: list[tuple[str, str]] = []
+
+    import inkbox.tunnels.client._ws_upstream as _wsu
+
+    async def _fake_open_ws_upstream(**kwargs):
+        return _FakeUpstream()
+
+    async def _raise_post_response(
+        request_id, *, status, headers, body, end_stream=True, target=None,
+    ):
+        raise ConnectionError("origin draining")
+
+    monkey_orig = _wsu.open_ws_upstream
+    _wsu.open_ws_upstream = _fake_open_ws_upstream  # type: ignore[assignment]
+    runtime._post_response = _raise_post_response  # type: ignore[assignment]
+
+    envelope = Envelope(
+        request_id="req-url-drain", method="GET", path="/ws",
+        route_kind="ws-upgrade", ws_id="ws-url-drain",
+        forwarded_headers=[], body=b"", body_uri=None,
+        forwarded_for_ip=None, tcp_id=None, sni_host=None,
+        extra_meta={},
+    )
+    try:
+        with pytest.raises(ConnectionError):
+            await runtime._dispatch_ws_upgrade_to_url(envelope)
+        assert closed["v"] is True, "upstream writer not closed on reply failure"
+    finally:
+        _wsu.open_ws_upstream = monkey_orig  # type: ignore[assignment]
+
+
+@pytest.mark.asyncio
 async def test_open_ws_upstream_handshake_timeout():
     """An upstream that completes TCP but stalls on the response head
     must trip the handshake timeout instead of wedging the dispatch."""

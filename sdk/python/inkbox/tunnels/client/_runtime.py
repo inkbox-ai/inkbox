@@ -1489,32 +1489,38 @@ class TunnelRuntime:
         if subprotocol:
             upgrade_reply_headers.append(("sec-websocket-protocol", subprotocol))
         upgrade_reply_headers.extend(accept_headers)
-        # WS-upgrade reply rides the origin conn only (never migrates).
-        await self._post_response(
-            envelope.request_id,
-            status=200,
-            headers=upgrade_reply_headers,
-            body=b"",
-            target=origin,
-        )
-
-        connect_headers: list[tuple[str, str]] = [
-            (":method", "CONNECT"),
-            (":scheme", "https"),
-            (":authority", self._zone),
-            (":path", f"/_system/ws/{envelope.ws_id}"),
-            (":protocol", "inkbox-tunnel-ws"),
-            ("sec-websocket-version", "13"),
-            ("x-tunnel-id", self._tunnel_id),
-            ("x-api-key", self._api_key),
-            ("inkbox-ws-id", envelope.ws_id),
-        ]
-
-        async with origin.send_lock:
-            stream_id = self._open_stream_locked(
-                connect_headers, end_stream=False, conn=origin,
+        # The upgrade reply + bind ride the origin conn only. If origin is
+        # draining/closed mid-handshake either can raise; close the app
+        # session so its task isn't orphaned, then let the dispatcher log.
+        try:
+            await self._post_response(
+                envelope.request_id,
+                status=200,
+                headers=upgrade_reply_headers,
+                body=b"",
+                target=origin,
             )
-            await self._flush_conn(origin)
+
+            connect_headers: list[tuple[str, str]] = [
+                (":method", "CONNECT"),
+                (":scheme", "https"),
+                (":authority", self._zone),
+                (":path", f"/_system/ws/{envelope.ws_id}"),
+                (":protocol", "inkbox-tunnel-ws"),
+                ("sec-websocket-version", "13"),
+                ("x-tunnel-id", self._tunnel_id),
+                ("x-api-key", self._api_key),
+                ("inkbox-ws-id", envelope.ws_id),
+            ]
+
+            async with origin.send_lock:
+                stream_id = self._open_stream_locked(
+                    connect_headers, end_stream=False, conn=origin,
+                )
+                await self._flush_conn(origin)
+        except Exception:
+            await ws_session.close(code=WS_CLOSE_SERVER_DRAINING)
+            raise
         origin.bridge_stream_ids.add(stream_id)
 
         queue = origin.streams[stream_id]
@@ -1649,14 +1655,9 @@ class TunnelRuntime:
             if hk in ws_handshake_strip:
                 continue
             upgrade_reply_headers.append((hk, hv))
-        # WS-upgrade reply rides the origin conn only (never migrates).
-        await self._post_response(
-            envelope.request_id, status=200,
-            headers=upgrade_reply_headers, body=b"",
-            target=origin,
-        )
-
-        # Open the bridge stream.
+        # The upgrade reply + bind ride the origin conn only. If origin is
+        # draining/closed mid-handshake either can raise; close the SDK-owned
+        # upstream socket so it isn't leaked, then let the dispatcher log.
         connect_headers: list[tuple[str, str]] = [
             (":method", "CONNECT"),
             (":scheme", "https"),
@@ -1668,11 +1669,20 @@ class TunnelRuntime:
             ("x-api-key", self._api_key),
             ("inkbox-ws-id", envelope.ws_id),
         ]
-        async with origin.send_lock:
-            stream_id = self._open_stream_locked(
-                connect_headers, end_stream=False, conn=origin,
+        try:
+            await self._post_response(
+                envelope.request_id, status=200,
+                headers=upgrade_reply_headers, body=b"",
+                target=origin,
             )
-            await self._flush_conn(origin)
+            async with origin.send_lock:
+                stream_id = self._open_stream_locked(
+                    connect_headers, end_stream=False, conn=origin,
+                )
+                await self._flush_conn(origin)
+        except Exception:
+            await _safe_close_stream_writer(up.writer)
+            raise
         origin.bridge_stream_ids.add(stream_id)
         queue = origin.streams[stream_id]
 

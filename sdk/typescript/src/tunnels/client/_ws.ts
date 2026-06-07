@@ -375,7 +375,16 @@ class WsSession implements InkboxWebSocket {
         if (this.acceptResolved && !this.closeRequested) {
           await this.close(1000, "");
         } else if (!this.acceptResolved && !this.closeRequested) {
-          await this.bridge.rejectUpgrade(500, "handler returned without accept");
+          // Mark terminal FIRST so pumpStarter's wait loop exits even if
+          // rejectUpgrade throws (e.g. the origin conn is draining and
+          // refuses the reply stream) — otherwise run()'s finally would
+          // await pumpStarter forever.
+          this.closeRequested = true;
+          try {
+            await this.bridge.rejectUpgrade(500, "handler returned without accept");
+          } catch {
+            /* swallow — origin may already be torn down */
+          }
           this.closeResolved = true;
         }
       }
