@@ -18,16 +18,19 @@ coverage/
 *.tsbuildinfo
 *.js.map
 *.ts.map
-package-lock.json
+
+# Lockfiles are tracked only for the published packages (the two SDKs +
+# the CLI). Ignore them in example apps and integration-test scaffolding.
+examples/**/package-lock.json
+examples/**/uv.lock
+tests/integration/**/package-lock.json
+
 # Python testing asnd linting
 .pytest_cache/
 .ruff_cache/
 .coverage
 .coverage.*
 htmlcov/
-
-# uv lock file
-uv.lock
 
 # Environment
 .env
