@@ -15,6 +15,8 @@ import { DomainsResource } from "./mail/resources/domains.js";
 import { SigningKeysResource } from "./signing_keys.js";
 import type { SigningKey } from "./signing_keys.js";
 import { WebhookSubscriptionsResource } from "./webhooks/subscriptions.js";
+import { IMessagesResource } from "./imessage/resources/imessages.js";
+import { IMessageContactRulesResource } from "./imessage/resources/contactRules.js";
 import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
@@ -126,6 +128,8 @@ export class Inkbox {
   readonly _numbers: PhoneNumbersResource;
   readonly _calls: CallsResource;
   readonly _texts: TextsResource;
+  readonly _imessages: IMessagesResource;
+  readonly _imessageContactRules: IMessageContactRulesResource;
   readonly _transcripts: TranscriptsResource;
   readonly _phoneContactRules: PhoneContactRulesResource;
   readonly _smsOptIns: SmsOptInsResource;
@@ -160,6 +164,7 @@ export class Inkbox {
 
     const mailHttp     = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms, cookieJar);
     const phoneHttp    = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms, cookieJar);
+    const imessageHttp = new HttpTransport(options.apiKey, `${apiRoot}/imessage`, ms, cookieJar);
     const idsHttp      = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms, cookieJar);
     const vaultHttp    = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms, cookieJar);
     const domainsHttp  = new HttpTransport(options.apiKey, `${apiRoot}/domains`, ms, cookieJar);
@@ -181,6 +186,9 @@ export class Inkbox {
     this._transcripts      = new TranscriptsResource(phoneHttp);
     this._phoneContactRules = new PhoneContactRulesResource(phoneHttp);
     this._smsOptIns         = new SmsOptInsResource(phoneHttp);
+
+    this._imessages            = new IMessagesResource(imessageHttp);
+    this._imessageContactRules = new IMessageContactRulesResource(imessageHttp);
 
     this._idsResource = new IdentitiesResource(idsHttp);
 
@@ -246,6 +254,12 @@ export class Inkbox {
   /** Text message operations (list, get, search, conversations). */
   get texts(): TextsResource { return this._texts; }
 
+  /** iMessage operations (send, list, conversations, reactions). */
+  get imessages(): IMessagesResource { return this._imessages; }
+
+  /** iMessage per-identity allow/block rules (+ org-wide list). */
+  get imessageContactRules(): IMessageContactRulesResource { return this._imessageContactRules; }
+
   /** Call transcript operations. */
   get transcripts(): TranscriptsResource { return this._transcripts; }
 
@@ -282,10 +296,11 @@ export class Inkbox {
 
   /**
    * Webhook subscription management. Use `inkbox.webhooks.subscriptions`
-   * to attach HTTPS receivers to mail (`message.*`) or phone-text
-   * (`text.*`) events. Incoming-call webhooks still live on the
-   * phone-number resource (`incomingCallWebhookUrl`) because the
-   * response body controls call routing.
+   * to attach HTTPS receivers to mail (`message.*`), phone-text
+   * (`text.*`), or iMessage (`imessage.*`) events. Incoming-call
+   * webhooks still live on the phone-number resource
+   * (`incomingCallWebhookUrl`) because the response body controls call
+   * routing.
    */
   get webhooks(): { readonly subscriptions: WebhookSubscriptionsResource } {
     return this._webhooks;
@@ -305,6 +320,9 @@ export class Inkbox {
    *   Defaults server-side to `agentHandle`.
    * @param options.description - Free-form org-internal description.
    *   Never surfaces in outbound mail. Omit to leave null.
+   * @param options.imessageEnabled - Whether this identity can be reached
+   *   over the shared iMessage service. Defaults server-side to `false`;
+   *   pass `true` to opt in.
    * @param options.emailLocalPart - Optional requested mailbox local part.
    *   On the platform domain the server forces it to the handle; only
    *   meaningful on a custom sending domain.
@@ -334,6 +352,7 @@ export class Inkbox {
     };
     if (options.displayName !== undefined) createArgs.displayName = options.displayName;
     if (options.description !== undefined) createArgs.description = options.description;
+    if (options.imessageEnabled !== undefined) createArgs.imessageEnabled = options.imessageEnabled;
     if (options.tunnel !== undefined) createArgs.tunnel = options.tunnel;
     const data = await this._idsResource.create(createArgs);
     return new AgentIdentity(data, this);

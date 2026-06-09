@@ -14,7 +14,17 @@ import { Credentials } from "./credentials.js";
 import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
 import { ForwardMode, MessageDirection } from "./mail/types.js";
-import type { Message, MessageDetail, ThreadDetail } from "./mail/types.js";
+import type { FilterMode, Message, MessageDetail, ThreadDetail } from "./mail/types.js";
+import type {
+  IMessage,
+  IMessageConversation,
+  IMessageConversationSummary,
+  IMessageMarkReadResult,
+  IMessageMediaUpload,
+  IMessageReaction,
+  IMessageReactionType,
+  IMessageSendStyle,
+} from "./imessage/types.js";
 import type {
   PhoneCall,
   PhoneCallWithRateLimit,
@@ -64,6 +74,12 @@ export class AgentIdentity {
 
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   get emailAddress(): string | null { return this._data.emailAddress; }
+
+  /** Whether this identity can be reached over the shared iMessage service. */
+  get imessageEnabled(): boolean { return this._data.imessageEnabled; }
+
+  /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
+  get imessageFilterMode(): FilterMode { return this._data.imessageFilterMode; }
 
   /** The mailbox currently assigned to this identity. Non-null for live identities (1:1 invariant). */
   get mailbox(): IdentityMailbox | null { return this._mailbox; }
@@ -606,11 +622,175 @@ export class AgentIdentity {
   }
 
   // ------------------------------------------------------------------
+  // iMessage helpers
+  // ------------------------------------------------------------------
+
+  /**
+   * Send an outbound iMessage as this identity.
+   *
+   * Sends only work toward recipients that triage has already connected
+   * to this identity over the shared iMessage service — there is no
+   * cold outreach. Inbound replies and reactions arrive via
+   * identity-owned webhook subscriptions
+   * (`inkbox.webhooks.subscriptions.create({ agentIdentityId, url,
+   * eventTypes: ["imessage.received", ...] })`).
+   *
+   * @param options.to - E.164 recipient number. Mutually exclusive with
+   *   `conversationId`.
+   * @param options.conversationId - Existing conversation UUID to reply into.
+   * @param options.text - Message body.
+   * @param options.mediaUrls - Media URLs (at most one). Use
+   *   {@link uploadIMessageMedia} to create one from bytes.
+   * @param options.sendStyle - Optional expressive send style.
+   *
+   * @throws {InkboxError} when this identity is not iMessage-enabled.
+   * @throws {InkboxAPIError} 403 when the recipient is blocked by a
+   *   contact rule; other send failures.
+   */
+  async sendIMessage(options: {
+    to?: string | null;
+    conversationId?: string | null;
+    text?: string | null;
+    mediaUrls?: string[] | null;
+    sendStyle?: IMessageSendStyle | string | null;
+  }): Promise<IMessage> {
+    this._requireIMessage();
+    return this._inkbox._imessages.send({
+      ...options,
+      agentIdentityId: this.id,
+    });
+  }
+
+  /**
+   * List this identity's iMessages, newest first.
+   *
+   * Identity-scoped credentials never see contact-rule-blocked rows
+   * regardless of `isBlocked` (server-side access policy).
+   *
+   * @param options.conversationId - Narrow to one conversation.
+   * @param options.limit - Maximum number of results. Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   * @param options.isRead - Filter by read state.
+   * @param options.isBlocked - Tri-state filter. `true` for only blocked,
+   *   `false` for only non-blocked, omit for all.
+   */
+  async listIMessages(
+    options?: {
+      conversationId?: string;
+      limit?: number;
+      offset?: number;
+      isRead?: boolean;
+      isBlocked?: boolean;
+    },
+  ): Promise<IMessage[]> {
+    this._requireIMessage();
+    return this._inkbox._imessages.list({
+      ...options,
+      agentIdentityId: this.id,
+    });
+  }
+
+  /**
+   * List this identity's iMessage conversations.
+   *
+   * @param options.limit - Maximum number of results. Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   * @param options.isBlocked - Tri-state filter applied to the
+   *   underlying messages. `true` for only blocked, `false` for only
+   *   non-blocked, omit for all.
+   */
+  async listIMessageConversations(
+    options?: {
+      limit?: number;
+      offset?: number;
+      isBlocked?: boolean;
+    },
+  ): Promise<IMessageConversationSummary[]> {
+    this._requireIMessage();
+    return this._inkbox._imessages.listConversations({
+      ...options,
+      agentIdentityId: this.id,
+    });
+  }
+
+  /**
+   * Get one of this identity's iMessage conversations by ID.
+   *
+   * @param conversationId - UUID of the conversation.
+   */
+  async getIMessageConversation(
+    conversationId: string,
+  ): Promise<IMessageConversation> {
+    this._requireIMessage();
+    return this._inkbox._imessages.getConversation(conversationId, {
+      agentIdentityId: this.id,
+    });
+  }
+
+  /**
+   * Send a tapback reaction to a message in one of this identity's
+   * conversations.
+   *
+   * @param options.messageId - UUID of the message being reacted to.
+   * @param options.reaction - Tapback kind (see {@link IMessageReactionType}).
+   * @param options.partIndex - Part of a multi-part message to react to.
+   *   Defaults to 0.
+   */
+  async sendIMessageReaction(options: {
+    messageId: string;
+    reaction: IMessageReactionType | string;
+    partIndex?: number;
+  }): Promise<IMessageReaction> {
+    this._requireIMessage();
+    return this._inkbox._imessages.sendReaction(options);
+  }
+
+  /**
+   * Send a read receipt and mark a conversation's inbound messages read.
+   *
+   * @param conversationId - UUID of the conversation.
+   * @returns Object with `conversationId` and `updatedCount`.
+   */
+  async markIMessageConversationRead(
+    conversationId: string,
+  ): Promise<IMessageMarkReadResult> {
+    this._requireIMessage();
+    return this._inkbox._imessages.markConversationRead(conversationId);
+  }
+
+  /**
+   * Show a typing indicator to a conversation's recipient.
+   *
+   * @param conversationId - UUID of the conversation.
+   */
+  async sendIMessageTyping(conversationId: string): Promise<void> {
+    this._requireIMessage();
+    await this._inkbox._imessages.sendTyping(conversationId);
+  }
+
+  /**
+   * Upload media and get back a URL usable in `mediaUrls`.
+   *
+   * @param options.content - Raw file bytes (max 10 MiB).
+   * @param options.filename - Original filename, used for type inference.
+   * @param options.contentType - Optional MIME type.
+   */
+  async uploadIMessageMedia(options: {
+    content: Uint8Array | Blob;
+    filename: string;
+    contentType?: string;
+  }): Promise<IMessageMediaUpload> {
+    this._requireIMessage();
+    return this._inkbox._imessages.uploadMedia(options);
+  }
+
+  // ------------------------------------------------------------------
   // Identity management
   // ------------------------------------------------------------------
 
   /**
-   * Update this identity's handle, display name, description, and/or status.
+   * Update this identity's handle, display name, description, iMessage
+   * reachability, and/or status.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
    * For `displayName` and `description`, explicit `null` clears the column;
@@ -619,6 +799,9 @@ export class AgentIdentity {
    * @param options.newHandle - New agent handle.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
+   * @param options.imessageEnabled - Toggle shared-iMessage reachability.
+   * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
+   *   for iMessage contact rules (admin-only).
    * @param options.status - `"active"` or `"paused"`. Call `delete()`
    *   to remove the identity; `"deleted"` is rejected here.
    */
@@ -626,6 +809,8 @@ export class AgentIdentity {
     newHandle?: string;
     displayName?: string | null;
     description?: string | null;
+    imessageEnabled?: boolean;
+    imessageFilterMode?: "whitelist" | "blacklist";
     status?: "active" | "paused";
   }): Promise<void> {
     const result = await this._inkbox._idsResource.update(this.agentHandle, options);
@@ -697,6 +882,14 @@ export class AgentIdentity {
     if (!this._phoneNumber) {
       throw new InkboxError(
         `Identity '${this.agentHandle}' has no phone number assigned. Call identity.provisionPhoneNumber() first, or pass phoneNumber to createIdentity().`,
+      );
+    }
+  }
+
+  private _requireIMessage(): void {
+    if (!this._data.imessageEnabled) {
+      throw new InkboxError(
+        `Identity '${this.agentHandle}' is not iMessage-enabled. Call identity.update({ imessageEnabled: true }) first, or pass imessageEnabled to createIdentity().`,
       );
     }
   }

@@ -33,6 +33,8 @@ from inkbox.identities.types import (  # noqa: I001
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
 )
+from inkbox.imessage.resources.contact_rules import IMessageContactRulesResource
+from inkbox.imessage.resources.imessages import IMessagesResource
 from inkbox.mail.resources.contact_rules import MailContactRulesResource
 from inkbox.mail.resources.domains import DomainsResource
 from inkbox.mail.resources.mailboxes import MailboxesResource
@@ -150,6 +152,12 @@ class Inkbox:
             timeout=timeout,
             cookie_jar=_cookie_jar,
         )
+        self._imessage_http = HttpTransport(
+            api_key=api_key,
+            base_url=f"{_api_root}/imessage",
+            timeout=timeout,
+            cookie_jar=_cookie_jar,
+        )
         self._ids_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/identities",
@@ -194,6 +202,9 @@ class Inkbox:
         self._phone_contact_rules = PhoneContactRulesResource(self._phone_http)
         self._sms_opt_ins = SmsOptInsResource(self._phone_http)
 
+        self._imessages = IMessagesResource(self._imessage_http)
+        self._imessage_contact_rules = IMessageContactRulesResource(self._imessage_http)
+
         self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
 
         self._signing_keys = SigningKeysResource(self._api_http)
@@ -222,6 +233,7 @@ class Inkbox:
         """Close all underlying HTTP connection pools."""
         self._mail_http.close()
         self._phone_http.close()
+        self._imessage_http.close()
         self._ids_http.close()
         self._vault_http.close()
         self._root_api_http.close()
@@ -260,6 +272,16 @@ class Inkbox:
     def texts(self) -> TextsResource:
         """Access org-level text message operations (list, get, search, conversations)."""
         return self._texts
+
+    @property
+    def imessages(self) -> IMessagesResource:
+        """Access org-level iMessage operations (send, list, conversations, reactions)."""
+        return self._imessages
+
+    @property
+    def imessage_contact_rules(self) -> IMessageContactRulesResource:
+        """iMessage per-identity allow/block rules (+ org-wide list)."""
+        return self._imessage_contact_rules
 
     @property
     def transcripts(self) -> TranscriptsResource:
@@ -335,6 +357,7 @@ class Inkbox:
         *,
         display_name: str | None = None,
         description: Any = _UNSET,
+        imessage_enabled: bool | None = None,
         email_local_part: str | None = None,
         sending_domain: str | None = _UNSET,  # type: ignore[assignment]
         tunnel: "IdentityTunnelCreateOptions | None" = None,
@@ -353,6 +376,9 @@ class Inkbox:
             description: Free-form org-internal description. Pass
                 ``None`` to leave the column null; omit to defer to the
                 server default. Never surfaces in outbound mail.
+            imessage_enabled: Whether this identity can be reached over
+                the shared iMessage service. Defaults server-side to
+                ``False``; pass ``True`` to opt in.
             email_local_part: Optional requested mailbox local part.
                 On the platform domain the server forces it to the
                 handle; only meaningful on a custom sending domain.
@@ -382,6 +408,7 @@ class Inkbox:
             agent_handle=agent_handle,
             display_name=display_name,
             description=description,
+            imessage_enabled=imessage_enabled,
             mailbox=mailbox,
             tunnel=tunnel,
             phone_number=phone_number,

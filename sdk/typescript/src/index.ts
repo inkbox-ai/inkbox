@@ -50,6 +50,18 @@ export type {
   TextTypeWire,
   SmsDeliveryStatusWire,
   TextMessageOriginWire,
+  IMessageWebhookPayload,
+  IMessageWebhookEventType,
+  IMessageWebhookMessage,
+  IMessageWebhookReaction,
+  IMessageDirectionWire,
+  IMessageServiceWire,
+  IMessageTypeWire,
+  IMessageDeliveryStatusWire,
+  IMessageReactionTypeWire,
+  IMessageSendStyleWire,
+  IMessageMediaItemWire,
+  IMessageRecipientWire,
   PhoneIncomingCallWebhookPayload,
   CallStatusWire,
   HangupReasonWire,
@@ -115,6 +127,35 @@ export type {
   TextConversationSummary,
   TextConversationUpdateResult,
 } from "./phone/types.js";
+export {
+  IMessageDeliveryStatus,
+  IMessageReactionType,
+  IMessageRuleAction,
+  IMessageRuleMatchType,
+  IMessageSendStyle,
+  IMessageService,
+} from "./imessage/types.js";
+export type {
+  IMessage,
+  IMessageContactRule,
+  IMessageConversation,
+  IMessageConversationSummary,
+  IMessageMarkReadResult,
+  IMessageMediaItem,
+  IMessageMediaUpload,
+  IMessageReaction,
+  IMessageRecipient,
+} from "./imessage/types.js";
+export type {
+  IMessagesResource,
+} from "./imessage/resources/imessages.js";
+export type {
+  IMessageContactRulesResource,
+  CreateIMessageContactRuleOptions,
+  ListIMessageContactRulesOptions,
+  ListAllIMessageContactRulesOptions,
+  UpdateIMessageContactRuleOptions,
+} from "./imessage/resources/contactRules.js";
 export type {
   AgentIdentitySummary,
   CreateIdentityOptions,

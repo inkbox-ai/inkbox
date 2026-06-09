@@ -224,6 +224,29 @@ inkbox text mark-read <text-id> -i <handle>
 inkbox text mark-conversation-read <conversation-key> -i <handle>
 ```
 
+## iMessage
+
+All iMessage commands are identity-scoped and require `-i <handle>`. iMessage has no per-identity number: recipients connect to an agent identity through a shared pool of numbers via the triage line, which creates an assignment for that one recipient. There is **no cold outreach** — sends only work toward recipients who connected first, and the identity must be opted in (`inkbox identity update <handle> --imessage-enabled true`).
+
+```bash
+inkbox imessage send -i <handle> --to +15551234567 --text "Hello over iMessage"
+inkbox imessage send -i <handle> --conversation-id <conversation-uuid> --text "Reply" --send-style slam
+inkbox imessage list -i <handle> --limit 20 --unread-only
+inkbox imessage conversations -i <handle> --limit 20
+inkbox imessage conversation <conversation-id> -i <handle> --limit 50
+inkbox imessage react <message-id> -i <handle> --reaction like
+inkbox imessage mark-conversation-read <conversation-id> -i <handle>
+inkbox imessage typing <conversation-id> -i <handle>
+inkbox imessage upload-media ./photo.jpg -i <handle> --content-type image/jpeg
+
+# Contact rules are scoped to the identity (not a phone number):
+inkbox imessage contact-rule list -i <handle>
+inkbox imessage contact-rule create -i <handle> --action block --match-target +15559999999
+inkbox imessage contact-rule update <rule-id> -i <handle> --status paused   # admin-only
+inkbox imessage contact-rule delete <rule-id> -i <handle>                   # admin-only
+inkbox imessage contact-rule list-all                                       # admin-only, org-wide
+```
+
 ## SMS Opt-Ins
 
 Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The registry is updated automatically when recipients text `START` / `STOP` to any of your numbers (`source=sms`). Reads work for any admin caller; writes require your org to be on its own active, customer-managed 10DLC campaign — default-campaign orgs share consent state and get `409 customer_campaign_required` on writes (audit event recorded with `source=api`).
@@ -405,10 +428,12 @@ inkbox signing-key create
 inkbox webhook verify --payload <payload> --secret <secret> -H "X-Header: value"
 
 # Webhook subscriptions (fan-out per (owner, url, event_types)):
-inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>]
+inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>] [--agent-identity-id <id>]
 inkbox webhook subscription create --mailbox-id <id> --url <url> --event-type message.received
 inkbox webhook subscription create --phone-number-id <id> --url <url> \
   --event-type text.received --event-type text.delivered
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
+  --event-type imessage.received --event-type imessage.reaction_received
 inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...]
 inkbox webhook subscription delete <sub-id>
 ```
@@ -426,6 +451,10 @@ any of:
 - **Text** (envelope): `text.received`, `text.sent`, `text.delivered`,
   `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
   `inkbox webhook subscription create --phone-number-id ...`.
+- **iMessage** (envelope): `imessage.received`,
+  `imessage.reaction_received`. Subscribe via `inkbox webhook
+  subscription create --agent-identity-id ...` — owned by the agent
+  identity, since shared iMessage pool numbers are not org resources.
 - **Inbound call** (flat, no envelope; response controls call routing).
   Not subscribable; URL stays on the phone-number resource as
   `incomingCallWebhookUrl`.

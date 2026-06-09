@@ -9,6 +9,7 @@ const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "id",
   "mailboxId",
   "phoneNumberId",
+  "agentIdentityId",
   "url",
   "eventTypes",
   "status",
@@ -21,6 +22,7 @@ function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
     organizationId: sub.organizationId,
     mailboxId: sub.mailboxId,
     phoneNumberId: sub.phoneNumberId,
+    agentIdentityId: sub.agentIdentityId,
     url: sub.url,
     eventTypes: sub.eventTypes.join(", "),
     status: sub.status,
@@ -39,6 +41,7 @@ function registerSubscriptionCommands(parent: Command): void {
     .description("List webhook subscriptions in the caller's org (filters AND-combine)")
     .option("--mailbox-id <id>", "Filter by owning mailbox id")
     .option("--phone-number-id <id>", "Filter by owning phone number id")
+    .option("--agent-identity-id <id>", "Filter by owning agent identity id (iMessage)")
     .option("--url <url>", "Filter by destination URL (exact match)")
     .option("--event-type <type>", "Filter by event type wire value")
     .action(
@@ -47,6 +50,7 @@ function registerSubscriptionCommands(parent: Command): void {
         cmdOpts: {
           mailboxId?: string;
           phoneNumberId?: string;
+          agentIdentityId?: string;
           url?: string;
           eventType?: string;
         },
@@ -56,6 +60,7 @@ function registerSubscriptionCommands(parent: Command): void {
         const subs = await inkbox.webhooks.subscriptions.list({
           mailboxId: cmdOpts.mailboxId,
           phoneNumberId: cmdOpts.phoneNumberId,
+          agentIdentityId: cmdOpts.agentIdentityId,
           url: cmdOpts.url,
           eventType: cmdOpts.eventType,
         });
@@ -80,9 +85,10 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("create")
-    .description("Create a webhook subscription. Exactly one of --mailbox-id / --phone-number-id is required.")
+    .description("Create a webhook subscription. Exactly one of --mailbox-id / --phone-number-id / --agent-identity-id is required.")
     .option("--mailbox-id <id>", "Owning mailbox id")
     .option("--phone-number-id <id>", "Owning phone number id")
+    .option("--agent-identity-id <id>", "Owning agent identity id (for imessage.* events)")
     .requiredOption("--url <url>", "HTTPS destination for delivered events")
     .requiredOption(
       "--event-type <type>",
@@ -99,6 +105,7 @@ function registerSubscriptionCommands(parent: Command): void {
         cmdOpts: {
           mailboxId?: string;
           phoneNumberId?: string;
+          agentIdentityId?: string;
           url: string;
           eventType: string[];
         },
@@ -108,6 +115,7 @@ function registerSubscriptionCommands(parent: Command): void {
         const row = await inkbox.webhooks.subscriptions.create({
           mailboxId: cmdOpts.mailboxId,
           phoneNumberId: cmdOpts.phoneNumberId,
+          agentIdentityId: cmdOpts.agentIdentityId,
           url: cmdOpts.url,
           eventTypes: cmdOpts.eventType,
         });

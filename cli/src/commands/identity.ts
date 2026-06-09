@@ -137,6 +137,8 @@ export function registerIdentityCommands(program: Command): void {
             description: id.description,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
+            imessageEnabled: id.imessageEnabled,
+            imessageFilterMode: id.imessageFilterMode,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
@@ -167,6 +169,11 @@ export function registerIdentityCommands(program: Command): void {
       "Free-form org-internal description (never surfaces in outbound mail).",
     )
     .option(
+      "--imessage-enabled",
+      "Opt the identity into the shared iMessage service.",
+      false,
+    )
+    .option(
       "--email-local-part <part>",
       "Requested mailbox local part. On the platform domain the server forces this to the handle.",
     )
@@ -190,6 +197,7 @@ export function registerIdentityCommands(program: Command): void {
         cmdOpts: {
           displayName?: string;
           description?: string;
+          imessageEnabled?: boolean;
           emailLocalPart?: string;
           sendingDomain?: string;
           platformDomain?: boolean;
@@ -207,12 +215,14 @@ export function registerIdentityCommands(program: Command): void {
         const createOpts: {
           displayName?: string;
           description?: string | null;
+          imessageEnabled?: boolean;
           emailLocalPart?: string;
           sendingDomain?: string | null;
           tunnel?: { tlsMode?: "edge" | "passthrough" };
         } = {};
         if (cmdOpts.displayName !== undefined) createOpts.displayName = cmdOpts.displayName;
         if (cmdOpts.description !== undefined) createOpts.description = cmdOpts.description;
+        if (cmdOpts.imessageEnabled) createOpts.imessageEnabled = true;
         if (cmdOpts.emailLocalPart !== undefined) createOpts.emailLocalPart = cmdOpts.emailLocalPart;
         if (cmdOpts.sendingDomain !== undefined) {
           createOpts.sendingDomain = cmdOpts.sendingDomain;
@@ -230,6 +240,7 @@ export function registerIdentityCommands(program: Command): void {
             displayName: id.displayName,
             description: id.description,
             mailbox: id.mailbox?.emailAddress ?? null,
+            imessageEnabled: id.imessageEnabled,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
@@ -269,6 +280,8 @@ export function registerIdentityCommands(program: Command): void {
     .option("--display-name <name>", "New display name (pass '' to clear)")
     .option("--description <text>", "New description (pass '' to clear)")
     .option("--clear-description", "Explicitly clear the description (sends null)", false)
+    .option("--imessage-enabled <bool>", "Toggle shared-iMessage reachability: true or false")
+    .option("--imessage-filter-mode <mode>", "iMessage contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--status <status>", "active or paused")
     .action(
       withErrorHandler(async function (
@@ -279,11 +292,19 @@ export function registerIdentityCommands(program: Command): void {
           displayName?: string;
           description?: string;
           clearDescription?: boolean;
+          imessageEnabled?: string;
+          imessageFilterMode?: string;
           status?: string;
         },
       ) {
         if (cmdOpts.description !== undefined && cmdOpts.clearDescription) {
           throw new Error("--description and --clear-description are mutually exclusive");
+        }
+        if (cmdOpts.imessageEnabled !== undefined && cmdOpts.imessageEnabled !== "true" && cmdOpts.imessageEnabled !== "false") {
+          throw new Error("--imessage-enabled must be 'true' or 'false'");
+        }
+        if (cmdOpts.imessageFilterMode !== undefined && cmdOpts.imessageFilterMode !== "whitelist" && cmdOpts.imessageFilterMode !== "blacklist") {
+          throw new Error("--imessage-filter-mode must be 'whitelist' or 'blacklist'");
         }
         if (cmdOpts.status !== undefined && cmdOpts.status !== "active" && cmdOpts.status !== "paused") {
           throw new Error("--status must be 'active' or 'paused'");
@@ -295,6 +316,8 @@ export function registerIdentityCommands(program: Command): void {
           newHandle?: string;
           displayName?: string | null;
           description?: string | null;
+          imessageEnabled?: boolean;
+          imessageFilterMode?: "whitelist" | "blacklist";
           status?: "active" | "paused";
         } = {};
         if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
@@ -305,6 +328,12 @@ export function registerIdentityCommands(program: Command): void {
           updateOpts.description = cmdOpts.description === "" ? null : cmdOpts.description;
         } else if (cmdOpts.clearDescription) {
           updateOpts.description = null;
+        }
+        if (cmdOpts.imessageEnabled !== undefined) {
+          updateOpts.imessageEnabled = cmdOpts.imessageEnabled === "true";
+        }
+        if (cmdOpts.imessageFilterMode !== undefined) {
+          updateOpts.imessageFilterMode = cmdOpts.imessageFilterMode as "whitelist" | "blacklist";
         }
         if (cmdOpts.status !== undefined) {
           updateOpts.status = cmdOpts.status as "active" | "paused";
@@ -331,6 +360,8 @@ export function registerIdentityCommands(program: Command): void {
             description: id.description,
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
+            imessageEnabled: id.imessageEnabled,
+            imessageFilterMode: id.imessageFilterMode,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,

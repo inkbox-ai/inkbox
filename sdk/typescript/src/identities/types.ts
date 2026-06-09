@@ -46,6 +46,11 @@ export interface CreateIdentityOptions {
    * leave the column null. Never surfaces in outbound mail / public payloads.
    */
   description?: string | null;
+  /**
+   * Whether this identity can be reached over the shared iMessage
+   * service. Defaults server-side to `false`; pass `true` to opt in.
+   */
+  imessageEnabled?: boolean;
   emailLocalPart?: string;
   /**
    * Optional sending-domain selector by **bare domain name**. Presence
@@ -120,6 +125,14 @@ export interface AgentIdentitySummary {
   description: string | null;
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   emailAddress: string | null;
+  /**
+   * Whether this identity can be reached over the shared iMessage
+   * service. There is no per-identity iMessage number, so this lives
+   * on the identity itself rather than on a channel object.
+   */
+  imessageEnabled: boolean;
+  /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
+  imessageFilterMode: FilterMode;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -190,6 +203,8 @@ export interface RawAgentIdentitySummary {
   display_name: string | null;
   description: string | null;
   email_address: string | null;
+  imessage_enabled?: boolean;
+  imessage_filter_mode?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -256,6 +271,8 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     displayName: r.display_name ?? null,
     description: r.description ?? null,
     emailAddress: r.email_address,
+    imessageEnabled: r.imessage_enabled ?? false,
+    imessageFilterMode: (r.imessage_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

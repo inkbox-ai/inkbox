@@ -15,6 +15,7 @@ class FakeHttpTransport:
     def __init__(self) -> None:
         self.get = MagicMock()
         self.post = MagicMock()
+        self.post_multipart = MagicMock()
         self.patch = MagicMock()
         self.delete = MagicMock()
         self.close = MagicMock()
@@ -33,6 +34,8 @@ def client(transport: FakeHttpTransport) -> Inkbox:
     c._numbers._http = transport
     c._calls._http = transport
     c._texts._http = transport
+    c._imessages._http = transport
+    c._imessage_contact_rules._http = transport
     c._transcripts._http = transport
     c._signing_keys._http = transport
     c._webhook_subscriptions._http = transport

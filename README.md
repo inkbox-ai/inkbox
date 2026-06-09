@@ -50,6 +50,10 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     # Read text messages
     for t in identity.list_texts():
         print(t.remote_phone_number, t.text)
+
+    # Reply over iMessage (identity must be iMessage-enabled and the
+    # recipient connected to it via the shared triage line first)
+    identity.send_imessage(to="+15551234567", text="Hi over iMessage!")
 ```
 
 ### TypeScript
@@ -86,6 +90,10 @@ const texts = await identity.listTexts();
 for (const t of texts) {
   console.log(t.remotePhoneNumber, t.text);
 }
+
+// Reply over iMessage (identity must be iMessage-enabled and the
+// recipient connected to it via the shared triage line first)
+await identity.sendIMessage({ to: "+15551234567", text: "Hi over iMessage!" });
 ```
 
 ### CLI
@@ -108,6 +116,10 @@ inkbox phone call -i my-agent --to +15551234567
 
 # Send a text message (SMS/MMS; comma-separate --to for groups)
 inkbox text send -i my-agent --to +15551234567 --text "Hi from my agent!"
+
+# Reply over iMessage (identity must be iMessage-enabled and the
+# recipient connected to it via the shared triage line first)
+inkbox imessage send -i my-agent --to +15551234567 --text "Hi over iMessage!"
 
 # Read text messages
 inkbox text list -i my-agent

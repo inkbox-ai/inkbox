@@ -236,7 +236,12 @@ class IdentityPhoneNumber:
 
 @dataclass
 class AgentIdentitySummary:
-    """Lightweight agent identity returned by list endpoints."""
+    """Lightweight agent identity returned by list endpoints.
+
+    ``imessage_enabled`` / ``imessage_filter_mode`` describe shared-pool
+    iMessage reachability — there is no per-identity iMessage number, so
+    these live on the identity itself rather than on a channel object.
+    """
 
     id: UUID
     organization_id: str
@@ -246,6 +251,8 @@ class AgentIdentitySummary:
     email_address: str | None
     created_at: datetime
     updated_at: datetime
+    imessage_enabled: bool = False
+    imessage_filter_mode: FilterMode = FilterMode.BLACKLIST
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentIdentitySummary:
@@ -258,6 +265,8 @@ class AgentIdentitySummary:
             email_address=d.get("email_address"),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            imessage_enabled=d.get("imessage_enabled", False),
+            imessage_filter_mode=FilterMode(d.get("imessage_filter_mode") or "blacklist"),
         )
 
 

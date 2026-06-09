@@ -276,6 +276,144 @@ class TextWebhookPayload(TypedDict):
     data: TextWebhookData
 
 
+# ---- iMessage ____________________________________________________________
+
+IMessageWebhookEventType = Literal[
+    "imessage.received",
+    "imessage.reaction_received",
+]
+
+IMessageDirectionWire = Literal["inbound", "outbound"]
+
+IMessageServiceWire = Literal["imessage", "sms", "rcs"]
+
+IMessageTypeWire = Literal["message", "carousel"]
+
+IMessageDeliveryStatusWire = Literal[
+    "registered",
+    "pending",
+    "queued",
+    "accepted",
+    "sent",
+    "delivered",
+    "declined",
+    "error",
+    "received",
+]
+
+IMessageReactionTypeWire = Literal[
+    "love",
+    "like",
+    "dislike",
+    "laugh",
+    "emphasize",
+    "question",
+]
+
+IMessageSendStyleWire = Literal[
+    "celebration",
+    "shooting_star",
+    "fireworks",
+    "lasers",
+    "love",
+    "confetti",
+    "balloons",
+    "spotlight",
+    "echo",
+    "invisible",
+    "gentle",
+    "loud",
+    "slam",
+]
+
+
+class IMessageMediaItemWire(TypedDict):
+    """iMessage media attachment (snake_case wire shape)."""
+    content_type: str | None
+    size: int | None
+    url: str
+
+
+class IMessageRecipientWire(TypedDict):
+    """Per-recipient outbound iMessage delivery state."""
+    remote_number: str
+    delivery_status: IMessageDeliveryStatusWire | None
+    service: IMessageServiceWire | None
+    error_code: str | None
+    error_message: str | None
+    error_reason: str | None
+    error_detail: str | None
+    sent_at: str | None
+    delivered_at: str | None
+    failed_at: str | None
+
+
+class IMessageWebhookMessage(TypedDict):
+    """
+    Stored iMessage. ``is_blocked`` is not part of the wire body --
+    blocked messages never reach the webhook. There is no local-number
+    field: shared pool lines are hidden from agents, so the message is
+    identified by ``conversation_id`` and the counterparty
+    ``remote_number`` only.
+    """
+    id: str
+    conversation_id: str
+    assignment_id: str
+    direction: IMessageDirectionWire
+    remote_number: str
+    content: str | None
+    message_type: IMessageTypeWire
+    service: IMessageServiceWire
+    send_style: IMessageSendStyleWire | None
+    media: list[IMessageMediaItemWire] | None
+    was_downgraded: bool | None
+    status: IMessageDeliveryStatusWire | None
+    error_code: str | None
+    error_message: str | None
+    error_reason: str | None
+    error_detail: str | None
+    is_read: bool
+    recipients: list[IMessageRecipientWire] | None
+    created_at: str
+    updated_at: str
+
+
+class IMessageWebhookReaction(TypedDict):
+    """A tapback reaction on an iMessage (snake_case wire shape)."""
+    id: str
+    conversation_id: str
+    assignment_id: str
+    target_message_id: str
+    direction: IMessageDirectionWire
+    reaction: IMessageReactionTypeWire
+    remote_number: str
+    part_index: int
+    created_at: str
+    updated_at: str
+
+
+class IMessageWebhookData(TypedDict):
+    """
+    Wrapper under ``IMessageWebhookPayload.data``.
+
+    Exactly one of ``message`` (``imessage.received``) / ``reaction``
+    (``imessage.reaction_received``) is populated. ``contacts`` and
+    ``agent_identities`` resolve the remote number against the assigned
+    identity's visible contact book and identity graph; both are always
+    present, possibly empty.
+    """
+    message: IMessageWebhookMessage | None
+    reaction: IMessageWebhookReaction | None
+    contacts: list[WebhookContact]
+    agent_identities: list[WebhookAgentIdentity]
+
+
+class IMessageWebhookPayload(TypedDict):
+    event_type: IMessageWebhookEventType
+    timestamp: str
+    data: IMessageWebhookData
+
+
 # ---- Inbound call (FLAT - no envelope) ___________________________________
 
 class PhoneIncomingCallWebhookPayload(TypedDict):

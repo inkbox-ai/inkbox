@@ -273,6 +273,71 @@ const results = await inkbox.texts.search(phone.id, { q: "invoice", limit: 20 })
 await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 ```
 
+## iMessage
+
+iMessage works differently from SMS: there is no per-identity iMessage number. Recipients connect to an agent identity through a small shared pool of numbers — they ask the triage line to connect them to `@agent_handle`, and that creates an assignment between that one recipient and the identity. Everything agent-facing is keyed by `conversationId` / `remoteNumber`; the shared local number is never exposed, and there is **no cold outreach** — you can only message recipients who connected first.
+
+Reachability is **opt-in per identity** (`imessageEnabled`, default `false`):
+
+```typescript
+const identity = await inkbox.createIdentity("my-agent", { imessageEnabled: true });
+// or toggle later
+await identity.update({ imessageEnabled: true });
+// admin-only: flip contact-rule mode (default "blacklist")
+await identity.update({ imessageFilterMode: "whitelist" });
+console.log(identity.imessageEnabled, identity.imessageFilterMode);
+```
+
+Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agentIdentityId` / `isBlocked` filters):
+
+```typescript
+// Send to a connected recipient, or reply into a conversation by UUID.
+const sent = await identity.sendIMessage({ to: "+15551234567", text: "Hello over iMessage" });
+const reply = await identity.sendIMessage({
+  conversationId: sent.conversationId,
+  text: "With style",
+  sendStyle: "slam",            // IMessageSendStyle: confetti, lasers, slam, ...
+});
+console.log(sent.service, sent.status);  // "imessage", "queued"
+
+// List messages / conversations
+const msgs = await identity.listIMessages({ limit: 20, isRead: false });
+const convos = await identity.listIMessageConversations({ limit: 20 });
+const convo = await identity.getIMessageConversation(sent.conversationId);
+
+// Tapback reactions (love, like, dislike, laugh, emphasize, question)
+await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+
+// Read receipts + typing indicator
+await identity.markIMessageConversationRead(sent.conversationId);
+await identity.sendIMessageTyping(sent.conversationId);
+
+// Media: upload bytes (max 10 MiB), then send the returned URL (one per message)
+const upload = await identity.uploadIMessageMedia({
+  content: await readFile("photo.jpg"),
+  filename: "photo.jpg",
+  contentType: "image/jpeg",
+});
+await identity.sendIMessage({ to: "+15551234567", mediaUrls: [upload.mediaUrl] });
+```
+
+Contact rules are scoped to the **identity** (not a phone number) because pool numbers are shared infrastructure:
+
+```typescript
+import { IMessageRuleAction } from "@inkbox/sdk";
+
+const rule = await inkbox.imessageContactRules.create("my-agent", {
+  action: IMessageRuleAction.BLOCK,
+  matchTarget: "+15559999999",
+});
+const rules = await inkbox.imessageContactRules.list("my-agent");
+await inkbox.imessageContactRules.update("my-agent", rule.id, { status: "paused" }); // admin-only
+await inkbox.imessageContactRules.delete("my-agent", rule.id);                       // admin-only
+const allRules = await inkbox.imessageContactRules.listAll();                        // admin-only, org-wide
+```
+
+Inbound messages and reactions arrive via **identity-owned** webhook subscriptions — see Webhooks below.
+
 ## SMS Opt-Ins
 
 Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The registry is updated automatically when recipients text `START` / `STOP` to any of your numbers (`source: "sms"`). Reads are admin-only; writes are admin-only **and** require your org to be on its own active, customer-managed 10DLC campaign (Inkbox-default-campaign orgs share consent state and get `409 customer_campaign_required` on writes — `source: "api"` writes record an audit event).
@@ -796,15 +861,16 @@ Algorithm: HMAC-SHA256 over `"{requestId}.{timestamp}.{body}"`.
 
 - **Mail** (envelope, fire-and-forget) — `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed`. Subscribe via `inkbox.webhooks.subscriptions.create({ mailboxId, url, eventTypes })`.
 - **Text** (envelope, fire-and-forget) — `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via `inkbox.webhooks.subscriptions.create({ phoneNumberId, url, eventTypes })`. The text-message body carries `delivery_status` as an outbound message-level rollup; 1:1 traffic also hoists `error_code`, `error_detail`, `sent_at`, `delivered_at`, and `failed_at`. On group outbound those legacy detail fields are `null` and per-recipient state lives in `recipients[]`.
+- **iMessage** (envelope, fire-and-forget) — `imessage.received`, `imessage.reaction_received`. Subscribe via `inkbox.webhooks.subscriptions.create({ agentIdentityId, url, eventTypes })` — owned by the **agent identity**, since shared iMessage pool numbers are not org resources. `data.message` is populated on `imessage.received`; `data.reaction` on `imessage.reaction_received`. Fan-out only happens while the identity is active and `imessageEnabled`; contact-rule-blocked traffic is never delivered.
 - **Inbound call** (flat, synchronous) — `PhoneIncomingCallWebhookPayload` on a phone number's `incomingCallWebhookUrl`. Not subscribable; the URL stays on the phone-number resource because the response (`action: "answer" | "reject"` + optional `clientWebsocketUrl`) decides the call's fate. Non-200, invalid bodies, and timeouts are treated as "decline routing" by Inkbox.
 
-**Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox **or** phone number), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, `message.` / `text.` prefix matching the owner's channel) so most shape mistakes surface as `Error` before the request leaves the client. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
+**Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox, phone number, **or** agent identity), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, `message.` / `text.` / `imessage.` prefix matching the owner's channel) so most shape mistakes surface as `Error` before the request leaves the client. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
 
 **Mail contact / identity resolution:** `data.contacts` and `data.agent_identities` are lists of `{ bucket, address, id, ... }` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)`. Outbound payloads also carry `data.message.bcc_addresses` (`null` on inbound, since BCC is not visible to recipients).
 
 **Phone/text contact / identity resolution:** `data.contacts` (text) and top-level `contacts` (inbound call) are lists of `{ id, name }` matches; `data.agent_identities` mirrors that for matched agent identities. Scoped to the identity that owns the receiving phone number; both default to `[]` when nothing matches. Group text events carry per-recipient delivery rows in `data.text_message.recipients`; **outbound group lifecycle** events name the event target in `data.recipient_phone_number` (one webhook per recipient leg). Inbound and outbound 1:1 events leave `data.recipient_phone_number` as `null` — the singular peer is already in `data.text_message.remote_phone_number` (inbound) or `data.text_message.recipients[0]` (outbound 1:1).
 
-Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `RawTextMessageRecipient`, plus event-type string unions (`MailWebhookEventType`, `TextWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case to match the raw JSON body.
+Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `RawTextMessageRecipient`, plus event-type string unions (`MailWebhookEventType`, `TextWebhookEventType`, `IMessageWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case to match the raw JSON body.
 
 ## Error Handling
 

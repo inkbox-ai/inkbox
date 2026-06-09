@@ -249,6 +249,133 @@ export interface TextWebhookPayload {
   };
 }
 
+// ---- iMessage ---------------------------------------------------------
+
+export type IMessageWebhookEventType =
+  | "imessage.received"
+  | "imessage.reaction_received";
+
+export type IMessageDirectionWire = "inbound" | "outbound";
+
+export type IMessageServiceWire = "imessage" | "sms" | "rcs";
+
+export type IMessageTypeWire = "message" | "carousel";
+
+export type IMessageDeliveryStatusWire =
+  | "registered"
+  | "pending"
+  | "queued"
+  | "accepted"
+  | "sent"
+  | "delivered"
+  | "declined"
+  | "error"
+  | "received";
+
+export type IMessageReactionTypeWire =
+  | "love"
+  | "like"
+  | "dislike"
+  | "laugh"
+  | "emphasize"
+  | "question";
+
+export type IMessageSendStyleWire =
+  | "celebration"
+  | "shooting_star"
+  | "fireworks"
+  | "lasers"
+  | "love"
+  | "confetti"
+  | "balloons"
+  | "spotlight"
+  | "echo"
+  | "invisible"
+  | "gentle"
+  | "loud"
+  | "slam";
+
+/** iMessage media attachment (snake_case wire shape). */
+export interface IMessageMediaItemWire {
+  content_type: string | null;
+  size: number | null;
+  url: string;
+}
+
+/** Per-recipient outbound iMessage delivery state. */
+export interface IMessageRecipientWire {
+  remote_number: string;
+  delivery_status: IMessageDeliveryStatusWire | null;
+  service: IMessageServiceWire | null;
+  error_code: string | null;
+  error_message: string | null;
+  error_reason: string | null;
+  error_detail: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  failed_at: string | null;
+}
+
+/**
+ * Stored iMessage. `is_blocked` is not part of the wire body — blocked
+ * messages never reach the webhook. There is no local-number field:
+ * shared pool lines are hidden from agents, so the message is
+ * identified by `conversation_id` and the counterparty `remote_number`
+ * only.
+ */
+export interface IMessageWebhookMessage {
+  id: string;
+  conversation_id: string;
+  assignment_id: string;
+  direction: IMessageDirectionWire;
+  remote_number: string;
+  content: string | null;
+  message_type: IMessageTypeWire;
+  service: IMessageServiceWire;
+  send_style: IMessageSendStyleWire | null;
+  media: IMessageMediaItemWire[] | null;
+  was_downgraded: boolean | null;
+  status: IMessageDeliveryStatusWire | null;
+  error_code: string | null;
+  error_message: string | null;
+  error_reason: string | null;
+  error_detail: string | null;
+  is_read: boolean;
+  recipients: IMessageRecipientWire[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A tapback reaction on an iMessage (snake_case wire shape). */
+export interface IMessageWebhookReaction {
+  id: string;
+  conversation_id: string;
+  assignment_id: string;
+  target_message_id: string;
+  direction: IMessageDirectionWire;
+  reaction: IMessageReactionTypeWire;
+  remote_number: string;
+  part_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IMessageWebhookPayload {
+  event_type: IMessageWebhookEventType;
+  /** ISO 8601 datetime. */
+  timestamp: string;
+  data: {
+    /** Populated on `imessage.received`; `null` on reaction events. */
+    message: IMessageWebhookMessage | null;
+    /** Populated on `imessage.reaction_received`; `null` on message events. */
+    reaction: IMessageWebhookReaction | null;
+    /** Address-book matches for the remote party. Always present, possibly empty. */
+    contacts: WebhookContact[];
+    /** Identity matches for the remote party. Always present, possibly empty. */
+    agent_identities: WebhookAgentIdentity[];
+  };
+}
+
 // ---- Inbound call (FLAT — no envelope) ------------------------------
 
 /**
