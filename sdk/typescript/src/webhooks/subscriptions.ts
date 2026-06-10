@@ -3,7 +3,10 @@
  *
  * Replaces the legacy per-resource `webhook_url` columns on mailboxes
  * and phone numbers. Use this resource to attach HTTPS receivers to
- * mail (`message.*`) or phone-text (`text.*`) events. Incoming-call
+ * mail (`message.*`), phone-text (`text.*`), or iMessage (`imessage.*`)
+ * events. Mail and text subscriptions are owned by the mailbox / phone
+ * number; iMessage subscriptions are owned by the agent identity, since
+ * shared iMessage pool numbers are not org resources. Incoming-call
  * webhooks (`phone.incoming_call`) are still set on the phone-number
  * resource itself — that channel is a synchronous control-plane
  * callback whose response body drives call routing, so fan-out is not
@@ -21,10 +24,12 @@ export interface WebhookSubscription {
   id: string;
   /** `"org_..."` token; not a UUID. */
   organizationId: string;
-  /** Owning mailbox. Exactly one of `mailboxId` / `phoneNumberId` is non-null. */
+  /** Owning mailbox. Exactly one of `mailboxId` / `phoneNumberId` / `agentIdentityId` is non-null. */
   mailboxId: string | null;
-  /** Owning phone number. Exactly one of `mailboxId` / `phoneNumberId` is non-null. */
+  /** Owning phone number. Exactly one of `mailboxId` / `phoneNumberId` / `agentIdentityId` is non-null. */
   phoneNumberId: string | null;
+  /** Owning agent identity, for identity-owned iMessage subscriptions. */
+  agentIdentityId: string | null;
   url: string;
   /** Wire event-type strings (e.g. `"message.received"`, `"text.sent"`). Not narrowed to a literal union — the catalog is the source of truth. */
   eventTypes: string[];
@@ -38,6 +43,7 @@ export interface RawWebhookSubscription {
   organization_id: string;
   mailbox_id: string | null;
   phone_number_id: string | null;
+  agent_identity_id?: string | null;
   url: string;
   event_types: string[];
   status: WebhookSubscriptionStatus;
@@ -57,6 +63,7 @@ export function parseWebhookSubscription(
     organizationId: r.organization_id,
     mailboxId: r.mailbox_id,
     phoneNumberId: r.phone_number_id,
+    agentIdentityId: r.agent_identity_id ?? null,
     url: r.url,
     eventTypes: r.event_types,
     status: r.status,
@@ -105,20 +112,26 @@ function assertNoIncomingCall(eventTypes: string[]): void {
   }
 }
 
+const OWNER_EVENT_PREFIXES: Record<string, string> = {
+  mailbox: "message.",
+  phone_number: "text.",
+  agent_identity: "imessage.",
+};
+
 function assertChannelCoherence(
-  hasMailbox: boolean,
+  owner: string,
   eventTypes: string[],
 ): void {
-  const expectedPrefix = hasMailbox ? "message." : "text.";
-  const otherPrefix = hasMailbox ? "text." : "message.";
-  const otherChannel = hasMailbox ? "phone_number" : "mailbox";
+  const expectedPrefix = OWNER_EVENT_PREFIXES[owner];
   for (const e of eventTypes) {
     if (e.startsWith(expectedPrefix)) continue;
-    if (e.startsWith(otherPrefix)) {
-      throw new Error(
-        `event_type '${e}' does not belong to the ${hasMailbox ? "mailbox" : "phone_number"} ` +
-        `channel (it belongs to ${otherChannel})`,
-      );
+    for (const [otherOwner, otherPrefix] of Object.entries(OWNER_EVENT_PREFIXES)) {
+      if (otherOwner !== owner && e.startsWith(otherPrefix)) {
+        throw new Error(
+          `event_type '${e}' does not belong to the ${owner} ` +
+          `channel (it belongs to ${otherOwner})`,
+        );
+      }
     }
     throw new Error(`event_type '${e}' does not belong to any known channel`);
   }
@@ -128,6 +141,7 @@ function assertChannelCoherence(
 export interface CreateWebhookSubscriptionOptions {
   mailboxId?: string;
   phoneNumberId?: string;
+  agentIdentityId?: string;
   url: string;
   eventTypes: string[];
 }
@@ -140,6 +154,7 @@ export interface UpdateWebhookSubscriptionOptions {
 export interface ListWebhookSubscriptionsOptions {
   mailboxId?: string;
   phoneNumberId?: string;
+  agentIdentityId?: string;
   url?: string;
   eventType?: string;
 }
@@ -149,9 +164,9 @@ export class WebhookSubscriptionsResource {
 
   /**
    * List webhook subscriptions visible to the caller. Filters AND-combine;
-   * unmatched filters return an empty list. `mailboxId` and `phoneNumberId`
-   * are mutually exclusive — passing both yields a 422. Deleted
-   * subscriptions are not returned.
+   * unmatched filters return an empty list. `mailboxId` / `phoneNumberId`
+   * / `agentIdentityId` are mutually exclusive — passing more than one
+   * yields a 422. Deleted subscriptions are not returned.
    */
   async list(
     filters: ListWebhookSubscriptionsOptions = {},
@@ -159,6 +174,7 @@ export class WebhookSubscriptionsResource {
     const params: Record<string, string> = {};
     if (filters.mailboxId !== undefined) params["mailbox_id"] = filters.mailboxId;
     if (filters.phoneNumberId !== undefined) params["phone_number_id"] = filters.phoneNumberId;
+    if (filters.agentIdentityId !== undefined) params["agent_identity_id"] = filters.agentIdentityId;
     if (filters.url !== undefined) params["url"] = filters.url;
     if (filters.eventType !== undefined) params["event_type"] = filters.eventType;
     const data = await this.http.get<RawListWebhookSubscriptionsResponse>(PATH, params);
@@ -173,33 +189,38 @@ export class WebhookSubscriptionsResource {
 
   /**
    * Create a webhook subscription. Exactly one of `mailboxId` /
-   * `phoneNumberId` is required; `eventTypes` must be a non-empty list
-   * of distinct values belonging to the owner's channel (mailbox →
-   * `message.*`, phone number → `text.*`).
+   * `phoneNumberId` / `agentIdentityId` is required; `eventTypes` must
+   * be a non-empty list of distinct values belonging to the owner's
+   * channel (mailbox → `message.*`, phone number → `text.*`, agent
+   * identity → `imessage.*`).
    */
   async create(
     options: CreateWebhookSubscriptionOptions,
   ): Promise<WebhookSubscription> {
-    const hasMailbox = options.mailboxId !== undefined && options.mailboxId !== null;
-    const hasPhoneNumber =
-      options.phoneNumberId !== undefined && options.phoneNumberId !== null;
-    if (hasMailbox === hasPhoneNumber) {
+    const owners: Record<string, string | undefined | null> = {
+      mailbox: options.mailboxId,
+      phone_number: options.phoneNumberId,
+      agent_identity: options.agentIdentityId,
+    };
+    const populated = Object.entries(owners)
+      .filter(([, value]) => value !== undefined && value !== null);
+    if (populated.length !== 1) {
       throw new Error(
-        "Exactly one of mailboxId or phoneNumberId must be provided",
+        "Exactly one of mailboxId, phoneNumberId, or agentIdentityId must be provided",
       );
     }
+    const [owner, ownerId] = populated[0];
     assertUrlNotNull(options.url);
     assertEventTypesNotNull(options.eventTypes);
     assertEventTypesNonEmptyDistinct(options.eventTypes);
     assertNoIncomingCall(options.eventTypes);
-    assertChannelCoherence(hasMailbox, options.eventTypes);
+    assertChannelCoherence(owner, options.eventTypes);
 
     const body: Record<string, unknown> = {
       url: options.url,
       event_types: options.eventTypes,
+      [`${owner}_id`]: ownerId,
     };
-    if (hasMailbox) body["mailbox_id"] = options.mailboxId;
-    if (hasPhoneNumber) body["phone_number_id"] = options.phoneNumberId;
     const data = await this.http.post<RawWebhookSubscription>(PATH, body);
     return parseWebhookSubscription(data);
   }

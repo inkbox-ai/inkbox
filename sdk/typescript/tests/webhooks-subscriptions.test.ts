@@ -323,3 +323,89 @@ describe("WebhookSubscriptionsResource.get / delete", () => {
     expect(http.delete).toHaveBeenCalledWith("/webhooks/subscriptions/subid");
   });
 });
+
+const IDENTITY_ID = "44444444-4444-4444-4444-444444444444";
+
+const RAW_IDENTITY_SUBSCRIPTION: RawWebhookSubscription = {
+  ...RAW_SUBSCRIPTION,
+  mailbox_id: null,
+  agent_identity_id: IDENTITY_ID,
+  event_types: ["imessage.received", "imessage.reaction_received"],
+};
+
+describe("WebhookSubscriptionsResource — agent identity owner", () => {
+  it("creates an identity-owned imessage subscription", async () => {
+    const { resource, http } = makeResource();
+    http.post.mockResolvedValue(RAW_IDENTITY_SUBSCRIPTION);
+
+    const sub = await resource.create({
+      agentIdentityId: IDENTITY_ID,
+      url: "https://customer.example.com/hook",
+      eventTypes: ["imessage.received", "imessage.reaction_received"],
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      url: "https://customer.example.com/hook",
+      event_types: ["imessage.received", "imessage.reaction_received"],
+      agent_identity_id: IDENTITY_ID,
+    });
+    expect(sub.agentIdentityId).toBe(IDENTITY_ID);
+    expect(sub.mailboxId).toBeNull();
+    expect(sub.phoneNumberId).toBeNull();
+  });
+
+  it("rejects imessage events on a mailbox owner", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        mailboxId: "22222222-2222-2222-2222-222222222222",
+        url: "https://x.example.com/hook",
+        eventTypes: ["imessage.received"],
+      }),
+    ).rejects.toThrow(/agent_identity/);
+  });
+
+  it("rejects text events on an agent identity owner", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        agentIdentityId: IDENTITY_ID,
+        url: "https://x.example.com/hook",
+        eventTypes: ["text.received"],
+      }),
+    ).rejects.toThrow(/phone_number/);
+  });
+
+  it("rejects multiple owners including the identity", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        mailboxId: "22222222-2222-2222-2222-222222222222",
+        agentIdentityId: IDENTITY_ID,
+        url: "https://x.example.com/hook",
+        eventTypes: ["imessage.received"],
+      }),
+    ).rejects.toThrow(/Exactly one/);
+  });
+
+  it("passes the agent identity list filter", async () => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValue({ subscriptions: [RAW_IDENTITY_SUBSCRIPTION] });
+
+    const rows = await resource.list({ agentIdentityId: IDENTITY_ID });
+
+    expect(http.get).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      agent_identity_id: IDENTITY_ID,
+    });
+    expect(rows[0].agentIdentityId).toBe(IDENTITY_ID);
+  });
+
+  it("defaults a missing agent_identity_id to null when parsing", async () => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValue({ subscriptions: [RAW_SUBSCRIPTION] });
+
+    const rows = await resource.list();
+
+    expect(rows[0].agentIdentityId).toBeNull();
+  });
+});

@@ -412,6 +412,62 @@ await inkbox.smsOptIns.optOut("+15551234567");
 
 ---
 
+## iMessage
+
+Chat with humans over iMessage through the shared Inkbox router — no
+per-identity iMessage number. iMessage is **opt-in per identity**
+(`imessageEnabled`), and the **human always texts first**: they connect
+by texting `connect @<handle>` to the router number, after which the
+agent can reply into the conversation. Each identity can send up to
+100 iMessages per rolling 24-hour window.
+
+```ts
+// Opt an identity in (at create time or later).
+const identity = await inkbox.createIdentity("my-agent", { imessageEnabled: true });
+
+// Resolve the router number at runtime — never hardcode it.
+const router = await inkbox.imessages.getTriageNumber();
+console.log(router.number, router.connectCommand); // e.g. 'connect @my-agent'
+
+// Once a human has connected and messaged, read and reply.
+const convos = await identity.listIMessageConversations({ limit: 20 });
+const msgs = await identity.listIMessages({ conversationId: convos[0].id });
+await identity.sendIMessage({
+  conversationId: convos[0].id,
+  text: "On it — give me two minutes.",
+});
+
+// Who is currently connected? (Disconnected conversations stay readable
+// with assignmentStatus === "released"; sends into them return 409.)
+const connections = await identity.listIMessageAssignments();
+
+// Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
+// a new tapback replaces your previous one on the same message part.
+await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+
+// Read receipts, typing indicator, media.
+await identity.markIMessageConversationRead(convos[0].id);
+await identity.sendIMessageTyping(convos[0].id);
+const upload = await identity.uploadIMessageMedia({
+  content: fileBytes,
+  filename: "chart.png",
+  contentType: "image/png",
+});
+await identity.sendIMessage({ conversationId: convos[0].id, mediaUrls: [upload.mediaUrl] });
+
+// Per-identity allow/block rules, interpreted via imessageFilterMode.
+await inkbox.imessageContactRules.create("my-agent", {
+  action: "block",
+  matchTarget: "+15555550999",
+});
+```
+
+Inbound messages, tapbacks, and outbound delivery status arrive via
+identity-owned webhook subscriptions — see
+[Webhooks](#webhooks) for the five `imessage.*` event types.
+
+---
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
@@ -728,17 +784,17 @@ await inkbox.phoneNumbers.release(num.id);
 ## Webhooks
 
 Webhook delivery uses a dedicated subscription resource. Each
-subscription names exactly one owner (a mailbox **or** a phone
-number), one HTTPS destination URL, and a non-empty subset of the
-catalog's event types. Multiple subscriptions on the same owner fan
-out independently.
+subscription names exactly one owner (a mailbox, a phone number, **or**
+an agent identity for iMessage), one HTTPS destination URL, and a
+non-empty subset of the catalog's event types. Multiple subscriptions
+on the same owner fan out independently.
 
 The one exception is `phone.incoming_call`, which is a synchronous
 control-plane callback (the response body decides whether Inkbox
 answers). That URL still lives on the phone-number resource as
 `incomingCallWebhookUrl`.
 
-### Subscribing to mail or text events
+### Subscribing to mail, text, or iMessage events
 
 ```ts
 // Mail subscription: pick the message.* events you want.
@@ -761,6 +817,20 @@ await inkbox.webhooks.subscriptions.create({
   ],
 });
 
+// iMessage subscription: owned by the agent identity (the shared
+// pool lines aren't org resources).
+await inkbox.webhooks.subscriptions.create({
+  agentIdentityId: identity.id,
+  url: "https://example.com/imessage",
+  eventTypes: [
+    "imessage.received",
+    "imessage.reaction_received",
+    "imessage.sent",
+    "imessage.delivered",
+    "imessage.delivery_failed",
+  ],
+});
+
 // List, update, remove.
 const subs = await inkbox.webhooks.subscriptions.list({ mailboxId: mb.id });
 await inkbox.webhooks.subscriptions.update(subs[0].id, { url: "https://new/hook" });
@@ -773,13 +843,15 @@ Available event types:
 |---|---|
 | Mail | `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed` |
 | Phone text | `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed` |
+| iMessage | `imessage.received`, `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` |
 
-Server-side validation: exactly one of `mailboxId` / `phoneNumberId`
-must be set; `eventTypes` must be non-empty and distinct; every event
-type must belong to the owner's channel (mailbox → `message.*`, phone
-number → `text.*`). On `create` the SDK mirrors the structural checks
-(XOR owner, non-empty, distinct, no `phone.incoming_call`) plus the
-`message.` / `text.` prefix check, so most shape mistakes surface as
+Server-side validation: exactly one of `mailboxId` / `phoneNumberId` /
+`agentIdentityId` must be set; `eventTypes` must be non-empty and
+distinct; every event type must belong to the owner's channel (mailbox
+→ `message.*`, phone number → `text.*`, agent identity → `imessage.*`).
+On `create` the SDK mirrors the structural checks (XOR owner,
+non-empty, distinct, no `phone.incoming_call`) plus the `message.` /
+`text.` / `imessage.` prefix check, so most shape mistakes surface as
 `Error` before the request leaves the client. The server remains
 authoritative for the exact event-name enum, so a typo with a valid
 prefix (e.g. `message.received_typo`) passes the SDK's check and is

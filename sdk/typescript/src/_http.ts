@@ -257,8 +257,38 @@ export class HttpTransport {
     return this.request<T>("GET", path, { params, timeoutMs: opts?.timeoutMs });
   }
 
-  async post<T>(path: string, body?: unknown, opts?: { timeoutMs?: number }): Promise<T> {
-    return this.request<T>("POST", path, { body, timeoutMs: opts?.timeoutMs });
+  async post<T>(
+    path: string,
+    body?: unknown,
+    opts?: { timeoutMs?: number; params?: Params },
+  ): Promise<T> {
+    return this.request<T>("POST", path, {
+      body,
+      params: opts?.params,
+      timeoutMs: opts?.timeoutMs,
+    });
+  }
+
+  /**
+   * POST one file as multipart/form-data. JSON response.
+   *
+   * Used for media uploads.
+   */
+  async postMultipart<T>(
+    path: string,
+    file: {
+      fieldName: string;
+      filename: string;
+      content: Uint8Array | Blob;
+      contentType: string;
+    },
+  ): Promise<T> {
+    const form = new FormData();
+    const blob = file.content instanceof Blob
+      ? file.content
+      : new Blob([file.content as BlobPart], { type: file.contentType });
+    form.append(file.fieldName, blob, file.filename);
+    return this.request<T>("POST", path, { formBody: form });
   }
 
   async put<T>(path: string, body: unknown, opts?: { timeoutMs?: number }): Promise<T> {
@@ -312,6 +342,7 @@ export class HttpTransport {
       params?: Params;
       body?: unknown;
       rawBody?: string | Uint8Array;
+      formBody?: FormData;
       contentType?: string;
       accept?: string;
       rawResponse?: "text" | "bytes";
@@ -340,8 +371,11 @@ export class HttpTransport {
       headers.Cookie = cookieHeader;
     }
 
-    let bodyPayload: string | Uint8Array | undefined;
-    if (opts.rawBody !== undefined) {
+    let bodyPayload: string | Uint8Array | FormData | undefined;
+    if (opts.formBody !== undefined) {
+      // No explicit Content-Type — fetch sets the multipart boundary.
+      bodyPayload = opts.formBody;
+    } else if (opts.rawBody !== undefined) {
       headers["Content-Type"] = opts.contentType ?? "application/octet-stream";
       bodyPayload = opts.rawBody;
     } else if (opts.body !== undefined) {

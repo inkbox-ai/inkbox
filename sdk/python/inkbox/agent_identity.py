@@ -26,7 +26,19 @@ from inkbox.identities.types import (
 )
 from inkbox.tunnels.types import Tunnel
 from inkbox.exceptions import InkboxError
+from inkbox.imessage.types import (
+    IMessage,
+    IMessageAssignment,
+    IMessageConversation,
+    IMessageConversationSummary,
+    IMessageMarkReadResult,
+    IMessageMediaUpload,
+    IMessageReaction,
+    IMessageReactionType,
+    IMessageSendStyle,
+)
 from inkbox.mail.types import (
+    FilterMode,
     ForwardMode,
     Message,
     MessageDetail,
@@ -108,6 +120,16 @@ class AgentIdentity:
         Always trust this value — do not derive it from ``agent_handle``.
         """
         return self._data.email_address
+
+    @property
+    def imessage_enabled(self) -> bool:
+        """Whether this identity can be reached over the shared iMessage service."""
+        return self._data.imessage_enabled
+
+    @property
+    def imessage_filter_mode(self) -> FilterMode:
+        """Whitelist/blacklist mode for this identity's iMessage contact rules."""
+        return self._data.imessage_filter_mode
 
     @property
     def mailbox(self) -> IdentityMailbox | None:
@@ -738,6 +760,201 @@ class AgentIdentity:
             is_read=True,
         )
 
+    ## iMessage helpers
+
+    def send_imessage(
+        self,
+        *,
+        to: str | None = None,
+        conversation_id: UUID | str | None = None,
+        text: str | None = None,
+        media_urls: list[str] | None = None,
+        send_style: IMessageSendStyle | str | None = None,
+    ) -> IMessage:
+        """Send an outbound iMessage as this identity.
+
+        Sends only work toward recipients that triage has already
+        connected to this identity over the shared iMessage service —
+        there is no cold outreach.
+
+        Args:
+            to: E.164 recipient number. Mutually exclusive with
+                ``conversation_id``.
+            conversation_id: Existing conversation UUID to reply into.
+            text: Message body.
+            media_urls: Media URLs (at most one). Use
+                :meth:`upload_imessage_media` to create one from bytes.
+            send_style: Optional expressive send style
+                (see ``IMessageSendStyle``).
+
+        Raises:
+            InkboxError: when this identity is not iMessage-enabled.
+            InkboxAPIError: 403 when the recipient is blocked by a
+                contact rule; other send failures.
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.send(
+            to=to,
+            conversation_id=conversation_id,
+            text=text,
+            media_urls=media_urls,
+            send_style=send_style,
+            agent_identity_id=self.id,
+        )
+
+    def list_imessages(
+        self,
+        *,
+        conversation_id: UUID | str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        is_read: bool | None = None,
+        is_blocked: bool | None = None,
+    ) -> list[IMessage]:
+        """List this identity's iMessages, newest first.
+
+        Identity-scoped credentials never see contact-rule-blocked rows
+        regardless of ``is_blocked`` (server-side access policy).
+
+        Args:
+            conversation_id: Narrow to one conversation.
+            limit: Maximum number of results (default 50).
+            offset: Pagination offset (default 0).
+            is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
+            is_blocked: Tri-state filter — ``True`` for only blocked,
+                ``False`` for only non-blocked, ``None`` for all.
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.list(
+            agent_identity_id=self.id,
+            conversation_id=conversation_id,
+            limit=limit,
+            offset=offset,
+            is_read=is_read,
+            is_blocked=is_blocked,
+        )
+
+    def list_imessage_assignments(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[IMessageAssignment]:
+        """List recipients actively connected to this identity, newest first.
+
+        Args:
+            limit: Maximum number of results (default 50).
+            offset: Pagination offset (default 0).
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.list_assignments(
+            agent_identity_id=self.id,
+            limit=limit,
+            offset=offset,
+        )
+
+    def list_imessage_conversations(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        is_blocked: bool | None = None,
+    ) -> list[IMessageConversationSummary]:
+        """List this identity's iMessage conversations.
+
+        Args:
+            limit: Maximum number of results (default 50).
+            offset: Pagination offset (default 0).
+            is_blocked: Tri-state filter applied to the underlying
+                messages — ``True`` for only blocked, ``False`` for only
+                non-blocked, ``None`` for all.
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.list_conversations(
+            agent_identity_id=self.id,
+            limit=limit,
+            offset=offset,
+            is_blocked=is_blocked,
+        )
+
+    def get_imessage_conversation(
+        self, conversation_id: UUID | str
+    ) -> IMessageConversation:
+        """Get one of this identity's iMessage conversations by ID.
+
+        Args:
+            conversation_id: UUID of the conversation.
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.get_conversation(
+            conversation_id,
+            agent_identity_id=self.id,
+        )
+
+    def send_imessage_reaction(
+        self,
+        *,
+        message_id: UUID | str,
+        reaction: IMessageReactionType | str,
+        part_index: int = 0,
+    ) -> IMessageReaction:
+        """Send a tapback reaction to a message in one of this
+        identity's conversations.
+
+        Args:
+            message_id: UUID of the message being reacted to.
+            reaction: Tapback kind (see ``IMessageReactionType``).
+            part_index: Part of a multi-part message to react to.
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.send_reaction(
+            message_id=message_id,
+            reaction=reaction,
+            part_index=part_index,
+        )
+
+    def mark_imessage_conversation_read(
+        self, conversation_id: UUID | str
+    ) -> IMessageMarkReadResult:
+        """Send a read receipt and mark a conversation's inbound
+        messages read.
+
+        Args:
+            conversation_id: UUID of the conversation.
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.mark_conversation_read(conversation_id)
+
+    def send_imessage_typing(self, conversation_id: UUID | str) -> None:
+        """Show a typing indicator to a conversation's recipient.
+
+        Args:
+            conversation_id: UUID of the conversation.
+        """
+        self._require_imessage()
+        self._inkbox._imessages.send_typing(conversation_id)
+
+    def upload_imessage_media(
+        self,
+        *,
+        content: bytes,
+        filename: str,
+        content_type: str | None = None,
+    ) -> IMessageMediaUpload:
+        """Upload media and get back a URL usable in ``media_urls``.
+
+        Args:
+            content: Raw file bytes (max 10 MiB).
+            filename: Original filename, used for type inference.
+            content_type: Optional MIME type.
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.upload_media(
+            content=content,
+            filename=filename,
+            content_type=content_type,
+        )
+
     ## Identity management
 
     def update(
@@ -746,10 +963,12 @@ class AgentIdentity:
         new_handle: str | None = None,
         display_name: Any = _UNSET,
         description: Any = _UNSET,
+        imessage_enabled: bool | None = None,
+        imessage_filter_mode: FilterMode | str | None = None,
         status: str | None = None,
     ) -> None:
         """Update this identity's handle, display name, description,
-        and/or status.
+        iMessage reachability, and/or status.
 
         Only provided fields are applied; omitted fields are left
         unchanged. For ``display_name`` and ``description``, explicit
@@ -760,6 +979,9 @@ class AgentIdentity:
             new_handle: New agent handle.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
+            imessage_enabled: Toggle shared-iMessage reachability.
+            imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
+                iMessage contact rules (admin-only).
             status: ``"active"`` or ``"paused"``. Call :meth:`delete`
                 to remove the identity; ``"deleted"`` is rejected here.
         """
@@ -770,6 +992,14 @@ class AgentIdentity:
             update_kwargs["display_name"] = display_name
         if description is not _UNSET:
             update_kwargs["description"] = description
+        if imessage_enabled is not None:
+            update_kwargs["imessage_enabled"] = imessage_enabled
+        if imessage_filter_mode is not None:
+            update_kwargs["imessage_filter_mode"] = (
+                imessage_filter_mode.value
+                if isinstance(imessage_filter_mode, FilterMode)
+                else imessage_filter_mode
+            )
         if status is not None:
             update_kwargs["status"] = status
         result = self._inkbox._ids_resource.update(
@@ -784,6 +1014,8 @@ class AgentIdentity:
             email_address=result.email_address,
             created_at=result.created_at,
             updated_at=result.updated_at,
+            imessage_enabled=result.imessage_enabled,
+            imessage_filter_mode=result.imessage_filter_mode,
             mailbox=self._mailbox,
             phone_number=self._phone_number,
             tunnel=self._tunnel,
@@ -835,6 +1067,14 @@ class AgentIdentity:
             raise InkboxError(
                 f"Identity '{self.agent_handle}' has no phone number assigned. "
                 "Call identity.provision_phone_number() first, or pass phone_number to create_identity()."
+            )
+
+    def _require_imessage(self) -> None:
+        if not self._data.imessage_enabled:
+            raise InkboxError(
+                f"Identity '{self.agent_handle}' is not iMessage-enabled. "
+                "Call identity.update(imessage_enabled=True) first, or pass "
+                "imessage_enabled=True to create_identity()."
             )
 
     def _require_vault_unlocked(self) -> None:

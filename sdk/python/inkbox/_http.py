@@ -56,9 +56,11 @@ class HttpTransport:
         path: str,
         *,
         json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         timeout: float | None = None,
     ) -> Any:
-        resp = self._send("POST", path, json=json, timeout=timeout)
+        cleaned = {k: v for k, v in (params or {}).items() if v is not None}
+        resp = self._send("POST", path, json=json, params=cleaned, timeout=timeout)
         _raise_for_status(resp)
         if resp.status_code == 204:
             return None
@@ -101,6 +103,26 @@ class HttpTransport:
         resp = self._send("DELETE", path, timeout=timeout)
         _raise_for_status(resp)
         if resp.status_code == 204 or not resp.content:
+            return None
+        return resp.json()
+
+    def post_multipart(
+        self,
+        path: str,
+        *,
+        field_name: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+    ) -> Any:
+        """POST one file as multipart/form-data.
+
+        Used for media uploads. The response is decoded as JSON.
+        """
+        files = {field_name: (filename, content, content_type)}
+        resp = self._send("POST", path, files=files)
+        _raise_for_status(resp)
+        if resp.status_code == 204:
             return None
         return resp.json()
 

@@ -7,6 +7,7 @@ import { registerIdentityCommands } from "./commands/identity.js";
 import { registerEmailCommands } from "./commands/email.js";
 import { registerPhoneCommands } from "./commands/phone.js";
 import { registerTextCommands } from "./commands/text.js";
+import { registerIMessageCommands } from "./commands/imessage.js";
 import { registerSmsOptInCommands } from "./commands/sms-opt-in.js";
 import { registerVaultCommands } from "./commands/vault.js";
 import { registerMailboxCommands } from "./commands/mailbox.js";
@@ -22,7 +23,7 @@ import { registerDomainCommands } from "./commands/domain.js";
 const program = new Command()
   .name("inkbox")
   .description("CLI for the Inkbox API — email, phone, identities, and vault for AI agents")
-  .version("0.4.5")
+  .version("0.4.7")
   .option("--api-key <key>", "Inkbox API key (or set INKBOX_API_KEY)")
   .option("--vault-key <key>", "Vault key for decrypt operations (or set INKBOX_VAULT_KEY)")
   .option("--base-url <url>", "Override API base URL (or set INKBOX_BASE_URL)")
@@ -34,6 +35,7 @@ registerIdentityCommands(program);
 registerEmailCommands(program);
 registerPhoneCommands(program);
 registerTextCommands(program);
+registerIMessageCommands(program);
 registerSmsOptInCommands(program);
 registerVaultCommands(program);
 registerMailboxCommands(program);

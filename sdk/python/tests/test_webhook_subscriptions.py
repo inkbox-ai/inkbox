@@ -308,3 +308,82 @@ class TestClientWiring:
             WebhookSubscriptionsResource,
         )
         assert client.webhooks is client.webhooks
+
+
+_IDENTITY_ID = "44444444-4444-4444-4444-444444444444"
+
+RAW_IDENTITY_SUBSCRIPTION = {
+    **RAW_SUBSCRIPTION,
+    "mailbox_id": None,
+    "agent_identity_id": _IDENTITY_ID,
+    "event_types": ["imessage.received", "imessage.reaction_received"],
+}
+
+
+class TestAgentIdentityOwner:
+    def test_round_trip_with_agent_identity(self):
+        res, http = _resource()
+        http.post.return_value = RAW_IDENTITY_SUBSCRIPTION
+
+        sub = res.create(
+            agent_identity_id=_IDENTITY_ID,
+            url="https://customer.example.com/hook",
+            event_types=["imessage.received", "imessage.reaction_received"],
+        )
+
+        http.post.assert_called_once_with(
+            "/webhooks/subscriptions",
+            json={
+                "url": "https://customer.example.com/hook",
+                "event_types": ["imessage.received", "imessage.reaction_received"],
+                "agent_identity_id": _IDENTITY_ID,
+            },
+        )
+        assert sub.agent_identity_id == UUID(_IDENTITY_ID)
+        assert sub.mailbox_id is None
+        assert sub.phone_number_id is None
+
+    def test_rejects_imessage_events_on_mailbox_owner(self):
+        res, _http = _resource()
+        with pytest.raises(ValueError, match="agent_identity"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url="https://x.example.com/hook",
+                event_types=["imessage.received"],
+            )
+
+    def test_rejects_text_events_on_agent_identity_owner(self):
+        res, _http = _resource()
+        with pytest.raises(ValueError, match="phone_number"):
+            res.create(
+                agent_identity_id=_IDENTITY_ID,
+                url="https://x.example.com/hook",
+                event_types=["text.received"],
+            )
+
+    def test_rejects_multiple_owners_including_identity(self):
+        res, _http = _resource()
+        with pytest.raises(ValueError, match="Exactly one"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                agent_identity_id=_IDENTITY_ID,
+                url="https://x.example.com/hook",
+                event_types=["imessage.received"],
+            )
+
+    def test_list_passes_agent_identity_filter(self):
+        res, http = _resource()
+        http.get.return_value = {"subscriptions": [RAW_IDENTITY_SUBSCRIPTION]}
+
+        rows = res.list(agent_identity_id=_IDENTITY_ID)
+
+        http.get.assert_called_once_with(
+            "/webhooks/subscriptions",
+            params={"agent_identity_id": _IDENTITY_ID},
+        )
+        assert rows[0].agent_identity_id == UUID(_IDENTITY_ID)
+
+    def test_parse_defaults_missing_agent_identity_to_none(self):
+        # Older payloads without the key must keep parsing.
+        sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
+        assert sub.agent_identity_id is None

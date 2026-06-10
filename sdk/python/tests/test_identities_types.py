@@ -119,3 +119,43 @@ class TestIdentityPhoneNumberParsing:
         )
 
         assert p.state == "NY"
+
+
+class TestIdentityIMessageFields:
+    def test_summary_parses_imessage_fields(self):
+        from inkbox.identities.types import AgentIdentitySummary
+        from inkbox.mail.types import FilterMode
+
+        d = {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "organization_id": "org_x",
+            "agent_handle": "support-bot",
+            "display_name": None,
+            "description": None,
+            "email_address": None,
+            "imessage_enabled": True,
+            "imessage_filter_mode": "whitelist",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+        }
+        summary = AgentIdentitySummary._from_dict(d)
+        assert summary.imessage_enabled is True
+        assert summary.imessage_filter_mode is FilterMode.WHITELIST
+
+    def test_summary_defaults_imessage_fields_when_absent(self):
+        from inkbox.identities.types import AgentIdentitySummary
+        from inkbox.mail.types import FilterMode
+
+        d = {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "organization_id": "org_x",
+            "agent_handle": "support-bot",
+            "display_name": None,
+            "description": None,
+            "email_address": None,
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+        }
+        summary = AgentIdentitySummary._from_dict(d)
+        assert summary.imessage_enabled is False
+        assert summary.imessage_filter_mode is FilterMode.BLACKLIST

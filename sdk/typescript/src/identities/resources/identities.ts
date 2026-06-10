@@ -42,6 +42,9 @@ export class IdentitiesResource {
    *   server-side to `agentHandle`.
    * @param options.description - Free-form org-internal description.
    *   `null` leaves the column null; omit to defer to server default.
+   * @param options.imessageEnabled - Whether the identity can be reached
+   *   over the shared iMessage service. Omit to defer to the server
+   *   default (`false`).
    * @param options.mailbox - Optional nested mailbox spec. Mailbox is
    *   always provisioned; this just lets the caller customize.
    * @param options.tunnel - Optional nested tunnel spec (tlsMode only).
@@ -53,6 +56,7 @@ export class IdentitiesResource {
     agentHandle: string;
     displayName?: string;
     description?: string | null;
+    imessageEnabled?: boolean;
     mailbox?: IdentityMailboxCreateOptions;
     tunnel?: IdentityTunnelCreateOptions;
     phoneNumber?: IdentityPhoneNumberCreateOptions;
@@ -61,6 +65,7 @@ export class IdentitiesResource {
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
+    if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
     if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
     if (options.tunnel !== undefined) body["tunnel"] = identityTunnelCreateOptionsToWire(options.tunnel);
     if (options.phoneNumber !== undefined) body["phone_number"] = identityPhoneNumberCreateOptionsToWire(options.phoneNumber);
@@ -91,7 +96,8 @@ export class IdentitiesResource {
   }
 
   /**
-   * Update an identity's handle, display name, description, and/or status.
+   * Update an identity's handle, display name, description, iMessage
+   * reachability, and/or status.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
    * For `displayName` and `description`, explicit `null` clears the value
@@ -101,6 +107,9 @@ export class IdentitiesResource {
    * @param options.newHandle - New handle value.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
+   * @param options.imessageEnabled - Toggle shared-iMessage reachability.
+   * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
+   *   for iMessage contact rules (admin-only).
    * @param options.status - `"active"` or `"paused"`. Call `delete()` to
    *   remove an identity; `"deleted"` is rejected here.
    */
@@ -110,6 +119,8 @@ export class IdentitiesResource {
       newHandle?: string;
       displayName?: string | null;
       description?: string | null;
+      imessageEnabled?: boolean;
+      imessageFilterMode?: "whitelist" | "blacklist";
       status?: "active" | "paused";
     },
   ): Promise<AgentIdentitySummary> {
@@ -117,6 +128,8 @@ export class IdentitiesResource {
     if (options.newHandle !== undefined) body["agent_handle"] = options.newHandle;
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
+    if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.status !== undefined) body["status"] = options.status;
     try {
       const data = await this.http.patch<RawAgentIdentitySummary>(`/${agentHandle}`, body);

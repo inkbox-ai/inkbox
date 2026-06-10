@@ -4,6 +4,19 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.7 — iMessage
+
+### Added
+
+- **iMessage surface** across all three packages, riding the shared Inkbox iMessage router (recipients connect by texting `connect @<handle>` to the router number; no cold outreach):
+  - TypeScript: `inkbox.imessages` + `inkbox.imessageContactRules` resources, and identity helpers `sendIMessage`, `listIMessages`, `listIMessageConversations`, `listIMessageAssignments`, `sendIMessageReaction`, `markIMessageConversationRead`, `sendIMessageTyping`, `uploadIMessageMedia`.
+  - Python: `inkbox.imessages` + `inkbox.imessage_contact_rules` resources, and the matching `identity.*_imessage_*` helpers.
+  - CLI: the `inkbox imessage` command group — `triage-number`, `send`, `list`, `assignments`, `conversations`, `conversation`, `react`, `mark-conversation-read`, `typing`, `upload-media`, and `contact-rule {list,create,update,delete,list-all}`.
+- **Identity iMessage fields** — `imessage_enabled` / `imessageEnabled` on create and update, `imessage_filter_mode` / `imessageFilterMode` (admin-only) on update; both returned on reads.
+- **Identity-owned webhook subscriptions** — `agent_identity_id` / `agentIdentityId` as the third subscription owner, carrying the five `imessage.*` events: `imessage.received`, `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed`. Typed wire shapes for the iMessage envelope ship in both SDKs.
+- **Tapbacks** — send the classic six (`custom` is inbound-only and rejected with 422); one live tapback per sender per message part, replace-on-resend. Message reads carry a `reactions` array including inbound custom-emoji tapbacks.
+- **Connection state** — conversations carry `assignment_status` / `assignmentStatus` (`active` / `released`); `GET /assignments` lists currently connected recipients.
+
 ## 0.4.6 — webhook subscriptions refactor
 
 ### Breaking

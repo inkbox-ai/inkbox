@@ -253,3 +253,38 @@ class TestIdentitiesRevokeAccess:
         res.revoke_access(HANDLE, VIEWER_ID)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/access/{VIEWER_ID}")
+
+
+class TestIdentitiesIMessageFields:
+    def test_create_sends_imessage_enabled(self):
+        res, http = _resource()
+        http.post.return_value = IDENTITY_DICT
+
+        res.create(agent_handle=HANDLE, imessage_enabled=True)
+
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["imessage_enabled"] is True
+
+    def test_create_omits_imessage_enabled_by_default(self):
+        res, http = _resource()
+        http.post.return_value = IDENTITY_DICT
+
+        res.create(agent_handle=HANDLE)
+
+        _, kwargs = http.post.call_args
+        assert "imessage_enabled" not in kwargs["json"]
+
+    def test_update_sends_imessage_fields(self):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DICT
+
+        res.update(
+            HANDLE,
+            imessage_enabled=True,
+            imessage_filter_mode="whitelist",
+        )
+
+        http.patch.assert_called_once_with(
+            f"/{HANDLE}",
+            json={"imessage_enabled": True, "imessage_filter_mode": "whitelist"},
+        )

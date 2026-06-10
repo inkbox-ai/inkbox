@@ -5,7 +5,10 @@ Webhook subscriptions -- fan-out per ``(owner, url, event_types)``.
 
 Replaces the legacy per-resource ``webhook_url`` columns on mailboxes
 and phone numbers. Use this resource to attach HTTPS receivers to mail
-(``message.*``) or phone-text (``text.*``) events. Incoming-call
+(``message.*``), phone-text (``text.*``), or iMessage (``imessage.*``)
+events. Mail and text subscriptions are owned by the mailbox / phone
+number; iMessage subscriptions are owned by the agent identity, since
+shared iMessage pool numbers are not org resources. Incoming-call
 webhooks (``phone.incoming_call``) are still set on the phone-number
 resource itself -- that channel is a synchronous control-plane
 callback whose response body drives call routing, so fan-out is not
@@ -38,7 +41,8 @@ WebhookSubscriptionStatus = Literal["active", "deleted"]
 class WebhookSubscription:
     """A webhook subscription row returned by the API.
 
-    Exactly one of ``mailbox_id`` / ``phone_number_id`` is populated.
+    Exactly one of ``mailbox_id`` / ``phone_number_id`` /
+    ``agent_identity_id`` is populated.
     ``organization_id`` is an ``"org_..."`` token string, not a UUID.
     ``status`` is always ``"active"`` for subscriptions callers can
     observe; deleted subscriptions are not returned by ``list`` /
@@ -49,6 +53,7 @@ class WebhookSubscription:
     organization_id: str
     mailbox_id: UUID | None
     phone_number_id: UUID | None
+    agent_identity_id: UUID | None
     url: str
     event_types: list[str]
     status: WebhookSubscriptionStatus
@@ -62,6 +67,9 @@ class WebhookSubscription:
             organization_id=d["organization_id"],
             mailbox_id=UUID(d["mailbox_id"]) if d["mailbox_id"] else None,
             phone_number_id=UUID(d["phone_number_id"]) if d["phone_number_id"] else None,
+            agent_identity_id=(
+                UUID(d["agent_identity_id"]) if d.get("agent_identity_id") else None
+            ),
             url=d["url"],
             event_types=list(d["event_types"]),
             status=d["status"],
@@ -105,23 +113,28 @@ def _assert_no_incoming_call(event_types: list[str]) -> None:
         )
 
 
+_OWNER_EVENT_PREFIXES = {
+    "mailbox": "message.",
+    "phone_number": "text.",
+    "agent_identity": "imessage.",
+}
+
+
 def _assert_channel_coherence(
     *,
-    has_mailbox: bool,
+    owner: str,
     event_types: list[str],
 ) -> None:
-    expected_prefix = "message." if has_mailbox else "text."
-    other_prefix = "text." if has_mailbox else "message."
-    owner = "mailbox" if has_mailbox else "phone_number"
-    other_owner = "phone_number" if has_mailbox else "mailbox"
+    expected_prefix = _OWNER_EVENT_PREFIXES[owner]
     for e in event_types:
         if e.startswith(expected_prefix):
             continue
-        if e.startswith(other_prefix):
-            raise ValueError(
-                f"event_type {e!r} does not belong to the {owner!r} channel "
-                f"(it belongs to {other_owner!r})",
-            )
+        for other_owner, other_prefix in _OWNER_EVENT_PREFIXES.items():
+            if other_owner != owner and e.startswith(other_prefix):
+                raise ValueError(
+                    f"event_type {e!r} does not belong to the {owner!r} channel "
+                    f"(it belongs to {other_owner!r})",
+                )
         raise ValueError(
             f"event_type {e!r} does not belong to any known channel",
         )
@@ -141,20 +154,23 @@ class WebhookSubscriptionsResource:
         *,
         mailbox_id: UUID | str | None = None,
         phone_number_id: UUID | str | None = None,
+        agent_identity_id: UUID | str | None = None,
         url: str | None = None,
         event_type: str | None = None,
     ) -> list[WebhookSubscription]:
         """List webhook subscriptions visible to the caller.
 
-        Filters AND-combine. ``mailbox_id`` and ``phone_number_id`` are
-        mutually exclusive -- passing both yields a 422. Deleted
-        subscriptions are not returned.
+        Filters AND-combine. ``mailbox_id`` / ``phone_number_id`` /
+        ``agent_identity_id`` are mutually exclusive -- passing more
+        than one yields a 422. Deleted subscriptions are not returned.
         """
         params: dict[str, Any] = {}
         if mailbox_id is not None:
             params["mailbox_id"] = _uuid_str(mailbox_id)
         if phone_number_id is not None:
             params["phone_number_id"] = _uuid_str(phone_number_id)
+        if agent_identity_id is not None:
+            params["agent_identity_id"] = _uuid_str(agent_identity_id)
         if url is not None:
             params["url"] = url
         if event_type is not None:
@@ -174,37 +190,42 @@ class WebhookSubscriptionsResource:
         event_types: list[str],
         mailbox_id: UUID | str | None = None,
         phone_number_id: UUID | str | None = None,
+        agent_identity_id: UUID | str | None = None,
     ) -> WebhookSubscription:
         """Create a webhook subscription.
 
-        Exactly one of ``mailbox_id`` / ``phone_number_id`` is required.
-        ``event_types`` must be a non-empty list of distinct values
-        belonging to the owner's channel (mailbox -> ``message.*``,
-        phone number -> ``text.*``).
+        Exactly one of ``mailbox_id`` / ``phone_number_id`` /
+        ``agent_identity_id`` is required. ``event_types`` must be a
+        non-empty list of distinct values belonging to the owner's
+        channel (mailbox -> ``message.*``, phone number -> ``text.*``,
+        agent identity -> ``imessage.*``).
         """
-        has_mailbox = mailbox_id is not None
-        has_phone = phone_number_id is not None
-        if has_mailbox == has_phone:
+        owners: dict[str, UUID | str | None] = {
+            "mailbox": mailbox_id,
+            "phone_number": phone_number_id,
+            "agent_identity": agent_identity_id,
+        }
+        populated = [name for name, value in owners.items() if value is not None]
+        if len(populated) != 1:
             raise ValueError(
-                "Exactly one of mailbox_id or phone_number_id must be provided",
+                "Exactly one of mailbox_id, phone_number_id, or "
+                "agent_identity_id must be provided",
             )
+        owner = populated[0]
         _assert_url_not_none(url)
         _assert_event_types_not_none(event_types)
         _assert_event_types_non_empty_distinct(event_types)
         _assert_no_incoming_call(event_types)
         _assert_channel_coherence(
-            has_mailbox=has_mailbox,
+            owner=owner,
             event_types=event_types,
         )
 
         body: dict[str, Any] = {
             "url": url,
             "event_types": list(event_types),
+            f"{owner}_id": _uuid_str(owners[owner]),  # type: ignore[arg-type]
         }
-        if has_mailbox:
-            body["mailbox_id"] = _uuid_str(mailbox_id)  # type: ignore[arg-type]
-        else:
-            body["phone_number_id"] = _uuid_str(phone_number_id)  # type: ignore[arg-type]
         data = self._http.post(_BASE, json=body)
         return WebhookSubscription._from_dict(data)
 
