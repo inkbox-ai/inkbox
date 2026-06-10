@@ -89,7 +89,12 @@ class IMessagesResource:
 
         Raises:
             InkboxAPIError: 400 when the identity is not iMessage-enabled;
-                403 when the recipient is blocked by a contact rule.
+                404 when the recipient has never connected (the detail
+                includes the connect command and router number); 409 when
+                the recipient disconnected or has not messaged first; 429
+                when the identity's rolling 24-hour send cap is reached.
+            RecipientBlockedError: 403 when the recipient is blocked by a
+                contact rule.
         """
         body: dict[str, Any] = {}
         if to is not None:
@@ -232,7 +237,7 @@ class IMessagesResource:
         Args:
             message_id: UUID of the message being reacted to.
             reaction: Tapback kind. Sends accept the classic six;
-                ``custom`` is inbound-only.
+                ``custom`` is inbound-only and rejected with 422.
             part_index: Part of a multi-part message to react to.
         """
         body: dict[str, Any] = {

@@ -417,7 +417,9 @@ class IMessageWebhookData(TypedDict):
     """
     Wrapper under ``IMessageWebhookPayload.data``.
 
-    Exactly one of ``message`` (``imessage.received``) / ``reaction``
+    Exactly one of ``message`` (``imessage.received`` and the delivery
+    lifecycle events ``imessage.sent`` / ``imessage.delivered`` /
+    ``imessage.delivery_failed``) or ``reaction``
     (``imessage.reaction_received``) is populated. ``contacts`` and
     ``agent_identities`` resolve the remote number against the assigned
     identity's visible contact book and identity graph; both are always

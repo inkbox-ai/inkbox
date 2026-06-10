@@ -43,8 +43,9 @@ class InkboxAPIError(InkboxError):
 
 class DuplicateContactRuleError(InkboxAPIError):
     """
-    Raised on 409 when creating a mail or phone contact rule that duplicates
-    an existing (match_type, match_target) pair on the same resource.
+    Raised on 409 when creating a mail, phone, or iMessage contact rule that
+    duplicates an existing (match_type, match_target) pair on the same
+    resource.
 
     Attributes:
         existing_rule_id: UUID of the already-existing rule.
@@ -77,8 +78,8 @@ class RedundantContactAccessGrantError(InkboxAPIError):
 
 class RecipientBlockedError(InkboxAPIError):
     """
-    Raised on 403 when an SMS or call destination is blocked by an
-    outbound contact rule on the sender (or by the sender's
+    Raised on 403 when an SMS, call, or iMessage destination is blocked
+    by an outbound contact rule on the sender (or by the sender's
     ``filter_mode`` default).
 
     Attributes:

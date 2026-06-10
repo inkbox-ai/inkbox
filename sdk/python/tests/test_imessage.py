@@ -275,14 +275,14 @@ class TestIMessageActions:
 class TestIMessageTriageNumber:
     def test_gets_triage_number(self, client, transport):
         transport.get.return_value = {
-            "number": "+16467044388",
+            "number": "+15555550100",
             "connect_command": "connect @support-bot",
         }
 
         triage = client._imessages.get_triage_number()
 
         transport.get.assert_called_once_with("/triage-number")
-        assert triage.number == "+16467044388"
+        assert triage.number == "+15555550100"
         assert triage.connect_command == "connect @support-bot"
 
 

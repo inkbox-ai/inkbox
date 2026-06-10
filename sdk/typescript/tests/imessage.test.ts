@@ -348,7 +348,7 @@ describe("IMessagesResource.getTriageNumber", () => {
 
   it("fetches and parses the triage line", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      ok({ number: "+16467044388", connect_command: "connect @support-bot" }),
+      ok({ number: "+15555550100", connect_command: "connect @support-bot" }),
     );
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
 
@@ -356,7 +356,7 @@ describe("IMessagesResource.getTriageNumber", () => {
 
     const { url } = lastCall();
     expect(url).toBe(`${BASE}/triage-number`);
-    expect(triage.number).toBe("+16467044388");
+    expect(triage.number).toBe("+15555550100");
     expect(triage.connectCommand).toBe("connect @support-bot");
   });
 });

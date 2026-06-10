@@ -386,6 +386,61 @@ inkbox.sms_opt_ins.opt_out("+15551234567")
 
 ---
 
+## iMessage
+
+Chat with humans over iMessage through the shared Inkbox router — no
+per-identity iMessage number. iMessage is **opt-in per identity**
+(`imessage_enabled`), and the **human always texts first**: they
+connect by texting `connect @<handle>` to the router number, after
+which the agent can reply into the conversation. Each identity can
+send up to 100 iMessages per rolling 24-hour window.
+
+```python
+# Opt an identity in (at create time or later).
+identity = inkbox.create_identity("my-agent", imessage_enabled=True)
+
+# Resolve the router number at runtime — never hardcode it.
+router = inkbox.imessages.get_triage_number()
+print(router.number, router.connect_command)  # e.g. 'connect @my-agent'
+
+# Once a human has connected and messaged, read and reply.
+convos = identity.list_imessage_conversations(limit=20)
+msgs = identity.list_imessages(conversation_id=convos[0].id)
+identity.send_imessage(
+    conversation_id=convos[0].id,
+    text="On it — give me two minutes.",
+)
+
+# Who is currently connected? (Disconnected conversations stay readable
+# with assignment_status == "released"; sends into them return 409.)
+connections = identity.list_imessage_assignments()
+
+# Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
+# a new tapback replaces your previous one on the same message part.
+identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
+
+# Read receipts, typing indicator, media.
+identity.mark_imessage_conversation_read(convos[0].id)
+identity.send_imessage_typing(convos[0].id)
+upload = identity.upload_imessage_media(
+    content=open("chart.png", "rb").read(),
+    filename="chart.png",
+    content_type="image/png",
+)
+identity.send_imessage(conversation_id=convos[0].id, media_urls=[upload.media_url])
+
+# Per-identity allow/block rules, interpreted via imessage_filter_mode.
+inkbox.imessage_contact_rules.create(
+    "my-agent", action="block", match_target="+15555550999",
+)
+```
+
+Inbound messages, tapbacks, and outbound delivery status arrive via
+identity-owned webhook subscriptions — see [Webhooks](#webhooks) for
+the five `imessage.*` event types.
+
+---
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
@@ -739,17 +794,17 @@ like an SSH key dir. `forward_to` is loopback-only by default; pass
 ## Webhooks
 
 Webhook delivery uses a dedicated subscription resource. Each
-subscription names exactly one owner (a mailbox **or** a phone
-number), one HTTPS destination URL, and a non-empty subset of the
-catalog's event types. Multiple subscriptions on the same owner fan
-out independently.
+subscription names exactly one owner (a mailbox, a phone number, **or**
+an agent identity for iMessage), one HTTPS destination URL, and a
+non-empty subset of the catalog's event types. Multiple subscriptions
+on the same owner fan out independently.
 
 The one exception is `phone.incoming_call`, which is a synchronous
 control-plane callback (the response body decides whether Inkbox
 answers). That URL still lives on the phone-number resource as
 `incoming_call_webhook_url`.
 
-### Subscribing to mail or text events
+### Subscribing to mail, text, or iMessage events
 
 ```python
 # Mail subscription: pick the message.* events you want.
@@ -772,6 +827,20 @@ inkbox.webhooks.subscriptions.create(
     ],
 )
 
+# iMessage subscription: owned by the agent identity (the shared
+# pool lines aren't org resources).
+inkbox.webhooks.subscriptions.create(
+    agent_identity_id=identity.id,
+    url="https://example.com/imessage",
+    event_types=[
+        "imessage.received",
+        "imessage.reaction_received",
+        "imessage.sent",
+        "imessage.delivered",
+        "imessage.delivery_failed",
+    ],
+)
+
 # List, update, remove.
 subs = inkbox.webhooks.subscriptions.list(mailbox_id=mailbox.id)
 inkbox.webhooks.subscriptions.update(subs[0].id, url="https://new/hook")
@@ -784,15 +853,17 @@ Available event types:
 |---|---|
 | Mail | `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed` |
 | Phone text | `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed` |
+| iMessage | `imessage.received`, `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` |
 
 Server-side validation: exactly one of `mailbox_id` /
-`phone_number_id` must be set; `event_types` must be non-empty and
-distinct; every event type must belong to the owner's channel (mailbox
--> `message.*`, phone number -> `text.*`). On `create` the SDK mirrors
-the structural checks (XOR owner, non-empty, distinct, no
-`phone.incoming_call`) plus the `message.` / `text.` prefix check, so
-most shape mistakes surface as `ValueError` before the request leaves
-the client. The server remains authoritative for the exact event-name
+`phone_number_id` / `agent_identity_id` must be set; `event_types`
+must be non-empty and distinct; every event type must belong to the
+owner's channel (mailbox -> `message.*`, phone number -> `text.*`,
+agent identity -> `imessage.*`). On `create` the SDK mirrors the
+structural checks (XOR owner, non-empty, distinct, no
+`phone.incoming_call`) plus the `message.` / `text.` / `imessage.`
+prefix check, so most shape mistakes surface as `ValueError` before
+the request leaves the client. The server remains authoritative for the exact event-name
 enum, so a typo with a valid prefix (e.g. `message.received_typo`)
 passes the SDK's check and is rejected as 422 by the server. On
 `update` the SDK mirrors the non-empty / distinct /

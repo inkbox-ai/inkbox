@@ -386,7 +386,9 @@ export interface IMessageWebhookPayload {
   /** ISO 8601 datetime. */
   timestamp: string;
   data: {
-    /** Populated on `imessage.received`; `null` on reaction events. */
+    /** Populated on `imessage.received` and the delivery-lifecycle events
+     * (`imessage.sent` / `imessage.delivered` / `imessage.delivery_failed`);
+     * `null` on reaction events. */
     message: IMessageWebhookMessage | null;
     /** Populated on `imessage.reaction_received`; `null` on message events. */
     reaction: IMessageWebhookReaction | null;

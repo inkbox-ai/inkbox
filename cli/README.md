@@ -83,6 +83,7 @@ inkbox identity create <handle>              # Provisions identity + mailbox + t
   --sending-domain <name>                    #   Bind mailbox to a verified custom domain (bare name)
   --platform-domain                          #   Force the platform sending domain (mutually exclusive)
   --tls-mode <mode>                          #   edge (default) or passthrough — fixed at create time
+  --imessage-enabled                         #   Opt the identity into iMessage (default off)
 inkbox identity delete <handle>              # Cascades to mailbox + tunnel; revokes scoped API keys
 inkbox identity update <handle>              # Update an identity
   --new-handle <handle>                      #   New handle
@@ -90,6 +91,8 @@ inkbox identity update <handle>              # Update an identity
   --description <text>                       #   New description ("" to clear)
   --clear-description                        #   Explicit null (mutually exclusive with --description)
   --status <status>                          #   active or paused
+  --imessage-enabled <bool>                  #   Toggle iMessage reachability (true/false)
+  --imessage-filter-mode <mode>              #   whitelist or blacklist (admin API key required)
 inkbox identity refresh <handle>             # Re-fetch identity from API
 
 inkbox identity create-secret <handle>       # Create a secret scoped to identity (vault key)
@@ -217,6 +220,54 @@ inkbox text search -i <handle>              # Search text messages
 
 inkbox text mark-read <text-id> -i <handle>                     # Mark a text as read
 inkbox text mark-conversation-read <conversation-key> -i <handle>  # Mark conversation as read
+```
+
+### imessage
+
+iMessage over the shared Inkbox router. Recipients connect first by texting
+`connect @<handle>` to the router number; there is no cold outreach.
+
+```bash
+inkbox imessage triage-number                # Router number + the command humans text to connect
+
+inkbox imessage send -i <handle>             # Send a message to a connected recipient
+  --to <number>                              #   E.164 recipient (mutually exclusive with --conversation-id)
+  --conversation-id <id>                     #   Existing conversation UUID to reply into
+  --text <text>                              #   Message body
+  --media-url <url>                          #   Media URL (at most one)
+  --send-style <style>                       #   Expressive send style (e.g. slam, confetti)
+
+inkbox imessage list -i <handle>             # List messages, newest first
+  --conversation-id <id>                     #   Narrow to one conversation
+  --limit <n>                                #   Max results (default: 50)
+  --offset <n>                               #   Pagination offset (default: 0)
+  --unread-only                              #   Show only unread messages
+
+inkbox imessage assignments -i <handle>      # List recipients currently connected to the identity
+  --limit <n>                                #   Max results (default: 50)
+  --offset <n>                               #   Pagination offset (default: 0)
+
+inkbox imessage conversations -i <handle>    # Conversation summaries with previews + unread counts
+inkbox imessage conversation <conversation-id> -i <handle>  # Read one conversation's messages
+
+inkbox imessage react <message-id> -i <handle>  # Send a tapback (replaces your previous one)
+  --reaction <kind>                          #   love, like, dislike, laugh, emphasize, question
+  --part-index <n>                           #   Part of a multi-part message (default: 0)
+
+inkbox imessage mark-conversation-read <conversation-id> -i <handle>  # Send a read receipt
+inkbox imessage typing <conversation-id> -i <handle>                  # Show the typing bubble
+
+inkbox imessage upload-media <file> -i <handle>  # Upload a file, get a sendable media URL
+  --content-type <type>                      #   MIME type of the file
+
+inkbox imessage contact-rule list -i <handle>    # Allow/block rules for the identity
+inkbox imessage contact-rule create -i <handle>  # Add a rule
+  --action <action>                          #   'allow' or 'block'
+  --match-target <number>                    #   Phone number to match (E.164)
+inkbox imessage contact-rule update <rule-id> -i <handle>  # Change action/status (admin key)
+inkbox imessage contact-rule delete <rule-id> -i <handle>  # Delete a rule (admin key)
+inkbox imessage contact-rule list-all        # Org-wide rule list (admin key)
+  --agent-identity-id <id>                   #   Narrow to one identity
 ```
 
 ### vault
@@ -367,12 +418,14 @@ inkbox webhook verify                        # Verify a webhook signature (local
 inkbox webhook subscription list             # List webhook subscriptions
   --mailbox-id <id>                          #   Filter by owning mailbox id
   --phone-number-id <id>                     #   Filter by owning phone number id
+  --agent-identity-id <id>                   #   Filter by owning agent identity id (iMessage)
   --url <url>                                #   Filter by destination URL (exact)
   --event-type <type>                        #   Filter by event_type wire value
 inkbox webhook subscription get <sub-id>     # Get one subscription
 inkbox webhook subscription create           # Create a subscription
-  --mailbox-id <id>                          #   Owning mailbox id (exactly one of these
-  --phone-number-id <id>                     #     two FKs is required)
+  --mailbox-id <id>                          #   Owning mailbox id (exactly one of the
+  --phone-number-id <id>                     #     three owner FKs is required)
+  --agent-identity-id <id>                   #   Owning agent identity id (iMessage events)
   --url <url>                                #   HTTPS destination (required)
   --event-type <type>                        #   Event type (repeatable; ≥1 required)
 inkbox webhook subscription update <sub-id>  # Update url and/or event_types
