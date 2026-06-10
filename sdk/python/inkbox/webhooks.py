@@ -281,6 +281,9 @@ class TextWebhookPayload(TypedDict):
 IMessageWebhookEventType = Literal[
     "imessage.received",
     "imessage.reaction_received",
+    "imessage.sent",
+    "imessage.delivered",
+    "imessage.delivery_failed",
 ]
 
 IMessageDirectionWire = Literal["inbound", "outbound"]

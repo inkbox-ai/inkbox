@@ -453,7 +453,8 @@ any of:
   `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
   `inkbox webhook subscription create --phone-number-id ...`.
 - **iMessage** (envelope): `imessage.received`,
-  `imessage.reaction_received`. Subscribe via `inkbox webhook
+  `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`,
+  `imessage.delivery_failed`. Subscribe via `inkbox webhook
   subscription create --agent-identity-id ...` — owned by the agent
   identity, since shared iMessage pool numbers are not org resources.
 - **Inbound call** (flat, no envelope; response controls call routing).
