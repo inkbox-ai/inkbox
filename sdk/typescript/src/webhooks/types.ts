@@ -278,7 +278,8 @@ export type IMessageReactionTypeWire =
   | "dislike"
   | "laugh"
   | "emphasize"
-  | "question";
+  | "question"
+  | "custom";
 
 export type IMessageSendStyleWire =
   | "celebration"
@@ -316,6 +317,17 @@ export interface IMessageRecipientWire {
   failed_at: string | null;
 }
 
+/** A live tapback attached to a message (snake_case wire shape). */
+export interface IMessageMessageReactionWire {
+  id: string;
+  direction: IMessageDirectionWire;
+  reaction: IMessageReactionTypeWire;
+  custom_emoji: string | null;
+  remote_number: string;
+  part_index: number;
+  created_at: string;
+}
+
 /**
  * Stored iMessage. `is_blocked` is not part of the wire body — blocked
  * messages never reach the webhook. There is no local-number field:
@@ -342,11 +354,16 @@ export interface IMessageWebhookMessage {
   error_detail: string | null;
   is_read: boolean;
   recipients: IMessageRecipientWire[] | null;
+  reactions: IMessageMessageReactionWire[] | null;
   created_at: string;
   updated_at: string;
 }
 
-/** A tapback reaction on an iMessage (snake_case wire shape). */
+/**
+ * A tapback reaction on an iMessage (snake_case wire shape).
+ * `custom_emoji` carries the literal emoji when `reaction` is
+ * `"custom"`; `null` for the classic six.
+ */
 export interface IMessageWebhookReaction {
   id: string;
   conversation_id: string;
@@ -354,6 +371,7 @@ export interface IMessageWebhookReaction {
   target_message_id: string;
   direction: IMessageDirectionWire;
   reaction: IMessageReactionTypeWire;
+  custom_emoji: string | null;
   remote_number: string;
   part_index: number;
   created_at: string;

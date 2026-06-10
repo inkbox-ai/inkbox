@@ -34,6 +34,8 @@ Inkbox (admin-only client)
 ├── .mailboxes                → MailboxesResource
 ├── .phoneNumbers             → PhoneNumbersResource
 ├── .texts                    → TextsResource
+├── .imessages                → IMessagesResource
+├── .imessageContactRules     → IMessageContactRulesResource
 ├── .mailContactRules         → MailContactRulesResource
 ├── .phoneContactRules        → PhoneContactRulesResource
 ├── .smsOptIns                → SmsOptInsResource
@@ -277,6 +279,14 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 iMessage works differently from SMS: there is no per-identity iMessage number. Recipients connect to an agent identity through a small shared pool of numbers — they ask the triage line to connect them to `@agent_handle`, and that creates an assignment between that one recipient and the identity. Everything agent-facing is keyed by `conversationId` / `remoteNumber`; the shared local number is never exposed, and there is **no cold outreach** — you can only message recipients who connected first.
 
+Discover the router (triage) line at runtime — it can change, so never hardcode it:
+
+```typescript
+const triage = await inkbox.imessages.getTriageNumber();
+console.log(triage.number, triage.connectCommand);  // "+1646...", "connect @your-handle"
+// Humans connect by texting that command to that number.
+```
+
 Reachability is **opt-in per identity** (`imessageEnabled`, default `false`):
 
 ```typescript
@@ -305,8 +315,15 @@ const msgs = await identity.listIMessages({ limit: 20, isRead: false });
 const convos = await identity.listIMessageConversations({ limit: 20 });
 const convo = await identity.getIMessageConversation(sent.conversationId);
 
-// Tapback reactions (love, like, dislike, laugh, emphasize, question)
+// Tapback reactions. Sends accept the classic six (love, like, dislike,
+// laugh, emphasize, question); inbound can also be "custom" with the
+// literal emoji in customEmoji.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+
+// Live tapbacks come back on message reads, oldest first.
+for (const r of msgs[0].reactions ?? []) {
+  console.log(r.direction, r.reaction, r.customEmoji);
+}
 
 // Read receipts + typing indicator
 await identity.markIMessageConversationRead(sent.conversationId);

@@ -163,6 +163,24 @@ export function registerIMessageCommands(program: Command): void {
     .description("iMessage operations over shared pool numbers (identity-scoped)");
 
   imessage
+    .command("triage-number")
+    .description("Show the iMessage router number and the command humans text to connect")
+    .action(
+      withErrorHandler(async function (this: Command) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const triage = await inkbox.imessages.getTriageNumber();
+        output(
+          {
+            number: triage.number,
+            connectCommand: triage.connectCommand,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  imessage
     .command("send")
     .description(
       "Send an iMessage through an existing triage assignment. " +

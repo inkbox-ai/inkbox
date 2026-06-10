@@ -31,7 +31,12 @@ export enum IMessageDeliveryStatus {
   RECEIVED = "received",
 }
 
-/** Tapback reaction kinds. */
+/**
+ * Tapback reaction kinds.
+ *
+ * `CUSTOM` is inbound-only: recipients can react with any emoji
+ * (carried in `customEmoji`), but sends accept the classic six.
+ */
 export enum IMessageReactionType {
   LOVE = "love",
   LIKE = "like",
@@ -39,6 +44,7 @@ export enum IMessageReactionType {
   LAUGH = "laugh",
   EMPHASIZE = "emphasize",
   QUESTION = "question",
+  CUSTOM = "custom",
 }
 
 /** Expressive send style applied to an outbound iMessage. */
@@ -90,6 +96,19 @@ export interface IMessageRecipient {
   failedAt: Date | null;
 }
 
+/** A live tapback attached to a message in read responses. */
+export interface IMessageMessageReaction {
+  id: string;
+  /** "inbound" | "outbound" */
+  direction: string;
+  reaction: IMessageReactionType;
+  /** Literal emoji when `reaction` is "custom"; null for the classic six. */
+  customEmoji: string | null;
+  remoteNumber: string;
+  partIndex: number;
+  createdAt: Date;
+}
+
 /**
  * An iMessage in an assignment-routed conversation.
  *
@@ -119,6 +138,8 @@ export interface IMessage {
   isRead: boolean;
   isBlocked: boolean;
   recipients: IMessageRecipient[] | null;
+  /** Live (non-removed) tapbacks targeting this message, oldest first. */
+  reactions: IMessageMessageReaction[] | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -154,10 +175,18 @@ export interface IMessageReaction {
   /** "inbound" | "outbound" */
   direction: string;
   reaction: IMessageReactionType;
+  /** Literal emoji when `reaction` is "custom"; null for the classic six. */
+  customEmoji: string | null;
   remoteNumber: string;
   partIndex: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** The active triage line and how recipients start a connection. */
+export interface IMessageTriageNumber {
+  number: string;
+  connectCommand: string;
 }
 
 /** Result of marking a conversation's inbound messages read. */
@@ -206,6 +235,16 @@ export interface RawIMessageRecipient {
   failed_at?: string | null;
 }
 
+export interface RawIMessageMessageReaction {
+  id: string;
+  direction: string;
+  reaction: string;
+  custom_emoji?: string | null;
+  remote_number: string;
+  part_index?: number;
+  created_at: string;
+}
+
 export interface RawIMessage {
   id: string;
   conversation_id: string;
@@ -226,6 +265,7 @@ export interface RawIMessage {
   is_read: boolean;
   is_blocked?: boolean;
   recipients?: RawIMessageRecipient[] | null;
+  reactions?: RawIMessageMessageReaction[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -254,10 +294,16 @@ export interface RawIMessageReaction {
   target_message_id: string;
   direction: string;
   reaction: string;
+  custom_emoji?: string | null;
   remote_number: string;
   part_index?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface RawIMessageTriageNumber {
+  number: string;
+  connect_command: string;
 }
 
 export interface RawIMessageContactRule {
@@ -296,6 +342,20 @@ export function parseIMessageRecipient(r: RawIMessageRecipient): IMessageRecipie
   };
 }
 
+export function parseIMessageMessageReaction(
+  r: RawIMessageMessageReaction,
+): IMessageMessageReaction {
+  return {
+    id: r.id,
+    direction: r.direction,
+    reaction: r.reaction as IMessageReactionType,
+    customEmoji: r.custom_emoji ?? null,
+    remoteNumber: r.remote_number,
+    partIndex: r.part_index ?? 0,
+    createdAt: new Date(r.created_at),
+  };
+}
+
 export function parseIMessage(r: RawIMessage): IMessage {
   return {
     id: r.id,
@@ -317,6 +377,7 @@ export function parseIMessage(r: RawIMessage): IMessage {
     isRead: r.is_read,
     isBlocked: r.is_blocked ?? false,
     recipients: r.recipients ? r.recipients.map(parseIMessageRecipient) : null,
+    reactions: r.reactions ? r.reactions.map(parseIMessageMessageReaction) : null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -358,10 +419,20 @@ export function parseIMessageReaction(r: RawIMessageReaction): IMessageReaction 
     targetMessageId: r.target_message_id,
     direction: r.direction,
     reaction: r.reaction as IMessageReactionType,
+    customEmoji: r.custom_emoji ?? null,
     remoteNumber: r.remote_number,
     partIndex: r.part_index ?? 0,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseIMessageTriageNumber(
+  r: RawIMessageTriageNumber,
+): IMessageTriageNumber {
+  return {
+    number: r.number,
+    connectCommand: r.connect_command,
   };
 }
 

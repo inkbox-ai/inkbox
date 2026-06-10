@@ -9,6 +9,7 @@ from inkbox.imessage.types import (
     IMessageConversationSummary,
     IMessageDeliveryStatus,
     IMessageMarkReadResult,
+    IMessageMessageReaction,
     IMessageMediaItem,
     IMessageMediaUpload,
     IMessageReaction,
@@ -18,6 +19,7 @@ from inkbox.imessage.types import (
     IMessageRuleMatchType,
     IMessageSendStyle,
     IMessageService,
+    IMessageTriageNumber,
 )
 
 __all__ = [
@@ -27,6 +29,7 @@ __all__ = [
     "IMessageConversationSummary",
     "IMessageDeliveryStatus",
     "IMessageMarkReadResult",
+    "IMessageMessageReaction",
     "IMessageMediaItem",
     "IMessageMediaUpload",
     "IMessageReaction",
@@ -36,4 +39,5 @@ __all__ = [
     "IMessageRuleMatchType",
     "IMessageSendStyle",
     "IMessageService",
+    "IMessageTriageNumber",
 ]

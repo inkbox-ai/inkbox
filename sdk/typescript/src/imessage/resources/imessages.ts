@@ -20,18 +20,36 @@ import {
   IMessageReaction,
   IMessageReactionType,
   IMessageSendStyle,
+  IMessageTriageNumber,
   RawIMessage,
   RawIMessageConversation,
   RawIMessageConversationSummary,
   RawIMessageReaction,
+  RawIMessageTriageNumber,
   parseIMessage,
   parseIMessageConversation,
   parseIMessageConversationSummary,
   parseIMessageReaction,
+  parseIMessageTriageNumber,
 } from "../types.js";
 
 export class IMessagesResource {
   constructor(private readonly http: HttpTransport) {}
+
+  /**
+   * Return the active triage line and the connect command.
+   *
+   * Recipients text the returned `connectCommand` (e.g.
+   * `connect @your-handle`) to the triage `number` to get connected to
+   * an agent identity. Resolve this at runtime instead of hardcoding
+   * the number — the line can change.
+   *
+   * @throws {InkboxAPIError} 404 when no triage line is active.
+   */
+  async getTriageNumber(): Promise<IMessageTriageNumber> {
+    const data = await this.http.get<RawIMessageTriageNumber>("/triage-number");
+    return parseIMessageTriageNumber(data);
+  }
 
   /**
    * Send an outbound iMessage through an existing assignment.
@@ -207,7 +225,8 @@ export class IMessagesResource {
    * Send a tapback reaction to a message.
    *
    * @param options.messageId - UUID of the message being reacted to.
-   * @param options.reaction - Tapback kind (see {@link IMessageReactionType}).
+   * @param options.reaction - Tapback kind. Sends accept the classic
+   *   six; `custom` is inbound-only.
    * @param options.partIndex - Part of a multi-part message to react to.
    *   Defaults to 0.
    */

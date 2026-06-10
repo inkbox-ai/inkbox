@@ -35,6 +35,8 @@ Inkbox (admin-only client)
 ├── .mailboxes                → MailboxesResource
 ├── .phone_numbers            → PhoneNumbersResource
 ├── .texts                    → TextsResource
+├── .imessages                → IMessagesResource
+├── .imessage_contact_rules   → IMessageContactRulesResource
 ├── .mail_contact_rules       → MailContactRulesResource
 ├── .phone_contact_rules      → PhoneContactRulesResource
 ├── .sms_opt_ins              → SmsOptInsResource
@@ -263,6 +265,14 @@ inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 
 iMessage works differently from SMS: there is no per-identity iMessage number. Recipients connect to an agent identity through a small shared pool of numbers — they ask the triage line to connect them to `@agent_handle`, and that creates an assignment between that one recipient and the identity. Everything agent-facing is keyed by `conversation_id` / `remote_number`; the shared local number is never exposed, and there is **no cold outreach** — you can only message recipients who connected first.
 
+Discover the router (triage) line at runtime — it can change, so never hardcode it:
+
+```python
+triage = inkbox.imessages.get_triage_number()
+print(triage.number, triage.connect_command)  # "+1646...", "connect @your-handle"
+# Humans connect by texting that command to that number.
+```
+
 Reachability is **opt-in per identity** (`imessage_enabled`, default `False`):
 
 ```python
@@ -291,8 +301,14 @@ msgs = identity.list_imessages(limit=20, is_read=False)
 convos = identity.list_imessage_conversations(limit=20)
 convo = identity.get_imessage_conversation(sent.conversation_id)
 
-# Tapback reactions (love, like, dislike, laugh, emphasize, question)
+# Tapback reactions. Sends accept the classic six (love, like, dislike,
+# laugh, emphasize, question); inbound can also be "custom" with the
+# literal emoji in custom_emoji.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
+
+# Live tapbacks come back on message reads, oldest first.
+for r in msgs[0].reactions or []:
+    print(r.direction, r.reaction, r.custom_emoji)
 
 # Read receipts + typing indicator
 identity.mark_imessage_conversation_read(sent.conversation_id)

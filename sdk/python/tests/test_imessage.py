@@ -50,6 +50,17 @@ IMESSAGE_DICT = {
             "service": "imessage",
         },
     ],
+    "reactions": [
+        {
+            "id": "aaaa8888-0000-0000-0000-000000000001",
+            "direction": "inbound",
+            "reaction": "custom",
+            "custom_emoji": "\U0001f334",
+            "remote_number": REMOTE,
+            "part_index": 0,
+            "created_at": "2026-06-01T00:01:00+00:00",
+        },
+    ],
     "created_at": "2026-06-01T00:00:00+00:00",
     "updated_at": "2026-06-01T00:00:00+00:00",
 }
@@ -141,6 +152,10 @@ class TestIMessagesSend:
         assert msg.recipients is not None
         assert msg.recipients[0].remote_number == REMOTE
         assert msg.recipients[0].delivery_status is IMessageDeliveryStatus.QUEUED
+        assert msg.reactions is not None
+        assert msg.reactions[0].reaction is IMessageReactionType.CUSTOM
+        assert msg.reactions[0].custom_emoji == "\U0001f334"
+        assert msg.reactions[0].direction == "inbound"
 
 
 class TestIMessagesList:
@@ -255,6 +270,20 @@ class TestIMessageActions:
             content_type="image/png",
         )
         assert upload.media_url == "https://media.example/abc.png"
+
+
+class TestIMessageTriageNumber:
+    def test_gets_triage_number(self, client, transport):
+        transport.get.return_value = {
+            "number": "+16467044388",
+            "connect_command": "connect @support-bot",
+        }
+
+        triage = client._imessages.get_triage_number()
+
+        transport.get.assert_called_once_with("/triage-number")
+        assert triage.number == "+16467044388"
+        assert triage.connect_command == "connect @support-bot"
 
 
 class TestIMessageContactRules:

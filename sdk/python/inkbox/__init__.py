@@ -68,6 +68,7 @@ from inkbox.imessage.types import (
     IMessageDeliveryStatus,
     IMessageMarkReadResult,
     IMessageMediaItem,
+    IMessageMessageReaction,
     IMessageMediaUpload,
     IMessageReaction,
     IMessageReactionType,
@@ -76,6 +77,7 @@ from inkbox.imessage.types import (
     IMessageRuleMatchType,
     IMessageSendStyle,
     IMessageService,
+    IMessageTriageNumber,
 )
 
 # Identity types
@@ -208,6 +210,7 @@ from inkbox.webhooks import (
     IMessageDeliveryStatusWire,
     IMessageDirectionWire,
     IMessageMediaItemWire,
+    IMessageMessageReactionWire,
     IMessageReactionTypeWire,
     IMessageRecipientWire,
     IMessageSendStyleWire,
@@ -295,6 +298,7 @@ __all__ = [
     "IMessageDeliveryStatus",
     "IMessageMarkReadResult",
     "IMessageMediaItem",
+    "IMessageMessageReaction",
     "IMessageMediaUpload",
     "IMessageReaction",
     "IMessageReactionType",
@@ -303,6 +307,7 @@ __all__ = [
     "IMessageRuleMatchType",
     "IMessageSendStyle",
     "IMessageService",
+    "IMessageTriageNumber",
     # Identity types
     "AgentIdentitySummary",
     "IdentityAccess",
@@ -406,6 +411,7 @@ __all__ = [
     "IMessageDeliveryStatusWire",
     "IMessageDirectionWire",
     "IMessageMediaItemWire",
+    "IMessageMessageReactionWire",
     "IMessageReactionTypeWire",
     "IMessageRecipientWire",
     "IMessageSendStyleWire",

@@ -61,6 +61,7 @@ export type {
   IMessageReactionTypeWire,
   IMessageSendStyleWire,
   IMessageMediaItemWire,
+  IMessageMessageReactionWire,
   IMessageRecipientWire,
   PhoneIncomingCallWebhookPayload,
   CallStatusWire,
@@ -143,8 +144,10 @@ export type {
   IMessageMarkReadResult,
   IMessageMediaItem,
   IMessageMediaUpload,
+  IMessageMessageReaction,
   IMessageReaction,
   IMessageRecipient,
+  IMessageTriageNumber,
 } from "./imessage/types.js";
 export type {
   IMessagesResource,

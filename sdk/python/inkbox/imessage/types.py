@@ -43,7 +43,11 @@ class IMessageDeliveryStatus(StrEnum):
 
 
 class IMessageReactionType(StrEnum):
-    """Tapback reaction kinds."""
+    """Tapback reaction kinds.
+
+    ``CUSTOM`` is inbound-only: recipients can react with any emoji
+    (carried in ``custom_emoji``), but sends accept the classic six.
+    """
 
     LOVE = "love"
     LIKE = "like"
@@ -51,6 +55,7 @@ class IMessageReactionType(StrEnum):
     LAUGH = "laugh"
     EMPHASIZE = "emphasize"
     QUESTION = "question"
+    CUSTOM = "custom"
 
 
 class IMessageSendStyle(StrEnum):
@@ -139,6 +144,31 @@ class IMessageRecipient:
 
 
 @dataclass
+class IMessageMessageReaction:
+    """A live tapback attached to a message in read responses."""
+
+    id: UUID
+    direction: str  # "inbound" | "outbound"
+    reaction: IMessageReactionType
+    remote_number: str
+    created_at: datetime
+    custom_emoji: str | None = None
+    part_index: int = 0
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IMessageMessageReaction:
+        return cls(
+            id=UUID(d["id"]),
+            direction=d["direction"],
+            reaction=IMessageReactionType(d["reaction"]),
+            remote_number=d["remote_number"],
+            created_at=datetime.fromisoformat(d["created_at"]),
+            custom_emoji=d.get("custom_emoji"),
+            part_index=d.get("part_index", 0),
+        )
+
+
+@dataclass
 class IMessage:
     """An iMessage in an assignment-routed conversation.
 
@@ -168,11 +198,14 @@ class IMessage:
     error_detail: str | None = None
     is_blocked: bool = False
     recipients: list[IMessageRecipient] | None = None
+    # Live (non-removed) tapbacks targeting this message, oldest first.
+    reactions: list[IMessageMessageReaction] | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessage:
         raw_media = d.get("media")
         raw_recipients = d.get("recipients")
+        raw_reactions = d.get("reactions")
         raw_send_style = d.get("send_style")
         raw_status = d.get("status")
         return cls(
@@ -202,6 +235,10 @@ class IMessage:
             recipients=(
                 [IMessageRecipient._from_dict(r) for r in raw_recipients]
                 if raw_recipients else None
+            ),
+            reactions=(
+                [IMessageMessageReaction._from_dict(r) for r in raw_reactions]
+                if raw_reactions else None
             ),
         )
 
@@ -269,6 +306,8 @@ class IMessageReaction:
     remote_number: str
     created_at: datetime
     updated_at: datetime
+    # Literal emoji when reaction is "custom"; None for the classic six.
+    custom_emoji: str | None = None
     part_index: int = 0
 
     @classmethod
@@ -283,6 +322,7 @@ class IMessageReaction:
             remote_number=d["remote_number"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            custom_emoji=d.get("custom_emoji"),
             part_index=d.get("part_index", 0),
         )
 
@@ -316,6 +356,21 @@ class IMessageMediaUpload:
             media_url=d["media_url"],
             content_type=d.get("content_type"),
             size=d.get("size"),
+        )
+
+
+@dataclass
+class IMessageTriageNumber:
+    """The active triage line and how recipients start a connection."""
+
+    number: str
+    connect_command: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IMessageTriageNumber:
+        return cls(
+            number=d["number"],
+            connect_command=d["connect_command"],
         )
 
 

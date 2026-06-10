@@ -308,6 +308,7 @@ IMessageReactionTypeWire = Literal[
     "laugh",
     "emphasize",
     "question",
+    "custom",
 ]
 
 IMessageSendStyleWire = Literal[
@@ -348,6 +349,17 @@ class IMessageRecipientWire(TypedDict):
     failed_at: str | None
 
 
+class IMessageMessageReactionWire(TypedDict):
+    """A live tapback attached to a message (snake_case wire shape)."""
+    id: str
+    direction: IMessageDirectionWire
+    reaction: IMessageReactionTypeWire
+    custom_emoji: str | None
+    remote_number: str
+    part_index: int
+    created_at: str
+
+
 class IMessageWebhookMessage(TypedDict):
     """
     Stored iMessage. ``is_blocked`` is not part of the wire body --
@@ -374,18 +386,24 @@ class IMessageWebhookMessage(TypedDict):
     error_detail: str | None
     is_read: bool
     recipients: list[IMessageRecipientWire] | None
+    reactions: list[IMessageMessageReactionWire] | None
     created_at: str
     updated_at: str
 
 
 class IMessageWebhookReaction(TypedDict):
-    """A tapback reaction on an iMessage (snake_case wire shape)."""
+    """A tapback reaction on an iMessage (snake_case wire shape).
+
+    ``custom_emoji`` carries the literal emoji when ``reaction`` is
+    ``"custom"``; ``None`` for the classic six.
+    """
     id: str
     conversation_id: str
     assignment_id: str
     target_message_id: str
     direction: IMessageDirectionWire
     reaction: IMessageReactionTypeWire
+    custom_emoji: str | None
     remote_number: str
     part_index: int
     created_at: str

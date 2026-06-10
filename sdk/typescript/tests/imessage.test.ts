@@ -44,6 +44,17 @@ const IMESSAGE_DICT = {
   recipients: [
     { remote_number: REMOTE, delivery_status: "queued", service: "imessage" },
   ],
+  reactions: [
+    {
+      id: "aaaa8888-0000-0000-0000-000000000001",
+      direction: "inbound",
+      reaction: "custom",
+      custom_emoji: "\u{1F334}",
+      remote_number: REMOTE,
+      part_index: 0,
+      created_at: "2026-06-01T00:01:00Z",
+    },
+  ],
   created_at: "2026-06-01T00:00:00Z",
   updated_at: "2026-06-01T00:00:00Z",
 };
@@ -295,6 +306,9 @@ describe("parseIMessage", () => {
     });
     expect(msg.recipients?.[0].remoteNumber).toBe(REMOTE);
     expect(msg.recipients?.[0].deliveryStatus).toBe(IMessageDeliveryStatus.QUEUED);
+    expect(msg.reactions?.[0].reaction).toBe(IMessageReactionType.CUSTOM);
+    expect(msg.reactions?.[0].customEmoji).toBe("\u{1F334}");
+    expect(msg.reactions?.[0].direction).toBe("inbound");
     expect(msg.createdAt).toBeInstanceOf(Date);
   });
 
@@ -317,7 +331,32 @@ describe("parseIMessage", () => {
     expect(msg.media).toBeNull();
     expect(msg.status).toBeNull();
     expect(msg.recipients).toBeNull();
+    expect(msg.reactions).toBeNull();
     expect(msg.isBlocked).toBe(false);
+  });
+});
+
+describe("IMessagesResource.getTriageNumber", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fetches and parses the triage line", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      ok({ number: "+16467044388", connect_command: "connect @support-bot" }),
+    );
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const triage = await resource.getTriageNumber();
+
+    const { url } = lastCall();
+    expect(url).toBe(`${BASE}/triage-number`);
+    expect(triage.number).toBe("+16467044388");
+    expect(triage.connectCommand).toBe("connect @support-bot");
   });
 });
 

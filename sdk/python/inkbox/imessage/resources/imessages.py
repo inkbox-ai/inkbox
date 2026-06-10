@@ -24,6 +24,7 @@ from inkbox.imessage.types import (
     IMessageReaction,
     IMessageReactionType,
     IMessageSendStyle,
+    IMessageTriageNumber,
 )
 
 if TYPE_CHECKING:
@@ -34,6 +35,20 @@ class IMessagesResource:
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+
+    def get_triage_number(self) -> IMessageTriageNumber:
+        """Return the active triage line and the connect command.
+
+        Recipients text the returned ``connect_command`` (e.g.
+        ``connect @your-handle``) to the triage ``number`` to get
+        connected to an agent identity. Resolve this at runtime instead
+        of hardcoding the number — the line can change.
+
+        Raises:
+            InkboxAPIError: 404 when no triage line is active.
+        """
+        data = self._http.get("/triage-number")
+        return IMessageTriageNumber._from_dict(data)
 
     def send(
         self,
@@ -191,7 +206,8 @@ class IMessagesResource:
 
         Args:
             message_id: UUID of the message being reacted to.
-            reaction: Tapback kind (see ``IMessageReactionType``).
+            reaction: Tapback kind. Sends accept the classic six;
+                ``custom`` is inbound-only.
             part_index: Part of a multi-part message to react to.
         """
         body: dict[str, Any] = {
