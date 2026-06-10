@@ -300,6 +300,15 @@ print(sent.service, sent.status)  # IMessageService.IMESSAGE, IMessageDeliverySt
 msgs = identity.list_imessages(limit=20, is_read=False)
 convos = identity.list_imessage_conversations(limit=20)
 convo = identity.get_imessage_conversation(sent.conversation_id)
+# assignment_status tells you whether the recipient is still connected:
+# anything other than "active" means sends/reactions will be refused
+# until they reconnect through triage.
+print(convo.assignment_status)
+
+# Who is actively connected to this identity right now (paginated)?
+connections = identity.list_imessage_assignments(limit=20)
+for a in connections:
+    print(a.remote_number, a.status, a.created_at)
 
 # Tapback reactions. Sends accept the classic six (love, like, dislike,
 # laugh, emphasize, question); inbound can also be "custom" with the

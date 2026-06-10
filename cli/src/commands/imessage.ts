@@ -276,6 +276,31 @@ export function registerIMessageCommands(program: Command): void {
     );
 
   imessage
+    .command("assignments")
+    .description("List recipients actively connected to this identity (newest first)")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--limit <n>", "Max results", "50")
+    .option("--offset <n>", "Pagination offset", "0")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity: string; limit: string; offset: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const rows = await identity.listIMessageAssignments({
+          limit: parseInt(cmdOpts.limit, 10),
+          offset: parseInt(cmdOpts.offset, 10),
+        });
+        output(rows, {
+          json: !!opts.json,
+          columns: ["id", "remoteNumber", "status", "createdAt"],
+        });
+      }),
+    );
+
+  imessage
     .command("conversations")
     .description("List iMessage conversation summaries")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

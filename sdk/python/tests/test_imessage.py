@@ -348,3 +348,53 @@ class TestIMessageContactRules:
             "/contact-rules",
             params={"agent_identity_id": IDENTITY_ID},
         )
+
+
+class TestIMessageAssignments:
+    def test_lists_active_assignments(self, client, transport):
+        from inkbox.imessage.types import IMessageAssignmentStatus
+
+        transport.get.return_value = [
+            {
+                "id": "bbbb2222-0000-0000-0000-000000000001",
+                "remote_number": REMOTE,
+                "agent_identity_id": IDENTITY_ID,
+                "organization_id": "org_x",
+                "status": "active",
+                "released_at": None,
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-01T00:00:00+00:00",
+            },
+        ]
+
+        rows = client._imessages.list_assignments(
+            agent_identity_id=IDENTITY_ID, limit=25, offset=50,
+        )
+
+        transport.get.assert_called_once_with(
+            "/assignments",
+            params={"limit": 25, "offset": 50, "agent_identity_id": IDENTITY_ID},
+        )
+        assert rows[0].status is IMessageAssignmentStatus.ACTIVE
+        assert rows[0].remote_number == REMOTE
+        assert rows[0].released_at is None
+
+
+class TestConversationAssignmentStatus:
+    def test_parses_assignment_status(self, client, transport):
+        from inkbox.imessage.types import IMessageAssignmentStatus
+
+        transport.get.return_value = {**IMESSAGE_CONVERSATION_DICT, "assignment_status": "released"}
+
+        convo = client._imessages.get_conversation(CONVO_ID)
+
+        assert convo.assignment_status is IMessageAssignmentStatus.RELEASED
+
+    def test_defaults_assignment_status_when_absent(self, client, transport):
+        from inkbox.imessage.types import IMessageAssignmentStatus
+
+        transport.get.return_value = [IMESSAGE_CONVERSATION_SUMMARY_DICT]
+
+        convos = client._imessages.list_conversations()
+
+        assert convos[0].assignment_status is IMessageAssignmentStatus.ACTIVE

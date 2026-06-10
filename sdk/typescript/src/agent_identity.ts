@@ -17,6 +17,7 @@ import { ForwardMode, MessageDirection } from "./mail/types.js";
 import type { FilterMode, Message, MessageDetail, ThreadDetail } from "./mail/types.js";
 import type {
   IMessage,
+  IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
   IMessageMarkReadResult,
@@ -685,6 +686,22 @@ export class AgentIdentity {
   ): Promise<IMessage[]> {
     this._requireIMessage();
     return this._inkbox._imessages.list({
+      ...options,
+      agentIdentityId: this.id,
+    });
+  }
+
+  /**
+   * List recipients actively connected to this identity, newest first.
+   *
+   * @param options.limit - Maximum number of results. Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   */
+  async listIMessageAssignments(
+    options?: { limit?: number; offset?: number },
+  ): Promise<IMessageAssignment[]> {
+    this._requireIMessage();
+    return this._inkbox._imessages.listAssignments({
       ...options,
       agentIdentityId: this.id,
     });

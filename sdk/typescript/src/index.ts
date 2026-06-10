@@ -129,6 +129,7 @@ export type {
   TextConversationUpdateResult,
 } from "./phone/types.js";
 export {
+  IMessageAssignmentStatus,
   IMessageDeliveryStatus,
   IMessageReactionType,
   IMessageRuleAction,
@@ -138,6 +139,7 @@ export {
 } from "./imessage/types.js";
 export type {
   IMessage,
+  IMessageAssignment,
   IMessageContactRule,
   IMessageConversation,
   IMessageConversationSummary,

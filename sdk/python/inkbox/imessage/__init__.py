@@ -4,6 +4,8 @@ inkbox.imessage — iMessage types.
 
 from inkbox.imessage.types import (
     IMessage,
+    IMessageAssignment,
+    IMessageAssignmentStatus,
     IMessageContactRule,
     IMessageConversation,
     IMessageConversationSummary,
@@ -24,6 +26,8 @@ from inkbox.imessage.types import (
 
 __all__ = [
     "IMessage",
+    "IMessageAssignment",
+    "IMessageAssignmentStatus",
     "IMessageContactRule",
     "IMessageConversation",
     "IMessageConversationSummary",

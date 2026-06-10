@@ -233,6 +233,7 @@ inkbox imessage triage-number   # the router number + the connect command humans
 inkbox imessage send -i <handle> --to +15551234567 --text "Hello over iMessage"
 inkbox imessage send -i <handle> --conversation-id <conversation-uuid> --text "Reply" --send-style slam
 inkbox imessage list -i <handle> --limit 20 --unread-only
+inkbox imessage assignments -i <handle> --limit 20   # active connections, newest first
 inkbox imessage conversations -i <handle> --limit 20
 inkbox imessage conversation <conversation-id> -i <handle> --limit 50
 inkbox imessage react <message-id> -i <handle> --reaction like

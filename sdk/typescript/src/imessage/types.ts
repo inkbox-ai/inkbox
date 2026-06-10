@@ -64,6 +64,12 @@ export enum IMessageSendStyle {
   SLAM = "slam",
 }
 
+/** Lifecycle of a recipient's triage-created connection to an agent. */
+export enum IMessageAssignmentStatus {
+  ACTIVE = "active",
+  RELEASED = "released",
+}
+
 /** Whether a matching remote number is allowed through or blocked. */
 export enum IMessageRuleAction {
   ALLOW = "allow",
@@ -144,10 +150,17 @@ export interface IMessage {
   updatedAt: Date;
 }
 
-/** One assignment-scoped iMessage conversation. */
+/**
+ * One assignment-scoped iMessage conversation.
+ *
+ * `assignmentStatus` reflects the current connection: non-active means
+ * the recipient is disconnected and the agent cannot reply until they
+ * reconnect through triage.
+ */
 export interface IMessageConversation {
   id: string;
   assignmentId: string;
+  assignmentStatus: IMessageAssignmentStatus;
   remoteNumber: string;
   createdAt: Date;
   updatedAt: Date;
@@ -157,6 +170,7 @@ export interface IMessageConversation {
 export interface IMessageConversationSummary {
   id: string;
   assignmentId: string;
+  assignmentStatus: IMessageAssignmentStatus;
   remoteNumber: string;
   latestText: string | null;
   latestMessageAt: Date | null;
@@ -179,6 +193,18 @@ export interface IMessageReaction {
   customEmoji: string | null;
   remoteNumber: string;
   partIndex: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** An active connection between one recipient and one agent identity. */
+export interface IMessageAssignment {
+  id: string;
+  remoteNumber: string;
+  agentIdentityId: string;
+  organizationId: string;
+  status: IMessageAssignmentStatus;
+  releasedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -273,7 +299,19 @@ export interface RawIMessage {
 export interface RawIMessageConversation {
   id: string;
   assignment_id: string;
+  assignment_status?: string | null;
   remote_number: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RawIMessageAssignment {
+  id: string;
+  remote_number: string;
+  agent_identity_id: string;
+  organization_id: string;
+  status: string;
+  released_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -389,7 +427,22 @@ export function parseIMessageConversation(
   return {
     id: r.id,
     assignmentId: r.assignment_id,
+    assignmentStatus:
+      (r.assignment_status as IMessageAssignmentStatus) ?? IMessageAssignmentStatus.ACTIVE,
     remoteNumber: r.remote_number,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseIMessageAssignment(r: RawIMessageAssignment): IMessageAssignment {
+  return {
+    id: r.id,
+    remoteNumber: r.remote_number,
+    agentIdentityId: r.agent_identity_id,
+    organizationId: r.organization_id,
+    status: r.status as IMessageAssignmentStatus,
+    releasedAt: r.released_at ? new Date(r.released_at) : null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -401,6 +454,8 @@ export function parseIMessageConversationSummary(
   return {
     id: r.id,
     assignmentId: r.assignment_id,
+    assignmentStatus:
+      (r.assignment_status as IMessageAssignmentStatus) ?? IMessageAssignmentStatus.ACTIVE,
     remoteNumber: r.remote_number,
     latestText: r.latest_text ?? null,
     latestMessageAt: r.latest_message_at ? new Date(r.latest_message_at) : null,

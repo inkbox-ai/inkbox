@@ -314,6 +314,16 @@ console.log(sent.service, sent.status);  // "imessage", "queued"
 const msgs = await identity.listIMessages({ limit: 20, isRead: false });
 const convos = await identity.listIMessageConversations({ limit: 20 });
 const convo = await identity.getIMessageConversation(sent.conversationId);
+// assignmentStatus tells you whether the recipient is still connected:
+// anything other than "active" means sends/reactions will be refused
+// until they reconnect through triage.
+console.log(convo.assignmentStatus);
+
+// Who is actively connected to this identity right now (paginated)?
+const connections = await identity.listIMessageAssignments({ limit: 20 });
+for (const a of connections) {
+  console.log(a.remoteNumber, a.status, a.createdAt);
+}
 
 // Tapback reactions. Sends accept the classic six (love, like, dislike,
 // laugh, emphasize, question); inbound can also be "custom" with the

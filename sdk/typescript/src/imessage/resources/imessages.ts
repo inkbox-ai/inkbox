@@ -13,6 +13,7 @@
 import { HttpTransport } from "../../_http.js";
 import {
   IMessage,
+  IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
   IMessageMarkReadResult,
@@ -22,11 +23,13 @@ import {
   IMessageSendStyle,
   IMessageTriageNumber,
   RawIMessage,
+  RawIMessageAssignment,
   RawIMessageConversation,
   RawIMessageConversationSummary,
   RawIMessageReaction,
   RawIMessageTriageNumber,
   parseIMessage,
+  parseIMessageAssignment,
   parseIMessageConversation,
   parseIMessageConversationSummary,
   parseIMessageReaction,
@@ -161,6 +164,35 @@ export class IMessagesResource {
     }
     const data = await this.http.get<RawIMessage[]>("/messages", params);
     return data.map(parseIMessage);
+  }
+
+  /**
+   * List active iMessage connections, newest first.
+   *
+   * One row per recipient currently connected to an agent identity
+   * through triage. Released connections are not returned.
+   *
+   * @param options.agentIdentityId - Narrow to one agent identity.
+   *   Ignored for identity-scoped keys (always their own identity).
+   * @param options.limit - Max results (1–200). Defaults to 50.
+   * @param options.offset - Pagination offset. Defaults to 0.
+   */
+  async listAssignments(
+    options?: {
+      agentIdentityId?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<IMessageAssignment[]> {
+    const params: Record<string, string | number> = {
+      limit: options?.limit ?? 50,
+      offset: options?.offset ?? 0,
+    };
+    if (options?.agentIdentityId !== undefined) {
+      params["agent_identity_id"] = options.agentIdentityId;
+    }
+    const data = await this.http.get<RawIMessageAssignment[]>("/assignments", params);
+    return data.map(parseIMessageAssignment);
   }
 
   /**

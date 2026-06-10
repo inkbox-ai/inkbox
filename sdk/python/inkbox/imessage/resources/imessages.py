@@ -17,6 +17,7 @@ from uuid import UUID
 
 from inkbox.imessage.types import (
     IMessage,
+    IMessageAssignment,
     IMessageConversation,
     IMessageConversationSummary,
     IMessageMarkReadResult,
@@ -148,6 +149,30 @@ class IMessagesResource:
             params["is_blocked"] = is_blocked
         data = self._http.get("/messages", params=params)
         return [IMessage._from_dict(m) for m in data]
+
+    def list_assignments(
+        self,
+        *,
+        agent_identity_id: UUID | str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[IMessageAssignment]:
+        """List active iMessage connections, newest first.
+
+        One row per recipient currently connected to an agent identity
+        through triage. Released connections are not returned.
+
+        Args:
+            agent_identity_id: Narrow to one agent identity. Ignored
+                for identity-scoped keys (always their own identity).
+            limit: Max results to return (1–200).
+            offset: Pagination offset.
+        """
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        if agent_identity_id is not None:
+            params["agent_identity_id"] = str(agent_identity_id)
+        data = self._http.get("/assignments", params=params)
+        return [IMessageAssignment._from_dict(a) for a in data]
 
     def list_conversations(
         self,

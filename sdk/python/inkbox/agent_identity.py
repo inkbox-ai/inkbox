@@ -28,6 +28,7 @@ from inkbox.tunnels.types import Tunnel
 from inkbox.exceptions import InkboxError
 from inkbox.imessage.types import (
     IMessage,
+    IMessageAssignment,
     IMessageConversation,
     IMessageConversationSummary,
     IMessageMarkReadResult,
@@ -831,6 +832,25 @@ class AgentIdentity:
             offset=offset,
             is_read=is_read,
             is_blocked=is_blocked,
+        )
+
+    def list_imessage_assignments(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[IMessageAssignment]:
+        """List recipients actively connected to this identity, newest first.
+
+        Args:
+            limit: Maximum number of results (default 50).
+            offset: Pagination offset (default 0).
+        """
+        self._require_imessage()
+        return self._inkbox._imessages.list_assignments(
+            agent_identity_id=self.id,
+            limit=limit,
+            offset=offset,
         )
 
     def list_imessage_conversations(

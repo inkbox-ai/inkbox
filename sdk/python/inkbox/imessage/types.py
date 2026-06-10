@@ -76,6 +76,13 @@ class IMessageSendStyle(StrEnum):
     SLAM = "slam"
 
 
+class IMessageAssignmentStatus(StrEnum):
+    """Lifecycle of a recipient's triage-created connection to an agent."""
+
+    ACTIVE = "active"
+    RELEASED = "released"
+
+
 class IMessageRuleAction(StrEnum):
     """Whether a matching remote number is allowed through or blocked."""
 
@@ -245,13 +252,19 @@ class IMessage:
 
 @dataclass
 class IMessageConversation:
-    """One assignment-scoped iMessage conversation."""
+    """One assignment-scoped iMessage conversation.
+
+    ``assignment_status`` reflects the current connection: non-active
+    means the recipient is disconnected and the agent cannot reply until
+    they reconnect through triage.
+    """
 
     id: UUID
     assignment_id: UUID
     remote_number: str
     created_at: datetime
     updated_at: datetime
+    assignment_status: IMessageAssignmentStatus = IMessageAssignmentStatus.ACTIVE
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageConversation:
@@ -261,6 +274,9 @@ class IMessageConversation:
             remote_number=d["remote_number"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            assignment_status=IMessageAssignmentStatus(
+                d.get("assignment_status") or "active"
+            ),
         )
 
 
@@ -277,6 +293,7 @@ class IMessageConversationSummary:
     latest_has_media: bool = False
     unread_count: int = 0
     total_count: int = 0
+    assignment_status: IMessageAssignmentStatus = IMessageAssignmentStatus.ACTIVE
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageConversationSummary:
@@ -290,6 +307,9 @@ class IMessageConversationSummary:
             latest_has_media=d.get("latest_has_media", False),
             unread_count=d.get("unread_count", 0),
             total_count=d.get("total_count", 0),
+            assignment_status=IMessageAssignmentStatus(
+                d.get("assignment_status") or "active"
+            ),
         )
 
 
@@ -356,6 +376,33 @@ class IMessageMediaUpload:
             media_url=d["media_url"],
             content_type=d.get("content_type"),
             size=d.get("size"),
+        )
+
+
+@dataclass
+class IMessageAssignment:
+    """An active connection between one recipient and one agent identity."""
+
+    id: UUID
+    remote_number: str
+    agent_identity_id: UUID
+    organization_id: str
+    status: IMessageAssignmentStatus
+    created_at: datetime
+    updated_at: datetime
+    released_at: datetime | None = None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IMessageAssignment:
+        return cls(
+            id=UUID(d["id"]),
+            remote_number=d["remote_number"],
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            organization_id=d["organization_id"],
+            status=IMessageAssignmentStatus(d["status"]),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+            released_at=_dt(d.get("released_at")),
         )
 
 

@@ -4,6 +4,7 @@ import { HttpTransport } from "../src/_http.js";
 import { IMessagesResource } from "../src/imessage/resources/imessages.js";
 import { IMessageContactRulesResource } from "../src/imessage/resources/contactRules.js";
 import {
+  IMessageAssignmentStatus,
   IMessageDeliveryStatus,
   IMessageReactionType,
   IMessageRuleAction,
@@ -494,5 +495,75 @@ describe("identity iMessage fields", () => {
     });
     expect(summary.imessageEnabled).toBe(false);
     expect(summary.imessageFilterMode).toBe("blacklist");
+  });
+});
+
+describe("IMessagesResource.listAssignments", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("lists active connections with pagination and identity filter", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok([
+      {
+        id: "bbbb2222-0000-0000-0000-000000000001",
+        remote_number: REMOTE,
+        agent_identity_id: IDENTITY_ID,
+        organization_id: "org_x",
+        status: "active",
+        released_at: null,
+        created_at: "2026-06-01T00:00:00Z",
+        updated_at: "2026-06-01T00:00:00Z",
+      },
+    ]));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const rows = await resource.listAssignments({
+      agentIdentityId: IDENTITY_ID,
+      limit: 25,
+      offset: 50,
+    });
+
+    const { url } = lastCall();
+    const params = new URL(url).searchParams;
+    expect(new URL(url).pathname.endsWith("/assignments")).toBe(true);
+    expect(params.get("limit")).toBe("25");
+    expect(params.get("offset")).toBe("50");
+    expect(params.get("agent_identity_id")).toBe(IDENTITY_ID);
+    expect(rows[0].status).toBe(IMessageAssignmentStatus.ACTIVE);
+    expect(rows[0].remoteNumber).toBe(REMOTE);
+    expect(rows[0].releasedAt).toBeNull();
+  });
+});
+
+describe("conversation assignmentStatus", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("parses a released connection state", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok({ ...CONVERSATION_DICT, assignment_status: "released" }));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const convo = await resource.getConversation(CONVO_ID);
+
+    expect(convo.assignmentStatus).toBe(IMessageAssignmentStatus.RELEASED);
+  });
+
+  it("defaults to active when the field is absent", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok([CONVERSATION_SUMMARY_DICT]));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const convos = await resource.listConversations();
+
+    expect(convos[0].assignmentStatus).toBe(IMessageAssignmentStatus.ACTIVE);
   });
 });
