@@ -173,8 +173,14 @@ impl TunnelsResource {
     /// failure (e.g. the API key is rejected by `/_system/hello`).
     #[cfg(feature = "tunnels-runtime")]
     pub fn connect(&self, name: &str, forward_to: &str) -> Result<()> {
-        use crate::tunnels::client::bootstrap::{validate_pool_size, TunnelBundle};
+        use crate::tunnels::client::bootstrap::{resolve_zone_and_host, validate_pool_size, TunnelBundle};
+        use crate::tunnels::client::cert::{
+            build_csr, cert_needs_sign, key_pem_bytes, load_or_create_keypair, write_cert_chain,
+        };
         use crate::tunnels::client::runtime::{ForwardTo, TunnelRuntime, TunnelRuntimeConfig};
+        use crate::tunnels::client::state::{
+            ensure_private_state_dir, load_state, save_state, StateEntry, CERT_FILE,
+        };
         use crate::tunnels::client::url_forward::validate_forward_target;
         use crate::tunnels::types::{TLSMode, TunnelStatus, TunnelStatusValue};
 
@@ -186,40 +192,54 @@ impl TunnelsResource {
             .ok_or_else(|| InkboxError::Tunnel("owning Inkbox client was dropped".into()))?;
         let api_key = client.api_key().to_string();
 
-        // Local fast-fail validations, mirroring Python `connect`.
+        // Local fast-fail validations, mirroring Python `connect` + `bootstrap`.
+        crate::tunnels::validation::validate_tunnel_name(name)?;
         validate_pool_size(None)?;
         validate_forward_target(forward_to, false)
             .map_err(|e| InkboxError::InvalidArgument(e.to_string()))?;
 
-        // Bootstrap: control-plane lookup by name (the server lists only live
-        // tunnels), then the edge-mode ACTIVE gate. Passthrough CSR signing is
-        // not yet supported in the Rust runtime (CSR DER pending), so a
-        // passthrough tunnel is rejected with a clear error here.
-        let tunnel = self
-            .list()?
-            .into_iter()
-            .find(|t| t.tunnel_name == name)
-            .ok_or_else(|| {
-                InkboxError::Tunnel(format!(
-                    "TunnelNotProvisioned: no tunnel named {name:?} exists in this org; \
-                     provision one via create_identity({name:?})"
-                ))
-            })?;
+        // State dir: ~/.inkbox/tunnels/{name} (Python default). Holds the
+        // passthrough key/cert + the learned zone/public_host.
+        let home = std::env::var_os("HOME")
+            .map(std::path::PathBuf::from)
+            .ok_or_else(|| InkboxError::Tunnel("HOME not set; cannot resolve state dir".into()))?;
+        let state_dir = home.join(".inkbox").join("tunnels").join(name);
+        ensure_private_state_dir(&state_dir).map_err(|e| InkboxError::Tunnel(e.to_string()))?;
+        let state = load_state(&state_dir);
 
-        if tunnel.tls_mode == TLSMode::Passthrough {
-            return Err(InkboxError::Tunnel(
-                "passthrough tunnels are not yet supported by the Rust runtime \
-                 (CSR generation pending); use edge mode or the Python/TS SDK"
-                    .into(),
-            ));
-        }
+        // Resolve the tunnel: prefer the state's tunnel_id (a `get`), else look
+        // it up by name (the server lists only live tunnels). Mirrors `bootstrap`.
+        let mut tunnel = match state.as_ref().map(|s| s.tunnel_id.clone()) {
+            Some(id) if !id.is_empty() => match self.get(&id) {
+                Ok(t) => t,
+                Err(InkboxError::Api { status_code: 404, .. }) => {
+                    return Err(InkboxError::Tunnel(format!(
+                        "TunnelRemoved: tunnel {name:?} (id={id}) has been removed; clear \
+                         {} and call create_identity({name:?}) to start fresh",
+                        state_dir.display()
+                    )));
+                }
+                Err(e) => return Err(e),
+            },
+            _ => self
+                .list()?
+                .into_iter()
+                .find(|t| t.tunnel_name == name)
+                .ok_or_else(|| {
+                    InkboxError::Tunnel(format!(
+                        "TunnelNotProvisioned: no tunnel named {name:?} exists in this org; \
+                         provision one via create_identity({name:?})"
+                    ))
+                })?,
+        };
+
+        let is_active = |t: &crate::tunnels::types::Tunnel| {
+            matches!(&t.status, TunnelStatusValue::Known(TunnelStatus::Active))
+        };
 
         // Edge tunnels must be ACTIVE before opening the data plane.
-        let is_active = matches!(
-            &tunnel.status,
-            TunnelStatusValue::Known(TunnelStatus::Active)
-        );
-        if !is_active {
+        // Passthrough has its own AWAITING_CERT branch below.
+        if tunnel.tls_mode == TLSMode::Edge && !is_active(&tunnel) {
             return Err(InkboxError::Api {
                 status_code: 409,
                 detail: crate::error::ApiErrorDetail::Message(format!(
@@ -228,13 +248,75 @@ impl TunnelsResource {
             });
         }
 
-        let public_host = tunnel.public_host.clone();
-        let zone = tunnel.zone.clone();
+        // Cert dance for passthrough: load/create the P-256 key, sign a CSR if
+        // the tunnel is awaiting a cert or the stored cert needs renewal, then
+        // assemble the TLS material the runtime terminates with.
+        let mut tls_material: Option<(Vec<u8>, Vec<u8>)> = None;
+        if tunnel.tls_mode == TLSMode::Passthrough {
+            let (_zone, public_host) = resolve_zone_and_host(
+                name,
+                Some(&tunnel.zone),
+                Some(&tunnel.public_host),
+                state.as_ref(),
+                None,
+            );
+            let key = load_or_create_keypair(&state_dir)?;
+            let awaiting = matches!(
+                &tunnel.status,
+                TunnelStatusValue::Known(TunnelStatus::AwaitingCert)
+            );
+            let chain_bytes = if awaiting || cert_needs_sign(&state_dir, &key) {
+                let csr_pem = build_csr(&key, &public_host)?;
+                let signed = self.sign_csr(&tunnel.id.to_string(), &csr_pem)?;
+                let chain = write_cert_chain(&state_dir, &signed.cert_pem, &signed.chain_pem)?;
+                // Refresh to pick up the new ACTIVE status.
+                tunnel = self.get(&tunnel.id.to_string())?;
+                chain
+            } else {
+                std::fs::read(state_dir.join(CERT_FILE))
+                    .map_err(|e| InkboxError::Tunnel(format!("read cert chain: {e}")))?
+            };
+            if !is_active(&tunnel) {
+                return Err(InkboxError::Api {
+                    status_code: 409,
+                    detail: crate::error::ApiErrorDetail::Message(format!(
+                        "tunnel {name:?} is not active after CSR sign"
+                    )),
+                });
+            }
+            tls_material = Some((chain_bytes, key_pem_bytes(&key)?));
+        }
+
+        // Final zone/public_host (server > state > prod fallback) + persist.
+        let (zone, public_host) = resolve_zone_and_host(
+            name,
+            Some(&tunnel.zone),
+            Some(&tunnel.public_host),
+            state.as_ref(),
+            None,
+        );
+        let _ = save_state(
+            &state_dir,
+            &StateEntry {
+                tunnel_id: tunnel.id.to_string(),
+                name: name.to_string(),
+                mode: Some(
+                    match tunnel.tls_mode {
+                        TLSMode::Edge => "edge",
+                        TLSMode::Passthrough => "passthrough",
+                    }
+                    .to_string(),
+                ),
+                zone: Some(zone.clone()),
+                public_host: Some(public_host.clone()),
+            },
+        );
+
         let bundle = TunnelBundle {
             tunnel,
             public_host,
             zone,
-            tls_material: None,
+            tls_material,
         };
 
         let cfg = TunnelRuntimeConfig::from_bundle(

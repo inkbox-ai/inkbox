@@ -113,12 +113,24 @@ pure Rust.
 
 ## Status
 
-The full REST surface, vault crypto + TOTP, webhook verification, and the
-tunnels control plane are complete and type-check cleanly. The tunnels
-data-plane runtime ships its wire codecs (envelope, WebSocket framing,
-protocol constants — with unit tests) fully ported; the connection
-orchestration is scaffolded with precise `TODO(tunnels-runtime)` markers where
-behaviour needs to be validated against a live edge. See `src/tunnels/client/`.
+Feature-complete against the Python and TypeScript SDKs. The full REST
+surface, vault crypto + TOTP, webhook verification, and the tunnels control
+plane are implemented and tested. The tunnels **data-plane runtime**
+(`tunnels-runtime` feature) is implemented end-to-end:
+
+- Edge HTTP: TLS h2 dial, `/_system/hello`, parked intake pool, body
+  materialization, URL-forward, `/_system/response/{id}`, PING keepalive,
+  jittered reconnect.
+- WebSocket upgrade bridge and raw-TCP passthrough bridge over h2 extended
+  CONNECT, with local upstream WS handshake and rustls TLS termination.
+- Passthrough bootstrap: EC P-256 keypair + PKCS#10 CSR signing + cert-chain
+  persistence.
+
+61 unit/integration tests cover the wire codecs, crypto, CSR, URL-forward, and
+runtime lifecycle. The bidirectional bridge **pumps compile and follow the
+Python control flow but have not been exercised against a live edge** in this
+repo — run them against a real tunnel to validate end-to-end. See
+`src/tunnels/client/`.
 
 ## License
 

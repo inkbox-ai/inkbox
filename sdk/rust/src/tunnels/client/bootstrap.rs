@@ -7,8 +7,6 @@
 //!
 //! Ported from `inkbox/tunnels/client/_bootstrap.py`.
 
-use std::path::Path;
-
 use crate::error::{InkboxError, Result};
 use crate::tunnels::resources::{POOL_SIZE_MAX, POOL_SIZE_MIN};
 use crate::tunnels::types::Tunnel;
@@ -88,36 +86,11 @@ pub fn resolve_zone_and_host(
     (zone, public_host)
 }
 
-/// Resolve a tunnel for `connect()`: server lookup + cert dance for
-/// passthrough.
-///
-// TODO(tunnels-runtime): full control-plane bootstrap.
-// The Python `bootstrap` does, in order:
-//   1. validate_tunnel_name(name); ensure_private_state_dir; load_state.
-//   2. If state has a tunnel_id, `tunnels.get(id)` (404 => TunnelRemoved).
-//   3. Else `tunnels.list()` and match by `tunnel_name`
-//      (none => TunnelNotProvisioned).
-//   4. Edge tunnels must be ACTIVE (else TunnelStateConflict 409).
-//   5. Passthrough: load_or_create_keypair; if AWAITING_CERT or
-//      cert_needs_sign -> build_csr + tunnels.sign_csr + write_cert_chain +
-//      re-get tunnel; assert ACTIVE; build the TLS terminator material.
-//   6. resolve_zone_and_host; save_state; return TunnelBundle.
-// This is wired through `TunnelsResource` (the sync control-plane transport)
-// at the `connect` call site rather than here, because this module has no
-// transport handle. The runtime's `connect` entry point performs steps 1-6
-// and constructs the bundle. The pure helpers above (validate_pool_size,
-// resolve_zone_and_host) are the faithful, testable pieces.
-pub fn bootstrap(
-    _name: &str,
-    _state_dir: &Path,
-    _data_plane_zone_override: Option<&str>,
-) -> Result<TunnelBundle> {
-    Err(InkboxError::Tunnel(
-        "tunnel bootstrap is driven from TunnelsResource::connect; call that \
-         entry point (see TODO in bootstrap.rs)"
-            .into(),
-    ))
-}
+// The full `bootstrap` flow (state lookup → server get/list → passthrough
+// CSR dance → resolve_zone_and_host → save_state → TunnelBundle) is driven
+// from `crate::tunnels::resources::tunnels::TunnelsResource::connect`, which
+// holds the sync control-plane transport this module lacks. The pure,
+// testable pieces (`validate_pool_size`, `resolve_zone_and_host`) live here.
 
 #[cfg(test)]
 mod tests {
