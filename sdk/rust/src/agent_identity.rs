@@ -55,6 +55,10 @@ use crate::phone::types::{
     TextConversationUpdateResult, TextMessage,
 };
 use crate::tunnels::types::Tunnel;
+use crate::credentials::Credentials;
+use crate::vault::resources::vault::UnlockedVault;
+use crate::vault::totp::{TOTPCode, TOTPConfig};
+use crate::vault::types::{DecryptedVaultSecret, SecretPayload, VaultSecret};
 
 /// An agent identity with convenience methods for its assigned channels.
 ///
@@ -759,8 +763,95 @@ impl AgentIdentity {
     }
 
     // -----------------------------------------------------------------------
+    // Vault / credentials (identity-scoped)
+    // -----------------------------------------------------------------------
+
+    /// Identity-scoped credential access. The vault must be unlocked first via
+    /// `inkbox.vault().unlock(...)`. Mirrors the Python `credentials` property
+    /// (built from the unlocked vault's decrypted secrets).
+    ///
+    /// Unlike Python this is not cached on the facade — each call rebuilds the
+    /// view from the current unlock snapshot, which is always consistent.
+    pub fn credentials(&self) -> Result<Credentials> {
+        let unlocked = self.require_vault_unlocked()?;
+        Ok(Credentials::new(unlocked.secrets()))
+    }
+
+    /// Revoke this identity's access to a vault secret.
+    pub fn revoke_credential_access(&self, secret_id: &str) -> Result<()> {
+        self.inkbox
+            .vault()
+            .revoke_access(secret_id, &self.id().to_string())
+    }
+
+    /// Create a vault secret and grant this identity access to it. The vault
+    /// must be unlocked first.
+    ///
+    /// Note: the new secret is not added to the in-memory unlock snapshot;
+    /// re-unlock the vault to surface it in [`Self::credentials`].
+    pub fn create_secret(
+        &self,
+        name: &str,
+        payload: &SecretPayload,
+        description: Option<&str>,
+    ) -> Result<VaultSecret> {
+        let mut unlocked = self.require_vault_unlocked()?;
+        let secret = unlocked.create_secret(name, payload, description)?;
+        self.inkbox
+            .vault()
+            .grant_access(&secret.id.to_string(), &self.id().to_string())?;
+        Ok(secret)
+    }
+
+    /// Fetch and decrypt a vault secret this identity has access to.
+    pub fn get_secret(&self, secret_id: &str) -> Result<DecryptedVaultSecret> {
+        let unlocked = self.require_vault_unlocked()?;
+        unlocked.get_secret(secret_id)
+    }
+
+    /// Add or replace TOTP on a login secret using a [`TOTPConfig`].
+    pub fn set_totp(&self, secret_id: &str, totp: TOTPConfig) -> Result<VaultSecret> {
+        let mut unlocked = self.require_vault_unlocked()?;
+        unlocked.set_totp(secret_id, totp)
+    }
+
+    /// Add or replace TOTP on a login secret from an `otpauth://totp/...` URI.
+    pub fn set_totp_uri(&self, secret_id: &str, uri: &str) -> Result<VaultSecret> {
+        let mut unlocked = self.require_vault_unlocked()?;
+        unlocked.set_totp_uri(secret_id, uri)
+    }
+
+    /// Remove TOTP from a login secret this identity has access to.
+    pub fn remove_totp(&self, secret_id: &str) -> Result<VaultSecret> {
+        let mut unlocked = self.require_vault_unlocked()?;
+        unlocked.remove_totp(secret_id)
+    }
+
+    /// Generate the current TOTP code for a login secret.
+    pub fn get_totp_code(&self, secret_id: &str) -> Result<TOTPCode> {
+        let unlocked = self.require_vault_unlocked()?;
+        unlocked.get_totp_code(secret_id)
+    }
+
+    /// Delete a vault secret this identity has access to.
+    pub fn delete_secret(&self, secret_id: &str) -> Result<()> {
+        let mut unlocked = self.require_vault_unlocked()?;
+        unlocked.delete_secret(secret_id)
+    }
+
+    // -----------------------------------------------------------------------
     // Internal guards
     // -----------------------------------------------------------------------
+
+    /// Return the unlocked vault snapshot or an error (mirrors
+    /// `_require_vault_unlocked`).
+    fn require_vault_unlocked(&self) -> Result<UnlockedVault> {
+        self.inkbox.vault().unlocked().ok_or_else(|| {
+            InkboxError::VaultKey(
+                "Vault has not been unlocked. Call inkbox.vault().unlock(vault_key) first.".into(),
+            )
+        })
+    }
 
     /// Return the mailbox email address or an error (mirrors `_require_mailbox`).
     fn require_mailbox(&self) -> Result<String> {

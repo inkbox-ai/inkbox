@@ -159,13 +159,111 @@ impl TunnelsResource {
     /// Bring a tunnel online from this process.
     ///
     /// Launches the data-plane runtime via the owning client. The runtime is
-    /// ported separately (behind the `tunnels-runtime` feature); until it
-    /// lands, this stub returns an error.
-    // TODO(tunnels-runtime): wire this to the data-plane `connect` entry point
-    // once `crate::tunnels::client` is ported. The Python version lazy-imports
-    // `inkbox.tunnels.client.connect` and calls it with the back-ref client.
-    pub fn connect(&self) -> Result<()> {
-        let _ = &self.inkbox; // silence unused until the runtime is wired
-        Err(InkboxError::Tunnel("runtime not yet wired".into()))
+    /// gated behind the `tunnels-runtime` feature; without it this is a stub
+    /// that returns an error (matching the non-POSIX Python `connect` guard in
+    /// spirit — the data plane is unavailable).
+    ///
+    /// # Arguments
+    /// * `name` - The tunnel name (= the owning identity's agent handle).
+    /// * `forward_to` - A local URL to forward inbound traffic to, e.g.
+    ///   `http://localhost:8080`.
+    ///
+    /// # Returns
+    /// Runs until shutdown; `Ok(())` on clean stop, `Err` on a permanent
+    /// failure (e.g. the API key is rejected by `/_system/hello`).
+    #[cfg(feature = "tunnels-runtime")]
+    pub fn connect(&self, name: &str, forward_to: &str) -> Result<()> {
+        use crate::tunnels::client::bootstrap::{validate_pool_size, TunnelBundle};
+        use crate::tunnels::client::runtime::{ForwardTo, TunnelRuntime, TunnelRuntimeConfig};
+        use crate::tunnels::client::url_forward::validate_forward_target;
+        use crate::tunnels::types::{TLSMode, TunnelStatus, TunnelStatusValue};
+
+        // Read the owning client (Weak -> Arc) to source the API key. The
+        // Python `connect` reads `inkbox._api_key`.
+        let client = self
+            .inkbox
+            .upgrade()
+            .ok_or_else(|| InkboxError::Tunnel("owning Inkbox client was dropped".into()))?;
+        let api_key = client.api_key().to_string();
+
+        // Local fast-fail validations, mirroring Python `connect`.
+        validate_pool_size(None)?;
+        validate_forward_target(forward_to, false)
+            .map_err(|e| InkboxError::InvalidArgument(e.to_string()))?;
+
+        // Bootstrap: control-plane lookup by name (the server lists only live
+        // tunnels), then the edge-mode ACTIVE gate. Passthrough CSR signing is
+        // not yet supported in the Rust runtime (CSR DER pending), so a
+        // passthrough tunnel is rejected with a clear error here.
+        let tunnel = self
+            .list()?
+            .into_iter()
+            .find(|t| t.tunnel_name == name)
+            .ok_or_else(|| {
+                InkboxError::Tunnel(format!(
+                    "TunnelNotProvisioned: no tunnel named {name:?} exists in this org; \
+                     provision one via create_identity({name:?})"
+                ))
+            })?;
+
+        if tunnel.tls_mode == TLSMode::Passthrough {
+            return Err(InkboxError::Tunnel(
+                "passthrough tunnels are not yet supported by the Rust runtime \
+                 (CSR generation pending); use edge mode or the Python/TS SDK"
+                    .into(),
+            ));
+        }
+
+        // Edge tunnels must be ACTIVE before opening the data plane.
+        let is_active = matches!(
+            &tunnel.status,
+            TunnelStatusValue::Known(TunnelStatus::Active)
+        );
+        if !is_active {
+            return Err(InkboxError::Api {
+                status_code: 409,
+                detail: crate::error::ApiErrorDetail::Message(format!(
+                    "tunnel {name:?} is not active; expected active before opening the data plane"
+                )),
+            });
+        }
+
+        let public_host = tunnel.public_host.clone();
+        let zone = tunnel.zone.clone();
+        let bundle = TunnelBundle {
+            tunnel,
+            public_host,
+            zone,
+            tls_material: None,
+        };
+
+        let cfg = TunnelRuntimeConfig::from_bundle(
+            &bundle,
+            api_key,
+            ForwardTo::Url(forward_to.to_string()),
+        );
+        let runtime = TunnelRuntime::new(cfg);
+
+        // The runtime is async; the resource surface is sync (mirrors the
+        // Python `TunnelListener` running the runtime on its own loop). Build
+        // a current-thread tokio runtime and drive `serve_forever` to
+        // completion.
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| InkboxError::Tunnel(format!("could not start async runtime: {e}")))?;
+        rt.block_on(runtime.serve_forever())
+    }
+
+    /// Bring a tunnel online from this process.
+    ///
+    /// The data-plane runtime is gated behind the `tunnels-runtime` feature;
+    /// without it this returns an error.
+    #[cfg(not(feature = "tunnels-runtime"))]
+    pub fn connect(&self, _name: &str, _forward_to: &str) -> Result<()> {
+        let _ = &self.inkbox; // silence unused without the runtime feature
+        Err(InkboxError::Tunnel(
+            "the tunnels data-plane runtime requires the `tunnels-runtime` cargo feature".into(),
+        ))
     }
 }

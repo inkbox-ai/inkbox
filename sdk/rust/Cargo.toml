@@ -53,11 +53,11 @@ ed25519-dalek = { version = "2", features = ["pkcs8", "pem", "rand_core"] }
 
 # Tunnels runtime (optional)
 tokio = { version = "1", features = ["full"], optional = true }
-rustls = { version = "0.23", optional = true }
+# ring-only crypto backend: avoids the aws-lc-rs cmake/C build and keeps the
+# TLS backend consistent with reqwest's `rustls-tls` (which also uses ring).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
 rustls-pemfile = { version = "2", optional = true }
 h2 = { version = "0.4", optional = true }
 http = { version = "1", optional = true }
 bytes = { version = "1", optional = true }
 
-[dev-dependencies]
-httpmock = "0.7"

@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use reqwest::blocking::{Client, RequestBuilder, Response};
-use reqwest::Method;
 use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
