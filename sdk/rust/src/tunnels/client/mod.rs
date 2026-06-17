@@ -13,15 +13,15 @@
 //!
 //! - **Fully faithful** (with `#[cfg(test)]` vectors mirroring the Python
 //!   tests): [`protocol`], [`envelope`], [`wsframe`], [`bridge`], [`state`],
-//!   [`url_forward`], and the pure helpers in [`bootstrap`].
-//! - **Partial / documented divergence**: [`cert`] generates an Ed25519 key
-//!   (Python uses EC P-256, which needs a C dep) and PKCS#8 PEM; CSR DER
-//!   encoding and X.509 cert parsing are precise TODOs.
-//! - **Scaffolded** (compiles; lifecycle skeleton + wire-shape constants;
-//!   deep dispatch bodies are `TODO(tunnels-runtime)`): [`runtime`].
+//!   [`url_forward`], [`cert`] (EC P-256 keys + PKCS#10 CSR), and the pure
+//!   helpers in [`bootstrap`].
+//! - **Implemented**: [`runtime`] HTTP data path (TLS h2 dial, hello, intake
+//!   pool, forward, post-response, PING, reconnect) and the [`bridges`]
+//!   WebSocket-upgrade + TCP-passthrough extended-CONNECT pumps.
 
 pub mod bootstrap;
 pub mod bridge;
+pub mod bridges;
 pub mod cert;
 pub mod envelope;
 pub mod protocol;

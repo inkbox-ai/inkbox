@@ -26,7 +26,8 @@ use crate::error::{InkboxError, Result};
 use super::bootstrap::TunnelBundle;
 use super::envelope::{filter_response_headers, parse_envelope, Envelope};
 use super::protocol::{
-    META_REASON, META_STATUS, PATH_HELLO, PATH_INTAKE, PATH_RESPONSE_PREFIX, ROUTE_KIND_WEBHOOK,
+    META_REASON, META_STATUS, PATH_HELLO, PATH_INTAKE, PATH_RESPONSE_PREFIX, ROUTE_KIND_TCP_STREAM,
+    ROUTE_KIND_WEBHOOK, ROUTE_KIND_WS_UPGRADE,
 };
 use super::url_forward::{forward_envelope_to_url, validate_envelope_path, ForwardResult};
 
@@ -462,9 +463,12 @@ impl TunnelRuntime {
     async fn dispatch(&self, envelope: Envelope, conn: Arc<ActiveConn>) -> Result<()> {
         match envelope.route_kind.as_str() {
             ROUTE_KIND_WEBHOOK => self.dispatch_http(envelope, &conn).await,
-            // WS-upgrade + TCP-passthrough bridges use extended CONNECT; until
-            // the bridge pump is wired, reply with a definite 502 so the third
-            // party isn't left hanging.
+            ROUTE_KIND_WS_UPGRADE => {
+                super::bridges::dispatch_ws_upgrade(self.bridge_ctx(&conn), envelope).await
+            }
+            ROUTE_KIND_TCP_STREAM => {
+                super::bridges::dispatch_tcp_stream(self.bridge_ctx(&conn), envelope).await
+            }
             other => {
                 let reason = format!("route-kind-{other}-unsupported");
                 self.post_response(
@@ -477,6 +481,23 @@ impl TunnelRuntime {
                 )
                 .await
             }
+        }
+    }
+
+    /// Build the context the WS / TCP bridges need (cloneable per dispatch).
+    fn bridge_ctx(&self, conn: &ActiveConn) -> super::bridges::BridgeCtx {
+        let ForwardTo::Url(forward_to) = &self.cfg.forward_to;
+        super::bridges::BridgeCtx {
+            zone: self.cfg.zone.clone(),
+            tunnel_id: self.cfg.tunnel_id.clone(),
+            api_key: self.cfg.api_key.clone(),
+            public_host: self.cfg.public_host.clone(),
+            forward_to: forward_to.clone(),
+            verify_tls: self.cfg.forward_to_verify_tls,
+            ca_bundle: self.cfg.forward_to_ca_bundle.clone(),
+            response_deadline_seconds: conn.response_deadline_seconds,
+            tls_material: self.cfg.tls_material.clone(),
+            send: conn.send.clone(),
         }
     }
 
