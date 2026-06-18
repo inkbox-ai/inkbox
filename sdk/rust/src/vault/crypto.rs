@@ -391,3 +391,234 @@ pub fn generate_recovery_code(
     };
     Ok((code, material))
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+//
+// Exact mimics of the Python (`tests/test_vault_crypto.py`) and TypeScript
+// (`tests/vault/crypto.test.ts`) suites, ported to the Rust API. Same inputs,
+// same assertions, and the same cross-SDK `auth_hash` vector — so vault key
+// material derived here stays byte-for-byte interoperable with the other SDKs.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    const VALID_VAULT_KEY: &str = "Test-Passw0rd!xy";
+
+    // ---- validate_vault_key (TestValidateVaultKey) ----
+
+    #[test]
+    fn valid_key_passes() {
+        validate_vault_key(VALID_VAULT_KEY).unwrap();
+    }
+
+    #[test]
+    fn too_short() {
+        let e = validate_vault_key("Short-Pass0rd!").unwrap_err();
+        assert!(e.to_string().contains("at least 16 characters"));
+    }
+
+    #[test]
+    fn no_uppercase() {
+        let e = validate_vault_key("test-passw0rd!xy").unwrap_err();
+        assert!(e.to_string().contains("uppercase letter"));
+    }
+
+    #[test]
+    fn no_lowercase() {
+        let e = validate_vault_key("TEST-PASSW0RD!XY").unwrap_err();
+        assert!(e.to_string().contains("lowercase letter"));
+    }
+
+    #[test]
+    fn no_digit() {
+        let e = validate_vault_key("Test-Password!xy").unwrap_err();
+        assert!(e.to_string().contains("digit"));
+    }
+
+    #[test]
+    fn no_special() {
+        let e = validate_vault_key("TestPassw0rdxyxy").unwrap_err();
+        assert!(e.to_string().contains("special character"));
+    }
+
+    // ---- derive_salt (TestDeriveSalt) ----
+
+    #[test]
+    fn salt_deterministic() {
+        assert_eq!(derive_salt("org_test_123"), derive_salt("org_test_123"));
+    }
+
+    #[test]
+    fn salt_different_orgs_differ() {
+        assert_ne!(derive_salt("org_a"), derive_salt("org_b"));
+    }
+
+    #[test]
+    fn salt_length_matches_org_id() {
+        assert_eq!(derive_salt("org_test_123"), b"org_test_123".to_vec());
+    }
+
+    // ---- derive_master_key + compute_auth_hash (TestDeriveAndHash) ----
+
+    #[test]
+    fn same_password_same_salt_same_key() {
+        let salt = derive_salt("org_test_123");
+        let k1 = derive_master_key("password", &salt).unwrap();
+        let k2 = derive_master_key("password", &salt).unwrap();
+        assert_eq!(k1, k2);
+    }
+
+    #[test]
+    fn different_passwords_different_keys() {
+        let salt = derive_salt("org_test_123");
+        let k1 = derive_master_key("password_a", &salt).unwrap();
+        let k2 = derive_master_key("password_b", &salt).unwrap();
+        assert_ne!(k1, k2);
+    }
+
+    #[test]
+    fn master_key_length() {
+        let salt = derive_salt("org_test_123");
+        assert_eq!(derive_master_key("pw", &salt).unwrap().len(), 32);
+    }
+
+    #[test]
+    fn auth_hash_is_hex_64() {
+        let salt = derive_salt("org_test_123");
+        let mk = derive_master_key("pw", &salt).unwrap();
+        let h = compute_auth_hash(&mk);
+        assert_eq!(h.len(), 64);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit())); // valid hex
+    }
+
+    // ---- wrap_org_key / unwrap_org_key (TestWrapUnwrapOrgKey) ----
+
+    #[test]
+    fn wrap_unwrap_roundtrip() {
+        let mk = derive_master_key("pw", &derive_salt("org_test_wrap")).unwrap();
+        let org_key = generate_org_encryption_key();
+        let wrapped = wrap_org_key(&mk, &org_key, "").unwrap();
+        let recovered = unwrap_org_key(&mk, &wrapped, "").unwrap();
+        assert_eq!(recovered, org_key);
+    }
+
+    #[test]
+    fn wrap_wrong_key_fails() {
+        let salt = derive_salt("org_test_wrap");
+        let mk1 = derive_master_key("right", &salt).unwrap();
+        let mk2 = derive_master_key("wrong", &salt).unwrap();
+        let org_key = generate_org_encryption_key();
+        let wrapped = wrap_org_key(&mk1, &org_key, "").unwrap();
+        assert!(unwrap_org_key(&mk2, &wrapped, "").is_err());
+    }
+
+    // ---- encrypt_payload / decrypt_payload (TestEncryptDecryptPayload) ----
+
+    #[test]
+    fn payload_roundtrip() {
+        let org_key = generate_org_encryption_key();
+        let payload = json!({"username": "admin", "password": "s3cret", "url": "https://x.com"});
+        let enc = encrypt_payload(&org_key, &payload, "").unwrap();
+        let dec = decrypt_payload(&org_key, &enc, "").unwrap();
+        assert_eq!(dec, payload);
+    }
+
+    #[test]
+    fn payload_different_keys_fail() {
+        let k1 = generate_org_encryption_key();
+        let k2 = generate_org_encryption_key();
+        let enc = encrypt_payload(&k1, &json!({"a": 1}), "").unwrap();
+        assert!(decrypt_payload(&k2, &enc, "").is_err());
+    }
+
+    // ---- generate_vault_key_material (TestGenerateVaultKeyMaterial) ----
+
+    #[test]
+    fn material_roundtrip() {
+        let org_key = generate_org_encryption_key();
+        let mat = generate_vault_key_material(
+            VALID_VAULT_KEY,
+            "org_test_123",
+            &org_key,
+            VaultKeyType::Primary,
+        )
+        .unwrap();
+        assert_eq!(mat.key_type, VaultKeyType::Primary);
+        // Re-derive and verify.
+        let salt = derive_salt("org_test_123");
+        let mk = derive_master_key(VALID_VAULT_KEY, &salt).unwrap();
+        assert_eq!(compute_auth_hash(&mk), mat.auth_hash);
+        let recovered =
+            unwrap_org_key(&mk, &mat.wrapped_org_encryption_key, &mat.id.to_string()).unwrap();
+        assert_eq!(recovered, org_key);
+    }
+
+    #[test]
+    fn material_type_override() {
+        let org_key = generate_org_encryption_key();
+        let mat = generate_vault_key_material(
+            VALID_VAULT_KEY,
+            "org_test_123",
+            &org_key,
+            VaultKeyType::Recovery,
+        )
+        .unwrap();
+        assert_eq!(mat.key_type, VaultKeyType::Recovery);
+    }
+
+    #[test]
+    fn material_rejects_weak_key() {
+        let org_key = generate_org_encryption_key();
+        let e = generate_vault_key_material("short", "org_test_123", &org_key, VaultKeyType::Primary)
+            .unwrap_err();
+        assert!(e.to_string().contains("at least 16 characters"));
+    }
+
+    // ---- generate_recovery_code (TestGenerateRecoveryCode) ----
+
+    #[test]
+    fn recovery_code_format() {
+        let org_key = generate_org_encryption_key();
+        let (code, mat) = generate_recovery_code("org_test_123", &org_key).unwrap();
+        let parts: Vec<&str> = code.split('-').collect();
+        assert_eq!(parts.len(), 8);
+        assert!(parts.iter().all(|p| p.len() == 4));
+        assert_eq!(mat.key_type, VaultKeyType::Recovery);
+    }
+
+    #[test]
+    fn recovery_code_roundtrip() {
+        let org_key = generate_org_encryption_key();
+        let (code, mat) = generate_recovery_code("org_test_123", &org_key).unwrap();
+        let salt = derive_salt("org_test_123");
+        let mk = derive_master_key(&code, &salt).unwrap();
+        assert_eq!(compute_auth_hash(&mk), mat.auth_hash);
+        let recovered =
+            unwrap_org_key(&mk, &mat.wrapped_org_encryption_key, &mat.id.to_string()).unwrap();
+        assert_eq!(recovered, org_key);
+    }
+
+    #[test]
+    fn recovery_codes_are_unique() {
+        let org_key = generate_org_encryption_key();
+        let (c1, _) = generate_recovery_code("org_test_123", &org_key).unwrap();
+        let (c2, _) = generate_recovery_code("org_test_123", &org_key).unwrap();
+        assert_ne!(c1, c2);
+    }
+
+    // ---- cross-SDK compatibility (mirrors TS "cross-SDK compatibility") ----
+
+    #[test]
+    fn cross_sdk_auth_hash_for_known_inputs() {
+        // This prefix was verified against the Python and TypeScript SDKs:
+        // SHA-256(Argon2id("test-password", salt = "org_test_123")) must match
+        // byte-for-byte across all three, or vault keys are not interoperable.
+        let salt = derive_salt("org_test_123");
+        let mk = derive_master_key("test-password", &salt).unwrap();
+        let hash = compute_auth_hash(&mk);
+        assert!(hash.starts_with("056863c98cd0759f"), "got {hash}");
+    }
+}

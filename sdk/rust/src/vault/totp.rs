@@ -386,3 +386,314 @@ fn percent_decode(input: &str) -> String {
     }
     String::from_utf8_lossy(&out).into_owned()
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+//
+// Exact mimics of the Python (`tests/test_vault_totp.py`) and TypeScript
+// (`tests/vault/totp.test.ts`) suites, ported to the Rust API — same RFC 4226 /
+// RFC 6238 vectors and the same URI-parsing cases.
+//
+// Python/TS mock the clock to assert the time=59 / time=1111111109 RFC 6238
+// vectors through `generate_totp`. Rust reads `SystemTime::now()` directly and
+// can't be mocked, so those two vectors are driven through the deterministic
+// `generate_hotp` at the equivalent counter (`time / period`) — identical math,
+// identical expected codes.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // RFC 6238 appendix B secret: ASCII "12345678901234567890".
+    const RFC_SECRET_SHA1: &str = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+
+    // ---- TOTPAlgorithm (TestTOTPAlgorithm) ----
+
+    #[test]
+    fn algorithm_values() {
+        assert_eq!(TOTPAlgorithm::Sha1.as_str(), "sha1");
+        assert_eq!(TOTPAlgorithm::Sha256.as_str(), "sha256");
+        assert_eq!(TOTPAlgorithm::Sha512.as_str(), "sha512");
+    }
+
+    #[test]
+    fn algorithm_coerce_from_string() {
+        assert_eq!(TOTPAlgorithm::from_str("sha256").unwrap(), TOTPAlgorithm::Sha256);
+    }
+
+    // ---- TOTPConfig (TestTOTPConfig) ----
+
+    #[test]
+    fn config_defaults() {
+        // Mirrors test_from_dict_defaults: a minimal payload uses the defaults.
+        let c: TOTPConfig = serde_json::from_value(json!({"secret": "JBSWY3DPEHPK3PXP"})).unwrap();
+        assert_eq!(c.algorithm, TOTPAlgorithm::Sha1);
+        assert_eq!(c.digits, 6);
+        assert_eq!(c.period, 30);
+        assert!(c.issuer.is_none());
+        assert!(c.account_name.is_none());
+    }
+
+    #[test]
+    fn config_all_fields() {
+        let c = TOTPConfig::new(
+            "JBSWY3DPEHPK3PXP",
+            TOTPAlgorithm::Sha256,
+            8,
+            60,
+            Some("GitHub".into()),
+            Some("user@example.com".into()),
+        )
+        .unwrap();
+        assert_eq!(c.algorithm, TOTPAlgorithm::Sha256);
+        assert_eq!(c.digits, 8);
+        assert_eq!(c.period, 60);
+    }
+
+    #[test]
+    fn config_invalid_digits() {
+        let e = TOTPConfig::new("JBSWY3DPEHPK3PXP", TOTPAlgorithm::Sha1, 7, 30, None, None)
+            .unwrap_err();
+        assert!(e.to_string().contains("digits must be 6 or 8"));
+    }
+
+    #[test]
+    fn config_invalid_period() {
+        let e = TOTPConfig::new("JBSWY3DPEHPK3PXP", TOTPAlgorithm::Sha1, 6, 45, None, None)
+            .unwrap_err();
+        assert!(e.to_string().contains("period must be 30 or 60"));
+    }
+
+    #[test]
+    fn config_to_dict_omits_none() {
+        let c = TOTPConfig::new("JBSWY3DPEHPK3PXP", TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let d = serde_json::to_value(&c).unwrap();
+        assert!(d.get("issuer").is_none());
+        assert!(d.get("account_name").is_none());
+        assert_eq!(d["secret"], "JBSWY3DPEHPK3PXP");
+        assert_eq!(d["algorithm"], "sha1");
+        assert_eq!(d["digits"], 6);
+        assert_eq!(d["period"], 30);
+    }
+
+    #[test]
+    fn config_to_dict_includes_optionals() {
+        let c = TOTPConfig::new(
+            "JBSWY3DPEHPK3PXP",
+            TOTPAlgorithm::Sha1,
+            6,
+            30,
+            Some("GitHub".into()),
+            Some("user@example.com".into()),
+        )
+        .unwrap();
+        let d = serde_json::to_value(&c).unwrap();
+        assert_eq!(d["issuer"], "GitHub");
+        assert_eq!(d["account_name"], "user@example.com");
+    }
+
+    #[test]
+    fn config_from_dict_roundtrip() {
+        let original = TOTPConfig::new(
+            "JBSWY3DPEHPK3PXP",
+            TOTPAlgorithm::Sha256,
+            8,
+            60,
+            Some("GitHub".into()),
+            Some("user@example.com".into()),
+        )
+        .unwrap();
+        let d = serde_json::to_value(&original).unwrap();
+        let restored: TOTPConfig = serde_json::from_value(d).unwrap();
+        assert_eq!(restored.secret, original.secret);
+        assert_eq!(restored.algorithm, original.algorithm);
+        assert_eq!(restored.digits, original.digits);
+        assert_eq!(restored.period, original.period);
+        assert_eq!(restored.issuer, original.issuer);
+        assert_eq!(restored.account_name, original.account_name);
+    }
+
+    // ---- b32decode (TestB32Decode) ----
+
+    #[test]
+    fn b32_valid_secret() {
+        assert_eq!(
+            b32decode("JBSWY3DPEHPK3PXP").unwrap(),
+            b"Hello!\xde\xad\xbe\xef".to_vec()
+        );
+    }
+
+    #[test]
+    fn b32_lowercase_normalized() {
+        assert_eq!(
+            b32decode("jbswy3dpehpk3pxp").unwrap(),
+            b32decode("JBSWY3DPEHPK3PXP").unwrap()
+        );
+    }
+
+    #[test]
+    fn b32_invalid_secret() {
+        let e = b32decode("!!!invalid!!!").unwrap_err();
+        assert!(e.to_string().contains("Invalid base32"));
+    }
+
+    // ---- generate_hotp: RFC 4226 appendix D vectors (TestGenerateHOTP) ----
+
+    #[test]
+    fn hotp_rfc4226_vectors() {
+        let expected = [
+            "755224", "287082", "359152", "969429", "338314", "254676", "287922", "162583",
+            "399871", "520489",
+        ];
+        for (counter, want) in expected.iter().enumerate() {
+            let got = generate_hotp(RFC_SECRET_SHA1, counter as u64, TOTPAlgorithm::Sha1, 6).unwrap();
+            assert_eq!(&got, want, "counter={counter}");
+        }
+    }
+
+    // ---- generate_totp (TestGenerateTOTP) ----
+
+    #[test]
+    fn totp_returns_code() {
+        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let result = generate_totp(&config).unwrap();
+        assert_eq!(result.code.len(), 6);
+        assert!(result.code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn totp_timing_metadata() {
+        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let result = generate_totp(&config).unwrap();
+        assert_eq!(result.period_end - result.period_start, 30);
+        assert!(result.seconds_remaining > 0 && result.seconds_remaining <= 30);
+    }
+
+    #[test]
+    fn totp_8_digit_code() {
+        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 8, 30, None, None).unwrap();
+        assert_eq!(generate_totp(&config).unwrap().code.len(), 8);
+    }
+
+    #[test]
+    fn totp_60_second_period() {
+        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 60, None, None).unwrap();
+        let result = generate_totp(&config).unwrap();
+        assert_eq!(result.period_end - result.period_start, 60);
+    }
+
+    #[test]
+    fn totp_generate_code_method() {
+        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let result = config.generate_code().unwrap();
+        assert_eq!(result.code.len(), 6);
+    }
+
+    #[test]
+    fn totp_known_time_sha1() {
+        // RFC 6238 vector: time=59, SHA1, 8 digits -> 94287082.
+        // counter = 59 / 30 = 1.
+        assert_eq!(
+            generate_hotp(RFC_SECRET_SHA1, 1, TOTPAlgorithm::Sha1, 8).unwrap(),
+            "94287082"
+        );
+    }
+
+    #[test]
+    fn totp_known_time_sha1_large() {
+        // RFC 6238 vector: time=1111111109, SHA1, 8 digits -> 07081804.
+        // counter = 1111111109 / 30 = 37037036.
+        assert_eq!(
+            generate_hotp(RFC_SECRET_SHA1, 37037036, TOTPAlgorithm::Sha1, 8).unwrap(),
+            "07081804"
+        );
+    }
+
+    // ---- parse_totp_uri (TestParseTotpUri) ----
+
+    #[test]
+    fn parse_full_uri() {
+        let uri = "otpauth://totp/GitHub:user@example.com?secret=JBSWY3DPEHPK3PXP&issuer=GitHub&algorithm=SHA256&digits=8&period=60";
+        let config = parse_totp_uri(uri).unwrap();
+        assert_eq!(config.secret, "JBSWY3DPEHPK3PXP");
+        assert_eq!(config.issuer.as_deref(), Some("GitHub"));
+        assert_eq!(config.account_name.as_deref(), Some("user@example.com"));
+        assert_eq!(config.algorithm, TOTPAlgorithm::Sha256);
+        assert_eq!(config.digits, 8);
+        assert_eq!(config.period, 60);
+    }
+
+    #[test]
+    fn parse_minimal_uri() {
+        let config = parse_totp_uri("otpauth://totp/?secret=JBSWY3DPEHPK3PXP").unwrap();
+        assert_eq!(config.secret, "JBSWY3DPEHPK3PXP");
+        assert_eq!(config.algorithm, TOTPAlgorithm::Sha1);
+        assert_eq!(config.digits, 6);
+        assert_eq!(config.period, 30);
+        assert!(config.issuer.is_none());
+    }
+
+    #[test]
+    fn parse_issuer_in_label_only() {
+        let config = parse_totp_uri("otpauth://totp/MyApp:alice?secret=JBSWY3DPEHPK3PXP").unwrap();
+        assert_eq!(config.issuer.as_deref(), Some("MyApp"));
+        assert_eq!(config.account_name.as_deref(), Some("alice"));
+    }
+
+    #[test]
+    fn parse_issuer_param_overrides_label() {
+        let config =
+            parse_totp_uri("otpauth://totp/OldIssuer:alice?secret=JBSWY3DPEHPK3PXP&issuer=NewIssuer")
+                .unwrap();
+        assert_eq!(config.issuer.as_deref(), Some("NewIssuer"));
+    }
+
+    #[test]
+    fn parse_secret_uppercased() {
+        let config = parse_totp_uri("otpauth://totp/?secret=jbswy3dpehpk3pxp").unwrap();
+        assert_eq!(config.secret, "JBSWY3DPEHPK3PXP");
+    }
+
+    #[test]
+    fn parse_rejects_hotp() {
+        let e = parse_totp_uri("otpauth://hotp/?secret=JBSWY3DPEHPK3PXP&counter=0").unwrap_err();
+        assert!(e.to_string().contains("HOTP is not supported"));
+    }
+
+    #[test]
+    fn parse_rejects_invalid_scheme() {
+        let e = parse_totp_uri("https://example.com/totp?secret=JBSWY3DPEHPK3PXP").unwrap_err();
+        assert!(e.to_string().contains("Invalid scheme"));
+    }
+
+    #[test]
+    fn parse_rejects_missing_secret() {
+        let e = parse_totp_uri("otpauth://totp/?issuer=GitHub").unwrap_err();
+        assert!(e.to_string().contains("Missing required 'secret'"));
+    }
+
+    #[test]
+    fn parse_rejects_invalid_algorithm() {
+        let e = parse_totp_uri("otpauth://totp/?secret=JBSWY3DPEHPK3PXP&algorithm=MD5").unwrap_err();
+        assert!(e.to_string().contains("Invalid algorithm"));
+    }
+
+    #[test]
+    fn parse_rejects_invalid_digits() {
+        let e = parse_totp_uri("otpauth://totp/?secret=JBSWY3DPEHPK3PXP&digits=7").unwrap_err();
+        assert!(e.to_string().contains("Invalid digits"));
+    }
+
+    #[test]
+    fn parse_rejects_invalid_period() {
+        let e = parse_totp_uri("otpauth://totp/?secret=JBSWY3DPEHPK3PXP&period=45").unwrap_err();
+        assert!(e.to_string().contains("Invalid period"));
+    }
+
+    #[test]
+    fn parse_rejects_invalid_base32_secret() {
+        let e = parse_totp_uri("otpauth://totp/?secret=!!!invalid!!!").unwrap_err();
+        assert!(e.to_string().contains("Invalid base32"));
+    }
+}
