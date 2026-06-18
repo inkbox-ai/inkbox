@@ -97,7 +97,7 @@ describe("parseIdentityPhoneNumber", () => {
     const p = parseIdentityPhoneNumber(RAW_IDENTITY_PHONE);
     expect(p.id).toBe(RAW_IDENTITY_PHONE.id);
     expect(p.number).toBe("+18335794607");
-    expect(p.type).toBe("toll_free");
+    expect(p.type).toBe("local");
     expect(p.incomingCallAction).toBe("auto_reject");
     expect(p.clientWebsocketUrl).toBeNull();
     expect(p.incomingCallWebhookUrl).toBeNull();

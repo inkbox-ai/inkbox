@@ -82,7 +82,7 @@ describe("PhoneNumbersResource.update", () => {
 });
 
 describe("PhoneNumbersResource.provision", () => {
-  it("defaults to toll_free", async () => {
+  it("defaults to local", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_PHONE_NUMBER);
     const res = new PhoneNumbersResource(http);
@@ -91,7 +91,7 @@ describe("PhoneNumbersResource.provision", () => {
 
     expect(http.post).toHaveBeenCalledWith("/numbers", {
       agent_handle: "sales-agent",
-      type: "toll_free",
+      type: "local",
     });
   });
 

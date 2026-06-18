@@ -93,7 +93,7 @@ export interface InkboxOptions {
  * const identity = await inkbox.createIdentity("support-bot");
  *
  * // Provision a phone number for the identity
- * const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
+ * const phone = await identity.provisionPhoneNumber(); // provisions a local number
  *
  * // Send email directly from the identity
  * await identity.sendEmail({

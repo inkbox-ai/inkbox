@@ -110,8 +110,7 @@ class PhoneNumber:
     sms_error_code: str | None = None
     sms_error_detail: str | None = None
     sms_ready_at: datetime | None = None
-    # 2-letter US state abbreviation for LOCAL numbers (e.g. "NY");
-    # null for TOLL_FREE.
+    # 2-letter US state abbreviation (e.g. "NY"); null if not set.
     state: str | None = None
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None

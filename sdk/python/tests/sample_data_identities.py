@@ -41,7 +41,7 @@ IDENTITY_TUNNEL_DICT = {
 IDENTITY_PHONE_DICT = {
     "id": "bbbb2222-0000-0000-0000-000000000001",
     "number": "+18335794607",
-    "type": "toll_free",
+    "type": "local",
     "status": "active",
     "incoming_call_action": "auto_reject",
     "client_websocket_url": None,

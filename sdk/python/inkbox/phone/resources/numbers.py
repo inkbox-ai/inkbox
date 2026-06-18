@@ -83,15 +83,15 @@ class PhoneNumbersResource:
         self,
         *,
         agent_handle: str,
-        type: str = "toll_free",
+        type: str = "local",
         state: str | None = None,
     ) -> PhoneNumber:
         """Provision a new phone number and link it to an agent identity.
 
         Args:
             agent_handle: Handle of the agent identity to assign this number to.
-            type: ``"toll_free"`` or ``"local"``. Defaults to ``"toll_free"``.
-            state: US state abbreviation (e.g. ``"NY"``). Only valid for ``local`` numbers.
+            type: Number type to provision. Only ``"local"`` is supported. Defaults to ``"local"``.
+            state: US state abbreviation (e.g. ``"NY"``) to request a number in that state.
 
         Returns:
             The provisioned phone number.

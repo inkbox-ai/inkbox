@@ -133,8 +133,8 @@ impl IdentityTunnelCreateOptions {
 /// Optional phone-number provisioning payload nested under identity creation.
 ///
 /// # Fields
-/// * `r#type` (`String`) - Type of phone number to provision. Defaults to
-///   `"toll_free"`.
+/// * `r#type` (`String`) - Type of phone number to provision. Only `"local"`
+///   is supported; defaults to `"local"`.
 /// * `state` (`Option<String>`) - Optional US state abbreviation filter for
 ///   local numbers.
 /// * `incoming_call_action` (`String`) - How to handle inbound calls. Defaults
@@ -155,7 +155,7 @@ pub struct IdentityPhoneNumberCreateOptions {
 impl Default for IdentityPhoneNumberCreateOptions {
     fn default() -> Self {
         Self {
-            r#type: "toll_free".to_string(),
+            r#type: "local".to_string(),
             state: None,
             incoming_call_action: "auto_reject".to_string(),
             client_websocket_url: None,
@@ -168,12 +168,6 @@ impl IdentityPhoneNumberCreateOptions {
     /// Return a JSON object matching the API schema, validating the same
     /// invariants the Python `to_wire` raises `ValueError` for.
     pub fn to_wire(&self) -> crate::error::Result<Value> {
-        // `state` only applies to local numbers.
-        if self.r#type == "toll_free" && self.state.is_some() {
-            return Err(crate::error::InkboxError::InvalidArgument(
-                "state is only supported for local phone numbers".into(),
-            ));
-        }
         // auto_accept needs a client websocket; webhook needs a webhook URL.
         if self.incoming_call_action == "auto_accept" && self.client_websocket_url.is_none() {
             return Err(crate::error::InkboxError::InvalidArgument(
@@ -326,8 +320,7 @@ pub struct IdentityPhoneNumber {
     pub sms_error_detail: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sms_ready_at: Option<String>,
-    /// 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`); null for
-    /// TOLL_FREE.
+    /// 2-letter US state abbreviation (e.g. `"NY"`); null if not set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

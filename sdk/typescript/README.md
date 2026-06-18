@@ -35,7 +35,7 @@ const inkbox = await new Inkbox({
 
 // Create an agent identity with a linked mailbox
 const identity = await inkbox.createIdentity("support-bot", { displayName: "Support Bot" });
-const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
+const phone = await identity.provisionPhoneNumber(); // provisions a local number
 
 // Send email directly from the identity
 await identity.sendEmail({
@@ -133,7 +133,7 @@ const identity = await inkbox.createIdentity("sales-bot", {
   displayName: "Sales Bot",
   description: "Sales-outreach agent",
 });
-const phone    = await identity.provisionPhoneNumber({ type: "toll_free" });
+const phone    = await identity.provisionPhoneNumber(); // provisions a local number
 
 console.log(identity.emailAddress);            // sales-bot@inkboxmail.com
 console.log(identity.tunnel?.publicHost);      // sales-bot.inkboxwire.com
@@ -305,13 +305,12 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 
 **Outbound SMS rules (read before sending):**
 
-- Outbound SMS is currently allowed only from **local** numbers, not toll-free.
 - Each sender phone number is rate-limited to **100 recipient sends per rolling 24-hour window**. A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phoneNumber.smsStatus` reads `"pending"` until then, and sends will return `409 sender_sms_pending`.
 - The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`. You can inspect consent state directly via `inkbox.smsOptIns` — see [SMS Opt-Ins](#sms-opt-ins).
 - **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
+Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier.
 
 **TypeScript users:** group rows can legitimately have no single remote party, so text/conversation/webhook `remotePhoneNumber` / `remote_phone_number` fields are typed as `string | null`. One-to-one traffic still populates the remote number.
 
@@ -756,8 +755,8 @@ const numbers = await inkbox.phoneNumbers.list();
 const number = await inkbox.phoneNumbers.get("phone-number-uuid");
 
 // Provision a new number
-const num   = await inkbox.phoneNumbers.provision({ agentHandle: "sales-bot", type: "toll_free" });
-const local = await inkbox.phoneNumbers.provision({ agentHandle: "sales-bot", type: "local", state: "NY" });
+const num   = await inkbox.phoneNumbers.provision({ agentHandle: "sales-bot" }); // local by default
+const inNy  = await inkbox.phoneNumbers.provision({ agentHandle: "sales-bot", state: "NY" });
 
 // Update incoming call behaviour
 await inkbox.phoneNumbers.update(num.id, {

@@ -95,7 +95,7 @@ class TestIdentityPhoneNumberParsing:
 
         assert isinstance(p.id, UUID)
         assert p.number == "+18335794607"
-        assert p.type == "toll_free"
+        assert p.type == "local"
         assert p.status == "active"
         assert p.incoming_call_action == "auto_reject"
         assert p.client_websocket_url is None

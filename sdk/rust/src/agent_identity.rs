@@ -165,8 +165,9 @@ impl AgentIdentity {
     /// Provision a new phone number and link it to this identity.
     ///
     /// # Arguments
-    /// * `r#type` - `"toll_free"` (default) or `"local"`.
-    /// * `state` - US state abbreviation (e.g. `"NY"`), valid for local numbers only.
+    /// * `r#type` - Number type to provision. Only `"local"` is supported.
+    /// * `state` - US state abbreviation (e.g. `"NY"`) to request a number in
+    ///   that state.
     ///
     /// # Returns
     /// The newly provisioned and linked phone number.

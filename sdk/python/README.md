@@ -26,7 +26,7 @@ with Inkbox(
 ) as inkbox:
     # Create an agent identity with a linked mailbox
     identity = inkbox.create_identity("support-bot", display_name="Support Bot")
-    identity.provision_phone_number(type="toll_free")
+    identity.provision_phone_number()  # provisions a local number
 
     # Send email directly from the identity
     identity.send_email(
@@ -123,7 +123,7 @@ identity = inkbox.create_identity(
     display_name="Sales Bot",
     description="Sales-outreach agent",
 )
-phone = identity.provision_phone_number(type="toll_free")
+phone = identity.provision_phone_number()  # provisions a local number
 
 print(identity.email_address)            # sales-bot@inkboxmail.com
 print(identity.tunnel.public_host)       # sales-bot.inkboxwire.com
@@ -288,13 +288,12 @@ Send and receive SMS/MMS through the identity's assigned phone number.
 
 **Outbound SMS rules (read before sending):**
 
-- Outbound SMS is currently allowed only from **local** numbers, not toll-free.
 - Each sender phone number is rate-limited to **100 recipient sends per rolling 24-hour window**. A 3-recipient group message counts as 3 recipient sends. A single accepted send may push usage past the cap; the next capped send returns `429 sender_rate_limited`.
 - A new local number takes **~10-15 minutes** for the 10DLC campaign to propagate at the carrier — `phone_number.sms_status` reads `pending` until then, and sends will return `409 sender_sms_pending`.
 - The recipient must have texted **`START`** to any number within your organization to opt in. Unknown recipients will fail with `403 recipient_not_opted_in`; recipients who later send `STOP` flip to `403 recipient_opted_out`. You can inspect consent state directly via `inkbox.sms_opt_ins` — see [SMS Opt-Ins](#sms-opt-ins).
 - **Beta:** Group MMS and conversation sends are beta. Some carriers may reject group chats or MMS from 10DLC numbers even when the sender is ready and recipients have opted in.
 
-Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier. Toll-free SMS sending is still coming soon.
+Customer-managed 10DLC brands and campaigns lift the default per-number cap to the carrier-assigned tier.
 
 ```python
 # Send SMS/MMS. Returns a queued TextMessage; final delivery state
@@ -715,8 +714,8 @@ numbers = inkbox.phone_numbers.list()
 number = inkbox.phone_numbers.get("phone-number-uuid")
 
 # Provision a new number
-number = inkbox.phone_numbers.provision(agent_handle="sales-bot", type="toll_free")
-local  = inkbox.phone_numbers.provision(agent_handle="sales-bot", type="local", state="NY")
+number = inkbox.phone_numbers.provision(agent_handle="sales-bot")  # local by default
+in_ny  = inkbox.phone_numbers.provision(agent_handle="sales-bot", state="NY")
 
 # Update incoming call behaviour
 inkbox.phone_numbers.update(

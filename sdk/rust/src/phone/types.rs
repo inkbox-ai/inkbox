@@ -213,8 +213,7 @@ pub struct PhoneNumber {
     pub sms_error_detail: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sms_ready_at: Option<String>,
-    /// 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`); null for
-    /// TOLL_FREE.
+    /// 2-letter US state abbreviation (e.g. `"NY"`); null if not set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

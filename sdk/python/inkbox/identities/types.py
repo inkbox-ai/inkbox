@@ -80,14 +80,14 @@ class IdentityPhoneNumberCreateOptions:
     Optional phone-number provisioning payload nested under identity creation.
 
     Attributes:
-        type: Type of phone number to provision. Defaults to ``"toll_free"``.
+        type: Type of phone number to provision. Only ``"local"`` is supported; defaults to ``"local"``.
         state: Optional US state abbreviation filter for local numbers.
         incoming_call_action: How to handle inbound calls on the provisioned number.
         client_websocket_url: WebSocket URL for ``"auto_accept"`` call handling.
         incoming_call_webhook_url: Webhook URL for ``"webhook"`` call handling.
     """
 
-    type: str = "toll_free"
+    type: str = "local"
     state: str | None = None
     incoming_call_action: str = "auto_reject"
     client_websocket_url: str | None = None
@@ -95,8 +95,6 @@ class IdentityPhoneNumberCreateOptions:
 
     def to_wire(self) -> dict[str, Any]:
         """Return a JSON-serializable dict matching the API schema."""
-        if self.type == "toll_free" and self.state is not None:
-            raise ValueError("state is only supported for local phone numbers")
         if self.incoming_call_action == "auto_accept" and self.client_websocket_url is None:
             raise ValueError("client_websocket_url is required for auto_accept")
         if self.incoming_call_action == "webhook" and self.incoming_call_webhook_url is None:
@@ -197,8 +195,7 @@ class IdentityPhoneNumber:
     sms_error_code: str | None = None
     sms_error_detail: str | None = None
     sms_ready_at: datetime | None = None
-    # 2-letter US state abbreviation for LOCAL numbers (e.g. "NY");
-    # null for TOLL_FREE.
+    # 2-letter US state abbreviation (e.g. "NY"); null if not set.
     state: str | None = None
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None

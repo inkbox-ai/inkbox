@@ -86,8 +86,9 @@ impl PhoneNumbersResource {
     ///
     /// # Arguments
     /// * `agent_handle` - Handle of the agent identity to assign this number to.
-    /// * `type_` - `"toll_free"` or `"local"`.
-    /// * `state` - US state abbreviation (e.g. `"NY"`). Only valid for `local`.
+    /// * `type_` - Number type to provision. Only `"local"` is supported.
+    /// * `state` - US state abbreviation (e.g. `"NY"`) to request a number in
+    ///   that state.
     ///
     /// # Returns
     /// The provisioned phone number.

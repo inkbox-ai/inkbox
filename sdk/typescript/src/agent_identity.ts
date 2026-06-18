@@ -229,8 +229,8 @@ export class AgentIdentity {
   /**
    * Provision a new phone number and link it to this identity.
    *
-   * @param options.type - `"toll_free"` (default) or `"local"`.
-   * @param options.state - US state abbreviation (e.g. `"NY"`), valid for local numbers only.
+   * @param options.type - Number type to provision. Only `"local"` is supported. Defaults to `"local"`.
+   * @param options.state - US state abbreviation (e.g. `"NY"`) to request a number in that state.
    * @returns The newly provisioned and linked {@link IdentityPhoneNumber}.
    */
   async provisionPhoneNumber(

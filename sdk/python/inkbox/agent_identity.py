@@ -293,13 +293,13 @@ class AgentIdentity:
     ## Channel management
 
     def provision_phone_number(
-        self, *, type: str = "toll_free", state: str | None = None
+        self, *, type: str = "local", state: str | None = None
     ) -> IdentityPhoneNumber:
         """Provision a new phone number and link it to this identity.
 
         Args:
-            type: ``"toll_free"`` (default) or ``"local"``.
-            state: US state abbreviation (e.g. ``"NY"``), valid for local numbers only.
+            type: Number type to provision. Only ``"local"`` is supported. Defaults to ``"local"``.
+            state: US state abbreviation (e.g. ``"NY"``) to request a number in that state.
 
         Returns:
             The newly provisioned and linked phone number.

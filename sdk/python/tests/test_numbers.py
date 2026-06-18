@@ -18,7 +18,7 @@ class TestNumbersList:
         transport.get.assert_called_once_with("/numbers")
         assert len(numbers) == 1
         assert numbers[0].number == "+18335794607"
-        assert numbers[0].type == "toll_free"
+        assert numbers[0].type == "local"
         assert numbers[0].status == "active"
         assert numbers[0].client_websocket_url is None
 
@@ -109,16 +109,16 @@ class TestNumbersUpdate:
 
 
 class TestNumbersProvision:
-    def test_provision_toll_free(self, client, transport):
+    def test_provision_explicit_local(self, client, transport):
         transport.post.return_value = PHONE_NUMBER_DICT
 
-        number = client._numbers.provision(agent_handle="sales-bot", type="toll_free")
+        number = client._numbers.provision(agent_handle="sales-bot", type="local")
 
         transport.post.assert_called_once_with(
             "/numbers",
-            json={"agent_handle": "sales-bot", "type": "toll_free"},
+            json={"agent_handle": "sales-bot", "type": "local"},
         )
-        assert number.type == "toll_free"
+        assert number.type == "local"
 
     def test_provision_local_with_state(self, client, transport):
         local = {**PHONE_NUMBER_DICT, "type": "local", "number": "+12125551234"}
@@ -132,13 +132,13 @@ class TestNumbersProvision:
         )
         assert number.type == "local"
 
-    def test_provision_defaults_to_toll_free(self, client, transport):
+    def test_provision_defaults_to_local(self, client, transport):
         transport.post.return_value = PHONE_NUMBER_DICT
 
         client._numbers.provision(agent_handle="sales-bot")
 
         _, kwargs = transport.post.call_args
-        assert kwargs["json"]["type"] == "toll_free"
+        assert kwargs["json"]["type"] == "local"
         assert kwargs["json"]["agent_handle"] == "sales-bot"
 
 class TestNumbersRelease:
