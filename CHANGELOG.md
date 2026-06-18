@@ -8,7 +8,14 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- **Rust SDK** (`sdk/rust`, crate `inkbox`). A faithful port of the Python and TypeScript SDKs: mail, phone, iMessage, contacts, notes, identities, the encrypted vault (Argon2id + AES-256-GCM + TOTP), API keys, webhook payload types + HMAC signature verification, agent signup, whoami, and the tunnels control plane. The public surface is blocking (`reqwest::blocking`) to match the synchronous Python/TS APIs; wire shapes are identical across all three SDKs. The tunnels data-plane runtime (h2/TLS data plane + P-256 PKCS#10 CSR) lives behind the optional `tunnels-runtime` feature; its wire codecs are unit-tested. Live-edge validation of the connection runtime is still recommended before relying on it in production.
+- **Rust SDK** (`sdk/rust`, crate `inkbox`). A faithful port of the Python and TypeScript SDKs: mail, phone, iMessage, contacts, notes, identities, the encrypted vault (Argon2id + AES-256-GCM + TOTP), API keys, webhook payload types + HMAC signature verification, agent signup, whoami, and the tunnels control plane. The public surface is blocking (`reqwest::blocking`) to match the synchronous Python/TS APIs; wire shapes are identical across all three SDKs. The tunnels data-plane runtime (h2/TLS data plane + P-256 PKCS#10 CSR) lives behind the optional `tunnels-runtime` feature. The encrypted vault and the passthrough tunnel data plane are live-validated end-to-end against production.
+
+### Fixed
+
+- **Passthrough tunnel data plane (`tunnels-runtime`).** Three bugs that prevented passthrough tunnels from serving inbound traffic, found and fixed during live-edge validation:
+  - The agent's extended-CONNECT bridge request (`/_system/tcp/{id}`) omitted the `sec-websocket-protocol: inkbox-tunnel-tcp` header, so the edge closed the bridge pre-accept (surfaced as HTTP 403) and every inbound TLS handshake hung. The header is now sent (matching the Python SDK).
+  - `cert_needs_sign` parsed the cached cert chain with `Certificate::from_pem`, which rejects multi-block PEM — so it re-signed the CSR on every `connect()`, exhausting the server's sign-CSR rate limit. It now parses the chain with `load_pem_chain` and reuses a valid cached cert.
+  - On upstream EOF the passthrough bridge dropped its h2 receive stream while the edge still considered it open, emitting `RST_STREAM` and truncating the client's TLS session (connection-close-delimited responses failed). The bridge now drains inbound to EOF before closing, so the client gets a clean TLS shutdown.
 
 ### Changed
 

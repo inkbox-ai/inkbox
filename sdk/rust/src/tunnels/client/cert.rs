@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use p256::ecdsa::{DerSignature, SigningKey};
 use p256::pkcs8::{DecodePrivateKey, EncodePrivateKey, LineEnding};
 
-use der::{DecodePem, EncodePem};
+use der::EncodePem;
 use spki::{EncodePublicKey, SubjectPublicKeyInfoOwned};
 use x509_cert::builder::{Builder, RequestBuilder};
 use x509_cert::ext::pkix::name::GeneralName;
@@ -123,9 +123,10 @@ fn cert_expiry_secs(state_dir: &Path) -> Option<i64> {
         return None;
     }
     let pem = std::fs::read(&cert_path).ok()?;
-    // The chain file may hold multiple PEM blocks; from_pem reads the first
-    // (leaf) CERTIFICATE block, matching the TS port's leaf-first behavior.
-    let cert = Certificate::from_pem(&pem).ok()?;
+    // The chain file holds multiple PEM blocks (leaf + intermediates).
+    // `from_pem` rejects trailing blocks, so parse the whole chain and take the
+    // leaf (first cert) — matching the TS port's leaf-first behavior.
+    let cert = Certificate::load_pem_chain(&pem).ok()?.into_iter().next()?;
     let secs = cert
         .tbs_certificate
         .validity
@@ -188,7 +189,8 @@ pub fn cert_needs_sign(state_dir: &Path, key: &SigningKey) -> bool {
 /// Read the leaf cert's SubjectPublicKeyInfo as DER bytes, or `None` on error.
 fn cert_spki_der(cert_path: &Path) -> Option<Vec<u8>> {
     let pem = std::fs::read(cert_path).ok()?;
-    let cert = Certificate::from_pem(&pem).ok()?;
+    // Parse the full chain and take the leaf; `from_pem` rejects trailing blocks.
+    let cert = Certificate::load_pem_chain(&pem).ok()?.into_iter().next()?;
     let spki: &SubjectPublicKeyInfoOwned = &cert.tbs_certificate.subject_public_key_info;
     use der::Encode;
     spki.to_der().ok()
@@ -208,6 +210,7 @@ pub fn write_cert_chain(state_dir: &Path, cert_pem: &str, chain_pem: &str) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+    use der::DecodePem; // CertReq::from_pem in the CSR test
     use std::path::PathBuf;
 
     fn unique_dir(tag: &str) -> PathBuf {

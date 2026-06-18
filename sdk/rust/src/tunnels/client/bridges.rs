@@ -797,6 +797,22 @@ async fn run_tcp_bridge(
     .await;
 
     finish_tcp_bridge(&send, &mut tls, &close_reason).await;
+
+    // Drain the inbound half until the edge ends the stream. Dropping `recv`
+    // while the edge still considers the stream open makes h2 emit RST_STREAM,
+    // which the edge propagates as a TCP reset to the third party — truncating
+    // its TLS session before our close_notify lands (curl reports error 56 on
+    // connection-close-delimited bodies). Mirrors Python's
+    // `_drain_and_ack_pending`: read to EOF (bounded) so the close is graceful.
+    let _ = tokio::time::timeout(
+        Duration::from_secs_f64(BRIDGE_HALF_CLOSE_GRACE_SEC),
+        async {
+            while let Some(Ok(chunk)) = recv.data().await {
+                let _ = recv.flow_control().release_capacity(chunk.len());
+            }
+        },
+    )
+    .await;
     close_reason
 }
 
@@ -850,7 +866,12 @@ fn open_connect_bridge(
     let mut req = Request::builder()
         .method(Method::CONNECT)
         .uri(&uri)
+        // The edge routes the bridge by subprotocol: it requires the
+        // `inkbox-tunnel-{ws,tcp}` value in `sec-websocket-protocol` (which it
+        // reads into the ASGI `subprotocols` list). Omitting it makes the
+        // handler close pre-accept, which Hypercorn surfaces as HTTP 403.
         .header("sec-websocket-version", "13")
+        .header("sec-websocket-protocol", subprotocol)
         .header("x-tunnel-id", &ctx.tunnel_id)
         .header("x-api-key", &ctx.api_key)
         .header(id_header, id)
