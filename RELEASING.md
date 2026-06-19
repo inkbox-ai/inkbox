@@ -30,24 +30,16 @@ Add the release section to `CHANGELOG.md` (newest on top), then commit the bump 
 
 Publish the **TypeScript SDK before the CLI** (the CLI depends on it; its `publish.sh` runs `npm install`, which resolves the just-published `@inkbox/sdk`). Python and Rust have no cross-deps and can go anytime.
 
+Run all four from the repo root, in this order:
+
 ```bash
-# 1. TypeScript SDK (first — CLI depends on it)
-cd sdk/typescript && ./publish.sh           # dry run
-                     ./publish.sh --prod     # publish to npm
-
-# 2. CLI (after the SDK is live on npm)
-cd ../../cli && ./publish.sh && ./publish.sh --prod
-
-# 3. Python
-cd ../sdk/python && ./publish.sh             # dry run -> TestPyPI
-                    ./publish.sh --prod       # -> PyPI
-
-# 4. Rust
-cd ../rust && ./publish.sh                   # dry run (packages + verifies)
-              ./publish.sh --prod             # publish to crates.io
+(cd sdk/typescript && ./publish.sh --prod)   # npm        — @inkbox/sdk (first)
+(cd cli            && ./publish.sh --prod)   # npm        — @inkbox/cli
+(cd sdk/python     && ./publish.sh --prod)   # PyPI       — inkbox
+(cd sdk/rust       && ./publish.sh --prod)   # crates.io  — inkbox
 ```
 
-Always run the dry run first and eyeball the package contents/version.
+(Each script also runs as a dry run without `--prod`, if you want to preview first.)
 
 ## 4. Credentials (one-time per machine)
 
