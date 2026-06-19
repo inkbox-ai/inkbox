@@ -296,6 +296,10 @@ See [`skills/README.md`](./skills/README.md) for details.
 - [API Reference](https://inkbox.ai/docs/api-reference)
 - [Console](https://inkbox.ai/console)
 
+## Releasing
+
+Maintainers: see [RELEASING.md](./RELEASING.md) for the lockstep version-bump and per-registry publish steps (PyPI, npm, crates.io).
+
 ## License
 
 MIT
