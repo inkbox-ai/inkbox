@@ -231,9 +231,15 @@ impl TunnelRuntime {
     /// Open one connection, send hello, park the intake pool, and supervise
     /// it until the connection dies or shutdown is requested.
     async fn run_once(self: &Arc<Self>) -> Result<()> {
+        // `force_down` lets the PING keepalive and the intake loops force this
+        // connection down (a half-dead socket or a rejected owner token never
+        // fires `conn_closed` on its own — dropping those tasks isn't enough).
+        // Fresh per connection so a stale signal can't kill the next one.
+        let force_down = Arc::new(Notify::new());
+
         // Dial + h2 handshake. The driver runs as a background task; when it
         // ends (GOAWAY / reset / TCP close) `conn_closed` fires.
-        let (send, conn_closed) = self.open_connection().await?;
+        let (send, conn_closed) = self.open_connection(force_down.clone()).await?;
 
         // Hello handshake — establishes the owner_token used to park intakes.
         let active = self.send_hello(send).await?;
@@ -252,12 +258,15 @@ impl TunnelRuntime {
         for slot in 0..effective_pool {
             let me = self.clone();
             let conn = active.clone();
-            handles.push(tokio::spawn(async move { me.intake_loop(conn, slot).await }));
+            let fd = force_down.clone();
+            handles.push(tokio::spawn(async move { me.intake_loop(conn, slot, fd).await }));
         }
 
-        // Supervise: return when the connection dies or stop is requested.
+        // Supervise: return when the connection dies, a keepalive/owner-token
+        // failure forces it down, or stop is requested.
         tokio::select! {
             _ = conn_closed => {}
+            _ = force_down.notified() => {}
             _ = self.stop.notified() => {}
             _ = wait_until_stopped(self.stopped.clone()) => {}
         }
@@ -280,6 +289,7 @@ impl TunnelRuntime {
     /// connection dies.
     async fn open_connection(
         self: &Arc<Self>,
+        force_down: Arc<Notify>,
     ) -> Result<(SendRequest<Bytes>, tokio::sync::oneshot::Receiver<()>)> {
         use tokio::net::TcpStream;
         use tokio_rustls::TlsConnector;
@@ -324,6 +334,7 @@ impl TunnelRuntime {
         });
         if let Some(mut pp) = ping_pong {
             let stopped_ping = self.stopped.clone();
+            let force_down_ping = force_down.clone();
             tokio::spawn(async move {
                 loop {
                     tokio::time::sleep(PING_INTERVAL).await;
@@ -332,10 +343,13 @@ impl TunnelRuntime {
                     }
                     match tokio::time::timeout(PING_ACK_TIMEOUT, pp.ping(h2::Ping::opaque())).await {
                         Ok(Ok(_pong)) => {}
-                        // Ack timed out or the connection errored: stop pinging.
-                        // Dropping `pp` and the connection death surface to the
-                        // supervisor via `conn_closed`.
-                        _ => return,
+                        // Ack timed out or the connection errored. The socket may
+                        // still look open to the driver (no `conn_closed`), so
+                        // force the supervisor to tear it down and reconnect.
+                        _ => {
+                            force_down_ping.notify_one();
+                            return;
+                        }
                     }
                 }
             });
@@ -408,7 +422,7 @@ impl TunnelRuntime {
     /// One parked-intake worker (Python `_intake_loop`): long-poll
     /// `/_system/intake`, then dispatch the returned envelope. Loops until
     /// shutdown or a fatal owner-token rejection.
-    async fn intake_loop(self: Arc<Self>, conn: Arc<ActiveConn>, slot: usize) {
+    async fn intake_loop(self: Arc<Self>, conn: Arc<ActiveConn>, slot: usize, force_down: Arc<Notify>) {
         while !self.is_stopped() {
             match self.park_one_intake(&conn, slot).await {
                 Ok(Some(env)) => {
@@ -419,7 +433,13 @@ impl TunnelRuntime {
                     });
                 }
                 Ok(None) => continue,
-                Err(e) if is_owner_token_invalid(&e) => return, // triggers reconnect
+                // The owner token is no longer valid (e.g. a sibling connection
+                // re-registered): force the supervisor down so it reconnects and
+                // re-hellos for a fresh token, then exit this slot.
+                Err(e) if is_owner_token_invalid(&e) => {
+                    force_down.notify_one();
+                    return;
+                }
                 Err(_) => tokio::time::sleep(Duration::from_millis(250)).await,
             }
         }
