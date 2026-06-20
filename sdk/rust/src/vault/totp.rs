@@ -9,6 +9,7 @@ use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
@@ -35,9 +36,13 @@ impl TOTPAlgorithm {
             TOTPAlgorithm::Sha512 => "sha512",
         }
     }
+}
+
+impl std::str::FromStr for TOTPAlgorithm {
+    type Err = InkboxError;
 
     /// Parse from a (case-insensitive) string. Mirrors `TOTPAlgorithm(value)`.
-    pub fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
             "sha1" => Ok(TOTPAlgorithm::Sha1),
             "sha256" => Ok(TOTPAlgorithm::Sha256),
@@ -222,7 +227,11 @@ fn generate_hotp(
         | (((h[offset + 2] as u32) & 0xff) << 8)
         | ((h[offset + 3] as u32) & 0xff);
     let modulo = 10u32.pow(digits);
-    Ok(format!("{:0width$}", code % modulo, width = digits as usize))
+    Ok(format!(
+        "{:0width$}",
+        code % modulo,
+        width = digits as usize
+    ))
 }
 
 /// Generate the current TOTP code per RFC 6238.
@@ -267,8 +276,8 @@ pub fn generate_totp(config: &TOTPConfig) -> Result<TOTPCode> {
 /// # Returns
 /// A validated [`TOTPConfig`].
 pub fn parse_totp_uri(uri: &str) -> Result<TOTPConfig> {
-    let parsed = Url::parse(uri)
-        .map_err(|_| InkboxError::InvalidArgument(format!("Invalid URI: {uri}")))?;
+    let parsed =
+        Url::parse(uri).map_err(|_| InkboxError::InvalidArgument(format!("Invalid URI: {uri}")))?;
 
     // `url` keeps the trailing ':' off the scheme.
     if parsed.scheme() != "otpauth" {
@@ -419,7 +428,10 @@ mod tests {
 
     #[test]
     fn algorithm_coerce_from_string() {
-        assert_eq!(TOTPAlgorithm::from_str("sha256").unwrap(), TOTPAlgorithm::Sha256);
+        assert_eq!(
+            TOTPAlgorithm::from_str("sha256").unwrap(),
+            TOTPAlgorithm::Sha256
+        );
     }
 
     // ---- TOTPConfig (TestTOTPConfig) ----
@@ -467,7 +479,8 @@ mod tests {
 
     #[test]
     fn config_to_dict_omits_none() {
-        let c = TOTPConfig::new("JBSWY3DPEHPK3PXP", TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let c =
+            TOTPConfig::new("JBSWY3DPEHPK3PXP", TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
         let d = serde_json::to_value(&c).unwrap();
         assert!(d.get("issuer").is_none());
         assert!(d.get("account_name").is_none());
@@ -547,7 +560,8 @@ mod tests {
             "399871", "520489",
         ];
         for (counter, want) in expected.iter().enumerate() {
-            let got = generate_hotp(RFC_SECRET_SHA1, counter as u64, TOTPAlgorithm::Sha1, 6).unwrap();
+            let got =
+                generate_hotp(RFC_SECRET_SHA1, counter as u64, TOTPAlgorithm::Sha1, 6).unwrap();
             assert_eq!(&got, want, "counter={counter}");
         }
     }
@@ -556,7 +570,8 @@ mod tests {
 
     #[test]
     fn totp_returns_code() {
-        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let config =
+            TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
         let result = generate_totp(&config).unwrap();
         assert_eq!(result.code.len(), 6);
         assert!(result.code.chars().all(|c| c.is_ascii_digit()));
@@ -564,7 +579,8 @@ mod tests {
 
     #[test]
     fn totp_timing_metadata() {
-        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let config =
+            TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
         let result = generate_totp(&config).unwrap();
         assert_eq!(result.period_end - result.period_start, 30);
         assert!(result.seconds_remaining > 0 && result.seconds_remaining <= 30);
@@ -572,20 +588,23 @@ mod tests {
 
     #[test]
     fn totp_8_digit_code() {
-        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 8, 30, None, None).unwrap();
+        let config =
+            TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 8, 30, None, None).unwrap();
         assert_eq!(generate_totp(&config).unwrap().code.len(), 8);
     }
 
     #[test]
     fn totp_60_second_period() {
-        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 60, None, None).unwrap();
+        let config =
+            TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 60, None, None).unwrap();
         let result = generate_totp(&config).unwrap();
         assert_eq!(result.period_end - result.period_start, 60);
     }
 
     #[test]
     fn totp_generate_code_method() {
-        let config = TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
+        let config =
+            TOTPConfig::new(RFC_SECRET_SHA1, TOTPAlgorithm::Sha1, 6, 30, None, None).unwrap();
         let result = config.generate_code().unwrap();
         assert_eq!(result.code.len(), 6);
     }
@@ -643,9 +662,10 @@ mod tests {
 
     #[test]
     fn parse_issuer_param_overrides_label() {
-        let config =
-            parse_totp_uri("otpauth://totp/OldIssuer:alice?secret=JBSWY3DPEHPK3PXP&issuer=NewIssuer")
-                .unwrap();
+        let config = parse_totp_uri(
+            "otpauth://totp/OldIssuer:alice?secret=JBSWY3DPEHPK3PXP&issuer=NewIssuer",
+        )
+        .unwrap();
         assert_eq!(config.issuer.as_deref(), Some("NewIssuer"));
     }
 
@@ -675,7 +695,8 @@ mod tests {
 
     #[test]
     fn parse_rejects_invalid_algorithm() {
-        let e = parse_totp_uri("otpauth://totp/?secret=JBSWY3DPEHPK3PXP&algorithm=MD5").unwrap_err();
+        let e =
+            parse_totp_uri("otpauth://totp/?secret=JBSWY3DPEHPK3PXP&algorithm=MD5").unwrap_err();
         assert!(e.to_string().contains("Invalid algorithm"));
     }
 

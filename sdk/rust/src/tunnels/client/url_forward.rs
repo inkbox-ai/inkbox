@@ -46,9 +46,7 @@ pub fn url_split(url: &str) -> UrlParts {
         None => (String::new(), url),
     };
     // netloc ends at the first '/', '?' or '#'.
-    let netloc_end = rest
-        .find(|c| c == '/' || c == '?' || c == '#')
-        .unwrap_or(rest.len());
+    let netloc_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
     let netloc = rest[..netloc_end].to_string();
     let after = &rest[netloc_end..];
     let (path, query) = match after.find('?') {
@@ -587,7 +585,10 @@ mod tests {
             out,
             vec![
                 ("Host".to_string(), "localhost:8080".to_string()),
-                ("X-Forwarded-Host".to_string(), "tun.example.com".to_string()),
+                (
+                    "X-Forwarded-Host".to_string(),
+                    "tun.example.com".to_string()
+                ),
                 ("X-Forwarded-Proto".to_string(), "https".to_string()),
                 ("X-Forwarded-For".to_string(), "1.2.3.4".to_string()),
                 ("Forwarded".to_string(), "for=1.2.3.4".to_string()),
@@ -604,7 +605,10 @@ mod tests {
             out,
             vec![
                 ("Host".to_string(), "127.0.0.1:9000".to_string()),
-                ("X-Forwarded-Host".to_string(), "tun.example.com".to_string()),
+                (
+                    "X-Forwarded-Host".to_string(),
+                    "tun.example.com".to_string()
+                ),
                 ("X-Forwarded-Proto".to_string(), "https".to_string()),
                 ("accept".to_string(), "*/*".to_string()),
             ]
@@ -629,7 +633,10 @@ mod tests {
             out,
             vec![
                 ("Host".to_string(), "localhost:8080".to_string()),
-                ("X-Forwarded-Host".to_string(), "tun.example.com".to_string()),
+                (
+                    "X-Forwarded-Host".to_string(),
+                    "tun.example.com".to_string()
+                ),
                 ("X-Forwarded-Proto".to_string(), "https".to_string()),
                 ("X-Real-Custom".to_string(), "kept".to_string()),
             ]
@@ -654,7 +661,10 @@ mod tests {
             out,
             vec![
                 ("Host".to_string(), "localhost:8080".to_string()),
-                ("X-Forwarded-Host".to_string(), "tun.example.com".to_string()),
+                (
+                    "X-Forwarded-Host".to_string(),
+                    "tun.example.com".to_string()
+                ),
                 ("X-Forwarded-Proto".to_string(), "https".to_string()),
                 ("X-Forwarded-For".to_string(), "1.2.3.4".to_string()),
                 ("Forwarded".to_string(), "for=1.2.3.4".to_string()),
@@ -666,7 +676,10 @@ mod tests {
     #[test]
     fn target_host_is_netloc_with_port() {
         // The Host header uses the full netloc (authority) including the port.
-        assert_eq!(url_split("http://localhost:8080/base").netloc, "localhost:8080");
+        assert_eq!(
+            url_split("http://localhost:8080/base").netloc,
+            "localhost:8080"
+        );
         assert_eq!(url_split("http://127.0.0.1:9000").netloc, "127.0.0.1:9000");
     }
 }

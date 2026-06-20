@@ -22,9 +22,7 @@ pub use types::{
 };
 
 // Re-export the domain exceptions.
-pub use exceptions::{
-    map_identity_conflict_error, BlockingNamespace, HandleUnavailableError,
-};
+pub use exceptions::{map_identity_conflict_error, BlockingNamespace, HandleUnavailableError};
 
 // Re-export the resource.
 pub use resources::IdentitiesResource;

@@ -25,17 +25,12 @@ const BASE: &str = "/contacts";
 /// * `Null` — send `access_identity_ids: null` (same as wildcard server-side).
 /// * `Ids(vec)` — explicit per-identity grants. `[]` means zero grants (only
 ///   admin + human callers see it). Capped at 500 entries server-side.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum AccessIdentityIds {
+    #[default]
     Wildcard,
     Null,
     Ids(Vec<String>),
-}
-
-impl Default for AccessIdentityIds {
-    fn default() -> Self {
-        AccessIdentityIds::Wildcard
-    }
 }
 
 /// Optional filters for [`ContactsResource::list`]. All fields default to None
@@ -217,13 +212,19 @@ impl ContactsResource {
             body.insert("phones".into(), wire_list(phones, ContactPhone::to_wire));
         }
         if let Some(websites) = &params.websites {
-            body.insert("websites".into(), wire_list(websites, ContactWebsite::to_wire));
+            body.insert(
+                "websites".into(),
+                wire_list(websites, ContactWebsite::to_wire),
+            );
         }
         if let Some(dates) = &params.dates {
             body.insert("dates".into(), wire_list(dates, ContactDate::to_wire));
         }
         if let Some(addresses) = &params.addresses {
-            body.insert("addresses".into(), wire_list(addresses, ContactAddress::to_wire));
+            body.insert(
+                "addresses".into(),
+                wire_list(addresses, ContactAddress::to_wire),
+            );
         }
         if let Some(custom_fields) = &params.custom_fields {
             body.insert(
@@ -244,9 +245,7 @@ impl ContactsResource {
                 );
             }
         }
-        let data = self
-            .http
-            .post(BASE, Some(&Value::Object(body)), NO_QUERY)?;
+        let data = self.http.post(BASE, Some(&Value::Object(body)), NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -270,9 +269,19 @@ impl ContactsResource {
         // List fields: outer Some => emit; inner None => JSON null, else array.
         insert_patch_list(&mut body, "emails", &params.emails, ContactEmail::to_wire);
         insert_patch_list(&mut body, "phones", &params.phones, ContactPhone::to_wire);
-        insert_patch_list(&mut body, "websites", &params.websites, ContactWebsite::to_wire);
+        insert_patch_list(
+            &mut body,
+            "websites",
+            &params.websites,
+            ContactWebsite::to_wire,
+        );
         insert_patch_list(&mut body, "dates", &params.dates, ContactDate::to_wire);
-        insert_patch_list(&mut body, "addresses", &params.addresses, ContactAddress::to_wire);
+        insert_patch_list(
+            &mut body,
+            "addresses",
+            &params.addresses,
+            ContactAddress::to_wire,
+        );
         insert_patch_list(
             &mut body,
             "custom_fields",

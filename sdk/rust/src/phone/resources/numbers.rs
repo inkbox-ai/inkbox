@@ -78,7 +78,9 @@ impl PhoneNumbersResource {
             };
             body.insert("filter_mode".into(), mode.into());
         }
-        let data = self.http.patch(&format!("{BASE}/{phone_number_id}"), &body)?;
+        let data = self
+            .http
+            .patch(&format!("{BASE}/{phone_number_id}"), &body)?;
         Ok(serde_json::from_value(data)?)
     }
 

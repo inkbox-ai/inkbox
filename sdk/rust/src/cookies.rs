@@ -46,7 +46,11 @@ impl CookieJar {
     pub fn header_for_url(&self, url: &str) -> Option<String> {
         let parsed = Url::parse(url).ok()?;
         let host = parsed.host_str().unwrap_or("").to_lowercase();
-        let path = if parsed.path().is_empty() { "/" } else { parsed.path() };
+        let path = if parsed.path().is_empty() {
+            "/"
+        } else {
+            parsed.path()
+        };
         let is_secure = parsed.scheme() == "https";
         let now = now_secs();
 
@@ -89,10 +93,18 @@ impl CookieJar {
     }
 
     /// Ingest every `Set-Cookie` header from a response.
-    pub fn store_from_headers<'a>(&self, url: &str, set_cookie_values: impl Iterator<Item = &'a str>) {
+    pub fn store_from_headers<'a>(
+        &self,
+        url: &str,
+        set_cookie_values: impl Iterator<Item = &'a str>,
+    ) {
         for raw in set_cookie_values {
             if let Some(cookie) = parse_set_cookie(url, raw) {
-                let key = (cookie.domain.clone(), cookie.path.clone(), cookie.name.clone());
+                let key = (
+                    cookie.domain.clone(),
+                    cookie.path.clone(),
+                    cookie.name.clone(),
+                );
                 if let Some(exp) = cookie.expires_at {
                     if exp <= now_secs() {
                         self.cookies.lock().unwrap().remove(&key);
@@ -106,7 +118,11 @@ impl CookieJar {
 }
 
 fn parse_set_cookie(url: &str, header: &str) -> Option<Cookie> {
-    let parts: Vec<&str> = header.split(';').map(|p| p.trim()).filter(|p| !p.is_empty()).collect();
+    let parts: Vec<&str> = header
+        .split(';')
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+        .collect();
     let first = parts.first()?;
     let (name, value) = first.split_once('=')?;
     if name.is_empty() {
@@ -116,7 +132,11 @@ fn parse_set_cookie(url: &str, header: &str) -> Option<Cookie> {
     let parsed = Url::parse(url).ok()?;
     let mut domain = parsed.host_str().unwrap_or("").to_lowercase();
     let mut host_only = true;
-    let mut path = default_path(if parsed.path().is_empty() { "/" } else { parsed.path() });
+    let mut path = default_path(if parsed.path().is_empty() {
+        "/"
+    } else {
+        parsed.path()
+    });
     let mut secure = false;
     let mut expires_at: Option<f64> = None;
 
@@ -179,8 +199,18 @@ fn parse_http_date(s: &str) -> Option<f64> {
 
 fn month_num(m: &str) -> Option<i64> {
     Some(match m {
-        "Jan" => 1, "Feb" => 2, "Mar" => 3, "Apr" => 4, "May" => 5, "Jun" => 6,
-        "Jul" => 7, "Aug" => 8, "Sep" => 9, "Oct" => 10, "Nov" => 11, "Dec" => 12,
+        "Jan" => 1,
+        "Feb" => 2,
+        "Mar" => 3,
+        "Apr" => 4,
+        "May" => 5,
+        "Jun" => 6,
+        "Jul" => 7,
+        "Aug" => 8,
+        "Sep" => 9,
+        "Oct" => 10,
+        "Nov" => 11,
+        "Dec" => 12,
         _ => return None,
     })
 }

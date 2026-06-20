@@ -25,7 +25,9 @@ impl ContactAccessResource {
     ///
     /// Returns 404 from the server if the caller can't see the contact.
     pub fn list(&self, contact_id: &str) -> Result<Vec<ContactAccess>> {
-        let data = self.http.get(&format!("{BASE}/{contact_id}/access"), NO_QUERY)?;
+        let data = self
+            .http
+            .get(&format!("{BASE}/{contact_id}/access"), NO_QUERY)?;
         // The server may wrap the rows in `{ "items": [...] }` or return a bare array.
         let items = unwrap_items(data);
         Ok(serde_json::from_value(items)?)
@@ -51,9 +53,11 @@ impl ContactAccessResource {
         // `identity_id` is null for a wildcard grant, otherwise the supplied id.
         let identity = if wildcard { None } else { identity_id };
         let body = json!({ "identity_id": identity });
-        let data = self
-            .http
-            .post(&format!("{BASE}/{contact_id}/access"), Some(&body), NO_QUERY)?;
+        let data = self.http.post(
+            &format!("{BASE}/{contact_id}/access"),
+            Some(&body),
+            NO_QUERY,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 

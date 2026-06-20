@@ -70,7 +70,10 @@ impl MessagesResource {
             out.extend(batch);
 
             // Stop once the server reports no more pages.
-            let has_more = page.get("has_more").and_then(Value::as_bool).unwrap_or(false);
+            let has_more = page
+                .get("has_more")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
             if !has_more {
                 break;
             }
@@ -152,7 +155,10 @@ impl MessagesResource {
             body.insert("body_html".into(), Value::String(bh.to_string()));
         }
         if let Some(irt) = in_reply_to_message_id {
-            body.insert("in_reply_to_message_id".into(), Value::String(irt.to_string()));
+            body.insert(
+                "in_reply_to_message_id".into(),
+                Value::String(irt.to_string()),
+            );
         }
         if let Some(att) = attachments {
             body.insert("attachments".into(), json!(att));
@@ -324,7 +330,10 @@ impl MessagesResource {
         filename: &str,
         redirect: bool,
     ) -> Result<Value> {
-        let params = [("redirect", if redirect { "true" } else { "false" }.to_string())];
+        let params = [(
+            "redirect",
+            if redirect { "true" } else { "false" }.to_string(),
+        )];
         self.http.get(
             &format!("/mailboxes/{email_address}/messages/{message_id}/attachments/{filename}"),
             &params,

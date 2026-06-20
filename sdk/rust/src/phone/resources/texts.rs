@@ -136,9 +136,10 @@ impl TextsResource {
         if let Some(r) = is_read {
             body.insert("is_read".into(), r.into());
         }
-        let data = self
-            .http
-            .patch(&format!("/numbers/{phone_number_id}/texts/{text_id}"), &body)?;
+        let data = self.http.patch(
+            &format!("/numbers/{phone_number_id}/texts/{text_id}"),
+            &body,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 

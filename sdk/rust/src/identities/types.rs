@@ -45,6 +45,9 @@ pub enum Unset<T> {
     Value(Option<T>),
 }
 
+// Not derived: `#[derive(Default)]` would add a spurious `T: Default` bound,
+// but `Omit` needs none — keep the impl unconstrained over `T`.
+#[allow(clippy::derivable_impls)]
 impl<T> Default for Unset<T> {
     fn default() -> Self {
         Unset::Omit

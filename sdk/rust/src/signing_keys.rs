@@ -69,8 +69,8 @@ pub fn verify_webhook(
     let key = secret.strip_prefix("whsec_").unwrap_or(secret);
 
     // Signed payload: "{request_id}.{timestamp}." + raw body bytes.
-    let mut mac = HmacSha256::new_from_slice(key.as_bytes())
-        .expect("HMAC accepts keys of any length");
+    let mut mac =
+        HmacSha256::new_from_slice(key.as_bytes()).expect("HMAC accepts keys of any length");
     mac.update(format!("{request_id}.{timestamp}.").as_bytes());
     mac.update(payload);
     let expected = hex::encode(mac.finalize().into_bytes());

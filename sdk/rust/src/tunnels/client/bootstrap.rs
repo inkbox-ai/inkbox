@@ -68,7 +68,10 @@ pub fn resolve_zone_and_host(
 ) -> (String, String) {
     let public_host = if let Some(h) = server_public_host.filter(|s| !s.is_empty()) {
         h.to_string()
-    } else if let Some(h) = state.and_then(|s| s.public_host.as_deref()).filter(|s| !s.is_empty()) {
+    } else if let Some(h) = state
+        .and_then(|s| s.public_host.as_deref())
+        .filter(|s| !s.is_empty())
+    {
         h.to_string()
     } else {
         format!("{name}.{PROD_ZONE}")
@@ -78,7 +81,10 @@ pub fn resolve_zone_and_host(
         z.to_string()
     } else if let Some(z) = server_zone.filter(|s| !s.is_empty()) {
         z.to_string()
-    } else if let Some(z) = state.and_then(|s| s.zone.as_deref()).filter(|s| !s.is_empty()) {
+    } else if let Some(z) = state
+        .and_then(|s| s.zone.as_deref())
+        .filter(|s| !s.is_empty())
+    {
         z.to_string()
     } else {
         PROD_ZONE.to_string()

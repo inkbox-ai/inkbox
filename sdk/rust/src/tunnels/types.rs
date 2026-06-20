@@ -132,9 +132,8 @@ impl Tunnel {
         let tunnel_name = str_field(obj, "tunnel_name")?;
 
         // `tls_mode`: a closed enum — coerce the raw string through serde.
-        let tls_mode: TLSMode = serde_json::from_value(
-            obj.get("tls_mode").cloned().unwrap_or(Value::Null),
-        )?;
+        let tls_mode: TLSMode =
+            serde_json::from_value(obj.get("tls_mode").cloned().unwrap_or(Value::Null))?;
 
         // `status`: known member if recognized, else the raw string (no
         // fail-open coercion — future states surface unmodified).
@@ -142,7 +141,8 @@ impl Tunnel {
             .get("status")
             .and_then(|v| v.as_str())
             .ok_or_else(|| InkboxError::Decode(de_err("tunnel response missing 'status'")))?;
-        let status = match serde_json::from_value::<TunnelStatus>(Value::String(raw_status.into())) {
+        let status = match serde_json::from_value::<TunnelStatus>(Value::String(raw_status.into()))
+        {
             Ok(known) => TunnelStatusValue::Known(known),
             Err(_) => TunnelStatusValue::Unknown(raw_status.to_string()),
         };

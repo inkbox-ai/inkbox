@@ -237,7 +237,9 @@ impl IMessagesResource {
             "reaction": reaction.as_str(),
             "part_index": part_index,
         });
-        let data = self.http.post("/reactions", Some(&body), crate::http::NO_QUERY)?;
+        let data = self
+            .http
+            .post("/reactions", Some(&body), crate::http::NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -248,12 +250,11 @@ impl IMessagesResource {
     ///
     /// # Returns
     /// [`IMessageMarkReadResult`] with the count of rows updated.
-    pub fn mark_conversation_read(
-        &self,
-        conversation_id: &Uuid,
-    ) -> Result<IMessageMarkReadResult> {
+    pub fn mark_conversation_read(&self, conversation_id: &Uuid) -> Result<IMessageMarkReadResult> {
         let body = json!({ "conversation_id": conversation_id.to_string() });
-        let data = self.http.post("/mark-read", Some(&body), crate::http::NO_QUERY)?;
+        let data = self
+            .http
+            .post("/mark-read", Some(&body), crate::http::NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -263,7 +264,8 @@ impl IMessagesResource {
     /// * `conversation_id` - UUID of the conversation.
     pub fn send_typing(&self, conversation_id: &Uuid) -> Result<()> {
         let body = json!({ "conversation_id": conversation_id.to_string() });
-        self.http.post("/typing", Some(&body), crate::http::NO_QUERY)?;
+        self.http
+            .post("/typing", Some(&body), crate::http::NO_QUERY)?;
         Ok(())
     }
 

@@ -37,6 +37,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::client::Inkbox;
+use crate::credentials::Credentials;
 use crate::error::{InkboxError, Result};
 use crate::identities::types::{
     AgentIdentityData, IdentityAccess, IdentityMailbox, IdentityPhoneNumber,
@@ -55,7 +56,6 @@ use crate::phone::types::{
     TextConversationUpdateResult, TextMessage,
 };
 use crate::tunnels::types::Tunnel;
-use crate::credentials::Credentials;
 use crate::vault::resources::vault::UnlockedVault;
 use crate::vault::totp::{TOTPCode, TOTPConfig};
 use crate::vault::types::{DecryptedVaultSecret, SecretPayload, VaultSecret};
@@ -512,9 +512,7 @@ impl AgentIdentity {
     /// Mark a single text message as read.
     pub fn mark_text_read(&self, text_id: &str) -> Result<TextMessage> {
         let number_id = self.require_phone_id()?;
-        self.inkbox
-            .texts()
-            .update(&number_id, text_id, Some(true))
+        self.inkbox.texts().update(&number_id, text_id, Some(true))
     }
 
     /// Mark all messages in a conversation as read.
@@ -561,14 +559,9 @@ impl AgentIdentity {
     ) -> Result<IMessage> {
         self.require_imessage()?;
         let id = self.id();
-        self.inkbox.imessages().send(
-            to,
-            conversation_id,
-            text,
-            media_urls,
-            send_style,
-            Some(&id),
-        )
+        self.inkbox
+            .imessages()
+            .send(to, conversation_id, text, media_urls, send_style, Some(&id))
     }
 
     /// List this identity's iMessages, newest first.
@@ -909,7 +902,11 @@ impl std::fmt::Debug for AgentIdentity {
             .borrow()
             .as_ref()
             .map(|m| m.email_address.clone());
-        let phone = self.phone_number.borrow().as_ref().map(|p| p.number.clone());
+        let phone = self
+            .phone_number
+            .borrow()
+            .as_ref()
+            .map(|p| p.number.clone());
         f.debug_struct("AgentIdentity")
             .field("agent_handle", &self.agent_handle())
             .field("mailbox", &mailbox)

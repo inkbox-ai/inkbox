@@ -82,7 +82,12 @@ impl InkboxBuilder {
 
     /// Build the client.
     pub fn build(self) -> Result<Arc<Inkbox>> {
-        Inkbox::build(self.api_key, self.base_url, self.timeout_secs, self.vault_key)
+        Inkbox::build(
+            self.api_key,
+            self.base_url,
+            self.timeout_secs,
+            self.vault_key,
+        )
     }
 }
 
@@ -168,7 +173,12 @@ impl Inkbox {
 
         // One transport per sub-base, mirroring client.py.
         let mk = |suffix: &str| -> Result<Arc<HttpTransport>> {
-            Ok(Arc::new(HttpTransport::new(&api_key, suffix.to_string(), timeout, jar.clone())?))
+            Ok(Arc::new(HttpTransport::new(
+                &api_key,
+                suffix.to_string(),
+                timeout,
+                jar.clone(),
+            )?))
         };
         let mail_http = mk(&format!("{api_root}/mail"))?;
         let contacts_http = mk(&api_root)?;
@@ -237,35 +247,73 @@ impl Inkbox {
 
     // ----- Public resource accessors (mirror the Python @property names) -----
 
-    pub fn mailboxes(&self) -> &MailboxesResource { &self.mailboxes }
-    pub fn messages(&self) -> &MessagesResource { &self.messages }
-    pub fn threads(&self) -> &ThreadsResource { &self.threads }
-    pub fn mail_contact_rules(&self) -> &MailContactRulesResource { &self.mail_contact_rules }
-    pub fn domains(&self) -> &DomainsResource { &self.domains }
+    pub fn mailboxes(&self) -> &MailboxesResource {
+        &self.mailboxes
+    }
+    pub fn messages(&self) -> &MessagesResource {
+        &self.messages
+    }
+    pub fn threads(&self) -> &ThreadsResource {
+        &self.threads
+    }
+    pub fn mail_contact_rules(&self) -> &MailContactRulesResource {
+        &self.mail_contact_rules
+    }
+    pub fn domains(&self) -> &DomainsResource {
+        &self.domains
+    }
 
-    pub fn calls(&self) -> &CallsResource { &self.calls }
-    pub fn phone_numbers(&self) -> &PhoneNumbersResource { &self.phone_numbers }
-    pub fn texts(&self) -> &TextsResource { &self.texts }
-    pub fn transcripts(&self) -> &TranscriptsResource { &self.transcripts }
-    pub fn phone_contact_rules(&self) -> &PhoneContactRulesResource { &self.phone_contact_rules }
-    pub fn sms_opt_ins(&self) -> &SmsOptInsResource { &self.sms_opt_ins }
+    pub fn calls(&self) -> &CallsResource {
+        &self.calls
+    }
+    pub fn phone_numbers(&self) -> &PhoneNumbersResource {
+        &self.phone_numbers
+    }
+    pub fn texts(&self) -> &TextsResource {
+        &self.texts
+    }
+    pub fn transcripts(&self) -> &TranscriptsResource {
+        &self.transcripts
+    }
+    pub fn phone_contact_rules(&self) -> &PhoneContactRulesResource {
+        &self.phone_contact_rules
+    }
+    pub fn sms_opt_ins(&self) -> &SmsOptInsResource {
+        &self.sms_opt_ins
+    }
 
-    pub fn imessages(&self) -> &IMessagesResource { &self.imessages }
+    pub fn imessages(&self) -> &IMessagesResource {
+        &self.imessages
+    }
     pub fn imessage_contact_rules(&self) -> &IMessageContactRulesResource {
         &self.imessage_contact_rules
     }
 
-    pub fn vault(&self) -> &VaultResource { &self.vault }
-    pub fn contacts(&self) -> &ContactsResource { &self.contacts }
-    pub fn notes(&self) -> &NotesResource { &self.notes }
+    pub fn vault(&self) -> &VaultResource {
+        &self.vault
+    }
+    pub fn contacts(&self) -> &ContactsResource {
+        &self.contacts
+    }
+    pub fn notes(&self) -> &NotesResource {
+        &self.notes
+    }
 
-    pub fn api_keys(&self) -> &ApiKeysResource { &self.api_keys }
-    pub fn identities(&self) -> &IdentitiesResource { &self.identities }
-    pub fn tunnels(&self) -> &TunnelsResource { &self.tunnels }
+    pub fn api_keys(&self) -> &ApiKeysResource {
+        &self.api_keys
+    }
+    pub fn identities(&self) -> &IdentitiesResource {
+        &self.identities
+    }
+    pub fn tunnels(&self) -> &TunnelsResource {
+        &self.tunnels
+    }
 
     /// Webhook subscription management (`inkbox.webhooks().subscriptions()`).
     pub fn webhooks(&self) -> WebhooksNamespace<'_> {
-        WebhooksNamespace { subscriptions: &self.webhook_subscriptions }
+        WebhooksNamespace {
+            subscriptions: &self.webhook_subscriptions,
+        }
     }
 
     // ----- Org-level operations -----
@@ -366,11 +414,22 @@ impl Inkbox {
         let mut body = serde_json::Map::new();
         body.insert("human_email".into(), human_email.into());
         body.insert("note_to_human".into(), note_to_human.into());
-        if let Some(v) = display_name { body.insert("display_name".into(), v.into()); }
-        if let Some(v) = agent_handle { body.insert("agent_handle".into(), v.into()); }
-        if let Some(v) = email_local_part { body.insert("email_local_part".into(), v.into()); }
+        if let Some(v) = display_name {
+            body.insert("display_name".into(), v.into());
+        }
+        if let Some(v) = agent_handle {
+            body.insert("agent_handle".into(), v.into());
+        }
+        if let Some(v) = email_local_part {
+            body.insert("email_local_part".into(), v.into());
+        }
         let data = signup_request(
-            "POST", "", None, Some(Value::Object(body)), base_url, timeout_secs,
+            "POST",
+            "",
+            None,
+            Some(Value::Object(body)),
+            base_url,
+            timeout_secs,
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -384,7 +443,12 @@ impl Inkbox {
     ) -> Result<AgentSignupVerifyResponse> {
         let body = serde_json::json!({ "verification_code": verification_code });
         let data = signup_request(
-            "POST", "/verify", Some(api_key), Some(body), base_url, timeout_secs,
+            "POST",
+            "/verify",
+            Some(api_key),
+            Some(body),
+            base_url,
+            timeout_secs,
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -396,7 +460,12 @@ impl Inkbox {
         timeout_secs: Option<f64>,
     ) -> Result<AgentSignupResendResponse> {
         let data = signup_request(
-            "POST", "/resend-verification", Some(api_key), None, base_url, timeout_secs,
+            "POST",
+            "/resend-verification",
+            Some(api_key),
+            None,
+            base_url,
+            timeout_secs,
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -408,7 +477,12 @@ impl Inkbox {
         timeout_secs: Option<f64>,
     ) -> Result<AgentSignupStatusResponse> {
         let data = signup_request(
-            "GET", "/status", Some(api_key), None, base_url, timeout_secs,
+            "GET",
+            "/status",
+            Some(api_key),
+            None,
+            base_url,
+            timeout_secs,
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -431,7 +505,9 @@ fn validate_base_url(base_url: &str) -> Result<()> {
     if base_url.starts_with("https://") {
         return Ok(());
     }
-    let host = Url::parse(base_url).ok().and_then(|u| u.host_str().map(|h| h.to_string()));
+    let host = Url::parse(base_url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h.to_string()));
     match host.as_deref() {
         Some("localhost") | Some("127.0.0.1") => Ok(()),
         _ => Err(InkboxError::InvalidArgument(
@@ -455,11 +531,15 @@ fn signup_request(
     validate_base_url(base)?;
     let url = format!("{}/api/v1/agent-signup{}", base.trim_end_matches('/'), path);
     let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs_f64(timeout_secs.unwrap_or(default_timeout())))
+        .timeout(std::time::Duration::from_secs_f64(
+            timeout_secs.unwrap_or(default_timeout()),
+        ))
         .build()?;
     let m = reqwest::Method::from_bytes(method.as_bytes())
         .map_err(|_| InkboxError::InvalidArgument(format!("bad method {method}")))?;
-    let mut rb = client.request(m, &url).header(reqwest::header::ACCEPT, "application/json");
+    let mut rb = client
+        .request(m, &url)
+        .header(reqwest::header::ACCEPT, "application/json");
     if let Some(key) = api_key {
         rb = rb.header("X-API-Key", key);
     }
@@ -472,7 +552,11 @@ fn signup_request(
     if status >= 400 {
         let detail = serde_json::from_str::<Value>(&text)
             .ok()
-            .and_then(|v| v.get("detail").and_then(|d| d.as_str()).map(|s| s.to_string()))
+            .and_then(|v| {
+                v.get("detail")
+                    .and_then(|d| d.as_str())
+                    .map(|s| s.to_string())
+            })
             .unwrap_or_else(|| text.clone());
         return Err(InkboxError::Api {
             status_code: status,

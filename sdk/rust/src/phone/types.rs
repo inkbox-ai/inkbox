@@ -119,18 +119,13 @@ pub enum SmsDeliveryStatus {
 }
 
 /// Whether a text was user-initiated or an internal auto-reply.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TextMessageOrigin {
+    // Matches the Python dataclass default of `USER_INITIATED`.
+    #[default]
     UserInitiated,
     AutoReply,
-}
-
-impl Default for TextMessageOrigin {
-    fn default() -> Self {
-        // Matches the Python dataclass default of `USER_INITIATED`.
-        TextMessageOrigin::UserInitiated
-    }
 }
 
 /// Consent state of a receiver number for the calling org.

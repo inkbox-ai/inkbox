@@ -174,7 +174,9 @@ impl TunnelsResource {
     /// failure (e.g. the API key is rejected by `/_system/hello`).
     #[cfg(feature = "tunnels-runtime")]
     pub fn connect(&self, name: &str, forward_to: &str) -> Result<()> {
-        use crate::tunnels::client::bootstrap::{resolve_zone_and_host, validate_pool_size, TunnelBundle};
+        use crate::tunnels::client::bootstrap::{
+            resolve_zone_and_host, validate_pool_size, TunnelBundle,
+        };
         use crate::tunnels::client::cert::{
             build_csr, cert_needs_sign, key_pem_bytes, load_or_create_keypair, write_cert_chain,
         };
@@ -213,7 +215,9 @@ impl TunnelsResource {
         let mut tunnel = match state.as_ref().map(|s| s.tunnel_id.clone()) {
             Some(id) if !id.is_empty() => match self.get(&id) {
                 Ok(t) => t,
-                Err(InkboxError::Api { status_code: 404, .. }) => {
+                Err(InkboxError::Api {
+                    status_code: 404, ..
+                }) => {
                     return Err(InkboxError::Tunnel(format!(
                         "TunnelRemoved: tunnel {name:?} (id={id}) has been removed; clear \
                          {} and call create_identity({name:?}) to start fresh",

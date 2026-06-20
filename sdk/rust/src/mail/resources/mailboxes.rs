@@ -58,11 +58,7 @@ impl MailboxesResource {
     /// The updated mailbox. When `filter_mode` was supplied and the value
     /// actually changed, `mailbox.filter_mode_change_notice` is populated;
     /// otherwise it's `None`.
-    pub fn update(
-        &self,
-        email_address: &str,
-        filter_mode: Option<FilterMode>,
-    ) -> Result<Mailbox> {
+    pub fn update(&self, email_address: &str, filter_mode: Option<FilterMode>) -> Result<Mailbox> {
         let mut body = serde_json::Map::new();
         if let Some(fm) = filter_mode {
             body.insert("filter_mode".into(), Value::String(fm.as_str().to_string()));
@@ -88,10 +84,7 @@ impl MailboxesResource {
             .http
             .get(&format!("{BASE}/{email_address}/search"), &params)?;
         // Search responses are always wrapped in an `{"items": [...]}` envelope.
-        let items = data
-            .get("items")
-            .cloned()
-            .unwrap_or(Value::Array(vec![]));
+        let items = data.get("items").cloned().unwrap_or(Value::Array(vec![]));
         Ok(serde_json::from_value(items)?)
     }
 }

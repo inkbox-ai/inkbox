@@ -72,9 +72,10 @@ impl IMessageContactRulesResource {
 
     /// Get a single contact rule by id.
     pub fn get(&self, agent_handle: &str, rule_id: &str) -> Result<IMessageContactRule> {
-        let data = self
-            .http
-            .get(&rule_path(agent_handle, Some(rule_id)), crate::http::NO_QUERY)?;
+        let data = self.http.get(
+            &rule_path(agent_handle, Some(rule_id)),
+            crate::http::NO_QUERY,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -101,9 +102,11 @@ impl IMessageContactRulesResource {
             "match_type": match_type.as_str(),
             "match_target": match_target,
         });
-        let data = self
-            .http
-            .post(&rule_path(agent_handle, None), Some(&body), crate::http::NO_QUERY)?;
+        let data = self.http.post(
+            &rule_path(agent_handle, None),
+            Some(&body),
+            crate::http::NO_QUERY,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -133,7 +136,9 @@ impl IMessageContactRulesResource {
             map.insert("status".to_string(), json!(s.as_str()));
         }
         let body = serde_json::Value::Object(map);
-        let data = self.http.patch(&rule_path(agent_handle, Some(rule_id)), &body)?;
+        let data = self
+            .http
+            .patch(&rule_path(agent_handle, Some(rule_id)), &body)?;
         Ok(serde_json::from_value(data)?)
     }
 

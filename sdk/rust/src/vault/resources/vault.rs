@@ -265,16 +265,20 @@ impl VaultResource {
 
     /// List identity access rules for a vault secret.
     pub fn list_access_rules(&self, secret_id: &str) -> Result<Vec<AccessRule>> {
-        let data = self.http.get(&format!("/secrets/{secret_id}/access"), NO_QUERY)?;
+        let data = self
+            .http
+            .get(&format!("/secrets/{secret_id}/access"), NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
     /// Grant an identity access to a vault secret.
     pub fn grant_access(&self, secret_id: &str, identity_id: &str) -> Result<AccessRule> {
         let body = serde_json::json!({ "identity_id": identity_id });
-        let data = self
-            .http
-            .post(&format!("/secrets/{secret_id}/access"), Some(&body), NO_QUERY)?;
+        let data = self.http.post(
+            &format!("/secrets/{secret_id}/access"),
+            Some(&body),
+            NO_QUERY,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -335,11 +339,8 @@ impl VaultResource {
         if let Some(secrets) = data.get("encrypted_secrets").and_then(|v| v.as_array()) {
             for raw in secrets {
                 let detail: VaultSecretDetail = serde_json::from_value(raw.clone())?;
-                let payload_dict = decrypt_payload(
-                    &org_key,
-                    &detail.encrypted_payload,
-                    &detail.id.to_string(),
-                )?;
+                let payload_dict =
+                    decrypt_payload(&org_key, &detail.encrypted_payload, &detail.id.to_string())?;
                 let payload = SecretPayload::from_value(&detail.secret_type, payload_dict)?;
                 decrypted.push(DecryptedVaultSecret {
                     id: detail.id,
@@ -368,9 +369,9 @@ impl VaultResource {
                 let granted = access_rules
                     .as_array()
                     .map(|rules| {
-                        rules.iter().any(|r| {
-                            r.get("identity_id").and_then(|v| v.as_str()) == Some(id_str)
-                        })
+                        rules
+                            .iter()
+                            .any(|r| r.get("identity_id").and_then(|v| v.as_str()) == Some(id_str))
                     })
                     .unwrap_or(false);
                 if granted {
@@ -462,8 +463,11 @@ impl UnlockedVault {
     pub fn get_secret(&self, secret_id: &str) -> Result<DecryptedVaultSecret> {
         let data = self.http.get(&format!("/secrets/{secret_id}"), NO_QUERY)?;
         let detail: VaultSecretDetail = serde_json::from_value(data)?;
-        let payload_dict =
-            decrypt_payload(&self.org_key, &detail.encrypted_payload, &detail.id.to_string())?;
+        let payload_dict = decrypt_payload(
+            &self.org_key,
+            &detail.encrypted_payload,
+            &detail.id.to_string(),
+        )?;
         let payload = SecretPayload::from_value(&detail.secret_type, payload_dict)?;
         Ok(DecryptedVaultSecret {
             id: detail.id,
@@ -510,7 +514,9 @@ impl UnlockedVault {
         if let Some(desc) = description {
             body.insert("description".into(), Value::String(desc.to_string()));
         }
-        let data = self.http.post("/secrets", Some(&Value::Object(body)), NO_QUERY)?;
+        let data = self
+            .http
+            .post("/secrets", Some(&Value::Object(body)), NO_QUERY)?;
         let result: VaultSecret = serde_json::from_value(data)?;
 
         // Append the new secret to the cache so it's immediately visible
@@ -573,7 +579,11 @@ impl UnlockedVault {
             }
             body.insert(
                 "encrypted_payload".into(),
-                Value::String(encrypt_payload(&self.org_key, &payload.to_value()?, secret_id)?),
+                Value::String(encrypt_payload(
+                    &self.org_key,
+                    &payload.to_value()?,
+                    secret_id,
+                )?),
             );
         }
         let data = self
@@ -587,8 +597,7 @@ impl UnlockedVault {
     /// Delete a vault secret.
     pub fn delete_secret(&mut self, secret_id: &str) -> Result<()> {
         self.http.delete(&format!("/secrets/{secret_id}"))?;
-        self.secrets_cache
-            .retain(|s| s.id.to_string() != secret_id);
+        self.secrets_cache.retain(|s| s.id.to_string() != secret_id);
         Ok(())
     }
 
@@ -663,5 +672,9 @@ fn parse_uuid(data: &Value, field: &str) -> Result<Uuid> {
     data.get(field)
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok())
-        .ok_or_else(|| InkboxError::Decode(serde_json::Error::custom(format!("missing/invalid {field}"))))
+        .ok_or_else(|| {
+            InkboxError::Decode(serde_json::Error::custom(format!(
+                "missing/invalid {field}"
+            )))
+        })
 }

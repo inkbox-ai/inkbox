@@ -7,9 +7,7 @@ use uuid::Uuid;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::mail::types::{
-    ContactRuleStatus, MailContactRule, MailRuleAction, MailRuleMatchType,
-};
+use crate::mail::types::{ContactRuleStatus, MailContactRule, MailRuleAction, MailRuleMatchType};
 
 const BASE: &str = "/mailboxes";
 const ORG_BASE: &str = "/contact-rules";
@@ -68,9 +66,10 @@ impl MailContactRulesResource {
 
     /// Get a single contact rule by id.
     pub fn get(&self, email_address: &str, rule_id: &str) -> Result<MailContactRule> {
-        let data = self
-            .http
-            .get(&rule_path(email_address, Some(rule_id)), crate::http::NO_QUERY)?;
+        let data = self.http.get(
+            &rule_path(email_address, Some(rule_id)),
+            crate::http::NO_QUERY,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -119,9 +118,10 @@ impl MailContactRulesResource {
         if let Some(s) = status {
             body.insert("status".into(), Value::String(s.as_str().to_string()));
         }
-        let data = self
-            .http
-            .patch(&rule_path(email_address, Some(rule_id)), &Value::Object(body))?;
+        let data = self.http.patch(
+            &rule_path(email_address, Some(rule_id)),
+            &Value::Object(body),
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 

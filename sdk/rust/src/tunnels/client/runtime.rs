@@ -259,7 +259,9 @@ impl TunnelRuntime {
             let me = self.clone();
             let conn = active.clone();
             let fd = force_down.clone();
-            handles.push(tokio::spawn(async move { me.intake_loop(conn, slot, fd).await }));
+            handles.push(tokio::spawn(
+                async move { me.intake_loop(conn, slot, fd).await },
+            ));
         }
 
         // Supervise: return when the connection dies, a keepalive/owner-token
@@ -341,7 +343,8 @@ impl TunnelRuntime {
                     if stopped_ping.load(Ordering::SeqCst) {
                         return;
                     }
-                    match tokio::time::timeout(PING_ACK_TIMEOUT, pp.ping(h2::Ping::opaque())).await {
+                    match tokio::time::timeout(PING_ACK_TIMEOUT, pp.ping(h2::Ping::opaque())).await
+                    {
                         Ok(Ok(_pong)) => {}
                         // Ack timed out or the connection errored. The socket may
                         // still look open to the driver (no `conn_closed`), so
@@ -422,7 +425,12 @@ impl TunnelRuntime {
     /// One parked-intake worker (Python `_intake_loop`): long-poll
     /// `/_system/intake`, then dispatch the returned envelope. Loops until
     /// shutdown or a fatal owner-token rejection.
-    async fn intake_loop(self: Arc<Self>, conn: Arc<ActiveConn>, slot: usize, force_down: Arc<Notify>) {
+    async fn intake_loop(
+        self: Arc<Self>,
+        conn: Arc<ActiveConn>,
+        slot: usize,
+        force_down: Arc<Notify>,
+    ) {
         while !self.is_stopped() {
             match self.park_one_intake(&conn, slot).await {
                 Ok(Some(env)) => {
@@ -470,7 +478,9 @@ impl TunnelRuntime {
 
         if status != 200 {
             if status == 401 {
-                return Err(owner_token_invalid(format!("intake slot={slot} status=401")));
+                return Err(owner_token_invalid(format!(
+                    "intake slot={slot} status=401"
+                )));
             }
             return Ok(None);
         }
@@ -566,8 +576,15 @@ impl TunnelRuntime {
         if let Some(reason) = &result.inkbox_reason {
             headers.push((META_REASON.to_string(), reason.clone()));
         }
-        self.post_response(conn, &envelope.request_id, result.status, &headers, None, result.body)
-            .await
+        self.post_response(
+            conn,
+            &envelope.request_id,
+            result.status,
+            &headers,
+            None,
+            result.body,
+        )
+        .await
     }
 
     /// Resolve any `inkbox-body-uri` into the envelope body, enforcing the
@@ -786,7 +803,9 @@ mod tests {
         let seen = Arc::new(StdMutex::new(Vec::<String>::new()));
         let seen2 = seen.clone();
         let mut c = cfg();
-        c.on_status = Some(Box::new(move |s: &str| seen2.lock().unwrap().push(s.to_string())));
+        c.on_status = Some(Box::new(move |s: &str| {
+            seen2.lock().unwrap().push(s.to_string())
+        }));
         let rt = Arc::new(TunnelRuntime::new(c));
         rt.aclose().await;
         let _ = rt.serve_forever().await;

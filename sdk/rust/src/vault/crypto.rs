@@ -572,8 +572,9 @@ mod tests {
     #[test]
     fn material_rejects_weak_key() {
         let org_key = generate_org_encryption_key();
-        let e = generate_vault_key_material("short", "org_test_123", &org_key, VaultKeyType::Primary)
-            .unwrap_err();
+        let e =
+            generate_vault_key_material("short", "org_test_123", &org_key, VaultKeyType::Primary)
+                .unwrap_err();
         assert!(e.to_string().contains("at least 16 characters"));
     }
 

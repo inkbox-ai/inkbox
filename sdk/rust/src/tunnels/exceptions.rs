@@ -90,11 +90,21 @@ impl TunnelError {
             TunnelError::NotProvisioned(m) => {
                 InkboxError::Tunnel(format!("TunnelNotProvisioned: {m}"))
             }
-            TunnelError::StateConflict { status_code, detail }
-            | TunnelError::TLSModeMismatch { status_code, detail }
-            | TunnelError::CSRStateConflict { status_code, detail } => {
-                InkboxError::Api { status_code, detail }
+            TunnelError::StateConflict {
+                status_code,
+                detail,
             }
+            | TunnelError::TLSModeMismatch {
+                status_code,
+                detail,
+            }
+            | TunnelError::CSRStateConflict {
+                status_code,
+                detail,
+            } => InkboxError::Api {
+                status_code,
+                detail,
+            },
         }
     }
 }
@@ -139,16 +149,25 @@ pub fn map_sign_csr_error(err: InkboxError) -> InkboxError {
     // Only API 409s are reclassified; everything else (transport, decode,
     // other status codes) passes through verbatim.
     let (status_code, detail) = match &err {
-        InkboxError::Api { status_code, detail } if *status_code == 409 => {
-            (*status_code, detail.clone())
-        }
+        InkboxError::Api {
+            status_code,
+            detail,
+        } if *status_code == 409 => (*status_code, detail.clone()),
         _ => return err,
     };
 
     let text = detail_text(&detail).to_lowercase();
     if text.contains("edge") || text.contains("tls_mode") || text.contains("passthrough") {
-        TunnelError::TLSModeMismatch { status_code, detail }.into()
+        TunnelError::TLSModeMismatch {
+            status_code,
+            detail,
+        }
+        .into()
     } else {
-        TunnelError::CSRStateConflict { status_code, detail }.into()
+        TunnelError::CSRStateConflict {
+            status_code,
+            detail,
+        }
+        .into()
     }
 }

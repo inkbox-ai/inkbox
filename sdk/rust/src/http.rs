@@ -63,11 +63,18 @@ impl HttpTransport {
 
     fn url(&self, path: &str) -> String {
         // `path` is a server-relative segment like "/messages" or "messages".
-        format!("{}/{}", self.base_url.trim_end_matches('/'), path.trim_start_matches('/'))
+        format!(
+            "{}/{}",
+            self.base_url.trim_end_matches('/'),
+            path.trim_start_matches('/')
+        )
     }
 
     pub fn get(&self, path: &str, params: Query) -> Result<Value> {
-        let resp = self.send(self.client.get(self.url(path)).query(params), &self.url(path))?;
+        let resp = self.send(
+            self.client.get(self.url(path)).query(params),
+            &self.url(path),
+        )?;
         raise_for_status(resp)?.json_value()
     }
 
@@ -258,15 +265,19 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                 return Err(InkboxError::DuplicateContactRule {
                     status_code: status,
                     existing_rule_id: id,
-                    detail: raw_detail,
+                    detail: Box::new(raw_detail),
                 });
             }
             if map.get("error").and_then(|e| e.as_str()) == Some("redundant_grant") {
                 return Err(InkboxError::RedundantContactAccessGrant {
                     status_code: status,
                     error: "redundant_grant".to_string(),
-                    detail_message: map.get("detail").and_then(|d| d.as_str()).unwrap_or("").to_string(),
-                    detail: raw_detail,
+                    detail_message: map
+                        .get("detail")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    detail: Box::new(raw_detail),
                 });
             }
         }
@@ -282,9 +293,17 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                 return Err(InkboxError::RecipientBlocked {
                     status_code: status,
                     matched_rule_id: matched,
-                    address: map.get("address").and_then(|a| a.as_str()).unwrap_or("").to_string(),
-                    reason: map.get("reason").and_then(|r| r.as_str()).unwrap_or("").to_string(),
-                    detail: raw_detail,
+                    address: map
+                        .get("address")
+                        .and_then(|a| a.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    reason: map
+                        .get("reason")
+                        .and_then(|r| r.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    detail: Box::new(raw_detail),
                 });
             }
         }
@@ -294,7 +313,10 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
         Value::String(s) => ApiErrorDetail::Message(s),
         other => ApiErrorDetail::Structured(other),
     };
-    Err(InkboxError::Api { status_code: status, detail })
+    Err(InkboxError::Api {
+        status_code: status,
+        detail,
+    })
 }
 
 /// Default request timeout, exposed so the client builder and `_http.py`

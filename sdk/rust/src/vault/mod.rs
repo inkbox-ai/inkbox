@@ -20,7 +20,7 @@ pub use crypto::{
 pub use resources::vault::{UnlockedVault, VaultResource};
 pub use totp::{generate_totp, parse_totp_uri, TOTPAlgorithm, TOTPCode, TOTPConfig};
 pub use types::{
-    AbstractSecretPayload, AccessRule, APIKeyPayload, DecryptedVaultSecret, KeyPairPayload,
+    APIKeyPayload, AbstractSecretPayload, AccessRule, DecryptedVaultSecret, KeyPairPayload,
     LoginPayload, OtherPayload, SSHKeyPayload, SecretPayload, VaultInfo, VaultInitializeResult,
     VaultKey, VaultKeyType, VaultSecret, VaultSecretDetail, VaultSecretType,
 };

@@ -62,7 +62,10 @@ impl IdentitiesResource {
         // Build the body conditionally, omitting any field left unset/None,
         // matching the Python dict-building exactly.
         let mut body = Map::new();
-        body.insert("agent_handle".into(), Value::String(agent_handle.to_string()));
+        body.insert(
+            "agent_handle".into(),
+            Value::String(agent_handle.to_string()),
+        );
         if let Some(name) = display_name {
             body.insert("display_name".into(), Value::String(name.to_string()));
         }
@@ -170,7 +173,10 @@ impl IdentitiesResource {
             body.insert("imessage_enabled".into(), Value::Bool(flag));
         }
         if let Some(mode) = imessage_filter_mode {
-            body.insert("imessage_filter_mode".into(), Value::String(mode.to_string()));
+            body.insert(
+                "imessage_filter_mode".into(),
+                Value::String(mode.to_string()),
+            );
         }
         if let Some(s) = status {
             body.insert("status".into(), Value::String(s.to_string()));
@@ -198,8 +204,7 @@ impl IdentitiesResource {
     /// Released at the carrier; the number is not available for reassignment
     /// afterwards.
     pub fn release_phone_number(&self, agent_handle: &str) -> Result<()> {
-        self.http
-            .delete(&format!("/{agent_handle}/phone_number"))
+        self.http.delete(&format!("/{agent_handle}/phone_number"))
     }
 
     /// List who can see this identity (agent visibility).

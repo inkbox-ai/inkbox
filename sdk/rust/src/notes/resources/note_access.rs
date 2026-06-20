@@ -23,7 +23,9 @@ impl NoteAccessResource {
 
     /// List grants on a note.
     pub fn list(&self, note_id: Uuid) -> Result<Vec<NoteAccess>> {
-        let data = self.http.get(&format!("{BASE}/{note_id}/access"), NO_QUERY)?;
+        let data = self
+            .http
+            .get(&format!("{BASE}/{note_id}/access"), NO_QUERY)?;
         // Unwrap the `{"items": [...]}` envelope if present, else treat as a list.
         let items = match data.get("items") {
             Some(items) => items.clone(),

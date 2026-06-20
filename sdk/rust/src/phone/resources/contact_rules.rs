@@ -97,9 +97,11 @@ impl PhoneContactRulesResource {
         body.insert("action".into(), action.as_str().into());
         body.insert("match_type".into(), match_type.as_str().into());
         body.insert("match_target".into(), match_target.into());
-        let data = self
-            .http
-            .post(&rule_path(phone_number_id, None), Some(&body), crate::http::NO_QUERY)?;
+        let data = self.http.post(
+            &rule_path(phone_number_id, None),
+            Some(&body),
+            crate::http::NO_QUERY,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 

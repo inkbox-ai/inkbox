@@ -11,8 +11,8 @@ pub mod types;
 
 // Re-export the public types.
 pub use types::{
-    ContactRuleStatus, Domain, FilterMode, FilterModeChangeNotice, Mailbox, MailContactRule,
-    MailRuleAction, MailRuleMatchType, Message, MessageDetail, MessageDirection, ForwardMode,
+    ContactRuleStatus, Domain, FilterMode, FilterModeChangeNotice, ForwardMode, MailContactRule,
+    MailRuleAction, MailRuleMatchType, Mailbox, Message, MessageDetail, MessageDirection,
     SendingDomainStatus, Thread, ThreadDetail, ThreadFolder,
 };
 

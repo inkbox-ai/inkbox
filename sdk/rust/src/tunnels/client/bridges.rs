@@ -98,13 +98,27 @@ impl BridgeCtx {
 /// `_dispatch_ws_upgrade` / `_dispatch_ws_upgrade_to_url`.
 pub async fn dispatch_ws_upgrade(ctx: BridgeCtx, envelope: Envelope) -> Result<()> {
     let Some(ws_id) = envelope.ws_id.clone() else {
-        post_reply(&ctx, &envelope.request_id, 400, Some("missing ws_id"), b"missing ws_id").await?;
+        post_reply(
+            &ctx,
+            &envelope.request_id,
+            400,
+            Some("missing ws_id"),
+            b"missing ws_id",
+        )
+        .await?;
         return Ok(());
     };
     // Path-traversal guard. Edge WS upgrades skip the HTTP validate, so we
     // re-apply it here (matches `_dispatch_ws_upgrade`).
     if let Some(reason) = validate_envelope_path(&envelope.path) {
-        post_reply(&ctx, &envelope.request_id, 400, Some(&reason), b"invalid path").await?;
+        post_reply(
+            &ctx,
+            &envelope.request_id,
+            400,
+            Some(&reason),
+            b"invalid path",
+        )
+        .await?;
         return Ok(());
     }
 
@@ -113,7 +127,14 @@ pub async fn dispatch_ws_upgrade(ctx: BridgeCtx, envelope: Envelope) -> Result<(
     let up = match open_ws_upstream(&ctx, &envelope).await {
         Ok(up) => up,
         Err(WsUpstreamError { status, reason }) => {
-            post_reply(&ctx, &envelope.request_id, status, Some(&reason), reason.as_bytes()).await?;
+            post_reply(
+                &ctx,
+                &envelope.request_id,
+                status,
+                Some(&reason),
+                reason.as_bytes(),
+            )
+            .await?;
             return Ok(());
         }
     };
@@ -221,22 +242,41 @@ async fn open_ws_upstream(
 ) -> std::result::Result<WsUpstream, WsUpstreamError> {
     let target_url = join_forward_path(&ctx.forward_to, &envelope.path);
     let parsed = url_split(&target_url);
-    let host = if parsed.host.is_empty() { "localhost".to_string() } else { parsed.host.clone() };
+    let host = if parsed.host.is_empty() {
+        "localhost".to_string()
+    } else {
+        parsed.host.clone()
+    };
     let port = upstream_port(&parsed.netloc, &parsed.scheme);
-    let mut path_only = if parsed.path.is_empty() { "/".to_string() } else { parsed.path.clone() };
+    let mut path_only = if parsed.path.is_empty() {
+        "/".to_string()
+    } else {
+        parsed.path.clone()
+    };
     if !parsed.query.is_empty() {
         path_only = format!("{path_only}?{}", parsed.query);
     }
     let is_tls = parsed.scheme == "https";
 
     let ws_subprotocol = first_header(&envelope.forwarded_headers, "sec-websocket-protocol");
-    let deadline = tokio::time::Instant::now() + Duration::from_secs_f64(ctx.handshake_deadline_s());
+    let deadline =
+        tokio::time::Instant::now() + Duration::from_secs_f64(ctx.handshake_deadline_s());
 
     // --- connect (single composite budget, like the Python helper) -------
     let connect = tokio::net::TcpStream::connect((host.as_str(), port));
     let tcp = match tokio::time::timeout_at(deadline, connect).await {
-        Err(_) => return Err(WsUpstreamError { status: 504, reason: "upstream-connect-timeout".into() }),
-        Ok(Err(e)) => return Err(WsUpstreamError { status: 502, reason: format!("upstream-unreachable: {e}") }),
+        Err(_) => {
+            return Err(WsUpstreamError {
+                status: 504,
+                reason: "upstream-connect-timeout".into(),
+            })
+        }
+        Ok(Err(e)) => {
+            return Err(WsUpstreamError {
+                status: 502,
+                reason: format!("upstream-unreachable: {e}"),
+            })
+        }
         Ok(Ok(s)) => s,
     };
     let _ = tcp.set_nodelay(true);
@@ -244,13 +284,29 @@ async fn open_ws_upstream(
     // Optionally TLS-wrap for wss:// upstreams.
     let mut stream = if is_tls {
         let connector = build_upstream_tls_connector(ctx.verify_tls, ctx.ca_bundle.as_deref())
-            .map_err(|e| WsUpstreamError { status: 502, reason: format!("upstream-tls-setup: {e}") })?;
-        let server_name = rustls::pki_types::ServerName::try_from(host.clone())
-            .map_err(|_| WsUpstreamError { status: 502, reason: "upstream-tls-bad-host".into() })?;
+            .map_err(|e| WsUpstreamError {
+                status: 502,
+                reason: format!("upstream-tls-setup: {e}"),
+            })?;
+        let server_name =
+            rustls::pki_types::ServerName::try_from(host.clone()).map_err(|_| WsUpstreamError {
+                status: 502,
+                reason: "upstream-tls-bad-host".into(),
+            })?;
         let connect = connector.connect(server_name, tcp);
         match tokio::time::timeout_at(deadline, connect).await {
-            Err(_) => return Err(WsUpstreamError { status: 504, reason: "upstream-connect-timeout".into() }),
-            Ok(Err(e)) => return Err(WsUpstreamError { status: 502, reason: format!("upstream-tls: {e}") }),
+            Err(_) => {
+                return Err(WsUpstreamError {
+                    status: 504,
+                    reason: "upstream-connect-timeout".into(),
+                })
+            }
+            Ok(Err(e)) => {
+                return Err(WsUpstreamError {
+                    status: 502,
+                    reason: format!("upstream-tls: {e}"),
+                })
+            }
             Ok(Ok(s)) => UpstreamStream::Tls(Box::new(s)),
         }
     } else {
@@ -269,8 +325,18 @@ async fn open_ws_upstream(
         &envelope.forwarded_headers,
     );
     match tokio::time::timeout_at(deadline, stream.write_all(&upgrade_bytes)).await {
-        Err(_) => return Err(WsUpstreamError { status: 504, reason: "upstream-write-timeout".into() }),
-        Ok(Err(e)) => return Err(WsUpstreamError { status: 502, reason: format!("upstream-write: {e}") }),
+        Err(_) => {
+            return Err(WsUpstreamError {
+                status: 504,
+                reason: "upstream-write-timeout".into(),
+            })
+        }
+        Ok(Err(e)) => {
+            return Err(WsUpstreamError {
+                status: 502,
+                reason: format!("upstream-write: {e}"),
+            })
+        }
         Ok(Ok(())) => {}
     }
 
@@ -282,14 +348,32 @@ async fn open_ws_upstream(
         }
         let mut chunk = [0u8; 4096];
         let n = match tokio::time::timeout_at(deadline, stream.read(&mut chunk)).await {
-            Err(_) => return Err(WsUpstreamError { status: 504, reason: "upstream-handshake-timeout".into() }),
-            Ok(Err(e)) => return Err(WsUpstreamError { status: 502, reason: format!("upstream-read: {e}") }),
-            Ok(Ok(0)) => return Err(WsUpstreamError { status: 502, reason: "upstream closed before response".into() }),
+            Err(_) => {
+                return Err(WsUpstreamError {
+                    status: 504,
+                    reason: "upstream-handshake-timeout".into(),
+                })
+            }
+            Ok(Err(e)) => {
+                return Err(WsUpstreamError {
+                    status: 502,
+                    reason: format!("upstream-read: {e}"),
+                })
+            }
+            Ok(Ok(0)) => {
+                return Err(WsUpstreamError {
+                    status: 502,
+                    reason: "upstream closed before response".into(),
+                })
+            }
             Ok(Ok(n)) => n,
         };
         head_buf.extend_from_slice(&chunk[..n]);
         if head_buf.len() > 65536 {
-            return Err(WsUpstreamError { status: 502, reason: "upstream response head too large".into() });
+            return Err(WsUpstreamError {
+                status: 502,
+                reason: "upstream response head too large".into(),
+            });
         }
     }
 
@@ -298,7 +382,10 @@ async fn open_ws_upstream(
     let leftover = head_buf[head_end..].to_vec();
     let lines: Vec<&str> = head_text.split("\r\n").collect();
     if lines.is_empty() {
-        return Err(WsUpstreamError { status: 502, reason: "empty response".into() });
+        return Err(WsUpstreamError {
+            status: 502,
+            reason: "empty response".into(),
+        });
     }
     // Status line: "HTTP/1.1 101 ...".
     let status: u16 = lines[0]
@@ -307,7 +394,10 @@ async fn open_ws_upstream(
         .and_then(|s| s.parse().ok())
         .unwrap_or(502);
     if status != 101 {
-        return Err(WsUpstreamError { status, reason: format!("upstream returned {status}") });
+        return Err(WsUpstreamError {
+            status,
+            reason: format!("upstream returned {status}"),
+        });
     }
 
     let mut response_headers: Vec<(String, String)> = Vec::new();
@@ -315,7 +405,9 @@ async fn open_ws_upstream(
     let mut upstream_extensions: Option<String> = None;
     let mut upstream_subprotocol: Option<String> = None;
     for line in &lines[1..] {
-        let Some((k, v)) = line.split_once(':') else { continue };
+        let Some((k, v)) = line.split_once(':') else {
+            continue;
+        };
         let kl = k.trim().to_ascii_lowercase();
         let vs = v.trim().to_string();
         match kl.as_str() {
@@ -329,24 +421,40 @@ async fn open_ws_upstream(
 
     // Validate Sec-WebSocket-Accept (RFC 6455 §1.3).
     if upstream_accept.as_deref() != Some(&compute_ws_accept(&ws_key)) {
-        return Err(WsUpstreamError { status: 502, reason: "upstream Sec-WebSocket-Accept mismatch".into() });
-    }
-    // We never offer extensions; refuse a confirmed one (no codec wired).
-    if upstream_extensions.as_deref().is_some_and(|s| !s.is_empty()) {
         return Err(WsUpstreamError {
             status: 502,
-            reason: format!("upstream negotiated unsupported extensions: {}", upstream_extensions.unwrap()),
+            reason: "upstream Sec-WebSocket-Accept mismatch".into(),
+        });
+    }
+    // We never offer extensions; refuse a confirmed one (no codec wired).
+    if upstream_extensions
+        .as_deref()
+        .is_some_and(|s| !s.is_empty())
+    {
+        return Err(WsUpstreamError {
+            status: 502,
+            reason: format!(
+                "upstream negotiated unsupported extensions: {}",
+                upstream_extensions.unwrap()
+            ),
         });
     }
     // Selected subprotocol must be one we offered (RFC 6455 §4.1).
     if let Some(sub) = upstream_subprotocol.as_deref().filter(|s| !s.is_empty()) {
         let offered = parse_subprotocol_offer(ws_subprotocol.as_deref());
         if !offered.iter().any(|o| o == sub) {
-            return Err(WsUpstreamError { status: 502, reason: format!("upstream-subprotocol-not-offered: {sub}") });
+            return Err(WsUpstreamError {
+                status: 502,
+                reason: format!("upstream-subprotocol-not-offered: {sub}"),
+            });
         }
     }
 
-    Ok(WsUpstream { stream, leftover, headers: response_headers })
+    Ok(WsUpstream {
+        stream,
+        leftover,
+        headers: response_headers,
+    })
 }
 
 /// Build the h1 `Upgrade: websocket` request bytes for the upstream hop.
@@ -440,7 +548,9 @@ async fn pump_ws_url_bridge(
     recv: h2::RecvStream,
     up: WsUpstream,
 ) -> Result<()> {
-    let WsUpstream { stream, leftover, .. } = up;
+    let WsUpstream {
+        stream, leftover, ..
+    } = up;
     let (mut up_read, up_write) = split_upstream(stream);
 
     // Shared outbound WS SendStream guarded by a mutex (both directions may
@@ -481,7 +591,10 @@ async fn pump_ws_url_bridge(
                     WS_OPCODE_PONG => continue,
                     WS_OPCODE_CLOSE => {
                         let code = close_code(&payload);
-                        let env = encode_ws_envelope(&OutboundWsMsg::Close { code, reason: String::new() });
+                        let env = encode_ws_envelope(&OutboundWsMsg::Close {
+                            code,
+                            reason: String::new(),
+                        });
                         let frame = encode_ws_frame(WS_OPCODE_BINARY, &env, true, true);
                         let mut s = send_u2b.lock().await;
                         let _ = s.send_data(Bytes::from(frame), true);
@@ -514,7 +627,12 @@ async fn pump_ws_url_bridge(
                             encode_ws_envelope(&OutboundWsMsg::SendBytes(full))
                         };
                         let frame = encode_ws_frame(WS_OPCODE_BINARY, &env, true, true);
-                        if send_u2b.lock().await.send_data(Bytes::from(frame), false).is_err() {
+                        if send_u2b
+                            .lock()
+                            .await
+                            .send_data(Bytes::from(frame), false)
+                            .is_err()
+                        {
                             return;
                         }
                     }
@@ -560,7 +678,8 @@ async fn pump_ws_url_bridge(
                 if env_buf.len() < 4 {
                     break;
                 }
-                let length = u32::from_be_bytes([env_buf[0], env_buf[1], env_buf[2], env_buf[3]]) as usize;
+                let length =
+                    u32::from_be_bytes([env_buf[0], env_buf[1], env_buf[2], env_buf[3]]) as usize;
                 if env_buf.len() < 4 + length {
                     break;
                 }
@@ -580,7 +699,9 @@ async fn pump_ws_url_bridge(
                     }
                     Some("binary") => {
                         let data_b64 = msg.get("data").and_then(|d| d.as_str()).unwrap_or("");
-                        let Ok(payload) = base64::engine::general_purpose::STANDARD.decode(data_b64) else {
+                        let Ok(payload) =
+                            base64::engine::general_purpose::STANDARD.decode(data_b64)
+                        else {
                             continue;
                         };
                         let frame = encode_ws_frame(WS_OPCODE_BINARY, &payload, true, true);
@@ -591,7 +712,8 @@ async fn pump_ws_url_bridge(
                     }
                     Some("close") => {
                         let code = msg.get("code").and_then(|c| c.as_i64()).unwrap_or(1000) as u16;
-                        let frame = encode_ws_frame(WS_OPCODE_CLOSE, &code.to_be_bytes(), true, true);
+                        let frame =
+                            encode_ws_frame(WS_OPCODE_CLOSE, &code.to_be_bytes(), true, true);
                         let _ = up_write_b2u.lock().await.write_all(&frame).await;
                         recv_done = true;
                         break;
@@ -640,8 +762,13 @@ pub async fn dispatch_tcp_stream(ctx: BridgeCtx, envelope: Envelope) -> Result<(
     let sni_host = envelope.sni_host.clone().unwrap_or_default();
 
     // Open the extended-CONNECT bridge stream to `/_system/tcp/{tcp_id}`.
-    let (resp_fut, send_stream) =
-        open_connect_bridge(&ctx, &tcp_id, PATH_TCP_PREFIX, SUBPROTOCOL_TCP, "inkbox-tcp-id")?;
+    let (resp_fut, send_stream) = open_connect_bridge(
+        &ctx,
+        &tcp_id,
+        PATH_TCP_PREFIX,
+        SUBPROTOCOL_TCP,
+        "inkbox-tcp-id",
+    )?;
 
     // Await `:status 200`, bounded by BRIDGE_STATUS_TIMEOUT_SEC.
     let recv = match await_connect_200(resp_fut, BRIDGE_STATUS_TIMEOUT_SEC).await {
@@ -679,7 +806,11 @@ async fn run_tcp_bridge(
 
     // Connect to the local upstream TCP (host:port from forward_to).
     let parsed = url_split(&ctx.forward_to);
-    let host = if parsed.host.is_empty() { "localhost".to_string() } else { parsed.host.clone() };
+    let host = if parsed.host.is_empty() {
+        "localhost".to_string()
+    } else {
+        parsed.host.clone()
+    };
     let port = upstream_port(&parsed.netloc, &parsed.scheme);
     let upstream = match tokio::net::TcpStream::connect((host.as_str(), port)).await {
         Ok(s) => s,
@@ -791,9 +922,12 @@ async fn run_tcp_bridge(
     }
 
     // Half-close grace: let the upstream flush whatever it had queued.
-    let _ = tokio::time::timeout(Duration::from_secs_f64(BRIDGE_HALF_CLOSE_GRACE_SEC), async {
-        let _ = up_write.shutdown().await;
-    })
+    let _ = tokio::time::timeout(
+        Duration::from_secs_f64(BRIDGE_HALF_CLOSE_GRACE_SEC),
+        async {
+            let _ = up_write.shutdown().await;
+        },
+    )
     .await;
 
     finish_tcp_bridge(&send, &mut tls, &close_reason).await;
@@ -879,7 +1013,8 @@ fn open_connect_bridge(
         .map_err(|e| tunnel(format!("connect request build: {e}")))?;
     // The `:protocol` pseudo-header rides the request extensions; the h2 client
     // pulls it out via `extensions_mut().remove::<Protocol>()`.
-    req.extensions_mut().insert(h2::ext::Protocol::from(subprotocol));
+    req.extensions_mut()
+        .insert(h2::ext::Protocol::from(subprotocol));
 
     let mut send = ctx.send.clone();
     let (resp_fut, send_stream) = send
@@ -899,7 +1034,10 @@ async fn await_connect_200(
         .map_err(|_| tunnel("connect bridge: status timeout"))?
         .map_err(|e| tunnel(format!("connect bridge: response error: {e}")))?;
     if resp.status().as_u16() != 200 {
-        return Err(tunnel(format!("connect bridge: status={}", resp.status().as_u16())));
+        return Err(tunnel(format!(
+            "connect bridge: status={}",
+            resp.status().as_u16()
+        )));
     }
     Ok(resp.into_body())
 }
@@ -959,7 +1097,8 @@ async fn post_reply_inner(
         if kl == "content-length" || kl == "transfer-encoding" {
             continue;
         }
-        if let Ok(name) = http::header::HeaderName::from_bytes(format!("inkbox-h-{kl}").as_bytes()) {
+        if let Ok(name) = http::header::HeaderName::from_bytes(format!("inkbox-h-{kl}").as_bytes())
+        {
             if let Ok(val) = http::header::HeaderValue::from_str(v) {
                 builder = builder.header(name, val);
             }
@@ -967,7 +1106,9 @@ async fn post_reply_inner(
     }
 
     let end_stream = body.is_empty();
-    let req = builder.body(()).map_err(|e| tunnel(format!("reply build: {e}")))?;
+    let req = builder
+        .body(())
+        .map_err(|e| tunnel(format!("reply build: {e}")))?;
     let mut send = ctx.send.clone();
     let (resp_fut, mut stream) = send
         .send_request(req, end_stream)
@@ -1048,8 +1189,15 @@ impl rustls::client::danger::ServerCertVerifier for NoVerify {
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
         use rustls::SignatureScheme::*;
         vec![
-            RSA_PKCS1_SHA256, RSA_PKCS1_SHA384, RSA_PKCS1_SHA512, ECDSA_NISTP256_SHA256,
-            ECDSA_NISTP384_SHA384, RSA_PSS_SHA256, RSA_PSS_SHA384, RSA_PSS_SHA512, ED25519,
+            RSA_PKCS1_SHA256,
+            RSA_PKCS1_SHA384,
+            RSA_PKCS1_SHA512,
+            ECDSA_NISTP256_SHA256,
+            ECDSA_NISTP384_SHA384,
+            RSA_PSS_SHA256,
+            RSA_PSS_SHA384,
+            RSA_PSS_SHA512,
+            ED25519,
         ]
     }
 }
@@ -1210,14 +1358,22 @@ fn b64_random_key() -> String {
 fn parse_subprotocol_offer(offer: Option<&str>) -> Vec<String> {
     match offer {
         None => Vec::new(),
-        Some(s) => s.split(',').map(|t| t.trim()).filter(|t| !t.is_empty()).map(|t| t.to_string()).collect(),
+        Some(s) => s
+            .split(',')
+            .map(|t| t.trim())
+            .filter(|t| !t.is_empty())
+            .map(|t| t.to_string())
+            .collect(),
     }
 }
 
 /// First header value (case-insensitive name match), or `None`.
 fn first_header(headers: &[(String, String)], name: &str) -> Option<String> {
     let nl = name.to_ascii_lowercase();
-    headers.iter().find(|(k, _)| k.to_ascii_lowercase() == nl).map(|(_, v)| v.clone())
+    headers
+        .iter()
+        .find(|(k, _)| k.to_ascii_lowercase() == nl)
+        .map(|(_, v)| v.clone())
 }
 
 /// WS CLOSE code from a close payload (first 2 bytes BE), default 1000.
@@ -1240,7 +1396,8 @@ fn upstream_port(netloc: &str, scheme: &str) -> u16 {
     // a bracketed IPv6 literal.
     let hostport = netloc.rsplit('@').next().unwrap_or(netloc);
     let port_str = if let Some(rest) = hostport.strip_prefix('[') {
-        rest.split_once(']').and_then(|(_, after)| after.strip_prefix(':'))
+        rest.split_once(']')
+            .and_then(|(_, after)| after.strip_prefix(':'))
     } else {
         hostport.rsplit_once(':').map(|(_, p)| p)
     };
@@ -1280,7 +1437,9 @@ mod tests {
         let len = u32::from_be_bytes([wire[0], wire[1], wire[2], wire[3]]) as usize;
         let msg: serde_json::Value = serde_json::from_slice(&wire[4..4 + len]).unwrap();
         let b64 = msg.get("data").unwrap().as_str().unwrap();
-        let decoded = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .unwrap();
         assert_eq!(decoded, vec![0, 1, 2, 3]);
     }
 
@@ -1348,7 +1507,10 @@ mod tests {
         let up_headers = vec![
             (":status".to_string(), "101".to_string()),
             ("sec-websocket-accept".to_string(), "abc".to_string()),
-            ("sec-websocket-extensions".to_string(), "permessage-deflate".to_string()),
+            (
+                "sec-websocket-extensions".to_string(),
+                "permessage-deflate".to_string(),
+            ),
             ("connection".to_string(), "Upgrade".to_string()),
             ("upgrade".to_string(), "websocket".to_string()),
             ("set-cookie".to_string(), "sid=1".to_string()),
@@ -1410,7 +1572,10 @@ mod tests {
     #[test]
     fn parse_subprotocol_offer_splits() {
         assert_eq!(parse_subprotocol_offer(None), Vec::<String>::new());
-        assert_eq!(parse_subprotocol_offer(Some("a, b ,c")), vec!["a", "b", "c"]);
+        assert_eq!(
+            parse_subprotocol_offer(Some("a, b ,c")),
+            vec!["a", "b", "c"]
+        );
         assert_eq!(parse_subprotocol_offer(Some(" , ")), Vec::<String>::new());
     }
 

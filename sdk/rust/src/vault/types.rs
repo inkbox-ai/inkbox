@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::error::{InkboxError, Result};
@@ -46,9 +47,13 @@ impl VaultSecretType {
             VaultSecretType::Other => "other",
         }
     }
+}
+
+impl std::str::FromStr for VaultSecretType {
+    type Err = InkboxError;
 
     /// Parse from a wire string, mirroring `VaultSecretType(value)`.
-    pub fn from_str(s: &str) -> Result<Self> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "api_key" => Ok(VaultSecretType::ApiKey),
             "key_pair" => Ok(VaultSecretType::KeyPair),

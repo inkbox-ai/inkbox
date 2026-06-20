@@ -32,8 +32,9 @@ pub enum InkboxError {
         status_code: u16,
         /// UUID of the already-existing rule.
         existing_rule_id: Uuid,
-        /// Full structured detail from the server.
-        detail: Value,
+        /// Full structured detail from the server. Boxed to keep `InkboxError`
+        /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
+        detail: Box<Value>,
     },
 
     /// 409 when posting a contact-access grant that is redundant under the
@@ -45,8 +46,9 @@ pub enum InkboxError {
         error: String,
         /// Human-readable explanation from the server's `detail` field.
         detail_message: String,
-        /// Full structured detail from the server.
-        detail: Value,
+        /// Full structured detail from the server. Boxed to keep `InkboxError`
+        /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
+        detail: Box<Value>,
     },
 
     /// 403 when an SMS, call, or iMessage destination is blocked by an outbound
@@ -61,8 +63,9 @@ pub enum InkboxError {
         address: String,
         /// Human-readable explanation from the server.
         reason: String,
-        /// Full structured detail from the server.
-        detail: Value,
+        /// Full structured detail from the server. Boxed to keep `InkboxError`
+        /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
+        detail: Box<Value>,
     },
 
     /// A vault key did not meet requirements, or a vault crypto operation failed.

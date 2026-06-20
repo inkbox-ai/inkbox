@@ -278,9 +278,10 @@ impl WebhookSubscriptionsResource {
             assert_no_incoming_call(events)?;
             body.insert("event_types".into(), json!(events));
         }
-        let data = self
-            .http
-            .patch(&format!("{BASE}/{sub_id}"), &serde_json::Value::Object(body))?;
+        let data = self.http.patch(
+            &format!("{BASE}/{sub_id}"),
+            &serde_json::Value::Object(body),
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 

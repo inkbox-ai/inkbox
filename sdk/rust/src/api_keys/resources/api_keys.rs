@@ -62,9 +62,7 @@ impl ApiKeysResource {
                 Value::String(scoped_identity_id.to_string()),
             );
         }
-        let data = self
-            .http
-            .post(BASE, Some(&Value::Object(body)), NO_QUERY)?;
+        let data = self.http.post(BASE, Some(&Value::Object(body)), NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 }

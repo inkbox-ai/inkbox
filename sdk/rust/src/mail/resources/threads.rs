@@ -60,7 +60,10 @@ impl ThreadsResource {
             let batch: Vec<Thread> = serde_json::from_value(items)?;
             out.extend(batch);
 
-            let has_more = page.get("has_more").and_then(Value::as_bool).unwrap_or(false);
+            let has_more = page
+                .get("has_more")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
             if !has_more {
                 break;
             }

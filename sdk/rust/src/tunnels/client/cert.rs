@@ -59,7 +59,8 @@ pub fn load_or_create_keypair(state_dir: &Path) -> Result<SigningKey> {
     let key = SigningKey::random(&mut rand::thread_rng());
     let pem = key_pem_string(&key)?;
     // 0o600, O_NOFOLLOW first-create — same hardening as the state file.
-    write_private_file(&key_path, pem.as_bytes()).map_err(|e| InkboxError::Tunnel(e.to_string()))?;
+    write_private_file(&key_path, pem.as_bytes())
+        .map_err(|e| InkboxError::Tunnel(e.to_string()))?;
     Ok(key)
 }
 
