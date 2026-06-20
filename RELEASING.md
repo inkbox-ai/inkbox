@@ -47,7 +47,7 @@ Each `publish.sh` sources `.env` from the repo root. Set up registry auth:
 
 - **PyPI** — put `TWINE_PASSWORD=<pypi-api-token>` in `.env` (the script sets `TWINE_USERNAME=__token__`). The non-`--prod` path targets TestPyPI.
 - **npm** (`@inkbox/sdk`, `@inkbox/cli`) — be logged in (`npm login`) or have an `authToken` in `~/.npmrc`.
-- **crates.io** — put `CARGO_REGISTRY_TOKEN=<crates.io-token>` in `.env`, or run `cargo login` once. Get the token from crates.io → Account Settings → API Tokens.
+- **crates.io** — put `CARGO_REGISTRY_TOKEN=<crates.io-token>` in `.env`, or run `cargo login` once. Get the token from crates.io → Account Settings → API Tokens. **First publish gotchas:** crates.io refuses to publish until your account email is **verified** (Account Settings → Email), and the token needs the **`publish-new`** scope to publish a crate that doesn't exist yet (`publish-update` alone 403s the first publish).
 
 ## 5. Tag
 
