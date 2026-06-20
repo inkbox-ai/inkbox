@@ -61,3 +61,40 @@ jobs:
 
       - name: Run TypeScript tests
         run: npx vitest run --coverage --coverage.thresholds.lines=80
+
+  rust-tests:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/rust
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sdk/rust
+
+      - name: Build (default + tunnels-runtime)
+        run: |
+          cargo build
+          cargo build --features tunnels-runtime
+
+      - name: Run tests
+        run: cargo test --features tunnels-runtime
+
+      # Advisory for now — the crate still carries clippy/style warnings to clean up.
+      - name: Clippy (advisory)
+        continue-on-error: true
+        run: cargo clippy --all-targets --features tunnels-runtime
+
+      - name: Format check (advisory)
+        continue-on-error: true
+        run: cargo fmt --check
