@@ -25,7 +25,7 @@
 //! * `imessages() -> &IMessagesResource`
 //! * `phone_numbers() -> &PhoneNumbersResource`  (Python property `phone_numbers`, attr `_numbers`)
 //! * `identities() -> &IdentitiesResource`       (no Python property; attr `_ids_resource`)
-//! * `vault() -> &VaultResource`                 (vault domain not yet ported — see below)
+//! * `credentials() -> Credentials` + `get_secret(..)` (per-identity vault access)
 //!
 //! Interior mutability uses `RefCell` so the convenience methods can take
 //! `&self` while still refreshing the cached channels (`_data`, `_phone_number`)
