@@ -72,7 +72,7 @@ export enum TextMessageOrigin {
 export interface PhoneNumber {
   id: string;
   number: string;
-  /** "toll_free" | "local" */
+  /** Number type. Always `"local"`. */
   type: string;
   /** "active" | "paused" | "released" */
   status: string;
@@ -89,8 +89,7 @@ export interface PhoneNumber {
   incomingCallWebhookUrl: string | null;
   filterMode: FilterMode;
   /**
-   * 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`);
-   * `null` for TOLL_FREE.
+   * 2-letter US state abbreviation (e.g. `"NY"`); `null` if not set.
    */
   state: string | null;
   /**

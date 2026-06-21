@@ -198,7 +198,7 @@ export function registerNumberCommands(program: Command): void {
     .command("provision")
     .description("Provision a new phone number")
     .requiredOption("--handle <handle>", "Agent handle to provision for")
-    .option("--type <type>", "Number type: toll_free or local", "toll_free")
+    .option("--type <type>", "Number type (only local is supported)", "local")
     .option("--state <state>", "US state abbreviation (for local numbers)")
     .action(
       withErrorHandler(async function (

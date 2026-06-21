@@ -28,7 +28,7 @@ from inkbox import Inkbox
 with Inkbox(api_key="ApiKey_...") as inkbox:
     # Create an agent identity with a linked mailbox
     identity = inkbox.create_identity("my-agent", display_name="My Agent")
-    identity.provision_phone_number(type="toll_free")
+    identity.provision_phone_number()  # provisions a local number
 
     # Send an email
     identity.send_email(
@@ -65,7 +65,7 @@ const inkbox = new Inkbox({ apiKey: "ApiKey_..." });
 
 // Create an agent identity with a linked mailbox
 const identity = await inkbox.createIdentity("my-agent", { displayName: "My Agent" });
-const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
+const phone = await identity.provisionPhoneNumber(); // provisions a local number
 
 // Send an email
 await identity.sendEmail({
@@ -295,6 +295,10 @@ See [`skills/README.md`](./skills/README.md) for details.
 - [Inkbox Docs](https://inkbox.ai/docs)
 - [API Reference](https://inkbox.ai/docs/api-reference)
 - [Console](https://inkbox.ai/console)
+
+## Releasing
+
+Maintainers: see [RELEASING.md](./RELEASING.md) for the lockstep version-bump and per-registry publish steps (PyPI, npm, crates.io).
 
 ## License
 

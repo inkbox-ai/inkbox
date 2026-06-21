@@ -3,7 +3,7 @@
 PHONE_NUMBER_DICT = {
     "id": "aaaa1111-0000-0000-0000-000000000001",
     "number": "+18335794607",
-    "type": "toll_free",
+    "type": "local",
     "status": "active",
     "sms_status": "ready",
     "sms_error_code": None,

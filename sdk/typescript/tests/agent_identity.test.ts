@@ -107,11 +107,11 @@ describe("AgentIdentity channel management", () => {
     vi.mocked(ink._idsResource.get).mockResolvedValue(makeData());
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
 
-    const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
+    const phone = await identity.provisionPhoneNumber({ type: "local" });
 
     expect(ink._numbers.provision).toHaveBeenCalledWith({
       agentHandle: "sales-agent",
-      type: "toll_free",
+      type: "local",
     });
     expect(phone).toEqual(PARSED_PHONE);
   });

@@ -1,0 +1,84 @@
+# sdk/rust/Cargo.toml
+#
+# inkbox — Rust SDK for the Inkbox APIs.
+#
+# Mirrors the Python (`inkbox` on PyPI) and TypeScript (`@inkbox/sdk` on npm)
+# SDKs feature-for-feature: mail, phone, iMessage, contacts, notes,
+# identities, vault, API keys, webhooks, agent signup, whoami, and tunnels.
+
+[package]
+name = "inkbox"
+version = "0.4.9"
+edition = "2021"
+rust-version = "1.74"
+description = "Rust SDK for the Inkbox API"
+readme = "README.md"
+license = "MIT"
+homepage = "https://inkbox.ai"
+repository = "https://github.com/inkbox-ai/inkbox/tree/main/sdk/rust"
+keywords = ["inkbox", "email", "sms", "agents", "api"]
+categories = ["api-bindings"]
+
+# docs.rs builds with default features only, which would hide the optional
+# `tunnels-runtime` API. Build all features there so the full surface renders.
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = []
+# The tunnels reverse-proxy runtime (local TLS-terminating HTTP/2 + WebSocket
+# data plane). Off by default because it pulls in tokio/rustls/h2; the REST
+# tunnels surface (list/get/update/sign_csr) is always available.
+tunnels-runtime = [
+    "dep:tokio", "dep:rustls", "dep:rustls-pemfile", "dep:h2", "dep:http", "dep:bytes",
+    "dep:tokio-rustls", "dep:webpki-roots", "dep:p256", "dep:x509-cert", "dep:der", "dep:spki",
+    # `sha2/oid` exposes the SHA-256 AssociatedOid impl that x509-cert's ECDSA
+    # DynSignatureAlgorithmIdentifier needs to emit `ecdsa-with-SHA256` in CSRs.
+    "sha2/oid",
+]
+
+[dependencies]
+# HTTP — blocking client mirrors the synchronous Python SDK surface.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls", "multipart"] }
+serde = { version = "1", features = ["derive"] }
+# `preserve_order` keeps JSON object keys in insertion order, matching the
+# Python SDK's dict-insertion wire order (e.g. WS envelopes are `type`-first).
+# State-file writes still sort explicitly (see tunnels::client::state).
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"
+
+# Vault crypto (Argon2id KDF + AES-256-GCM envelope encryption, matching
+# inkbox/vault/crypto.py) and webhook HMAC verification.
+argon2 = "0.5"
+aes-gcm = "0.10"
+hmac = "0.12"
+sha1 = "0.10"
+sha2 = "0.10"
+hkdf = "0.12"
+base64 = "0.22"
+base32 = "0.5"
+hex = "0.4"
+rand = "0.8"
+subtle = "2"
+zeroize = "1"
+
+# Tunnels runtime (optional)
+tokio = { version = "1", features = ["full"], optional = true }
+# ring-only crypto backend: avoids the aws-lc-rs cmake/C build and keeps the
+# TLS backend consistent with reqwest's `rustls-tls` (which also uses ring).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
+rustls-pemfile = { version = "2", optional = true }
+h2 = { version = "0.4", optional = true }
+http = { version = "1", optional = true }
+bytes = { version = "1", optional = true }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"], optional = true }
+webpki-roots = { version = "0.26", optional = true }
+# Passthrough cert/CSR (PKCS#10) — matches the Python SDK's EC P-256 keys.
+# All pure-Rust (RustCrypto), no C/OpenSSL dependency.
+p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"], optional = true }
+x509-cert = { version = "0.2", features = ["pem", "builder"], optional = true }
+der = { version = "0.7", optional = true }
+spki = { version = "0.7", optional = true }
+

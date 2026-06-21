@@ -61,8 +61,8 @@ class TextsResource:
                 outbound contact rule on the sender.
             InkboxAPIError: for other 4xx/5xx errors. Stable ``error`` codes
                 live in ``error.detail["error"]`` (e.g. ``recipient_not_opted_in``,
-                ``sender_sms_pending``, ``toll_free_verification_pending``,
-                ``sender_rate_limited``, ``carrier_rate_limit``).
+                ``sender_sms_pending``, ``sender_rate_limited``,
+                ``carrier_rate_limit``).
         """
         body: dict[str, Any] = {}
         if to is not None:

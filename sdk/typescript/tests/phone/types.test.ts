@@ -21,7 +21,7 @@ describe("parsePhoneNumber", () => {
     const n = parsePhoneNumber(RAW_PHONE_NUMBER);
     expect(n.id).toBe(RAW_PHONE_NUMBER.id);
     expect(n.number).toBe("+18335794607");
-    expect(n.type).toBe("toll_free");
+    expect(n.type).toBe("local");
     expect(n.status).toBe("active");
     expect(n.incomingCallAction).toBe("auto_reject");
     expect(n.clientWebsocketUrl).toBeNull();

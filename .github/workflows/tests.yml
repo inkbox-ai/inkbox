@@ -14,7 +14,7 @@ jobs:
         working-directory: sdk/python
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,12 +46,12 @@ jobs:
         working-directory: sdk/typescript
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install dependencies
         run: npm install
@@ -61,3 +61,40 @@ jobs:
 
       - name: Run TypeScript tests
         run: npx vitest run --coverage --coverage.thresholds.lines=80
+
+  rust-tests:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/rust
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sdk/rust
+
+      - name: Build (default + tunnels-runtime)
+        run: |
+          cargo build
+          cargo build --features tunnels-runtime
+
+      - name: Run tests (default features)
+        run: cargo test
+
+      - name: Run tests (tunnels-runtime)
+        run: cargo test --features tunnels-runtime
+
+      - name: Clippy
+        run: cargo clippy --all-targets --features tunnels-runtime -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --check

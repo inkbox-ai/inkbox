@@ -87,7 +87,7 @@ export interface IdentityMailbox {
 export interface IdentityPhoneNumber {
   id: string;
   number: string;
-  /** "toll_free" | "local" */
+  /** Number type. Always `"local"`. */
   type: string;
   /** "active" | "paused" | "released" */
   status: string;
@@ -102,8 +102,7 @@ export interface IdentityPhoneNumber {
   incomingCallWebhookUrl: string | null;
   filterMode: FilterMode;
   /**
-   * 2-letter US state abbreviation for LOCAL numbers (e.g. `"NY"`);
-   * `null` for TOLL_FREE.
+   * 2-letter US state abbreviation (e.g. `"NY"`); `null` if not set.
    */
   state: string | null;
   /**
@@ -316,9 +315,6 @@ export function identityTunnelCreateOptionsToWire(
 export function identityPhoneNumberCreateOptionsToWire(
   options: IdentityPhoneNumberCreateOptions,
 ): Record<string, unknown> {
-  if (options.type === "toll_free" && options.state !== undefined) {
-    throw new Error("state is only supported for local phone numbers");
-  }
   if (options.incomingCallAction === "auto_accept" && options.clientWebsocketUrl === undefined) {
     throw new Error("clientWebsocketUrl is required for auto_accept");
   }

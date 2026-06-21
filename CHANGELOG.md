@@ -4,6 +4,16 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.9 — Rust SDK
+
+### Added
+
+- **Rust SDK** (`sdk/rust`, crate `inkbox`). A faithful port of the Python and TypeScript SDKs: mail, phone, iMessage, contacts, notes, identities, the encrypted vault (Argon2id + AES-256-GCM + TOTP), API keys, webhook payload types + HMAC signature verification, agent signup, whoami, and the tunnels control plane. The public surface is blocking (`reqwest::blocking`) to match the synchronous Python/TS APIs; wire shapes are identical across all three SDKs. The tunnels data-plane runtime (h2/TLS data plane + P-256 PKCS#10 CSR) lives behind the optional `tunnels-runtime` feature. The encrypted vault and the passthrough tunnel data plane are live-validated end-to-end against production.
+
+### Changed
+
+- **Phone-number provisioning now defaults to `local`.** Across all three SDKs, `provision()` / `provision_phone_number()` and identity-creation now default the number `type` to `"local"` (previously `"toll_free"`). This matches the server, which has retired toll-free provisioning and rejects `type: "toll_free"` with HTTP 422. Toll-free is no longer referenced in method signatures, docstrings, type comments, or READMEs. The previous `"toll_free"` default sent a value the server now rejects, so this fixes default `provision()` calls.
+
 ## 0.4.8 — graceful tunnel reconnect on redeploy
 
 ### Added

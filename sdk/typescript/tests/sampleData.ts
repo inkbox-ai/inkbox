@@ -78,7 +78,7 @@ export const CURSOR_PAGE_THREADS = {
 export const RAW_PHONE_NUMBER = {
   id: "aaaa1111-0000-0000-0000-000000000001",
   number: "+18335794607",
-  type: "toll_free",
+  type: "local",
   status: "active",
   sms_status: "ready",
   sms_error_code: null,
@@ -316,7 +316,7 @@ export const RAW_IDENTITY_MAILBOX = {
 export const RAW_IDENTITY_PHONE = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   number: "+18335794607",
-  type: "toll_free",
+  type: "local",
   status: "active",
   incoming_call_action: "auto_reject",
   client_websocket_url: null,
