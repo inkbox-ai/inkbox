@@ -19,6 +19,19 @@ The flow has four steps:
 
 > **Important:** Always confirm with the user before initiating a signup, as it sends a real email to the specified human.
 
+## Harness values
+
+When this skill is bundled in an Inkbox plugin, the plugin MUST pass its harness identifier during signup:
+
+| Plugin / harness | `harness` value |
+|---|---|
+| Claude Code plugin | `cc` |
+| Codex plugin | `codex` |
+| Hermes Agent plugin | `hermes` |
+| OpenClaw plugin | `openclaw` |
+
+Other agent harnesses should pass their best stable string (for example `cursor`, `opencode`, `aider`, `cline`, `roo_code`, `windsurf`, `copilot`, `gemini_cli`, `qwen_code`, `amp`, or `goose`). If Inkbox returns `plugin_setup_hint`, ask the human for permission before installing or configuring that plugin.
+
 ## Restrictions
 
 | | Unclaimed | Claimed (after verification) |
@@ -34,8 +47,9 @@ The flow has four steps:
 
 All signup methods are **class methods** on `Inkbox` — no instance required.
 
-`human_email` and `note_to_human` are required. `display_name`, `agent_handle`, and
-`email_local_part` are optional.
+`human_email` and `note_to_human` are required. `display_name`, `agent_handle`,
+`email_local_part`, and `harness` are optional. Inkbox plugins must set `harness`
+to their plugin value (`cc`, `codex`, `hermes`, or `openclaw`).
 
 ```python
 from inkbox import Inkbox
@@ -47,6 +61,7 @@ result = Inkbox.signup(
     display_name="Sales Agent",          # optional
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
+    harness="cc",                        # use "codex", "hermes", or "openclaw" in those plugins
 )
 
 # Save these — the api_key is shown only once
@@ -87,8 +102,9 @@ with Inkbox(api_key=api_key) as inkbox:
 
 All signup methods are **static methods** on `Inkbox` — no instance required.
 
-`humanEmail` and `noteToHuman` are required. `displayName`, `agentHandle`, and
-`emailLocalPart` are optional.
+`humanEmail` and `noteToHuman` are required. `displayName`, `agentHandle`,
+`emailLocalPart`, and `harness` are optional. Inkbox plugins must set `harness`
+to their plugin value (`cc`, `codex`, `hermes`, or `openclaw`).
 
 ```ts
 import { Inkbox } from "@inkbox/sdk";
@@ -100,6 +116,7 @@ const result = await Inkbox.signup({
   displayName: "Sales Agent",      // optional
   agentHandle: "sales-agent",      // optional
   emailLocalPart: "sales.agent",   // optional
+  harness: "codex",                // use "cc", "hermes", or "openclaw" in those plugins
 });
 
 // Save these — the apiKey is shown only once
@@ -150,12 +167,14 @@ curl -X POST https://inkbox.ai/api/v1/agent-signup \
     "note_to_human": "Hey John, this is your sales bot signing up!",
     "display_name": "Sales Agent",
     "agent_handle": "sales-agent",
-    "email_local_part": "sales.agent"
+    "email_local_part": "sales.agent",
+    "harness": "cc"
   }'
 ```
 
-`human_email` and `note_to_human` are required. `display_name`, `agent_handle`, and
-`email_local_part` are optional.
+`human_email` and `note_to_human` are required. `display_name`, `agent_handle`,
+`email_local_part`, and `harness` are optional. Inkbox plugins must set `harness`
+to their plugin value (`cc`, `codex`, `hermes`, or `openclaw`).
 
 Response:
 
@@ -167,6 +186,8 @@ Response:
   "agent_handle": "sales-agent-a1b2c3",
   "claim_status": "UNCLAIMED",
   "human_email": "john@example.com",
+  "harness": "cc",
+  "plugin_setup_hint": "Ask the human for permission before setting up the matching Inkbox plugin.",
   "message": "Agent created successfully."
 }
 ```
@@ -219,4 +240,4 @@ Response:
 ```
 
 
-Agent self-signup supports an optional `harness` identifier (for example `cc`, `codex`, `openclaw`, `hermes`, `cursor`, or a future harness string). When Inkbox has a matching plugin, the signup response includes a plugin setup hint telling the agent to ask the human for permission before installing or configuring it.
+Agent self-signup supports an optional `harness` identifier. Inkbox plugins must pass their harness value (`cc`, `codex`, `hermes`, or `openclaw`) on signup. When Inkbox has a matching plugin, the signup response includes a plugin setup hint telling the agent to ask the human for permission before installing or configuring it.

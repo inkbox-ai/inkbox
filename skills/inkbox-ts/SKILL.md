@@ -65,6 +65,8 @@ For the full agent self-signup flow (register, verify, check status, restriction
 
 > **See:** `skills/inkbox-agent-self-signup/SKILL.md`
 
+For plugin-driven self-signup, pass `harness: "cc"` from the Claude Code plugin, `harness: "codex"` from the Codex plugin, `harness: "hermes"` from the Hermes plugin, and `harness: "openclaw"` from the OpenClaw plugin.
+
 TypeScript SDK methods: `Inkbox.signup({...})`, `Inkbox.verifySignup(apiKey, {...})`, `Inkbox.resendSignupVerification(apiKey)`, `Inkbox.getSignupStatus(apiKey)`.
 
 ## Identities

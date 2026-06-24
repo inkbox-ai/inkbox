@@ -5,7 +5,8 @@
     "email": "hello@inkbox.ai"
   },
   "metadata": {
-    "description": "Inkbox email and phone SDK skills."
+    "description": "Inkbox email and phone SDK skills.",
+    "inkboxAgentSignupHarness": "cc"
   },
   "plugins": [
     {
@@ -20,6 +21,9 @@
       "policy": {
         "installation": "AVAILABLE",
         "authentication": "ON_INSTALL"
+      },
+      "metadata": {
+        "inkboxAgentSignupHarness": "cc"
       }
     }
   ]

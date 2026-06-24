@@ -86,6 +86,8 @@ For the full self-signup flow and API semantics, read the shared reference:
 
 > **See:** `skills/inkbox-agent-self-signup/SKILL.md`
 
+For plugin-driven self-signup, `signup create` should include `--harness cc`, `--harness codex`, `--harness hermes`, or `--harness openclaw` as appropriate.
+
 CLI commands:
 
 ```bash
