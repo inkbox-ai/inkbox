@@ -29,6 +29,8 @@ const RAW_SIGNUP_RESPONSE = {
   agent_handle: "my-agent",
   claim_status: "unclaimed",
   human_email: "human@example.com",
+  harness: "cc",
+  plugin_setup_hint: "Ask permission before setup",
   message: "Verification email sent",
 };
 
@@ -91,6 +93,8 @@ describe("Inkbox.signup", () => {
       agentHandle: "my-agent",
       claimStatus: "unclaimed",
       humanEmail: "human@example.com",
+      harness: "cc",
+      pluginSetupHint: "Ask permission before setup",
       message: "Verification email sent",
     });
   });
@@ -120,6 +124,7 @@ describe("Inkbox.signup", () => {
       displayName: "My Agent",
       agentHandle: "my-agent",
       emailLocalPart: "my.agent",
+      harness: "codex",
     });
 
     const [, init] = vi.mocked(fetch).mock.calls[0];
@@ -130,6 +135,7 @@ describe("Inkbox.signup", () => {
       display_name: "My Agent",
       agent_handle: "my-agent",
       email_local_part: "my.agent",
+      harness: "codex",
     });
   });
 

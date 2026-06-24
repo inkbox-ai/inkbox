@@ -1018,3 +1018,6 @@ Runnable example scripts are available in the [examples/typescript](https://gith
 ## License
 
 MIT
+
+
+Agent self-signup supports an optional `harness` identifier (for example `cc`, `codex`, `openclaw`, `hermes`, `cursor`, or a future harness string). When Inkbox has a matching plugin, the signup response includes a plugin setup hint telling the agent to ask the human for permission before installing or configuring it.

@@ -7,7 +7,14 @@ Dataclasses for the agent self-signup flow.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal, TypeAlias
+
+AgentHarnessKnown: TypeAlias = Literal[
+    "cc", "codex", "openclaw", "hermes", "cursor", "opencode",
+    "aider", "cline", "roo_code", "windsurf", "copilot",
+    "gemini_cli", "qwen_code", "amp", "goose", "other",
+]
+AgentHarness: TypeAlias = AgentHarnessKnown | str
 
 
 @dataclass
@@ -20,6 +27,8 @@ class AgentSignupResponse:
     agent_handle: str
     claim_status: str
     human_email: str
+    harness: str | None
+    plugin_setup_hint: str | None
     message: str
 
     @classmethod
@@ -31,6 +40,8 @@ class AgentSignupResponse:
             agent_handle=d["agent_handle"],
             claim_status=d["claim_status"],
             human_email=d["human_email"],
+            harness=d.get("harness"),
+            plugin_setup_hint=d.get("plugin_setup_hint"),
             message=d["message"],
         )
 

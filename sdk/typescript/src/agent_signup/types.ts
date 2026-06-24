@@ -6,12 +6,32 @@
 
 // ---- public interfaces (camelCase) ----
 
+export type AgentHarnessKnown =
+  | "cc"
+  | "codex"
+  | "openclaw"
+  | "hermes"
+  | "cursor"
+  | "opencode"
+  | "aider"
+  | "cline"
+  | "roo_code"
+  | "windsurf"
+  | "copilot"
+  | "gemini_cli"
+  | "qwen_code"
+  | "amp"
+  | "goose"
+  | "other";
+export type AgentHarness = AgentHarnessKnown | (string & {});
+
 export interface AgentSignupRequest {
   humanEmail: string;
   noteToHuman: string;
   displayName?: string;
   agentHandle?: string;
   emailLocalPart?: string;
+  harness?: AgentHarness;
 }
 
 export interface AgentSignupResponse {
@@ -21,6 +41,8 @@ export interface AgentSignupResponse {
   agentHandle: string;
   claimStatus: string;
   humanEmail: string;
+  harness: AgentHarness | null;
+  pluginSetupHint: string | null;
   message: string;
 }
 
@@ -63,6 +85,8 @@ export interface RawAgentSignupResponse {
   agent_handle: string;
   claim_status: string;
   human_email: string;
+  harness?: string | null;
+  plugin_setup_hint?: string | null;
   message: string;
 }
 
@@ -102,6 +126,8 @@ export function parseAgentSignupResponse(r: RawAgentSignupResponse): AgentSignup
     agentHandle: r.agent_handle,
     claimStatus: r.claim_status,
     humanEmail: r.human_email,
+    harness: r.harness ?? null,
+    pluginSetupHint: r.plugin_setup_hint ?? null,
     message: r.message,
   };
 }
@@ -152,6 +178,7 @@ export function agentSignupRequestToWire(
   if (req.displayName !== undefined) body["display_name"] = req.displayName;
   if (req.agentHandle !== undefined) body["agent_handle"] = req.agentHandle;
   if (req.emailLocalPart !== undefined) body["email_local_part"] = req.emailLocalPart;
+  if (req.harness !== undefined) body["harness"] = req.harness;
   return body;
 }
 

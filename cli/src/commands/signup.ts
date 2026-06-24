@@ -28,6 +28,7 @@ export function registerSignupCommands(program: Command): void {
     .option("--display-name <name>", "Human-readable name for the agent")
     .option("--agent-handle <handle>", "Requested handle for the agent identity")
     .option("--email-local-part <local>", "Requested mailbox local part before the sending domain")
+    .option("--harness <harness>", "Agent harness identifier (cc, codex, openclaw, hermes, cursor, etc.)")
     .action(
       withErrorHandler(async function (this: Command) {
         const globalOpts = getGlobalOpts(this);
@@ -39,6 +40,7 @@ export function registerSignupCommands(program: Command): void {
             displayName: cmdOpts.displayName,
             agentHandle: cmdOpts.agentHandle,
             emailLocalPart: cmdOpts.emailLocalPart,
+            harness: cmdOpts.harness,
           },
           { baseUrl: globalOpts.baseUrl },
         );
@@ -52,11 +54,13 @@ export function registerSignupCommands(program: Command): void {
           console.log(`  Handle:   ${result.agentHandle}`);
           console.log(`  Org:      ${result.organizationId}`);
           console.log(`  Status:   ${result.claimStatus}`);
+          if (result.harness) console.log(`  Harness:  ${result.harness}`);
           console.log();
           console.log(`  API Key:  ${result.apiKey}`);
           console.log();
           console.log("Save the API key — it is shown only once.");
           console.log(`A verification email has been sent to ${result.humanEmail}.`);
+          if (result.pluginSetupHint) console.log(result.pluginSetupHint);
         }
       }),
     );

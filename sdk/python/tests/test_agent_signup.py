@@ -30,6 +30,8 @@ RAW_SIGNUP = {
     "agent_handle": "my-agent",
     "claim_status": "unclaimed",
     "human_email": "human@example.com",
+    "harness": "cc",
+    "plugin_setup_hint": "Ask permission before setup",
     "message": "Verification email sent",
 }
 
@@ -102,6 +104,8 @@ class TestSignup:
         assert result.agent_handle == "my-agent"
         assert result.claim_status == "unclaimed"
         assert result.human_email == "human@example.com"
+        assert result.harness == "cc"
+        assert result.plugin_setup_hint == "Ask permission before setup"
         assert result.message == "Verification email sent"
 
     @patch("httpx.Client")
@@ -133,6 +137,7 @@ class TestSignup:
             display_name="My Agent",
             agent_handle="my-agent",
             email_local_part="my.agent",
+            harness="codex",
         )
 
         client.request.assert_called_once_with(
@@ -145,6 +150,7 @@ class TestSignup:
                 "display_name": "My Agent",
                 "agent_handle": "my-agent",
                 "email_local_part": "my.agent",
+                "harness": "codex",
             },
         )
 

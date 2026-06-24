@@ -147,6 +147,8 @@ from inkbox.agent_signup.types import (
     AgentSignupVerifyResponse,
     AgentSignupResendResponse,
     AgentSignupStatusResponse,
+    AgentHarness,
+    AgentHarnessKnown,
     SignupRestrictions,
 )
 
@@ -364,6 +366,8 @@ __all__ = [
     "AgentSignupVerifyResponse",
     "AgentSignupResendResponse",
     "AgentSignupStatusResponse",
+    "AgentHarness",
+    "AgentHarnessKnown",
     "SignupRestrictions",
     # Whoami types + auth_subtype constants
     "AUTH_SUBTYPE_API_KEY_ADMIN_SCOPED",

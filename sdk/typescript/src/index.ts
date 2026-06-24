@@ -3,6 +3,8 @@ export { AgentIdentity } from "./agent_identity.js";
 export { Credentials } from "./credentials.js";
 export type { InkboxOptions, SignupOptions } from "./inkbox.js";
 export type {
+  AgentHarness,
+  AgentHarnessKnown,
   AgentSignupRequest,
   AgentSignupResponse,
   AgentSignupVerifyRequest,
