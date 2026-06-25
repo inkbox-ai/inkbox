@@ -92,6 +92,8 @@ describe("Inkbox.signup", () => {
       claimStatus: "unclaimed",
       humanEmail: "human@example.com",
       message: "Verification email sent",
+      harness: null,
+      pluginAvailable: false,
     });
   });
 
@@ -188,6 +190,7 @@ describe("Inkbox.verifySignup", () => {
       claimStatus: "claimed",
       organizationId: "org-123",
       message: "Verified",
+      nextSteps: null,
     });
   });
 });

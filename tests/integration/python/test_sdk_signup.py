@@ -41,10 +41,11 @@ def test_python_sdk_signup_accepts_custom_handle_and_email_local_part(
     )
     assert signup.agent_handle == agent_handle
     assert signup.email_address.startswith(f"{email_local_part}@")
-    # The harness echoes back on the response, and plugin_available is a bool
-    # the agent uses to decide whether to offer a matching plugin.
-    assert signup.harness == "cc"
-    assert isinstance(signup.plugin_available, bool)
+    # We send the `cc` alias; the server normalizes it to `claude-code` and
+    # echoes the canonical value back. `claude-code` has a matching plugin,
+    # so plugin_available is truthy.
+    assert signup.harness == "claude-code"
+    assert signup.plugin_available
 
     api_url = f"{cfg.base_url.rstrip('/')}/api/v1"
 

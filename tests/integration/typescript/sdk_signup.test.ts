@@ -46,10 +46,11 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
     );
     expect(signup.agentHandle).toBe(agentHandle);
     expect(signup.emailAddress.startsWith(`${emailLocalPart}@`)).toBe(true);
-    // The harness echoes back on the response, and pluginAvailable is a bool
-    // the agent uses to decide whether to offer a matching plugin.
-    expect(signup.harness).toBe("cc");
-    expect(typeof signup.pluginAvailable).toBe("boolean");
+    // We send the `cc` alias; the server normalizes it to `claude-code` and
+    // echoes the canonical value back. `claude-code` has a matching plugin,
+    // so pluginAvailable is truthy.
+    expect(signup.harness).toBe("claude-code");
+    expect(signup.pluginAvailable).toBeTruthy();
 
     const apiUrl = `${config.baseUrl.replace(/\/$/, "")}/api/v1`;
 
