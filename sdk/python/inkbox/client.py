@@ -515,14 +515,13 @@ class Inkbox:
             agent_handle: Optional requested handle for the agent identity.
             email_local_part: Optional requested mailbox local part.
             harness: Optional identifier for the agent harness/runtime (e.g.
-                ``"claude-code"``, ``"codex"``). Free-form string; when a
-                matching plugin exists the response flags ``plugin_available``.
+                ``"claude-code"``, ``"codex"``). Free-form string passed to the
+                server to record the calling runtime.
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
 
         Returns:
-            AgentSignupResponse: Provisioned mailbox, org, one-time API key,
-            and (when applicable) the echoed harness and plugin availability.
+            AgentSignupResponse: Provisioned mailbox, org, and one-time API key.
         """
         body: dict[str, str] = {
             "human_email": human_email,

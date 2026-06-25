@@ -23,8 +23,6 @@ export interface AgentSignupResponse {
   claimStatus: string;
   humanEmail: string;
   message: string;
-  harness: string | null;
-  pluginAvailable: boolean;
 }
 
 export interface AgentSignupVerifyRequest {
@@ -68,8 +66,6 @@ export interface RawAgentSignupResponse {
   claim_status: string;
   human_email: string;
   message: string;
-  harness?: string | null;
-  plugin_available?: boolean;
 }
 
 export interface RawAgentSignupVerifyResponse {
@@ -110,8 +106,6 @@ export function parseAgentSignupResponse(r: RawAgentSignupResponse): AgentSignup
     claimStatus: r.claim_status,
     humanEmail: r.human_email,
     message: r.message,
-    harness: r.harness ?? null,
-    pluginAvailable: r.plugin_available ?? false,
   };
 }
 

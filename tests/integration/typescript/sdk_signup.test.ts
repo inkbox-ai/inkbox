@@ -46,11 +46,9 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
     );
     expect(signup.agentHandle).toBe(agentHandle);
     expect(signup.emailAddress.startsWith(`${emailLocalPart}@`)).toBe(true);
-    // We send the `cc` alias; the server normalizes it to `claude-code` and
-    // echoes the canonical value back. `claude-code` has a matching plugin,
-    // so pluginAvailable is truthy.
-    expect(signup.harness).toBe("claude-code");
-    expect(signup.pluginAvailable).toBeTruthy();
+    // We pass the `cc` harness alias to confirm the request param is accepted;
+    // the response no longer echoes it, so just assert signup succeeded.
+    expect(signup.apiKey).toBeTruthy();
 
     const apiUrl = `${config.baseUrl.replace(/\/$/, "")}/api/v1`;
 

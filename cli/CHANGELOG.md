@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`--harness <harness>` flag on `inkbox signup`.** Passes an optional identifier for the agent harness/runtime; the signup response echoes `harness` and flags `pluginAvailable`, and the verify response returns `nextSteps`. Bundles `@inkbox/sdk` `0.4.10`.
+- **`--harness <harness>` flag on `inkbox signup`.** Passes an optional identifier for the agent harness/runtime; the verify response returns `nextSteps`. Bundles `@inkbox/sdk` `0.4.10`.
 
 ## 0.4.8 — graceful tunnel reconnect on redeploy
 

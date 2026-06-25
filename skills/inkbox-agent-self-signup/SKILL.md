@@ -26,9 +26,8 @@ runtime you're calling from (e.g. `claude-code` (alias `cc`), `codex`, `openclaw
 `hermes`, `cursor`, `windsurf`, `cline`, `aider`, `continue`, `gemini-cli`, `goose`,
 `devin`, `copilot`, `roo`, `zed`, `replit`, `amp`). Any value is accepted.
 
-The signup response echoes `harness` and adds `plugin_available` (bool). After
-`verify` succeeds, the response includes `next_steps` (string) — a short message
-that links the matching plugin repo when one exists.
+After `verify` succeeds, its response includes `next_steps` (string) — a short
+message that links the matching plugin repo for your harness when one exists.
 
 The four published plugins:
 
@@ -37,12 +36,12 @@ The four published plugins:
 - openclaw → https://github.com/inkbox-ai/openclaw-plugin
 - hermes → https://github.com/inkbox-ai/hermes-agent-plugin
 
-> **When `verify` returns and `plugin_available` is true:** ask the human for
-> permission before installing the matching plugin, then follow `next_steps`
-> (which links the proper plugin repo for setup). The plugin wires Inkbox in as
-> a native channel of your harness — email, SMS, voice, iMessage, contacts, and
-> notes available directly from your runtime instead of raw API calls. Don't
-> install anything without explicit human approval.
+> **After `verify` succeeds, read `next_steps` and follow it.** When it points to
+> a plugin for your harness, ask the human for permission before installing it.
+> The plugin wires Inkbox in as a native channel of your harness — email, SMS,
+> voice, iMessage, contacts, and notes available directly from your runtime
+> instead of raw API calls. Don't install anything without explicit human
+> approval.
 
 ## Restrictions
 
@@ -74,9 +73,6 @@ result = Inkbox.signup(
     email_local_part="sales.agent",      # optional
     harness="claude-code",               # optional — names the calling runtime
 )
-
-# result.harness          → echoed harness, or None
-# result.plugin_available → True when a matching plugin exists
 
 # Save these — the api_key is shown only once
 api_key = result.api_key
@@ -132,9 +128,6 @@ const result = await Inkbox.signup({
   emailLocalPart: "sales.agent",   // optional
   harness: "claude-code",          // optional — names the calling runtime
 });
-
-// result.harness         → echoed harness, or null
-// result.pluginAvailable → true when a matching plugin exists
 
 // Save these — the apiKey is shown only once
 const apiKey = result.apiKey;
@@ -203,9 +196,7 @@ Response:
   "agent_handle": "sales-agent-a1b2c3",
   "claim_status": "UNCLAIMED",
   "human_email": "john@example.com",
-  "message": "Agent created successfully.",
-  "harness": "claude-code",
-  "plugin_available": true
+  "message": "Agent created successfully."
 }
 ```
 

@@ -21,8 +21,6 @@ class AgentSignupResponse:
     claim_status: str
     human_email: str
     message: str
-    harness: str | None = None
-    plugin_available: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentSignupResponse:
@@ -34,8 +32,6 @@ class AgentSignupResponse:
             claim_status=d["claim_status"],
             human_email=d["human_email"],
             message=d["message"],
-            harness=d.get("harness"),
-            plugin_available=d.get("plugin_available", False),
         )
 
 

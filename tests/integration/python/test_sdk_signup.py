@@ -41,11 +41,9 @@ def test_python_sdk_signup_accepts_custom_handle_and_email_local_part(
     )
     assert signup.agent_handle == agent_handle
     assert signup.email_address.startswith(f"{email_local_part}@")
-    # We send the `cc` alias; the server normalizes it to `claude-code` and
-    # echoes the canonical value back. `claude-code` has a matching plugin,
-    # so plugin_available is truthy.
-    assert signup.harness == "claude-code"
-    assert signup.plugin_available
+    # We pass the `cc` harness alias to confirm the request param is accepted;
+    # the response no longer echoes it, so just assert signup succeeded.
+    assert signup.api_key
 
     api_url = f"{cfg.base_url.rstrip('/')}/api/v1"
 

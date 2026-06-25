@@ -92,8 +92,6 @@ describe("Inkbox.signup", () => {
       claimStatus: "unclaimed",
       humanEmail: "human@example.com",
       message: "Verification email sent",
-      harness: null,
-      pluginAvailable: false,
     });
   });
 

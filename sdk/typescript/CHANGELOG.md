@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Optional `harness` on agent self-signup.** The signup helper accepts an optional `harness` identifying the agent harness/runtime. The signup response now carries `harness` (the echoed value) and `pluginAvailable` (whether a matching plugin exists), and the verify response carries `nextSteps`. New fields read with defaults (`harness`/`nextSteps` → `null`, `pluginAvailable` → `false`) so responses from older servers still parse.
+- **Optional `harness` on agent self-signup.** The signup helper accepts an optional `harness` identifying the agent harness/runtime. The verify response now carries `nextSteps`, which reads with a default (`null`) so responses from older servers still parse.
 
 ## 0.4.8 — graceful tunnel reconnect on redeploy
 
