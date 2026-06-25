@@ -12,6 +12,7 @@ export interface AgentSignupRequest {
   displayName?: string;
   agentHandle?: string;
   emailLocalPart?: string;
+  harness?: string;
 }
 
 export interface AgentSignupResponse {
@@ -22,6 +23,8 @@ export interface AgentSignupResponse {
   claimStatus: string;
   humanEmail: string;
   message: string;
+  harness: string | null;
+  pluginAvailable: boolean;
 }
 
 export interface AgentSignupVerifyRequest {
@@ -32,6 +35,7 @@ export interface AgentSignupVerifyResponse {
   claimStatus: string;
   organizationId: string;
   message: string;
+  nextSteps: string | null;
 }
 
 export interface AgentSignupResendResponse {
@@ -64,12 +68,15 @@ export interface RawAgentSignupResponse {
   claim_status: string;
   human_email: string;
   message: string;
+  harness?: string | null;
+  plugin_available?: boolean;
 }
 
 export interface RawAgentSignupVerifyResponse {
   claim_status: string;
   organization_id: string;
   message: string;
+  next_steps?: string | null;
 }
 
 export interface RawAgentSignupResendResponse {
@@ -103,6 +110,8 @@ export function parseAgentSignupResponse(r: RawAgentSignupResponse): AgentSignup
     claimStatus: r.claim_status,
     humanEmail: r.human_email,
     message: r.message,
+    harness: r.harness ?? null,
+    pluginAvailable: r.plugin_available ?? false,
   };
 }
 
@@ -111,6 +120,7 @@ export function parseAgentSignupVerifyResponse(r: RawAgentSignupVerifyResponse):
     claimStatus: r.claim_status,
     organizationId: r.organization_id,
     message: r.message,
+    nextSteps: r.next_steps ?? null,
   };
 }
 
@@ -152,6 +162,7 @@ export function agentSignupRequestToWire(
   if (req.displayName !== undefined) body["display_name"] = req.displayName;
   if (req.agentHandle !== undefined) body["agent_handle"] = req.agentHandle;
   if (req.emailLocalPart !== undefined) body["email_local_part"] = req.emailLocalPart;
+  if (req.harness !== undefined) body["harness"] = req.harness;
   return body;
 }
 

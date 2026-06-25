@@ -28,6 +28,7 @@ export function registerSignupCommands(program: Command): void {
     .option("--display-name <name>", "Human-readable name for the agent")
     .option("--agent-handle <handle>", "Requested handle for the agent identity")
     .option("--email-local-part <local>", "Requested mailbox local part before the sending domain")
+    .option("--harness <harness>", "Identifier for the agent harness/runtime (e.g. claude-code, codex)")
     .action(
       withErrorHandler(async function (this: Command) {
         const globalOpts = getGlobalOpts(this);
@@ -39,6 +40,7 @@ export function registerSignupCommands(program: Command): void {
             displayName: cmdOpts.displayName,
             agentHandle: cmdOpts.agentHandle,
             emailLocalPart: cmdOpts.emailLocalPart,
+            harness: cmdOpts.harness,
           },
           { baseUrl: globalOpts.baseUrl },
         );

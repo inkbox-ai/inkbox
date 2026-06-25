@@ -40,11 +40,16 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
         noteToHuman: "TypeScript SDK integration signup test",
         agentHandle,
         emailLocalPart,
+        harness: "cc",
       },
       { baseUrl: config.baseUrl, timeoutMs: config.httpTimeout },
     );
     expect(signup.agentHandle).toBe(agentHandle);
     expect(signup.emailAddress.startsWith(`${emailLocalPart}@`)).toBe(true);
+    // The harness echoes back on the response, and pluginAvailable is a bool
+    // the agent uses to decide whether to offer a matching plugin.
+    expect(signup.harness).toBe("cc");
+    expect(typeof signup.pluginAvailable).toBe("boolean");
 
     const apiUrl = `${config.baseUrl.replace(/\/$/, "")}/api/v1`;
 

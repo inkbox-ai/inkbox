@@ -19,6 +19,29 @@ The flow has four steps:
 
 > **Important:** Always confirm with the user before initiating a signup, as it sends a real email to the specified human.
 
+## Harness & plugins
+
+Signup accepts an optional `harness` field — a free-form string naming the agent
+runtime you're calling from (e.g. `claude-code` (alias `cc`), `codex`, `openclaw`,
+`hermes`, `cursor`, `windsurf`, `cline`, `aider`, `continue`, `gemini-cli`, `goose`,
+`devin`, `copilot`, `roo`, `zed`, `replit`, `amp`). Any value is accepted.
+
+The signup response echoes `harness` and adds `plugin_available` (bool). After
+`verify` succeeds, the response includes `next_steps` (string) — a short message
+that links the matching plugin repo when one exists.
+
+The four published plugins:
+
+- claude-code → https://github.com/inkbox-ai/claude-code-plugin
+- codex → https://github.com/inkbox-ai/codex-plugin
+- openclaw → https://github.com/inkbox-ai/openclaw-plugin
+- hermes → https://github.com/inkbox-ai/hermes-agent-plugin
+
+> **When `verify` returns and `plugin_available` is true:** ASK THE HUMAN FOR
+> PERMISSION before installing the matching plugin, then follow `next_steps`
+> (which links the proper plugin repo for setup). Do not install anything
+> without explicit human approval.
+
 ## Restrictions
 
 | | Unclaimed | Claimed (after verification) |
@@ -47,7 +70,11 @@ result = Inkbox.signup(
     display_name="Sales Agent",          # optional
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
+    harness="claude-code",               # optional — names the calling runtime
 )
+
+# result.harness          → echoed harness, or None
+# result.plugin_available → True when a matching plugin exists
 
 # Save these — the api_key is shown only once
 api_key = result.api_key
@@ -58,6 +85,7 @@ org_id = result.organization_id    # provisional org
 # 2. Verify (after the human shares the 6-digit code)
 verify = Inkbox.verify_signup(api_key, verification_code="483921")
 # verify.claim_status → "agent_claimed"
+# verify.next_steps   → guidance string (links the matching plugin repo)
 
 # 3. Resend verification (5-minute cooldown)
 resend = Inkbox.resend_signup_verification(api_key)
@@ -100,7 +128,11 @@ const result = await Inkbox.signup({
   displayName: "Sales Agent",      // optional
   agentHandle: "sales-agent",      // optional
   emailLocalPart: "sales.agent",   // optional
+  harness: "claude-code",          // optional — names the calling runtime
 });
+
+// result.harness         → echoed harness, or null
+// result.pluginAvailable → true when a matching plugin exists
 
 // Save these — the apiKey is shown only once
 const apiKey = result.apiKey;
@@ -111,6 +143,7 @@ const orgId = result.organizationId;     // provisional org
 // 2. Verify (after the human shares the 6-digit code)
 const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
 // verify.claimStatus → "agent_claimed"
+// verify.nextSteps   → guidance string (links the matching plugin repo)
 
 // 3. Resend verification (5-minute cooldown)
 const resend = await Inkbox.resendSignupVerification(apiKey);
@@ -150,12 +183,13 @@ curl -X POST https://inkbox.ai/api/v1/agent-signup \
     "note_to_human": "Hey John, this is your sales bot signing up!",
     "display_name": "Sales Agent",
     "agent_handle": "sales-agent",
-    "email_local_part": "sales.agent"
+    "email_local_part": "sales.agent",
+    "harness": "claude-code"
   }'
 ```
 
-`human_email` and `note_to_human` are required. `display_name`, `agent_handle`, and
-`email_local_part` are optional.
+`human_email` and `note_to_human` are required. `display_name`, `agent_handle`,
+`email_local_part`, and `harness` are optional.
 
 Response:
 
@@ -167,7 +201,9 @@ Response:
   "agent_handle": "sales-agent-a1b2c3",
   "claim_status": "UNCLAIMED",
   "human_email": "john@example.com",
-  "message": "Agent created successfully."
+  "message": "Agent created successfully.",
+  "harness": "claude-code",
+  "plugin_available": true
 }
 ```
 
