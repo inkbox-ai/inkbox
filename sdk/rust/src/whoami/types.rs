@@ -30,13 +30,42 @@ pub struct WhoamiApiKeyResponse {
     pub label: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    // Timestamps arrive as epoch floats.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_used_at: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expires_at: Option<f64>,
+    // Timestamps arrive as ISO-8601 strings — the server serializes `datetime`
+    // fields like everything else in the API (e.g. "2026-06-25T23:05:46Z").
+    // Kept as the raw string; the helper also tolerates a legacy epoch number.
+    #[serde(
+        default,
+        deserialize_with = "de_opt_timestamp",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub created_at: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "de_opt_timestamp",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub last_used_at: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "de_opt_timestamp",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub expires_at: Option<String>,
+}
+
+/// Deserialize an optional timestamp that may arrive as an ISO-8601 string (the
+/// server's actual format) or, defensively, a legacy epoch number — keeping the
+/// raw value as a string either way. Avoids the hard serde failure an earlier
+/// `Option<f64>` typing hit on the server's string timestamps.
+fn de_opt_timestamp<'de, D>(de: D) -> std::result::Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(match Option::<Value>::deserialize(de)? {
+        Some(Value::String(s)) => Some(s),
+        Some(Value::Number(n)) => Some(n.to_string()),
+        _ => None,
+    })
 }
 
 /// Returned when the caller authenticates with a JWT.
@@ -77,5 +106,41 @@ pub fn parse_whoami(v: Value) -> Result<WhoamiResponse> {
         Ok(WhoamiResponse::ApiKey(serde_json::from_value(v)?))
     } else {
         Ok(WhoamiResponse::Jwt(serde_json::from_value(v)?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn whoami_decodes_iso_string_timestamps() {
+        // The server serializes datetime fields as ISO-8601 strings; the earlier
+        // `Option<f64>` typing failed to decode these (the bug this guards).
+        let payload = serde_json::json!({
+            "auth_type": "api_key",
+            "auth_subtype": "api_key.admin_scoped",
+            "organization_id": "org_123",
+            "created_at": "2026-06-25T23:05:46.406390Z",
+            "last_used_at": "2026-06-25T23:10:00Z",
+            "expires_at": null
+        });
+        match parse_whoami(payload).expect("decodes ISO timestamps") {
+            WhoamiResponse::ApiKey(k) => {
+                assert_eq!(k.created_at.as_deref(), Some("2026-06-25T23:05:46.406390Z"));
+                assert_eq!(k.last_used_at.as_deref(), Some("2026-06-25T23:10:00Z"));
+                assert_eq!(k.expires_at, None);
+            }
+            _ => panic!("expected ApiKey variant"),
+        }
+    }
+
+    #[test]
+    fn whoami_tolerates_numeric_timestamps() {
+        let payload = serde_json::json!({ "auth_type": "api_key", "created_at": 1_750_000_000.5 });
+        match parse_whoami(payload).expect("tolerates numeric timestamps") {
+            WhoamiResponse::ApiKey(k) => assert_eq!(k.created_at.as_deref(), Some("1750000000.5")),
+            _ => panic!("expected ApiKey variant"),
+        }
     }
 }
