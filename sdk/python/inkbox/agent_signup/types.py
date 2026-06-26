@@ -42,7 +42,6 @@ class AgentSignupVerifyResponse:
     claim_status: str
     organization_id: str
     message: str
-    next_steps: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentSignupVerifyResponse:
@@ -50,7 +49,6 @@ class AgentSignupVerifyResponse:
             claim_status=d["claim_status"],
             organization_id=d["organization_id"],
             message=d["message"],
-            next_steps=d.get("next_steps"),
         )
 
 

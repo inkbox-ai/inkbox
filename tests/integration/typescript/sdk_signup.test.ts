@@ -40,14 +40,14 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
         noteToHuman: "TypeScript SDK integration signup test",
         agentHandle,
         emailLocalPart,
-        harness: "cc",
+        harness: "claude-code",
       },
       { baseUrl: config.baseUrl, timeoutMs: config.httpTimeout },
     );
     expect(signup.agentHandle).toBe(agentHandle);
     expect(signup.emailAddress.startsWith(`${emailLocalPart}@`)).toBe(true);
-    // We pass the `cc` harness alias to confirm the request param is accepted;
-    // the response no longer echoes it, so just assert signup succeeded.
+    // We pass a harness to confirm the request param is accepted; the response
+    // no longer echoes it, so just assert signup succeeded.
     expect(signup.apiKey).toBeTruthy();
 
     const apiUrl = `${config.baseUrl.replace(/\/$/, "")}/api/v1`;

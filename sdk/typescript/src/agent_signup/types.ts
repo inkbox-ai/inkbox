@@ -33,7 +33,6 @@ export interface AgentSignupVerifyResponse {
   claimStatus: string;
   organizationId: string;
   message: string;
-  nextSteps: string | null;
 }
 
 export interface AgentSignupResendResponse {
@@ -72,7 +71,6 @@ export interface RawAgentSignupVerifyResponse {
   claim_status: string;
   organization_id: string;
   message: string;
-  next_steps?: string | null;
 }
 
 export interface RawAgentSignupResendResponse {
@@ -114,7 +112,6 @@ export function parseAgentSignupVerifyResponse(r: RawAgentSignupVerifyResponse):
     claimStatus: r.claim_status,
     organizationId: r.organization_id,
     message: r.message,
-    nextSteps: r.next_steps ?? null,
   };
 }
 

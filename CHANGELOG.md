@@ -8,10 +8,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- **Optional `harness` on agent self-signup** across all four packages. Agents may pass a `harness` identifier (e.g. the agent runtime they run under) when signing up. The verify response now returns `next_steps` (absent → `null`/`None`) so older servers still parse.
-  - TypeScript / Python: optional `harness` argument on the signup helper; `nextSteps` / `next_steps` on the verify response.
+- **Optional `harness` on agent self-signup** across all four packages. Agents may pass a `harness` identifier (e.g. the agent runtime they run under) when signing up (free-form string; unknown values accepted). When a plugin exists for the harness, post-verification guidance is folded into the verify response's `message`.
+  - TypeScript / Python: optional `harness` argument on the signup helper.
   - CLI: `inkbox signup` gains a `--harness <harness>` flag.
-  - Rust SDK: `Inkbox::signup` gains an `Option<&str>` `harness` parameter, with `next_steps` on `AgentSignupVerifyResponse` — at parity with the Python and TypeScript SDKs.
+  - Rust SDK: `Inkbox::signup` gains an `Option<&str>` `harness` parameter — at parity with the Python and TypeScript SDKs.
 
 ## 0.4.9 — Rust SDK
 

@@ -35,14 +35,14 @@ def test_python_sdk_signup_accepts_custom_handle_and_email_local_part(
         note_to_human="Python SDK integration signup test",
         agent_handle=agent_handle,
         email_local_part=email_local_part,
-        harness="cc",
+        harness="claude-code",
         base_url=cfg.base_url,
         timeout=cfg.http_timeout,
     )
     assert signup.agent_handle == agent_handle
     assert signup.email_address.startswith(f"{email_local_part}@")
-    # We pass the `cc` harness alias to confirm the request param is accepted;
-    # the response no longer echoes it, so just assert signup succeeded.
+    # We pass a harness to confirm the request param is accepted; the response
+    # no longer echoes it, so just assert signup succeeded.
     assert signup.api_key
 
     api_url = f"{cfg.base_url.rstrip('/')}/api/v1"

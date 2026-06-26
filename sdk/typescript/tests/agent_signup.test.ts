@@ -188,7 +188,6 @@ describe("Inkbox.verifySignup", () => {
       claimStatus: "claimed",
       organizationId: "org-123",
       message: "Verified",
-      nextSteps: null,
     });
   });
 });

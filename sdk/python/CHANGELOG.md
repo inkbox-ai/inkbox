@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Optional `harness` on agent self-signup.** `Inkbox.signup(...)` accepts a `harness` keyword identifying the agent harness/runtime. The verify response now carries `next_steps`, which parses with a default (`None`) so responses from older servers still deserialize.
+- **Optional `harness` on agent self-signup.** `Inkbox.signup(...)` accepts a `harness` keyword identifying the agent harness/runtime (free-form string; unknown values accepted). When a plugin exists for the harness, post-verification guidance is folded into the verify response's `message`.
 
 ## 0.4.8 — graceful tunnel reconnect on redeploy
 

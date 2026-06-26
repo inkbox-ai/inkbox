@@ -22,12 +22,15 @@ The flow has four steps:
 ## Harness & plugins
 
 Signup accepts an optional `harness` field — a free-form string naming the agent
-runtime you're calling from (e.g. `claude-code` (alias `cc`), `codex`, `openclaw`,
-`hermes`, `cursor`, `windsurf`, `cline`, `aider`, `continue`, `gemini-cli`, `goose`,
-`devin`, `copilot`, `roo`, `zed`, `replit`, `amp`). Any value is accepted.
+runtime you're calling from (e.g. `claude-code`, `codex`, `openclaw`, `hermes`,
+`cursor`, `windsurf`, `cline`, `aider`, `continue`, `gemini-cli`, `goose`,
+`devin`, `copilot`, `roo`, `zed`, `replit`, `amp`). Any value is accepted; it's
+trimmed and lowercased server-side, and unknown harnesses are never rejected.
 
-After `verify` succeeds, its response includes `next_steps` (string) — a short
-message that links the matching plugin repo for your harness when one exists.
+After `verify` succeeds, read the response's `message`. When a plugin exists for
+your harness, the `message` includes guidance pointing you at the matching plugin
+repo. (There is no separate `next_steps` field — the guidance is folded into
+`message`.)
 
 The four published plugins:
 
@@ -36,12 +39,13 @@ The four published plugins:
 - openclaw → https://github.com/inkbox-ai/openclaw-plugin
 - hermes → https://github.com/inkbox-ai/hermes-agent-plugin
 
-> **After `verify` succeeds, read `next_steps` and follow it.** Ask your human for
-> permission before you start any plugin setup or local porting — once they approve,
-> you can do it yourself. If a plugin exists for your harness, set it up; if not,
-> review the listed plugins and port the relevant logic locally. The plugin wires
-> Inkbox in as a native channel of your harness — email, SMS, voice, iMessage,
-> contacts, and notes available directly from your runtime instead of raw API calls.
+> **After `verify` succeeds, read the `message` and follow any plugin guidance it
+> contains.** Ask your human for permission before you start any plugin setup or
+> local porting — once they approve, you can do it yourself. If a plugin exists for
+> your harness, set it up; if not, review the listed plugins and port the relevant
+> logic locally. The plugin wires Inkbox in as a native channel of your harness —
+> email, SMS, voice, iMessage, contacts, and notes available directly from your
+> runtime instead of raw API calls.
 
 ## Restrictions
 
@@ -83,7 +87,7 @@ org_id = result.organization_id    # provisional org
 # 2. Verify (after the human shares the 6-digit code)
 verify = Inkbox.verify_signup(api_key, verification_code="483921")
 # verify.claim_status → "agent_claimed"
-# verify.next_steps   → guidance string (links the matching plugin repo)
+# verify.message      → result + plugin guidance for your harness (when one exists)
 
 # 3. Resend verification (5-minute cooldown)
 resend = Inkbox.resend_signup_verification(api_key)
@@ -138,7 +142,7 @@ const orgId = result.organizationId;     // provisional org
 // 2. Verify (after the human shares the 6-digit code)
 const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
 // verify.claimStatus → "agent_claimed"
-// verify.nextSteps   → guidance string (links the matching plugin repo)
+// verify.message     → result + plugin guidance for your harness (when one exists)
 
 // 3. Resend verification (5-minute cooldown)
 const resend = await Inkbox.resendSignupVerification(apiKey);

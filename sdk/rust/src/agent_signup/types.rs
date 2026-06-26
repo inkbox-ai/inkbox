@@ -20,9 +20,6 @@ pub struct AgentSignupVerifyResponse {
     pub claim_status: String,
     pub organization_id: String,
     pub message: String,
-    /// Suggested next steps after verification. Absent on older servers.
-    #[serde(default)]
-    pub next_steps: Option<String>,
 }
 
 /// Response from `POST /api/v1/agent-signup/resend-verification`.
