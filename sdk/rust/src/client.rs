@@ -424,8 +424,6 @@ impl Inkbox {
         if let Some(v) = email_local_part {
             body.insert("email_local_part".into(), v.into());
         }
-        // Optional identifier for the agent harness/runtime, recorded by the
-        // server as the calling runtime.
         if let Some(v) = harness {
             body.insert("harness".into(), v.into());
         }
