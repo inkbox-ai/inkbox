@@ -13,6 +13,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   - CLI: `inkbox signup` gains a `--harness <harness>` flag.
   - Rust SDK: `Inkbox::signup` gains an `Option<&str>` `harness` parameter — at parity with the Python and TypeScript SDKs.
 
+### Fixed
+
+- **Rust SDK: decode `whoami` timestamps as ISO-8601 strings.** `created_at` / `last_used_at` / `expires_at` on the API-key whoami response are now `Option<String>` (tolerating a legacy epoch number), replacing an `Option<f64>` typing that failed to deserialize the server's string timestamps.
+
 ## 0.4.9 — Rust SDK
 
 ### Added
