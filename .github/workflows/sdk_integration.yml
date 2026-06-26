@@ -87,7 +87,13 @@ jobs:
 
   python-sdk:
     name: Python SDK (${{ matrix.environment }}, ${{ matrix.source }})
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # select-targets uses always(), so a skipped wait-for-unit-tests (every
+    # schedule/dispatch run) would otherwise propagate down and skip this job.
+    # always() + an explicit success check keeps the real gates intact.
+    if: |
+      always() &&
+      needs.select-targets.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -163,7 +169,13 @@ jobs:
 
   typescript-sdk:
     name: TypeScript SDK (${{ matrix.environment }}, ${{ matrix.source }})
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # select-targets uses always(), so a skipped wait-for-unit-tests (every
+    # schedule/dispatch run) would otherwise propagate down and skip this job.
+    # always() + an explicit success check keeps the real gates intact.
+    if: |
+      always() &&
+      needs.select-targets.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -242,7 +254,13 @@ jobs:
 
   cli:
     name: CLI (${{ matrix.environment }}, ${{ matrix.source }})
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # select-targets uses always(), so a skipped wait-for-unit-tests (every
+    # schedule/dispatch run) would otherwise propagate down and skip this job.
+    # always() + an explicit success check keeps the real gates intact.
+    if: |
+      always() &&
+      needs.select-targets.result == 'success' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs: select-targets
     runs-on: ubuntu-latest
     timeout-minutes: 25
