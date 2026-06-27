@@ -1,0 +1,8 @@
+[package]
+name = "use-inkbox-rust"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[dependencies]
+inkbox = { path = "../../sdk/rust" }
