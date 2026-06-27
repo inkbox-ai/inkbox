@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.11 — Reply all
+
+### Added
+
+- **`inkbox email reply-all <message-id>`.** Sends a reply to all visible participants on an existing email. Bundles `@inkbox/sdk` `0.4.11`.
+
 ## 0.4.10 — Agent harness
 
 ### Added

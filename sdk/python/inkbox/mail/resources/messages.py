@@ -139,6 +139,49 @@ class MessagesResource:
         data = self._http.post(f"/mailboxes/{email_address}/messages", json=body)
         return Message._from_dict(data)
 
+    def reply_all(
+        self,
+        email_address: str,
+        message_id: UUID | str,
+        *,
+        subject: str | None = None,
+        body_text: str | None = None,
+        body_html: str | None = None,
+        attachments: list[dict[str, str]] | None = None,
+        reply_to: str | None = None,
+    ) -> Message:
+        """Reply to everyone on a stored message.
+
+        The server resolves recipients from the source message.
+
+        Args:
+            email_address: Full email address of the replying mailbox.
+            message_id: UUID of the message being replied to.
+            subject: Optional subject override.
+            body_text: Plain-text reply body.
+            body_html: HTML reply body.
+            attachments: Optional file attachments. Same shape as
+                ``send(attachments=...)``.
+            reply_to: Optional Reply-To address.
+        """
+        body: dict[str, Any] = {}
+        if subject is not None:
+            body["subject"] = subject
+        if body_text is not None:
+            body["body_text"] = body_text
+        if body_html is not None:
+            body["body_html"] = body_html
+        if attachments is not None:
+            body["attachments"] = attachments
+        if reply_to is not None:
+            body["reply_to"] = reply_to
+
+        data = self._http.post(
+            f"/mailboxes/{email_address}/messages/{message_id}/reply-all",
+            json=body,
+        )
+        return Message._from_dict(data)
+
     def forward(
         self,
         email_address: str,

@@ -60,6 +60,47 @@ export function registerEmailCommands(program: Command): void {
     );
 
   email
+    .command("reply-all <message-id>")
+    .description("Reply to everyone on an existing email")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--subject <subject>", "Override subject")
+    .option("--body-text <text>", "Plain text body")
+    .option("--body-html <html>", "HTML body")
+    .option("--reply-to <address>", "Reply-To address")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageId: string,
+        cmdOpts: {
+          identity: string;
+          subject?: string;
+          bodyText?: string;
+          bodyHtml?: string;
+          replyTo?: string;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const msg = await identity.replyAllEmail(messageId, {
+          subject: cmdOpts.subject,
+          bodyText: cmdOpts.bodyText,
+          bodyHtml: cmdOpts.bodyHtml,
+          replyTo: cmdOpts.replyTo,
+        });
+        output(
+          {
+            id: msg.id,
+            subject: msg.subject,
+            to: msg.toAddresses.join(", "),
+            status: msg.status,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  email
     .command("forward <message-id>")
     .description("Forward an existing email")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

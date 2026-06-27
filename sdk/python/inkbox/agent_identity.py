@@ -390,6 +390,38 @@ class AgentIdentity:
             attachments=attachments,
         )
 
+    def reply_all_email(
+        self,
+        message_id: str,
+        *,
+        subject: str | None = None,
+        body_text: str | None = None,
+        body_html: str | None = None,
+        attachments: list[dict] | None = None,
+        reply_to: str | None = None,
+    ) -> Message:
+        """Reply to everyone on a stored message from this identity's mailbox.
+
+        Args:
+            message_id: UUID of the message being replied to.
+            subject: Optional subject override.
+            body_text: Plain-text reply body.
+            body_html: HTML reply body.
+            attachments: List of file attachment dicts with ``filename``,
+                ``content_type``, and ``content_base64`` keys.
+            reply_to: Optional Reply-To address.
+        """
+        self._require_mailbox()
+        return self._inkbox._messages.reply_all(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            message_id,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            attachments=attachments,
+            reply_to=reply_to,
+        )
+
     def forward_email(
         self,
         message_id: str,

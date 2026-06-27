@@ -305,6 +305,15 @@ pub struct Message {
 
 /// Full message including body content.
 ///
+/// Server-suggested To/Cc for a reply-all (sending mailbox and BCC excluded).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplyAllRecipients {
+    #[serde(default)]
+    pub to: Vec<String>,
+    #[serde(default)]
+    pub cc: Vec<String>,
+}
+
 /// Carries the [`Message`] metadata plus the body and extended headers. The
 /// Python models this as a subclass of `Message`; here the base fields are
 /// flattened in so the wire shape is identical.
@@ -328,6 +337,8 @@ pub struct MessageDetail {
     pub ses_message_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_all_recipients: Option<ReplyAllRecipients>,
 }
 
 /// A conversation thread grouping related messages.

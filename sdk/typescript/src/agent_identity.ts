@@ -317,6 +317,34 @@ export class AgentIdentity {
   }
 
   /**
+   * Reply to everyone on a stored message from this identity's mailbox.
+   *
+   * @param messageId - UUID of the message being replied to.
+   * @param options.subject - Optional subject override.
+   * @param options.bodyText - Plain-text reply body.
+   * @param options.bodyHtml - HTML reply body.
+   * @param options.attachments - File attachments.
+   * @param options.replyTo - Optional Reply-To address.
+   */
+  async replyAllEmail(
+    messageId: string,
+    options: {
+      subject?: string;
+      bodyText?: string;
+      bodyHtml?: string;
+      attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+      replyTo?: string;
+    } = {},
+  ): Promise<Message> {
+    this._requireMailbox();
+    return this._inkbox._messages.replyAll(
+      this._mailbox!.emailAddress,
+      messageId,
+      options,
+    );
+  }
+
+  /**
    * Forward a stored message out from this identity's mailbox.
    *
    * @param messageId - UUID of the message being forwarded.

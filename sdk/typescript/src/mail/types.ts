@@ -166,6 +166,12 @@ export interface Message {
   createdAt: Date;
 }
 
+/** Server-suggested To/Cc for a reply-all (sending mailbox and BCC excluded). */
+export interface ReplyAllRecipients {
+  to: string[];
+  cc: string[];
+}
+
 export interface MessageDetail extends Message {
   bodyText: string | null;
   bodyHtml: string | null;
@@ -177,6 +183,8 @@ export interface MessageDetail extends Message {
   attachmentMetadata: Record<string, unknown>[] | null;
   sesMessageId: string | null;
   updatedAt: Date;
+  /** Suggested reply-all recipients, for prefilling UIs. */
+  replyAllRecipients: ReplyAllRecipients | null;
 }
 
 export interface Thread {
@@ -261,6 +269,7 @@ export interface RawMessage {
   attachment_metadata?: Record<string, unknown>[] | null;
   ses_message_id?: string | null;
   updated_at?: string;
+  reply_all_recipients?: { to: string[]; cc: string[] } | null;
 }
 
 export interface RawThread {
@@ -359,6 +368,12 @@ export function parseMessageDetail(r: RawMessage): MessageDetail {
     attachmentMetadata: r.attachment_metadata ?? null,
     sesMessageId: r.ses_message_id ?? null,
     updatedAt: new Date(r.updated_at!),
+    replyAllRecipients: r.reply_all_recipients
+      ? {
+          to: r.reply_all_recipients.to ?? [],
+          cc: r.reply_all_recipients.cc ?? [],
+        }
+      : null,
   };
 }
 

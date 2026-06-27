@@ -172,6 +172,58 @@ impl MessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// Reply to everyone on a stored message.
+    ///
+    /// The server resolves recipients from the source message, so no `to`/`cc`
+    /// is sent. BCC recipients are never carried forward.
+    ///
+    /// # Arguments
+    /// * `email_address` - Full email address of the replying mailbox.
+    /// * `message_id` - UUID of the message being replied to.
+    /// * `subject` - Optional override; defaults server-side to
+    ///   `"Re: " + original.subject`.
+    /// * `body_text` / `body_html` - Optional reply body.
+    /// * `attachments` - Optional file attachments. Same shape as `send`.
+    /// * `reply_to` - Optional Reply-To address.
+    ///
+    /// # Returns
+    /// The sent reply's message metadata.
+    #[allow(clippy::too_many_arguments)]
+    pub fn reply_all(
+        &self,
+        email_address: &str,
+        message_id: &str,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        attachments: Option<&[Attachment]>,
+        reply_to: Option<&str>,
+    ) -> Result<Message> {
+        let mut body = serde_json::Map::new();
+        if let Some(s) = subject {
+            body.insert("subject".into(), Value::String(s.to_string()));
+        }
+        if let Some(bt) = body_text {
+            body.insert("body_text".into(), Value::String(bt.to_string()));
+        }
+        if let Some(bh) = body_html {
+            body.insert("body_html".into(), Value::String(bh.to_string()));
+        }
+        if let Some(att) = attachments {
+            body.insert("attachments".into(), json!(att));
+        }
+        if let Some(rt) = reply_to {
+            body.insert("reply_to".into(), Value::String(rt.to_string()));
+        }
+
+        let data = self.http.post(
+            &format!("/mailboxes/{email_address}/messages/{message_id}/reply-all"),
+            Some(&Value::Object(body)),
+            crate::http::NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
     /// Forward a stored message out from this mailbox.
     ///
     /// Two modes are available — see [`ForwardMode`]. Forwards start a
