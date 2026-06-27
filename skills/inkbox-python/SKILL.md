@@ -780,10 +780,10 @@ listener.wait()                   # blocks until close()/Ctrl-C
 # Forward to an in-process ASGI app (FastAPI / Starlette / your own)
 listener = inkbox.tunnels.connect(name="my-app", forward_to=fastapi_app)
 
-# Passthrough TLS (you terminate; SDK auto-signs a cert via the control plane)
+# Passthrough TLS is fixed at create time (see below); the connect() call is
+# identical. In passthrough the SDK auto-signs a cert via the control plane.
 listener = inkbox.tunnels.connect(
     name="my-app",
-    tls_mode="passthrough",
     forward_to="http://127.0.0.1:8080",
 )
 ```

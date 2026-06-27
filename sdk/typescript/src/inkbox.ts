@@ -5,6 +5,7 @@
  */
 
 import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
+import { resolveClientSettings } from "./_config.js";
 import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
 import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
@@ -66,8 +67,11 @@ export interface SignupOptions {
 }
 
 export interface InkboxOptions {
-  /** Your Inkbox API key (sent as `X-API-Key`). */
-  apiKey: string;
+  /**
+   * Your Inkbox API key (sent as `X-API-Key`). Falls back to the
+   * `INKBOX_API_KEY` env var, then `~/.inkbox/config`.
+   */
+  apiKey?: string;
   /** Override the API base URL (useful for self-hosting or testing). */
   baseUrl?: string;
   /** Request timeout in milliseconds. Defaults to 30 000. */
@@ -145,9 +149,22 @@ export class Inkbox {
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
 
-  constructor(options: InkboxOptions) {
-    this._apiKey = options.apiKey;
-    const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+  constructor(options: InkboxOptions = {}) {
+    const resolved = resolveClientSettings({
+      apiKey: options.apiKey,
+      baseUrl: options.baseUrl,
+      vaultKey: options.vaultKey,
+    });
+    if (resolved.apiKey === undefined) {
+      throw new Error(
+        "No API key found. Pass apiKey, set INKBOX_API_KEY, or add " +
+          "'api_key = ...' to ~/.inkbox/config.",
+      );
+    }
+    const apiKey = resolved.apiKey;
+    const vaultKey = resolved.vaultKey;
+    this._apiKey = apiKey;
+    const baseUrl = resolved.baseUrl ?? DEFAULT_BASE_URL;
     if (!baseUrl.startsWith("https://")) {
       const parsed = new URL(baseUrl);
       if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
@@ -162,14 +179,14 @@ export class Inkbox {
     const ms = options.timeoutMs ?? 30_000;
     const cookieJar = new CookieJar();
 
-    const mailHttp     = new HttpTransport(options.apiKey, `${apiRoot}/mail`, ms, cookieJar);
-    const phoneHttp    = new HttpTransport(options.apiKey, `${apiRoot}/phone`, ms, cookieJar);
-    const imessageHttp = new HttpTransport(options.apiKey, `${apiRoot}/imessage`, ms, cookieJar);
-    const idsHttp      = new HttpTransport(options.apiKey, `${apiRoot}/identities`, ms, cookieJar);
-    const vaultHttp    = new HttpTransport(options.apiKey, `${apiRoot}/vault`, ms, cookieJar);
-    const domainsHttp  = new HttpTransport(options.apiKey, `${apiRoot}/domains`, ms, cookieJar);
-    const rootApiHttp  = new HttpTransport(options.apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar);
-    const apiHttp      = new HttpTransport(options.apiKey, apiRoot, ms, cookieJar);
+    const mailHttp     = new HttpTransport(apiKey, `${apiRoot}/mail`, ms, cookieJar);
+    const phoneHttp    = new HttpTransport(apiKey, `${apiRoot}/phone`, ms, cookieJar);
+    const imessageHttp = new HttpTransport(apiKey, `${apiRoot}/imessage`, ms, cookieJar);
+    const idsHttp      = new HttpTransport(apiKey, `${apiRoot}/identities`, ms, cookieJar);
+    const vaultHttp    = new HttpTransport(apiKey, `${apiRoot}/vault`, ms, cookieJar);
+    const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar);
+    const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar);
+    const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar);
 
     this._mailboxes        = new MailboxesResource(mailHttp);
     this._messages         = new MessagesResource(mailHttp);
@@ -200,8 +217,8 @@ export class Inkbox {
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
 
-    if (options.vaultKey !== undefined) {
-      this._vaultUnlockPromise = this._vaultResource.unlock(options.vaultKey);
+    if (vaultKey !== undefined) {
+      this._vaultUnlockPromise = this._vaultResource.unlock(vaultKey);
     }
   }
 

@@ -96,6 +96,7 @@ async def open_ws_upstream(
 
     ssl_ctx: ssl.SSLContext | None = None
     if parsed.scheme == "https":
+        from inkbox.tunnels.client._tls import create_default_verify_context
         from inkbox.tunnels.client._upstream_tls import (
             build_upstream_tls_context,
         )
@@ -103,7 +104,7 @@ async def open_ws_upstream(
         if isinstance(built, ssl.SSLContext):
             ssl_ctx = built
         else:
-            ssl_ctx = ssl.create_default_context()
+            ssl_ctx = create_default_verify_context()
 
     # Single composite handshake budget (connect + write + head-read).
     # Earlier shape used two ``wait_for(..., timeout=handshake_timeout_s)``

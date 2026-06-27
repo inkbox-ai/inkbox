@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.12 — Tunnel DX
+
+### Added
+
+- **Config-file / env auth resolution.** `Inkbox()` resolves `api_key` / `base_url` / `vault_key` from the argument, then the env var, then `~/.inkbox/config` — so it works with no explicit key in background/agent processes.
+
+### Fixed
+
+- **macOS TLS verification.** The tunnel data plane falls back to certifi's CA bundle when the system trust store is empty (the python.org installer case), avoiding `SSL: CERTIFICATE_VERIFY_FAILED`.
+
 ## 0.4.11 — Reply all
 
 ### Added

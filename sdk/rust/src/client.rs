@@ -159,6 +159,30 @@ impl Inkbox {
         }
     }
 
+    /// Build a client from the environment. Resolves `api_key` / `base_url` /
+    /// `vault_key` from the matching env var (`INKBOX_API_KEY` /
+    /// `INKBOX_BASE_URL` / `INKBOX_VAULT_KEY`), then from `~/.inkbox/config`.
+    /// Handy for background/agent processes that don't inherit the shell's env.
+    /// Errors if no API key is found anywhere.
+    pub fn from_env() -> Result<Arc<Self>> {
+        let (api_key, base_url, vault_key) =
+            crate::config::resolve_client_settings(None, None, None);
+        let api_key = api_key.ok_or_else(|| {
+            InkboxError::InvalidArgument(
+                "no API key found: set INKBOX_API_KEY or add 'api_key = ...' to ~/.inkbox/config"
+                    .to_string(),
+            )
+        })?;
+        let mut builder = Self::builder(api_key);
+        if let Some(base_url) = base_url {
+            builder = builder.base_url(base_url);
+        }
+        if let Some(vault_key) = vault_key {
+            builder = builder.vault_key(vault_key);
+        }
+        builder.build()
+    }
+
     fn build(
         api_key: String,
         base_url: String,

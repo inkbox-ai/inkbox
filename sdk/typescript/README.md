@@ -23,6 +23,8 @@ Requires Node.js ≥ 22.
 
 You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://inkbox.ai/console).
 
+`new Inkbox(...)` resolves `apiKey` / `baseUrl` / `vaultKey` from the explicit option, then the matching env var (`INKBOX_API_KEY` / `INKBOX_BASE_URL` / `INKBOX_VAULT_KEY`), then a `~/.inkbox/config` file (`key = value` lines). The file fallback is handy for background/agent processes that don't inherit the shell's env, so `new Inkbox()` with no arguments works once the file is in place.
+
 ## Quick start
 
 ```ts
