@@ -207,6 +207,7 @@ class MailWebhookData(TypedDict):
 
 
 class MailWebhookPayload(TypedDict):
+    id: str  # stable per-event id (evt_...); idempotency key, stable across replays
     event_type: MailWebhookEventType
     timestamp: str
     data: MailWebhookData
@@ -271,6 +272,7 @@ class TextWebhookData(TypedDict):
 
 
 class TextWebhookPayload(TypedDict):
+    id: str  # stable per-event id (evt_...); idempotency key, stable across replays
     event_type: TextWebhookEventType
     timestamp: str
     data: TextWebhookData
@@ -432,6 +434,7 @@ class IMessageWebhookData(TypedDict):
 
 
 class IMessageWebhookPayload(TypedDict):
+    id: str  # stable per-event id (evt_...); idempotency key, stable across replays
     event_type: IMessageWebhookEventType
     timestamp: str
     data: IMessageWebhookData

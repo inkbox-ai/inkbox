@@ -151,6 +151,8 @@ export interface MailWebhookMessage {
 }
 
 export interface MailWebhookPayload {
+  /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
+  id: string;
   event_type: MailWebhookEventType;
   /** ISO 8601 datetime. */
   timestamp: string;
@@ -231,6 +233,8 @@ export interface TextWebhookMessage {
 }
 
 export interface TextWebhookPayload {
+  /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
+  id: string;
   event_type: TextWebhookEventType;
   timestamp: string;
   data: {
@@ -382,6 +386,8 @@ export interface IMessageWebhookReaction {
 }
 
 export interface IMessageWebhookPayload {
+  /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
+  id: string;
   event_type: IMessageWebhookEventType;
   /** ISO 8601 datetime. */
   timestamp: string;
