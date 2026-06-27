@@ -273,6 +273,38 @@ impl AgentIdentity {
         )
     }
 
+    /// Reply to everyone on a stored message from this identity's mailbox.
+    ///
+    /// Recipients are resolved server-side from the source message.
+    ///
+    /// # Arguments
+    /// * `message_id` - UUID of the message being replied to.
+    /// * `subject` - Optional override; defaults to `"Re: " + original.subject`.
+    /// * `body_text` / `body_html` - Optional reply body.
+    /// * `attachments` - Optional file attachments.
+    /// * `reply_to` - Optional Reply-To address.
+    #[allow(clippy::too_many_arguments)]
+    pub fn reply_all_email(
+        &self,
+        message_id: &str,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        attachments: Option<&[crate::mail::resources::Attachment]>,
+        reply_to: Option<&str>,
+    ) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.messages().reply_all(
+            &email,
+            message_id,
+            subject,
+            body_text,
+            body_html,
+            attachments,
+            reply_to,
+        )
+    }
+
     /// Forward a stored message out from this identity's mailbox.
     ///
     /// # Arguments

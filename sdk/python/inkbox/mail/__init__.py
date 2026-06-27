@@ -7,6 +7,7 @@ from inkbox.mail.types import (
     Mailbox,
     Message,
     MessageDetail,
+    ReplyAllRecipients,
     Thread,
     ThreadDetail,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "Mailbox",
     "Message",
     "MessageDetail",
+    "ReplyAllRecipients",
     "SigningKey",
     "Thread",
     "ThreadDetail",

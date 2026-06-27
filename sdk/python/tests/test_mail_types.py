@@ -80,6 +80,9 @@ class TestMessageDetailParsing:
         assert m.attachment_metadata is None
         assert m.ses_message_id == "ses-abc123"
         assert isinstance(m.updated_at, datetime)
+        assert m.reply_all_recipients is not None
+        assert m.reply_all_recipients.to == ["alice@example.com"]
+        assert m.reply_all_recipients.cc == ["bob@example.com"]
         # inherits base fields
         assert m.from_address == "user@example.com"
         assert m.subject == "Hello from test"

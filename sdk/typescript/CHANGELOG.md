@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.11 — Reply all
+
+### Added
+
+- **Email reply-all helpers.** `messages.replyAll(...)` and `identity.replyAllEmail(...)` call the mailbox reply-all endpoint, with server-resolved recipients and optional subject/body/attachment fields.
+
 ## 0.4.10 — Agent harness
 
 ### Added

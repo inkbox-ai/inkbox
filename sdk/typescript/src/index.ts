@@ -102,6 +102,7 @@ export type {
   MailContactRule,
   Message,
   MessageDetail,
+  ReplyAllRecipients,
   Thread,
   ThreadDetail,
 } from "./mail/types.js";

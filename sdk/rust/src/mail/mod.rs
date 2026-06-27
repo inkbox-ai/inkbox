@@ -13,7 +13,7 @@ pub mod types;
 pub use types::{
     ContactRuleStatus, Domain, FilterMode, FilterModeChangeNotice, ForwardMode, MailContactRule,
     MailRuleAction, MailRuleMatchType, Mailbox, Message, MessageDetail, MessageDirection,
-    SendingDomainStatus, Thread, ThreadDetail, ThreadFolder,
+    ReplyAllRecipients, SendingDomainStatus, Thread, ThreadDetail, ThreadFolder,
 };
 
 // Re-export the resources.

@@ -290,6 +290,18 @@ class Message:
 
 
 @dataclass
+class ReplyAllRecipients:
+    """Server-suggested To/Cc for a reply-all (sending mailbox and BCC excluded)."""
+
+    to: list[str]
+    cc: list[str]
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> ReplyAllRecipients:
+        return cls(to=d.get("to") or [], cc=d.get("cc") or [])
+
+
+@dataclass
 class MessageDetail(Message):
     """Full message including body content."""
 
@@ -301,10 +313,12 @@ class MessageDetail(Message):
     attachment_metadata: list[dict[str, Any]] | None = None
     ses_message_id: str | None = None
     updated_at: datetime | None = None  # type: ignore[assignment]
+    reply_all_recipients: ReplyAllRecipients | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> MessageDetail:  # type: ignore[override]
         base = Message._from_dict(d)
+        reply_all = d.get("reply_all_recipients")
         return cls(
             **base.__dict__,
             body_text=d.get("body_text"),
@@ -315,6 +329,9 @@ class MessageDetail(Message):
             attachment_metadata=d.get("attachment_metadata"),
             ses_message_id=d.get("ses_message_id"),
             updated_at=_dt(d.get("updated_at")),
+            reply_all_recipients=(
+                ReplyAllRecipients._from_dict(reply_all) if reply_all else None
+            ),
         )
 
 

@@ -74,6 +74,10 @@ describe("MessagesResource.get", () => {
 
     expect(http.get).toHaveBeenCalledWith(`/mailboxes/${ADDR}/messages/${MSG_ID}`);
     expect(detail.bodyText).toBe("Hi there, this is a test message body.");
+    expect(detail.replyAllRecipients).toEqual({
+      to: ["alice@example.com"],
+      cc: ["bob@example.com"],
+    });
   });
 });
 
@@ -123,6 +127,51 @@ describe("MessagesResource.send", () => {
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["body_text"]).toBeUndefined();
     expect(body["in_reply_to_message_id"]).toBeUndefined();
+  });
+});
+
+describe("MessagesResource.replyAll", () => {
+  it("posts a reply-all body", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    const msg = await res.replyAll(ADDR, MSG_ID, {
+      subject: "Re: custom",
+      bodyText: "Looping everyone in",
+      bodyHtml: "<p>Looping everyone in</p>",
+      attachments: [
+        { filename: "n.txt", contentType: "text/plain", contentBase64: "aGk=" },
+      ],
+      replyTo: "me@example.com",
+    });
+
+    expect(http.post).toHaveBeenCalledWith(
+      `/mailboxes/${ADDR}/messages/${MSG_ID}/reply-all`,
+      {
+        subject: "Re: custom",
+        body_text: "Looping everyone in",
+        body_html: "<p>Looping everyone in</p>",
+        attachments: [
+          { filename: "n.txt", content_type: "text/plain", content_base64: "aGk=" },
+        ],
+        reply_to: "me@example.com",
+      },
+    );
+    expect(msg.id).toBe(RAW_MESSAGE.id);
+  });
+
+  it("omits optional fields when not provided", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.replyAll(ADDR, MSG_ID, {});
+
+    expect(http.post).toHaveBeenCalledWith(
+      `/mailboxes/${ADDR}/messages/${MSG_ID}/reply-all`,
+      {},
+    );
   });
 });
 

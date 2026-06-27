@@ -122,6 +122,45 @@ class TestMessagesSend:
         assert "attachments" not in body
 
 
+class TestMessagesReplyAll:
+    def test_reply_all_with_all_options(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+
+        msg = res.reply_all(
+            MBOX,
+            MSG,
+            subject="Re: custom",
+            body_text="Looping everyone in",
+            body_html="<p>Looping everyone in</p>",
+            attachments=[{"filename": "n.txt", "content_type": "text/plain", "content_base64": "aGk="}],
+            reply_to="me@b.com",
+        )
+
+        http.post.assert_called_once_with(
+            f"/mailboxes/{MBOX}/messages/{MSG}/reply-all",
+            json={
+                "subject": "Re: custom",
+                "body_text": "Looping everyone in",
+                "body_html": "<p>Looping everyone in</p>",
+                "attachments": [{"filename": "n.txt", "content_type": "text/plain", "content_base64": "aGk="}],
+                "reply_to": "me@b.com",
+            },
+        )
+        assert msg.subject == "Hello from test"
+
+    def test_reply_all_optional_fields_omitted(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+
+        res.reply_all(MBOX, MSG)
+
+        http.post.assert_called_once_with(
+            f"/mailboxes/{MBOX}/messages/{MSG}/reply-all",
+            json={},
+        )
+
+
 class TestMessagesForward:
     def test_forward_basic(self):
         res, http = _resource()

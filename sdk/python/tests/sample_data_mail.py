@@ -53,6 +53,7 @@ MESSAGE_DETAIL_DICT = {
     "attachment_metadata": None,
     "ses_message_id": "ses-abc123",
     "updated_at": "2026-03-09T00:00:00Z",
+    "reply_all_recipients": {"to": ["alice@example.com"], "cc": ["bob@example.com"]},
 }
 
 THREAD_DICT = {

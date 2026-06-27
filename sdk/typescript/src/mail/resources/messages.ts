@@ -130,6 +130,55 @@ export class MessagesResource {
   }
 
   /**
+   * Reply to everyone on a stored message.
+   *
+   * The server resolves recipients from the source message.
+   *
+   * @param emailAddress - Full email address of the replying mailbox.
+   * @param messageId - UUID of the message being replied to.
+   * @param options.subject - Optional subject override.
+   * @param options.bodyText - Plain-text reply body.
+   * @param options.bodyHtml - HTML reply body.
+   * @param options.attachments - Optional file attachments. Same shape as
+   *   `send({ attachments })`.
+   * @param options.replyTo - Optional Reply-To address.
+   */
+  async replyAll(
+    emailAddress: string,
+    messageId: string,
+    options: {
+      subject?: string;
+      bodyText?: string;
+      bodyHtml?: string;
+      attachments?: Array<{
+        filename: string;
+        contentType: string;
+        contentBase64: string;
+      }>;
+      replyTo?: string;
+    } = {},
+  ): Promise<Message> {
+    const body: Record<string, unknown> = {};
+    if (options.subject !== undefined) body["subject"] = options.subject;
+    if (options.bodyText !== undefined) body["body_text"] = options.bodyText;
+    if (options.bodyHtml !== undefined) body["body_html"] = options.bodyHtml;
+    if (options.attachments !== undefined) {
+      body["attachments"] = options.attachments.map((a) => ({
+        filename: a.filename,
+        content_type: a.contentType,
+        content_base64: a.contentBase64,
+      }));
+    }
+    if (options.replyTo !== undefined) body["reply_to"] = options.replyTo;
+
+    const data = await this.http.post<RawMessage>(
+      `/mailboxes/${emailAddress}/messages/${messageId}/reply-all`,
+      body,
+    );
+    return parseMessage(data);
+  }
+
+  /**
    * Forward a stored message out from this mailbox.
    *
    * Two modes are available — see {@link ForwardMode}. Forwards start a
