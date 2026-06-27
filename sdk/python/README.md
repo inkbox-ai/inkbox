@@ -14,6 +14,8 @@ Requires Python ≥ 3.11.
 
 You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://inkbox.ai/console).
 
+`Inkbox(...)` resolves `api_key` / `base_url` / `vault_key` from the explicit argument, then the matching env var (`INKBOX_API_KEY` / `INKBOX_BASE_URL` / `INKBOX_VAULT_KEY`), then a `~/.inkbox/config` file (`key = value` lines). The file fallback is handy for background/agent processes that don't inherit the shell's env, so `Inkbox()` with no arguments works once the file is in place.
+
 ## Quick start
 
 ```python

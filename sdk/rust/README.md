@@ -64,6 +64,16 @@ let inkbox = Inkbox::builder("ApiKey_...")
     .build()?;
 ```
 
+### Construction from the environment
+
+```rust
+// Resolves api_key / base_url / vault_key from the matching env var
+// (INKBOX_API_KEY / INKBOX_BASE_URL / INKBOX_VAULT_KEY), then ~/.inkbox/config
+// (`key = value` lines). Handy for background/agent processes that don't
+// inherit the shell's env. Errors if no API key is found.
+let inkbox = Inkbox::from_env()?;
+```
+
 ### Vault credentials
 
 ```rust
@@ -107,9 +117,12 @@ pure Rust.
 ## Features
 
 - `tunnels-runtime` — the local TLS-terminating HTTP/2 reverse-proxy data plane
-  for inbound tunnels (pulls in `tokio`, `rustls` (ring), `h2`). The control-plane
-  tunnels surface (`inkbox.tunnels()`: list / get / update / sign_csr) is always
-  available without this feature.
+  for inbound tunnels (pulls in `tokio`, `rustls` (ring), `h2`). Bring a tunnel
+  online with `inkbox.tunnels().connect(name, forward_to)`, or
+  `connect_with_status(name, forward_to, on_status)` to observe `"connecting"` /
+  `"connected"` / `"reconnecting"` / `"closed"`. The control-plane tunnels surface
+  (`inkbox.tunnels()`: list / get / update / sign_csr) is always available
+  without this feature.
 
 ## Status
 

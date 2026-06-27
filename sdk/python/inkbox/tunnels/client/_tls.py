@@ -16,6 +16,25 @@ import tempfile
 from typing import Sequence
 
 
+def create_default_verify_context() -> ssl.SSLContext:
+    """A verifying client context, with a certifi fallback for empty stores.
+
+    The macOS python.org installer doesn't hook the system keychain, so
+    ``ssl.create_default_context()`` can come up empty and fail to verify our
+    edge cert. When the default store has no CAs we load certifi's bundle.
+    ``SSL_CERT_FILE`` still wins.
+    """
+    ctx = ssl.create_default_context()
+    if ctx.cert_store_stats().get("x509_ca", 0) == 0:
+        try:
+            import certifi
+
+            ctx.load_verify_locations(cafile=certifi.where())
+        except Exception:
+            pass
+    return ctx
+
+
 class TLSTerminator:
     """Owns a memory-only TLS context for one tunnel.
 

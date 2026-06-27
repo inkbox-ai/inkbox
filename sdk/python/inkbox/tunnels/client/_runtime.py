@@ -58,7 +58,10 @@ from inkbox.tunnels.client._envelope import (
     filter_response_headers,
     parse_envelope,
 )
-from inkbox.tunnels.client._tls import TLSTerminator
+from inkbox.tunnels.client._tls import (
+    TLSTerminator,
+    create_default_verify_context,
+)
 from inkbox.tunnels.client._url_forward import (
     forward_envelope_to_url,
     validate_envelope_path,
@@ -716,7 +719,7 @@ class TunnelRuntime:
             writer.close()
 
     async def _open_connection(self, conn: _Connection) -> None:
-        ctx = ssl.create_default_context()
+        ctx = create_default_verify_context()
         ctx.set_alpn_protocols(["h2"])
         logger.info("connecting to https://%s/_system/connect", self._zone)
         conn.reader, conn.writer = await asyncio.open_connection(

@@ -41,6 +41,8 @@ scoped_key = inkbox.api_keys.create(label="my-app agent", scoped_identity_id=ide
 
 The legacy per-tunnel `connect_secret` is gone — there is nothing to print, persist, or rotate per tunnel. To revoke a tunnel's access, revoke the API key.
 
+The key is resolved in order: the `api_key=` argument → the `INKBOX_API_KEY` env var → a `~/.inkbox/config` file (`api_key = ...`). The file fallback is handy for background/agent processes that don't inherit the shell's env. The CLI resolves the same way (`--api-key` → `INKBOX_API_KEY` → `~/.inkbox/config`).
+
 ---
 
 ## Python
@@ -50,6 +52,8 @@ The legacy per-tunnel `connect_secret` is gone — there is nothing to print, pe
 ```bash
 pip install inkbox
 ```
+
+> **macOS note:** the python.org installer doesn't hook into the system keychain, so TLS to the data plane can fail with `SSL: CERTIFICATE_VERIFY_FAILED`. The SDK now falls back to certifi's CA bundle automatically; if you still hit it, set `export SSL_CERT_FILE=$(python -m certifi)`.
 
 ### Forward to a local URL (edge mode)
 
@@ -63,6 +67,8 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     listener = inkbox.tunnels.connect(
         name="my-app",
         forward_to="http://127.0.0.1:8080",
+        # on_status fires "connecting" -> "connected" -> "reconnecting" -> "closed"
+        on_status=lambda s: print("tunnel:", s),
     )
     print(listener.public_url)   # https://my-app.inkboxwire.com
     listener.wait()              # blocks; Ctrl-C to stop

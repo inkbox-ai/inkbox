@@ -13,6 +13,7 @@ from uuid import UUID
 import httpx
 
 from inkbox._http import HttpTransport
+from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
 from inkbox.agent_identity import AgentIdentity
 from inkbox.api_keys.resources.api_keys import ApiKeysResource
@@ -100,24 +101,39 @@ class Inkbox:
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         *,
-        base_url: str = _DEFAULT_BASE_URL,
+        base_url: str | None = None,
         timeout: float = 30.0,
         vault_key: str | None = None,
     ) -> None:
         """
         Create an Inkbox client.
 
+        Each of ``api_key`` / ``base_url`` / ``vault_key`` falls back to its
+        env var (``INKBOX_API_KEY`` / ``INKBOX_BASE_URL`` / ``INKBOX_VAULT_KEY``)
+        and then to ``~/.inkbox/config`` — handy for background/agent processes
+        that don't inherit the shell's env.
+
         Args:
             api_key: Your Inkbox API key (``X-API-Key``).
             base_url: Override the API base URL (useful for self-hosting
-                or testing).
+                or testing). Defaults to ``https://inkbox.ai``.
             timeout: Request timeout in seconds (default 30).
             vault_key: Optional vault key or recovery code.  When provided,
                 the vault is unlocked automatically at construction so
                 ``identity.credentials`` is immediately available.
         """
+        api_key, base_url, vault_key = resolve_client_settings(
+            api_key=api_key, base_url=base_url, vault_key=vault_key,
+        )
+        if not api_key:
+            raise ValueError(
+                "No API key found. Pass api_key=, set INKBOX_API_KEY, or add "
+                "'api_key = ...' to ~/.inkbox/config."
+            )
+        if base_url is None:
+            base_url = _DEFAULT_BASE_URL
         if not base_url.startswith("https://"):
             _parsed = urlparse(base_url)
             if _parsed.hostname not in ("localhost", "127.0.0.1"):

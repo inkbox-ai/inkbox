@@ -14,6 +14,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 dependencies = [
     "argon2-cffi>=23.1",
+    "certifi>=2024.2.2",
     "cryptography>=43.0",
     "h11>=0.14",
     "h2>=4.1",

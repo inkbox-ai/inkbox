@@ -174,6 +174,29 @@ impl TunnelsResource {
     /// failure (e.g. the API key is rejected by `/_system/hello`).
     #[cfg(feature = "tunnels-runtime")]
     pub fn connect(&self, name: &str, forward_to: &str) -> Result<()> {
+        self.connect_inner(name, forward_to, None)
+    }
+
+    /// Like [`connect`](Self::connect), but reports data-plane state changes to
+    /// `on_status` — invoked with `"connecting"`, `"connected"`,
+    /// `"reconnecting"`, and `"closed"`. Mirrors the Python `on_status` kwarg.
+    #[cfg(feature = "tunnels-runtime")]
+    pub fn connect_with_status(
+        &self,
+        name: &str,
+        forward_to: &str,
+        on_status: crate::tunnels::client::runtime::StatusCallback,
+    ) -> Result<()> {
+        self.connect_inner(name, forward_to, Some(on_status))
+    }
+
+    #[cfg(feature = "tunnels-runtime")]
+    fn connect_inner(
+        &self,
+        name: &str,
+        forward_to: &str,
+        on_status: Option<crate::tunnels::client::runtime::StatusCallback>,
+    ) -> Result<()> {
         use crate::tunnels::client::bootstrap::{
             resolve_zone_and_host, validate_pool_size, TunnelBundle,
         };
@@ -324,11 +347,12 @@ impl TunnelsResource {
             tls_material,
         };
 
-        let cfg = TunnelRuntimeConfig::from_bundle(
+        let mut cfg = TunnelRuntimeConfig::from_bundle(
             &bundle,
             api_key,
             ForwardTo::Url(forward_to.to_string()),
         );
+        cfg.on_status = on_status;
         let runtime = std::sync::Arc::new(TunnelRuntime::new(cfg));
 
         // The runtime is async; the resource surface is sync (mirrors the
@@ -349,6 +373,21 @@ impl TunnelsResource {
     #[cfg(not(feature = "tunnels-runtime"))]
     pub fn connect(&self, _name: &str, _forward_to: &str) -> Result<()> {
         let _ = &self.inkbox; // silence unused without the runtime feature
+        Err(InkboxError::Tunnel(
+            "the tunnels data-plane runtime requires the `tunnels-runtime` cargo feature".into(),
+        ))
+    }
+
+    /// Like [`connect`](Self::connect) with a status callback. Gated behind the
+    /// `tunnels-runtime` feature; without it this returns an error.
+    #[cfg(not(feature = "tunnels-runtime"))]
+    pub fn connect_with_status(
+        &self,
+        _name: &str,
+        _forward_to: &str,
+        _on_status: Box<dyn Fn(&str) + Send + Sync>,
+    ) -> Result<()> {
+        let _ = &self.inkbox;
         Err(InkboxError::Tunnel(
             "the tunnels data-plane runtime requires the `tunnels-runtime` cargo feature".into(),
         ))

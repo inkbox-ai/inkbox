@@ -26,6 +26,7 @@
 //! ```
 
 // Internal infrastructure.
+mod config;
 mod cookies;
 pub mod error;
 pub mod http;

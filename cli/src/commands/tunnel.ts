@@ -28,6 +28,7 @@ export function registerTunnelCommands(program: Command): void {
             "publicHost",
             "tlsMode",
             "status",
+            "currentlyConnected",
             "id",
             "createdAt",
           ],
