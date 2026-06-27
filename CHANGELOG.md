@@ -4,6 +4,18 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.12 — Tunnel DX
+
+### Added
+
+- **Config-file / env auth resolution** in the TypeScript, Python, and Rust SDKs, plus the CLI. `api_key` / `base_url` / `vault_key` resolve from the explicit argument, then the matching env var (`INKBOX_API_KEY` / `INKBOX_BASE_URL` / `INKBOX_VAULT_KEY`), then a `~/.inkbox/config` file — so `Inkbox()` / `new Inkbox()` / `Inkbox::from_env()` work without an explicit key in background/agent processes that don't inherit the shell's env.
+- **Tunnel status callback in the Rust SDK** — `tunnels().connect_with_status(name, forward_to, on_status)` reports `"connecting"` / `"connected"` / `"reconnecting"` / `"closed"`, at parity with the Python/TypeScript `on_status`.
+- **`currentlyConnected` column** on `inkbox tunnel list` in the CLI.
+
+### Fixed
+
+- **macOS TLS verification** in the Python SDK: the tunnel data plane falls back to certifi's CA bundle when the system trust store is empty (the python.org installer case), avoiding `SSL: CERTIFICATE_VERIFY_FAILED`.
+
 ## 0.4.11 — Reply all
 
 ### Added

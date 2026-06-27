@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.12 — Tunnel DX
+
+### Added
+
+- **Config-file / env auth resolution.** `new Inkbox()` resolves `apiKey` / `baseUrl` / `vaultKey` from the options, then the env var, then `~/.inkbox/config` — so it works with no explicit key in background/agent processes.
+
 ## 0.4.11 — Reply all
 
 ### Added

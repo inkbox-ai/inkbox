@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.12 — Tunnel DX
+
+### Added
+
+- **`~/.inkbox/config` auth fallback.** `--api-key` / `INKBOX_API_KEY` / a `~/.inkbox/config` file are tried in order, so the CLI can authenticate where the shell's env isn't inherited.
+- **`currentlyConnected` column** on `inkbox tunnel list`. Bundles `@inkbox/sdk` `0.4.12`.
+
 ## 0.4.11 — Reply all
 
 ### Added
