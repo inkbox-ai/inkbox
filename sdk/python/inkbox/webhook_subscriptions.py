@@ -42,7 +42,12 @@ class WebhookSubscription:
     """A webhook subscription row returned by the API.
 
     Exactly one of ``mailbox_id`` / ``phone_number_id`` /
-    ``agent_identity_id`` is populated.
+    ``agent_identity_id`` (the raw owner FK) is populated.
+    ``owner_identity_id`` is the **resolved** owning agent identity for
+    every subscription regardless of channel — mail/phone subs resolve
+    it server-side through the mailbox / phone number, while iMessage
+    subs carry it directly. (Optional for forward-compatibility: ``None``
+    on servers that predate the field.)
     ``organization_id`` is an ``"org_..."`` token string, not a UUID.
     ``status`` is always ``"active"`` for subscriptions callers can
     observe; deleted subscriptions are not returned by ``list`` /
@@ -59,6 +64,7 @@ class WebhookSubscription:
     status: WebhookSubscriptionStatus
     created_at: datetime
     updated_at: datetime
+    owner_identity_id: UUID | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookSubscription:
@@ -75,7 +81,28 @@ class WebhookSubscription:
             status=d["status"],
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
+            owner_identity_id=(
+                UUID(d["owner_identity_id"]) if d.get("owner_identity_id") else None
+            ),
         )
+
+
+@dataclass
+class WebhookSubscriptionCreateResponse(WebhookSubscription):
+    """The response from creating a webhook subscription.
+
+    Extends :class:`WebhookSubscription` with a one-time ``signing_key``.
+    It is populated **only** on the request that first mints the owning
+    identity's signing key (returned once — store it securely); on every
+    other create it is ``None``. List/get/update never return it.
+    """
+
+    signing_key: str | None = None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> WebhookSubscriptionCreateResponse:
+        base = WebhookSubscription._from_dict(d)
+        return cls(**base.__dict__, signing_key=d.get("signing_key"))
 
 
 def _assert_url_not_none(url: Any) -> None:
@@ -191,7 +218,7 @@ class WebhookSubscriptionsResource:
         mailbox_id: UUID | str | None = None,
         phone_number_id: UUID | str | None = None,
         agent_identity_id: UUID | str | None = None,
-    ) -> WebhookSubscription:
+    ) -> WebhookSubscriptionCreateResponse:
         """Create a webhook subscription.
 
         Exactly one of ``mailbox_id`` / ``phone_number_id`` /
@@ -199,6 +226,12 @@ class WebhookSubscriptionsResource:
         non-empty list of distinct values belonging to the owner's
         channel (mailbox -> ``message.*``, phone number -> ``text.*``,
         agent identity -> ``imessage.*``).
+
+        Returns a :class:`WebhookSubscriptionCreateResponse`. Its
+        ``signing_key`` is populated **once** when this is the first
+        subscription for an identity that had no signing key yet — store
+        it securely; it is the only time the plaintext secret is shown.
+        Otherwise ``signing_key`` is ``None``.
         """
         owners: dict[str, UUID | str | None] = {
             "mailbox": mailbox_id,
@@ -227,7 +260,7 @@ class WebhookSubscriptionsResource:
             f"{owner}_id": _uuid_str(owners[owner]),  # type: ignore[arg-type]
         }
         data = self._http.post(_BASE, json=body)
-        return WebhookSubscription._from_dict(data)
+        return WebhookSubscriptionCreateResponse._from_dict(data)
 
     def update(
         self,

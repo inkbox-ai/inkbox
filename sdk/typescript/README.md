@@ -703,11 +703,13 @@ console.log(mb.emailAddress);
 console.log(mb.sendingDomain);  // bare domain the mailbox sends from
 console.log(mb.agentIdentityId); // non-null for live customer mailboxes (1:1 invariant)
 
-// Update filter mode. Note: display_name has moved to the agent
-// identity — set it via identity.update({ displayName: ... }). The
-// mailbox PATCH endpoint hard-rejects display_name with a 422. To
-// attach a webhook receiver, see "Webhooks" below.
-await inkbox.mailboxes.update(mb.emailAddress, { filterMode: "whitelist" }); // admin-scoped key only
+// Filter mode now lives on the agent identity — set it via
+// identity.update({ mailFilterMode: ... }). display_name likewise moved
+// to the identity; the mailbox PATCH endpoint hard-rejects display_name
+// with a 422. To attach a webhook receiver, see "Webhooks" below.
+const supportAgent = await inkbox.getIdentity("support-agent");
+await supportAgent.update({ mailFilterMode: "whitelist" }); // admin-scoped key only
+// (deprecated) await inkbox.mailboxes.update(mb.emailAddress, { filterMode: "whitelist" });
 
 // Full-text search across messages in a mailbox
 const results = await inkbox.mailboxes.search(mb.emailAddress, { q: "invoice", limit: 20 });
@@ -972,10 +974,32 @@ if (info.authType === "api_key") {
 
 ## Signing Keys
 
+Signing keys are **per agent identity**. Create/rotate or check status via the
+identity (or `inkbox.signingKeys.createOrRotate(agentHandle)` /
+`getStatus(agentHandle)`). The plaintext is returned **once**.
+
 ```ts
-// Create or rotate the org-level webhook signing key (plaintext returned once)
-const key = await inkbox.createSigningKey();
+const identity = await inkbox.getIdentity("support-agent");
+
+// Create or rotate this identity's webhook signing key (plaintext returned once)
+const key = await identity.createSigningKey();
 console.log(key.signingKey); // save this immediately
+
+// Check whether a key is configured
+const status = await identity.getSigningKeyStatus();
+console.log(status.configured, status.createdAt);
+
+// The FIRST webhook subscription for a keyless identity returns its secret once:
+const created = await inkbox.webhooks.subscriptions.create({
+  mailboxId: identity.mailbox!.id,
+  url: "https://example.com/hooks/mail",
+  eventTypes: ["message.received"],
+});
+if (created.signingKey != null) {
+  console.log(created.signingKey); // save this immediately — shown only once
+}
+
+// (deprecated) org-level: await inkbox.createSigningKey();
 ```
 
 ---

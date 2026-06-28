@@ -14,7 +14,25 @@ import { Credentials } from "./credentials.js";
 import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
 import { ForwardMode, MessageDirection } from "./mail/types.js";
-import type { FilterMode, Message, MessageDetail, ThreadDetail } from "./mail/types.js";
+import type {
+  FilterMode,
+  MailIdentityContactRule,
+  Message,
+  MessageDetail,
+  ThreadDetail,
+} from "./mail/types.js";
+import type { PhoneIdentityContactRule } from "./phone/types.js";
+import type {
+  CreateMailIdentityContactRuleOptions,
+  ListMailIdentityContactRulesOptions,
+  UpdateMailIdentityContactRuleOptions,
+} from "./mail/resources/identityContactRules.js";
+import type {
+  CreatePhoneIdentityContactRuleOptions,
+  ListPhoneIdentityContactRulesOptions,
+  UpdatePhoneIdentityContactRuleOptions,
+} from "./phone/resources/identityContactRules.js";
+import type { SigningKey, SigningKeyStatus } from "./signing_keys.js";
 import type {
   IMessage,
   IMessageAssignment,
@@ -81,6 +99,12 @@ export class AgentIdentity {
 
   /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
   get imessageFilterMode(): FilterMode { return this._data.imessageFilterMode; }
+
+  /** Whitelist/blacklist mode for this identity's mail contact rules. */
+  get mailFilterMode(): FilterMode { return this._data.mailFilterMode; }
+
+  /** Whitelist/blacklist mode for this identity's phone contact rules. */
+  get phoneFilterMode(): FilterMode { return this._data.phoneFilterMode; }
 
   /** The mailbox currently assigned to this identity. Non-null for live identities (1:1 invariant). */
   get mailbox(): IdentityMailbox | null { return this._mailbox; }
@@ -830,6 +854,110 @@ export class AgentIdentity {
   }
 
   // ------------------------------------------------------------------
+  // Mail contact rules
+  // ------------------------------------------------------------------
+
+  /** List this identity's mail allow/block rules, newest first. */
+  async listMailContactRules(
+    options: ListMailIdentityContactRulesOptions = {},
+  ): Promise<MailIdentityContactRule[]> {
+    return this._inkbox._mailIdentityContactRules.list(this.agentHandle, options);
+  }
+
+  /** Get one of this identity's mail contact rules by id. */
+  async getMailContactRule(ruleId: string): Promise<MailIdentityContactRule> {
+    return this._inkbox._mailIdentityContactRules.get(this.agentHandle, ruleId);
+  }
+
+  /** Create a mail allow/block rule for this identity. */
+  async createMailContactRule(
+    options: CreateMailIdentityContactRuleOptions,
+  ): Promise<MailIdentityContactRule> {
+    return this._inkbox._mailIdentityContactRules.create(this.agentHandle, options);
+  }
+
+  /** Update a mail rule's `action` or `status` (admin-only). */
+  async updateMailContactRule(
+    ruleId: string,
+    options: UpdateMailIdentityContactRuleOptions,
+  ): Promise<MailIdentityContactRule> {
+    return this._inkbox._mailIdentityContactRules.update(this.agentHandle, ruleId, options);
+  }
+
+  /** Delete one of this identity's mail contact rules (admin-only). */
+  async deleteMailContactRule(ruleId: string): Promise<void> {
+    await this._inkbox._mailIdentityContactRules.delete(this.agentHandle, ruleId);
+  }
+
+  // ------------------------------------------------------------------
+  // Phone contact rules
+  // ------------------------------------------------------------------
+
+  /**
+   * List this identity's phone allow/block rules, newest first.
+   *
+   * @throws {InkboxError} if this identity has no phone number.
+   */
+  async listPhoneContactRules(
+    options: ListPhoneIdentityContactRulesOptions = {},
+  ): Promise<PhoneIdentityContactRule[]> {
+    this._requirePhone();
+    return this._inkbox._phoneIdentityContactRules.list(this.agentHandle, options);
+  }
+
+  /** Get one of this identity's phone contact rules by id. */
+  async getPhoneContactRule(ruleId: string): Promise<PhoneIdentityContactRule> {
+    this._requirePhone();
+    return this._inkbox._phoneIdentityContactRules.get(this.agentHandle, ruleId);
+  }
+
+  /**
+   * Create a phone allow/block rule for this identity.
+   *
+   * @throws {InkboxError} if this identity has no phone number.
+   */
+  async createPhoneContactRule(
+    options: CreatePhoneIdentityContactRuleOptions,
+  ): Promise<PhoneIdentityContactRule> {
+    this._requirePhone();
+    return this._inkbox._phoneIdentityContactRules.create(this.agentHandle, options);
+  }
+
+  /** Update a phone rule's `action` or `status` (admin-only). */
+  async updatePhoneContactRule(
+    ruleId: string,
+    options: UpdatePhoneIdentityContactRuleOptions,
+  ): Promise<PhoneIdentityContactRule> {
+    this._requirePhone();
+    return this._inkbox._phoneIdentityContactRules.update(this.agentHandle, ruleId, options);
+  }
+
+  /** Delete one of this identity's phone contact rules (admin-only). */
+  async deletePhoneContactRule(ruleId: string): Promise<void> {
+    this._requirePhone();
+    await this._inkbox._phoneIdentityContactRules.delete(this.agentHandle, ruleId);
+  }
+
+  // ------------------------------------------------------------------
+  // Signing key
+  // ------------------------------------------------------------------
+
+  /** Report whether this identity has a webhook signing key. */
+  async getSigningKeyStatus(): Promise<SigningKeyStatus> {
+    return this._inkbox._signingKeys.getStatus(this.agentHandle);
+  }
+
+  /**
+   * Create or rotate this identity's webhook signing key.
+   *
+   * The plaintext `signingKey` is returned **once** — store it securely,
+   * it cannot be retrieved again.
+   */
+  async createSigningKey(): Promise<SigningKey> {
+    return this._inkbox._signingKeys.createOrRotate(this.agentHandle);
+  }
+
+  // ------------------------------------------------------------------
   // Identity management
   // ------------------------------------------------------------------
 
@@ -847,6 +975,13 @@ export class AgentIdentity {
    * @param options.imessageEnabled - Toggle shared-iMessage reachability.
    * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
    *   for iMessage contact rules (admin-only).
+   * @param options.mailFilterMode - `"whitelist"` or `"blacklist"` for this
+   *   identity's mail contact rules (admin-only). Unlike the deprecated
+   *   `mailboxes.update({ filterMode })`, this does not return a
+   *   `FilterModeChangeNotice`.
+   * @param options.phoneFilterMode - `"whitelist"` or `"blacklist"` for this
+   *   identity's phone contact rules (admin-only). Rejected with a 422 when
+   *   the identity has no phone number.
    * @param options.status - `"active"` or `"paused"`. Call `delete()`
    *   to remove the identity; `"deleted"` is rejected here.
    */
@@ -856,6 +991,8 @@ export class AgentIdentity {
     description?: string | null;
     imessageEnabled?: boolean;
     imessageFilterMode?: "whitelist" | "blacklist";
+    mailFilterMode?: "whitelist" | "blacklist";
+    phoneFilterMode?: "whitelist" | "blacklist";
     status?: "active" | "paused";
   }): Promise<void> {
     const result = await this._inkbox._idsResource.update(this.agentHandle, options);

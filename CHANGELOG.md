@@ -4,6 +4,25 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## Unreleased — Identity-scoped contact rules + per-identity signing keys
+
+### Added
+
+- **Identity-keyed mail + phone contact rules** in the TypeScript, Python, and Rust SDKs, plus the CLI. Mail and phone contact rules are now addressed by **agent handle** (mirroring iMessage), with the rule shape keyed by `agent_identity_id`.
+  - SDKs: `inkbox.mail_identity_contact_rules` / `inkbox.phone_identity_contact_rules` (TS `mailIdentityContactRules` / `phoneIdentityContactRules`), each with `list/get/create/update/delete` keyed by `agent_handle` and an org-wide `list_all` filtered by `agent_identity_id`. Also surfaced as `identity.list_mail_contact_rules()` / `create_mail_contact_rule()` / … and the phone equivalents on the identity object (phone helpers require the identity to have a phone number). New types `MailIdentityContactRule` / `PhoneIdentityContactRule`.
+  - CLI: `inkbox identity mail-rules [list|list-all|get|create|update|delete]` and `inkbox identity phone-rules [...]`.
+- **Per-identity contact-rule filter mode.** `mail_filter_mode` / `phone_filter_mode` now live on the agent identity (alongside `imessage_filter_mode`) and are set via `identity.update(mail_filter_mode=…, phone_filter_mode=…)` (CLI `inkbox identity update --mail-filter-mode / --phone-filter-mode`). Unlike the deprecated channel update, the identity update does not return a `FilterModeChangeNotice`. `phone_filter_mode` requires the identity to have a phone number.
+- **Per-identity webhook signing keys** in the TypeScript, Python, and Rust SDKs, plus the CLI. Each agent identity has its own signing key.
+  - SDKs: `inkbox.signing_keys.create_or_rotate(agent_handle)` / `get_status(agent_handle)` and `identity.create_signing_key()` / `identity.get_signing_key_status()`, returning `SigningKey` / the new `SigningKeyStatus`.
+  - CLI: `inkbox identity signing-key status <handle>` / `rotate <handle>`.
+  - The **first webhook subscription** created for a keyless identity returns that identity's signing secret **once** — `inkbox.webhooks.subscriptions.create(...)` now returns a `WebhookSubscriptionCreateResponse` carrying an optional once-shown `signing_key`.
+- **`owner_identity_id` on webhook subscriptions** — the resolved owning agent identity for every subscription (mail/phone/iMessage), parsed by the SDKs (optional/back-compatible).
+
+### Deprecated
+
+- The per-mailbox `inkbox.mail_contact_rules` / per-number `inkbox.phone_contact_rules` resources and the CLI `inkbox mailbox rules` / `inkbox number rules` groups — use the identity-keyed surface above. They still work but hit deprecated server routes (Sunset 2026-08-31).
+- The org-level signing key (`inkbox.create_signing_key()` / no-arg `signing_keys.create_or_rotate()`, CLI `inkbox signing-key create`) — use the per-identity surface. With an agent-scoped key the org-level call still rotates that identity's key; with an admin key the server returns 409.
+
 ## 0.4.13 — Webhook delivery log + event id
 
 ### Added

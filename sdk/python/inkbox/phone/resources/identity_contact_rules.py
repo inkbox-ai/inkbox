@@ -1,7 +1,22 @@
 """
-inkbox/phone/resources/contact_rules.py
+inkbox/phone/resources/identity_contact_rules.py
 
-Phone contact rules (per-number allow/block rules + org-wide list).
+Identity-keyed phone contact rules (per-agent-identity allow/block rules
++ org-wide list).
+
+Phone (voice + SMS) rules live on the **agent identity**, addressed by
+``agent_handle``, mirroring the iMessage rule shape. The legacy
+per-number resource (``inkbox.phone_contact_rules``) is kept as a
+deprecated wrapper.
+
+The identity must have a phone number: ``create`` returns 422 and the
+identity helpers guard with ``_require_phone()`` before the request.
+Listing an identity with no number returns an empty list.
+
+Transport note: rides the api-root transport (``{base}/api/v1``) so it
+addresses both ``/identities/{handle}/phone-contact-rules`` and the
+org-wide ``/phone/contact-rules`` with full paths. It must NOT ride the
+``/phone``-prefixed transport.
 """
 
 from __future__ import annotations
@@ -11,7 +26,7 @@ from uuid import UUID
 
 from inkbox.mail.types import ContactRuleStatus
 from inkbox.phone.types import (
-    PhoneContactRule,
+    PhoneIdentityContactRule,
     PhoneRuleAction,
     PhoneRuleMatchType,
 )
@@ -19,40 +34,32 @@ from inkbox.phone.types import (
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
-_BASE = "/numbers"
-_ORG_BASE = "/contact-rules"
+_ORG_BASE = "/phone/contact-rules"
 _UNSET = object()
 
 
-def _rule_path(phone_number_id: UUID | str, rule_id: UUID | str | None = None) -> str:
-    base = f"{_BASE}/{phone_number_id}/contact-rules"
+def _rule_path(agent_handle: str, rule_id: UUID | str | None = None) -> str:
+    base = f"/identities/{agent_handle}/phone-contact-rules"
     return base if rule_id is None else f"{base}/{rule_id}"
 
 
-class PhoneContactRulesResource:
-    """Allow/block rules scoped to phone numbers (voice + SMS).
-
-    .. deprecated::
-        Phone contact rules are now keyed by **agent identity**. Use
-        ``inkbox.phone_identity_contact_rules`` (or
-        ``identity.list_phone_contact_rules()`` etc.) instead. These
-        per-number routes still work but hit the deprecated server
-        endpoints (Sunset 2026-08-31) and return the legacy
-        ``phone_number_id`` shape.
-    """
+class PhoneIdentityContactRulesResource:
+    """Allow/block phone rules scoped to agent identities (voice + SMS)."""
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
     def list(
         self,
-        phone_number_id: UUID | str,
+        agent_handle: str,
         *,
         action: PhoneRuleAction | str | None = None,
         match_type: PhoneRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> list[PhoneContactRule]:
+    ) -> list[PhoneIdentityContactRule]:
+        """List rules for an identity. Returns an empty list when the
+        identity has no phone number."""
         params: dict[str, Any] = {}
         if action is not None:
             params["action"] = action.value if isinstance(action, PhoneRuleAction) else action
@@ -64,24 +71,27 @@ class PhoneContactRulesResource:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
-        data = self._http.get(_rule_path(phone_number_id), params=params)
+        data = self._http.get(_rule_path(agent_handle), params=params)
         items = data["items"] if isinstance(data, dict) and "items" in data else data
-        return [PhoneContactRule._from_dict(r) for r in items]
+        return [PhoneIdentityContactRule._from_dict(r) for r in items]
 
-    def get(self, phone_number_id: UUID | str, rule_id: UUID | str) -> PhoneContactRule:
-        data = self._http.get(_rule_path(phone_number_id, rule_id))
-        return PhoneContactRule._from_dict(data)
+    def get(self, agent_handle: str, rule_id: UUID | str) -> PhoneIdentityContactRule:
+        data = self._http.get(_rule_path(agent_handle, rule_id))
+        return PhoneIdentityContactRule._from_dict(data)
 
     def create(
         self,
-        phone_number_id: UUID | str,
+        agent_handle: str,
         *,
         action: PhoneRuleAction | str,
         match_target: str,
         match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
-    ) -> PhoneContactRule:
-        """Create a rule. New rules are always ``active``; use
-        :meth:`update` to pause one after creation.
+    ) -> PhoneIdentityContactRule:
+        """Create a rule for an agent identity. New rules are always
+        ``active``; use :meth:`update` to pause one after creation.
+
+        The identity must have a phone number — otherwise the server
+        returns 422.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.
@@ -93,17 +103,17 @@ class PhoneContactRulesResource:
             ),
             "match_target": match_target,
         }
-        data = self._http.post(_rule_path(phone_number_id), json=body)
-        return PhoneContactRule._from_dict(data)
+        data = self._http.post(_rule_path(agent_handle), json=body)
+        return PhoneIdentityContactRule._from_dict(data)
 
     def update(
         self,
-        phone_number_id: UUID | str,
+        agent_handle: str,
         rule_id: UUID | str,
         *,
         action: PhoneRuleAction | str = _UNSET,  # type: ignore[assignment]
         status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
-    ) -> PhoneContactRule:
+    ) -> PhoneIdentityContactRule:
         """Update ``action`` or ``status`` (admin-only)."""
         body: dict[str, Any] = {}
         if action is not _UNSET:
@@ -114,32 +124,32 @@ class PhoneContactRulesResource:
             body["status"] = (
                 status.value if isinstance(status, ContactRuleStatus) else status
             )
-        data = self._http.patch(_rule_path(phone_number_id, rule_id), json=body)
-        return PhoneContactRule._from_dict(data)
+        data = self._http.patch(_rule_path(agent_handle, rule_id), json=body)
+        return PhoneIdentityContactRule._from_dict(data)
 
-    def delete(self, phone_number_id: UUID | str, rule_id: UUID | str) -> None:
+    def delete(self, agent_handle: str, rule_id: UUID | str) -> None:
         """Delete a rule (admin-only)."""
-        self._http.delete(_rule_path(phone_number_id, rule_id))
+        self._http.delete(_rule_path(agent_handle, rule_id))
 
     def list_all(
         self,
         *,
-        phone_number_id: UUID | str | None = None,
+        agent_identity_id: UUID | str | None = None,
         action: PhoneRuleAction | str | None = None,
         match_type: PhoneRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> list[PhoneContactRule]:
+    ) -> list[PhoneIdentityContactRule]:
         """Org-wide list of phone contact rules (admin-only).
 
         Args:
-            phone_number_id: Narrow to a single phone number by id.
+            agent_identity_id: Narrow to a single agent identity by id.
             action: Filter by ``allow`` or ``block``.
             match_type: Filter by ``exact_number``.
         """
         params: dict[str, Any] = {}
-        if phone_number_id is not None:
-            params["phone_number_id"] = str(phone_number_id)
+        if agent_identity_id is not None:
+            params["agent_identity_id"] = str(agent_identity_id)
         if action is not None:
             params["action"] = action.value if isinstance(action, PhoneRuleAction) else action
         if match_type is not None:
@@ -152,4 +162,4 @@ class PhoneContactRulesResource:
             params["offset"] = offset
         data = self._http.get(_ORG_BASE, params=params)
         items = data["items"] if isinstance(data, dict) and "items" in data else data
-        return [PhoneContactRule._from_dict(r) for r in items]
+        return [PhoneIdentityContactRule._from_dict(r) for r in items]

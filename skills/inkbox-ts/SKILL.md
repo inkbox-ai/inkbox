@@ -36,22 +36,29 @@ Inkbox (admin-only client)
 ├── .texts                    → TextsResource
 ├── .imessages                → IMessagesResource
 ├── .imessageContactRules     → IMessageContactRulesResource
-├── .mailContactRules         → MailContactRulesResource
-├── .phoneContactRules        → PhoneContactRulesResource
+├── .mailIdentityContactRules  → MailIdentityContactRulesResource    (keyed by agentHandle)
+├── .phoneIdentityContactRules → PhoneIdentityContactRulesResource   (keyed by agentHandle)
+├── .signingKeys              → SigningKeysResource  (per-identity: createOrRotate/getStatus)
+├── .mailContactRules         → MailContactRulesResource    (DEPRECATED — per-mailbox)
+├── .phoneContactRules        → PhoneContactRulesResource   (DEPRECATED — per-number)
 ├── .smsOptIns                → SmsOptInsResource
 ├── .contacts                 → ContactsResource   (.access, .vcards)
 ├── .notes                    → NotesResource      (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → Promise<WhoamiResponse>
-└── .createSigningKey()       → Promise<SigningKey>
+└── .createSigningKey()       → Promise<SigningKey>  (DEPRECATED — org-level; use .signingKeys)
 
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                → IdentityMailbox | null
 ├── .phoneNumber            → IdentityPhoneNumber | null
+├── .mailFilterMode / .phoneFilterMode → FilterMode
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── .listAccess()           → Promise<IdentityAccess[]>
 ├── .grantAccess(viewerId|null) → Promise<IdentityAccess>
 ├── .revokeAccess(viewerId) → Promise<void>
+├── .listMailContactRules() / .createMailContactRule(...) / .get/.update/.delete
+├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (requires phone number)
+├── .getSigningKeyStatus() / .createSigningKey()
 ├── mail methods            (requires assigned mailbox)
 ├── phone methods           (requires assigned phone number)
 └── text methods            (requires assigned phone number)
@@ -583,7 +590,9 @@ const mailbox   = await inkbox.mailboxes.get("abc@inkboxmail.com");
 // the mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 // To attach a webhook receiver, see "Webhooks" below.
 
-// Switch contact-rule filter mode (admin-only — agent-scoped keys get 403)
+// DEPRECATED channel path — the mail filter mode now lives on the identity.
+// Prefer `identity.update({ mailFilterMode: "whitelist" })` (which does NOT
+// return a change notice). This legacy mailbox flip still works and returns one:
 const updated = await inkbox.mailboxes.update(mailbox.emailAddress, {
   filterMode: "whitelist",   // or "blacklist" — see FilterMode enum
 });
@@ -646,11 +655,11 @@ const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", 
 await inkbox.phoneNumbers.release(num.id);
 ```
 
-Phone numbers carry the same `filterMode` / `agentIdentityId` / `filterModeChangeNotice` fields as mailboxes; flipping `filterMode` is admin-only and returns a change-notice when the value actually changed.
+Phone numbers carry the same `filterMode` / `agentIdentityId` / `filterModeChangeNotice` fields as mailboxes; flipping `filterMode` here is the **deprecated** channel path (admin-only; returns a change-notice when the value actually changed). Prefer `identity.update({ phoneFilterMode: "whitelist" })`, which sets the mode on the identity and does not return a change notice.
 
 ## Contact Rules
 
-Per-mailbox or per-phone-number allow/block lists, enforced server-side. The active `filterMode` on the owning resource decides whether the rules are a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
+Allow/block lists are scoped to the **agent identity** (mirroring iMessage), addressed by `agentHandle`. The identity's `mailFilterMode` / `phoneFilterMode` decides whether each channel's rules act as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number. Returned rows are `MailIdentityContactRule` / `PhoneIdentityContactRule`, keyed by `rule.agentIdentityId` (not a mailbox/phone-number id).
 
 ```typescript
 import {
@@ -658,24 +667,40 @@ import {
   DuplicateContactRuleError,
 } from "@inkbox/sdk";
 
-// Mail rules — scoped to a single mailbox. New rules always start active;
-// call `update(..., { status: "paused" })` afterwards to pause one.
-const rule = await inkbox.mailContactRules.create(mailbox.emailAddress, {
+const identity = await inkbox.getIdentity("sales-agent");
+
+// Mail rules via the identity convenience methods. New rules always start
+// active; call `update(..., { status: "paused" })` afterwards to pause one.
+const rule = await identity.createMailContactRule({
   action: MailRuleAction.ALLOW,          // or BLOCK
   matchType: MailRuleMatchType.DOMAIN,   // or EXACT_EMAIL
   matchTarget: "example.com",
 });
-await inkbox.mailContactRules.list(mailbox.emailAddress);
-await inkbox.mailContactRules.get(mailbox.emailAddress, rule.id);
-await inkbox.mailContactRules.update(mailbox.emailAddress, rule.id, { status: "paused" });  // admin-only
-await inkbox.mailContactRules.delete(mailbox.emailAddress, rule.id);                        // admin-only
+await identity.listMailContactRules();
+await identity.getMailContactRule(rule.id);
+await identity.updateMailContactRule(rule.id, { status: "paused" });  // admin-only
+await identity.deleteMailContactRule(rule.id);                        // admin-only
 
-// Admin-only list; optionally narrow to a single mailboxId
-const allRules = await inkbox.mailContactRules.listAll({ mailboxId: mailbox.id });
+// Phone rules — same shape, only matchType: "exact_number" is supported.
+// Phone helpers require the identity to have a phone number (else InkboxError).
+await identity.createPhoneContactRule({
+  action: PhoneRuleAction.BLOCK,
+  matchTarget: "+15551234567",
+  matchType: PhoneRuleMatchType.EXACT_NUMBER,
+});
+await identity.listPhoneContactRules();
 
-// Duplicate (matchType, matchTarget) on the same mailbox throws 409:
+// Equivalent org-level resources, keyed by agentHandle, with an org-wide listAll:
+await inkbox.mailIdentityContactRules.create("sales-agent", {
+  action: "allow", matchType: "domain", matchTarget: "example.com",
+});
+await inkbox.mailIdentityContactRules.list("sales-agent");
+await inkbox.mailIdentityContactRules.listAll({ agentIdentityId: identity.id });  // admin-only, org-wide
+await inkbox.phoneIdentityContactRules.listAll();                                 // admin-only, org-wide
+
+// Duplicate (matchType, matchTarget) on the same identity throws 409:
 try {
-  await inkbox.mailContactRules.create(mailbox.emailAddress, {
+  await identity.createMailContactRule({
     action: "allow", matchType: "domain", matchTarget: "example.com",
   });
 } catch (e) {
@@ -683,15 +708,36 @@ try {
     console.log(e.existingRuleId);   // id of the rule that already matched
   }
 }
+```
 
-// Phone rules — same shape, only matchType: "exact_number" is supported.
-await inkbox.phoneContactRules.create(num.id, {
-  action: PhoneRuleAction.BLOCK,
-  matchType: PhoneRuleMatchType.EXACT_NUMBER,
-  matchTarget: "+15551234567",
+### Filter mode
+
+The whitelist/blacklist mode lives on the identity. Flip it with `identity.update`
+(admin-only). Unlike the deprecated channel update, this does **not** return a
+`FilterModeChangeNotice`. `phoneFilterMode` requires the identity to have a phone
+number (else a 422).
+
+```typescript
+await identity.update({ mailFilterMode: "whitelist", phoneFilterMode: "blacklist" });
+console.log(identity.mailFilterMode, identity.phoneFilterMode);
+```
+
+### Deprecated: per-mailbox / per-number rules
+
+The legacy per-mailbox `inkbox.mailContactRules` and per-number
+`inkbox.phoneContactRules` resources still work but hit deprecated server routes
+(Sunset 2026-08-31). Prefer the identity-keyed surface above.
+
+```typescript
+// Deprecated — per-mailbox mail rule:
+await inkbox.mailContactRules.create(mailbox.emailAddress, {
+  action: "allow", matchType: "domain", matchTarget: "example.com",
 });
-await inkbox.phoneContactRules.list(num.id);
-await inkbox.phoneContactRules.listAll({ phoneNumberId: num.id });
+await inkbox.mailContactRules.listAll({ mailboxId: mailbox.id });
+// Deprecated — per-number phone rule:
+await inkbox.phoneContactRules.create(num.id, {
+  action: "block", matchType: "exact_number", matchTarget: "+15551234567",
+});
 ```
 
 ## Contacts
@@ -865,8 +911,15 @@ import {
   MailWebhookPayload, TextWebhookPayload, PhoneIncomingCallWebhookPayload,
 } from "@inkbox/sdk";
 
-// Rotate signing key (plaintext returned once — save it)
-const key = await inkbox.createSigningKey();
+// Each agent identity has its own webhook signing key. Create/rotate it
+// (plaintext returned once — save it), or read its status:
+const key = await identity.createSigningKey();                 // → SigningKey
+const status = await identity.getSigningKeyStatus();           // → SigningKeyStatus { configured, createdAt }
+// Org-level resource, keyed by agentHandle:
+const key2 = await inkbox.signingKeys.createOrRotate("sales-agent");
+const status2 = await inkbox.signingKeys.getStatus("sales-agent");
+// DEPRECATED: org-level inkbox.createSigningKey() — with an agent-scoped key it
+// still rotates that identity's key; with an admin key the server returns 409.
 
 // Verify, then parse + discriminate
 const valid = verifyWebhook({
@@ -892,6 +945,16 @@ Algorithm: HMAC-SHA256 over `"{requestId}.{timestamp}.{body}"`.
 - **Inbound call** (flat, synchronous) — `PhoneIncomingCallWebhookPayload` on a phone number's `incomingCallWebhookUrl`. Not subscribable; the URL stays on the phone-number resource because the response (`action: "answer" | "reject"` + optional `clientWebsocketUrl`) decides the call's fate. Non-200, invalid bodies, and timeouts are treated as "decline routing" by Inkbox.
 
 **Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox, phone number, **or** agent identity), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, `message.` / `text.` / `imessage.` prefix matching the owner's channel) so most shape mistakes surface as `Error` before the request leaves the client. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
+
+`create(...)` returns a `WebhookSubscriptionCreateResponse`. The **first** subscription created for an identity that has no signing key yet carries that identity's `signingKey` **once** (otherwise `null`) — capture it then, it cannot be retrieved again. Every subscription (read or created) also carries `ownerIdentityId`, the resolved owning agent identity (mail/phone/iMessage).
+
+```typescript
+const created = await inkbox.webhooks.subscriptions.create({
+  mailboxId: mailbox.id, url: "https://example.com/hook", eventTypes: ["message.received"],
+});
+console.log(created.ownerIdentityId);
+if (created.signingKey) saveSecret(created.signingKey);   // populated once if the identity had no key yet
+```
 
 **Mail contact / identity resolution:** `data.contacts` and `data.agent_identities` are lists of `{ bucket, address, id, ... }` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)`. Outbound payloads also carry `data.message.bcc_addresses` (`null` on inbound, since BCC is not visible to recipients).
 

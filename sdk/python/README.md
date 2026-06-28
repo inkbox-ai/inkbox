@@ -664,11 +664,12 @@ print(mailbox.email_address)
 print(mailbox.sending_domain)        # bare domain the mailbox sends from
 print(mailbox.agent_identity_id)     # non-null for live customer mailboxes (1:1 invariant)
 
-# Update filter mode. display_name has moved to the identity — set
-# it via identity.update(display_name=...). The mailbox PATCH
-# endpoint hard-rejects display_name with a 422. To attach a webhook
-# receiver, see "Webhooks" below.
-inkbox.mailboxes.update(mailbox.email_address, filter_mode="whitelist")  # admin-scoped key only
+# Filter mode now lives on the agent identity — set it via
+# identity.update(mail_filter_mode=...). display_name likewise moved to
+# the identity; the mailbox PATCH endpoint hard-rejects display_name
+# with a 422. To attach a webhook receiver, see "Webhooks" below.
+inkbox.get_identity("support-agent").update(mail_filter_mode="whitelist")  # admin-scoped key only
+# (deprecated) inkbox.mailboxes.update(mailbox.email_address, filter_mode="whitelist")
 
 # Full-text search across messages in a mailbox
 results = inkbox.mailboxes.search(mailbox.email_address, q="invoice", limit=20)
@@ -983,10 +984,31 @@ elif isinstance(info, inkbox.WhoamiJwtResponse):
 
 ## Signing Keys
 
+Signing keys are **per agent identity**. Create/rotate or check status via the
+identity (or `inkbox.signing_keys.create_or_rotate(agent_handle)` /
+`get_status(agent_handle)`). The plaintext is returned **once**.
+
 ```python
-# Create or rotate the org-level webhook signing key (plaintext returned once)
-key = inkbox.create_signing_key()
+identity = inkbox.get_identity("support-agent")
+
+# Create or rotate this identity's webhook signing key (plaintext returned once)
+key = identity.create_signing_key()
 print(key.signing_key)  # save this immediately
+
+# Check whether a key is configured
+status = identity.get_signing_key_status()
+print(status.configured, status.created_at)
+
+# The FIRST webhook subscription for a keyless identity returns its secret once:
+created = inkbox.webhooks.subscriptions.create(
+    mailbox_id=identity.mailbox.id,
+    url="https://example.com/hooks/mail",
+    event_types=["message.received"],
+)
+if created.signing_key is not None:
+    print(created.signing_key)  # save this immediately — shown only once
+
+# (deprecated) org-level: inkbox.create_signing_key()
 ```
 
 ---

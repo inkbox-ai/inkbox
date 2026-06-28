@@ -238,6 +238,11 @@ class AgentIdentitySummary:
     ``imessage_enabled`` / ``imessage_filter_mode`` describe shared-pool
     iMessage reachability — there is no per-identity iMessage number, so
     these live on the identity itself rather than on a channel object.
+
+    ``mail_filter_mode`` / ``phone_filter_mode`` are the whitelist/blacklist
+    modes for this identity's mail and phone contact rules. They live on the
+    identity (set via ``identity.update(...)``); the same field on the mailbox
+    / phone-number objects is the deprecated legacy mirror.
     """
 
     id: UUID
@@ -250,6 +255,8 @@ class AgentIdentitySummary:
     updated_at: datetime
     imessage_enabled: bool = False
     imessage_filter_mode: FilterMode = FilterMode.BLACKLIST
+    mail_filter_mode: FilterMode = FilterMode.BLACKLIST
+    phone_filter_mode: FilterMode = FilterMode.BLACKLIST
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentIdentitySummary:
@@ -264,6 +271,8 @@ class AgentIdentitySummary:
             updated_at=datetime.fromisoformat(d["updated_at"]),
             imessage_enabled=d.get("imessage_enabled", False),
             imessage_filter_mode=FilterMode(d.get("imessage_filter_mode") or "blacklist"),
+            mail_filter_mode=FilterMode(d.get("mail_filter_mode") or "blacklist"),
+            phone_filter_mode=FilterMode(d.get("phone_filter_mode") or "blacklist"),
         )
 
 

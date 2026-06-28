@@ -498,7 +498,12 @@ class SmsOptIn:
 
 @dataclass
 class PhoneContactRule:
-    """An inbound/outbound allow/block rule scoped to a phone number."""
+    """An inbound/outbound allow/block rule scoped to a phone number.
+
+    Returned by the **legacy** per-number routes
+    (``inkbox.phone_contact_rules``). The forward-looking, identity-keyed
+    shape is :class:`PhoneIdentityContactRule`.
+    """
 
     id: UUID
     phone_number_id: UUID
@@ -514,6 +519,40 @@ class PhoneContactRule:
         return cls(
             id=UUID(d["id"]),
             phone_number_id=UUID(d["phone_number_id"]),
+            action=PhoneRuleAction(d["action"]),
+            match_type=PhoneRuleMatchType(d["match_type"]),
+            match_target=d["match_target"],
+            status=ContactRuleStatus(d.get("status", "active")),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )
+
+
+@dataclass
+class PhoneIdentityContactRule:
+    """A phone allow/block rule scoped to an **agent identity**.
+
+    Returned by the identity-keyed routes
+    (``inkbox.phone_identity_contact_rules`` /
+    ``identity.list_phone_contact_rules()``). Same shape as
+    :class:`PhoneContactRule` but keyed by ``agent_identity_id`` instead
+    of ``phone_number_id``.
+    """
+
+    id: UUID
+    agent_identity_id: UUID
+    action: PhoneRuleAction
+    match_type: PhoneRuleMatchType
+    match_target: str
+    status: ContactRuleStatus
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> PhoneIdentityContactRule:
+        return cls(
+            id=UUID(d["id"]),
+            agent_identity_id=UUID(d["agent_identity_id"]),
             action=PhoneRuleAction(d["action"]),
             match_type=PhoneRuleMatchType(d["match_type"]),
             match_target=d["match_target"],

@@ -35,7 +35,10 @@ function assertFilterMode(raw: string): FilterMode {
 function registerNumberRulesCommands(parent: Command): void {
   const rules = parent
     .command("rules")
-    .description("Contact rules scoped to a phone number");
+    .description(
+      "[deprecated] Contact rules scoped to a phone number. Use " +
+        "'inkbox identity phone-rules ...' instead (keyed by agent handle).",
+    );
 
   rules
     .command("list")

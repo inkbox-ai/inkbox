@@ -110,6 +110,11 @@ export class IdentitiesResource {
    * @param options.imessageEnabled - Toggle shared-iMessage reachability.
    * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
    *   for iMessage contact rules (admin-only).
+   * @param options.mailFilterMode - `"whitelist"` or `"blacklist"` for this
+   *   identity's mail contact rules (admin-only).
+   * @param options.phoneFilterMode - `"whitelist"` or `"blacklist"` for this
+   *   identity's phone contact rules (admin-only). The server rejects this
+   *   with 422 when the identity has no phone number.
    * @param options.status - `"active"` or `"paused"`. Call `delete()` to
    *   remove an identity; `"deleted"` is rejected here.
    */
@@ -121,6 +126,8 @@ export class IdentitiesResource {
       description?: string | null;
       imessageEnabled?: boolean;
       imessageFilterMode?: "whitelist" | "blacklist";
+      mailFilterMode?: "whitelist" | "blacklist";
+      phoneFilterMode?: "whitelist" | "blacklist";
       status?: "active" | "paused";
     },
   ): Promise<AgentIdentitySummary> {
@@ -130,6 +137,8 @@ export class IdentitiesResource {
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
+    if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
+    if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;
     if (options.status !== undefined) body["status"] = options.status;
     try {
       const data = await this.http.patch<RawAgentIdentitySummary>(`/${agentHandle}`, body);

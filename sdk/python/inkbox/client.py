@@ -37,12 +37,16 @@ from inkbox.identities.types import (  # noqa: I001
 from inkbox.imessage.resources.contact_rules import IMessageContactRulesResource
 from inkbox.imessage.resources.imessages import IMessagesResource
 from inkbox.mail.resources.contact_rules import MailContactRulesResource
+from inkbox.mail.resources.identity_contact_rules import MailIdentityContactRulesResource
 from inkbox.mail.resources.domains import DomainsResource
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.contact_rules import PhoneContactRulesResource
+from inkbox.phone.resources.identity_contact_rules import (
+    PhoneIdentityContactRulesResource,
+)
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.sms_opt_ins import SmsOptInsResource
 from inkbox.phone.resources.texts import TextsResource
@@ -224,6 +228,16 @@ class Inkbox:
         self._phone_contact_rules = PhoneContactRulesResource(self._phone_http)
         self._sms_opt_ins = SmsOptInsResource(self._phone_http)
 
+        # Identity-keyed contact rules ride the api-root transport (base
+        # /api/v1) so they reach both /identities/{handle}/...-contact-rules
+        # and the org-wide /mail|/phone/contact-rules with full paths.
+        self._mail_identity_contact_rules = MailIdentityContactRulesResource(
+            self._api_http
+        )
+        self._phone_identity_contact_rules = PhoneIdentityContactRulesResource(
+            self._api_http
+        )
+
         self._imessages = IMessagesResource(self._imessage_http)
         self._imessage_contact_rules = IMessageContactRulesResource(self._imessage_http)
 
@@ -331,13 +345,31 @@ class Inkbox:
 
     @property
     def mail_contact_rules(self) -> MailContactRulesResource:
-        """Mail per-mailbox allow/block rules (+ org-wide list)."""
+        """Mail per-mailbox allow/block rules (+ org-wide list).
+
+        Deprecated: contact rules are now keyed by agent identity — use
+        :attr:`mail_identity_contact_rules` (or ``identity.*_mail_contact_rule``).
+        """
         return self._mail_contact_rules
 
     @property
     def phone_contact_rules(self) -> PhoneContactRulesResource:
-        """Phone per-number allow/block rules (+ org-wide list)."""
+        """Phone per-number allow/block rules (+ org-wide list).
+
+        Deprecated: contact rules are now keyed by agent identity — use
+        :attr:`phone_identity_contact_rules` (or ``identity.*_phone_contact_rule``).
+        """
         return self._phone_contact_rules
+
+    @property
+    def mail_identity_contact_rules(self) -> MailIdentityContactRulesResource:
+        """Mail per-identity allow/block rules (+ org-wide list), keyed by ``agent_handle``."""
+        return self._mail_identity_contact_rules
+
+    @property
+    def phone_identity_contact_rules(self) -> PhoneIdentityContactRulesResource:
+        """Phone per-identity allow/block rules (+ org-wide list), keyed by ``agent_handle``."""
+        return self._phone_identity_contact_rules
 
     @property
     def sms_opt_ins(self) -> SmsOptInsResource:
@@ -362,6 +394,17 @@ class Inkbox:
     def api_keys(self) -> ApiKeysResource:
         """Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys."""
         return self._api_keys
+
+    @property
+    def signing_keys(self) -> SigningKeysResource:
+        """Per-identity webhook signing keys.
+
+        Use ``create_or_rotate(agent_handle)`` / ``get_status(agent_handle)``
+        (or the ``identity.create_signing_key()`` /
+        ``identity.get_signing_key_status()`` convenience methods). Calling
+        either with no handle hits the deprecated org-level endpoint.
+        """
+        return self._signing_keys
 
     @property
     def webhooks(self) -> "_WebhooksNamespace":
@@ -469,7 +512,14 @@ class Inkbox:
 
     def create_signing_key(self) -> SigningKey:
         """
-        Create or rotate the org-level webhook signing key.
+        Create or rotate a webhook signing key via the deprecated org-level
+        endpoint.
+
+        Deprecated: signing keys are now per agent identity. Prefer
+        ``identity.create_signing_key()`` (or
+        ``inkbox.signing_keys.create_or_rotate(agent_handle)``). With an
+        agent-scoped API key this rotates that key's identity; with an admin
+        key the server returns 409 (``InkboxAPIError``).
 
         The plaintext key is returned once — save it immediately.
         """

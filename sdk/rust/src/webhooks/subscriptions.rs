@@ -34,10 +34,15 @@ pub enum WebhookSubscriptionStatus {
 
 /// A webhook subscription row returned by the API.
 ///
-/// Exactly one of `mailbox_id` / `phone_number_id` / `agent_identity_id` is
-/// populated. `organization_id` is an `"org_..."` token string, not a UUID.
-/// `status` is always `"active"` for subscriptions callers can observe;
-/// deleted subscriptions are not returned by `list` / `get`.
+/// Exactly one of `mailbox_id` / `phone_number_id` / `agent_identity_id` (the
+/// raw owner FK) is populated. `owner_identity_id` is the **resolved** owning
+/// agent identity for every subscription regardless of channel — mail/phone
+/// subs resolve it server-side through the mailbox / phone number, while
+/// iMessage subs carry it directly. (Optional for forward-compatibility: `None`
+/// on servers that predate the field.) `organization_id` is an `"org_..."`
+/// token string, not a UUID. `status` is always `"active"` for subscriptions
+/// callers can observe; deleted subscriptions are not returned by `list` /
+/// `get`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookSubscription {
     pub id: Uuid,
@@ -55,6 +60,23 @@ pub struct WebhookSubscription {
     // keeps ISO strings as `String`).
     pub created_at: String,
     pub updated_at: String,
+    // Resolved owning identity; absent on servers that predate the field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_identity_id: Option<Uuid>,
+}
+
+/// The response from creating a webhook subscription.
+///
+/// Extends [`WebhookSubscription`] with a one-time `signing_key`. It is
+/// populated **only** on the request that first mints the owning identity's
+/// signing key (returned once — store it securely); on every other create it is
+/// `None`. `list` / `get` / `update` never return it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookSubscriptionCreateResponse {
+    #[serde(flatten)]
+    pub subscription: WebhookSubscription,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signing_key: Option<String>,
 }
 
 /// Envelope for the `list` response.
@@ -204,7 +226,10 @@ impl WebhookSubscriptionsResource {
     /// * `mailbox_id` / `phone_number_id` / `agent_identity_id` - exactly one.
     ///
     /// # Returns
-    /// The created subscription.
+    /// A [`WebhookSubscriptionCreateResponse`]. Its `signing_key` is populated
+    /// **once** when this is the first subscription for an identity that had no
+    /// signing key yet — store it securely; it is the only time the plaintext
+    /// secret is shown. Otherwise `signing_key` is `None`.
     pub fn create(
         &self,
         url: &str,
@@ -212,7 +237,7 @@ impl WebhookSubscriptionsResource {
         mailbox_id: Option<Uuid>,
         phone_number_id: Option<Uuid>,
         agent_identity_id: Option<Uuid>,
-    ) -> Result<WebhookSubscription> {
+    ) -> Result<WebhookSubscriptionCreateResponse> {
         // Exactly one owner FK must be set.
         let owners: [(&str, Option<Uuid>); 3] = [
             ("mailbox", mailbox_id),

@@ -12,6 +12,7 @@ import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
 import { MailContactRulesResource } from "./mail/resources/contactRules.js";
+import { MailIdentityContactRulesResource } from "./mail/resources/identityContactRules.js";
 import { DomainsResource } from "./mail/resources/domains.js";
 import { SigningKeysResource } from "./signing_keys.js";
 import type { SigningKey } from "./signing_keys.js";
@@ -24,6 +25,7 @@ import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
 import { TranscriptsResource } from "./phone/resources/transcripts.js";
 import { PhoneContactRulesResource } from "./phone/resources/contactRules.js";
+import { PhoneIdentityContactRulesResource } from "./phone/resources/identityContactRules.js";
 import { SmsOptInsResource } from "./phone/resources/smsOptIns.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
@@ -126,6 +128,7 @@ export class Inkbox {
   readonly _messages: MessagesResource;
   readonly _threads: ThreadsResource;
   readonly _mailContactRules: MailContactRulesResource;
+  readonly _mailIdentityContactRules: MailIdentityContactRulesResource;
   readonly _domains: DomainsResource;
   readonly _signingKeys: SigningKeysResource;
   readonly _webhookSubscriptions: WebhookSubscriptionsResource;
@@ -141,6 +144,7 @@ export class Inkbox {
   readonly _imessageContactRules: IMessageContactRulesResource;
   readonly _transcripts: TranscriptsResource;
   readonly _phoneContactRules: PhoneContactRulesResource;
+  readonly _phoneIdentityContactRules: PhoneIdentityContactRulesResource;
   readonly _smsOptIns: SmsOptInsResource;
   readonly _idsResource: IdentitiesResource;
   readonly _vaultResource: VaultResource;
@@ -198,6 +202,11 @@ export class Inkbox {
     this._threads          = new ThreadsResource(mailHttp);
     this._mailContactRules = new MailContactRulesResource(mailHttp);
     this._domains          = new DomainsResource(domainsHttp);
+    // Identity-keyed contact rules ride the api-root transport (base
+    // /api/v1) so they reach both /identities/{handle}/...-contact-rules
+    // and the org-wide /mail|/phone/contact-rules with full paths.
+    this._mailIdentityContactRules = new MailIdentityContactRulesResource(apiHttp);
+    this._phoneIdentityContactRules = new PhoneIdentityContactRulesResource(apiHttp);
     this._signingKeys      = new SigningKeysResource(apiHttp);
     this._webhookSubscriptions = new WebhookSubscriptionsResource(apiHttp);
     this._webhookDeliveries = new WebhookDeliveriesResource(apiHttp);
@@ -298,11 +307,27 @@ export class Inkbox {
   /** Org-scoped notes with per-identity access grants. */
   get notes(): NotesResource { return this._notes; }
 
-  /** Mail per-mailbox allow/block rules (+ org-wide list). */
+  /**
+   * Mail per-mailbox allow/block rules (+ org-wide list).
+   *
+   * @deprecated Contact rules are now keyed by agent identity — use
+   *   {@link mailIdentityContactRules} (or `identity.*MailContactRule(...)`).
+   */
   get mailContactRules(): MailContactRulesResource { return this._mailContactRules; }
 
-  /** Phone per-number allow/block rules (+ org-wide list). */
+  /**
+   * Phone per-number allow/block rules (+ org-wide list).
+   *
+   * @deprecated Contact rules are now keyed by agent identity — use
+   *   {@link phoneIdentityContactRules} (or `identity.*PhoneContactRule(...)`).
+   */
   get phoneContactRules(): PhoneContactRulesResource { return this._phoneContactRules; }
+
+  /** Mail per-identity allow/block rules (+ org-wide list), keyed by `agentHandle`. */
+  get mailIdentityContactRules(): MailIdentityContactRulesResource { return this._mailIdentityContactRules; }
+
+  /** Phone per-identity allow/block rules (+ org-wide list), keyed by `agentHandle`. */
+  get phoneIdentityContactRules(): PhoneIdentityContactRulesResource { return this._phoneIdentityContactRules; }
 
   /**
    * SMS opt-in / opt-out registry (per-(org, receiver) consent).
@@ -319,6 +344,14 @@ export class Inkbox {
 
   /** Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys. */
   get apiKeys(): ApiKeysResource { return this._apiKeys; }
+
+  /**
+   * Per-identity webhook signing keys. Use `createOrRotate(agentHandle)` /
+   * `getStatus(agentHandle)` (or `identity.createSigningKey()` /
+   * `identity.getSigningKeyStatus()`). Calling either with no handle hits the
+   * deprecated org-level endpoint.
+   */
+  get signingKeys(): SigningKeysResource { return this._signingKeys; }
 
   /**
    * Webhook subscription management and delivery log. Use
@@ -408,9 +441,16 @@ export class Inkbox {
   }
 
   /**
-   * Create or rotate the org-level webhook signing key.
+   * Create or rotate a webhook signing key via the deprecated org-level
+   * endpoint.
    *
    * The plaintext key is returned once — save it immediately.
+   *
+   * @deprecated Signing keys are now per agent identity. Prefer
+   *   `identity.createSigningKey()` (or
+   *   `inkbox.signingKeys.createOrRotate(agentHandle)`). With an agent-scoped
+   *   API key this rotates that key's identity; with an admin key the server
+   *   returns 409 (`InkboxAPIError`).
    *
    * @returns The new {@link SigningKey}.
    */

@@ -377,7 +377,12 @@ class ThreadDetail(Thread):
 
 @dataclass
 class MailContactRule:
-    """An inbound/outbound allow/block rule scoped to a mailbox."""
+    """An inbound/outbound allow/block rule scoped to a mailbox.
+
+    Returned by the **legacy** per-mailbox routes
+    (``inkbox.mail_contact_rules``). The forward-looking, identity-keyed
+    shape is :class:`MailIdentityContactRule`.
+    """
 
     id: UUID
     mailbox_id: UUID
@@ -393,6 +398,40 @@ class MailContactRule:
         return cls(
             id=UUID(d["id"]),
             mailbox_id=UUID(d["mailbox_id"]),
+            action=MailRuleAction(d["action"]),
+            match_type=MailRuleMatchType(d["match_type"]),
+            match_target=d["match_target"],
+            status=ContactRuleStatus(d.get("status", "active")),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )
+
+
+@dataclass
+class MailIdentityContactRule:
+    """A mail allow/block rule scoped to an **agent identity**.
+
+    Returned by the identity-keyed routes
+    (``inkbox.mail_identity_contact_rules`` /
+    ``identity.list_mail_contact_rules()``). Same shape as
+    :class:`MailContactRule` but keyed by ``agent_identity_id`` instead
+    of ``mailbox_id``.
+    """
+
+    id: UUID
+    agent_identity_id: UUID
+    action: MailRuleAction
+    match_type: MailRuleMatchType
+    match_target: str
+    status: ContactRuleStatus
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> MailIdentityContactRule:
+        return cls(
+            id=UUID(d["id"]),
+            agent_identity_id=UUID(d["agent_identity_id"]),
             action=MailRuleAction(d["action"]),
             match_type=MailRuleMatchType(d["match_type"]),
             match_target=d["match_target"],

@@ -103,9 +103,36 @@ export interface PhoneNumber {
   filterModeChangeNotice: FilterModeChangeNotice | null;
 }
 
+/**
+ * A phone allow/block rule scoped to a phone number.
+ *
+ * @deprecated Returned by the legacy per-number routes
+ *   (`inkbox.phoneContactRules`). The forward-looking, identity-keyed
+ *   shape is {@link PhoneIdentityContactRule}.
+ */
 export interface PhoneContactRule {
   id: string;
   phoneNumberId: string;
+  action: PhoneRuleAction;
+  matchType: PhoneRuleMatchType;
+  matchTarget: string;
+  status: ContactRuleStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * A phone allow/block rule scoped to an **agent identity**.
+ *
+ * Returned by the identity-keyed routes
+ * (`inkbox.phoneIdentityContactRules` /
+ * `identity.listPhoneContactRules()`). Same shape as
+ * {@link PhoneContactRule} but keyed by `agentIdentityId` instead of
+ * `phoneNumberId`.
+ */
+export interface PhoneIdentityContactRule {
+  id: string;
+  agentIdentityId: string;
   action: PhoneRuleAction;
   matchType: PhoneRuleMatchType;
   matchTarget: string;
@@ -303,6 +330,17 @@ export interface RawPhoneContactRule {
   updated_at: string;
 }
 
+export interface RawPhoneIdentityContactRule {
+  id: string;
+  agent_identity_id: string;
+  action: string;
+  match_type: string;
+  match_target: string;
+  status?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RawSmsOptIn {
   id: string;
   organization_id: string;
@@ -447,6 +485,21 @@ export function parsePhoneContactRule(r: RawPhoneContactRule): PhoneContactRule 
   return {
     id: r.id,
     phoneNumberId: r.phone_number_id,
+    action: r.action as PhoneRuleAction,
+    matchType: r.match_type as PhoneRuleMatchType,
+    matchTarget: r.match_target,
+    status: (r.status as ContactRuleStatus) ?? ("active" as ContactRuleStatus),
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parsePhoneIdentityContactRule(
+  r: RawPhoneIdentityContactRule,
+): PhoneIdentityContactRule {
+  return {
+    id: r.id,
+    agentIdentityId: r.agent_identity_id,
     action: r.action as PhoneRuleAction,
     matchType: r.match_type as PhoneRuleMatchType,
     matchTarget: r.match_target,

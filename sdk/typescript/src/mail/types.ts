@@ -202,9 +202,35 @@ export interface ThreadDetail extends Thread {
   messages: Message[];
 }
 
+/**
+ * A mail allow/block rule scoped to a mailbox.
+ *
+ * @deprecated Returned by the legacy per-mailbox routes
+ *   (`inkbox.mailContactRules`). The forward-looking, identity-keyed
+ *   shape is {@link MailIdentityContactRule}.
+ */
 export interface MailContactRule {
   id: string;
   mailboxId: string;
+  action: MailRuleAction;
+  matchType: MailRuleMatchType;
+  matchTarget: string;
+  status: ContactRuleStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * A mail allow/block rule scoped to an **agent identity**.
+ *
+ * Returned by the identity-keyed routes
+ * (`inkbox.mailIdentityContactRules` / `identity.listMailContactRules()`).
+ * Same shape as {@link MailContactRule} but keyed by `agentIdentityId`
+ * instead of `mailboxId`.
+ */
+export interface MailIdentityContactRule {
+  id: string;
+  agentIdentityId: string;
   action: MailRuleAction;
   matchType: MailRuleMatchType;
   matchTarget: string;
@@ -286,6 +312,17 @@ export interface RawThread {
 export interface RawMailContactRule {
   id: string;
   mailbox_id: string;
+  action: string;
+  match_type: string;
+  match_target: string;
+  status?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RawMailIdentityContactRule {
+  id: string;
+  agent_identity_id: string;
   action: string;
   match_type: string;
   match_target: string;
@@ -400,6 +437,21 @@ export function parseMailContactRule(r: RawMailContactRule): MailContactRule {
   return {
     id: r.id,
     mailboxId: r.mailbox_id,
+    action: r.action as MailRuleAction,
+    matchType: r.match_type as MailRuleMatchType,
+    matchTarget: r.match_target,
+    status: (r.status as ContactRuleStatus) ?? ContactRuleStatus.ACTIVE,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseMailIdentityContactRule(
+  r: RawMailIdentityContactRule,
+): MailIdentityContactRule {
+  return {
+    id: r.id,
+    agentIdentityId: r.agent_identity_id,
     action: r.action as MailRuleAction,
     matchType: r.match_type as MailRuleMatchType,
     matchTarget: r.match_target,

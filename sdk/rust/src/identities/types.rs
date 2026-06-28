@@ -337,6 +337,11 @@ pub struct IdentityPhoneNumber {
 /// `imessage_enabled` / `imessage_filter_mode` describe shared-pool iMessage
 /// reachability — there is no per-identity iMessage number, so these live on
 /// the identity itself rather than on a channel object.
+///
+/// `mail_filter_mode` / `phone_filter_mode` are the whitelist/blacklist modes
+/// for this identity's mail and phone contact rules. They live on the identity
+/// (set via `identity.update(...)`); the same field on the mailbox /
+/// phone-number objects is the deprecated legacy mirror.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentIdentitySummary {
     pub id: Uuid,
@@ -356,6 +361,14 @@ pub struct AgentIdentitySummary {
     /// Defaults to `blacklist` when absent.
     #[serde(default = "default_filter_mode_blacklist")]
     pub imessage_filter_mode: FilterMode,
+    /// Whitelist/blacklist mode for this identity's mail contact rules.
+    /// Defaults to `blacklist` when absent.
+    #[serde(default = "default_filter_mode_blacklist")]
+    pub mail_filter_mode: FilterMode,
+    /// Whitelist/blacklist mode for this identity's phone contact rules.
+    /// Defaults to `blacklist` when absent.
+    #[serde(default = "default_filter_mode_blacklist")]
+    pub phone_filter_mode: FilterMode,
 }
 
 /// Agent identity with linked communication channels and tunnel.
