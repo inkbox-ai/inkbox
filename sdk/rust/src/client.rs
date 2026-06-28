@@ -300,10 +300,8 @@ impl Inkbox {
     /// Deprecated: contact rules are now keyed by agent identity — use
     /// [`Self::mail_identity_contact_rules`] (or the `identity.*_mail_contact_rule`
     /// helpers).
-    #[deprecated(
-        note = "Contact rules are now keyed by agent identity. Use \
-                mail_identity_contact_rules() or identity.*_mail_contact_rule()."
-    )]
+    #[deprecated(note = "Contact rules are now keyed by agent identity. Use \
+                mail_identity_contact_rules() or identity.*_mail_contact_rule().")]
     pub fn mail_contact_rules(&self) -> &MailContactRulesResource {
         &self.mail_contact_rules
     }
@@ -328,10 +326,8 @@ impl Inkbox {
     /// Deprecated: contact rules are now keyed by agent identity — use
     /// [`Self::phone_identity_contact_rules`] (or the
     /// `identity.*_phone_contact_rule` helpers).
-    #[deprecated(
-        note = "Contact rules are now keyed by agent identity. Use \
-                phone_identity_contact_rules() or identity.*_phone_contact_rule()."
-    )]
+    #[deprecated(note = "Contact rules are now keyed by agent identity. Use \
+                phone_identity_contact_rules() or identity.*_phone_contact_rule().")]
     pub fn phone_contact_rules(&self) -> &PhoneContactRulesResource {
         &self.phone_contact_rules
     }
@@ -476,11 +472,9 @@ impl Inkbox {
     /// `inkbox.signing_keys().create_or_rotate(agent_handle)`). With an
     /// agent-scoped API key this rotates that key's identity; with an admin key
     /// the server returns 409 ([`InkboxError::Api`]).
-    #[deprecated(
-        note = "Signing keys are now per agent identity. Use \
+    #[deprecated(note = "Signing keys are now per agent identity. Use \
                 identity.create_signing_key() or \
-                signing_keys().create_or_rotate(agent_handle)."
-    )]
+                signing_keys().create_or_rotate(agent_handle).")]
     pub fn create_signing_key(&self) -> Result<SigningKey> {
         #[allow(deprecated)]
         self.signing_keys.create_or_rotate_org()

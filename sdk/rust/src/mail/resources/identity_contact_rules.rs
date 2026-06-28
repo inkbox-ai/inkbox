@@ -142,9 +142,10 @@ impl MailIdentityContactRulesResource {
         if let Some(s) = status {
             body.insert("status".into(), Value::String(s.as_str().to_string()));
         }
-        let data = self
-            .http
-            .patch(&rule_path(agent_handle, Some(rule_id)), &Value::Object(body))?;
+        let data = self.http.patch(
+            &rule_path(agent_handle, Some(rule_id)),
+            &Value::Object(body),
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 
