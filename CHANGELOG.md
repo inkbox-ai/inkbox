@@ -4,6 +4,12 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.13 — Webhook event id
+
+### Added
+
+- **Stable per-event `id` on webhook payloads** in the TypeScript, Python, and Rust SDKs. The mail / text / iMessage webhook envelopes now carry a top-level `id` (`evt_...`) — a stable idempotency key that is the same across the original delivery and any retries or replays. Dedupe on it instead of the per-delivery `X-Inkbox-Request-ID` header. (Incoming-call payloads are flat and keep their own call `id`.)
+
 ## 0.4.12 — Tunnel DX
 
 ### Added
