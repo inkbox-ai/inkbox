@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
-## 0.4.14 — Webhook delivery log
+## 0.4.13 — Webhook delivery log + event id
 
 ### Added
 
@@ -12,16 +12,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   - SDKs: `inkbox.webhooks.deliveries.list(...)` / `.replay(deliveryId)` (Python `inkbox.webhooks.deliveries`, Rust `inkbox.webhooks().deliveries()`), returning the new `WebhookDelivery` type. `list` filters on subscription, phone number, event type, and 2xx success, with `limit` / `offset` paging.
   - CLI: `inkbox webhook delivery list` (with `--subscription-id` / `--phone-number-id` / `--event-type` / `--success` / `--failed` / `--limit` / `--offset`) and `inkbox webhook delivery replay <delivery-id>`.
   - Replay reuses the original envelope `event_id`, so a compliant endpoint dedupes a replay it already processed — it recovers a miss rather than forcing reprocessing. Incoming-call deliveries are logged but not replayable.
-
-### Fixed
-
-- **Rust webhook payloads tolerate a missing `id`.** The per-event `id` added to `MailWebhookPayload` / `TextWebhookPayload` / `IMessageWebhookPayload` in 0.4.13 was a required serde field, so a 0.4.13 Rust consumer hard-failed deserializing any payload without it (an older or mixed-deployment server, or a recorded/mocked payload predating the field). The field is now `#[serde(default)]` — an absent `id` parses to `""`. The TypeScript and Python types were already runtime-tolerant (compile-time-only `interface` / `TypedDict`).
-
-## 0.4.13 — Webhook event id
-
-### Added
-
-- **Stable per-event `id` on webhook payloads** in the TypeScript, Python, and Rust SDKs. The mail / text / iMessage webhook envelopes now carry a top-level `id` (`evt_...`) — a stable idempotency key that is the same across the original delivery and any retries or replays. Dedupe on it instead of the per-delivery `X-Inkbox-Request-ID` header. (Incoming-call payloads are flat and keep their own call `id`.)
+- **Stable per-event `id` on webhook payloads** in the TypeScript, Python, and Rust SDKs. The mail / text / iMessage webhook envelopes now carry a top-level `id` (`evt_...`) — a stable idempotency key that is the same across the original delivery and any retries or replays. Dedupe on it instead of the per-delivery `X-Inkbox-Request-ID` header. (Incoming-call payloads are flat and keep their own call `id`.) The Rust field is `#[serde(default)]`, so a payload without `id` parses to `""` rather than failing; the TypeScript and Python types are compile-time-only and already tolerant.
 
 ## 0.4.12 — Tunnel DX
 
