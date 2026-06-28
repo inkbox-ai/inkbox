@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
-## Unreleased — Identity-scoped contact rules + per-identity signing keys
+## 0.4.14 — Identity-scoped contact rules + per-identity signing keys
 
 ### Added
 

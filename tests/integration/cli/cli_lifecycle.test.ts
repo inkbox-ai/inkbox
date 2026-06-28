@@ -183,10 +183,43 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     const forwardedInbound = alphaList.find((m) => m.subject === forwardSubject)!;
     expect(forwardedInbound.direction).toBe("inbound");
 
-    // ── signing key ───────────────────────────────────────────
-    logStep(config, "create signing key");
-    const signingKey = inkboxJson<{ signingKey: string }>("signing-key create", cliOpts);
+    // ── identity-scoped contact rules + filter mode ───────────
+    // (mail only — alpha has no phone number, and we don't provision
+    // real numbers in CI; phone rules require a number server-side.)
+    logStep(config, "set alpha mail filter mode to whitelist");
+    inkbox(`identity update ${alphaHandle} --mail-filter-mode whitelist`, cliOpts);
+    const alphaAfterFlip = inkboxJson<{ mailFilterMode: string }>(
+      `identity get ${alphaHandle}`,
+      cliOpts,
+    );
+    expect(alphaAfterFlip.mailFilterMode).toBe("whitelist");
+
+    logStep(config, "create + list + delete an identity-keyed mail contact rule");
+    const rule = inkboxJson<{ id: string; agentIdentityId: string }>(
+      `identity mail-rules create ${alphaHandle} --action allow --match-type exact_email --match-target vip@example.com`,
+      cliOpts,
+    );
+    expect(rule.agentIdentityId).toBe(alphaCreate.id);
+    const ruleList = inkboxJson<Array<{ id: string }>>(
+      `identity mail-rules list ${alphaHandle}`,
+      cliOpts,
+    );
+    expect(ruleList.some((r) => r.id === rule.id)).toBe(true);
+    inkbox(`identity mail-rules delete ${alphaHandle} ${rule.id}`, cliOpts);
+    inkbox(`identity update ${alphaHandle} --mail-filter-mode blacklist`, cliOpts);
+
+    // ── per-identity signing key ──────────────────────────────
+    logStep(config, "per-identity signing key: rotate + status");
+    const signingKey = inkboxJson<{ signingKey: string }>(
+      `identity signing-key rotate ${alphaHandle}`,
+      cliOpts,
+    );
     expect(signingKey.signingKey).toBeTruthy();
+    const skStatus = inkboxJson<{ configured: boolean }>(
+      `identity signing-key status ${alphaHandle}`,
+      cliOpts,
+    );
+    expect(skStatus.configured).toBe(true);
 
     // ── cleanup: delete identities (cascades to mailbox + tunnel) ─
     logStep(config, "delete identities");

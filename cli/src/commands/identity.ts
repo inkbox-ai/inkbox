@@ -460,6 +460,8 @@ export function registerIdentityCommands(program: Command): void {
             phoneNumber: id.phoneNumber?.number ?? null,
             imessageEnabled: id.imessageEnabled,
             imessageFilterMode: id.imessageFilterMode,
+            mailFilterMode: id.mailFilterMode,
+            phoneFilterMode: id.phoneFilterMode,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
@@ -701,6 +703,8 @@ export function registerIdentityCommands(program: Command): void {
             phoneNumber: id.phoneNumber?.number ?? null,
             imessageEnabled: id.imessageEnabled,
             imessageFilterMode: id.imessageFilterMode,
+            mailFilterMode: id.mailFilterMode,
+            phoneFilterMode: id.phoneFilterMode,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
