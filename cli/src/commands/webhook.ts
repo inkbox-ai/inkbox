@@ -3,7 +3,7 @@ import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import { verifyWebhook } from "@inkbox/sdk";
-import type { WebhookSubscription } from "@inkbox/sdk";
+import type { WebhookSubscription, WebhookDelivery } from "@inkbox/sdk";
 
 const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "id",
@@ -165,6 +165,101 @@ function registerSubscriptionCommands(parent: Command): void {
     );
 }
 
+const WEBHOOK_DELIVERY_LIST_COLUMNS = [
+  "id",
+  "eventType",
+  "eventId",
+  "url",
+  "responseStatus",
+  "isReplay",
+  "createdAt",
+];
+
+function flattenDeliveryForOutput(d: WebhookDelivery): Record<string, unknown> {
+  return {
+    id: d.id,
+    organizationId: d.organizationId,
+    webhookSubscriptionId: d.webhookSubscriptionId,
+    phoneNumberId: d.phoneNumberId,
+    eventId: d.eventId,
+    eventType: d.eventType,
+    url: d.url,
+    requestPayload: d.requestPayload,
+    responseStatus: d.responseStatus,
+    responseBody: d.responseBody,
+    errorDetail: d.errorDetail,
+    durationMs: d.durationMs,
+    isReplay: d.isReplay,
+    createdAt: d.createdAt,
+  };
+}
+
+function registerDeliveryCommands(parent: Command): void {
+  const delivery = parent
+    .command("delivery")
+    .description("Inspect the webhook delivery log and replay missed deliveries");
+
+  delivery
+    .command("list")
+    .description("List logged webhook delivery attempts, newest first (filters AND-combine)")
+    .option("--subscription-id <id>", "Filter by the targeted subscription id")
+    .option("--phone-number-id <id>", "Filter by phone number id (incoming-call deliveries)")
+    .option("--event-type <type>", "Filter by event type wire value")
+    .option("--success", "Only deliveries with a 2xx response")
+    .option("--failed", "Only deliveries that failed or got no response")
+    .option("--limit <n>", "Page size (1-200, default 50)", (v) => parseInt(v, 10))
+    .option("--offset <n>", "Row offset for pagination", (v) => parseInt(v, 10))
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          subscriptionId?: string;
+          phoneNumberId?: string;
+          eventType?: string;
+          success?: boolean;
+          failed?: boolean;
+          limit?: number;
+          offset?: number;
+        },
+      ) {
+        if (cmdOpts.success && cmdOpts.failed) {
+          throw new Error("Pass at most one of --success / --failed.");
+        }
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const success = cmdOpts.success
+          ? true
+          : cmdOpts.failed
+            ? false
+            : undefined;
+        const rows = await inkbox.webhooks.deliveries.list({
+          subscriptionId: cmdOpts.subscriptionId,
+          phoneNumberId: cmdOpts.phoneNumberId,
+          eventType: cmdOpts.eventType,
+          success,
+          limit: cmdOpts.limit,
+          offset: cmdOpts.offset,
+        });
+        output(rows.map(flattenDeliveryForOutput), {
+          json: !!opts.json,
+          columns: WEBHOOK_DELIVERY_LIST_COLUMNS,
+        });
+      }),
+    );
+
+  delivery
+    .command("replay <delivery-id>")
+    .description("Re-deliver a logged event to its subscription's current URL")
+    .action(
+      withErrorHandler(async function (this: Command, deliveryId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const row = await inkbox.webhooks.deliveries.replay(deliveryId);
+        output(flattenDeliveryForOutput(row), { json: !!opts.json });
+      }),
+    );
+}
+
 export function registerWebhookCommands(program: Command): void {
   const webhook = program
     .command("webhook")
@@ -224,4 +319,5 @@ export function registerWebhookCommands(program: Command): void {
     );
 
   registerSubscriptionCommands(webhook);
+  registerDeliveryCommands(webhook);
 }

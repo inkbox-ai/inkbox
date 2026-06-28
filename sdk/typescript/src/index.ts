@@ -76,6 +76,11 @@ export type {
   ListWebhookSubscriptionsOptions,
 } from "./webhooks/subscriptions.js";
 export type { WebhookSubscriptionsResource } from "./webhooks/subscriptions.js";
+export type {
+  WebhookDelivery,
+  ListWebhookDeliveriesOptions,
+} from "./webhooks/deliveries.js";
+export type { WebhookDeliveriesResource } from "./webhooks/deliveries.js";
 // Snake_case wire shapes referenced by the webhook payload types above.
 // Re-exported from the root entry because package.json#exports only
 // publishes `"."` and `"./tunnels/connect"` — deep imports of

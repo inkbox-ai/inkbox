@@ -16,6 +16,7 @@ import { DomainsResource } from "./mail/resources/domains.js";
 import { SigningKeysResource } from "./signing_keys.js";
 import type { SigningKey } from "./signing_keys.js";
 import { WebhookSubscriptionsResource } from "./webhooks/subscriptions.js";
+import { WebhookDeliveriesResource } from "./webhooks/deliveries.js";
 import { IMessagesResource } from "./imessage/resources/imessages.js";
 import { IMessageContactRulesResource } from "./imessage/resources/contactRules.js";
 import { PhoneNumbersResource } from "./phone/resources/numbers.js";
@@ -128,7 +129,11 @@ export class Inkbox {
   readonly _domains: DomainsResource;
   readonly _signingKeys: SigningKeysResource;
   readonly _webhookSubscriptions: WebhookSubscriptionsResource;
-  private readonly _webhooks: { readonly subscriptions: WebhookSubscriptionsResource };
+  readonly _webhookDeliveries: WebhookDeliveriesResource;
+  private readonly _webhooks: {
+    readonly subscriptions: WebhookSubscriptionsResource;
+    readonly deliveries: WebhookDeliveriesResource;
+  };
   readonly _numbers: PhoneNumbersResource;
   readonly _calls: CallsResource;
   readonly _texts: TextsResource;
@@ -195,7 +200,11 @@ export class Inkbox {
     this._domains          = new DomainsResource(domainsHttp);
     this._signingKeys      = new SigningKeysResource(apiHttp);
     this._webhookSubscriptions = new WebhookSubscriptionsResource(apiHttp);
-    this._webhooks = Object.freeze({ subscriptions: this._webhookSubscriptions });
+    this._webhookDeliveries = new WebhookDeliveriesResource(apiHttp);
+    this._webhooks = Object.freeze({
+      subscriptions: this._webhookSubscriptions,
+      deliveries: this._webhookDeliveries,
+    });
 
     this._numbers          = new PhoneNumbersResource(phoneHttp);
     this._calls            = new CallsResource(phoneHttp);
@@ -312,14 +321,18 @@ export class Inkbox {
   get apiKeys(): ApiKeysResource { return this._apiKeys; }
 
   /**
-   * Webhook subscription management. Use `inkbox.webhooks.subscriptions`
-   * to attach HTTPS receivers to mail (`message.*`), phone-text
-   * (`text.*`), or iMessage (`imessage.*`) events. Incoming-call
-   * webhooks still live on the phone-number resource
-   * (`incomingCallWebhookUrl`) because the response body controls call
-   * routing.
+   * Webhook subscription management and delivery log. Use
+   * `inkbox.webhooks.subscriptions` to attach HTTPS receivers to mail
+   * (`message.*`), phone-text (`text.*`), or iMessage (`imessage.*`)
+   * events, and `inkbox.webhooks.deliveries` to inspect logged delivery
+   * attempts and replay missed ones. Incoming-call webhooks still live
+   * on the phone-number resource (`incomingCallWebhookUrl`) because the
+   * response body controls call routing.
    */
-  get webhooks(): { readonly subscriptions: WebhookSubscriptionsResource } {
+  get webhooks(): {
+    readonly subscriptions: WebhookSubscriptionsResource;
+    readonly deliveries: WebhookDeliveriesResource;
+  } {
     return this._webhooks;
   }
 
