@@ -49,6 +49,7 @@ from inkbox.phone.resources.texts import TextsResource
 from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.tunnels.resources.tunnels import TunnelsResource
+from inkbox.webhook_deliveries import WebhookDeliveriesResource
 from inkbox.webhook_subscriptions import WebhookSubscriptionsResource
 from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
@@ -67,10 +68,15 @@ class _WebhooksNamespace:
     Single allocation per ``Inkbox`` instance so identity checks
     (``client.webhooks is client.webhooks``) hold.
     """
-    __slots__ = ("subscriptions",)
+    __slots__ = ("subscriptions", "deliveries")
 
-    def __init__(self, subscriptions: WebhookSubscriptionsResource) -> None:
+    def __init__(
+        self,
+        subscriptions: WebhookSubscriptionsResource,
+        deliveries: WebhookDeliveriesResource,
+    ) -> None:
         self.subscriptions = subscriptions
+        self.deliveries = deliveries
 
 
 class Inkbox:
@@ -225,7 +231,11 @@ class Inkbox:
 
         self._signing_keys = SigningKeysResource(self._api_http)
         self._webhook_subscriptions = WebhookSubscriptionsResource(self._api_http)
-        self._webhooks = _WebhooksNamespace(self._webhook_subscriptions)
+        self._webhook_deliveries = WebhookDeliveriesResource(self._api_http)
+        self._webhooks = _WebhooksNamespace(
+            self._webhook_subscriptions,
+            self._webhook_deliveries,
+        )
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
 
@@ -355,13 +365,14 @@ class Inkbox:
 
     @property
     def webhooks(self) -> "_WebhooksNamespace":
-        """Webhook subscription management.
+        """Webhook subscription management and delivery log.
 
         Use ``inkbox.webhooks.subscriptions`` to attach HTTPS receivers
-        to mail (``message.*``) or phone-text (``text.*``) events.
-        Incoming-call webhooks still live on the phone-number resource
-        (``incoming_call_webhook_url``) because the response body
-        controls call routing.
+        to mail (``message.*``) or phone-text (``text.*``) events, and
+        ``inkbox.webhooks.deliveries`` to inspect logged delivery
+        attempts and replay missed ones. Incoming-call webhooks still
+        live on the phone-number resource (``incoming_call_webhook_url``)
+        because the response body controls call routing.
         """
         return self._webhooks
 

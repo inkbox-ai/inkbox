@@ -241,6 +241,12 @@ from inkbox.webhook_subscriptions import (
     WebhookSubscriptionStatus,
 )
 
+# Webhook delivery log + replay
+from inkbox.webhook_deliveries import (
+    WebhookDelivery,
+    WebhookDeliveriesResource,
+)
+
 # API keys
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
@@ -440,6 +446,9 @@ __all__ = [
     "WebhookSubscription",
     "WebhookSubscriptionsResource",
     "WebhookSubscriptionStatus",
+    # Webhook deliveries
+    "WebhookDelivery",
+    "WebhookDeliveriesResource",
     # API keys
     "ApiKey",
     "ApiKeyStatus",

@@ -250,6 +250,10 @@ pub struct MailWebhookData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MailWebhookPayload {
     /// Stable per-event id (`evt_...`); idempotency key, stable across replays.
+    // `serde(default)` so payloads that predate this field (older or
+    // mixed-deployment servers, recorded fixtures) still deserialize instead of
+    // hard-failing on a missing field; an absent id parses to "".
+    #[serde(default)]
     pub id: String,
     pub event_type: MailWebhookEventType,
     pub timestamp: String,
@@ -323,6 +327,10 @@ pub struct TextWebhookData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextWebhookPayload {
     /// Stable per-event id (`evt_...`); idempotency key, stable across replays.
+    // `serde(default)` so payloads that predate this field (older or
+    // mixed-deployment servers, recorded fixtures) still deserialize instead of
+    // hard-failing on a missing field; an absent id parses to "".
+    #[serde(default)]
     pub id: String,
     pub event_type: TextWebhookEventType,
     pub timestamp: String,
@@ -521,6 +529,10 @@ pub struct IMessageWebhookData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IMessageWebhookPayload {
     /// Stable per-event id (`evt_...`); idempotency key, stable across replays.
+    // `serde(default)` so payloads that predate this field (older or
+    // mixed-deployment servers, recorded fixtures) still deserialize instead of
+    // hard-failing on a missing field; an absent id parses to "".
+    #[serde(default)]
     pub id: String,
     pub event_type: IMessageWebhookEventType,
     pub timestamp: String,

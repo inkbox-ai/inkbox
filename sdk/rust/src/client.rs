@@ -44,6 +44,7 @@ use crate::phone::resources::transcripts::TranscriptsResource;
 use crate::signing_keys::{SigningKey, SigningKeysResource};
 use crate::tunnels::resources::tunnels::TunnelsResource;
 use crate::vault::resources::vault::VaultResource;
+use crate::webhooks::deliveries::WebhookDeliveriesResource;
 use crate::webhooks::subscriptions::WebhookSubscriptionsResource;
 use crate::whoami::types::{parse_whoami, WhoamiResponse};
 
@@ -134,6 +135,7 @@ pub struct Inkbox {
     // Org-level
     signing_keys: SigningKeysResource,
     webhook_subscriptions: WebhookSubscriptionsResource,
+    webhook_deliveries: WebhookDeliveriesResource,
     api_keys: ApiKeysResource,
     identities: IdentitiesResource,
     tunnels: TunnelsResource,
@@ -247,6 +249,7 @@ impl Inkbox {
 
             signing_keys: SigningKeysResource::new(api_http.clone()),
             webhook_subscriptions: WebhookSubscriptionsResource::new(api_http.clone()),
+            webhook_deliveries: WebhookDeliveriesResource::new(api_http.clone()),
             api_keys: ApiKeysResource::new(api_http.clone()),
             identities: IdentitiesResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
@@ -333,10 +336,12 @@ impl Inkbox {
         &self.tunnels
     }
 
-    /// Webhook subscription management (`inkbox.webhooks().subscriptions()`).
+    /// Webhook subscription management and delivery log
+    /// (`inkbox.webhooks().subscriptions()` / `inkbox.webhooks().deliveries()`).
     pub fn webhooks(&self) -> WebhooksNamespace<'_> {
         WebhooksNamespace {
             subscriptions: &self.webhook_subscriptions,
+            deliveries: &self.webhook_deliveries,
         }
     }
 
@@ -517,14 +522,20 @@ impl Inkbox {
     }
 }
 
-/// Typed namespace for `inkbox.webhooks().subscriptions()`.
+/// Typed namespace for `inkbox.webhooks().subscriptions()` and
+/// `inkbox.webhooks().deliveries()`.
 pub struct WebhooksNamespace<'a> {
     subscriptions: &'a WebhookSubscriptionsResource,
+    deliveries: &'a WebhookDeliveriesResource,
 }
 
 impl<'a> WebhooksNamespace<'a> {
     pub fn subscriptions(&self) -> &'a WebhookSubscriptionsResource {
         self.subscriptions
+    }
+
+    pub fn deliveries(&self) -> &'a WebhookDeliveriesResource {
+        self.deliveries
     }
 }
 
