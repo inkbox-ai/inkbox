@@ -8,13 +8,13 @@ No ngrok required. The handler runs in-process via `inkbox.tunnels.connect()`; I
 
 1. Python ≥ 3.11
 2. An Inkbox API key (`INKBOX_API_KEY`) from [inkbox.ai/console](https://inkbox.ai/console)
-3. Optional: `INKBOX_WEBHOOK_SIGNING_KEY` — if unset, the example calls `create_signing_key()` which **rotates** the org signing key
+3. Org webhook signing key (`INKBOX_WEBHOOK_SIGNING_KEY`) from the console
 
 ## Run
 
 ```bash
 cp .env.example .env
-# edit .env — set INKBOX_API_KEY
+# edit .env — set INKBOX_API_KEY and INKBOX_WEBHOOK_SIGNING_KEY
 
 cd ../../sdk/python
 uv run --env-file ../../examples/use-inkbox-webhook/.env \
@@ -23,13 +23,23 @@ uv run --env-file ../../examples/use-inkbox-webhook/.env \
 
 ## What it does
 
-1. Creates identity `webhook-email-demo` (mailbox + tunnel provisioned atomically)
-2. Resolves or creates the org webhook signing key
-3. Starts an in-process ASGI app behind `inkbox.tunnels.connect()`
-4. Registers a `message.received` webhook subscription on the identity's mailbox
-5. Sends a probe email to trigger an inbound webhook
-6. Verifies the `X-Inkbox-Signature` header and auto-replies once
-7. Deletes the subscription and identity on exit
+1. Creates a unique identity (`webhook-demo-{suffix}` by default; override base via `INKBOX_AGENT_HANDLE`)
+2. Starts an in-process ASGI app behind `inkbox.tunnels.connect()`
+3. Registers a `message.received` webhook subscription on the identity's mailbox
+4. Sends a probe email to trigger an inbound webhook
+5. Verifies the `X-Inkbox-Signature` header and auto-replies via `reply_all_email()`
+6. Deletes the subscription and identity on exit — including on failures after identity creation
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `INKBOX_API_KEY` | Yes | Console API key |
+| `INKBOX_WEBHOOK_SIGNING_KEY` | Yes* | Org webhook signing key for `verify_webhook()` |
+| `INKBOX_AGENT_HANDLE` | No | Base handle; unique suffix appended automatically |
+| `INKBOX_ROTATE_SIGNING_KEY` | No | Set to `1` to call `create_signing_key()` instead of using an existing key |
+
+\* Omit only when `INKBOX_ROTATE_SIGNING_KEY=1` (rotates the org key — save the new value immediately).
 
 ## Architecture
 
