@@ -18,11 +18,19 @@ cp .env.example .env
 cargo run
 ```
 
+The binary loads `.env` from the current directory via `dotenvy` when present.
+
+Optional: override the handle base (a unique suffix is always appended):
+
+```bash
+INKBOX_AGENT_HANDLE=my-rust-demo cargo run
+```
+
 The example uses a path dependency on `../../sdk/rust`, so no crates.io publish is required.
 
 ## What it does
 
-1. Creates identity `rust-email-demo` (mailbox + tunnel provisioned atomically)
+1. Creates identity `rust-email-demo-{suffix}` (mailbox + tunnel provisioned atomically)
 2. Sends a test email to the identity's own mailbox
 3. Lists recent emails and prints id, subject, from
 4. Fetches the first message body
@@ -31,8 +39,8 @@ The example uses a path dependency on `../../sdk/rust`, so no crates.io publish 
 
 ## Cleanup
 
-Identity deletion runs at the end of a successful run. If the process is interrupted, delete manually:
+Identity deletion runs at the end of a successful run. If the process is interrupted, delete manually (use the handle printed at startup):
 
 ```bash
-inkbox identity delete rust-email-demo
+inkbox identity delete rust-email-demo-<suffix>
 ```
