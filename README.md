@@ -258,6 +258,7 @@ inkbox signup status
 | [`examples/use-inkbox-cli/`](./examples/use-inkbox-cli/) | Shell script examples for CLI automation and CI pipelines |
 | [`examples/use-inkbox-vault/`](./examples/use-inkbox-vault/) | Vault TOTP example — create credentials with one-time codes |
 | [`examples/use-inkbox-signup/`](./examples/use-inkbox-signup/) | Agent self-signup — register without an API key, verify, send welcome email |
+| [`examples/use-inkbox-rust/`](./examples/use-inkbox-rust/) | Rust SDK quickstart — identity, email send/read, cleanup |
 
 ---
 
