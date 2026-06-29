@@ -257,9 +257,13 @@ class AgentIdentitySummary:
     imessage_filter_mode: FilterMode = FilterMode.BLACKLIST
     mail_filter_mode: FilterMode = FilterMode.BLACKLIST
     phone_filter_mode: FilterMode = FilterMode.BLACKLIST
+    # Webhook signing-key status (never the secret itself).
+    signing_key_configured: bool = False
+    signing_key_created_at: datetime | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentIdentitySummary:
+        raw_signing_created_at = d.get("signing_key_created_at")
         return cls(
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
@@ -273,6 +277,12 @@ class AgentIdentitySummary:
             imessage_filter_mode=FilterMode(d.get("imessage_filter_mode") or "blacklist"),
             mail_filter_mode=FilterMode(d.get("mail_filter_mode") or "blacklist"),
             phone_filter_mode=FilterMode(d.get("phone_filter_mode") or "blacklist"),
+            signing_key_configured=d.get("signing_key_configured", False),
+            signing_key_created_at=(
+                datetime.fromisoformat(raw_signing_created_at)
+                if raw_signing_created_at
+                else None
+            ),
         )
 
 

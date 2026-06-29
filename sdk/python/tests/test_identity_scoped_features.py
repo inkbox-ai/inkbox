@@ -319,10 +319,24 @@ class TestAgentIdentityContactRuleDelegation:
             identity.agent_handle, "rid", status="paused",
         )
 
-    def test_phone_rule_requires_phone_number(self):
+    def test_list_phone_contact_rules_without_phone_returns_empty(self):
+        identity, inkbox = _identity_without_phone()
+        inkbox._phone_identity_contact_rules.list.return_value = []
+        # List must not prethrow on a phoneless identity: the server requires a
+        # phone only for create/get/update/delete, not for list.
+        assert identity.list_phone_contact_rules() == []
+        inkbox._phone_identity_contact_rules.list.assert_called_once()
+
+    def test_phone_rule_cgud_requires_phone_number(self):
         identity, _ = _identity_without_phone()
         with pytest.raises(InkboxError, match="no phone number"):
-            identity.list_phone_contact_rules()
+            identity.get_phone_contact_rule("rid")
+        with pytest.raises(InkboxError, match="no phone number"):
+            identity.create_phone_contact_rule(action="block", match_target="+14155550199")
+        with pytest.raises(InkboxError, match="no phone number"):
+            identity.update_phone_contact_rule("rid", status="paused")
+        with pytest.raises(InkboxError, match="no phone number"):
+            identity.delete_phone_contact_rule("rid")
 
     def test_create_phone_contact_rule_delegates(self):
         identity, inkbox = _identity()

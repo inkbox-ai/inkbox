@@ -798,7 +798,8 @@ impl AgentIdentity {
 
     /// List this identity's phone allow/block rules, newest first.
     ///
-    /// Errors if this identity has no phone number.
+    /// Returns `[]` for a phoneless identity; the server requires a phone only
+    /// for create/get/update/delete, not for list.
     pub fn list_phone_contact_rules(
         &self,
         action: Option<PhoneRuleAction>,
@@ -806,7 +807,6 @@ impl AgentIdentity {
         limit: Option<i64>,
         offset: Option<i64>,
     ) -> Result<Vec<PhoneIdentityContactRule>> {
-        self.require_phone()?;
         self.inkbox.phone_identity_contact_rules().list(
             &self.agent_handle(),
             action,
@@ -1131,5 +1131,68 @@ impl std::fmt::Debug for AgentIdentity {
             .field("mailbox", &mailbox)
             .field("phone", &phone)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::identities::types::AgentIdentityData;
+
+    /// Build a phoneless identity backed by a client pointed at an unreachable
+    /// localhost port, so any real request fails fast instead of hanging.
+    fn phoneless_identity() -> AgentIdentity {
+        let data: AgentIdentityData = serde_json::from_value(serde_json::json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "organization_id": "org_x",
+            "agent_handle": "support-bot",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+        }))
+        .unwrap();
+        let inkbox = Inkbox::builder("test-key")
+            .base_url("http://127.0.0.1:1")
+            .build()
+            .unwrap();
+        AgentIdentity::new(data, inkbox)
+    }
+
+    #[test]
+    fn list_phone_contact_rules_does_not_prethrow_without_phone() {
+        let identity = phoneless_identity();
+        // List must not prethrow the phone guard: with no server it surfaces a
+        // transport error, never InvalidArgument("no phone number").
+        if let Err(InkboxError::InvalidArgument(m)) =
+            identity.list_phone_contact_rules(None, None, None, None)
+        {
+            panic!("list prethrew the phone guard: {m}");
+        }
+    }
+
+    #[test]
+    fn phone_rule_cgud_still_requires_phone_number() {
+        let identity = phoneless_identity();
+        let results = [
+            identity.get_phone_contact_rule("rid").err(),
+            identity
+                .create_phone_contact_rule(
+                    PhoneRuleAction::Block,
+                    "+14155550199",
+                    PhoneRuleMatchType::ExactNumber,
+                )
+                .err(),
+            identity
+                .update_phone_contact_rule("rid", Some(PhoneRuleAction::Block), None)
+                .err(),
+            identity.delete_phone_contact_rule("rid").err(),
+        ];
+        for res in results {
+            match res {
+                Some(InkboxError::InvalidArgument(m)) => {
+                    assert!(m.contains("no phone number"), "unexpected message: {m}");
+                }
+                other => panic!("expected phone-required error, got {other:?}"),
+            }
+        }
     }
 }

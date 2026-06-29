@@ -146,6 +146,10 @@ export interface AgentIdentitySummary {
   phoneFilterMode: FilterMode;
   createdAt: Date;
   updatedAt: Date;
+  /** Whether this identity has a webhook signing key configured. Status only — never the secret. */
+  signingKeyConfigured: boolean;
+  /** When the signing key was created, or `null` if none is configured. */
+  signingKeyCreatedAt: Date | null;
 }
 
 /** @internal Full identity data with channels — users interact with AgentIdentity (the class) instead. */
@@ -218,6 +222,8 @@ export interface RawAgentIdentitySummary {
   imessage_filter_mode?: string | null;
   mail_filter_mode?: string | null;
   phone_filter_mode?: string | null;
+  signing_key_configured?: boolean;
+  signing_key_created_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -290,6 +296,8 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     phoneFilterMode: (r.phone_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+    signingKeyConfigured: r.signing_key_configured ?? false,
+    signingKeyCreatedAt: r.signing_key_created_at ? new Date(r.signing_key_created_at) : null,
   };
 }
 

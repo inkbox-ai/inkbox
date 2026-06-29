@@ -369,6 +369,13 @@ pub struct AgentIdentitySummary {
     /// Defaults to `blacklist` when absent.
     #[serde(default = "default_filter_mode_blacklist")]
     pub phone_filter_mode: FilterMode,
+    /// Whether this identity has a webhook signing key configured. Status only,
+    /// never the secret. Defaults to `false` when the server omits the field.
+    #[serde(default)]
+    pub signing_key_configured: bool,
+    /// When the signing key was created, or `None` if none is configured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signing_key_created_at: Option<String>,
 }
 
 /// Agent identity with linked communication channels and tunnel.

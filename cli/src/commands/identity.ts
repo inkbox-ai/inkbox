@@ -462,6 +462,8 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            signingKeyConfigured: id.signingKeyConfigured,
+            signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
@@ -705,6 +707,8 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            signingKeyConfigured: id.signingKeyConfigured,
+            signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,

@@ -106,6 +106,12 @@ export class AgentIdentity {
   /** Whitelist/blacklist mode for this identity's phone contact rules. */
   get phoneFilterMode(): FilterMode { return this._data.phoneFilterMode; }
 
+  /** Whether this identity has a webhook signing key configured. Status only — never the secret. */
+  get signingKeyConfigured(): boolean { return this._data.signingKeyConfigured; }
+
+  /** When this identity's signing key was created, or `null` if none is configured. */
+  get signingKeyCreatedAt(): Date | null { return this._data.signingKeyCreatedAt; }
+
   /** The mailbox currently assigned to this identity. Non-null for live identities (1:1 invariant). */
   get mailbox(): IdentityMailbox | null { return this._mailbox; }
 
@@ -896,12 +902,12 @@ export class AgentIdentity {
   /**
    * List this identity's phone allow/block rules, newest first.
    *
-   * @throws {InkboxError} if this identity has no phone number.
+   * Returns `[]` for a phoneless identity; the server requires a phone only
+   * for create/get/update/delete, not for list.
    */
   async listPhoneContactRules(
     options: ListPhoneIdentityContactRulesOptions = {},
   ): Promise<PhoneIdentityContactRule[]> {
-    this._requirePhone();
     return this._inkbox._phoneIdentityContactRules.list(this.agentHandle, options);
   }
 

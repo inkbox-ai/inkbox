@@ -24,6 +24,23 @@ describe("parseAgentIdentitySummary", () => {
     expect(i.createdAt).toBeInstanceOf(Date);
     expect(i.updatedAt).toBeInstanceOf(Date);
   });
+
+  it("parses signing-key status fields", () => {
+    const i = parseAgentIdentitySummary({
+      ...RAW_IDENTITY,
+      signing_key_configured: true,
+      signing_key_created_at: "2026-06-02T03:04:05Z",
+    });
+    expect(i.signingKeyConfigured).toBe(true);
+    expect(i.signingKeyCreatedAt).toBeInstanceOf(Date);
+    expect(i.signingKeyCreatedAt!.toISOString()).toBe("2026-06-02T03:04:05.000Z");
+  });
+
+  it("defaults signing-key status when absent", () => {
+    const i = parseAgentIdentitySummary(RAW_IDENTITY);
+    expect(i.signingKeyConfigured).toBe(false);
+    expect(i.signingKeyCreatedAt).toBeNull();
+  });
 });
 
 describe("parseAgentIdentityData", () => {

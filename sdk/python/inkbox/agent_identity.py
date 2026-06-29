@@ -63,6 +63,8 @@ from inkbox.phone.types import (
 from inkbox.signing_keys import SigningKey, SigningKeyStatus
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from inkbox.client import Inkbox
 
 # `_UNSET` is imported from inkbox.identities.types above. Identity-based
@@ -148,6 +150,16 @@ class AgentIdentity:
     def phone_filter_mode(self) -> FilterMode:
         """Whitelist/blacklist mode for this identity's phone contact rules."""
         return self._data.phone_filter_mode
+
+    @property
+    def signing_key_configured(self) -> bool:
+        """Whether this identity has a webhook signing key configured (status only)."""
+        return self._data.signing_key_configured
+
+    @property
+    def signing_key_created_at(self) -> datetime | None:
+        """When this identity's signing key was created, or ``None`` if unset."""
+        return self._data.signing_key_created_at
 
     @property
     def mailbox(self) -> IdentityMailbox | None:
@@ -1076,9 +1088,9 @@ class AgentIdentity:
     ) -> list[PhoneIdentityContactRule]:
         """List this identity's phone allow/block rules, newest first.
 
-        Raises ``InkboxError`` if this identity has no phone number.
+        Returns ``[]`` for a phoneless identity; the server requires a phone
+        only for create/get/update/delete, not for list.
         """
-        self._require_phone()
         return self._inkbox._phone_identity_contact_rules.list(
             self.agent_handle,
             action=action,

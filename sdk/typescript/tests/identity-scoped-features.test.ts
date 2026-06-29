@@ -482,18 +482,35 @@ describe("AgentIdentity contact-rule delegation", () => {
     );
   });
 
-  it("phone contact-rule methods throw when the identity has no phone number", async () => {
+  it("listPhoneContactRules returns [] for a phoneless identity (no prethrow)", async () => {
+    const { identity, inkbox } = identityWithoutPhone();
+    vi.mocked(inkbox._phoneIdentityContactRules.list).mockResolvedValue([]);
+
+    // List must not prethrow: the server requires a phone only for
+    // create/get/update/delete, not for list.
+    await expect(identity.listPhoneContactRules()).resolves.toEqual([]);
+    expect(inkbox._phoneIdentityContactRules.list).toHaveBeenCalledWith(
+      identity.agentHandle,
+      {},
+    );
+  });
+
+  it("create/get/update/delete phone contact-rule methods throw when no phone number", async () => {
     const { identity, inkbox } = identityWithoutPhone();
 
-    await expect(identity.listPhoneContactRules()).rejects.toThrow(InkboxError);
     await expect(
       identity.createPhoneContactRule({
         action: PhoneRuleAction.BLOCK,
         matchTarget: "+14155550199",
       }),
     ).rejects.toThrow(/no phone number/);
-    expect(inkbox._phoneIdentityContactRules.list).not.toHaveBeenCalled();
+    await expect(identity.getPhoneContactRule("rid")).rejects.toThrow(InkboxError);
+    await expect(
+      identity.updatePhoneContactRule("rid", { status: ContactRuleStatus.PAUSED }),
+    ).rejects.toThrow(InkboxError);
+    await expect(identity.deletePhoneContactRule("rid")).rejects.toThrow(InkboxError);
     expect(inkbox._phoneIdentityContactRules.create).not.toHaveBeenCalled();
+    expect(inkbox._phoneIdentityContactRules.get).not.toHaveBeenCalled();
   });
 });
 

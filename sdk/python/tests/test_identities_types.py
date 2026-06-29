@@ -4,7 +4,7 @@ sdk/python/tests/test_identities_types.py
 Tests for identities type parsing.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sample_data_identities import (
@@ -159,3 +159,39 @@ class TestIdentityIMessageFields:
         summary = AgentIdentitySummary._from_dict(d)
         assert summary.imessage_enabled is False
         assert summary.imessage_filter_mode is FilterMode.BLACKLIST
+
+
+class TestIdentitySigningKeyStatusFields:
+    def test_summary_parses_signing_key_status(self):
+        d = {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "organization_id": "org_x",
+            "agent_handle": "support-bot",
+            "display_name": None,
+            "description": None,
+            "email_address": None,
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+            "signing_key_configured": True,
+            "signing_key_created_at": "2026-06-02T03:04:05+00:00",
+        }
+        summary = AgentIdentitySummary._from_dict(d)
+        assert summary.signing_key_configured is True
+        assert summary.signing_key_created_at == datetime(
+            2026, 6, 2, 3, 4, 5, tzinfo=timezone.utc,
+        )
+
+    def test_summary_defaults_signing_key_status_when_absent(self):
+        d = {
+            "id": "11111111-1111-1111-1111-111111111111",
+            "organization_id": "org_x",
+            "agent_handle": "support-bot",
+            "display_name": None,
+            "description": None,
+            "email_address": None,
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+        }
+        summary = AgentIdentitySummary._from_dict(d)
+        assert summary.signing_key_configured is False
+        assert summary.signing_key_created_at is None
