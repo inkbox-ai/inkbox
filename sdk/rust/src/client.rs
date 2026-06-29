@@ -31,12 +31,14 @@ use crate::imessage::resources::contact_rules::IMessageContactRulesResource;
 use crate::imessage::resources::imessages::IMessagesResource;
 use crate::mail::resources::contact_rules::MailContactRulesResource;
 use crate::mail::resources::domains::DomainsResource;
+use crate::mail::resources::identity_contact_rules::MailIdentityContactRulesResource;
 use crate::mail::resources::mailboxes::MailboxesResource;
 use crate::mail::resources::messages::MessagesResource;
 use crate::mail::resources::threads::ThreadsResource;
 use crate::notes::resources::notes::NotesResource;
 use crate::phone::resources::calls::CallsResource;
 use crate::phone::resources::contact_rules::PhoneContactRulesResource;
+use crate::phone::resources::identity_contact_rules::PhoneIdentityContactRulesResource;
 use crate::phone::resources::numbers::PhoneNumbersResource;
 use crate::phone::resources::sms_opt_ins::SmsOptInsResource;
 use crate::phone::resources::texts::TextsResource;
@@ -122,6 +124,10 @@ pub struct Inkbox {
     transcripts: TranscriptsResource,
     phone_contact_rules: PhoneContactRulesResource,
     sms_opt_ins: SmsOptInsResource,
+
+    // Identity-keyed contact rules (forward-looking; ride the api-root transport).
+    mail_identity_contact_rules: MailIdentityContactRulesResource,
+    phone_identity_contact_rules: PhoneIdentityContactRulesResource,
 
     // iMessage
     imessages: IMessagesResource,
@@ -240,6 +246,12 @@ impl Inkbox {
             phone_contact_rules: PhoneContactRulesResource::new(phone_http.clone()),
             sms_opt_ins: SmsOptInsResource::new(phone_http.clone()),
 
+            // Identity-keyed contact rules ride the api-root transport (base
+            // /api/v1) so they reach both /identities/{handle}/...-contact-rules
+            // and the org-wide /mail|/phone/contact-rules with full paths.
+            mail_identity_contact_rules: MailIdentityContactRulesResource::new(api_http.clone()),
+            phone_identity_contact_rules: PhoneIdentityContactRulesResource::new(api_http.clone()),
+
             imessages: IMessagesResource::new(imessage_http.clone()),
             imessage_contact_rules: IMessageContactRulesResource::new(imessage_http.clone()),
 
@@ -283,6 +295,13 @@ impl Inkbox {
     pub fn threads(&self) -> &ThreadsResource {
         &self.threads
     }
+    /// Mail per-mailbox allow/block rules (+ org-wide list).
+    ///
+    /// Deprecated: contact rules are now keyed by agent identity — use
+    /// [`Self::mail_identity_contact_rules`] (or the `identity.*_mail_contact_rule`
+    /// helpers).
+    #[deprecated(note = "Contact rules are now keyed by agent identity. Use \
+                mail_identity_contact_rules() or identity.*_mail_contact_rule().")]
     pub fn mail_contact_rules(&self) -> &MailContactRulesResource {
         &self.mail_contact_rules
     }
@@ -302,11 +321,34 @@ impl Inkbox {
     pub fn transcripts(&self) -> &TranscriptsResource {
         &self.transcripts
     }
+    /// Phone per-number allow/block rules (+ org-wide list).
+    ///
+    /// Deprecated: contact rules are now keyed by agent identity — use
+    /// [`Self::phone_identity_contact_rules`] (or the
+    /// `identity.*_phone_contact_rule` helpers).
+    #[deprecated(note = "Contact rules are now keyed by agent identity. Use \
+                phone_identity_contact_rules() or identity.*_phone_contact_rule().")]
     pub fn phone_contact_rules(&self) -> &PhoneContactRulesResource {
         &self.phone_contact_rules
     }
     pub fn sms_opt_ins(&self) -> &SmsOptInsResource {
         &self.sms_opt_ins
+    }
+
+    /// Mail per-identity allow/block rules (+ org-wide list), keyed by
+    /// `agent_handle`.
+    pub fn mail_identity_contact_rules(&self) -> &MailIdentityContactRulesResource {
+        &self.mail_identity_contact_rules
+    }
+    /// Phone per-identity allow/block rules (+ org-wide list), keyed by
+    /// `agent_handle`.
+    pub fn phone_identity_contact_rules(&self) -> &PhoneIdentityContactRulesResource {
+        &self.phone_identity_contact_rules
+    }
+
+    /// Webhook signing key management (per-identity create/rotate/status).
+    pub fn signing_keys(&self) -> &SigningKeysResource {
+        &self.signing_keys
     }
 
     pub fn imessages(&self) -> &IMessagesResource {
@@ -422,10 +464,20 @@ impl Inkbox {
         parse_whoami(data)
     }
 
-    /// Create or rotate the org-level webhook signing key. The plaintext key is
-    /// returned once — save it immediately.
+    /// Create or rotate a webhook signing key via the deprecated org-level
+    /// endpoint. The plaintext key is returned once — save it immediately.
+    ///
+    /// Deprecated: signing keys are now per agent identity. Prefer
+    /// `identity.create_signing_key()` (or
+    /// `inkbox.signing_keys().create_or_rotate(agent_handle)`). With an
+    /// agent-scoped API key this rotates that key's identity; with an admin key
+    /// the server returns 409 ([`InkboxError::Api`]).
+    #[deprecated(note = "Signing keys are now per agent identity. Use \
+                identity.create_signing_key() or \
+                signing_keys().create_or_rotate(agent_handle).")]
     pub fn create_signing_key(&self) -> Result<SigningKey> {
-        self.signing_keys.create_or_rotate()
+        #[allow(deprecated)]
+        self.signing_keys.create_or_rotate_org()
     }
 
     // ----- Agent signup (associated functions — no client instance needed) ---

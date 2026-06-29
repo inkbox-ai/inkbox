@@ -132,8 +132,24 @@ export interface AgentIdentitySummary {
   imessageEnabled: boolean;
   /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
   imessageFilterMode: FilterMode;
+  /**
+   * Whitelist/blacklist mode for this identity's mail contact rules. Lives
+   * on the identity (set via `identity.update(...)`); the same field on the
+   * mailbox object is the deprecated legacy mirror.
+   */
+  mailFilterMode: FilterMode;
+  /**
+   * Whitelist/blacklist mode for this identity's phone contact rules. Lives
+   * on the identity (set via `identity.update(...)`); the same field on the
+   * phone-number object is the deprecated legacy mirror.
+   */
+  phoneFilterMode: FilterMode;
   createdAt: Date;
   updatedAt: Date;
+  /** Whether this identity has a webhook signing key configured. Status only — never the secret. */
+  signingKeyConfigured: boolean;
+  /** When the signing key was created, or `null` if none is configured. */
+  signingKeyCreatedAt: Date | null;
 }
 
 /** @internal Full identity data with channels — users interact with AgentIdentity (the class) instead. */
@@ -204,6 +220,10 @@ export interface RawAgentIdentitySummary {
   email_address: string | null;
   imessage_enabled?: boolean;
   imessage_filter_mode?: string | null;
+  mail_filter_mode?: string | null;
+  phone_filter_mode?: string | null;
+  signing_key_configured?: boolean;
+  signing_key_created_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -272,8 +292,12 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     emailAddress: r.email_address,
     imessageEnabled: r.imessage_enabled ?? false,
     imessageFilterMode: (r.imessage_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    mailFilterMode: (r.mail_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    phoneFilterMode: (r.phone_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+    signingKeyConfigured: r.signing_key_configured ?? false,
+    signingKeyCreatedAt: r.signing_key_created_at ? new Date(r.signing_key_created_at) : null,
   };
 }
 

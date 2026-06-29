@@ -373,10 +373,34 @@ pub struct ThreadDetail {
 }
 
 /// An inbound/outbound allow/block rule scoped to a mailbox.
+///
+/// Returned by the **legacy** per-mailbox routes
+/// ([`crate::mail::resources::contact_rules::MailContactRulesResource`]). The
+/// forward-looking, identity-keyed shape is [`MailIdentityContactRule`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MailContactRule {
     pub id: Uuid,
     pub mailbox_id: Uuid,
+    pub action: MailRuleAction,
+    pub match_type: MailRuleMatchType,
+    pub match_target: String,
+    /// Defaults to `Active` when the server omits the field.
+    #[serde(default = "default_contact_rule_status")]
+    pub status: ContactRuleStatus,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// A mail allow/block rule scoped to an **agent identity**.
+///
+/// Returned by the identity-keyed routes
+/// ([`crate::mail::resources::identity_contact_rules::MailIdentityContactRulesResource`]
+/// / `identity.list_mail_contact_rules()`). Same shape as [`MailContactRule`]
+/// but keyed by `agent_identity_id` instead of `mailbox_id`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailIdentityContactRule {
+    pub id: Uuid,
+    pub agent_identity_id: Uuid,
     pub action: MailRuleAction,
     pub match_type: MailRuleMatchType,
     pub match_target: String,

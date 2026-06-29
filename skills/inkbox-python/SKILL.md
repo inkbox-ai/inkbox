@@ -37,22 +37,29 @@ Inkbox (admin-only client)
 ├── .texts                    → TextsResource
 ├── .imessages                → IMessagesResource
 ├── .imessage_contact_rules   → IMessageContactRulesResource
-├── .mail_contact_rules       → MailContactRulesResource
-├── .phone_contact_rules      → PhoneContactRulesResource
+├── .mail_identity_contact_rules  → MailIdentityContactRulesResource   (keyed by agent_handle)
+├── .phone_identity_contact_rules → PhoneIdentityContactRulesResource  (keyed by agent_handle)
+├── .signing_keys             → SigningKeysResource  (per-identity: create_or_rotate/get_status)
+├── .mail_contact_rules       → MailContactRulesResource   (DEPRECATED — per-mailbox)
+├── .phone_contact_rules      → PhoneContactRulesResource  (DEPRECATED — per-number)
 ├── .sms_opt_ins              → SmsOptInsResource
 ├── .contacts                 → ContactsResource  (.access, .vcards)
 ├── .notes                    → NotesResource     (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → WhoamiResponse
-└── .create_signing_key()     → SigningKey
+└── .create_signing_key()     → SigningKey  (DEPRECATED — org-level; use .signing_keys)
 
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                 → IdentityMailbox | None
 ├── .phone_number            → IdentityPhoneNumber | None
+├── .mail_filter_mode / .phone_filter_mode → FilterMode
 ├── .credentials             → Credentials  (requires vault unlocked)
 ├── .list_access()           → list[IdentityAccess]
 ├── .grant_access(viewer_id|None) → IdentityAccess
 ├── .revoke_access(viewer_id) → None
+├── .list_mail_contact_rules() / .create_mail_contact_rule(...) / .get_/.update_/.delete_
+├── .list_phone_contact_rules() / .create_phone_contact_rule(...) / ...  (requires phone number)
+├── .get_signing_key_status() / .create_signing_key()
 ├── mail methods             (requires assigned mailbox)
 ├── phone methods            (requires assigned phone number)
 └── text methods             (requires assigned phone number)
@@ -557,7 +564,9 @@ mailbox   = inkbox.mailboxes.get("abc@inkboxmail.com")
 # mailbox PATCH endpoint hard-rejects `display_name` with a 422. To
 # attach a webhook receiver, see "Webhooks" below.
 
-# Switch contact-rule filter mode (admin-only — agent-scoped keys get 403)
+# DEPRECATED channel path — the mail filter mode now lives on the identity.
+# Prefer `identity.update(mail_filter_mode="whitelist")` (which does NOT return
+# a change notice). This legacy mailbox flip still works and still returns one:
 updated = inkbox.mailboxes.update(mailbox.email_address, filter_mode="whitelist")
 if updated.filter_mode_change_notice:
     # Populated when filter_mode actually changed — tells you how many
@@ -622,11 +631,11 @@ hits = inkbox.phone_numbers.search_transcripts(number.id, q="refund", party="rem
 inkbox.phone_numbers.release(number.id)
 ```
 
-Phone numbers carry the same `filter_mode` / `agent_identity_id` / `filter_mode_change_notice` fields as mailboxes; flipping `filter_mode` is admin-only and returns a change-notice when the value actually changed.
+Phone numbers carry the same `filter_mode` / `agent_identity_id` / `filter_mode_change_notice` fields as mailboxes; flipping `filter_mode` here is the **deprecated** channel path (admin-only; returns a change-notice when the value actually changed). Prefer `identity.update(phone_filter_mode="whitelist")`, which sets the mode on the identity and does not return a change notice.
 
 ## Contact Rules
 
-Per-mailbox or per-phone-number allow/block lists, enforced server-side. The active `filter_mode` on the owning resource controls whether the rules are interpreted as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number.
+Allow/block lists are scoped to the **agent identity** (mirroring iMessage), addressed by `agent_handle`. The identity's `mail_filter_mode` / `phone_filter_mode` decides whether each channel's rules act as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number. Returned rows are `MailIdentityContactRule` / `PhoneIdentityContactRule`, keyed by `rule.agent_identity_id` (not a mailbox/phone-number id).
 
 ```python
 from inkbox import (
@@ -634,40 +643,73 @@ from inkbox import (
     DuplicateContactRuleError,
 )
 
-# Mail rules — scoped to a single mailbox. New rules always start active;
-# call `update(..., status="paused")` afterwards to pause one.
-rule = inkbox.mail_contact_rules.create(
-    mailbox.email_address,
+identity = inkbox.get_identity("sales-agent")
+
+# Mail rules via the identity convenience methods. New rules always start
+# active; call `update(..., status="paused")` afterwards to pause one.
+rule = identity.create_mail_contact_rule(
     action=MailRuleAction.ALLOW,         # or BLOCK
     match_type=MailRuleMatchType.DOMAIN, # or EXACT_EMAIL
     match_target="example.com",
 )
-inkbox.mail_contact_rules.list(mailbox.email_address)
-inkbox.mail_contact_rules.get(mailbox.email_address, rule.id)
-inkbox.mail_contact_rules.update(mailbox.email_address, rule.id, status="paused")  # admin-only
-inkbox.mail_contact_rules.delete(mailbox.email_address, rule.id)                   # admin-only
-
-# Admin-only list; optionally narrow to a single mailbox_id
-all_rules = inkbox.mail_contact_rules.list_all(mailbox_id=str(mailbox.id))
-
-# Duplicate (match_type, match_target) on the same mailbox raises 409:
-try:
-    inkbox.mail_contact_rules.create(
-        mailbox.email_address,
-        action="allow", match_type="domain", match_target="example.com",
-    )
-except DuplicateContactRuleError as e:
-    print(e.existing_rule_id)   # UUID of the rule that already matched
+identity.list_mail_contact_rules()
+identity.get_mail_contact_rule(rule.id)
+identity.update_mail_contact_rule(rule.id, status="paused")  # admin-only
+identity.delete_mail_contact_rule(rule.id)                   # admin-only
 
 # Phone rules — same shape, only match_type="exact_number" is supported.
-inkbox.phone_contact_rules.create(
-    number.id,
+# Phone helpers require the identity to have a phone number (else InkboxError).
+identity.create_phone_contact_rule(
     action=PhoneRuleAction.BLOCK,
-    match_type=PhoneRuleMatchType.EXACT_NUMBER,
     match_target="+15551234567",
+    match_type=PhoneRuleMatchType.EXACT_NUMBER,
 )
-inkbox.phone_contact_rules.list(number.id)
-inkbox.phone_contact_rules.list_all(phone_number_id=str(number.id))
+identity.list_phone_contact_rules()
+
+# Equivalent org-level resources, keyed by agent_handle, with an org-wide list_all:
+inkbox.mail_identity_contact_rules.create(
+    "sales-agent", action="allow", match_type="domain", match_target="example.com",
+)
+inkbox.mail_identity_contact_rules.list("sales-agent")
+inkbox.mail_identity_contact_rules.list_all(agent_identity_id=str(identity.id))  # admin-only, org-wide
+inkbox.phone_identity_contact_rules.list_all()                                   # admin-only, org-wide
+
+# Duplicate (match_type, match_target) on the same identity raises 409:
+try:
+    identity.create_mail_contact_rule(action="allow", match_type="domain", match_target="example.com")
+except DuplicateContactRuleError as e:
+    print(e.existing_rule_id)   # UUID of the rule that already matched
+```
+
+### Filter mode
+
+The whitelist/blacklist mode lives on the identity. Flip it with `identity.update`
+(admin-only). Unlike the deprecated channel update, this does **not** return a
+`FilterModeChangeNotice`. `phone_filter_mode` requires the identity to have a phone
+number (else a 422).
+
+```python
+identity.update(mail_filter_mode="whitelist", phone_filter_mode="blacklist")
+print(identity.mail_filter_mode, identity.phone_filter_mode)
+```
+
+### Deprecated: per-mailbox / per-number rules
+
+The legacy per-mailbox `inkbox.mail_contact_rules` and per-number
+`inkbox.phone_contact_rules` resources still work but hit deprecated server routes
+(Sunset 2026-08-31). Prefer the identity-keyed surface above.
+
+```python
+# Deprecated — per-mailbox mail rule:
+inkbox.mail_contact_rules.create(
+    mailbox.email_address,
+    action="allow", match_type="domain", match_target="example.com",
+)
+inkbox.mail_contact_rules.list_all(mailbox_id=str(mailbox.id))
+# Deprecated — per-number phone rule:
+inkbox.phone_contact_rules.create(
+    number.id, action="block", match_type="exact_number", match_target="+15551234567",
+)
 ```
 
 ## Contacts
@@ -832,8 +874,15 @@ from inkbox import (
     MailWebhookPayload, TextWebhookPayload, PhoneIncomingCallWebhookPayload,
 )
 
-# Rotate signing key (plaintext returned once — save it)
-key = inkbox.create_signing_key()
+# Each agent identity has its own webhook signing key. Create/rotate it
+# (plaintext returned once — save it), or read its status:
+key = identity.create_signing_key()                        # → SigningKey
+status = identity.get_signing_key_status()                 # → SigningKeyStatus(configured, created_at)
+# Org-level resource, keyed by agent_handle:
+key = inkbox.signing_keys.create_or_rotate("sales-agent")
+status = inkbox.signing_keys.get_status("sales-agent")
+# DEPRECATED: org-level inkbox.create_signing_key() — with an agent-scoped key it
+# still rotates that identity's key; with an admin key the server returns 409.
 
 # Verify, then parse + discriminate
 if not verify_webhook(payload=raw_body, headers=request.headers, secret="whsec_..."):
@@ -854,6 +903,17 @@ Algorithm: HMAC-SHA256 over `"{request_id}.{timestamp}.{body}"`.
 - **Inbound call** (flat, synchronous) — `PhoneIncomingCallWebhookPayload` on a phone number's `incoming_call_webhook_url`. Not subscribable; the URL stays on the phone-number resource because the response (`action: "answer" | "reject"` + optional `client_websocket_url`) decides the call's fate. Non-200, invalid bodies, and timeouts are treated as "decline routing" by Inkbox.
 
 **Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox, phone number, **or** agent identity), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, `message.` / `text.` / `imessage.` prefix matching the owner's channel) so most shape mistakes surface as `ValueError` before the request leaves the client. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
+
+`create(...)` returns a `WebhookSubscriptionCreateResponse`. The **first** subscription created for an identity that has no signing key yet carries that identity's `signing_key` **once** (otherwise `None`) — capture it then, it cannot be retrieved again. Every subscription (read or created) also carries `owner_identity_id`, the resolved owning agent identity (mail/phone/iMessage).
+
+```python
+created = inkbox.webhooks.subscriptions.create(
+    mailbox_id=str(mailbox.id), url="https://example.com/hook", event_types=["message.received"],
+)
+print(created.owner_identity_id)
+if created.signing_key:                # populated once if the identity had no key yet
+    save_secret(created.signing_key)
+```
 
 **Mail contact / identity resolution:** `data["contacts"]` and `data["agent_identities"]` are lists of `{"bucket", "address", "id", ...}` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)`. Outbound payloads also carry `data["message"]["bcc_addresses"]` (`None` on inbound, since BCC is not visible to recipients).
 

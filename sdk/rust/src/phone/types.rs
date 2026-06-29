@@ -417,10 +417,34 @@ pub struct SmsOptIn {
 }
 
 /// An inbound/outbound allow/block rule scoped to a phone number.
+///
+/// Returned by the **legacy** per-number routes
+/// ([`crate::phone::resources::contact_rules::PhoneContactRulesResource`]). The
+/// forward-looking, identity-keyed shape is [`PhoneIdentityContactRule`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoneContactRule {
     pub id: Uuid,
     pub phone_number_id: Uuid,
+    pub action: PhoneRuleAction,
+    pub match_type: PhoneRuleMatchType,
+    pub match_target: String,
+    /// Defaults to `active` when absent.
+    #[serde(default = "default_contact_rule_status_active")]
+    pub status: ContactRuleStatus,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// A phone allow/block rule scoped to an **agent identity** (voice + SMS).
+///
+/// Returned by the identity-keyed routes
+/// ([`crate::phone::resources::identity_contact_rules::PhoneIdentityContactRulesResource`]
+/// / `identity.list_phone_contact_rules()`). Same shape as [`PhoneContactRule`]
+/// but keyed by `agent_identity_id` instead of `phone_number_id`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhoneIdentityContactRule {
+    pub id: Uuid,
+    pub agent_identity_id: Uuid,
     pub action: PhoneRuleAction,
     pub match_type: PhoneRuleMatchType,
     pub match_target: String,

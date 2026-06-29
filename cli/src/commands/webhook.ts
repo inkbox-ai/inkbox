@@ -3,7 +3,11 @@ import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import { verifyWebhook } from "@inkbox/sdk";
-import type { WebhookSubscription, WebhookDelivery } from "@inkbox/sdk";
+import type {
+  WebhookSubscription,
+  WebhookSubscriptionCreateResponse,
+  WebhookDelivery,
+} from "@inkbox/sdk";
 
 const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "id",
@@ -29,6 +33,31 @@ function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
     createdAt: sub.createdAt,
     updatedAt: sub.updatedAt,
   };
+}
+
+// Create-only display shape: surfaces the one-time plaintext signingKey and the
+// resolved ownerIdentityId, which flattenForOutput drops. signingKey is shown
+// only on the first create that mints the owning identity's key.
+export function flattenCreateForOutput(
+  row: WebhookSubscriptionCreateResponse,
+): Record<string, unknown> {
+  return {
+    ...flattenForOutput(row),
+    ownerIdentityId: row.ownerIdentityId,
+    signingKey: row.signingKey,
+  };
+}
+
+// --json preserves the SDK response shape (eventTypes stays an array) so the
+// one-time signingKey/ownerIdentityId survive; human output uses the flattened
+// create shape. Either way the plaintext signingKey is never dropped.
+export function buildCreateOutput(
+  row: WebhookSubscriptionCreateResponse,
+  json: boolean,
+): { data: unknown; json: boolean } {
+  return json
+    ? { data: row, json: true }
+    : { data: flattenCreateForOutput(row), json: false };
 }
 
 function registerSubscriptionCommands(parent: Command): void {
@@ -119,7 +148,8 @@ function registerSubscriptionCommands(parent: Command): void {
           url: cmdOpts.url,
           eventTypes: cmdOpts.eventType,
         });
-        output(flattenForOutput(row), { json: !!opts.json });
+        const { data, json } = buildCreateOutput(row, !!opts.json);
+        output(data, { json });
       }),
     );
 

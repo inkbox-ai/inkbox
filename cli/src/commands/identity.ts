@@ -2,8 +2,24 @@ import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
-import type { SecretPayload } from "@inkbox/sdk";
+import type {
+  SecretPayload,
+  MailRuleAction,
+  MailRuleMatchType,
+  PhoneRuleAction,
+  PhoneRuleMatchType,
+  ContactRuleStatus,
+} from "@inkbox/sdk";
 import { parseTotpUri } from "@inkbox/sdk";
+
+const RULE_COLUMNS = [
+  "id",
+  "agentIdentityId",
+  "action",
+  "matchType",
+  "matchTarget",
+  "status",
+];
 
 function registerIdentityAccessCommands(parent: Command): void {
   const access = parent
@@ -101,6 +117,311 @@ function registerIdentityAccessCommands(parent: Command): void {
     );
 }
 
+function registerIdentityMailRuleCommands(parent: Command): void {
+  const rules = parent
+    .command("mail-rules")
+    .description("Mail contact rules scoped to an agent identity");
+
+  rules
+    .command("list <handle>")
+    .description("List an identity's mail contact rules")
+    .option("--action <action>", "Filter by action: allow or block")
+    .option("--match-type <type>", "Filter by match_type: exact_email or domain")
+    .option("--limit <n>", "Max rows", (v) => parseInt(v, 10))
+    .option("--offset <n>", "Offset", (v) => parseInt(v, 10))
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { action?: string; matchType?: string; limit?: number; offset?: number },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rows = await inkbox.mailIdentityContactRules.list(handle, {
+          action: cmdOpts.action as MailRuleAction | undefined,
+          matchType: cmdOpts.matchType as MailRuleMatchType | undefined,
+          limit: cmdOpts.limit,
+          offset: cmdOpts.offset,
+        });
+        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+      }),
+    );
+
+  rules
+    .command("list-all")
+    .description("List mail contact rules across the org (admin-only)")
+    .option("--agent-identity-id <id>", "Narrow to a single agent identity id")
+    .option("--action <action>", "Filter by action: allow or block")
+    .option("--match-type <type>", "Filter by match_type: exact_email or domain")
+    .option("--limit <n>", "Max rows", (v) => parseInt(v, 10))
+    .option("--offset <n>", "Offset", (v) => parseInt(v, 10))
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          agentIdentityId?: string;
+          action?: string;
+          matchType?: string;
+          limit?: number;
+          offset?: number;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rows = await inkbox.mailIdentityContactRules.listAll({
+          agentIdentityId: cmdOpts.agentIdentityId,
+          action: cmdOpts.action as MailRuleAction | undefined,
+          matchType: cmdOpts.matchType as MailRuleMatchType | undefined,
+          limit: cmdOpts.limit,
+          offset: cmdOpts.offset,
+        });
+        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+      }),
+    );
+
+  rules
+    .command("get <handle> <rule-id>")
+    .description("Get a single mail contact rule")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string, ruleId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rule = await inkbox.mailIdentityContactRules.get(handle, ruleId);
+        output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  rules
+    .command("create <handle>")
+    .description("Create a mail contact rule (always starts active; use `update` to pause)")
+    .requiredOption("--action <action>", "allow or block")
+    .requiredOption("--match-type <type>", "exact_email or domain")
+    .requiredOption("--match-target <value>", "Address or domain to match")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { action: string; matchType: string; matchTarget: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rule = await inkbox.mailIdentityContactRules.create(handle, {
+          action: cmdOpts.action as MailRuleAction,
+          matchType: cmdOpts.matchType as MailRuleMatchType,
+          matchTarget: cmdOpts.matchTarget,
+        });
+        output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  rules
+    .command("update <handle> <rule-id>")
+    .description("Update action and/or status on a mail rule (admin-only)")
+    .option("--action <action>", "allow or block")
+    .option("--status <status>", "active or paused")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        ruleId: string,
+        cmdOpts: { action?: string; status?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rule = await inkbox.mailIdentityContactRules.update(handle, ruleId, {
+          action: cmdOpts.action as MailRuleAction | undefined,
+          status: cmdOpts.status as ContactRuleStatus | undefined,
+        });
+        output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  rules
+    .command("delete <handle> <rule-id>")
+    .description("Delete a mail contact rule (admin-only)")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string, ruleId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        await inkbox.mailIdentityContactRules.delete(handle, ruleId);
+        console.log(`Deleted mail contact rule '${ruleId}' on '${handle}'.`);
+      }),
+    );
+}
+
+function registerIdentityPhoneRuleCommands(parent: Command): void {
+  const rules = parent
+    .command("phone-rules")
+    .description("Phone contact rules scoped to an agent identity (requires a phone number)");
+
+  rules
+    .command("list <handle>")
+    .description("List an identity's phone contact rules (empty if no phone number)")
+    .option("--action <action>", "Filter by action: allow or block")
+    .option("--match-type <type>", "Filter by match_type: exact_number")
+    .option("--limit <n>", "Max rows", (v) => parseInt(v, 10))
+    .option("--offset <n>", "Offset", (v) => parseInt(v, 10))
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { action?: string; matchType?: string; limit?: number; offset?: number },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rows = await inkbox.phoneIdentityContactRules.list(handle, {
+          action: cmdOpts.action as PhoneRuleAction | undefined,
+          matchType: cmdOpts.matchType as PhoneRuleMatchType | undefined,
+          limit: cmdOpts.limit,
+          offset: cmdOpts.offset,
+        });
+        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+      }),
+    );
+
+  rules
+    .command("list-all")
+    .description("List phone contact rules across the org (admin-only)")
+    .option("--agent-identity-id <id>", "Narrow to a single agent identity id")
+    .option("--action <action>", "Filter by action: allow or block")
+    .option("--match-type <type>", "Filter by match_type: exact_number")
+    .option("--limit <n>", "Max rows", (v) => parseInt(v, 10))
+    .option("--offset <n>", "Offset", (v) => parseInt(v, 10))
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          agentIdentityId?: string;
+          action?: string;
+          matchType?: string;
+          limit?: number;
+          offset?: number;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rows = await inkbox.phoneIdentityContactRules.listAll({
+          agentIdentityId: cmdOpts.agentIdentityId,
+          action: cmdOpts.action as PhoneRuleAction | undefined,
+          matchType: cmdOpts.matchType as PhoneRuleMatchType | undefined,
+          limit: cmdOpts.limit,
+          offset: cmdOpts.offset,
+        });
+        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+      }),
+    );
+
+  rules
+    .command("get <handle> <rule-id>")
+    .description("Get a single phone contact rule")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string, ruleId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rule = await inkbox.phoneIdentityContactRules.get(handle, ruleId);
+        output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  rules
+    .command("create <handle>")
+    .description("Create a phone contact rule (identity must have a phone number)")
+    .requiredOption("--action <action>", "allow or block")
+    .requiredOption("--match-target <value>", "E.164 phone number to match")
+    .option("--match-type <type>", "Match type (default exact_number)", "exact_number")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        cmdOpts: { action: string; matchTarget: string; matchType: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rule = await inkbox.phoneIdentityContactRules.create(handle, {
+          action: cmdOpts.action as PhoneRuleAction,
+          matchTarget: cmdOpts.matchTarget,
+          matchType: cmdOpts.matchType as PhoneRuleMatchType,
+        });
+        output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  rules
+    .command("update <handle> <rule-id>")
+    .description("Update action and/or status on a phone rule (admin-only)")
+    .option("--action <action>", "allow or block")
+    .option("--status <status>", "active or paused")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        handle: string,
+        ruleId: string,
+        cmdOpts: { action?: string; status?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rule = await inkbox.phoneIdentityContactRules.update(handle, ruleId, {
+          action: cmdOpts.action as PhoneRuleAction | undefined,
+          status: cmdOpts.status as ContactRuleStatus | undefined,
+        });
+        output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  rules
+    .command("delete <handle> <rule-id>")
+    .description("Delete a phone contact rule (admin-only)")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string, ruleId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        await inkbox.phoneIdentityContactRules.delete(handle, ruleId);
+        console.log(`Deleted phone contact rule '${ruleId}' on '${handle}'.`);
+      }),
+    );
+}
+
+function registerIdentitySigningKeyCommands(parent: Command): void {
+  const signingKey = parent
+    .command("signing-key")
+    .description("Per-identity webhook signing key operations");
+
+  signingKey
+    .command("status <handle>")
+    .description("Report whether this identity has a webhook signing key")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const id = await inkbox.getIdentity(handle);
+        const status = await id.getSigningKeyStatus();
+        output(
+          { configured: status.configured, createdAt: status.createdAt },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  signingKey
+    .command("rotate <handle>")
+    .description("Create or rotate this identity's webhook signing key")
+    .action(
+      withErrorHandler(async function (this: Command, handle: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const id = await inkbox.getIdentity(handle);
+        const key = await id.createSigningKey();
+        output(
+          { signingKey: key.signingKey, createdAt: key.createdAt },
+          { json: !!opts.json },
+        );
+        console.error(
+          "Note: Store this key securely — it cannot be retrieved again.",
+        );
+      }),
+    );
+}
+
 export function registerIdentityCommands(program: Command): void {
   const identity = program
     .command("identity")
@@ -139,6 +460,10 @@ export function registerIdentityCommands(program: Command): void {
             phoneNumber: id.phoneNumber?.number ?? null,
             imessageEnabled: id.imessageEnabled,
             imessageFilterMode: id.imessageFilterMode,
+            mailFilterMode: id.mailFilterMode,
+            phoneFilterMode: id.phoneFilterMode,
+            signingKeyConfigured: id.signingKeyConfigured,
+            signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
@@ -282,6 +607,8 @@ export function registerIdentityCommands(program: Command): void {
     .option("--clear-description", "Explicitly clear the description (sends null)", false)
     .option("--imessage-enabled <bool>", "Toggle shared-iMessage reachability: true or false")
     .option("--imessage-filter-mode <mode>", "iMessage contact-rule mode: whitelist or blacklist (admin-only)")
+    .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
+    .option("--phone-filter-mode <mode>", "Phone contact-rule mode: whitelist or blacklist (admin-only; identity must have a phone number)")
     .option("--status <status>", "active or paused")
     .action(
       withErrorHandler(async function (
@@ -294,6 +621,8 @@ export function registerIdentityCommands(program: Command): void {
           clearDescription?: boolean;
           imessageEnabled?: string;
           imessageFilterMode?: string;
+          mailFilterMode?: string;
+          phoneFilterMode?: string;
           status?: string;
         },
       ) {
@@ -303,8 +632,14 @@ export function registerIdentityCommands(program: Command): void {
         if (cmdOpts.imessageEnabled !== undefined && cmdOpts.imessageEnabled !== "true" && cmdOpts.imessageEnabled !== "false") {
           throw new Error("--imessage-enabled must be 'true' or 'false'");
         }
-        if (cmdOpts.imessageFilterMode !== undefined && cmdOpts.imessageFilterMode !== "whitelist" && cmdOpts.imessageFilterMode !== "blacklist") {
-          throw new Error("--imessage-filter-mode must be 'whitelist' or 'blacklist'");
+        for (const [flag, value] of [
+          ["--imessage-filter-mode", cmdOpts.imessageFilterMode],
+          ["--mail-filter-mode", cmdOpts.mailFilterMode],
+          ["--phone-filter-mode", cmdOpts.phoneFilterMode],
+        ] as const) {
+          if (value !== undefined && value !== "whitelist" && value !== "blacklist") {
+            throw new Error(`${flag} must be 'whitelist' or 'blacklist'`);
+          }
         }
         if (cmdOpts.status !== undefined && cmdOpts.status !== "active" && cmdOpts.status !== "paused") {
           throw new Error("--status must be 'active' or 'paused'");
@@ -318,6 +653,8 @@ export function registerIdentityCommands(program: Command): void {
           description?: string | null;
           imessageEnabled?: boolean;
           imessageFilterMode?: "whitelist" | "blacklist";
+          mailFilterMode?: "whitelist" | "blacklist";
+          phoneFilterMode?: "whitelist" | "blacklist";
           status?: "active" | "paused";
         } = {};
         if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
@@ -334,6 +671,12 @@ export function registerIdentityCommands(program: Command): void {
         }
         if (cmdOpts.imessageFilterMode !== undefined) {
           updateOpts.imessageFilterMode = cmdOpts.imessageFilterMode as "whitelist" | "blacklist";
+        }
+        if (cmdOpts.mailFilterMode !== undefined) {
+          updateOpts.mailFilterMode = cmdOpts.mailFilterMode as "whitelist" | "blacklist";
+        }
+        if (cmdOpts.phoneFilterMode !== undefined) {
+          updateOpts.phoneFilterMode = cmdOpts.phoneFilterMode as "whitelist" | "blacklist";
         }
         if (cmdOpts.status !== undefined) {
           updateOpts.status = cmdOpts.status as "active" | "paused";
@@ -362,6 +705,10 @@ export function registerIdentityCommands(program: Command): void {
             phoneNumber: id.phoneNumber?.number ?? null,
             imessageEnabled: id.imessageEnabled,
             imessageFilterMode: id.imessageFilterMode,
+            mailFilterMode: id.mailFilterMode,
+            phoneFilterMode: id.phoneFilterMode,
+            signingKeyConfigured: id.signingKeyConfigured,
+            signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
@@ -726,4 +1073,7 @@ export function registerIdentityCommands(program: Command): void {
     );
 
   registerIdentityAccessCommands(identity);
+  registerIdentityMailRuleCommands(identity);
+  registerIdentityPhoneRuleCommands(identity);
+  registerIdentitySigningKeyCommands(identity);
 }

@@ -133,6 +133,11 @@ impl IdentitiesResource {
     /// * `description` - New description, or `Unset::Value(None)` to clear.
     /// * `imessage_enabled` - Toggle shared-iMessage reachability.
     /// * `imessage_filter_mode` - `"whitelist"` or `"blacklist"` (admin-only).
+    /// * `mail_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
+    ///   mail contact rules (admin-only).
+    /// * `phone_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
+    ///   phone contact rules (admin-only). The server rejects this with 422 when
+    ///   the identity has no phone number.
     /// * `status` - `"active"` or `"paused"`. Call [`Self::delete`] to remove an
     ///   identity; `"deleted"` is rejected here.
     #[allow(clippy::too_many_arguments)]
@@ -144,6 +149,8 @@ impl IdentitiesResource {
         description: Unset<String>,
         imessage_enabled: Option<bool>,
         imessage_filter_mode: Option<&str>,
+        mail_filter_mode: Option<&str>,
+        phone_filter_mode: Option<&str>,
         status: Option<&str>,
     ) -> Result<AgentIdentitySummary> {
         let mut body = Map::new();
@@ -177,6 +184,12 @@ impl IdentitiesResource {
                 "imessage_filter_mode".into(),
                 Value::String(mode.to_string()),
             );
+        }
+        if let Some(mode) = mail_filter_mode {
+            body.insert("mail_filter_mode".into(), Value::String(mode.to_string()));
+        }
+        if let Some(mode) = phone_filter_mode {
+            body.insert("phone_filter_mode".into(), Value::String(mode.to_string()));
         }
         if let Some(s) = status {
             body.insert("status".into(), Value::String(s.to_string()));

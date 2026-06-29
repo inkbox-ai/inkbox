@@ -91,16 +91,27 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 
 | Domain | Accessor |
 |---|---|
-| Mail | `mailboxes()`, `messages()`, `threads()`, `mail_contact_rules()`, `domains()` |
-| Phone | `calls()`, `phone_numbers()`, `texts()`, `transcripts()`, `phone_contact_rules()`, `sms_opt_ins()` |
+| Mail | `mailboxes()`, `messages()`, `threads()`, `mail_identity_contact_rules()`, `mail_contact_rules()` *(deprecated)*, `domains()` |
+| Phone | `calls()`, `phone_numbers()`, `texts()`, `transcripts()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
 | iMessage | `imessages()`, `imessage_contact_rules()` |
 | Vault / data | `vault()`, `contacts()`, `notes()` |
-| Org | `api_keys()`, `identities()`, `tunnels()`, `webhooks()` |
+| Org | `api_keys()`, `identities()`, `signing_keys()`, `tunnels()`, `webhooks()` |
+
+Contact rules and webhook signing keys are keyed by **agent identity**, addressed
+by `agent_handle`. Use `mail_identity_contact_rules()` /
+`phone_identity_contact_rules()` (per-identity `list`/`get`/`create`/`update`/
+`delete` plus an org-wide `list_all`) and `signing_keys()`
+(`create_or_rotate(handle)` / `get_status(handle)`). The legacy per-mailbox /
+per-number `mail_contact_rules()` / `phone_contact_rules()` accessors and the
+org-level `create_signing_key()` are deprecated bridges that remain for
+back-compat.
 
 The per-identity facade `AgentIdentity` (from `create_identity` / `get_identity`)
 exposes channel-scoped convenience methods: `send_email`, `forward_email`,
 `iter_emails`, `place_call`, `send_text`, `send_imessage`, `credentials`,
-`create_secret`, `set_totp`, and more.
+`create_secret`, `set_totp`, the identity-keyed contact-rule helpers
+(`list_mail_contact_rules`, `create_phone_contact_rule`, ...), `create_signing_key`,
+and more.
 
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,

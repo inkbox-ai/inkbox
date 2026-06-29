@@ -30,6 +30,13 @@ export interface WebhookSubscription {
   phoneNumberId: string | null;
   /** Owning agent identity, for identity-owned iMessage subscriptions. */
   agentIdentityId: string | null;
+  /**
+   * Resolved owning agent identity for every subscription regardless of
+   * channel — mail/phone subs resolve it server-side through the mailbox /
+   * phone number, while iMessage subs carry it directly. `null` on servers
+   * that predate the field.
+   */
+  ownerIdentityId: string | null;
   url: string;
   /** Wire event-type strings (e.g. `"message.received"`, `"text.sent"`). Not narrowed to a literal union — the catalog is the source of truth. */
   eventTypes: string[];
@@ -38,17 +45,34 @@ export interface WebhookSubscription {
   updatedAt: Date;
 }
 
+/**
+ * The response from creating a webhook subscription.
+ *
+ * Extends {@link WebhookSubscription} with a one-time `signingKey`. It is
+ * populated **only** on the request that first mints the owning identity's
+ * signing key (returned once — store it securely); on every other create it
+ * is `null`. List/get/update never return it.
+ */
+export interface WebhookSubscriptionCreateResponse extends WebhookSubscription {
+  signingKey: string | null;
+}
+
 export interface RawWebhookSubscription {
   id: string;
   organization_id: string;
   mailbox_id: string | null;
   phone_number_id: string | null;
   agent_identity_id?: string | null;
+  owner_identity_id?: string | null;
   url: string;
   event_types: string[];
   status: WebhookSubscriptionStatus;
   created_at: string;
   updated_at: string;
+}
+
+export interface RawWebhookSubscriptionCreateResponse extends RawWebhookSubscription {
+  signing_key?: string | null;
 }
 
 interface RawListWebhookSubscriptionsResponse {
@@ -64,11 +88,21 @@ export function parseWebhookSubscription(
     mailboxId: r.mailbox_id,
     phoneNumberId: r.phone_number_id,
     agentIdentityId: r.agent_identity_id ?? null,
+    ownerIdentityId: r.owner_identity_id ?? null,
     url: r.url,
     eventTypes: r.event_types,
     status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseWebhookSubscriptionCreateResponse(
+  r: RawWebhookSubscriptionCreateResponse,
+): WebhookSubscriptionCreateResponse {
+  return {
+    ...parseWebhookSubscription(r),
+    signingKey: r.signing_key ?? null,
   };
 }
 
@@ -193,10 +227,16 @@ export class WebhookSubscriptionsResource {
    * be a non-empty list of distinct values belonging to the owner's
    * channel (mailbox → `message.*`, phone number → `text.*`, agent
    * identity → `imessage.*`).
+   *
+   * Returns a {@link WebhookSubscriptionCreateResponse}. Its `signingKey`
+   * is populated **once** when this is the first subscription for an
+   * identity that had no signing key yet — store it securely; it is the
+   * only time the plaintext secret is shown. Otherwise `signingKey` is
+   * `null`.
    */
   async create(
     options: CreateWebhookSubscriptionOptions,
-  ): Promise<WebhookSubscription> {
+  ): Promise<WebhookSubscriptionCreateResponse> {
     const owners: Record<string, string | undefined | null> = {
       mailbox: options.mailboxId,
       phone_number: options.phoneNumberId,
@@ -221,8 +261,8 @@ export class WebhookSubscriptionsResource {
       event_types: options.eventTypes,
       [`${owner}_id`]: ownerId,
     };
-    const data = await this.http.post<RawWebhookSubscription>(PATH, body);
-    return parseWebhookSubscription(data);
+    const data = await this.http.post<RawWebhookSubscriptionCreateResponse>(PATH, body);
+    return parseWebhookSubscriptionCreateResponse(data);
   }
 
   /**

@@ -48,13 +48,16 @@ use crate::imessage::types::{
     IMessageSendStyle,
 };
 use crate::mail::types::{
-    FilterMode, ForwardMode, Message, MessageDetail, MessageDirection, ThreadDetail,
+    ContactRuleStatus as MailContactRuleStatus, FilterMode, ForwardMode, MailIdentityContactRule,
+    MailRuleAction, MailRuleMatchType, Message, MessageDetail, MessageDirection, ThreadDetail,
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    PhoneCall, PhoneCallWithRateLimit, PhoneTranscript, TextConversationSummary,
-    TextConversationUpdateResult, TextMessage,
+    ContactRuleStatus as PhoneContactRuleStatus, PhoneCall, PhoneCallWithRateLimit,
+    PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript,
+    TextConversationSummary, TextConversationUpdateResult, TextMessage,
 };
+use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::Tunnel;
 use crate::vault::resources::vault::UnlockedVault;
 use crate::vault::totp::{TOTPCode, TOTPConfig};
@@ -141,6 +144,16 @@ impl AgentIdentity {
     /// Whitelist/blacklist mode for this identity's iMessage contact rules.
     pub fn imessage_filter_mode(&self) -> FilterMode {
         self.data.borrow().summary.imessage_filter_mode
+    }
+
+    /// Whitelist/blacklist mode for this identity's mail contact rules.
+    pub fn mail_filter_mode(&self) -> FilterMode {
+        self.data.borrow().summary.mail_filter_mode
+    }
+
+    /// Whitelist/blacklist mode for this identity's phone contact rules.
+    pub fn phone_filter_mode(&self) -> FilterMode {
+        self.data.borrow().summary.phone_filter_mode
     }
 
     /// Mailbox linked to this identity. Non-null for live identities (1:1 invariant).
@@ -714,11 +727,175 @@ impl AgentIdentity {
     }
 
     // -----------------------------------------------------------------------
+    // Mail contact rules (identity-keyed)
+    // -----------------------------------------------------------------------
+
+    /// List this identity's mail allow/block rules, newest first.
+    pub fn list_mail_contact_rules(
+        &self,
+        action: Option<MailRuleAction>,
+        match_type: Option<MailRuleMatchType>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> Result<Vec<MailIdentityContactRule>> {
+        self.inkbox.mail_identity_contact_rules().list(
+            &self.agent_handle(),
+            action,
+            match_type,
+            limit,
+            offset,
+        )
+    }
+
+    /// Get one of this identity's mail contact rules by id.
+    pub fn get_mail_contact_rule(&self, rule_id: &str) -> Result<MailIdentityContactRule> {
+        self.inkbox
+            .mail_identity_contact_rules()
+            .get(&self.agent_handle(), rule_id)
+    }
+
+    /// Create a mail allow/block rule for this identity.
+    pub fn create_mail_contact_rule(
+        &self,
+        action: MailRuleAction,
+        match_type: MailRuleMatchType,
+        match_target: &str,
+    ) -> Result<MailIdentityContactRule> {
+        self.inkbox.mail_identity_contact_rules().create(
+            &self.agent_handle(),
+            action,
+            match_type,
+            match_target,
+        )
+    }
+
+    /// Update a mail rule's `action` or `status` (admin-only). `None` arguments
+    /// are left unchanged.
+    pub fn update_mail_contact_rule(
+        &self,
+        rule_id: &str,
+        action: Option<MailRuleAction>,
+        status: Option<MailContactRuleStatus>,
+    ) -> Result<MailIdentityContactRule> {
+        self.inkbox.mail_identity_contact_rules().update(
+            &self.agent_handle(),
+            rule_id,
+            action,
+            status,
+        )
+    }
+
+    /// Delete one of this identity's mail contact rules (admin-only).
+    pub fn delete_mail_contact_rule(&self, rule_id: &str) -> Result<()> {
+        self.inkbox
+            .mail_identity_contact_rules()
+            .delete(&self.agent_handle(), rule_id)
+    }
+
+    // -----------------------------------------------------------------------
+    // Phone contact rules (identity-keyed)
+    // -----------------------------------------------------------------------
+
+    /// List this identity's phone allow/block rules, newest first.
+    ///
+    /// Returns `[]` for a phoneless identity; the server requires a phone only
+    /// for create/get/update/delete, not for list.
+    pub fn list_phone_contact_rules(
+        &self,
+        action: Option<PhoneRuleAction>,
+        match_type: Option<PhoneRuleMatchType>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> Result<Vec<PhoneIdentityContactRule>> {
+        self.inkbox.phone_identity_contact_rules().list(
+            &self.agent_handle(),
+            action,
+            match_type,
+            limit,
+            offset,
+        )
+    }
+
+    /// Get one of this identity's phone contact rules by id.
+    ///
+    /// Errors if this identity has no phone number.
+    pub fn get_phone_contact_rule(&self, rule_id: &str) -> Result<PhoneIdentityContactRule> {
+        self.require_phone()?;
+        self.inkbox
+            .phone_identity_contact_rules()
+            .get(&self.agent_handle(), rule_id)
+    }
+
+    /// Create a phone allow/block rule for this identity.
+    ///
+    /// Errors if this identity has no phone number.
+    pub fn create_phone_contact_rule(
+        &self,
+        action: PhoneRuleAction,
+        match_target: &str,
+        match_type: PhoneRuleMatchType,
+    ) -> Result<PhoneIdentityContactRule> {
+        self.require_phone()?;
+        self.inkbox.phone_identity_contact_rules().create(
+            &self.agent_handle(),
+            action,
+            match_target,
+            match_type,
+        )
+    }
+
+    /// Update a phone rule's `action` or `status` (admin-only). `None`
+    /// arguments are left unchanged. Errors if this identity has no phone number.
+    pub fn update_phone_contact_rule(
+        &self,
+        rule_id: &str,
+        action: Option<PhoneRuleAction>,
+        status: Option<PhoneContactRuleStatus>,
+    ) -> Result<PhoneIdentityContactRule> {
+        self.require_phone()?;
+        self.inkbox.phone_identity_contact_rules().update(
+            &self.agent_handle(),
+            rule_id,
+            action,
+            status,
+        )
+    }
+
+    /// Delete one of this identity's phone contact rules (admin-only).
+    ///
+    /// Errors if this identity has no phone number.
+    pub fn delete_phone_contact_rule(&self, rule_id: &str) -> Result<()> {
+        self.require_phone()?;
+        self.inkbox
+            .phone_identity_contact_rules()
+            .delete(&self.agent_handle(), rule_id)
+    }
+
+    // -----------------------------------------------------------------------
+    // Signing key (identity-keyed)
+    // -----------------------------------------------------------------------
+
+    /// Report whether this identity has a webhook signing key.
+    pub fn get_signing_key_status(&self) -> Result<SigningKeyStatus> {
+        self.inkbox.signing_keys().get_status(&self.agent_handle())
+    }
+
+    /// Create or rotate this identity's webhook signing key.
+    ///
+    /// The plaintext `signing_key` is returned **once** — store it securely, it
+    /// cannot be retrieved again.
+    pub fn create_signing_key(&self) -> Result<SigningKey> {
+        self.inkbox
+            .signing_keys()
+            .create_or_rotate(&self.agent_handle())
+    }
+
+    // -----------------------------------------------------------------------
     // Identity management
     // -----------------------------------------------------------------------
 
     /// Update this identity's handle, display name, description, iMessage
-    /// reachability, and/or status.
+    /// reachability, contact-rule filter modes, and/or status.
     ///
     /// Only provided fields are applied; omitted fields are left unchanged. For
     /// `display_name` and `description`, `Unset::Value(None)` clears the column;
@@ -730,8 +907,14 @@ impl AgentIdentity {
     /// * `description` - New description, or `Unset::Value(None)` to clear.
     /// * `imessage_enabled` - Toggle shared-iMessage reachability.
     /// * `imessage_filter_mode` - `"whitelist"` or `"blacklist"` (admin-only).
+    /// * `mail_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
+    ///   mail contact rules (admin-only).
+    /// * `phone_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
+    ///   phone contact rules (admin-only). Rejected with 422 when the identity
+    ///   has no phone number.
     /// * `status` - `"active"` or `"paused"`. Call [`Self::delete`] to remove the
     ///   identity; `"deleted"` is rejected here.
+    #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
         new_handle: Option<&str>,
@@ -739,6 +922,8 @@ impl AgentIdentity {
         description: crate::identities::types::Unset<String>,
         imessage_enabled: Option<bool>,
         imessage_filter_mode: Option<&str>,
+        mail_filter_mode: Option<&str>,
+        phone_filter_mode: Option<&str>,
         status: Option<&str>,
     ) -> Result<()> {
         let result = self.inkbox.identities().update(
@@ -748,6 +933,8 @@ impl AgentIdentity {
             description,
             imessage_enabled,
             imessage_filter_mode,
+            mail_filter_mode,
+            phone_filter_mode,
             status,
         )?;
 
@@ -944,5 +1131,68 @@ impl std::fmt::Debug for AgentIdentity {
             .field("mailbox", &mailbox)
             .field("phone", &phone)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::identities::types::AgentIdentityData;
+
+    /// Build a phoneless identity backed by a client pointed at an unreachable
+    /// localhost port, so any real request fails fast instead of hanging.
+    fn phoneless_identity() -> AgentIdentity {
+        let data: AgentIdentityData = serde_json::from_value(serde_json::json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "organization_id": "org_x",
+            "agent_handle": "support-bot",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+        }))
+        .unwrap();
+        let inkbox = Inkbox::builder("test-key")
+            .base_url("http://127.0.0.1:1")
+            .build()
+            .unwrap();
+        AgentIdentity::new(data, inkbox)
+    }
+
+    #[test]
+    fn list_phone_contact_rules_does_not_prethrow_without_phone() {
+        let identity = phoneless_identity();
+        // List must not prethrow the phone guard: with no server it surfaces a
+        // transport error, never InvalidArgument("no phone number").
+        if let Err(InkboxError::InvalidArgument(m)) =
+            identity.list_phone_contact_rules(None, None, None, None)
+        {
+            panic!("list prethrew the phone guard: {m}");
+        }
+    }
+
+    #[test]
+    fn phone_rule_cgud_still_requires_phone_number() {
+        let identity = phoneless_identity();
+        let results = [
+            identity.get_phone_contact_rule("rid").err(),
+            identity
+                .create_phone_contact_rule(
+                    PhoneRuleAction::Block,
+                    "+14155550199",
+                    PhoneRuleMatchType::ExactNumber,
+                )
+                .err(),
+            identity
+                .update_phone_contact_rule("rid", Some(PhoneRuleAction::Block), None)
+                .err(),
+            identity.delete_phone_contact_rule("rid").err(),
+        ];
+        for res in results {
+            match res {
+                Some(InkboxError::InvalidArgument(m)) => {
+                    assert!(m.contains("no phone number"), "unexpected message: {m}");
+                }
+                other => panic!("expected phone-required error, got {other:?}"),
+            }
+        }
     }
 }

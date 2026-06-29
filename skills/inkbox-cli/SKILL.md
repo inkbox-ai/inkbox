@@ -71,12 +71,14 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 - `email delete`
 - `email delete-thread`
 - `vault delete`
-- `mailbox update --filter-mode ...` (admin-only; flips allow/block semantics for that mailbox)
+- `identity update --mail-filter-mode ... / --phone-filter-mode ...` (admin-only; flips allow/block semantics for that identity's channel)
+- `mailbox update --filter-mode ...` (DEPRECATED channel path; admin-only)
 - `number release`
-- `number update --filter-mode ...` (admin-only; same caveat as mailbox)
-- `signing-key create`
+- `number update --filter-mode ...` (DEPRECATED channel path; admin-only)
+- `identity signing-key rotate <handle>` (rotates that identity's webhook signing key)
+- `signing-key create` (DEPRECATED org-level path)
 
-`contacts delete`, `notes delete`, `mailbox rules delete`, `number rules delete` affect downstream filtering and access — confirm intent before running.
+`contacts delete`, `notes delete`, `identity mail-rules delete`, `identity phone-rules delete`, `mailbox rules delete` (deprecated), `number rules delete` (deprecated) affect downstream filtering and access — confirm intent before running.
 
 Also confirm before creating or rotating secrets if the values were not explicitly provided by the user.
 
@@ -109,9 +111,13 @@ inkbox identity create <handle> [--display-name <name>] [--description <text>]
 inkbox identity delete <handle>
 inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
                                  [--description <text> | --clear-description]
+                                 [--mail-filter-mode whitelist|blacklist]
+                                 [--phone-filter-mode whitelist|blacklist]
                                  [--status active|paused]
 inkbox identity refresh <handle>
 ```
+
+`--mail-filter-mode` / `--phone-filter-mode` set the identity's contact-rule mode (admin-only). Unlike the deprecated `mailbox update --filter-mode` / `number update --filter-mode`, the identity path does **not** print a change notice. `--phone-filter-mode` requires the identity to have a phone number (else a 422).
 
 `identity create` atomically provisions the mailbox AND the tunnel. The JSON output includes both (`mailbox`, `tunnel.publicHost`, `tunnel.tlsMode`).
 
@@ -156,6 +162,39 @@ Secret types:
 
 ```text
 login, api_key, ssh_key, key_pair, other
+```
+
+### Identity Contact Rules
+
+Allow/block lists are scoped to the **agent identity** (keyed by handle), combined with the identity's mail/phone filter mode (`inkbox identity update --mail-filter-mode / --phone-filter-mode`). Mail matches by exact email or domain; phone matches by exact E.164 number.
+
+```bash
+# Mail rules
+inkbox identity mail-rules list <handle> [--action allow|block] [--match-type exact_email|domain] [--limit <n>] [--offset <n>]
+inkbox identity mail-rules list-all [--agent-identity-id <id>] [--action …] [--match-type …]   # admin-only, org-wide
+inkbox identity mail-rules get <handle> <rule-id>
+inkbox identity mail-rules create <handle> --action allow|block --match-type exact_email|domain --match-target <value>
+inkbox identity mail-rules update <handle> <rule-id> [--action allow|block] [--status active|paused]   # admin-only
+inkbox identity mail-rules delete <handle> <rule-id>                                                    # admin-only
+
+# Phone rules — require the identity to have a phone number; only exact_number is supported.
+inkbox identity phone-rules list <handle> [--action allow|block] [--match-type exact_number] [--limit <n>] [--offset <n>]
+inkbox identity phone-rules list-all [--agent-identity-id <id>] [--action …]   # admin-only, org-wide
+inkbox identity phone-rules get <handle> <rule-id>
+inkbox identity phone-rules create <handle> --action allow|block --match-target <e164> [--match-type exact_number]
+inkbox identity phone-rules update <handle> <rule-id> [--action allow|block] [--status active|paused]   # admin-only
+inkbox identity phone-rules delete <handle> <rule-id>                                                    # admin-only
+```
+
+New rules always start active; use `update --status paused` to pause one. These replace the deprecated `inkbox mailbox rules` / `inkbox number rules` groups below.
+
+### Identity Signing Key
+
+Each identity has its own webhook signing key:
+
+```bash
+inkbox identity signing-key status <handle>
+inkbox identity signing-key rotate <handle>   # mints or rotates; prints the plaintext secret ONCE
 ```
 
 ## Email
@@ -319,7 +358,7 @@ inkbox mailbox update <email-address> [--filter-mode whitelist|blacklist]
 # --mailbox-id <id> --url <url> --event-type message.received ...`.
 ```
 
-`mailbox list` / `get` / `update` rows include `filterMode` and `agentIdentityId`. `--filter-mode` is admin-only; when the value actually changes, a note is printed to **stderr** telling you how many existing rules are now redundant under the new mode.
+`mailbox list` / `get` / `update` rows include `filterMode` and `agentIdentityId`. `mailbox update --filter-mode` is the **deprecated** channel path (admin-only; prints a stderr change note when the value actually changes). Prefer `inkbox identity update <handle> --mail-filter-mode whitelist|blacklist`, which sets the mode on the identity and prints no change note.
 
 ## Tunnels
 
@@ -345,9 +384,9 @@ inkbox domain set-default <domain-name>
 
 `domain list` shows registered custom domains for your org, optionally filtered by status (e.g. `verified`). `domain set-default` requires an admin-scoped API key; pass the bare custom domain name to set it, or pass the platform sending domain (e.g. `inkboxmail.com` in production) to revert. Domain registration, DNS records, verification, DKIM rotation, and deletion stay in the console.
 
-### Mailbox Contact Rules (`inkbox mailbox rules …`)
+### Mailbox Contact Rules (`inkbox mailbox rules …`) — DEPRECATED
 
-Per-mailbox allow/block rules (combined with the mailbox's `filterMode`).
+**Deprecated** (Sunset 2026-08-31) — use `inkbox identity mail-rules …` (keyed by agent handle) instead. Per-mailbox allow/block rules (combined with the mailbox's `filterMode`).
 
 ```bash
 inkbox mailbox rules list --mailbox <email> [--action allow|block] [--match-type exact_email|domain] [--limit <n>] [--offset <n>]
@@ -368,11 +407,11 @@ inkbox number update <id> [--incoming-call-action auto_accept|auto_reject|webhoo
 inkbox number release <number-id>
 ```
 
-Use `--state` only when provisioning a local number. Phone-number rows also carry `filterMode` / `agentIdentityId`; `--filter-mode` is admin-only and prints a stderr note when the value changes.
+Use `--state` only when provisioning a local number. Phone-number rows also carry `filterMode` / `agentIdentityId`; `number update --filter-mode` is the **deprecated** channel path (admin-only; prints a stderr note when the value changes). Prefer `inkbox identity update <handle> --phone-filter-mode whitelist|blacklist`.
 
-### Number Contact Rules (`inkbox number rules …`)
+### Number Contact Rules (`inkbox number rules …`) — DEPRECATED
 
-Per-number allow/block rules (combined with the number's `filterMode`).
+**Deprecated** (Sunset 2026-08-31) — use `inkbox identity phone-rules …` (keyed by agent handle) instead. Per-number allow/block rules (combined with the number's `filterMode`).
 
 ```bash
 inkbox number rules list --number <id> [--action allow|block] [--match-type exact_number] [--limit <n>] [--offset <n>]
@@ -424,9 +463,16 @@ inkbox notes access revoke <note-id> <identity-id>
 
 ## Whoami, Signing Keys, Webhooks
 
+Each agent identity has its own webhook signing key. Manage it with the
+per-identity commands; the org-level `inkbox signing-key create` is deprecated
+(with an agent-scoped key it still rotates that identity's key; with an admin key
+the server returns 409).
+
 ```bash
 inkbox whoami
-inkbox signing-key create
+inkbox identity signing-key status <handle>
+inkbox identity signing-key rotate <handle>   # mints/rotates; prints the secret ONCE
+inkbox signing-key create                     # DEPRECATED — use the per-identity commands above
 inkbox webhook verify --payload <payload> --secret <secret> -H "X-Header: value"
 
 # Webhook subscriptions (fan-out per (owner, url, event_types)):
@@ -439,6 +485,8 @@ inkbox webhook subscription create --agent-identity-id <id> --url <url> \
 inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...]
 inkbox webhook subscription delete <sub-id>
 ```
+
+Every subscription row carries `ownerIdentityId` (the resolved owning agent identity). The **first** subscription created for an identity that has no signing key yet returns that identity's `signingKey` **once** in the create output (otherwise null) — capture it then, it cannot be retrieved again (use `--json` to read it reliably).
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 

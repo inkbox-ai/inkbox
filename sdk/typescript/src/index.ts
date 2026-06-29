@@ -30,7 +30,7 @@ export {
   AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED,
   AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED,
 } from "./whoami/types.js";
-export type { SigningKey } from "./signing_keys.js";
+export type { SigningKey, SigningKeyStatus } from "./signing_keys.js";
 export { verifyWebhook } from "./signing_keys.js";
 export type {
   WebhookContact,
@@ -70,6 +70,7 @@ export type {
 } from "./webhooks/types.js";
 export type {
   WebhookSubscription,
+  WebhookSubscriptionCreateResponse,
   WebhookSubscriptionStatus,
   CreateWebhookSubscriptionOptions,
   UpdateWebhookSubscriptionOptions,
@@ -105,12 +106,20 @@ export type {
   FilterModeChangeNotice,
   Mailbox,
   MailContactRule,
+  MailIdentityContactRule,
   Message,
   MessageDetail,
   ReplyAllRecipients,
   Thread,
   ThreadDetail,
 } from "./mail/types.js";
+export type {
+  MailIdentityContactRulesResource,
+  CreateMailIdentityContactRuleOptions,
+  ListMailIdentityContactRulesOptions,
+  ListAllMailIdentityContactRulesOptions,
+  UpdateMailIdentityContactRuleOptions,
+} from "./mail/resources/identityContactRules.js";
 export {
   PhoneRuleAction,
   PhoneRuleMatchType,
@@ -125,6 +134,7 @@ export type {
   PhoneCall,
   PhoneCallWithRateLimit,
   PhoneContactRule,
+  PhoneIdentityContactRule,
   RateLimitInfo,
   PhoneTranscript,
   SmsOptIn,
@@ -134,6 +144,13 @@ export type {
   TextConversationSummary,
   TextConversationUpdateResult,
 } from "./phone/types.js";
+export type {
+  PhoneIdentityContactRulesResource,
+  CreatePhoneIdentityContactRuleOptions,
+  ListPhoneIdentityContactRulesOptions,
+  ListAllPhoneIdentityContactRulesOptions,
+  UpdatePhoneIdentityContactRuleOptions,
+} from "./phone/resources/identityContactRules.js";
 export {
   IMessageAssignmentStatus,
   IMessageDeliveryStatus,

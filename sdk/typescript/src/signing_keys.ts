@@ -1,13 +1,23 @@
 /**
- * Org-level webhook signing key management.
+ * Per-identity webhook signing key management.
  *
- * Shared across all Inkbox clients (mail, phone, etc.).
+ * Each agent identity has its own signing key used to verify the webhooks
+ * (and WebSocket upgrades) for that identity's mail / phone / iMessage
+ * traffic. Manage it via `inkbox.signingKeys.createOrRotate(handle)` /
+ * `getStatus(handle)`, or the `identity.createSigningKey()` /
+ * `identity.getSigningKeyStatus()` convenience methods.
+ *
+ * The legacy no-arg / org-level calls are kept as deprecated bridges.
  */
 
 import { createHmac, timingSafeEqual } from "crypto";
 import { HttpTransport } from "./_http.js";
 
-const PATH = "/signing-keys";
+const ORG_PATH = "/signing-keys";
+
+function identityPath(agentHandle: string): string {
+  return `/identities/${agentHandle}/signing-key`;
+}
 
 export interface SigningKey {
   /** Plaintext signing key — returned once on creation/rotation. Store securely. */
@@ -15,15 +25,38 @@ export interface SigningKey {
   createdAt: Date;
 }
 
+/**
+ * Status of an identity's webhook signing key.
+ *
+ * `configured` is `true` once a key exists; `createdAt` is when it was
+ * created or last rotated (`null` when not configured).
+ */
+export interface SigningKeyStatus {
+  configured: boolean;
+  createdAt: Date | null;
+}
+
 interface RawSigningKey {
   signing_key: string;
   created_at: string;
+}
+
+interface RawSigningKeyStatus {
+  configured?: boolean;
+  created_at?: string | null;
 }
 
 function parseSigningKey(r: RawSigningKey): SigningKey {
   return {
     signingKey: r.signing_key,
     createdAt: new Date(r.created_at),
+  };
+}
+
+function parseSigningKeyStatus(r: RawSigningKeyStatus): SigningKeyStatus {
+  return {
+    configured: r.configured ?? false,
+    createdAt: r.created_at ? new Date(r.created_at) : null,
   };
 }
 
@@ -60,21 +93,54 @@ export function verifyWebhook({
   return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
 }
 
+/**
+ * Webhook signing key management.
+ *
+ * Rides the api-root transport (`{base}/api/v1`) so it can address both
+ * the per-identity routes (`/identities/{handle}/signing-key`) and the
+ * deprecated org-level route (`/signing-keys`).
+ */
 export class SigningKeysResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
-   * Create or rotate the webhook signing key for your organisation.
+   * Create or rotate a webhook signing key.
    *
-   * The first call creates a new key; subsequent calls rotate (replace) the
-   * existing key. The plaintext `signingKey` is returned **once** —
-   * store it securely as it cannot be retrieved again.
+   * Pass `agentHandle` to create/rotate **that identity's** key (the
+   * forward-looking surface). The first call mints a key; subsequent calls
+   * rotate (replace) it. The plaintext `signingKey` is returned **once** —
+   * store it securely, it cannot be retrieved again.
    *
    * Use the returned key to verify `X-Inkbox-Signature` headers on
    * incoming webhook requests.
+   *
+   * @deprecated Calling with no `agentHandle` hits the deprecated org-level
+   *   `/signing-keys` route. With an agent-scoped API key the server rotates
+   *   that key's identity; with an admin key it returns 409
+   *   (`InkboxAPIError`) pointing at the per-identity route. Prefer
+   *   `createOrRotate(agentHandle)` or `identity.createSigningKey()`.
    */
-  async createOrRotate(): Promise<SigningKey> {
-    const data = await this.http.post<RawSigningKey>(PATH, {});
+  async createOrRotate(agentHandle?: string): Promise<SigningKey> {
+    const path = agentHandle === undefined ? ORG_PATH : identityPath(agentHandle);
+    const data = await this.http.post<RawSigningKey>(path, {});
     return parseSigningKey(data);
+  }
+
+  /**
+   * Report whether a signing key is configured.
+   *
+   * Pass `agentHandle` for that identity's status (the forward-looking
+   * surface).
+   *
+   * @deprecated Calling with no `agentHandle` hits the deprecated org-level
+   *   `/signing-keys` route: with an agent-scoped key it reports that
+   *   identity's status; with an admin key it reports an org-aggregate
+   *   status (`configured` true if any identity in the org has a key).
+   *   Prefer `getStatus(agentHandle)` or `identity.getSigningKeyStatus()`.
+   */
+  async getStatus(agentHandle?: string): Promise<SigningKeyStatus> {
+    const path = agentHandle === undefined ? ORG_PATH : identityPath(agentHandle);
+    const data = await this.http.get<RawSigningKeyStatus>(path);
+    return parseSigningKeyStatus(data);
   }
 }

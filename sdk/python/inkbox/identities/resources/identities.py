@@ -109,10 +109,12 @@ class IdentitiesResource:
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
         imessage_filter_mode: str | None = None,
+        mail_filter_mode: str | None = None,
+        phone_filter_mode: str | None = None,
         status: str | None = None,
     ) -> AgentIdentitySummary:
         """Update an identity's handle, display name, description,
-        iMessage reachability, and/or status.
+        iMessage reachability, contact-rule filter modes, and/or status.
 
         Only provided fields are applied; omitted fields are left
         unchanged. For ``display_name`` and ``description``, explicit
@@ -127,6 +129,11 @@ class IdentitiesResource:
             imessage_enabled: Toggle shared-iMessage reachability.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
+            mail_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
+                identity's mail contact rules (admin-only).
+            phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
+                identity's phone contact rules (admin-only). The server
+                rejects this with 422 when the identity has no phone number.
             status: ``"active"`` or ``"paused"``. Call :meth:`delete`
                 to remove an identity; ``"deleted"`` is rejected here.
         """
@@ -141,6 +148,10 @@ class IdentitiesResource:
             body["imessage_enabled"] = imessage_enabled
         if imessage_filter_mode is not None:
             body["imessage_filter_mode"] = imessage_filter_mode
+        if mail_filter_mode is not None:
+            body["mail_filter_mode"] = mail_filter_mode
+        if phone_filter_mode is not None:
+            body["phone_filter_mode"] = phone_filter_mode
         if status is not None:
             body["status"] = status
         try:

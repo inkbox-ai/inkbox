@@ -44,7 +44,10 @@ function assertFilterMode(raw: string): FilterMode {
 function registerMailboxRulesCommands(parent: Command): void {
   const rules = parent
     .command("rules")
-    .description("Contact rules scoped to a mailbox");
+    .description(
+      "[deprecated] Contact rules scoped to a mailbox. Use " +
+        "'inkbox identity mail-rules ...' instead (keyed by agent handle).",
+    );
 
   rules
     .command("list")

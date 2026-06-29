@@ -2,6 +2,11 @@
  * inkbox-mail/resources/contactRules.ts
  *
  * Per-mailbox mail contact rules (allow/block) + org-wide list.
+ *
+ * @deprecated Contact rules are now keyed by agent identity. Use
+ *   {@link MailIdentityContactRulesResource} (`inkbox.mailIdentityContactRules`
+ *   or `identity.*MailContactRule(...)`) instead. These per-mailbox routes
+ *   keep working unchanged.
  */
 
 import { HttpTransport } from "../../_http.js";

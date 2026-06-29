@@ -10,7 +10,12 @@ export function registerSigningKeyCommands(program: Command): void {
 
   signingKey
     .command("create")
-    .description("Create or rotate the webhook signing key")
+    .description(
+      "[deprecated] Create or rotate a webhook signing key via the org-level " +
+        "endpoint. Use 'inkbox identity signing-key rotate <handle>' instead. " +
+        "With an agent-scoped key this rotates that identity's key; with an " +
+        "admin key the server returns 409.",
+    )
     .action(
       withErrorHandler(async function (this: Command) {
         const opts = getGlobalOpts(this);
@@ -25,6 +30,10 @@ export function registerSigningKeyCommands(program: Command): void {
         );
         console.error(
           "Note: Store this key securely — it cannot be retrieved again.",
+        );
+        console.error(
+          "Note: Org-level signing keys are deprecated. Prefer " +
+            "'inkbox identity signing-key rotate <handle>'.",
         );
       }),
     );

@@ -232,11 +232,38 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         alpha.delete_secret(secret_b.id)
         assert len(inkbox.vault.list_secrets()) == 0
 
-        # ── signing key ───────────────────────────────────────────
-        log_step(ctx, "create signing key")
-        signing_key = inkbox.create_signing_key()
+        # ── identity-scoped contact rules + filter mode ───────────
+        # (mail only — alpha has no phone number, and we don't provision
+        # real numbers in CI; phone rules require a number server-side.)
+        log_step(ctx, "set alpha mail filter mode to whitelist")
+        alpha.update(mail_filter_mode="whitelist")
+        assert inkbox.get_identity(alpha_handle).mail_filter_mode == "whitelist"
+
+        log_step(ctx, "create a mail contact rule on alpha (identity-keyed)")
+        rule = alpha.create_mail_contact_rule(
+            action="allow", match_type="exact_email", match_target="vip@example.com",
+        )
+        assert str(rule.agent_identity_id) == str(alpha.id)
+
+        log_step(ctx, "list alpha's mail rules + org-wide list filtered by identity")
+        assert any(r.id == rule.id for r in alpha.list_mail_contact_rules())
+        org_rules = inkbox.mail_identity_contact_rules.list_all(agent_identity_id=alpha.id)
+        assert any(r.id == rule.id for r in org_rules)
+
+        log_step(ctx, "delete the mail contact rule + reset filter mode")
+        alpha.delete_mail_contact_rule(rule.id)
+        assert all(r.id != rule.id for r in alpha.list_mail_contact_rules())
+        alpha.update(mail_filter_mode="blacklist")
+        assert inkbox.get_identity(alpha_handle).mail_filter_mode == "blacklist"
+
+        # ── per-identity signing key ──────────────────────────────
+        log_step(ctx, "per-identity signing key: status -> create -> status")
+        pre = alpha.get_signing_key_status()
+        assert isinstance(pre.configured, bool)
+        signing_key = alpha.create_signing_key()
         assert signing_key.signing_key is not None
         assert signing_key.created_at is not None
+        assert alpha.get_signing_key_status().configured is True
 
         # ── cleanup: delete identities (cascades to mailbox + tunnel) ─
         log_step(ctx, "delete identities")

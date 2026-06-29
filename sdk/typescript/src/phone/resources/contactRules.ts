@@ -2,6 +2,11 @@
  * inkbox-phone/resources/contactRules.ts
  *
  * Per-number phone contact rules (allow/block) + org-wide list.
+ *
+ * @deprecated Contact rules are now keyed by agent identity. Use
+ *   {@link PhoneIdentityContactRulesResource}
+ *   (`inkbox.phoneIdentityContactRules` or `identity.*PhoneContactRule(...)`)
+ *   instead. These per-number routes keep working unchanged.
  */
 
 import { HttpTransport } from "../../_http.js";

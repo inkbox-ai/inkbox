@@ -38,8 +38,12 @@ from inkbox.imessage.types import (
     IMessageSendStyle,
 )
 from inkbox.mail.types import (
+    ContactRuleStatus,
     FilterMode,
     ForwardMode,
+    MailIdentityContactRule,
+    MailRuleAction,
+    MailRuleMatchType,
     Message,
     MessageDetail,
     MessageDirection,
@@ -48,13 +52,19 @@ from inkbox.mail.types import (
 from inkbox.phone.types import (
     PhoneCall,
     PhoneCallWithRateLimit,
+    PhoneIdentityContactRule,
+    PhoneRuleAction,
+    PhoneRuleMatchType,
     PhoneTranscript,
     TextConversationSummary,
     TextConversationUpdateResult,
     TextMessage,
 )
+from inkbox.signing_keys import SigningKey, SigningKeyStatus
 
 if TYPE_CHECKING:
+    from datetime import datetime
+
     from inkbox.client import Inkbox
 
 # `_UNSET` is imported from inkbox.identities.types above. Identity-based
@@ -130,6 +140,26 @@ class AgentIdentity:
     def imessage_filter_mode(self) -> FilterMode:
         """Whitelist/blacklist mode for this identity's iMessage contact rules."""
         return self._data.imessage_filter_mode
+
+    @property
+    def mail_filter_mode(self) -> FilterMode:
+        """Whitelist/blacklist mode for this identity's mail contact rules."""
+        return self._data.mail_filter_mode
+
+    @property
+    def phone_filter_mode(self) -> FilterMode:
+        """Whitelist/blacklist mode for this identity's phone contact rules."""
+        return self._data.phone_filter_mode
+
+    @property
+    def signing_key_configured(self) -> bool:
+        """Whether this identity has a webhook signing key configured (status only)."""
+        return self._data.signing_key_configured
+
+    @property
+    def signing_key_created_at(self) -> datetime | None:
+        """When this identity's signing key was created, or ``None`` if unset."""
+        return self._data.signing_key_created_at
 
     @property
     def mailbox(self) -> IdentityMailbox | None:
@@ -987,6 +1017,149 @@ class AgentIdentity:
             content_type=content_type,
         )
 
+    ## Mail contact rules
+
+    def list_mail_contact_rules(
+        self,
+        *,
+        action: MailRuleAction | str | None = None,
+        match_type: MailRuleMatchType | str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[MailIdentityContactRule]:
+        """List this identity's mail allow/block rules, newest first."""
+        return self._inkbox._mail_identity_contact_rules.list(
+            self.agent_handle,
+            action=action,
+            match_type=match_type,
+            limit=limit,
+            offset=offset,
+        )
+
+    def get_mail_contact_rule(self, rule_id: UUID | str) -> MailIdentityContactRule:
+        """Get one of this identity's mail contact rules by id."""
+        return self._inkbox._mail_identity_contact_rules.get(self.agent_handle, rule_id)
+
+    def create_mail_contact_rule(
+        self,
+        *,
+        action: MailRuleAction | str,
+        match_type: MailRuleMatchType | str,
+        match_target: str,
+    ) -> MailIdentityContactRule:
+        """Create a mail allow/block rule for this identity."""
+        return self._inkbox._mail_identity_contact_rules.create(
+            self.agent_handle,
+            action=action,
+            match_type=match_type,
+            match_target=match_target,
+        )
+
+    def update_mail_contact_rule(
+        self,
+        rule_id: UUID | str,
+        *,
+        action: MailRuleAction | str = _UNSET,  # type: ignore[assignment]
+        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+    ) -> MailIdentityContactRule:
+        """Update a mail rule's ``action`` or ``status`` (admin-only)."""
+        kwargs: dict[str, Any] = {}
+        if action is not _UNSET:
+            kwargs["action"] = action
+        if status is not _UNSET:
+            kwargs["status"] = status
+        return self._inkbox._mail_identity_contact_rules.update(
+            self.agent_handle, rule_id, **kwargs,
+        )
+
+    def delete_mail_contact_rule(self, rule_id: UUID | str) -> None:
+        """Delete one of this identity's mail contact rules (admin-only)."""
+        self._inkbox._mail_identity_contact_rules.delete(self.agent_handle, rule_id)
+
+    ## Phone contact rules
+
+    def list_phone_contact_rules(
+        self,
+        *,
+        action: PhoneRuleAction | str | None = None,
+        match_type: PhoneRuleMatchType | str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[PhoneIdentityContactRule]:
+        """List this identity's phone allow/block rules, newest first.
+
+        Returns ``[]`` for a phoneless identity; the server requires a phone
+        only for create/get/update/delete, not for list.
+        """
+        return self._inkbox._phone_identity_contact_rules.list(
+            self.agent_handle,
+            action=action,
+            match_type=match_type,
+            limit=limit,
+            offset=offset,
+        )
+
+    def get_phone_contact_rule(self, rule_id: UUID | str) -> PhoneIdentityContactRule:
+        """Get one of this identity's phone contact rules by id."""
+        self._require_phone()
+        return self._inkbox._phone_identity_contact_rules.get(self.agent_handle, rule_id)
+
+    def create_phone_contact_rule(
+        self,
+        *,
+        action: PhoneRuleAction | str,
+        match_target: str,
+        match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
+    ) -> PhoneIdentityContactRule:
+        """Create a phone allow/block rule for this identity.
+
+        Raises ``InkboxError`` if this identity has no phone number.
+        """
+        self._require_phone()
+        return self._inkbox._phone_identity_contact_rules.create(
+            self.agent_handle,
+            action=action,
+            match_target=match_target,
+            match_type=match_type,
+        )
+
+    def update_phone_contact_rule(
+        self,
+        rule_id: UUID | str,
+        *,
+        action: PhoneRuleAction | str = _UNSET,  # type: ignore[assignment]
+        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+    ) -> PhoneIdentityContactRule:
+        """Update a phone rule's ``action`` or ``status`` (admin-only)."""
+        self._require_phone()
+        kwargs: dict[str, Any] = {}
+        if action is not _UNSET:
+            kwargs["action"] = action
+        if status is not _UNSET:
+            kwargs["status"] = status
+        return self._inkbox._phone_identity_contact_rules.update(
+            self.agent_handle, rule_id, **kwargs,
+        )
+
+    def delete_phone_contact_rule(self, rule_id: UUID | str) -> None:
+        """Delete one of this identity's phone contact rules (admin-only)."""
+        self._require_phone()
+        self._inkbox._phone_identity_contact_rules.delete(self.agent_handle, rule_id)
+
+    ## Signing key
+
+    def get_signing_key_status(self) -> SigningKeyStatus:
+        """Report whether this identity has a webhook signing key."""
+        return self._inkbox._signing_keys.get_status(self.agent_handle)
+
+    def create_signing_key(self) -> SigningKey:
+        """Create or rotate this identity's webhook signing key.
+
+        The plaintext ``signing_key`` is returned **once** — store it
+        securely, it cannot be retrieved again.
+        """
+        return self._inkbox._signing_keys.create_or_rotate(self.agent_handle)
+
     ## Identity management
 
     def update(
@@ -997,10 +1170,12 @@ class AgentIdentity:
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
         imessage_filter_mode: FilterMode | str | None = None,
+        mail_filter_mode: FilterMode | str | None = None,
+        phone_filter_mode: FilterMode | str | None = None,
         status: str | None = None,
     ) -> None:
         """Update this identity's handle, display name, description,
-        iMessage reachability, and/or status.
+        iMessage reachability, contact-rule filter modes, and/or status.
 
         Only provided fields are applied; omitted fields are left
         unchanged. For ``display_name`` and ``description``, explicit
@@ -1014,6 +1189,13 @@ class AgentIdentity:
             imessage_enabled: Toggle shared-iMessage reachability.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
+            mail_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
+                identity's mail contact rules (admin-only). Note: unlike the
+                deprecated ``mailboxes.update(filter_mode=...)``, this does
+                not return a ``FilterModeChangeNotice``.
+            phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
+                identity's phone contact rules (admin-only). Rejected with a
+                422 when the identity has no phone number.
             status: ``"active"`` or ``"paused"``. Call :meth:`delete`
                 to remove the identity; ``"deleted"`` is rejected here.
         """
@@ -1032,6 +1214,18 @@ class AgentIdentity:
                 if isinstance(imessage_filter_mode, FilterMode)
                 else imessage_filter_mode
             )
+        if mail_filter_mode is not None:
+            update_kwargs["mail_filter_mode"] = (
+                mail_filter_mode.value
+                if isinstance(mail_filter_mode, FilterMode)
+                else mail_filter_mode
+            )
+        if phone_filter_mode is not None:
+            update_kwargs["phone_filter_mode"] = (
+                phone_filter_mode.value
+                if isinstance(phone_filter_mode, FilterMode)
+                else phone_filter_mode
+            )
         if status is not None:
             update_kwargs["status"] = status
         result = self._inkbox._ids_resource.update(
@@ -1048,6 +1242,8 @@ class AgentIdentity:
             updated_at=result.updated_at,
             imessage_enabled=result.imessage_enabled,
             imessage_filter_mode=result.imessage_filter_mode,
+            mail_filter_mode=result.mail_filter_mode,
+            phone_filter_mode=result.phone_filter_mode,
             mailbox=self._mailbox,
             phone_number=self._phone_number,
             tunnel=self._tunnel,

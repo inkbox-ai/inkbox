@@ -243,11 +243,40 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     const remaining = await inkbox.vault.listSecrets();
     expect(remaining).toHaveLength(0);
 
-    // ── signing key ───────────────────────────────────────────
-    logStep(config, "create signing key");
-    const signingKey = await inkbox.createSigningKey();
+    // ── identity-scoped contact rules + filter mode ───────────
+    // (mail only — alpha has no phone number, and we don't provision
+    // real numbers in CI; phone rules require a number server-side.)
+    logStep(config, "set alpha mail filter mode to whitelist");
+    await alpha.update({ mailFilterMode: "whitelist" });
+    expect((await inkbox.getIdentity(alphaHandle)).mailFilterMode).toBe("whitelist");
+
+    logStep(config, "create a mail contact rule on alpha (identity-keyed)");
+    const rule = await alpha.createMailContactRule({
+      action: "allow",
+      matchType: "exact_email",
+      matchTarget: "vip@example.com",
+    });
+    expect(rule.agentIdentityId).toBe(alpha.id);
+
+    logStep(config, "list alpha's mail rules + org-wide list filtered by identity");
+    expect((await alpha.listMailContactRules()).some((r) => r.id === rule.id)).toBe(true);
+    const orgRules = await inkbox.mailIdentityContactRules.listAll({ agentIdentityId: alpha.id });
+    expect(orgRules.some((r) => r.id === rule.id)).toBe(true);
+
+    logStep(config, "delete the mail contact rule + reset filter mode");
+    await alpha.deleteMailContactRule(rule.id);
+    expect((await alpha.listMailContactRules()).some((r) => r.id === rule.id)).toBe(false);
+    await alpha.update({ mailFilterMode: "blacklist" });
+    expect((await inkbox.getIdentity(alphaHandle)).mailFilterMode).toBe("blacklist");
+
+    // ── per-identity signing key ──────────────────────────────
+    logStep(config, "per-identity signing key: status -> create -> status");
+    const preStatus = await alpha.getSigningKeyStatus();
+    expect(typeof preStatus.configured).toBe("boolean");
+    const signingKey = await alpha.createSigningKey();
     expect(signingKey.signingKey).toBeTruthy();
     expect(signingKey.createdAt).toBeTruthy();
+    expect((await alpha.getSigningKeyStatus()).configured).toBe(true);
 
     // ── cleanup: delete identities ────────────────────────────
     logStep(config, "delete identities (cascades to mailbox + tunnel)");
