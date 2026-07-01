@@ -620,30 +620,58 @@ inkbox.threads.delete("abc@inkboxmail.com", "thread-uuid")
 
 ---
 
-## Org-level Calls and Transcripts
+## Org-level Calls
 
-Access calls and transcripts directly. Access via `inkbox.calls` and `inkbox.transcripts`.
+Calls are identity-scoped. Access them via `inkbox.calls`; transcripts
+are folded onto the same resource as `inkbox.calls.transcripts(call_id)`.
 
 ```python
-# List calls for a phone number
-calls = inkbox.calls.list("phone-number-uuid", limit=10)
+# List calls (agent-scoped keys resolve their own identity; admin/JWT
+# keys must pass agent_identity_id).
+calls = inkbox.calls.list(limit=10)
 for call in calls:
-    print(call.id, call.direction, call.status)
+    print(call.id, call.direction, call.status, call.origin)
+
+# List calls for a specific identity (admin/JWT)
+scoped = inkbox.calls.list(agent_identity_id="identity-uuid", limit=10)
 
 # Get a single call
-call = inkbox.calls.get("phone-number-uuid", "call-uuid")
+call = inkbox.calls.get("call-uuid")
 
-# Place an outbound call
-call = inkbox.calls.place(
-    from_number="phone-number-uuid",
+# Place an outbound call from a dedicated number
+placed = inkbox.calls.place(
+    from_number="+18335794607",
     to_number="+15551234567",
     client_websocket_url="wss://example.com/ws",
 )
 
+# Place an outbound call over the shared iMessage-number pool
+from inkbox import CallOrigin
+shared = inkbox.calls.place(
+    to_number="+15551234567",
+    origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
+    agent_identity_id="identity-uuid",
+)
+
 # List transcript segments for a call
-segments = inkbox.transcripts.list("phone-number-uuid", "call-uuid")
+segments = inkbox.calls.transcripts("call-uuid")
 for t in segments:
     print(f"[{t.party}] {t.text}")
+```
+
+### Incoming-call routing
+
+```python
+from inkbox import IncomingCallAction
+
+# Read the current incoming-call config
+config = inkbox.incoming_call_action.get()
+
+# Route incoming calls to a webhook
+inkbox.incoming_call_action.set(
+    incoming_call_action=IncomingCallAction.WEBHOOK,
+    incoming_call_webhook_url="https://your-agent.example.com/incoming-call",
+)
 ```
 
 ---

@@ -6,7 +6,7 @@
 //! prints PASS/FAIL with the concrete status/field evidence instead of bailing,
 //! so a single run reports every surface's outcome.
 //!
-//! Run:  INKBOX_BASE_URL=https://api.development.inkbox.ai cargo run --example phone_acceptance
+//! Run:  INKBOX_BASE_URL=https://api.example.com cargo run --example phone_acceptance
 
 use inkbox::error::InkboxError;
 use inkbox::phone::{CallOrigin, IncomingCallAction};

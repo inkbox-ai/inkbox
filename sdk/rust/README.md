@@ -92,7 +92,7 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 | Domain | Accessor |
 |---|---|
 | Mail | `mailboxes()`, `messages()`, `threads()`, `mail_identity_contact_rules()`, `mail_contact_rules()` *(deprecated)*, `domains()` |
-| Phone | `calls()`, `phone_numbers()`, `texts()`, `transcripts()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
+| Phone | `calls()`, `phone_numbers()`, `texts()`, `incoming_call_action()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
 | iMessage | `imessages()`, `imessage_contact_rules()` |
 | Vault / data | `vault()`, `contacts()`, `notes()` |
 | Org | `api_keys()`, `identities()`, `signing_keys()`, `tunnels()`, `webhooks()` |

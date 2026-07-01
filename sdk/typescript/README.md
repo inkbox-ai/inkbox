@@ -657,7 +657,7 @@ await inkbox.threads.delete("abc@inkboxmail.com", "thread-uuid");
 
 ---
 
-## Org-level Calls and Transcripts
+## Org-level Calls
 
 Calls are identity-scoped. Access them via `inkbox.calls`; transcripts
 are folded onto the same resource as `inkbox.calls.transcripts(callId)`.
