@@ -6,6 +6,9 @@ import {
   parseRateLimitInfo,
   parsePhoneCallWithRateLimit,
   parsePhoneTranscript,
+  parseIncomingCallActionConfig,
+  CallOrigin,
+  IncomingCallAction,
   SmsStatus,
 } from "../../src/phone/types.js";
 import {
@@ -14,6 +17,7 @@ import {
   RAW_RATE_LIMIT,
   RAW_PHONE_CALL_WITH_RATE_LIMIT,
   RAW_PHONE_TRANSCRIPT,
+  RAW_INCOMING_CALL_ACTION_CONFIG,
 } from "../sampleData.js";
 
 describe("parsePhoneNumber", () => {
@@ -82,6 +86,24 @@ describe("parsePhoneCall", () => {
     expect(c.startedAt).toBeInstanceOf(Date);
     expect(c.endedAt).toBeInstanceOf(Date);
     expect(c.isBlocked).toBe(false);
+    expect(c.origin).toBe(CallOrigin.DEDICATED_NUMBER);
+  });
+
+  it("parses shared-pool origin and null localPhoneNumber", () => {
+    const c = parsePhoneCall({
+      ...RAW_PHONE_CALL,
+      local_phone_number: null,
+      origin: "shared_imessage_number",
+    });
+    expect(c.localPhoneNumber).toBeNull();
+    expect(c.origin).toBe(CallOrigin.SHARED_IMESSAGE_NUMBER);
+  });
+
+  it("defaults origin to dedicated_number when missing", () => {
+    const { origin: _ignored, ...legacyPayload } = RAW_PHONE_CALL;
+    void _ignored;
+    const c = parsePhoneCall(legacyPayload);
+    expect(c.origin).toBe(CallOrigin.DEDICATED_NUMBER);
   });
 
   it("handles null timestamps", () => {
@@ -135,6 +157,25 @@ describe("parsePhoneTranscript", () => {
     expect(t.party).toBe("local");
     expect(t.text).toBe("Hello, how can I help you?");
     expect(t.createdAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("parseIncomingCallActionConfig", () => {
+  it("converts all fields", () => {
+    const c = parseIncomingCallActionConfig(RAW_INCOMING_CALL_ACTION_CONFIG);
+    expect(c.agentIdentityId).toBe(RAW_INCOMING_CALL_ACTION_CONFIG.agent_identity_id);
+    expect(c.incomingCallAction).toBe(IncomingCallAction.WEBHOOK);
+    expect(c.clientWebsocketUrl).toBeNull();
+    expect(c.incomingCallWebhookUrl).toBe("https://agent.example.com/incoming-call");
+  });
+
+  it("coerces missing optional urls to null", () => {
+    const c = parseIncomingCallActionConfig({
+      agent_identity_id: "id-1",
+      incoming_call_action: "auto_accept",
+    });
+    expect(c.clientWebsocketUrl).toBeNull();
+    expect(c.incomingCallWebhookUrl).toBeNull();
   });
 });
 

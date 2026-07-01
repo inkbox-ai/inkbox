@@ -13,6 +13,9 @@ from sample_data import (
     PHONE_TRANSCRIPT_DICT,
 )
 from inkbox.phone.types import (
+    CallOrigin,
+    IncomingCallAction,
+    IncomingCallActionConfig,
     PhoneNumber,
     PhoneCall,
     PhoneTranscript,
@@ -88,6 +91,41 @@ class TestPhoneCallParsing:
 
         assert c.started_at is None
         assert c.ended_at is None
+
+    def test_origin_defaults_to_dedicated_when_missing(self):
+        # Older responses predate shared-iMessage calls.
+        c = PhoneCall._from_dict(PHONE_CALL_DICT)
+        assert c.origin is CallOrigin.DEDICATED_NUMBER
+
+    def test_origin_null_coerces_to_dedicated(self):
+        c = PhoneCall._from_dict({**PHONE_CALL_DICT, "origin": None})
+        assert c.origin is CallOrigin.DEDICATED_NUMBER
+
+    def test_shared_origin_has_null_local_number(self):
+        d = {
+            **PHONE_CALL_DICT,
+            "origin": "shared_imessage_number",
+            "local_phone_number": None,
+        }
+        c = PhoneCall._from_dict(d)
+        assert c.origin is CallOrigin.SHARED_IMESSAGE_NUMBER
+        assert c.local_phone_number is None
+
+
+class TestIncomingCallActionConfigParsing:
+    def test_from_dict(self):
+        cfg = IncomingCallActionConfig._from_dict(
+            {
+                "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
+                "incoming_call_action": "webhook",
+                "client_websocket_url": None,
+                "incoming_call_webhook_url": "https://hooks.example.com/x",
+            }
+        )
+        assert isinstance(cfg.agent_identity_id, UUID)
+        assert cfg.incoming_call_action is IncomingCallAction.WEBHOOK
+        assert cfg.client_websocket_url is None
+        assert cfg.incoming_call_webhook_url == "https://hooks.example.com/x"
 
 
 class TestPhoneTranscriptParsing:

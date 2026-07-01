@@ -128,6 +128,49 @@ pub enum TextMessageOrigin {
     AutoReply,
 }
 
+/// Where an outbound (or observed) call originates.
+///
+/// `dedicated_number` rides an identity's own provisioned phone number;
+/// `shared_imessage_number` rides the shared iMessage line and is scoped by
+/// agent identity instead. Defaults to `dedicated_number`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CallOrigin {
+    #[default]
+    DedicatedNumber,
+    SharedImessageNumber,
+}
+
+impl CallOrigin {
+    /// The wire string value (`"dedicated_number"` / `"shared_imessage_number"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CallOrigin::DedicatedNumber => "dedicated_number",
+            CallOrigin::SharedImessageNumber => "shared_imessage_number",
+        }
+    }
+}
+
+/// Routing decision applied to inbound calls for an agent identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IncomingCallAction {
+    AutoAccept,
+    AutoReject,
+    Webhook,
+}
+
+impl IncomingCallAction {
+    /// The wire string value (`"auto_accept"` / `"auto_reject"` / `"webhook"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IncomingCallAction::AutoAccept => "auto_accept",
+            IncomingCallAction::AutoReject => "auto_reject",
+            IncomingCallAction::Webhook => "webhook",
+        }
+    }
+}
+
 /// Consent state of a receiver number for the calling org.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -225,7 +268,10 @@ pub struct PhoneNumber {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoneCall {
     pub id: Uuid,
-    pub local_phone_number: String,
+    /// `None` when `origin == shared_imessage_number` (the shared line has no
+    /// dedicated local number). Defaults to `None` when absent.
+    #[serde(default)]
+    pub local_phone_number: Option<String>,
     pub remote_phone_number: String,
     pub direction: String,
     pub status: String,
@@ -246,6 +292,10 @@ pub struct PhoneCall {
     /// Defaults to `false` for older server responses without this field.
     #[serde(default)]
     pub is_blocked: bool,
+    /// Where the call originated. Defaults to `dedicated_number` when absent
+    /// or null (older server responses predate the field).
+    #[serde(default)]
+    pub origin: CallOrigin,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -271,6 +321,20 @@ pub struct PhoneCallWithRateLimit {
     /// a missing/empty value).
     #[serde(default)]
     pub rate_limit: Option<RateLimitInfo>,
+}
+
+/// Inbound-call routing config for an agent identity.
+///
+/// `client_websocket_url` is populated when the action bridges accepted calls
+/// to a socket; `incoming_call_webhook_url` when the action is `webhook`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IncomingCallActionConfig {
+    pub agent_identity_id: Uuid,
+    pub incoming_call_action: IncomingCallAction,
+    #[serde(default)]
+    pub client_websocket_url: Option<String>,
+    #[serde(default)]
+    pub incoming_call_webhook_url: Option<String>,
 }
 
 /// A single media attachment in an MMS message.

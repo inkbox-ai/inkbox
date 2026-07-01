@@ -1,6 +1,7 @@
 // sdk/typescript/tests/agent_identity.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AgentIdentity } from "../src/agent_identity.js";
+import { CallOrigin } from "../src/phone/types.js";
 import { InkboxError } from "../src/_http.js";
 import type { Inkbox } from "../src/inkbox.js";
 import type { _AgentIdentityData } from "../src/identities/types.js";
@@ -64,8 +65,7 @@ function mockInkbox() {
     },
     _threads: { get: vi.fn() },
     _numbers: { provision: vi.fn() },
-    _calls: { place: vi.fn(), list: vi.fn() },
-    _transcripts: { list: vi.fn() },
+    _calls: { place: vi.fn(), list: vi.fn(), transcripts: vi.fn() },
     _texts: { send: vi.fn(), update: vi.fn(), updateConversation: vi.fn() },
     _idsResource: {
       get: vi.fn(),
@@ -255,7 +255,7 @@ describe("AgentIdentity mail helpers", () => {
 });
 
 describe("AgentIdentity phone helpers", () => {
-  it("placeCall delegates to calls resource", async () => {
+  it("placeCall delegates to calls resource (dedicated origination)", async () => {
     const ink = mockInkbox();
     vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
     const identity = new AgentIdentity(makeData(), ink);
@@ -263,45 +263,78 @@ describe("AgentIdentity phone helpers", () => {
     await identity.placeCall({ toNumber: "+15551234567" });
 
     expect(ink._calls.place).toHaveBeenCalledWith({
-      fromNumber: PARSED_PHONE.number,
       toNumber: "+15551234567",
+      origination: CallOrigin.DEDICATED_NUMBER,
+      fromNumber: PARSED_PHONE.number,
       clientWebsocketUrl: undefined,
     });
   });
 
-  it("placeCall throws when no phone", async () => {
+  it("placeCall with shared origination scopes by identity id, no from_number", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+    // Shared origination works without a dedicated number.
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
+
+    await identity.placeCall({
+      toNumber: "+15551234567",
+      origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+    });
+
+    expect(ink._calls.place).toHaveBeenCalledWith({
+      toNumber: "+15551234567",
+      origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+      agentIdentityId: identity.id,
+      clientWebsocketUrl: undefined,
+    });
+  });
+
+  it("placeCall throws when no phone for dedicated origination", async () => {
     const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
     await expect(identity.placeCall({ toNumber: "+1" })).rejects.toThrow(InkboxError);
   });
 
-  it("listCalls delegates to calls resource", async () => {
+  it("listCalls delegates to calls resource scoped by identity id", async () => {
     const ink = mockInkbox();
     vi.mocked(ink._calls.list).mockResolvedValue([]);
     const identity = new AgentIdentity(makeData(), ink);
 
     await identity.listCalls({ limit: 10 });
 
-    expect(ink._calls.list).toHaveBeenCalledWith(PARSED_PHONE.id, { limit: 10 });
+    expect(ink._calls.list).toHaveBeenCalledWith({
+      agentIdentityId: identity.id,
+      limit: 10,
+    });
   });
 
-  it("listCalls throws when no phone", async () => {
-    const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
-    await expect(identity.listCalls()).rejects.toThrow(InkboxError);
-  });
-
-  it("listTranscripts delegates to transcripts resource", async () => {
+  it("listCalls works without a phone number (shared-only identity)", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._transcripts.list).mockResolvedValue([]);
+    vi.mocked(ink._calls.list).mockResolvedValue([]);
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
+
+    await identity.listCalls();
+
+    expect(ink._calls.list).toHaveBeenCalledWith({ agentIdentityId: identity.id });
+  });
+
+  it("listTranscripts delegates to calls.transcripts", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.transcripts).mockResolvedValue([]);
     const identity = new AgentIdentity(makeData(), ink);
 
     await identity.listTranscripts("call-1");
 
-    expect(ink._transcripts.list).toHaveBeenCalledWith(PARSED_PHONE.id, "call-1");
+    expect(ink._calls.transcripts).toHaveBeenCalledWith("call-1");
   });
 
-  it("listTranscripts throws when no phone", async () => {
-    const identity = new AgentIdentity(makeData({ phoneNumber: null }), mockInkbox());
-    await expect(identity.listTranscripts("call-1")).rejects.toThrow(InkboxError);
+  it("listTranscripts works without a phone number (shared-only identity)", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.transcripts).mockResolvedValue([]);
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
+
+    await identity.listTranscripts("call-1");
+
+    expect(ink._calls.transcripts).toHaveBeenCalledWith("call-1");
   });
 
   it("sendText delegates to texts resource", async () => {

@@ -1,84 +1,119 @@
 /**
  * inkbox-phone/resources/calls.ts
  *
- * Call operations: list, get, place.
+ * Identity-scoped call operations: list, get, transcripts, place.
  */
 
 import { HttpTransport } from "../../_http.js";
 import {
+  CallOrigin,
   PhoneCall,
   PhoneCallWithRateLimit,
+  PhoneTranscript,
   RawPhoneCall,
   RawPhoneCallWithRateLimit,
+  RawPhoneTranscript,
   parsePhoneCall,
   parsePhoneCallWithRateLimit,
+  parsePhoneTranscript,
 } from "../types.js";
 
 export class CallsResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
-   * List calls for a phone number, newest first.
+   * List calls, newest first.
    *
-   * Identity-scoped API keys never see contact-rule-blocked rows
-   * regardless of `isBlocked` (filtered server-side). Admin/JWT
-   * callers see everything by default; pass `isBlocked=true` for the
-   * blocked-only listing or `isBlocked=false` to exclude blocked rows.
+   * Identity-scoped API keys resolve their own identity and never see
+   * contact-rule-blocked rows regardless of `isBlocked` (filtered
+   * server-side). Admin/JWT callers must pass `agentIdentityId` (the
+   * server returns 422 otherwise) and see everything by default; pass
+   * `isBlocked=true` for the blocked-only listing or `isBlocked=false`
+   * to exclude blocked rows.
    *
-   * @param phoneNumberId - UUID of the phone number.
+   * @param options.agentIdentityId - UUID of the agent identity to scope
+   *   to. Optional for agent-scoped keys; required under admin/JWT.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isBlocked - Tri-state filter. `true` for only blocked,
    *   `false` for only non-blocked, omit for all.
    */
-  async list(
-    phoneNumberId: string,
-    options?: { limit?: number; offset?: number; isBlocked?: boolean },
-  ): Promise<PhoneCall[]> {
+  async list(options?: {
+    agentIdentityId?: string;
+    limit?: number;
+    offset?: number;
+    isBlocked?: boolean;
+  }): Promise<PhoneCall[]> {
     const params: Record<string, string | number | boolean> = {
       limit: options?.limit ?? 50,
       offset: options?.offset ?? 0,
     };
+    // Only scope by identity when explicitly supplied.
+    if (options?.agentIdentityId !== undefined) {
+      params["agent_identity_id"] = options.agentIdentityId;
+    }
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
     }
-    const data = await this.http.get<RawPhoneCall[]>(
-      `/numbers/${phoneNumberId}/calls`,
-      params,
-    );
+    const data = await this.http.get<RawPhoneCall[]>("/calls", params);
     return data.map(parsePhoneCall);
   }
 
   /**
    * Get a single call by ID.
    *
-   * @param phoneNumberId - UUID of the phone number.
    * @param callId - UUID of the call.
    */
-  async get(phoneNumberId: string, callId: string): Promise<PhoneCall> {
-    const data = await this.http.get<RawPhoneCall>(
-      `/numbers/${phoneNumberId}/calls/${callId}`,
-    );
+  async get(callId: string): Promise<PhoneCall> {
+    const data = await this.http.get<RawPhoneCall>(`/calls/${callId}`);
     return parsePhoneCall(data);
+  }
+
+  /**
+   * List all transcript segments for a call, ordered by sequence number.
+   *
+   * @param callId - UUID of the call.
+   */
+  async transcripts(callId: string): Promise<PhoneTranscript[]> {
+    const data = await this.http.get<RawPhoneTranscript[]>(
+      `/calls/${callId}/transcripts`,
+    );
+    return data.map(parsePhoneTranscript);
   }
 
   /**
    * Place an outbound call.
    *
-   * @param options.fromNumber - E.164 number to call from. Must belong to your org and be active.
+   * The server enforces the conditional requirements: `fromNumber` is
+   * required for `dedicated_number`, `agentIdentityId` for
+   * `shared_imessage_number`. Omissions surface as a server 422.
+   *
    * @param options.toNumber - E.164 number to call.
+   * @param options.origination - Where the call originates. Defaults to
+   *   `dedicated_number`.
+   * @param options.fromNumber - E.164 number to call from (dedicated origination).
+   * @param options.agentIdentityId - UUID of the placing identity (shared origination).
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @returns The created call record with current rate limit info.
    */
   async place(options: {
-    fromNumber: string;
     toNumber: string;
+    origination?: CallOrigin;
+    fromNumber?: string;
+    agentIdentityId?: string;
     clientWebsocketUrl?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const body: Record<string, unknown> = {
-      from_number: options.fromNumber,
       to_number: options.toNumber,
+      // Always sent (defaults to dedicated_number).
+      origination: options.origination ?? CallOrigin.DEDICATED_NUMBER,
     };
+    if (options.fromNumber !== undefined) {
+      body["from_number"] = options.fromNumber;
+    }
+    if (options.agentIdentityId !== undefined) {
+      body["agent_identity_id"] = options.agentIdentityId;
+    }
     if (options.clientWebsocketUrl !== undefined) {
       body["client_websocket_url"] = options.clientWebsocketUrl;
     }

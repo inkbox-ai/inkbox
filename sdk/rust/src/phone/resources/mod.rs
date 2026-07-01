@@ -3,7 +3,7 @@
 pub mod calls;
 pub mod contact_rules;
 pub mod identity_contact_rules;
+pub mod incoming_call_action;
 pub mod numbers;
 pub mod sms_opt_ins;
 pub mod texts;
-pub mod transcripts;

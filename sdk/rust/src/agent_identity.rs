@@ -19,8 +19,7 @@
 //!
 //! * `messages() -> &MessagesResource`
 //! * `threads() -> &ThreadsResource`
-//! * `calls() -> &CallsResource`
-//! * `transcripts() -> &TranscriptsResource`
+//! * `calls() -> &CallsResource`  (transcripts folded in as `calls().transcripts(..)`)
 //! * `texts() -> &TextsResource`
 //! * `imessages() -> &IMessagesResource`
 //! * `phone_numbers() -> &PhoneNumbersResource`  (Python property `phone_numbers`, attr `_numbers`)
@@ -53,9 +52,10 @@ use crate::mail::types::{
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    ContactRuleStatus as PhoneContactRuleStatus, PhoneCall, PhoneCallWithRateLimit,
-    PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript,
-    TextConversationSummary, TextConversationUpdateResult, TextMessage,
+    CallOrigin, ContactRuleStatus as PhoneContactRuleStatus, IncomingCallAction,
+    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
+    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
+    TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::Tunnel;
@@ -415,26 +415,55 @@ impl AgentIdentity {
     // Phone helpers
     // -----------------------------------------------------------------------
 
-    /// Place an outbound call from this identity's phone number.
+    /// Place an outbound call as this identity.
+    ///
+    /// For `dedicated_number` origination the call rides this identity's
+    /// provisioned phone number (requires one). For `shared_imessage_number`
+    /// it rides the shared line and is scoped by this identity's id instead.
     ///
     /// # Arguments
     /// * `to_number` - E.164 destination number.
+    /// * `origination` - How to place the call (defaults to
+    ///   [`CallOrigin::DedicatedNumber`]).
     /// * `client_websocket_url` - WebSocket URL (wss://) for audio bridging.
     pub fn place_call(
         &self,
         to_number: &str,
+        origination: CallOrigin,
         client_websocket_url: Option<&str>,
     ) -> Result<PhoneCallWithRateLimit> {
-        let number = self.require_phone()?;
-        self.inkbox
-            .calls()
-            .place(&number, to_number, client_websocket_url)
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                // Dedicated origination needs this identity's own number.
+                let number = self.require_phone()?;
+                self.inkbox.calls().place(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    client_websocket_url,
+                )
+            }
+            CallOrigin::SharedImessageNumber => {
+                // Shared-line origination scopes by identity id, no from_number.
+                let id = self.id().to_string();
+                self.inkbox.calls().place(
+                    to_number,
+                    origination,
+                    None,
+                    Some(&id),
+                    client_websocket_url,
+                )
+            }
+        }
     }
 
-    /// List calls made to/from this identity's phone number.
+    /// List calls made to/from this identity.
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
-    /// regardless of `is_blocked` (server-side access policy).
+    /// regardless of `is_blocked` (server-side access policy). Scopes by
+    /// identity id — no phone number required (a shared-only identity can
+    /// still have calls).
     ///
     /// # Arguments
     /// * `limit` - Maximum number of results (default 50).
@@ -446,16 +475,37 @@ impl AgentIdentity {
         offset: i64,
         is_blocked: Option<bool>,
     ) -> Result<Vec<PhoneCall>> {
-        let number_id = self.require_phone_id()?;
+        let id = self.id().to_string();
         self.inkbox
             .calls()
-            .list(&number_id, limit, offset, is_blocked)
+            .list(Some(&id), limit, offset, is_blocked)
     }
 
     /// List transcript segments for a specific call.
     pub fn list_transcripts(&self, call_id: &str) -> Result<Vec<PhoneTranscript>> {
-        let number_id = self.require_phone_id()?;
-        self.inkbox.transcripts().list(&number_id, call_id)
+        self.inkbox.calls().transcripts(call_id)
+    }
+
+    /// Get this identity's inbound-call handling config.
+    pub fn get_incoming_call_action(&self) -> Result<IncomingCallActionConfig> {
+        self.inkbox
+            .incoming_call_action()
+            .get(Some(&self.id().to_string()))
+    }
+
+    /// Set this identity's inbound-call handling config.
+    pub fn set_incoming_call_action(
+        &self,
+        incoming_call_action: IncomingCallAction,
+        client_websocket_url: Option<&str>,
+        incoming_call_webhook_url: Option<&str>,
+    ) -> Result<IncomingCallActionConfig> {
+        self.inkbox.incoming_call_action().set(
+            incoming_call_action,
+            Some(&self.id().to_string()),
+            client_websocket_url,
+            incoming_call_webhook_url,
+        )
     }
 
     // -----------------------------------------------------------------------

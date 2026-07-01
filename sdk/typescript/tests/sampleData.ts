@@ -107,6 +107,7 @@ export const RAW_PHONE_CALL = {
   started_at: "2026-03-09T00:01:00Z",
   ended_at: "2026-03-09T00:05:00Z",
   is_blocked: false,
+  origin: "dedicated_number",
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:05:00Z",
 };
@@ -150,6 +151,13 @@ export const RAW_PHONE_TRANSCRIPT = {
   party: "local",
   text: "Hello, how can I help you?",
   created_at: "2026-03-09T00:01:01Z",
+};
+
+export const RAW_INCOMING_CALL_ACTION_CONFIG = {
+  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
+  incoming_call_action: "webhook",
+  client_websocket_url: null,
+  incoming_call_webhook_url: "https://agent.example.com/incoming-call",
 };
 
 // ---- Texts ----

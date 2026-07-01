@@ -7,7 +7,7 @@ import { ThreadsResource } from "../src/mail/resources/threads.js";
 import { PhoneNumbersResource } from "../src/phone/resources/numbers.js";
 import { CallsResource } from "../src/phone/resources/calls.js";
 import { TextsResource } from "../src/phone/resources/texts.js";
-import { TranscriptsResource } from "../src/phone/resources/transcripts.js";
+import { IncomingCallActionResource } from "../src/phone/resources/incomingCallAction.js";
 import { IdentitiesResource } from "../src/identities/resources/identities.js";
 import { AgentIdentity } from "../src/agent_identity.js";
 import { VaultResource } from "../src/vault/resources/vault.js";
@@ -69,11 +69,11 @@ describe("Inkbox constructor", () => {
     expect(ink.phoneNumbers).toBeInstanceOf(PhoneNumbersResource);
   });
 
-  it("exposes phone calls, texts, and transcripts accessors", () => {
+  it("exposes phone calls, texts, and incomingCallAction accessors", () => {
     const ink = makeInkbox();
     expect(ink.calls).toBeInstanceOf(CallsResource);
     expect(ink.texts).toBeInstanceOf(TextsResource);
-    expect(ink.transcripts).toBeInstanceOf(TranscriptsResource);
+    expect(ink.incomingCallAction).toBeInstanceOf(IncomingCallActionResource);
   });
 
   it("strips trailing slash from baseUrl", () => {

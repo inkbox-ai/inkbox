@@ -55,6 +55,26 @@ export enum TextMessageOrigin {
 }
 
 /**
+ * Where an outbound call originates from.
+ *
+ * - `dedicated_number` — placed from the identity's own dedicated phone
+ *   number (requires `fromNumber`).
+ * - `shared_imessage_number` — placed over the shared iMessage-number
+ *   pool (requires `agentIdentityId`, no `fromNumber`).
+ */
+export enum CallOrigin {
+  DEDICATED_NUMBER = "dedicated_number",
+  SHARED_IMESSAGE_NUMBER = "shared_imessage_number",
+}
+
+/** What happens when a call comes in for an agent identity. */
+export enum IncomingCallAction {
+  AUTO_ACCEPT = "auto_accept",
+  AUTO_REJECT = "auto_reject",
+  WEBHOOK = "webhook",
+}
+
+/**
  * A phone number owned by your organization.
  *
  * **Webhook setup** splits across two surfaces:
@@ -175,7 +195,12 @@ export interface SmsOptIn {
 
 export interface PhoneCall {
   id: string;
-  localPhoneNumber: string;
+  /**
+   * The org-owned local number on this call. `null` when
+   * `origin === shared_imessage_number` (the call rode the shared pool,
+   * so no dedicated local number is attributed).
+   */
+  localPhoneNumber: string | null;
   remotePhoneNumber: string;
   /** "outbound" | "inbound" */
   direction: string;
@@ -196,6 +221,8 @@ export interface PhoneCall {
    * `CallsResource.list`.
    */
   isBlocked: boolean;
+  /** Where this call originated. Defaults to `dedicated_number`. */
+  origin: CallOrigin;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -222,6 +249,20 @@ export interface PhoneTranscript {
   party: string;
   text: string;
   createdAt: Date;
+}
+
+/**
+ * The incoming-call routing config for an agent identity.
+ *
+ * Controls what happens when a call comes in: auto-accept and bridge to
+ * `clientWebsocketUrl`, auto-reject, or fan the decision out to
+ * `incomingCallWebhookUrl`.
+ */
+export interface IncomingCallActionConfig {
+  agentIdentityId: string;
+  incomingCallAction: IncomingCallAction;
+  clientWebsocketUrl: string | null;
+  incomingCallWebhookUrl: string | null;
 }
 
 export interface TextMediaItem {
@@ -355,7 +396,8 @@ export interface RawSmsOptIn {
 
 export interface RawPhoneCall {
   id: string;
-  local_phone_number: string;
+  // Nullable: absent/null when the call rode the shared iMessage pool.
+  local_phone_number: string | null;
   remote_phone_number: string;
   direction: string;
   status: string;
@@ -368,6 +410,9 @@ export interface RawPhoneCall {
   // Optional for back-compat with older server responses that predate
   // the field; parser defaults missing values to false.
   is_blocked?: boolean;
+  // Optional for back-compat; parser coerces missing/null to
+  // dedicated_number.
+  origin?: string;
   created_at: string;
   updated_at: string;
 }
@@ -453,6 +498,13 @@ export interface RawPhoneTranscript {
   created_at: string;
 }
 
+export interface RawIncomingCallActionConfig {
+  agent_identity_id: string;
+  incoming_call_action: string;
+  client_websocket_url?: string | null;
+  incoming_call_webhook_url?: string | null;
+}
+
 // ---- parsers ----
 
 export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
@@ -526,7 +578,7 @@ export function parseSmsOptIn(r: RawSmsOptIn): SmsOptIn {
 export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
   return {
     id: r.id,
-    localPhoneNumber: r.local_phone_number,
+    localPhoneNumber: r.local_phone_number ?? null,
     remotePhoneNumber: r.remote_phone_number,
     direction: r.direction,
     status: r.status,
@@ -537,6 +589,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     startedAt: r.started_at ? new Date(r.started_at) : null,
     endedAt: r.ended_at ? new Date(r.ended_at) : null,
     isBlocked: r.is_blocked ?? false,
+    origin: (r.origin as CallOrigin) ?? CallOrigin.DEDICATED_NUMBER,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -571,6 +624,17 @@ export function parsePhoneTranscript(r: RawPhoneTranscript): PhoneTranscript {
     party: r.party,
     text: r.text,
     createdAt: new Date(r.created_at),
+  };
+}
+
+export function parseIncomingCallActionConfig(
+  r: RawIncomingCallActionConfig,
+): IncomingCallActionConfig {
+  return {
+    agentIdentityId: r.agent_identity_id,
+    incomingCallAction: r.incoming_call_action as IncomingCallAction,
+    clientWebsocketUrl: r.client_websocket_url ?? null,
+    incomingCallWebhookUrl: r.incoming_call_webhook_url ?? null,
   };
 }
 

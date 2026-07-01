@@ -39,10 +39,10 @@ use crate::notes::resources::notes::NotesResource;
 use crate::phone::resources::calls::CallsResource;
 use crate::phone::resources::contact_rules::PhoneContactRulesResource;
 use crate::phone::resources::identity_contact_rules::PhoneIdentityContactRulesResource;
+use crate::phone::resources::incoming_call_action::IncomingCallActionResource;
 use crate::phone::resources::numbers::PhoneNumbersResource;
 use crate::phone::resources::sms_opt_ins::SmsOptInsResource;
 use crate::phone::resources::texts::TextsResource;
-use crate::phone::resources::transcripts::TranscriptsResource;
 use crate::signing_keys::{SigningKey, SigningKeysResource};
 use crate::tunnels::resources::tunnels::TunnelsResource;
 use crate::vault::resources::vault::VaultResource;
@@ -121,7 +121,7 @@ pub struct Inkbox {
     calls: CallsResource,
     phone_numbers: PhoneNumbersResource,
     texts: TextsResource,
-    transcripts: TranscriptsResource,
+    incoming_call_action: IncomingCallActionResource,
     phone_contact_rules: PhoneContactRulesResource,
     sms_opt_ins: SmsOptInsResource,
 
@@ -242,7 +242,7 @@ impl Inkbox {
             calls: CallsResource::new(phone_http.clone()),
             phone_numbers: PhoneNumbersResource::new(phone_http.clone()),
             texts: TextsResource::new(phone_http.clone()),
-            transcripts: TranscriptsResource::new(phone_http.clone()),
+            incoming_call_action: IncomingCallActionResource::new(phone_http.clone()),
             phone_contact_rules: PhoneContactRulesResource::new(phone_http.clone()),
             sms_opt_ins: SmsOptInsResource::new(phone_http.clone()),
 
@@ -318,8 +318,9 @@ impl Inkbox {
     pub fn texts(&self) -> &TextsResource {
         &self.texts
     }
-    pub fn transcripts(&self) -> &TranscriptsResource {
-        &self.transcripts
+    /// Identity-scoped inbound-call routing config (`get()` / `set()`).
+    pub fn incoming_call_action(&self) -> &IncomingCallActionResource {
+        &self.incoming_call_action
     }
     /// Phone per-number allow/block rules (+ org-wide list).
     ///
