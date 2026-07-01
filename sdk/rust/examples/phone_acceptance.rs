@@ -15,7 +15,10 @@ use inkbox::Inkbox;
 // Pull the HTTP status + detail out of an SDK error for evidence lines.
 fn describe(e: &InkboxError) -> String {
     match e {
-        InkboxError::Api { status_code, detail } => {
+        InkboxError::Api {
+            status_code,
+            detail,
+        } => {
             format!("Api status={status_code} detail={detail:?}")
         }
         other => format!("{other:?}"),
@@ -54,7 +57,11 @@ fn main() {
     // ---- Surface 1: calls.list ----
     match inkbox.calls().list(scope, 25, 0, None) {
         Ok(calls) => {
-            println!("[1] calls.list OK: {} calls (scope={:?})", calls.len(), scope);
+            println!(
+                "[1] calls.list OK: {} calls (scope={:?})",
+                calls.len(),
+                scope
+            );
             let mut ded = 0;
             let mut shared = 0;
             for c in &calls {
@@ -62,13 +69,19 @@ fn main() {
                     CallOrigin::DedicatedNumber => {
                         ded += 1;
                         if c.local_phone_number.is_none() {
-                            println!("    WARN dedicated call {} has null local_phone_number", c.id);
+                            println!(
+                                "    WARN dedicated call {} has null local_phone_number",
+                                c.id
+                            );
                         }
                     }
                     CallOrigin::SharedImessageNumber => {
                         shared += 1;
                         if c.local_phone_number.is_some() {
-                            println!("    WARN shared call {} has non-null local_phone_number", c.id);
+                            println!(
+                                "    WARN shared call {} has non-null local_phone_number",
+                                c.id
+                            );
                         }
                     }
                 }
@@ -116,7 +129,10 @@ fn main() {
             "[4b] incoming-call-action.set(auto_accept + wss) OK: action={:?} ws={:?}",
             cfg.incoming_call_action, cfg.client_websocket_url
         ),
-        Err(e) => println!("[4b] incoming-call-action.set(valid) FAIL: {}", describe(&e)),
+        Err(e) => println!(
+            "[4b] incoming-call-action.set(valid) FAIL: {}",
+            describe(&e)
+        ),
     }
     // Invalid: auto_accept without ws -> expect 422.
     match inkbox
@@ -124,7 +140,10 @@ fn main() {
         .set(IncomingCallAction::AutoAccept, scope, None, None)
     {
         Ok(_) => println!("[4c] auto_accept-without-ws: UNEXPECTED 200 (validation NOT wired)"),
-        Err(InkboxError::Api { status_code: 422, detail }) => {
+        Err(InkboxError::Api {
+            status_code: 422,
+            detail,
+        }) => {
             println!("[4c] auto_accept-without-ws rejected 422 OK: {detail:?}")
         }
         Err(e) => println!("[4c] auto_accept-without-ws other error: {}", describe(&e)),
@@ -137,7 +156,10 @@ fn main() {
         Some("http://insecure.example.com/hook"),
     ) {
         Ok(_) => println!("[4d] http-webhook: UNEXPECTED 200 (validation NOT wired)"),
-        Err(InkboxError::Api { status_code: 422, detail }) => {
+        Err(InkboxError::Api {
+            status_code: 422,
+            detail,
+        }) => {
             println!("[4d] http-webhook rejected 422 OK: {detail:?}")
         }
         Err(e) => println!("[4d] http-webhook other error: {}", describe(&e)),
@@ -153,7 +175,10 @@ fn main() {
         None,
     ) {
         Ok(c) => println!("[5a] shared place-call: UNEXPECTED 200 id={}", c.call.id),
-        Err(InkboxError::Api { status_code: 409, detail }) => {
+        Err(InkboxError::Api {
+            status_code: 409,
+            detail,
+        }) => {
             println!("[5a] shared place-call rejected 409 OK (no_shared_connection): {detail:?}")
         }
         Err(e) => println!("[5a] shared place-call other error: {}", describe(&e)),
@@ -174,7 +199,10 @@ fn main() {
                 ) {
                     Ok(c) => println!(
                         "[5b] dedicated place-call OK: origin={:?} status={} local={:?} to={}",
-                        c.call.origin, c.call.status, c.call.local_phone_number, c.call.remote_phone_number
+                        c.call.origin,
+                        c.call.status,
+                        c.call.local_phone_number,
+                        c.call.remote_phone_number
                     ),
                     Err(e) => println!("[5b] dedicated place-call FAIL: {}", describe(&e)),
                 }

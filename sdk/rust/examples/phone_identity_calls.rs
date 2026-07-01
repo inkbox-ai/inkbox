@@ -47,10 +47,22 @@ fn main() -> inkbox::Result<()> {
     let _ = CallOrigin::DedicatedNumber;
     let _ = CallOrigin::SharedImessageNumber;
     let _ = IncomingCallAction::AutoAccept;
-    let _place = |i: &Inkbox| i.calls().place("+15550000000", CallOrigin::DedicatedNumber, Some("+15551112222"), None, None);
+    let _place = |i: &Inkbox| {
+        i.calls().place(
+            "+15550000000",
+            CallOrigin::DedicatedNumber,
+            Some("+15551112222"),
+            None,
+            None,
+        )
+    };
     let _set = |i: &Inkbox| {
-        i.incoming_call_action()
-            .set(IncomingCallAction::Webhook, None, None, Some("https://example.com/hook"))
+        i.incoming_call_action().set(
+            IncomingCallAction::Webhook,
+            None,
+            None,
+            Some("https://example.com/hook"),
+        )
     };
 
     Ok(())
