@@ -212,6 +212,15 @@ PHONE_TRANSCRIPT_DICT = {
     "created_at": "2026-03-09T00:01:01Z",
 }
 
+RATE_LIMIT_INFO_DICT = {
+    "calls_used": 3,
+    "calls_remaining": 7,
+    "calls_limit": 10,
+    "minutes_used": 12.5,
+    "minutes_remaining": 47.5,
+    "minutes_limit": 60,
+}
+
 INCOMING_CALL_ACTION_CONFIG_DICT = {
     "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "incoming_call_action": "webhook",

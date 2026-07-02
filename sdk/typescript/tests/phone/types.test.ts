@@ -145,6 +145,17 @@ describe("parsePhoneCallWithRateLimit", () => {
     expect(c.rateLimit.callsUsed).toBe(5);
     expect(c.status).toBe("completed");
   });
+
+  it("carries call fields through — shared origin and null localPhoneNumber", () => {
+    const c = parsePhoneCallWithRateLimit({
+      ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
+      local_phone_number: null,
+      origin: "shared_imessage_number",
+    });
+    expect(c.localPhoneNumber).toBeNull();
+    expect(c.origin).toBe(CallOrigin.SHARED_IMESSAGE_NUMBER);
+    expect(c.rateLimit.minutesRemaining).toBe(987.5);
+  });
 });
 
 describe("parsePhoneTranscript", () => {

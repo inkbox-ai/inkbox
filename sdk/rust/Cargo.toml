@@ -37,6 +37,11 @@ tunnels-runtime = [
     "sha2/oid",
 ]
 
+[dev-dependencies]
+# Local HTTP mock server for the phone resource tests (query/body/error-shape
+# assertions against the blocking transport).
+httpmock = "0.7"
+
 [dependencies]
 # HTTP — blocking client mirrors the synchronous Python SDK surface.
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls", "multipart"] }

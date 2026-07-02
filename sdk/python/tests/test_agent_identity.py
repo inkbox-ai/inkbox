@@ -15,7 +15,16 @@ from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
 from inkbox.mail.types import ForwardMode, MessageDetail, ThreadDetail
-from inkbox.phone.types import TextConversationUpdateResult, TextMessage
+from inkbox.phone.types import (
+    CallOrigin,
+    IncomingCallAction,
+    IncomingCallActionConfig,
+    PhoneCall,
+    PhoneCallWithRateLimit,
+    PhoneTranscript,
+    TextConversationUpdateResult,
+    TextMessage,
+)
 
 
 def _identity_with_mailbox():
@@ -121,6 +130,8 @@ class TestAgentIdentityGetThread:
 
 
 PHONE_NUMBER_ID = UUID("bbbb2222-0000-0000-0000-000000000001")
+IDENTITY_UUID = UUID("eeee5555-0000-0000-0000-000000000001")
+CALL_ID = "bbbb2222-0000-0000-0000-000000000001"
 
 
 class TestAgentIdentitySendText:
@@ -192,6 +203,171 @@ class TestAgentIdentityMarkTextConversationRead:
 
         with pytest.raises(InkboxError, match="no phone number assigned"):
             identity.mark_text_conversation_read("+15551234567")
+
+
+class TestAgentIdentityPlaceCall:
+    def test_place_call_dedicated_uses_own_number(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        result = identity.place_call(
+            to_number="+15551234567",
+            client_websocket_url="wss://agent.example.com/ws",
+        )
+
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination=CallOrigin.DEDICATED_NUMBER,
+            from_number="+18335794607",
+            client_websocket_url="wss://agent.example.com/ws",
+        )
+        assert result is inkbox._calls.place.return_value
+
+    def test_place_call_dedicated_string_origination(self):
+        # A raw "dedicated_number" string takes the same dedicated path.
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        identity.place_call(to_number="+15551234567", origination="dedicated_number")
+
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination="dedicated_number",
+            from_number="+18335794607",
+            client_websocket_url=None,
+        )
+
+    def test_place_call_dedicated_requires_phone(self):
+        identity, _ = _identity_without_phone()
+
+        with pytest.raises(InkboxError, match="no phone number assigned"):
+            identity.place_call(to_number="+15551234567")
+
+    def test_place_call_shared_scopes_by_identity_id(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        identity.place_call(
+            to_number="+15551234567",
+            origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
+            client_websocket_url="wss://agent.example.com/ws",
+        )
+
+        # Shared origination sends the identity id and no from_number.
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
+            agent_identity_id=IDENTITY_UUID,
+            client_websocket_url="wss://agent.example.com/ws",
+        )
+
+    def test_place_call_shared_does_not_require_phone(self):
+        # Shared-line calls work for identities with no dedicated number.
+        identity, inkbox = _identity_without_phone()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        identity.place_call(
+            to_number="+15551234567",
+            origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
+        )
+
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
+            agent_identity_id=IDENTITY_UUID,
+            client_websocket_url=None,
+        )
+
+
+class TestAgentIdentityListCalls:
+    def test_list_calls_scopes_to_identity_with_defaults(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.list.return_value = [MagicMock(spec=PhoneCall)]
+
+        result = identity.list_calls()
+
+        inkbox._calls.list.assert_called_once_with(
+            agent_identity_id=IDENTITY_UUID,
+            limit=50,
+            offset=0,
+            is_blocked=None,
+        )
+        assert result is inkbox._calls.list.return_value
+
+    def test_list_calls_forwards_filters(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.list.return_value = []
+
+        identity.list_calls(limit=10, offset=20, is_blocked=True)
+
+        inkbox._calls.list.assert_called_once_with(
+            agent_identity_id=IDENTITY_UUID,
+            limit=10,
+            offset=20,
+            is_blocked=True,
+        )
+
+
+class TestAgentIdentityListTranscripts:
+    def test_list_transcripts_delegates_to_calls_resource(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.transcripts.return_value = [MagicMock(spec=PhoneTranscript)]
+
+        result = identity.list_transcripts(CALL_ID)
+
+        inkbox._calls.transcripts.assert_called_once_with(CALL_ID)
+        assert result is inkbox._calls.transcripts.return_value
+
+
+class TestAgentIdentityIncomingCallAction:
+    def test_get_scopes_to_identity(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._incoming_call_action.get.return_value = MagicMock(
+            spec=IncomingCallActionConfig
+        )
+
+        result = identity.get_incoming_call_action()
+
+        inkbox._incoming_call_action.get.assert_called_once_with(
+            agent_identity_id=IDENTITY_UUID,
+        )
+        assert result is inkbox._incoming_call_action.get.return_value
+
+    def test_set_forwards_all_fields(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._incoming_call_action.set.return_value = MagicMock(
+            spec=IncomingCallActionConfig
+        )
+
+        result = identity.set_incoming_call_action(
+            incoming_call_action=IncomingCallAction.WEBHOOK,
+            client_websocket_url="wss://agent.example.com/ws",
+            incoming_call_webhook_url="https://hooks.example.com/incoming-call",
+        )
+
+        inkbox._incoming_call_action.set.assert_called_once_with(
+            incoming_call_action=IncomingCallAction.WEBHOOK,
+            agent_identity_id=IDENTITY_UUID,
+            client_websocket_url="wss://agent.example.com/ws",
+            incoming_call_webhook_url="https://hooks.example.com/incoming-call",
+        )
+        assert result is inkbox._incoming_call_action.set.return_value
+
+    def test_set_minimal_forwards_none_optionals(self):
+        # The delegator always passes the optionals; the resource drops Nones.
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._incoming_call_action.set.return_value = MagicMock(
+            spec=IncomingCallActionConfig
+        )
+
+        identity.set_incoming_call_action(incoming_call_action="auto_reject")
+
+        inkbox._incoming_call_action.set.assert_called_once_with(
+            incoming_call_action="auto_reject",
+            agent_identity_id=IDENTITY_UUID,
+            client_websocket_url=None,
+            incoming_call_webhook_url=None,
+        )
 
 
 class TestAgentIdentityUpdate:

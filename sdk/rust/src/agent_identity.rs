@@ -1186,25 +1186,63 @@ impl std::fmt::Debug for AgentIdentity {
 
 #[cfg(test)]
 mod tests {
+    use httpmock::prelude::*;
+    use serde_json::json;
+
     use super::*;
     use crate::identities::types::AgentIdentityData;
 
-    /// Build a phoneless identity backed by a client pointed at an unreachable
-    /// localhost port, so any real request fails fast instead of hanging.
-    fn phoneless_identity() -> AgentIdentity {
-        let data: AgentIdentityData = serde_json::from_value(serde_json::json!({
-            "id": "11111111-1111-1111-1111-111111111111",
+    /// The fixture identity's UUID, shared by the scoping assertions below.
+    const IDENTITY_ID: &str = "11111111-1111-1111-1111-111111111111";
+
+    /// Build an identity (optionally with a phone number) backed by a client
+    /// pointed at `base_url`.
+    fn identity_at(base_url: &str, with_phone: bool) -> AgentIdentity {
+        let mut payload = json!({
+            "id": IDENTITY_ID,
             "organization_id": "org_x",
             "agent_handle": "support-bot",
             "created_at": "2026-06-01T00:00:00+00:00",
             "updated_at": "2026-06-01T00:00:00+00:00",
-        }))
-        .unwrap();
+        });
+        if with_phone {
+            payload["phone_number"] = json!({
+                "id": "44444444-4444-4444-4444-444444444444",
+                "number": "+15550001111",
+                "type": "local",
+                "status": "active",
+                "incoming_call_action": "auto_reject",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-01T00:00:00+00:00",
+            });
+        }
+        let data: AgentIdentityData = serde_json::from_value(payload).unwrap();
         let inkbox = Inkbox::builder("test-key")
-            .base_url("http://127.0.0.1:1")
+            .base_url(base_url)
             .build()
             .unwrap();
         AgentIdentity::new(data, inkbox)
+    }
+
+    /// Build a phoneless identity backed by a client pointed at an unreachable
+    /// localhost port, so any real request fails fast instead of hanging.
+    fn phoneless_identity() -> AgentIdentity {
+        identity_at("http://127.0.0.1:1", false)
+    }
+
+    /// A `PhoneCall` response payload for the delegator tests.
+    fn call_json(origin: &str, local: serde_json::Value) -> serde_json::Value {
+        json!({
+            "id": "22222222-2222-2222-2222-222222222222",
+            "local_phone_number": local,
+            "remote_phone_number": "+15550002222",
+            "direction": "outbound",
+            "status": "initiated",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+            "is_blocked": false,
+            "origin": origin
+        })
     }
 
     #[test]
@@ -1244,5 +1282,182 @@ mod tests {
                 other => panic!("expected phone-required error, got {other:?}"),
             }
         }
+    }
+
+    #[test]
+    fn place_call_dedicated_uses_identitys_own_number() {
+        let server = MockServer::start();
+        // Exact body: from_number is this identity's provisioned number, and
+        // no agent_identity_id key rides along for dedicated origination.
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "from_number": "+15550001111"
+                }));
+            then.status(200)
+                .json_body(call_json("dedicated_number", json!("+15550001111")));
+        });
+        let identity = identity_at(&server.base_url(), true);
+        let placed = identity
+            .place_call("+15550002222", CallOrigin::DedicatedNumber, None)
+            .unwrap();
+        mock.assert();
+        assert_eq!(placed.call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn place_call_shared_scopes_by_identity_id_without_phone() {
+        let server = MockServer::start();
+        // Exact body: identity id in, from_number key never serialized. A
+        // phoneless identity proves shared origination needs no number.
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "shared_imessage_number",
+                    "agent_identity_id": IDENTITY_ID
+                }));
+            then.status(200)
+                .json_body(call_json("shared_imessage_number", serde_json::Value::Null));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let placed = identity
+            .place_call("+15550002222", CallOrigin::SharedImessageNumber, None)
+            .unwrap();
+        mock.assert();
+        assert_eq!(placed.call.origin, CallOrigin::SharedImessageNumber);
+        assert_eq!(placed.call.local_phone_number, None);
+    }
+
+    #[test]
+    fn place_call_forwards_client_websocket_url() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "shared_imessage_number",
+                    "agent_identity_id": IDENTITY_ID,
+                    "client_websocket_url": "wss://example.com/audio"
+                }));
+            then.status(200)
+                .json_body(call_json("shared_imessage_number", serde_json::Value::Null));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        identity
+            .place_call(
+                "+15550002222",
+                CallOrigin::SharedImessageNumber,
+                Some("wss://example.com/audio"),
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn list_calls_scopes_by_own_identity_id() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls")
+                .query_param("agent_identity_id", IDENTITY_ID)
+                .query_param("limit", "10")
+                .query_param("offset", "2")
+                .query_param("is_blocked", "false");
+            then.status(200).json_body(json!([call_json(
+                "dedicated_number",
+                json!("+15550001111")
+            )]));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let calls = identity.list_calls(10, 2, Some(false)).unwrap();
+        mock.assert();
+        assert_eq!(calls.len(), 1);
+    }
+
+    #[test]
+    fn list_transcripts_delegates_to_calls_resource() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/transcripts");
+            then.status(200).json_body(json!([{
+                "id": "55555555-5555-5555-5555-555555555555",
+                "call_id": "22222222-2222-2222-2222-222222222222",
+                "seq": 0,
+                "ts_ms": 0,
+                "party": "remote",
+                "text": "Hi",
+                "created_at": "2026-06-01T00:00:02+00:00"
+            }]));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let segments = identity
+            .list_transcripts("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].text, "Hi");
+    }
+
+    #[test]
+    fn get_incoming_call_action_scopes_by_own_identity_id() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/incoming-call-action")
+                .query_param("agent_identity_id", IDENTITY_ID);
+            then.status(200).json_body(json!({
+                "agent_identity_id": IDENTITY_ID,
+                "incoming_call_action": "auto_accept",
+                "client_websocket_url": "wss://example.com/audio"
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let config = identity.get_incoming_call_action().unwrap();
+        mock.assert();
+        assert_eq!(config.incoming_call_action, IncomingCallAction::AutoAccept);
+        assert_eq!(config.agent_identity_id.to_string(), IDENTITY_ID);
+    }
+
+    #[test]
+    fn set_incoming_call_action_forwards_args_and_own_identity_id() {
+        let server = MockServer::start();
+        // Exact PUT body: action + this identity's id + both forwarded URLs.
+        let mock = server.mock(|when, then| {
+            when.method(PUT)
+                .path("/api/v1/phone/incoming-call-action")
+                .json_body(json!({
+                    "incoming_call_action": "webhook",
+                    "agent_identity_id": IDENTITY_ID,
+                    "client_websocket_url": "wss://example.com/audio",
+                    "incoming_call_webhook_url": "https://example.com/route"
+                }));
+            then.status(200).json_body(json!({
+                "agent_identity_id": IDENTITY_ID,
+                "incoming_call_action": "webhook",
+                "client_websocket_url": "wss://example.com/audio",
+                "incoming_call_webhook_url": "https://example.com/route"
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let config = identity
+            .set_incoming_call_action(
+                IncomingCallAction::Webhook,
+                Some("wss://example.com/audio"),
+                Some("https://example.com/route"),
+            )
+            .unwrap();
+        mock.assert();
+        assert_eq!(config.incoming_call_action, IncomingCallAction::Webhook);
+        assert_eq!(
+            config.incoming_call_webhook_url.as_deref(),
+            Some("https://example.com/route")
+        );
     }
 }

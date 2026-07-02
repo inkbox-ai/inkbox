@@ -11,6 +11,7 @@ from sample_data import (
     PHONE_NUMBER_DICT,
     PHONE_CALL_DICT,
     PHONE_TRANSCRIPT_DICT,
+    RATE_LIMIT_INFO_DICT,
 )
 from inkbox.phone.types import (
     CallOrigin,
@@ -18,6 +19,7 @@ from inkbox.phone.types import (
     IncomingCallActionConfig,
     PhoneNumber,
     PhoneCall,
+    PhoneCallWithRateLimit,
     PhoneTranscript,
     SmsStatus,
 )
@@ -111,6 +113,52 @@ class TestPhoneCallParsing:
         assert c.origin is CallOrigin.SHARED_IMESSAGE_NUMBER
         assert c.local_phone_number is None
 
+    def test_origin_dedicated_explicit(self):
+        c = PhoneCall._from_dict({**PHONE_CALL_DICT, "origin": "dedicated_number"})
+        assert c.origin is CallOrigin.DEDICATED_NUMBER
+        assert c.local_phone_number == "+18335794607"
+
+    def test_unknown_extra_fields_ignored(self):
+        # A newer server can grow fields without breaking older SDKs.
+        c = PhoneCall._from_dict({**PHONE_CALL_DICT, "brand_new_field": "surprise"})
+        assert c.id == UUID(PHONE_CALL_DICT["id"])
+        assert not hasattr(c, "brand_new_field")
+
+
+class TestPhoneCallWithRateLimitParsing:
+    def test_from_dict_with_rate_limit(self):
+        c = PhoneCallWithRateLimit._from_dict(
+            {**PHONE_CALL_DICT, "rate_limit": RATE_LIMIT_INFO_DICT}
+        )
+
+        # Base PhoneCall fields survive the subclass hop.
+        assert isinstance(c, PhoneCall)
+        assert c.id == UUID(PHONE_CALL_DICT["id"])
+        assert c.remote_phone_number == "+15551234567"
+        assert c.origin is CallOrigin.DEDICATED_NUMBER
+        assert c.rate_limit.calls_used == 3
+        assert c.rate_limit.calls_remaining == 7
+        assert c.rate_limit.calls_limit == 10
+        assert c.rate_limit.minutes_used == 12.5
+        assert c.rate_limit.minutes_remaining == 47.5
+        assert c.rate_limit.minutes_limit == 60
+
+    def test_rate_limit_missing_is_none(self):
+        c = PhoneCallWithRateLimit._from_dict(PHONE_CALL_DICT)
+        assert c.rate_limit is None
+
+    def test_shared_origin_parses(self):
+        c = PhoneCallWithRateLimit._from_dict(
+            {
+                **PHONE_CALL_DICT,
+                "local_phone_number": None,
+                "origin": "shared_imessage_number",
+                "rate_limit": RATE_LIMIT_INFO_DICT,
+            }
+        )
+        assert c.origin is CallOrigin.SHARED_IMESSAGE_NUMBER
+        assert c.local_phone_number is None
+
 
 class TestIncomingCallActionConfigParsing:
     def test_from_dict(self):
@@ -139,3 +187,10 @@ class TestPhoneTranscriptParsing:
         assert t.party == "local"
         assert t.text == "Hello, how can I help you?"
         assert isinstance(t.created_at, datetime)
+
+    def test_unknown_extra_fields_ignored(self):
+        t = PhoneTranscript._from_dict(
+            {**PHONE_TRANSCRIPT_DICT, "brand_new_field": "surprise"}
+        )
+        assert t.seq == 0
+        assert not hasattr(t, "brand_new_field")

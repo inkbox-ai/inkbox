@@ -215,6 +215,16 @@ fn default_filter_mode_blacklist() -> FilterMode {
     FilterMode::Blacklist
 }
 
+/// Deserialize a `CallOrigin` treating an explicit `null` as the default, so
+/// `"origin": null` parses like a missing key (the Python parser coerces
+/// null/missing origins to `dedicated_number` for back-compat).
+fn deserialize_call_origin_null_default<'de, D>(deserializer: D) -> Result<CallOrigin, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<CallOrigin>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 // ---------------------------------------------------------------------------
 // Phone structs.
 // ---------------------------------------------------------------------------
@@ -294,7 +304,7 @@ pub struct PhoneCall {
     pub is_blocked: bool,
     /// Where the call originated. Defaults to `dedicated_number` when absent
     /// or null (older server responses predate the field).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_call_origin_null_default")]
     pub origin: CallOrigin,
 }
 
@@ -521,4 +531,156 @@ pub struct PhoneIdentityContactRule {
 
 fn default_contact_rule_status_active() -> ContactRuleStatus {
     ContactRuleStatus::Active
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// Minimal valid `PhoneCall` payload; tests mutate a copy per case.
+    fn call_json() -> serde_json::Value {
+        json!({
+            "id": "22222222-2222-2222-2222-222222222222",
+            "local_phone_number": "+15550001111",
+            "remote_phone_number": "+15550002222",
+            "direction": "outbound",
+            "status": "completed",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:01+00:00",
+            "is_blocked": false,
+            "origin": "dedicated_number"
+        })
+    }
+
+    #[test]
+    fn phone_call_dedicated_has_local_number_string() {
+        let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
+        assert_eq!(call.local_phone_number.as_deref(), Some("+15550001111"));
+        assert_eq!(call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn phone_call_shared_has_null_local_number() {
+        // Shared-line calls have no dedicated local number on the wire.
+        let mut v = call_json();
+        v["local_phone_number"] = serde_json::Value::Null;
+        v["origin"] = json!("shared_imessage_number");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.local_phone_number, None);
+        assert_eq!(call.origin, CallOrigin::SharedImessageNumber);
+    }
+
+    #[test]
+    fn phone_call_missing_local_number_key_defaults_to_none() {
+        let mut v = call_json();
+        v.as_object_mut().unwrap().remove("local_phone_number");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.local_phone_number, None);
+    }
+
+    #[test]
+    fn phone_call_missing_origin_key_defaults_to_dedicated() {
+        // Older server responses predate the field entirely.
+        let mut v = call_json();
+        v.as_object_mut().unwrap().remove("origin");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn phone_call_null_origin_defaults_to_dedicated() {
+        // Parity with the Python parser, which coerces a *null* origin (not
+        // just a missing key) to dedicated for back-compat.
+        let mut v = call_json();
+        v["origin"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn phone_call_tolerates_unknown_fields() {
+        let mut v = call_json();
+        v["some_future_field"] = json!({"nested": true});
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.status, "completed");
+    }
+
+    #[test]
+    fn phone_call_with_rate_limit_flatten_round_trip() {
+        // The wire shape is one flat object: call fields + rate_limit.
+        let mut v = call_json();
+        v["rate_limit"] = json!({
+            "calls_used": 1,
+            "calls_remaining": 9,
+            "calls_limit": 10,
+            "minutes_used": 1.5,
+            "minutes_remaining": 58.5,
+            "minutes_limit": 60
+        });
+        let parsed: PhoneCallWithRateLimit = serde_json::from_value(v.clone()).unwrap();
+        assert_eq!(parsed.call.remote_phone_number, "+15550002222");
+        let rl = parsed.rate_limit.as_ref().expect("rate_limit present");
+        assert_eq!(rl.calls_remaining, 9);
+        assert_eq!(rl.minutes_remaining, 58.5);
+        // Re-serialization stays flat: no `call` wrapper key, ids at top level.
+        let back = serde_json::to_value(&parsed).unwrap();
+        assert!(back.get("call").is_none());
+        assert_eq!(back["id"], v["id"]);
+        assert_eq!(back["rate_limit"]["calls_limit"], 10);
+    }
+
+    #[test]
+    fn phone_call_with_rate_limit_tolerates_missing_rate_limit() {
+        let parsed: PhoneCallWithRateLimit = serde_json::from_value(call_json()).unwrap();
+        assert!(parsed.rate_limit.is_none());
+    }
+
+    #[test]
+    fn phone_transcript_deserializes() {
+        let seg: PhoneTranscript = serde_json::from_value(json!({
+            "id": "55555555-5555-5555-5555-555555555555",
+            "call_id": "22222222-2222-2222-2222-222222222222",
+            "seq": 3,
+            "ts_ms": 1450,
+            "party": "agent",
+            "text": "Hello!",
+            "created_at": "2026-06-01T00:00:02+00:00"
+        }))
+        .unwrap();
+        assert_eq!(seg.seq, 3);
+        assert_eq!(seg.ts_ms, 1450);
+        assert_eq!(seg.party, "agent");
+        assert_eq!(seg.text, "Hello!");
+    }
+
+    #[test]
+    fn incoming_call_action_wire_strings_round_trip() {
+        let cases = [
+            (IncomingCallAction::AutoAccept, "auto_accept"),
+            (IncomingCallAction::AutoReject, "auto_reject"),
+            (IncomingCallAction::Webhook, "webhook"),
+        ];
+        for (variant, wire) in cases {
+            assert_eq!(variant.as_str(), wire);
+            assert_eq!(serde_json::to_value(variant).unwrap(), json!(wire));
+            let parsed: IncomingCallAction = serde_json::from_value(json!(wire)).unwrap();
+            assert_eq!(parsed, variant);
+        }
+    }
+
+    #[test]
+    fn call_origin_wire_strings_round_trip() {
+        let cases = [
+            (CallOrigin::DedicatedNumber, "dedicated_number"),
+            (CallOrigin::SharedImessageNumber, "shared_imessage_number"),
+        ];
+        for (variant, wire) in cases {
+            assert_eq!(variant.as_str(), wire);
+            assert_eq!(serde_json::to_value(variant).unwrap(), json!(wire));
+            let parsed: CallOrigin = serde_json::from_value(json!(wire)).unwrap();
+            assert_eq!(parsed, variant);
+        }
+    }
 }

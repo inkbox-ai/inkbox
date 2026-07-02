@@ -1,8 +1,8 @@
 // sdk/typescript/tests/phone/calls.test.ts
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CallsResource } from "../../src/phone/resources/calls.js";
 import { CallOrigin } from "../../src/phone/types.js";
-import type { HttpTransport } from "../../src/_http.js";
+import { HttpTransport, InkboxAPIError } from "../../src/_http.js";
 import {
   RAW_PHONE_CALL,
   RAW_PHONE_CALL_BLOCKED,
@@ -113,6 +113,33 @@ describe("CallsResource.list", () => {
 
     expect(calls[0].origin).toBe(CallOrigin.DEDICATED_NUMBER);
   });
+
+  it("parses PhoneCall rows to camelCase", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_PHONE_CALL]);
+    const res = new CallsResource(http);
+
+    const [call] = await res.list();
+
+    expect(call.localPhoneNumber).toBe("+18335794607");
+    expect(call.remotePhoneNumber).toBe("+15551234567");
+    expect(call.clientWebsocketUrl).toBe("wss://agent.example.com/ws");
+    expect(call.startedAt).toBeInstanceOf(Date);
+    expect(call.createdAt).toBeInstanceOf(Date);
+  });
+
+  it("passes shared-pool rows through with null localPhoneNumber", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([
+      { ...RAW_PHONE_CALL, local_phone_number: null, origin: "shared_imessage_number" },
+    ]);
+    const res = new CallsResource(http);
+
+    const [call] = await res.list();
+
+    expect(call.localPhoneNumber).toBeNull();
+    expect(call.origin).toBe(CallOrigin.SHARED_IMESSAGE_NUMBER);
+  });
 });
 
 describe("CallsResource.get", () => {
@@ -185,6 +212,9 @@ describe("CallsResource.place", () => {
       origination: "shared_imessage_number",
       agent_identity_id: IDENTITY_ID,
     });
+    // The from_number key must not be present at all on shared bodies.
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
+    expect(body).not.toHaveProperty("from_number");
   });
 
   it("includes optional fields when provided", async () => {
@@ -212,5 +242,116 @@ describe("CallsResource.place", () => {
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["client_websocket_url"]).toBeUndefined();
     expect(body["agent_identity_id"]).toBeUndefined();
+  });
+
+  it("parses the response including origin and rateLimit", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
+      local_phone_number: null,
+      origin: "shared_imessage_number",
+    });
+    const res = new CallsResource(http);
+
+    const call = await res.place({
+      toNumber: "+15551234567",
+      origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+      agentIdentityId: IDENTITY_ID,
+    });
+
+    expect(call.origin).toBe(CallOrigin.SHARED_IMESSAGE_NUMBER);
+    expect(call.localPhoneNumber).toBeNull();
+    expect(call.rateLimit).toEqual({
+      callsUsed: 5,
+      callsRemaining: 95,
+      callsLimit: 100,
+      minutesUsed: 12.5,
+      minutesRemaining: 987.5,
+      minutesLimit: 1000,
+    });
+  });
+});
+
+describe("CallsResource.place API errors", () => {
+  // Exercise the real transport so status/detail propagation is covered.
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function makeErrorResponse(status: number, body: unknown) {
+    return {
+      ok: false,
+      status,
+      statusText: "Error",
+      headers: {
+        get() { return null; },
+        getSetCookie() { return []; },
+      } as unknown as Headers,
+      json: () => Promise.resolve(body),
+    } as Response;
+  }
+
+  function makeResource() {
+    return new CallsResource(new HttpTransport("test-key", "https://inkbox.ai/api/v1"));
+  }
+
+  it("surfaces 409 no_shared_connection as InkboxAPIError with detail preserved", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(409, {
+        detail: {
+          error: "no_shared_connection",
+          message: "No active shared connection to this recipient",
+        },
+      }),
+    );
+    const res = makeResource();
+
+    try {
+      await res.place({
+        toNumber: "+15551234567",
+        origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+        agentIdentityId: IDENTITY_ID,
+      });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      expect((err as InkboxAPIError).statusCode).toBe(409);
+      const detail = (err as InkboxAPIError).detail as Record<string, unknown>;
+      expect(detail.error).toBe("no_shared_connection");
+      expect(detail.message).toBe("No active shared connection to this recipient");
+    }
+  });
+
+  it("surfaces 422 validation errors as InkboxAPIError with detail preserved", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(422, {
+        detail: "from_number is required for dedicated_number origination",
+      }),
+    );
+    const res = makeResource();
+
+    try {
+      await res.place({ toNumber: "+15551234567" });
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      expect((err as InkboxAPIError).statusCode).toBe(422);
+      expect((err as InkboxAPIError).detail).toBe(
+        "from_number is required for dedicated_number origination",
+      );
+    }
+  });
+});
+
+describe("CallsResource surface (identity-centered, v1.0.0)", () => {
+  it("exposes exactly list, get, transcripts, place", () => {
+    const methods = Object.getOwnPropertyNames(CallsResource.prototype)
+      .filter((n) => n !== "constructor")
+      .sort();
+    expect(methods).toEqual(["get", "list", "place", "transcripts"]);
   });
 });

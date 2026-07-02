@@ -43,6 +43,26 @@ describe("IncomingCallActionResource.get", () => {
       agent_identity_id: IDENTITY_ID,
     });
   });
+
+  it("maps snake_case fields to camelCase when all are set", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      agent_identity_id: IDENTITY_ID,
+      incoming_call_action: "auto_accept",
+      client_websocket_url: "wss://agent.example.com/ws",
+      incoming_call_webhook_url: "https://agent.example.com/incoming-call",
+    });
+    const res = new IncomingCallActionResource(http);
+
+    const config = await res.get();
+
+    expect(config).toEqual({
+      agentIdentityId: IDENTITY_ID,
+      incomingCallAction: IncomingCallAction.AUTO_ACCEPT,
+      clientWebsocketUrl: "wss://agent.example.com/ws",
+      incomingCallWebhookUrl: "https://agent.example.com/incoming-call",
+    });
+  });
 });
 
 describe("IncomingCallActionResource.set", () => {
@@ -76,5 +96,18 @@ describe("IncomingCallActionResource.set", () => {
       client_websocket_url: "wss://agent.example.com/ws",
       incoming_call_webhook_url: "https://agent.example.com/incoming-call",
     });
+  });
+
+  it("parses the returned config to camelCase", async () => {
+    const http = mockHttp();
+    vi.mocked(http.put).mockResolvedValue(RAW_INCOMING_CALL_ACTION_CONFIG);
+    const res = new IncomingCallActionResource(http);
+
+    const config = await res.set({ incomingCallAction: IncomingCallAction.WEBHOOK });
+
+    expect(config.agentIdentityId).toBe(IDENTITY_ID);
+    expect(config.incomingCallAction).toBe(IncomingCallAction.WEBHOOK);
+    expect(config.clientWebsocketUrl).toBeNull();
+    expect(config.incomingCallWebhookUrl).toBe("https://agent.example.com/incoming-call");
   });
 });
