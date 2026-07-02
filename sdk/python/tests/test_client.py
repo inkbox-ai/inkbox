@@ -15,7 +15,7 @@ from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.texts import TextsResource
-from inkbox.phone.resources.transcripts import TranscriptsResource
+from inkbox.phone.resources.incoming_call_action import IncomingCallActionResource
 from inkbox.signing_keys import SigningKeysResource
 
 
@@ -31,8 +31,8 @@ class TestInkboxPublicAccessors:
         assert isinstance(client.calls, CallsResource)
         assert client.texts is client._texts
         assert isinstance(client.texts, TextsResource)
-        assert client.transcripts is client._transcripts
-        assert isinstance(client.transcripts, TranscriptsResource)
+        assert client.incoming_call_action is client._incoming_call_action
+        assert isinstance(client.incoming_call_action, IncomingCallActionResource)
 
         client.close()
 
@@ -43,7 +43,7 @@ class TestInkboxPhoneResources:
 
         assert isinstance(client._numbers, PhoneNumbersResource)
         assert isinstance(client._calls, CallsResource)
-        assert isinstance(client._transcripts, TranscriptsResource)
+        assert isinstance(client._incoming_call_action, IncomingCallActionResource)
         assert isinstance(client._signing_keys, SigningKeysResource)
 
         client.close()

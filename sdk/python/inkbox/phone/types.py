@@ -60,6 +60,26 @@ class TextMessageOrigin(StrEnum):
     AUTO_REPLY = "auto_reply"
 
 
+class CallOrigin(StrEnum):
+    """How a call is placed / which line it rides.
+
+    ``dedicated_number`` uses the identity's own provisioned phone number;
+    ``shared_imessage_number`` rides the shared iMessage service line, in
+    which case the call has no dedicated ``local_phone_number``.
+    """
+
+    DEDICATED_NUMBER = "dedicated_number"
+    SHARED_IMESSAGE_NUMBER = "shared_imessage_number"
+
+
+class IncomingCallAction(StrEnum):
+    """What to do when an inbound call arrives for an identity."""
+
+    AUTO_ACCEPT = "auto_accept"
+    AUTO_REJECT = "auto_reject"
+    WEBHOOK = "webhook"
+
+
 def _dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
@@ -158,7 +178,9 @@ class PhoneCall:
     """
 
     id: UUID
-    local_phone_number: str
+    # Null when ``origin`` is ``shared_imessage_number`` — a shared-line call
+    # has no dedicated local number.
+    local_phone_number: str | None
     remote_phone_number: str
     direction: str
     status: str
@@ -173,12 +195,15 @@ class PhoneCall:
     # Default False — older server responses without this field were always
     # non-blocked (predicate hid blocked rows from every caller).
     is_blocked: bool = False
+    # Which line the call rode. Older responses without this field predate
+    # shared-iMessage calls and are always dedicated.
+    origin: CallOrigin = CallOrigin.DEDICATED_NUMBER
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
         return cls(
             id=UUID(d["id"]),
-            local_phone_number=d["local_phone_number"],
+            local_phone_number=d.get("local_phone_number"),
             remote_phone_number=d["remote_phone_number"],
             direction=d["direction"],
             status=d["status"],
@@ -191,6 +216,8 @@ class PhoneCall:
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             is_blocked=bool(d.get("is_blocked", False)),
+            # Coerce a null/missing origin to dedicated for back-compat.
+            origin=CallOrigin(d["origin"]) if d.get("origin") else CallOrigin.DEDICATED_NUMBER,
         )
 
 
@@ -440,6 +467,30 @@ class PhoneTranscript:
             party=d["party"],
             text=d["text"],
             created_at=datetime.fromisoformat(d["created_at"]),
+        )
+
+
+@dataclass
+class IncomingCallActionConfig:
+    """Per-identity inbound-call handling configuration.
+
+    ``incoming_call_action`` selects the behaviour; ``client_websocket_url``
+    is populated for the client-bridge case and ``incoming_call_webhook_url``
+    for the ``webhook`` action.
+    """
+
+    agent_identity_id: UUID
+    incoming_call_action: IncomingCallAction
+    client_websocket_url: str | None
+    incoming_call_webhook_url: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IncomingCallActionConfig:
+        return cls(
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            incoming_call_action=IncomingCallAction(d["incoming_call_action"]),
+            client_websocket_url=d.get("client_websocket_url"),
+            incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
         )
 
 

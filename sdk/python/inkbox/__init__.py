@@ -40,6 +40,9 @@ from inkbox.mail.types import (
 
 # Phone types
 from inkbox.phone.types import (
+    CallOrigin,
+    IncomingCallAction,
+    IncomingCallActionConfig,
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneContactRule,
@@ -285,6 +288,9 @@ __all__ = [
     "ThreadDetail",
     "ThreadFolder",
     # Phone types
+    "CallOrigin",
+    "IncomingCallAction",
+    "IncomingCallActionConfig",
     "PhoneCall",
     "PhoneCallWithRateLimit",
     "PhoneContactRule",

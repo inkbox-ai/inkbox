@@ -43,6 +43,7 @@ from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.calls import CallsResource
+from inkbox.phone.resources.incoming_call_action import IncomingCallActionResource
 from inkbox.phone.resources.contact_rules import PhoneContactRulesResource
 from inkbox.phone.resources.identity_contact_rules import (
     PhoneIdentityContactRulesResource,
@@ -50,7 +51,6 @@ from inkbox.phone.resources.identity_contact_rules import (
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.sms_opt_ins import SmsOptInsResource
 from inkbox.phone.resources.texts import TextsResource
-from inkbox.phone.resources.transcripts import TranscriptsResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.tunnels.resources.tunnels import TunnelsResource
 from inkbox.webhook_deliveries import WebhookDeliveriesResource
@@ -224,7 +224,7 @@ class Inkbox:
         self._calls = CallsResource(self._phone_http)
         self._numbers = PhoneNumbersResource(self._phone_http)
         self._texts = TextsResource(self._phone_http)
-        self._transcripts = TranscriptsResource(self._phone_http)
+        self._incoming_call_action = IncomingCallActionResource(self._phone_http)
         self._phone_contact_rules = PhoneContactRulesResource(self._phone_http)
         self._sms_opt_ins = SmsOptInsResource(self._phone_http)
 
@@ -324,9 +324,9 @@ class Inkbox:
         return self._imessage_contact_rules
 
     @property
-    def transcripts(self) -> TranscriptsResource:
-        """Access org-level call transcript operations."""
-        return self._transcripts
+    def incoming_call_action(self) -> IncomingCallActionResource:
+        """Access per-identity inbound-call handling config (get, set)."""
+        return self._incoming_call_action
 
     @property
     def vault(self) -> VaultResource:

@@ -21,7 +21,8 @@ import type {
   MessageDetail,
   ThreadDetail,
 } from "./mail/types.js";
-import type { PhoneIdentityContactRule } from "./phone/types.js";
+import type { PhoneIdentityContactRule, IncomingCallActionConfig } from "./phone/types.js";
+import { CallOrigin, IncomingCallAction } from "./phone/types.js";
 import type {
   CreateMailIdentityContactRuleOptions,
   ListMailIdentityContactRulesOptions,
@@ -488,25 +489,45 @@ export class AgentIdentity {
   // ------------------------------------------------------------------
 
   /**
-   * Place an outbound call from this identity's phone number.
+   * Place an outbound call for this identity.
+   *
+   * For `dedicated_number` origination (the default) the call is placed
+   * from this identity's own phone number (requires one to be assigned).
+   * For `shared_imessage_number` origination the call rides the shared
+   * pool and is scoped by this identity's id — no dedicated number needed.
    *
    * @param options.toNumber - E.164 destination number.
+   * @param options.origination - Where the call originates. Defaults to
+   *   `dedicated_number`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    */
   async placeCall(options: {
     toNumber: string;
+    origination?: CallOrigin;
     clientWebsocketUrl?: string;
   }): Promise<PhoneCallWithRateLimit> {
-    this._requirePhone();
+    const origination = options.origination ?? CallOrigin.DEDICATED_NUMBER;
+    if (origination === CallOrigin.DEDICATED_NUMBER) {
+      // Dedicated calls need this identity's own number as the sender.
+      this._requirePhone();
+      return this._inkbox._calls.place({
+        toNumber:            options.toNumber,
+        origination,
+        fromNumber:          this._phoneNumber!.number,
+        clientWebsocketUrl:  options.clientWebsocketUrl,
+      });
+    }
+    // Shared-pool calls scope by identity id; no from_number.
     return this._inkbox._calls.place({
-      fromNumber:          this._phoneNumber!.number,
       toNumber:            options.toNumber,
+      origination,
+      agentIdentityId:     this.id,
       clientWebsocketUrl:  options.clientWebsocketUrl,
     });
   }
 
   /**
-   * List calls made to/from this identity's phone number.
+   * List calls for this identity, newest first.
    *
    * Identity-scoped credentials never see contact-rule-blocked rows
    * regardless of `isBlocked` (server-side access policy).
@@ -519,8 +540,9 @@ export class AgentIdentity {
   async listCalls(
     options: { limit?: number; offset?: number; isBlocked?: boolean } = {},
   ): Promise<PhoneCall[]> {
-    this._requirePhone();
-    return this._inkbox._calls.list(this._phoneNumber!.id, options);
+    // Scope by identity id — no phone number required (a shared-only
+    // identity can still have calls).
+    return this._inkbox._calls.list({ agentIdentityId: this.id, ...options });
   }
 
   /**
@@ -529,8 +551,26 @@ export class AgentIdentity {
    * @param callId - ID of the call to fetch transcripts for.
    */
   async listTranscripts(callId: string): Promise<PhoneTranscript[]> {
-    this._requirePhone();
-    return this._inkbox._transcripts.list(this._phoneNumber!.id, callId);
+    return this._inkbox._calls.transcripts(callId);
+  }
+
+  /** Get this identity's inbound-call handling config. */
+  async getIncomingCallAction(): Promise<IncomingCallActionConfig> {
+    return this._inkbox._incomingCallAction.get({ agentIdentityId: this.id });
+  }
+
+  /** Set this identity's inbound-call handling config. */
+  async setIncomingCallAction(options: {
+    incomingCallAction: IncomingCallAction;
+    clientWebsocketUrl?: string;
+    incomingCallWebhookUrl?: string;
+  }): Promise<IncomingCallActionConfig> {
+    return this._inkbox._incomingCallAction.set({
+      incomingCallAction: options.incomingCallAction,
+      agentIdentityId: this.id,
+      clientWebsocketUrl: options.clientWebsocketUrl,
+      incomingCallWebhookUrl: options.incomingCallWebhookUrl,
+    });
   }
 
   // ------------------------------------------------------------------

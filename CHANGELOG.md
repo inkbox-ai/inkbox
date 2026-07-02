@@ -4,6 +4,26 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.15 — Identity-centered calls + shared iMessage-line calling
+
+### Added
+
+- **Shared iMessage-line calls** in the TypeScript, Python, and Rust SDKs. `calls.place(...)` gains `origination` (`dedicated_number`, the default, or `shared_imessage_number`) and `agent_identity_id`. For shared origination the agent supplies only the recipient — the line is resolved server-side from the identity's active iMessage assignment (409 `no_shared_connection` when there is none), and the returned call's `local_phone_number` is `null` (the shared line is never surfaced). Also on the identity object: `identity.place_call(origination=...)`.
+- **Identity-scoped call reads.** `calls.list(...)` is keyed by `agent_identity_id` (agent-scoped keys resolve their own) and returns calls across both origins — dedicated numbers past and present plus shared iMessage lines. `calls.get(call_id)` and `calls.transcripts(call_id)` address calls of either origin.
+- **Incoming-call config resource.** `inkbox.incoming_call_action.get()/set(...)` (TS `incomingCallAction`, Rust `incoming_call_action()`) reads/writes the identity's inbound-call behavior (`auto_accept` / `auto_reject` / `webhook` + `client_websocket_url` / `incoming_call_webhook_url`), with `identity.get_incoming_call_action()` / `set_incoming_call_action()` delegators. Works for identities with no dedicated number.
+- **`origin` on `PhoneCall`** — `"dedicated_number"` or `"shared_imessage_number"`; missing/null parses as `dedicated_number` for back-compat.
+
+### Changed
+
+- **`PhoneCall.local_phone_number` is now nullable** — `null` on shared-origin calls (Rust: `Option<String>`).
+- **`calls.place(...)` signature** — `from_number` is required only for `dedicated_number` origination and must be omitted for shared.
+- CLI pins `@inkbox/sdk` at `^0.4.15`.
+
+### Removed
+
+- **The standalone transcripts resource** (`inkbox.transcripts`) — transcripts are read via `calls.transcripts(call_id)`.
+- **The number-scoped call/transcript methods** (`phone_number_id`-keyed list/get) — replaced by the identity-scoped surface above. The old server routes still work but are deprecated; the SDKs no longer call them. **Source-breaking** for consumers upgrading within `^0.4` — see the migration notes in the PR.
+
 ## 0.4.14 — Identity-scoped contact rules + per-identity signing keys
 
 ### Added

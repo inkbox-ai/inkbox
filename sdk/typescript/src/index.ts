@@ -121,6 +121,8 @@ export type {
   UpdateMailIdentityContactRuleOptions,
 } from "./mail/resources/identityContactRules.js";
 export {
+  CallOrigin,
+  IncomingCallAction,
   PhoneRuleAction,
   PhoneRuleMatchType,
   SmsDeliveryStatus,
@@ -135,6 +137,7 @@ export type {
   PhoneCallWithRateLimit,
   PhoneContactRule,
   PhoneIdentityContactRule,
+  IncomingCallActionConfig,
   RateLimitInfo,
   PhoneTranscript,
   SmsOptIn,
@@ -144,6 +147,7 @@ export type {
   TextConversationSummary,
   TextConversationUpdateResult,
 } from "./phone/types.js";
+export type { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
 export type {
   PhoneIdentityContactRulesResource,
   CreatePhoneIdentityContactRuleOptions,

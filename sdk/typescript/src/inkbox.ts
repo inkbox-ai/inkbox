@@ -23,7 +23,7 @@ import { IMessageContactRulesResource } from "./imessage/resources/contactRules.
 import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
-import { TranscriptsResource } from "./phone/resources/transcripts.js";
+import { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
 import { PhoneContactRulesResource } from "./phone/resources/contactRules.js";
 import { PhoneIdentityContactRulesResource } from "./phone/resources/identityContactRules.js";
 import { SmsOptInsResource } from "./phone/resources/smsOptIns.js";
@@ -142,7 +142,7 @@ export class Inkbox {
   readonly _texts: TextsResource;
   readonly _imessages: IMessagesResource;
   readonly _imessageContactRules: IMessageContactRulesResource;
-  readonly _transcripts: TranscriptsResource;
+  readonly _incomingCallAction: IncomingCallActionResource;
   readonly _phoneContactRules: PhoneContactRulesResource;
   readonly _phoneIdentityContactRules: PhoneIdentityContactRulesResource;
   readonly _smsOptIns: SmsOptInsResource;
@@ -218,7 +218,7 @@ export class Inkbox {
     this._numbers          = new PhoneNumbersResource(phoneHttp);
     this._calls            = new CallsResource(phoneHttp);
     this._texts            = new TextsResource(phoneHttp);
-    this._transcripts      = new TranscriptsResource(phoneHttp);
+    this._incomingCallAction = new IncomingCallActionResource(phoneHttp);
     this._phoneContactRules = new PhoneContactRulesResource(phoneHttp);
     this._smsOptIns         = new SmsOptInsResource(phoneHttp);
 
@@ -283,7 +283,7 @@ export class Inkbox {
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
 
-  /** Call operations (list, get, place). */
+  /** Call operations (list, get, transcripts, place). */
   get calls(): CallsResource { return this._calls; }
 
   /** Text message operations (list, get, search, conversations). */
@@ -295,8 +295,8 @@ export class Inkbox {
   /** iMessage per-identity allow/block rules (+ org-wide list). */
   get imessageContactRules(): IMessageContactRulesResource { return this._imessageContactRules; }
 
-  /** Call transcript operations. */
-  get transcripts(): TranscriptsResource { return this._transcripts; }
+  /** Incoming-call routing config (get / set), keyed by agent identity. */
+  get incomingCallAction(): IncomingCallActionResource { return this._incomingCallAction; }
 
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }

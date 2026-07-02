@@ -128,6 +128,49 @@ pub enum TextMessageOrigin {
     AutoReply,
 }
 
+/// Where an outbound (or observed) call originates.
+///
+/// `dedicated_number` rides an identity's own provisioned phone number;
+/// `shared_imessage_number` rides the shared iMessage line and is scoped by
+/// agent identity instead. Defaults to `dedicated_number`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CallOrigin {
+    #[default]
+    DedicatedNumber,
+    SharedImessageNumber,
+}
+
+impl CallOrigin {
+    /// The wire string value (`"dedicated_number"` / `"shared_imessage_number"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CallOrigin::DedicatedNumber => "dedicated_number",
+            CallOrigin::SharedImessageNumber => "shared_imessage_number",
+        }
+    }
+}
+
+/// Routing decision applied to inbound calls for an agent identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IncomingCallAction {
+    AutoAccept,
+    AutoReject,
+    Webhook,
+}
+
+impl IncomingCallAction {
+    /// The wire string value (`"auto_accept"` / `"auto_reject"` / `"webhook"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IncomingCallAction::AutoAccept => "auto_accept",
+            IncomingCallAction::AutoReject => "auto_reject",
+            IncomingCallAction::Webhook => "webhook",
+        }
+    }
+}
+
 /// Consent state of a receiver number for the calling org.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -170,6 +213,16 @@ fn default_sms_status_ready() -> SmsStatus {
 
 fn default_filter_mode_blacklist() -> FilterMode {
     FilterMode::Blacklist
+}
+
+/// Deserialize a `CallOrigin` treating an explicit `null` as the default, so
+/// `"origin": null` parses like a missing key (the Python parser coerces
+/// null/missing origins to `dedicated_number` for back-compat).
+fn deserialize_call_origin_null_default<'de, D>(deserializer: D) -> Result<CallOrigin, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<CallOrigin>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +278,10 @@ pub struct PhoneNumber {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoneCall {
     pub id: Uuid,
-    pub local_phone_number: String,
+    /// `None` when `origin == shared_imessage_number` (the shared line has no
+    /// dedicated local number). Defaults to `None` when absent.
+    #[serde(default)]
+    pub local_phone_number: Option<String>,
     pub remote_phone_number: String,
     pub direction: String,
     pub status: String,
@@ -246,6 +302,10 @@ pub struct PhoneCall {
     /// Defaults to `false` for older server responses without this field.
     #[serde(default)]
     pub is_blocked: bool,
+    /// Where the call originated. Defaults to `dedicated_number` when absent
+    /// or null (older server responses predate the field).
+    #[serde(default, deserialize_with = "deserialize_call_origin_null_default")]
+    pub origin: CallOrigin,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -271,6 +331,20 @@ pub struct PhoneCallWithRateLimit {
     /// a missing/empty value).
     #[serde(default)]
     pub rate_limit: Option<RateLimitInfo>,
+}
+
+/// Inbound-call routing config for an agent identity.
+///
+/// `client_websocket_url` is populated when the action bridges accepted calls
+/// to a socket; `incoming_call_webhook_url` when the action is `webhook`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IncomingCallActionConfig {
+    pub agent_identity_id: Uuid,
+    pub incoming_call_action: IncomingCallAction,
+    #[serde(default)]
+    pub client_websocket_url: Option<String>,
+    #[serde(default)]
+    pub incoming_call_webhook_url: Option<String>,
 }
 
 /// A single media attachment in an MMS message.
@@ -457,4 +531,156 @@ pub struct PhoneIdentityContactRule {
 
 fn default_contact_rule_status_active() -> ContactRuleStatus {
     ContactRuleStatus::Active
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// Minimal valid `PhoneCall` payload; tests mutate a copy per case.
+    fn call_json() -> serde_json::Value {
+        json!({
+            "id": "22222222-2222-2222-2222-222222222222",
+            "local_phone_number": "+15550001111",
+            "remote_phone_number": "+15550002222",
+            "direction": "outbound",
+            "status": "completed",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:01+00:00",
+            "is_blocked": false,
+            "origin": "dedicated_number"
+        })
+    }
+
+    #[test]
+    fn phone_call_dedicated_has_local_number_string() {
+        let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
+        assert_eq!(call.local_phone_number.as_deref(), Some("+15550001111"));
+        assert_eq!(call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn phone_call_shared_has_null_local_number() {
+        // Shared-line calls have no dedicated local number on the wire.
+        let mut v = call_json();
+        v["local_phone_number"] = serde_json::Value::Null;
+        v["origin"] = json!("shared_imessage_number");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.local_phone_number, None);
+        assert_eq!(call.origin, CallOrigin::SharedImessageNumber);
+    }
+
+    #[test]
+    fn phone_call_missing_local_number_key_defaults_to_none() {
+        let mut v = call_json();
+        v.as_object_mut().unwrap().remove("local_phone_number");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.local_phone_number, None);
+    }
+
+    #[test]
+    fn phone_call_missing_origin_key_defaults_to_dedicated() {
+        // Older server responses predate the field entirely.
+        let mut v = call_json();
+        v.as_object_mut().unwrap().remove("origin");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn phone_call_null_origin_defaults_to_dedicated() {
+        // Parity with the Python parser, which coerces a *null* origin (not
+        // just a missing key) to dedicated for back-compat.
+        let mut v = call_json();
+        v["origin"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn phone_call_tolerates_unknown_fields() {
+        let mut v = call_json();
+        v["some_future_field"] = json!({"nested": true});
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.status, "completed");
+    }
+
+    #[test]
+    fn phone_call_with_rate_limit_flatten_round_trip() {
+        // The wire shape is one flat object: call fields + rate_limit.
+        let mut v = call_json();
+        v["rate_limit"] = json!({
+            "calls_used": 1,
+            "calls_remaining": 9,
+            "calls_limit": 10,
+            "minutes_used": 1.5,
+            "minutes_remaining": 58.5,
+            "minutes_limit": 60
+        });
+        let parsed: PhoneCallWithRateLimit = serde_json::from_value(v.clone()).unwrap();
+        assert_eq!(parsed.call.remote_phone_number, "+15550002222");
+        let rl = parsed.rate_limit.as_ref().expect("rate_limit present");
+        assert_eq!(rl.calls_remaining, 9);
+        assert_eq!(rl.minutes_remaining, 58.5);
+        // Re-serialization stays flat: no `call` wrapper key, ids at top level.
+        let back = serde_json::to_value(&parsed).unwrap();
+        assert!(back.get("call").is_none());
+        assert_eq!(back["id"], v["id"]);
+        assert_eq!(back["rate_limit"]["calls_limit"], 10);
+    }
+
+    #[test]
+    fn phone_call_with_rate_limit_tolerates_missing_rate_limit() {
+        let parsed: PhoneCallWithRateLimit = serde_json::from_value(call_json()).unwrap();
+        assert!(parsed.rate_limit.is_none());
+    }
+
+    #[test]
+    fn phone_transcript_deserializes() {
+        let seg: PhoneTranscript = serde_json::from_value(json!({
+            "id": "55555555-5555-5555-5555-555555555555",
+            "call_id": "22222222-2222-2222-2222-222222222222",
+            "seq": 3,
+            "ts_ms": 1450,
+            "party": "agent",
+            "text": "Hello!",
+            "created_at": "2026-06-01T00:00:02+00:00"
+        }))
+        .unwrap();
+        assert_eq!(seg.seq, 3);
+        assert_eq!(seg.ts_ms, 1450);
+        assert_eq!(seg.party, "agent");
+        assert_eq!(seg.text, "Hello!");
+    }
+
+    #[test]
+    fn incoming_call_action_wire_strings_round_trip() {
+        let cases = [
+            (IncomingCallAction::AutoAccept, "auto_accept"),
+            (IncomingCallAction::AutoReject, "auto_reject"),
+            (IncomingCallAction::Webhook, "webhook"),
+        ];
+        for (variant, wire) in cases {
+            assert_eq!(variant.as_str(), wire);
+            assert_eq!(serde_json::to_value(variant).unwrap(), json!(wire));
+            let parsed: IncomingCallAction = serde_json::from_value(json!(wire)).unwrap();
+            assert_eq!(parsed, variant);
+        }
+    }
+
+    #[test]
+    fn call_origin_wire_strings_round_trip() {
+        let cases = [
+            (CallOrigin::DedicatedNumber, "dedicated_number"),
+            (CallOrigin::SharedImessageNumber, "shared_imessage_number"),
+        ];
+        for (variant, wire) in cases {
+            assert_eq!(variant.as_str(), wire);
+            assert_eq!(serde_json::to_value(variant).unwrap(), json!(wire));
+            let parsed: CallOrigin = serde_json::from_value(json!(wire)).unwrap();
+            assert_eq!(parsed, variant);
+        }
+    }
 }

@@ -50,6 +50,9 @@ from inkbox.mail.types import (
     ThreadDetail,
 )
 from inkbox.phone.types import (
+    CallOrigin,
+    IncomingCallAction,
+    IncomingCallActionConfig,
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneIdentityContactRule,
@@ -594,18 +597,40 @@ class AgentIdentity:
         self,
         *,
         to_number: str,
+        origination: CallOrigin | str = CallOrigin.DEDICATED_NUMBER,
         client_websocket_url: str | None = None,
     ) -> PhoneCallWithRateLimit:
-        """Place an outbound call from this identity's phone number.
+        """Place an outbound call as this identity.
+
+        For ``dedicated_number`` origination the call rides this identity's
+        provisioned phone number (requires one). For
+        ``shared_imessage_number`` it rides the shared line and is scoped
+        by this identity's id instead.
 
         Args:
             to_number: E.164 destination number.
+            origination: How to place the call. Defaults to
+                ``dedicated_number``. See :class:`CallOrigin`.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
         """
-        self._require_phone()
+        is_dedicated = (
+            origination == CallOrigin.DEDICATED_NUMBER
+            or origination == CallOrigin.DEDICATED_NUMBER.value
+        )
+        if is_dedicated:
+            # Dedicated origination needs this identity's own number.
+            self._require_phone()
+            return self._inkbox._calls.place(
+                to_number=to_number,
+                origination=origination,
+                from_number=self._phone_number.number,  # type: ignore[union-attr]
+                client_websocket_url=client_websocket_url,
+            )
+        # Shared-line origination scopes by identity id, no from_number.
         return self._inkbox._calls.place(
-            from_number=self._phone_number.number,  # type: ignore[union-attr]
             to_number=to_number,
+            origination=origination,
+            agent_identity_id=self.id,
             client_websocket_url=client_websocket_url,
         )
 
@@ -616,7 +641,7 @@ class AgentIdentity:
         offset: int = 0,
         is_blocked: bool | None = None,
     ) -> list[PhoneCall]:
-        """List calls made to/from this identity's phone number.
+        """List calls made to/from this identity.
 
         Identity-scoped credentials never see contact-rule-blocked rows
         regardless of ``is_blocked`` (server-side access policy).
@@ -627,9 +652,8 @@ class AgentIdentity:
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
         """
-        self._require_phone()
         return self._inkbox._calls.list(
-            self._phone_number.id,  # type: ignore[union-attr]
+            agent_identity_id=self.id,
             limit=limit,
             offset=offset,
             is_blocked=is_blocked,
@@ -641,10 +665,33 @@ class AgentIdentity:
         Args:
             call_id: ID of the call to fetch transcripts for.
         """
-        self._require_phone()
-        return self._inkbox._transcripts.list(
-            self._phone_number.id,  # type: ignore[union-attr]
-            call_id,
+        return self._inkbox._calls.transcripts(call_id)
+
+    def get_incoming_call_action(self) -> IncomingCallActionConfig:
+        """Get this identity's inbound-call handling config."""
+        return self._inkbox._incoming_call_action.get(agent_identity_id=self.id)
+
+    def set_incoming_call_action(
+        self,
+        *,
+        incoming_call_action: IncomingCallAction | str,
+        client_websocket_url: str | None = None,
+        incoming_call_webhook_url: str | None = None,
+    ) -> IncomingCallActionConfig:
+        """Set this identity's inbound-call handling config.
+
+        Args:
+            incoming_call_action: Behaviour to apply. See
+                :class:`IncomingCallAction`.
+            client_websocket_url: WebSocket URL (wss://) for audio bridging.
+            incoming_call_webhook_url: HTTPS receiver for the
+                ``webhook`` action.
+        """
+        return self._inkbox._incoming_call_action.set(
+            incoming_call_action=incoming_call_action,
+            agent_identity_id=self.id,
+            client_websocket_url=client_websocket_url,
+            incoming_call_webhook_url=incoming_call_webhook_url,
         )
 
     ## Text message helpers

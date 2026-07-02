@@ -657,32 +657,60 @@ await inkbox.threads.delete("abc@inkboxmail.com", "thread-uuid");
 
 ---
 
-## Org-level Calls and Transcripts
+## Org-level Calls
 
-Access calls and transcripts directly. Access via `inkbox.calls` and `inkbox.transcripts`.
+Calls are identity-scoped. Access them via `inkbox.calls`; transcripts
+are folded onto the same resource as `inkbox.calls.transcripts(callId)`.
 
 ```ts
-// List calls for a phone number
-const calls = await inkbox.calls.list("phone-number-uuid", { limit: 10 });
+// List calls (agent-scoped keys resolve their own identity; admin/JWT
+// keys must pass agentIdentityId).
+const calls = await inkbox.calls.list({ limit: 10 });
 for (const call of calls) {
-  console.log(call.id, call.direction, call.status);
+  console.log(call.id, call.direction, call.status, call.origin);
 }
 
-// Get a single call
-const call = await inkbox.calls.get("phone-number-uuid", "call-uuid");
+// List calls for a specific identity (admin/JWT)
+const scoped = await inkbox.calls.list({ agentIdentityId: "identity-uuid", limit: 10 });
 
-// Place an outbound call
+// Get a single call
+const call = await inkbox.calls.get("call-uuid");
+
+// Place an outbound call from a dedicated number
 const placed = await inkbox.calls.place({
-  fromNumber: "phone-number-uuid",
+  fromNumber: "+18335794607",
   toNumber: "+15551234567",
   clientWebsocketUrl: "wss://example.com/ws",
 });
 
+// Place an outbound call over the shared iMessage-number pool
+import { CallOrigin } from "@inkbox/sdk";
+const shared = await inkbox.calls.place({
+  toNumber: "+15551234567",
+  origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+  agentIdentityId: "identity-uuid",
+});
+
 // List transcript segments for a call
-const segments = await inkbox.transcripts.list("phone-number-uuid", "call-uuid");
+const segments = await inkbox.calls.transcripts("call-uuid");
 for (const t of segments) {
   console.log(`[${t.party}] ${t.text}`);
 }
+```
+
+### Incoming-call routing
+
+```ts
+import { IncomingCallAction } from "@inkbox/sdk";
+
+// Read the current incoming-call config
+const config = await inkbox.incomingCallAction.get();
+
+// Route incoming calls to a webhook
+await inkbox.incomingCallAction.set({
+  incomingCallAction: IncomingCallAction.WEBHOOK,
+  incomingCallWebhookUrl: "https://your-agent.example.com/incoming-call",
+});
 ```
 
 ---

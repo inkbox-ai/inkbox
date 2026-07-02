@@ -8,7 +8,7 @@
 
 [package]
 name = "inkbox"
-version = "0.4.14"
+version = "0.4.15"
 edition = "2021"
 rust-version = "1.74"
 description = "Rust SDK for the Inkbox API"
@@ -36,6 +36,11 @@ tunnels-runtime = [
     # DynSignatureAlgorithmIdentifier needs to emit `ecdsa-with-SHA256` in CSRs.
     "sha2/oid",
 ]
+
+[dev-dependencies]
+# Local HTTP mock server for the phone resource tests (query/body/error-shape
+# assertions against the blocking transport).
+httpmock = "0.7"
 
 [dependencies]
 # HTTP — blocking client mirrors the synchronous Python SDK surface.
