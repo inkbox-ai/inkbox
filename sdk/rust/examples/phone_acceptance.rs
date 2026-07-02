@@ -168,7 +168,7 @@ fn main() {
     // ---- Surface 5a: shared-origin wiring WITHOUT extra ringing ----
     // origination=shared to an unassigned number -> expect 409 no_shared_connection.
     match inkbox.calls().place(
-        "+15005550006",
+        "+15555550006",
         CallOrigin::SharedImessageNumber,
         None,
         scope,
@@ -185,13 +185,16 @@ fn main() {
     }
 
     // ---- Surface 5b: REAL dedicated call (rings a phone) ----
-    // Gated behind PLACE_REAL_CALL=1 + INKBOX_FROM_NUMBER so it never rings by
-    // accident. to_number is fixed per the acceptance spec.
+    // Gated behind PLACE_REAL_CALL=1 + INKBOX_FROM_NUMBER + INKBOX_TO_NUMBER so
+    // it never rings anyone by accident.
     if std::env::var("PLACE_REAL_CALL").as_deref() == Ok("1") {
-        match std::env::var("INKBOX_FROM_NUMBER") {
-            Ok(from) if !from.is_empty() => {
+        match (
+            std::env::var("INKBOX_FROM_NUMBER"),
+            std::env::var("INKBOX_TO_NUMBER"),
+        ) {
+            (Ok(from), Ok(to)) if !from.is_empty() && !to.is_empty() => {
                 match inkbox.calls().place(
-                    "+15167251294",
+                    &to,
                     CallOrigin::DedicatedNumber,
                     Some(&from),
                     scope,
@@ -207,9 +210,9 @@ fn main() {
                     Err(e) => println!("[5b] dedicated place-call FAIL: {}", describe(&e)),
                 }
             }
-            _ => println!("[5b] SKIPPED: INKBOX_FROM_NUMBER not set"),
+            _ => println!("[5b] SKIPPED: INKBOX_FROM_NUMBER / INKBOX_TO_NUMBER not set"),
         }
     } else {
-        println!("[5b] SKIPPED: set PLACE_REAL_CALL=1 + INKBOX_FROM_NUMBER to ring a phone");
+        println!("[5b] SKIPPED: set PLACE_REAL_CALL=1 + INKBOX_FROM_NUMBER + INKBOX_TO_NUMBER to ring a phone");
     }
 }
