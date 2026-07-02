@@ -18,7 +18,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@inkbox/sdk": "^0.4.14",
+    "@inkbox/sdk": "^1.0.0",
     "commander": "^13.0.0"
   },
   "devDependencies": {
