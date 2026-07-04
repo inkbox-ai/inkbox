@@ -387,3 +387,106 @@ class TestAgentIdentityOwner:
         # Older payloads without the key must keep parsing.
         sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
         assert sub.agent_identity_id is None
+
+
+class TestContextConfig:
+    def test_create_includes_context_config_in_body(self):
+        res, http = _resource()
+        http.post.return_value = {
+            **RAW_SUBSCRIPTION,
+            "context_config": {"email": {"mode": "count", "count": 10}},
+        }
+        cfg = {
+            "email": {"mode": "count", "count": 10},
+            "texts": {"mode": "window", "hours": 24},
+        }
+        sub = res.create(
+            mailbox_id=_MAILBOX_ID,
+            url="https://x/y",
+            event_types=["message.received"],
+            context_config=cfg,
+        )
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["context_config"] == cfg
+        assert sub.context_config == {"email": {"mode": "count", "count": 10}}
+
+    def test_create_omits_context_config_when_not_passed(self):
+        res, http = _resource()
+        http.post.return_value = RAW_SUBSCRIPTION
+        res.create(
+            mailbox_id=_MAILBOX_ID,
+            url="https://x/y",
+            event_types=["message.received"],
+        )
+        _, kwargs = http.post.call_args
+        assert "context_config" not in kwargs["json"]
+
+    def test_parse_tolerates_missing_context_config(self):
+        sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
+        assert sub.context_config is None
+
+    def test_parse_reads_context_config_when_present(self):
+        raw = {**RAW_SUBSCRIPTION, "context_config": {"calls": {"mode": "count", "count": 2}}}
+        sub = WebhookSubscription._from_dict(raw)
+        assert sub.context_config == {"calls": {"mode": "count", "count": 2}}
+
+    def test_update_omitted_context_config_sends_no_key(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+        res.update(_SUB_ID, url="https://new/hook")
+        _, kwargs = http.patch.call_args
+        assert "context_config" not in kwargs["json"]
+
+    def test_update_none_context_config_sends_null(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+        res.update(_SUB_ID, context_config=None)
+        http.patch.assert_called_once_with(
+            f"/webhooks/subscriptions/{_SUB_ID}",
+            json={"context_config": None},
+        )
+
+    def test_update_dict_context_config_sends_object(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+        cfg = {"texts": {"mode": "window", "hours": 24}}
+        res.update(_SUB_ID, context_config=cfg)
+        http.patch.assert_called_once_with(
+            f"/webhooks/subscriptions/{_SUB_ID}",
+            json={"context_config": cfg},
+        )
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            {"bogus": {"mode": "count", "count": 1}},
+            {"email": {"mode": "count", "count": 0}},
+            {"email": {"mode": "count", "count": 51}},
+            {"email": {"mode": "window", "hours": 0}},
+            {"email": {"mode": "window", "hours": 169}},
+            {"email": {"mode": "bogus"}},
+            {"email": {"count": 5}},
+            {"email": {"mode": "count", "count": 5, "extra": 1}},
+        ],
+    )
+    def test_create_rejects_invalid_context_config(self, bad):
+        res, _ = _resource()
+        with pytest.raises(ValueError):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url="https://x/y",
+                event_types=["message.received"],
+                context_config=bad,
+            )
+
+    def test_validator_allows_none_class_value(self):
+        res, http = _resource()
+        http.post.return_value = RAW_SUBSCRIPTION
+        res.create(
+            mailbox_id=_MAILBOX_ID,
+            url="https://x/y",
+            event_types=["message.received"],
+            context_config={"email": {"mode": "count", "count": 3}, "texts": None},
+        )
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["context_config"]["texts"] is None

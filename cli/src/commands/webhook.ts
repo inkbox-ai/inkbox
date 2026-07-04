@@ -7,6 +7,8 @@ import type {
   WebhookSubscription,
   WebhookSubscriptionCreateResponse,
   WebhookDelivery,
+  WebhookContextClassConfig,
+  WebhookContextConfig,
 } from "@inkbox/sdk";
 
 const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
@@ -16,6 +18,7 @@ const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "agentIdentityId",
   "url",
   "eventTypes",
+  "contextConfig",
   "status",
   "createdAt",
 ];
@@ -29,6 +32,7 @@ function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
     agentIdentityId: sub.agentIdentityId,
     url: sub.url,
     eventTypes: sub.eventTypes.join(", "),
+    contextConfig: sub.contextConfig ? JSON.stringify(sub.contextConfig) : null,
     status: sub.status,
     createdAt: sub.createdAt,
     updatedAt: sub.updatedAt,
@@ -58,6 +62,34 @@ export function buildCreateOutput(
   return json
     ? { data: row, json: true }
     : { data: flattenCreateForOutput(row), json: false };
+}
+
+// `count:N` -> {mode:"count",count:N}; `window:H` -> {mode:"window",hours:H}.
+// Bounds (1..50 / 1..168) are validated by the SDK so the limits live in one place.
+export function parseContextSpec(value: string): WebhookContextClassConfig {
+  const idx = value.indexOf(":");
+  const mode = idx === -1 ? value : value.slice(0, idx);
+  const rawNum = idx === -1 ? "" : value.slice(idx + 1);
+  const n = /^\d+$/.test(rawNum) ? Number(rawNum) : NaN;
+  if (mode === "count" && !Number.isNaN(n)) return { mode: "count", count: n };
+  if (mode === "window" && !Number.isNaN(n)) return { mode: "window", hours: n };
+  throw new Error(
+    `Invalid context spec '${value}'. Use 'count:N' (e.g. count:10) or 'window:H' (e.g. window:24).`,
+  );
+}
+
+// Assemble contextConfig from whichever --context-* flags were passed;
+// undefined when none were (so create/update omit the field).
+function buildContextConfigFromFlags(cmdOpts: {
+  contextEmail?: string;
+  contextTexts?: string;
+  contextCalls?: string;
+}): WebhookContextConfig | undefined {
+  const cfg: WebhookContextConfig = {};
+  if (cmdOpts.contextEmail !== undefined) cfg.email = parseContextSpec(cmdOpts.contextEmail);
+  if (cmdOpts.contextTexts !== undefined) cfg.texts = parseContextSpec(cmdOpts.contextTexts);
+  if (cmdOpts.contextCalls !== undefined) cfg.calls = parseContextSpec(cmdOpts.contextCalls);
+  return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
 function registerSubscriptionCommands(parent: Command): void {
@@ -128,6 +160,9 @@ function registerSubscriptionCommands(parent: Command): void {
       },
       [] as string[],
     )
+    .option("--context-email <spec>", "Include recent emails as context: count:N or window:H")
+    .option("--context-texts <spec>", "Include recent SMS+iMessage as context: count:N or window:H")
+    .option("--context-calls <spec>", "Include recent calls+transcripts as context: count:N or window:H")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -137,6 +172,9 @@ function registerSubscriptionCommands(parent: Command): void {
           agentIdentityId?: string;
           url: string;
           eventType: string[];
+          contextEmail?: string;
+          contextTexts?: string;
+          contextCalls?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -147,6 +185,7 @@ function registerSubscriptionCommands(parent: Command): void {
           agentIdentityId: cmdOpts.agentIdentityId,
           url: cmdOpts.url,
           eventTypes: cmdOpts.eventType,
+          contextConfig: buildContextConfigFromFlags(cmdOpts),
         });
         const { data, json } = buildCreateOutput(row, !!opts.json);
         output(data, { json });
@@ -166,17 +205,43 @@ function registerSubscriptionCommands(parent: Command): void {
       // intentionally no default: undefined distinguishes "not provided"
       // from "explicitly empty" (the latter is invalid and the SDK throws).
     )
+    .option("--context-email <spec>", "Set email context: count:N or window:H (replaces stored config)")
+    .option("--context-texts <spec>", "Set texts context: count:N or window:H (replaces stored config)")
+    .option("--context-calls <spec>", "Set calls context: count:N or window:H (replaces stored config)")
+    .option("--clear-context", "Clear all conversation context (mutually exclusive with --context-*)")
     .action(
       withErrorHandler(async function (
         this: Command,
         subId: string,
-        cmdOpts: { url?: string; eventType?: string[] },
+        cmdOpts: {
+          url?: string;
+          eventType?: string[];
+          contextEmail?: string;
+          contextTexts?: string;
+          contextCalls?: string;
+          clearContext?: boolean;
+        },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        const body: { url?: string; eventTypes?: string[] } = {};
+        const body: {
+          url?: string;
+          eventTypes?: string[];
+          contextConfig?: WebhookContextConfig | null;
+        } = {};
         if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
         if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
+        const contextConfig = buildContextConfigFromFlags(cmdOpts);
+        if (cmdOpts.clearContext && contextConfig !== undefined) {
+          throw new Error(
+            "--clear-context cannot be combined with --context-email/--context-texts/--context-calls.",
+          );
+        }
+        if (cmdOpts.clearContext) {
+          body.contextConfig = null;
+        } else if (contextConfig !== undefined) {
+          body.contextConfig = contextConfig;
+        }
         const row = await inkbox.webhooks.subscriptions.update(subId, body);
         output(flattenForOutput(row), { json: !!opts.json });
       }),

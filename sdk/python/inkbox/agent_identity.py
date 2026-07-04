@@ -396,6 +396,7 @@ class AgentIdentity:
         bcc: list[str] | None = None,
         in_reply_to_message_id: str | None = None,
         attachments: list[dict] | None = None,
+        track_opens: bool = False,
     ) -> Message:
         """Send an email from this identity's mailbox.
 
@@ -409,6 +410,8 @@ class AgentIdentity:
             in_reply_to_message_id: RFC 5322 Message-ID to thread a reply.
             attachments: List of file attachment dicts with ``filename``,
                 ``content_type``, and ``content_base64`` keys.
+            track_opens: Embed an open-tracking pixel when ``body_html`` is
+                present; opens surface as ``first_opened_at``/``open_count``.
         """
         self._require_mailbox()
         return self._inkbox._messages.send(
@@ -421,6 +424,7 @@ class AgentIdentity:
             bcc=bcc,
             in_reply_to_message_id=in_reply_to_message_id,
             attachments=attachments,
+            track_opens=track_opens,
         )
 
     def reply_all_email(
@@ -469,6 +473,7 @@ class AgentIdentity:
         additional_attachments: list[dict] | None = None,
         include_original_attachments: bool = True,
         reply_to: str | None = None,
+        track_opens: bool = False,
     ) -> Message:
         """Forward a stored message out from this identity's mailbox.
 
@@ -492,6 +497,9 @@ class AgentIdentity:
                 outbound parts. Ignored in ``wrapped`` mode.
             reply_to: Optional Reply-To address for the forward's outer
                 envelope.
+            track_opens: Embed an open-tracking pixel (requires an HTML part
+                on the forward); opens surface as
+                ``first_opened_at``/``open_count``.
         """
         self._require_mailbox()
         return self._inkbox._messages.forward(
@@ -507,6 +515,7 @@ class AgentIdentity:
             additional_attachments=additional_attachments,
             include_original_attachments=include_original_attachments,
             reply_to=reply_to,
+            track_opens=track_opens,
         )
 
     def iter_emails(

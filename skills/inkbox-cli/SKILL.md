@@ -205,10 +205,13 @@ All email commands are identity-scoped and require `-i <handle>`.
 inkbox email send -i <handle> \
   --to user@example.com \
   --subject "Hello" \
-  --body-text "Hi"
+  --body-html "<p>Hi</p>" \
+  --track-opens                 # optional; embed a tracking pixel (needs --body-html)
+
+inkbox email forward <message-id> -i <handle> --to user@example.com --track-opens
 
 inkbox email list -i <handle> --limit 10
-inkbox email get <message-id> -i <handle>
+inkbox email get <message-id> -i <handle>   # fetching an inbound message marks it read
 inkbox email search -i <handle> -q "invoice"
 inkbox email unread -i <handle> --limit 10
 inkbox email mark-read <ids...> -i <handle>
@@ -482,11 +485,17 @@ inkbox webhook subscription create --phone-number-id <id> --url <url> \
   --event-type text.received --event-type text.delivered
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type imessage.received --event-type imessage.reaction_received
-inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...]
+# Opt into per-class conversation context on received events (count:N | window:H):
+inkbox webhook subscription create --mailbox-id <id> --url <url> \
+  --event-type message.received --context-email count:10 --context-texts window:24
+inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...] \
+  [--context-email <spec>] [--context-texts <spec>] [--context-calls <spec>] [--clear-context]
 inkbox webhook subscription delete <sub-id>
 ```
 
 Every subscription row carries `ownerIdentityId` (the resolved owning agent identity). The **first** subscription created for an identity that has no signing key yet returns that identity's `signingKey` **once** in the create output (otherwise null) — capture it then, it cannot be retrieved again (use `--json` to read it reliably).
+
+The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a subscription into per-class conversation history delivered under `data.context` on received events. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 

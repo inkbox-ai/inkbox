@@ -21,6 +21,7 @@ export function registerEmailCommands(program: Command): void {
     .option("--cc <addresses>", "Comma-separated CC addresses")
     .option("--bcc <addresses>", "Comma-separated BCC addresses")
     .option("--in-reply-to <message-id>", "Message ID to reply to")
+    .option("--track-opens", "Embed an open-tracking pixel (requires --body-html)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -33,9 +34,14 @@ export function registerEmailCommands(program: Command): void {
           cc?: string;
           bcc?: string;
           inReplyTo?: string;
+          trackOpens?: boolean;
         },
       ) {
         const opts = getGlobalOpts(this);
+        if (cmdOpts.trackOpens && !cmdOpts.bodyHtml) {
+          console.error("--track-opens requires --body-html.");
+          process.exit(1);
+        }
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const msg = await identity.sendEmail({
@@ -46,6 +52,7 @@ export function registerEmailCommands(program: Command): void {
           cc: cmdOpts.cc?.split(",").map((s) => s.trim()),
           bcc: cmdOpts.bcc?.split(",").map((s) => s.trim()),
           inReplyToMessageId: cmdOpts.inReplyTo,
+          trackOpens: cmdOpts.trackOpens,
         });
         output(
           {
@@ -120,6 +127,7 @@ export function registerEmailCommands(program: Command): void {
       "Drop the original attachments (inline mode only)",
     )
     .option("--reply-to <address>", "Reply-To address for the forward")
+    .option("--track-opens", "Embed an open-tracking pixel (inline forwards can reuse the original's HTML)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -135,6 +143,7 @@ export function registerEmailCommands(program: Command): void {
           bodyHtml?: string;
           includeOriginalAttachments: boolean;
           replyTo?: string;
+          trackOpens?: boolean;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -146,6 +155,8 @@ export function registerEmailCommands(program: Command): void {
           );
           process.exit(1);
         }
+        // No client-side --body-html guard here: inline forwards inherit the
+        // original's HTML, so trackability is only known server-side (422 if none).
         const split = (s: string | undefined) =>
           s?.split(",").map((x) => x.trim());
         const msg = await identity.forwardEmail(messageId, {
@@ -158,6 +169,7 @@ export function registerEmailCommands(program: Command): void {
           bodyHtml: cmdOpts.bodyHtml,
           includeOriginalAttachments: cmdOpts.includeOriginalAttachments,
           replyTo: cmdOpts.replyTo,
+          trackOpens: cmdOpts.trackOpens,
         });
         output(
           {
@@ -205,6 +217,8 @@ export function registerEmailCommands(program: Command): void {
             "fromAddress",
             "subject",
             "isRead",
+            "openCount",
+            "firstOpenedAt",
             "createdAt",
           ],
         });
@@ -234,6 +248,8 @@ export function registerEmailCommands(program: Command): void {
             subject: msg.subject,
             direction: msg.direction,
             isRead: msg.isRead,
+            openCount: msg.openCount,
+            firstOpenedAt: msg.firstOpenedAt,
             createdAt: msg.createdAt,
             bodyText: msg.bodyText,
           },

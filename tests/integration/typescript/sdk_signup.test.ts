@@ -7,6 +7,7 @@ import {
   loadConfig,
   loadBootstrapFromEnv,
   logStep,
+  registerOrgForCleanup,
   type SdkIntegrationConfig,
   type BootstrapResult,
 } from "./helpers.js";
@@ -88,10 +89,11 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
         noteToHuman: "TypeScript SDK integration signup test",
         agentHandle,
         emailLocalPart,
-        harness: "claude-code",
+        harness: "sdk-integration",
       },
       { baseUrl: config.baseUrl, timeoutMs: config.httpTimeout },
     );
+    registerOrgForCleanup(signup.organizationId);
     expect(signup.agentHandle).toBe(agentHandle);
     expect(signup.emailAddress.startsWith(`${emailLocalPart}@`)).toBe(true);
 

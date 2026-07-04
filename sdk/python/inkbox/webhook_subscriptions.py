@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 from uuid import UUID
 
 # `_UNSET` is imported from inkbox.identities.types -- identity-based
@@ -35,6 +35,37 @@ _BASE = "/webhooks/subscriptions"
 _INCOMING_CALL = "phone.incoming_call"
 
 WebhookSubscriptionStatus = Literal["active", "deleted"]
+
+_CONTEXT_CLASSES = ("email", "texts", "calls")
+_CONTEXT_MAX_COUNT = 50
+_CONTEXT_MAX_WINDOW_HOURS = 168
+
+
+class WebhookContextCountConfig(TypedDict):
+    """Count-mode context: the last ``count`` items of a class (1..50)."""
+    mode: Literal["count"]
+    count: int
+
+
+class WebhookContextWindowConfig(TypedDict):
+    """Window-mode context: items from the last ``hours`` hours (1..168)."""
+    mode: Literal["window"]
+    hours: int
+
+
+WebhookContextClassConfig = WebhookContextCountConfig | WebhookContextWindowConfig
+
+
+class WebhookContextConfig(TypedDict, total=False):
+    """Per-subscription conversation-context config, keyed by class.
+
+    Omit a class to leave it unconfigured. The server echoes unconfigured
+    classes back as explicit ``null``, so a round-tripped value may carry
+    ``None`` per class — truthy-check a class, don't test key presence.
+    """
+    email: WebhookContextClassConfig | None
+    texts: WebhookContextClassConfig | None
+    calls: WebhookContextClassConfig | None
 
 
 @dataclass
@@ -65,6 +96,7 @@ class WebhookSubscription:
     created_at: datetime
     updated_at: datetime
     owner_identity_id: UUID | None = None
+    context_config: WebhookContextConfig | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookSubscription:
@@ -84,6 +116,7 @@ class WebhookSubscription:
             owner_identity_id=(
                 UUID(d["owner_identity_id"]) if d.get("owner_identity_id") else None
             ),
+            context_config=d.get("context_config"),
         )
 
 
@@ -167,6 +200,56 @@ def _assert_channel_coherence(
         )
 
 
+def _assert_valid_context_config(cfg: Any) -> None:
+    """Validate context_config against the server's rules (fail fast).
+
+    Known class keys only; each non-null entry is count (1..50) or window
+    (1..168) with no stray keys. A ``None`` class value is allowed (server
+    treats it as unconfigured) and skipped.
+    """
+    if not isinstance(cfg, dict):
+        raise ValueError("context_config must be a dict of class -> mode config")
+    unknown = set(cfg) - set(_CONTEXT_CLASSES)
+    if unknown:
+        raise ValueError(
+            f"context_config has unknown class keys {sorted(unknown)!r}; "
+            f"allowed: {list(_CONTEXT_CLASSES)!r}",
+        )
+    for klass, entry in cfg.items():
+        if entry is not None:
+            _assert_valid_context_entry(klass, entry)
+
+
+def _assert_valid_context_entry(klass: str, entry: Any) -> None:
+    if not isinstance(entry, dict):
+        raise ValueError(f"context_config[{klass!r}] must be a mode config object")
+    mode = entry.get("mode")
+    if mode == "count":
+        _assert_context_int(klass, entry, "count", _CONTEXT_MAX_COUNT)
+    elif mode == "window":
+        _assert_context_int(klass, entry, "hours", _CONTEXT_MAX_WINDOW_HOURS)
+    else:
+        raise ValueError(
+            f"context_config[{klass!r}].mode must be 'count' or 'window', "
+            f"got {mode!r}",
+        )
+
+
+def _assert_context_int(klass: str, entry: dict, key: str, hi: int) -> None:
+    allowed = {"mode", key}
+    unknown = set(entry) - allowed
+    if unknown:
+        raise ValueError(
+            f"context_config[{klass!r}] has unknown keys {sorted(unknown)!r}; "
+            f"allowed: {sorted(allowed)!r}",
+        )
+    value = entry.get(key)
+    if not isinstance(value, int) or isinstance(value, bool) or not (1 <= value <= hi):
+        raise ValueError(
+            f"context_config[{klass!r}].{key} must be an int in 1..{hi}",
+        )
+
+
 def _uuid_str(value: UUID | str) -> str:
     return str(value)
 
@@ -218,6 +301,7 @@ class WebhookSubscriptionsResource:
         mailbox_id: UUID | str | None = None,
         phone_number_id: UUID | str | None = None,
         agent_identity_id: UUID | str | None = None,
+        context_config: WebhookContextConfig | None = None,
     ) -> WebhookSubscriptionCreateResponse:
         """Create a webhook subscription.
 
@@ -226,6 +310,10 @@ class WebhookSubscriptionsResource:
         non-empty list of distinct values belonging to the owner's
         channel (mailbox -> ``message.*``, phone number -> ``text.*``,
         agent identity -> ``imessage.*``).
+
+        ``context_config`` opts the subscription into per-class conversation
+        context (email/texts/calls) delivered on received events; omit it
+        for none. See :class:`WebhookContextConfig`.
 
         Returns a :class:`WebhookSubscriptionCreateResponse`. Its
         ``signing_key`` is populated **once** when this is the first
@@ -259,6 +347,9 @@ class WebhookSubscriptionsResource:
             "event_types": list(event_types),
             f"{owner}_id": _uuid_str(owners[owner]),  # type: ignore[arg-type]
         }
+        if context_config is not None:
+            _assert_valid_context_config(context_config)
+            body["context_config"] = context_config
         data = self._http.post(_BASE, json=body)
         return WebhookSubscriptionCreateResponse._from_dict(data)
 
@@ -268,12 +359,17 @@ class WebhookSubscriptionsResource:
         *,
         url: str = _UNSET,  # type: ignore[assignment]
         event_types: list[str] = _UNSET,  # type: ignore[assignment]
+        context_config: WebhookContextConfig | None = _UNSET,  # type: ignore[assignment]
     ) -> WebhookSubscription:
-        """Update the URL and/or event-type list of a subscription.
+        """Update the URL, event-type list, and/or context config.
 
         ``event_types``, if supplied, replaces the stored list and must
-        be non-empty and distinct. Owner FKs are not mutable. Omitting
-        both kwargs is a no-op.
+        be non-empty and distinct. Owner FKs are not mutable.
+
+        ``context_config`` is tri-state and the one field where ``None``
+        is meaningful on the wire: omitted = unchanged, ``None`` = clear
+        (send JSON ``null``), a dict = validate and replace. Omitting
+        every kwarg is a no-op.
         """
         body: dict[str, Any] = {}
         if url is not _UNSET:
@@ -284,6 +380,12 @@ class WebhookSubscriptionsResource:
             _assert_event_types_non_empty_distinct(event_types)
             _assert_no_incoming_call(event_types)
             body["event_types"] = list(event_types)
+        if context_config is not _UNSET:
+            if context_config is None:
+                body["context_config"] = None
+            else:
+                _assert_valid_context_config(context_config)
+                body["context_config"] = context_config
         data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}", json=body)
         return WebhookSubscription._from_dict(data)
 

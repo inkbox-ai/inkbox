@@ -219,6 +219,19 @@ identity.send_email(
     }],
 )
 
+# Track opens: embed a tracking pixel when an HTML body is present. Opens
+# surface on the returned Message as first_opened_at / open_count.
+tracked = identity.send_email(
+    to=["user@example.com"],
+    subject="Did you see this?",
+    body_html="<p>Please review.</p>",
+    track_opens=True,
+)
+print(tracked.first_opened_at, tracked.open_count)
+# Caveats: plain-text-only sends aren't tracked;
+# open_count is an upper bound (image proxies prefetch pixels); the pixel
+# can also raise spam scores.
+
 # Iterate inbox (paginated automatically)
 for msg in identity.iter_emails():
     print(msg.subject, msg.from_address, msg.is_read)
@@ -239,6 +252,14 @@ thread = identity.get_thread(msg.thread_id)
 for m in thread.messages:
     print(m.subject, m.from_address)
 ```
+
+Fetching a single inbound message by id (`inkbox.messages.get`, below)
+with an API key marks it read server-side (`is_read` becomes `True`);
+iterating via `iter_emails` / `iter_unread_emails` does not, so
+`mark_emails_read` stays the way to clear unread in list-only workflows.
+This server-side `is_read` (the agent consumed the message via the API)
+is distinct from `first_opened_at` (the recipient's mail client loaded
+the tracking pixel).
 
 ---
 
@@ -358,7 +379,7 @@ Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The
 registry is updated automatically when recipients text `START` / `STOP` to any
 of your numbers (`source="sms"`).
 
-**Reads** — open to admin API keys and Clerk JWT.
+**Reads** — open to admin API keys and user session JWTs.
 
 ```python
 from inkbox import SmsOptInStatus
@@ -581,7 +602,9 @@ Access messages and threads directly without going through an identity. Useful f
 for msg in inkbox.messages.list("abc@inkboxmail.com"):
     print(msg.subject)
 
-# Get a single message with full body
+# Get a single message with full body. Fetching an *inbound* message with
+# an API key marks it read server-side (is_read -> True); list, thread, and
+# attachment routes do not. Use mark_read for list-only workflows.
 detail = inkbox.messages.get("abc@inkboxmail.com", "message-uuid")
 print(detail.body_text)
 
@@ -899,6 +922,61 @@ passes the SDK's check and is rejected as 422 by the server. On
 `update` the SDK mirrors the non-empty / distinct /
 no-`phone.incoming_call` checks; channel coherence is deferred to the
 server because the SDK doesn't know the owner FK from a sub_id alone.
+
+### Conversation context
+
+Opt a subscription into per-class conversation history on **received**
+events (`message.received`, `text.received`, `imessage.received`) by
+passing `context_config`. Each class (`email`, `texts`, `calls`) takes a
+`count` mode (last N items, 1..50) or a `window` mode (last H hours,
+1..168); omit a class to leave it unconfigured.
+
+```python
+inkbox.webhooks.subscriptions.create(
+    mailbox_id=mailbox.id,
+    url="https://example.com/hook",
+    event_types=["message.received"],
+    context_config={
+        "email": {"mode": "count", "count": 10},
+        "texts": {"mode": "window", "hours": 24},
+    },
+)
+
+# update() is tri-state: omit context_config to leave it unchanged, pass a
+# dict to replace it, or pass None to clear it.
+inkbox.webhooks.subscriptions.update(sub.id, context_config=None)
+```
+
+Received-event payloads then carry an optional `data["context"]` keyed by
+class. Optional fields are **omitted when empty** (never `null`) — read
+with `.get(...)`. A skipped
+class ships `items: []` plus a `skipped` reason; call transcript entries
+are either turns or an abridgment marker, discriminated on
+`"marker" in entry`:
+
+```python
+# payload is a cast MailWebhookPayload / TextWebhookPayload / ... (see below)
+context = payload["data"].get("context")
+if context:
+    email = context.get("email")
+    if email:
+        if email.get("skipped"):
+            logger.info("no email context: %s", email["skipped"])
+        for item in email["items"]:
+            logger.info("%s %s", item["direction"], item.get("subject"))
+    calls = context.get("calls")
+    if calls:
+        for call in calls["items"]:
+            for entry in call["transcript"]:
+                if "marker" in entry:
+                    logger.info("… %s turns abridged", entry["omitted_turns"])
+                else:
+                    logger.info("%s: %s", entry.get("party"), entry.get("text"))
+```
+
+The config types (`WebhookContextConfig`, `WebhookContextClassConfig`) and
+the payload wire types (`WebhookContextWire`, `WebhookContextBlockWire`,
+`WebhookTranscriptEntryWire`, …) are exported from `inkbox`.
 
 ### Incoming-call webhooks (still per-number)
 

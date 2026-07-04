@@ -127,6 +127,38 @@ describe("MessagesResource.send", () => {
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["body_text"]).toBeUndefined();
     expect(body["in_reply_to_message_id"]).toBeUndefined();
+    expect(body["track_opens"]).toBeUndefined();
+  });
+
+  it("includes track_opens when requested", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.send(ADDR, {
+      to: ["a@example.com"],
+      subject: "Test",
+      bodyHtml: "<p>Tracked</p>",
+      trackOpens: true,
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
+    expect(body["track_opens"]).toBe(true);
+  });
+
+  it("omits track_opens when explicitly false", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.send(ADDR, {
+      to: ["a@example.com"],
+      subject: "Test",
+      trackOpens: false,
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
+    expect(body["track_opens"]).toBeUndefined();
   });
 });
 
@@ -265,6 +297,42 @@ describe("MessagesResource.forward", () => {
     expect(body["body_html"]).toBeUndefined();
     expect(body["additional_attachments"]).toBeUndefined();
     expect(body["reply_to"]).toBeUndefined();
+    expect(body["track_opens"]).toBeUndefined();
+  });
+
+  it("includes track_opens when requested", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.forward(ADDR, MSG_ID, {
+      to: ["a@example.com"],
+      bodyHtml: "<p>Tracked</p>",
+      trackOpens: true,
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["track_opens"]).toBe(true);
+  });
+
+  it("omits track_opens when explicitly false", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.forward(ADDR, MSG_ID, {
+      to: ["a@example.com"],
+      trackOpens: false,
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["track_opens"]).toBeUndefined();
   });
 });
 

@@ -81,6 +81,96 @@ export interface WebhookAgentIdentity {
   display_name: string | null;
 }
 
+// ---- Conversation context --------------------------------------------
+
+export type WebhookContextScopeWire = "thread" | "conversation" | "contact";
+export type WebhookContextModeWire = "count" | "window";
+export type WebhookContextSkipReasonWire =
+  | "no_contact"
+  | "no_resource"
+  | "unavailable";
+export type WebhookContextTextChannelWire = "sms" | "imessage";
+
+/** Slim mail context item: metadata + snippet only; bodies are omitted. */
+export interface WebhookContextMailItem {
+  id: string;
+  direction: string;
+  from_address: string;
+  to_addresses: string[];
+  created_at: string;
+  subject?: string;
+  snippet?: string;
+}
+
+/** One merged texts-class item (SMS or iMessage); `media` is metadata only, never URLs. */
+export interface WebhookContextTextItem {
+  id: string;
+  channel: WebhookContextTextChannelWire;
+  direction: string;
+  text: string;
+  text_truncated: boolean;
+  created_at: string;
+  sender?: string;
+  status?: string;
+  media?: Record<string, unknown>;
+}
+
+/**
+ * One transcript entry: a turn or the abridgment marker. Optional fields are
+ * omitted when unset — discriminate on `"marker" in entry`. A turn has
+ * `party`/`text`/`ts_ms` (plus `truncated` when char-cut); the marker has
+ * `marker`/`omitted_turns`/`omitted_ms`.
+ */
+export interface WebhookTranscriptEntry {
+  party?: string;
+  text?: string;
+  ts_ms?: number;
+  truncated?: boolean;
+  marker?: "abridged";
+  omitted_turns?: number;
+  omitted_ms?: number;
+}
+
+/** One calls-class item: metadata plus its (possibly abridged) transcript. */
+export interface WebhookContextCallItem {
+  call_id: string;
+  abridged: boolean;
+  transcript: WebhookTranscriptEntry[];
+  direction?: string;
+  counterparty?: string;
+  duration_s?: number;
+  started_at?: string;
+}
+
+/**
+ * One delivered context class under `data.context`. Optional fields such as
+ * `mode`/`requested`/`hours`/`skipped` are absent (not null) when unset.
+ * `items` is chronological oldest-first and excludes the trigger; a skipped
+ * class ships `items: []` plus `skipped`.
+ */
+export interface WebhookContextBlock {
+  scope: WebhookContextScopeWire;
+  items: Array<
+    WebhookContextMailItem | WebhookContextTextItem | WebhookContextCallItem
+  >;
+  truncated: boolean;
+  mode?: WebhookContextModeWire;
+  requested?: number;
+  hours?: number;
+  skipped?: WebhookContextSkipReasonWire;
+}
+
+/**
+ * `data.context` value — only configured classes appear. Present only on
+ * received events whose subscription opted in via `contextConfig`. Capped at
+ * 256 KB; over-cap classes drop oldest items and set `truncated: true`.
+ */
+export interface WebhookContext {
+  email?: WebhookContextBlock;
+  texts?: WebhookContextBlock;
+  calls?: WebhookContextBlock;
+}
+
 // ---- Mail ------------------------------------------------------------
 
 export type MailWebhookEventType =
@@ -174,6 +264,8 @@ export interface MailWebhookPayload {
      * decide precedence.
      */
     agent_identities: WebhookMailAgentIdentity[];
+    /** Conversation context; present only when the subscription configured `contextConfig`. */
+    context?: WebhookContext;
   };
 }
 
@@ -250,6 +342,8 @@ export interface TextWebhookPayload {
      * recipient).
      */
     recipient_phone_number: string | null;
+    /** Conversation context; present only when the subscription configured `contextConfig`. */
+    context?: WebhookContext;
   };
 }
 
@@ -402,6 +496,8 @@ export interface IMessageWebhookPayload {
     contacts: WebhookContact[];
     /** Identity matches for the remote party. Always present, possibly empty. */
     agent_identities: WebhookAgentIdentity[];
+    /** Conversation context; present only when the subscription configured `contextConfig`. */
+    context?: WebhookContext;
   };
 }
 

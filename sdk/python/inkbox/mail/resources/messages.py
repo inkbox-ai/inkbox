@@ -74,6 +74,13 @@ class MessagesResource:
     def get(self, email_address: str, message_id: UUID | str) -> MessageDetail:
         """Get a message with full body content.
 
+        Fetching a single **inbound** message with an API key marks it read
+        server-side (``is_read`` becomes ``True``); list, thread, and
+        attachment routes do not. Agents that only read via ``list`` never
+        flip ``is_read`` — use ``mark_read`` for those workflows. ``is_read``
+        (agent consumed via API) is distinct from ``first_opened_at`` (the
+        recipient's mail client loaded the tracking pixel).
+
         Args:
             email_address: Full email address of the owning mailbox.
             message_id: UUID of the message.
@@ -96,6 +103,7 @@ class MessagesResource:
         bcc: list[str] | None = None,
         in_reply_to_message_id: str | None = None,
         attachments: list[dict[str, str]] | None = None,
+        track_opens: bool = False,
     ) -> Message:
         """Send an email from a mailbox.
 
@@ -113,6 +121,11 @@ class MessagesResource:
                 ``filename`` (str), ``content_type`` (MIME type str), and
                 ``content_base64`` (base64-encoded file content str).
                 Max total size: 25 MB. Blocked extensions: ``.exe``, ``.bat``, ``.scr``.
+            track_opens: Embed an open-tracking pixel in the HTML body.
+                Requires ``body_html``; a plain-text-only send with
+                ``track_opens`` is rejected with 422. Opens surface as
+                ``first_opened_at``/``open_count`` (an upper bound; proxy
+                prefetch fires pixels). Note: pixels can raise spam scores.
 
         Returns:
             The sent message metadata.
@@ -135,6 +148,8 @@ class MessagesResource:
             body["in_reply_to_message_id"] = in_reply_to_message_id
         if attachments is not None:
             body["attachments"] = attachments
+        if track_opens:
+            body["track_opens"] = True
 
         data = self._http.post(f"/mailboxes/{email_address}/messages", json=body)
         return Message._from_dict(data)
@@ -197,6 +212,7 @@ class MessagesResource:
         additional_attachments: list[dict[str, str]] | None = None,
         include_original_attachments: bool = True,
         reply_to: str | None = None,
+        track_opens: bool = False,
     ) -> Message:
         """Forward a stored message out from this mailbox.
 
@@ -229,6 +245,11 @@ class MessagesResource:
                 inside the wrapped ``.eml``).
             reply_to: Optional Reply-To address for the forward's outer
                 envelope.
+            track_opens: Embed an open-tracking pixel; requires HTML on the
+                outgoing forward — inline mode inherits the original's HTML
+                (no caller ``body_html`` needed), wrapped mode needs one. A
+                no-HTML forward is rejected with 422. Opens surface as
+                ``first_opened_at``/``open_count``.
 
         Returns:
             The newly forwarded message metadata.
@@ -256,6 +277,8 @@ class MessagesResource:
             body["additional_attachments"] = additional_attachments
         if reply_to is not None:
             body["reply_to"] = reply_to
+        if track_opens:
+            body["track_opens"] = True
 
         data = self._http.post(
             f"/mailboxes/{email_address}/messages/{message_id}/forward",

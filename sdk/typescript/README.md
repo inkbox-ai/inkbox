@@ -226,6 +226,19 @@ await identity.sendEmail({
   }],
 });
 
+// Track opens: embed a tracking pixel when an HTML body is present. Opens
+// surface on the returned Message as firstOpenedAt / openCount.
+const tracked = await identity.sendEmail({
+  to: ["user@example.com"],
+  subject: "Did you see this?",
+  bodyHtml: "<p>Please review.</p>",
+  trackOpens: true,
+});
+console.log(tracked.firstOpenedAt, tracked.openCount);
+// Caveats: plain-text-only sends aren't tracked;
+// openCount is an upper bound (image proxies prefetch pixels); the pixel
+// can also raise spam scores.
+
 // Iterate inbox (paginated automatically)
 for await (const msg of identity.iterEmails()) {
   console.log(msg.subject, msg.fromAddress, msg.isRead);
@@ -252,6 +265,14 @@ for (const m of thread.messages) {
   console.log(m.subject, m.fromAddress);
 }
 ```
+
+Fetching a single inbound message by id (`inkbox.messages.get`, below)
+with an API key marks it read server-side (`isRead` becomes `true`);
+iterating via `iterEmails` / `iterUnreadEmails` does not, so
+`markEmailsRead` stays the way to clear unread in list-only workflows.
+This server-side `isRead` (the agent consumed the message via the API) is
+distinct from `firstOpenedAt` (the recipient's mail client loaded the
+tracking pixel).
 
 ---
 
@@ -384,7 +405,7 @@ Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The
 registry is updated automatically when recipients text `START` / `STOP` to any
 of your numbers (`source: "sms"`).
 
-**Reads** — open to admin API keys and Clerk JWT.
+**Reads** — open to admin API keys and user session JWTs.
 
 ```ts
 import { SmsOptInStatus } from "@inkbox/sdk";
@@ -618,7 +639,9 @@ for await (const msg of inkbox.messages.list("abc@inkboxmail.com")) {
   console.log(msg.subject);
 }
 
-// Get a single message with full body
+// Get a single message with full body. Fetching an *inbound* message with
+// an API key marks it read server-side (isRead -> true); list, thread, and
+// attachment routes do not. Use markRead for list-only workflows.
 const detail = await inkbox.messages.get("abc@inkboxmail.com", "message-uuid");
 console.log(detail.bodyText);
 
@@ -890,6 +913,66 @@ rejected as 422 by the server. On `update` the SDK mirrors the
 non-empty / distinct / no-`phone.incoming_call` checks; channel
 coherence is deferred to the server because the SDK doesn't know the
 owner FK from a sub_id alone.
+
+### Conversation context
+
+Opt a subscription into per-class conversation history on **received**
+events (`message.received`, `text.received`, `imessage.received`) by
+passing `contextConfig`. Each class (`email`, `texts`, `calls`) takes a
+`count` mode (last N items, 1..50) or a `window` mode (last H hours,
+1..168); omit a class to leave it unconfigured.
+
+```ts
+await inkbox.webhooks.subscriptions.create({
+  mailboxId: mb.id,
+  url: "https://example.com/hook",
+  eventTypes: ["message.received"],
+  contextConfig: {
+    email: { mode: "count", count: 10 },
+    texts: { mode: "window", hours: 24 },
+  },
+});
+
+// update() is tri-state: omit contextConfig to leave it unchanged, pass an
+// object to replace it, or pass null to clear it.
+await inkbox.webhooks.subscriptions.update(sub.id, { contextConfig: null });
+```
+
+Received-event payloads then carry an optional `payload.data.context` keyed
+by class. Optional fields are **omitted when empty** (never `null`) —
+guard with `?.`, not `=== null`. A
+skipped class ships `items: []` plus a `skipped` reason; call transcript
+entries are either turns or an abridgment marker, discriminated on
+`"marker" in entry`:
+
+```ts
+import type { WebhookContextCallItem, WebhookContextMailItem } from "@inkbox/sdk";
+
+// payload is a MailWebhookPayload / TextWebhookPayload / ... (see below)
+const context = payload.data.context;
+if (context?.email) {
+  if (context.email.skipped) {
+    console.log("no email context:", context.email.skipped);
+  }
+  // Each class's items are that class's item type.
+  for (const item of context.email.items as WebhookContextMailItem[]) {
+    console.log(item.direction, item.subject);
+  }
+}
+for (const call of (context?.calls?.items ?? []) as WebhookContextCallItem[]) {
+  for (const entry of call.transcript) {
+    if ("marker" in entry) {
+      console.log(`… ${entry.omitted_turns} turns abridged`);
+    } else {
+      console.log(`${entry.party}: ${entry.text}`);
+    }
+  }
+}
+```
+
+The config types (`WebhookContextConfig`, `WebhookContextClassConfig`) and
+the payload types (`WebhookContext`, `WebhookContextBlock`,
+`WebhookTranscriptEntry`, …) are exported from `@inkbox/sdk`.
 
 ### Incoming-call webhooks (still per-number)
 

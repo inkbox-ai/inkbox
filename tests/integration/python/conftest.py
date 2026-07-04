@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Generator
 
 import httpx
@@ -44,21 +44,28 @@ class BootstrapResult:
 class SdkIntegrationContext:
     config: SdkIntegrationConfig
     bootstrap: BootstrapResult
+    extra_cleanup_org_ids: list[str] = field(default_factory=list)
     _cleaned_up: bool = False
+
+    def register_org_for_cleanup(self, org_id: str) -> None:
+        self.extra_cleanup_org_ids.append(org_id)
 
     def cleanup(self) -> dict[str, Any]:
         if self._cleaned_up:
             return {}
         self._cleaned_up = True
         api_url = f"{self.config.base_url.rstrip('/')}/api/v1"
+        account: dict[str, Any] = {
+            "user_id": self.bootstrap.user_id,
+            "org_id": self.bootstrap.org_id,
+        }
+        # Omit when empty to stay compatible with servers predating the field.
+        if self.extra_cleanup_org_ids:
+            account["created_provisional_org_ids"] = self.extra_cleanup_org_ids
         resp = httpx.post(
             f"{api_url}/testing/cleanup-test-user-organization",
             headers={"X-Interservice-Secret": self.config.interservice_secret},
-            json={
-                "accounts": [
-                    {"user_id": self.bootstrap.user_id, "org_id": self.bootstrap.org_id},
-                ],
-            },
+            json={"accounts": [account]},
             timeout=self.config.http_timeout,
         )
         resp.raise_for_status()
@@ -88,7 +95,7 @@ def sdk_integration_config() -> SdkIntegrationConfig:
 
 @pytest.fixture(scope="session")
 def sdk_context(sdk_integration_config: SdkIntegrationConfig) -> Generator[SdkIntegrationContext, None, None]:
-    # Session-scoped: one Clerk org/user is bootstrapped per pytest invocation
+    # Session-scoped: one test org/user is bootstrapped per pytest invocation
     # and shared across every test in this directory. Tests are responsible
     # for cleaning up any identities/secrets they create so that later tests
     # see a predictable starting state.

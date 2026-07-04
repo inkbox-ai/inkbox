@@ -58,6 +58,12 @@ export class MessagesResource {
   /**
    * Get a message with full body content.
    *
+   * Fetching a single **inbound** message with an API key marks it read
+   * server-side (`isRead` becomes `true`); list, thread, and attachment
+   * routes do not. Agents that only read via `list` never flip `isRead` —
+   * use `markRead` for those workflows. `isRead` (agent consumed via API) is
+   * distinct from `firstOpenedAt` (recipient's client loaded the pixel).
+   *
    * @param emailAddress - Full email address of the owning mailbox.
    * @param messageId - UUID of the message.
    */
@@ -83,6 +89,10 @@ export class MessagesResource {
    * @param options.attachments - Optional file attachments. Each entry must have
    *   `filename`, `contentType` (MIME type), and `contentBase64` (base64-encoded
    *   file content). Max total size: 25 MB. Blocked: `.exe`, `.bat`, `.scr`.
+   * @param options.trackOpens - Embed an open-tracking pixel in the HTML body.
+   *   Requires `bodyHtml`; a plain-text-only send with `trackOpens` is rejected
+   *   with 422. Opens surface as `firstOpenedAt`/`openCount` (an upper bound).
+   *   Note: pixels can raise spam scores.
    */
   async send(
     emailAddress: string,
@@ -99,6 +109,7 @@ export class MessagesResource {
         contentType: string;
         contentBase64: string;
       }>;
+      trackOpens?: boolean;
     },
   ): Promise<Message> {
     const recipients: Record<string, unknown> = { to: options.to };
@@ -121,6 +132,7 @@ export class MessagesResource {
         content_base64: a.contentBase64,
       }));
     }
+    if (options.trackOpens) body["track_opens"] = true;
 
     const data = await this.http.post<RawMessage>(
       `/mailboxes/${emailAddress}/messages`,
@@ -205,6 +217,9 @@ export class MessagesResource {
    *   outbound parts. Ignored in `wrapped` mode.
    * @param options.replyTo - Optional Reply-To address for the forward's
    *   outer envelope.
+   * @param options.trackOpens - Embed an open-tracking pixel; requires HTML on
+   *   the outgoing forward — inline mode inherits the original's HTML (no caller
+   *   `bodyHtml` needed), wrapped mode needs one. A no-HTML forward returns 422.
    */
   async forward(
     emailAddress: string,
@@ -224,6 +239,7 @@ export class MessagesResource {
       }>;
       includeOriginalAttachments?: boolean;
       replyTo?: string;
+      trackOpens?: boolean;
     },
   ): Promise<Message> {
     const recipients: Record<string, unknown> = {};
@@ -247,6 +263,7 @@ export class MessagesResource {
       }));
     }
     if (options.replyTo !== undefined) body["reply_to"] = options.replyTo;
+    if (options.trackOpens) body["track_opens"] = true;
 
     const data = await this.http.post<RawMessage>(
       `/mailboxes/${emailAddress}/messages/${messageId}/forward`,

@@ -133,12 +133,16 @@ inkbox email send -i <handle>                # Send an email
   --cc <addresses>                           #   Comma-separated CC
   --bcc <addresses>                          #   Comma-separated BCC
   --in-reply-to <message-id>                 #   Message ID to reply to
+  --track-opens                              #   Embed an open-tracking pixel
+                                             #     (requires --body-html)
 
 inkbox email list -i <handle>                # List emails
   --direction <dir>                          #   Filter: inbound or outbound
   --limit <n>                                #   Max messages (default: 50)
 
 inkbox email get <message-id> -i <handle>    # Get full message with body
+                                             #   Fetching an inbound message
+                                             #   marks it read server-side.
 
 inkbox email search -i <handle>              # Search emails
   -q, --query <query>                        #   Search query (required)
@@ -428,9 +432,18 @@ inkbox webhook subscription create           # Create a subscription
   --agent-identity-id <id>                   #   Owning agent identity id (iMessage events)
   --url <url>                                #   HTTPS destination (required)
   --event-type <type>                        #   Event type (repeatable; ≥1 required)
-inkbox webhook subscription update <sub-id>  # Update url and/or event_types
+  --context-email <spec>                     #   Conversation context for the email
+                                             #     class: count:N or window:H
+  --context-texts <spec>                     #   Same for texts (count:N | window:H)
+  --context-calls <spec>                     #   Same for calls (count:N | window:H)
+inkbox webhook subscription update <sub-id>  # Update url, event_types, and/or context
   --url <url>                                #   New HTTPS destination
   --event-type <type>                        #   Replacement event-type list (repeatable)
+  --context-email <spec>                     #   Replace email context (count:N | window:H)
+  --context-texts <spec>                     #   Replace texts context (count:N | window:H)
+  --context-calls <spec>                     #   Replace calls context (count:N | window:H)
+  --clear-context                            #   Clear all conversation context
+                                             #     (mutually exclusive with --context-*)
 inkbox webhook subscription delete <sub-id>  # Remove a subscription
 ```
 

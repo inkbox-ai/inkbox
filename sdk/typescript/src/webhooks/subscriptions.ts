@@ -20,6 +20,23 @@ const PATH = "/webhooks/subscriptions";
 /** Lifecycle status of a subscription row. Callers only ever see `"active"`; deleted subscriptions are not returned by `list` / `get`. */
 export type WebhookSubscriptionStatus = "active" | "deleted";
 
+/** One context class's mode config: last `count` items (1..50) or last `hours` hours (1..168). */
+export type WebhookContextClassConfig =
+  | { mode: "count"; count: number }
+  | { mode: "window"; hours: number };
+
+/**
+ * Per-subscription conversation-context config, keyed by class. Omit a class
+ * to leave it unconfigured; the server echoes unconfigured classes back as
+ * explicit `null`, so a round-tripped value may carry `null` per class —
+ * truthy-check a class (`if (cfg.texts)`), don't test for `undefined`.
+ */
+export interface WebhookContextConfig {
+  email?: WebhookContextClassConfig | null;
+  texts?: WebhookContextClassConfig | null;
+  calls?: WebhookContextClassConfig | null;
+}
+
 export interface WebhookSubscription {
   id: string;
   /** `"org_..."` token; not a UUID. */
@@ -43,6 +60,11 @@ export interface WebhookSubscription {
   status: WebhookSubscriptionStatus;
   createdAt: Date;
   updatedAt: Date;
+  /**
+   * Per-class conversation context config, or `null` if none (and on servers
+   * that predate the field). Unconfigured classes may echo as explicit `null`.
+   */
+  contextConfig: WebhookContextConfig | null;
 }
 
 /**
@@ -69,6 +91,7 @@ export interface RawWebhookSubscription {
   status: WebhookSubscriptionStatus;
   created_at: string;
   updated_at: string;
+  context_config?: WebhookContextConfig | null;
 }
 
 export interface RawWebhookSubscriptionCreateResponse extends RawWebhookSubscription {
@@ -94,6 +117,7 @@ export function parseWebhookSubscription(
     status: r.status,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+    contextConfig: r.context_config ?? null,
   };
 }
 
@@ -172,17 +196,73 @@ function assertChannelCoherence(
   // INCOMING_CALL is rejected by assertNoIncomingCall earlier.
 }
 
+const CONTEXT_CLASSES = ["email", "texts", "calls"] as const;
+const CONTEXT_MAX_COUNT = 50;
+const CONTEXT_MAX_WINDOW_HOURS = 168;
+
+function assertValidContextConfig(cfg: unknown): void {
+  if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
+    throw new Error("contextConfig must be an object of class -> mode config");
+  }
+  for (const [klass, entry] of Object.entries(cfg as Record<string, unknown>)) {
+    if (!(CONTEXT_CLASSES as readonly string[]).includes(klass)) {
+      throw new Error(
+        `contextConfig has unknown class key '${klass}'; allowed: ${CONTEXT_CLASSES.join(", ")}`,
+      );
+    }
+    if (entry === null || entry === undefined) continue;
+    assertValidContextEntry(klass, entry);
+  }
+}
+
+function assertValidContextEntry(klass: string, entry: unknown): void {
+  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+    throw new Error(`contextConfig['${klass}'] must be a mode config object`);
+  }
+  const e = entry as Record<string, unknown>;
+  if (e.mode === "count") {
+    assertContextInt(klass, e, "count", CONTEXT_MAX_COUNT);
+  } else if (e.mode === "window") {
+    assertContextInt(klass, e, "hours", CONTEXT_MAX_WINDOW_HOURS);
+  } else {
+    throw new Error(
+      `contextConfig['${klass}'].mode must be 'count' or 'window', got ${JSON.stringify(e.mode)}`,
+    );
+  }
+}
+
+function assertContextInt(
+  klass: string,
+  entry: Record<string, unknown>,
+  key: string,
+  hi: number,
+): void {
+  for (const k of Object.keys(entry)) {
+    if (k !== "mode" && k !== key) {
+      throw new Error(`contextConfig['${klass}'] has unknown key '${k}'`);
+    }
+  }
+  const value = entry[key];
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > hi) {
+    throw new Error(`contextConfig['${klass}'].${key} must be an integer in 1..${hi}`);
+  }
+}
+
 export interface CreateWebhookSubscriptionOptions {
   mailboxId?: string;
   phoneNumberId?: string;
   agentIdentityId?: string;
   url: string;
   eventTypes: string[];
+  /** Opt into per-class conversation context (email/texts/calls) on received events. */
+  contextConfig?: WebhookContextConfig;
 }
 
 export interface UpdateWebhookSubscriptionOptions {
   url?: string;
   eventTypes?: string[];
+  /** Tri-state: omit = unchanged, `null` = clear, object = validate and replace. */
+  contextConfig?: WebhookContextConfig | null;
 }
 
 export interface ListWebhookSubscriptionsOptions {
@@ -261,6 +341,10 @@ export class WebhookSubscriptionsResource {
       event_types: options.eventTypes,
       [`${owner}_id`]: ownerId,
     };
+    if (options.contextConfig !== undefined) {
+      assertValidContextConfig(options.contextConfig);
+      body["context_config"] = options.contextConfig;
+    }
     const data = await this.http.post<RawWebhookSubscriptionCreateResponse>(PATH, body);
     return parseWebhookSubscriptionCreateResponse(data);
   }
@@ -285,6 +369,14 @@ export class WebhookSubscriptionsResource {
       assertEventTypesNonEmptyDistinct(options.eventTypes);
       assertNoIncomingCall(options.eventTypes);
       body["event_types"] = options.eventTypes;
+    }
+    if (options.contextConfig !== undefined) {
+      if (options.contextConfig === null) {
+        body["context_config"] = null;
+      } else {
+        assertValidContextConfig(options.contextConfig);
+        body["context_config"] = options.contextConfig;
+      }
     }
     const data = await this.http.patch<RawWebhookSubscription>(
       `${PATH}/${subId}`,

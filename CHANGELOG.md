@@ -4,6 +4,17 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), and `@inkbox/cli`.
 
+## 0.4.16 — Configurable webhook context + open tracking
+
+### Added
+
+- **Conversation-context webhooks.** Webhook subscriptions gain an optional per-class `context_config` (TS `contextConfig`) — `email` / `texts` / `calls`, each `{"mode": "count", "count": N}` (1..50) or `{"mode": "window", "hours": H}` (1..168) — on `create` and `update` (tri-state on update: omit = unchanged, `null` = clear, object = replace). Received events (`message.received`, `text.received`, `imessage.received`) then deliver the matching history under `data.context`, keyed by class. New types: Python `WebhookContextConfig` / `WebhookContextClassConfig` plus receiver wire shapes `WebhookContextWire` / `WebhookContextBlockWire` / `WebhookTranscriptEntryWire` (…); TS `WebhookContextConfig` / `WebhookContextClassConfig` / `WebhookContext` / `WebhookContextBlock` / `WebhookTranscriptEntry` (…). Discriminate transcript entries on `"marker" in entry`. CLI: `--context-email` / `--context-texts` / `--context-calls <count:N|window:H>` on `webhook subscription create` / `update`, plus `--clear-context` on `update`.
+- **Open tracking.** `messages.send(...)` / `forward(...)` and the identity `send_email` / `forward_email` accept `track_opens` (TS `trackOpens`) to embed a tracking pixel. A plain-text send with `track_opens` (TS `trackOpens`) is rejected with 422; forwards need HTML on the outgoing message — inline forwards inherit the original's HTML (no caller body needed), wrapped forwards need one. Opens surface on the returned message as `first_opened_at` / `open_count` (TS `firstOpenedAt` / `openCount`); `open_count` is an upper bound and pixels can raise spam scores. CLI: `--track-opens` on `email send` (requires `--body-html`) and `email forward` (inline forwards reuse the original's HTML).
+
+### Changed
+
+- **`messages.get` marks inbound messages read.** Fetching a single inbound message by id with an API key now flips `is_read` / `isRead` server-side; list, thread, and attachment routes do not. `mark_read` / `markRead` remains for list-only workflows. `is_read` (agent consumed via API) is distinct from `first_opened_at` (recipient's client loaded the tracking pixel).
+
 ## 0.4.15 — Identity-centered calls + shared iMessage-line calling
 
 ### Added

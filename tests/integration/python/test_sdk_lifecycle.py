@@ -276,4 +276,4 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
 
     # Test-org cleanup is now handled by the session-scoped sdk_context
     # fixture teardown so that subsequent tests in the same pytest run
-    # (e.g. test_sdk_signup) can reuse the same Clerk org.
+    # (e.g. test_sdk_signup) can reuse the same test org.

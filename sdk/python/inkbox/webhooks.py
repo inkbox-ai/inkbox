@@ -12,7 +12,7 @@ since ``json.loads`` produces bare strings.
 
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 # ---- Wire union types ____________________________________________________
@@ -119,6 +119,99 @@ class WebhookAgentIdentity(TypedDict):
     display_name: str | None
 
 
+# ---- Conversation context ________________________________________________
+
+WebhookContextScopeWire = Literal["thread", "conversation", "contact"]
+WebhookContextModeWire = Literal["count", "window"]
+WebhookContextSkipReasonWire = Literal["no_contact", "no_resource", "unavailable"]
+WebhookContextTextChannelWire = Literal["sms", "imessage"]
+
+
+class WebhookContextMailItemWire(TypedDict):
+    """Slim mail context item: metadata + snippet only; bodies are omitted."""
+    id: str
+    direction: str
+    from_address: str
+    to_addresses: list[str]
+    created_at: str
+    subject: NotRequired[str]
+    snippet: NotRequired[str]
+
+
+class WebhookContextTextItemWire(TypedDict):
+    """One merged texts-class item (SMS or iMessage).
+
+    ``media`` is metadata only (``{"count": N}``), never URLs.
+    """
+    id: str
+    channel: WebhookContextTextChannelWire
+    direction: str
+    text: str
+    text_truncated: bool
+    created_at: str
+    sender: NotRequired[str]
+    status: NotRequired[str]
+    media: NotRequired[dict]
+
+
+class WebhookTranscriptEntryWire(TypedDict, total=False):
+    """One transcript entry: a turn or the abridgment marker.
+
+    Optional keys are omitted when unset. A turn has ``party``/``text``/
+    ``ts_ms`` (plus ``truncated`` when char-cut), the marker has
+    ``marker``/``omitted_turns``/``omitted_ms``. Discriminate on
+    ``"marker" in entry``.
+    """
+    party: str
+    text: str
+    ts_ms: int
+    truncated: bool
+    marker: Literal["abridged"]
+    omitted_turns: int
+    omitted_ms: int
+
+
+class WebhookContextCallItemWire(TypedDict):
+    """One calls-class item: metadata plus its (possibly abridged) transcript."""
+    call_id: str
+    abridged: bool
+    transcript: list[WebhookTranscriptEntryWire]
+    direction: NotRequired[str]
+    counterparty: NotRequired[str]
+    duration_s: NotRequired[int]
+    started_at: NotRequired[str]
+
+
+class WebhookContextBlockWire(TypedDict):
+    """One delivered context class under ``data.context``.
+
+    Optional keys are absent, not null. ``items`` is chronological
+    oldest-first and excludes the trigger; a skipped class ships
+    ``items: []`` plus ``skipped``.
+    """
+    scope: WebhookContextScopeWire
+    items: list[
+        WebhookContextMailItemWire | WebhookContextTextItemWire | WebhookContextCallItemWire
+    ]
+    truncated: bool
+    mode: NotRequired[WebhookContextModeWire]
+    requested: NotRequired[int]
+    hours: NotRequired[int]
+    skipped: NotRequired[WebhookContextSkipReasonWire]
+
+
+class WebhookContextWire(TypedDict, total=False):
+    """``data.context`` value — only configured classes appear.
+
+    Present only on received events whose subscription opted in via
+    ``context_config``. Capped at 256 KB; over-cap classes drop oldest
+    items and set ``truncated: true``.
+    """
+    email: WebhookContextBlockWire
+    texts: WebhookContextBlockWire
+    calls: WebhookContextBlockWire
+
+
 # ---- Mail ________________________________________________________________
 
 MailWebhookEventType = Literal[
@@ -204,6 +297,7 @@ class MailWebhookData(TypedDict):
     message: MailWebhookMessage
     contacts: list[WebhookMailContact]
     agent_identities: list[WebhookMailAgentIdentity]
+    context: NotRequired[WebhookContextWire]
 
 
 class MailWebhookPayload(TypedDict):
@@ -269,6 +363,7 @@ class TextWebhookData(TypedDict):
     contacts: list[WebhookContact]
     agent_identities: list[WebhookAgentIdentity]
     recipient_phone_number: str | None
+    context: NotRequired[WebhookContextWire]
 
 
 class TextWebhookPayload(TypedDict):
@@ -431,6 +526,7 @@ class IMessageWebhookData(TypedDict):
     reaction: IMessageWebhookReaction | None
     contacts: list[WebhookContact]
     agent_identities: list[WebhookAgentIdentity]
+    context: NotRequired[WebhookContextWire]
 
 
 class IMessageWebhookPayload(TypedDict):

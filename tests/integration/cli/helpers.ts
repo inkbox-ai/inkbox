@@ -66,19 +66,24 @@ export async function bootstrapTestOrg(config: CliIntegrationConfig): Promise<Bo
 export async function cleanupTestOrg(
   config: CliIntegrationConfig,
   bootstrap: BootstrapResult,
+  extraCleanupOrgIds?: string[],
 ): Promise<Record<string, unknown>> {
   const apiUrl = `${config.baseUrl.replace(/\/$/, "")}/api/v1`;
+  const account: Record<string, unknown> = {
+    user_id: bootstrap.userId,
+    org_id: bootstrap.orgId,
+  };
+  // Omit when empty to stay compatible with servers predating the field.
+  if (extraCleanupOrgIds && extraCleanupOrgIds.length > 0) {
+    account.created_provisional_org_ids = extraCleanupOrgIds;
+  }
   const resp = await fetch(`${apiUrl}/testing/cleanup-test-user-organization`, {
     method: "POST",
     headers: {
       "X-Interservice-Secret": config.interserviceSecret,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      accounts: [
-        { user_id: bootstrap.userId, org_id: bootstrap.orgId },
-      ],
-    }),
+    body: JSON.stringify({ accounts: [account] }),
   });
   if (!resp.ok) {
     throw new Error(`Cleanup failed: ${resp.status} ${await resp.text()}`);

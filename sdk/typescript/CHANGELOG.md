@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.16 — Configurable webhook context + open tracking
+
+### Added
+
+- **Conversation-context webhooks.** `webhooks.subscriptions.create(...)` / `update(...)` accept `contextConfig` — per class (`email` / `texts` / `calls`) a `{ mode: "count", count: N }` (1..50) or `{ mode: "window", hours: H }` (1..168). `update` is tri-state (omit = unchanged, `null` = clear, object = replace). Received events carry the history under `payload.data.context`. New exports: `WebhookContextConfig`, `WebhookContextClassConfig`, `WebhookContext`, `WebhookContextBlock`, `WebhookContextMailItem` / `WebhookContextTextItem` / `WebhookContextCallItem`, and `WebhookTranscriptEntry` (discriminate transcript entries on `"marker" in entry`).
+- **Open tracking.** `messages.send(...)` / `forward(...)` and `identity.sendEmail(...)` / `forwardEmail(...)` accept `trackOpens`. A plain-text `trackOpens` send is rejected with 422; forwards need HTML on the outgoing message (inline forwards inherit the original's HTML, wrapped forwards need a caller body). `Message` gains `firstOpenedAt` and `openCount` (an upper bound; pixels can raise spam scores).
+
+### Changed
+
+- **`messages.get` marks inbound messages read.** Fetching a single inbound message by id with an API key now flips `isRead` server-side; list, thread, and attachment routes do not. `markRead` remains for list-only workflows. `isRead` (agent consumed via API) is distinct from `firstOpenedAt` (recipient's client loaded the tracking pixel).
+
 ## 0.4.12 — Tunnel DX
 
 ### Added

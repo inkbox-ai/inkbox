@@ -46,6 +46,33 @@ describe("parseMessage", () => {
     const msg = parseMessage({ ...RAW_MESSAGE, thread_id: null });
     expect(msg.threadId).toBeNull();
   });
+
+  it("parses open-tracking fields when present", () => {
+    const msg = parseMessage({
+      ...RAW_MESSAGE,
+      first_opened_at: "2026-03-09T00:10:00Z",
+      open_count: 3,
+    });
+    expect(msg.firstOpenedAt).toBeInstanceOf(Date);
+    expect(msg.firstOpenedAt?.toISOString()).toBe("2026-03-09T00:10:00.000Z");
+    expect(msg.openCount).toBe(3);
+  });
+
+  it("defaults absent open-tracking fields for older responses", () => {
+    const msg = parseMessage(RAW_MESSAGE);
+    expect(msg.firstOpenedAt).toBeNull();
+    expect(msg.openCount).toBe(0);
+  });
+
+  it("defaults null first_opened_at to null", () => {
+    const msg = parseMessage({
+      ...RAW_MESSAGE,
+      first_opened_at: null,
+      open_count: 0,
+    });
+    expect(msg.firstOpenedAt).toBeNull();
+    expect(msg.openCount).toBe(0);
+  });
 });
 
 describe("parseMessageDetail", () => {
@@ -84,4 +111,3 @@ describe("parseThreadDetail", () => {
     expect(td.messages).toEqual([]);
   });
 });
-
