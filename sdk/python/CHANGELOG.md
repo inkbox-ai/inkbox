@@ -5,7 +5,7 @@
 ### Added
 
 - **Conversation-context webhooks.** `webhooks.subscriptions.create(...)` / `update(...)` accept `context_config` — per class (`email` / `texts` / `calls`) a `{"mode": "count", "count": N}` (1..50) or `{"mode": "window", "hours": H}` (1..168). `update` is tri-state (omit = unchanged, `None` = clear, dict = replace). Received events carry the history under `data["context"]`. New exports: `WebhookContextConfig`, `WebhookContextClassConfig`, and the receiver wire shapes `WebhookContextWire`, `WebhookContextBlockWire`, `WebhookTranscriptEntryWire` (discriminate transcript entries on `"marker" in entry`), plus the item wire types; `data["context"]` is optional on `MailWebhookData` / `TextWebhookData` / `IMessageWebhookData`.
-- **Open tracking.** `messages.send(...)` / `forward(...)` and `identity.send_email(...)` / `forward_email(...)` accept `track_opens`. A plain-text `track_opens` send is rejected with 422; forwards need HTML on the outgoing message (inline forwards inherit the original's HTML, wrapped forwards need a caller body). `Message` gains `first_opened_at` and `open_count` (an upper bound; pixels can raise spam scores).
+- **Open tracking.** `messages.send(...)` / `forward(...)` and `identity.send_email(...)` / `forward_email(...)` accept `track_opens`. A plain-text `track_opens` send is rejected with 422; forwards need HTML on the outgoing message (inline forwards inherit the original's HTML, wrapped forwards need a caller body). `Message` gains `first_opened_at` and `open_count` (approximate/biased both ways — prefer `first_opened_at`; pixels can raise spam scores).
 
 ### Changed
 

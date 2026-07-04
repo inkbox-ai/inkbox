@@ -136,6 +136,28 @@ inkbox email send -i <handle>                # Send an email
   --track-opens                              #   Embed an open-tracking pixel
                                              #     (requires --body-html)
 
+inkbox email reply-all <message-id> -i <handle>  # Reply to everyone on a message
+  --subject <subject>                        #   Override subject
+  --body-text <text>                         #   Plain text body
+  --body-html <html>                         #   HTML body
+  --reply-to <address>                       #   Reply-To address
+
+inkbox email forward <message-id> -i <handle>    # Forward a message
+  --to <addresses>                           #   Comma-separated recipients
+  --cc <addresses>                           #   Comma-separated CC
+  --bcc <addresses>                          #   Comma-separated BCC
+                                             #     (at least one of to/cc/bcc)
+  --mode <mode>                              #   'inline' (default) or 'wrapped'
+  --subject <subject>                        #   Override subject (default: 'Fwd: ...')
+  --body-text <text>                         #   Plain text caller note
+  --body-html <html>                         #   HTML caller note
+  --no-include-original-attachments          #   Drop originals (inline mode)
+  --reply-to <address>                       #   Reply-To for the forward
+  --track-opens                              #   Embed an open-tracking pixel
+                                             #     (inline forwards reuse the
+                                             #     original's HTML; server 422s
+                                             #     if the forward has no HTML)
+
 inkbox email list -i <handle>                # List emails
   --direction <dir>                          #   Filter: inbound or outbound
   --limit <n>                                #   Max messages (default: 50)

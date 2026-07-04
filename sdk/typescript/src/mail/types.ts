@@ -166,7 +166,7 @@ export interface Message {
   createdAt: Date;
   /** First observed recipient open (tracked sends only); `null` otherwise. */
   firstOpenedAt: Date | null;
-  /** Observed opens; an upper bound (image proxies prefetch pixels). */
+  /** Observed opens; approximate (proxy prefetch inflates, the per-window debounce collapses repeats) — prefer `firstOpenedAt`. */
   openCount: number;
 }
 

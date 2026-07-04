@@ -5,7 +5,7 @@
 ### Added
 
 - **Conversation-context webhooks.** `webhooks.subscriptions.create(...)` / `update(...)` accept `contextConfig` — per class (`email` / `texts` / `calls`) a `{ mode: "count", count: N }` (1..50) or `{ mode: "window", hours: H }` (1..168). `update` is tri-state (omit = unchanged, `null` = clear, object = replace). Received events carry the history under `payload.data.context`. New exports: `WebhookContextConfig`, `WebhookContextClassConfig`, `WebhookContext`, `WebhookContextBlock`, `WebhookContextMailItem` / `WebhookContextTextItem` / `WebhookContextCallItem`, and `WebhookTranscriptEntry` (discriminate transcript entries on `"marker" in entry`).
-- **Open tracking.** `messages.send(...)` / `forward(...)` and `identity.sendEmail(...)` / `forwardEmail(...)` accept `trackOpens`. A plain-text `trackOpens` send is rejected with 422; forwards need HTML on the outgoing message (inline forwards inherit the original's HTML, wrapped forwards need a caller body). `Message` gains `firstOpenedAt` and `openCount` (an upper bound; pixels can raise spam scores).
+- **Open tracking.** `messages.send(...)` / `forward(...)` and `identity.sendEmail(...)` / `forwardEmail(...)` accept `trackOpens`. A plain-text `trackOpens` send is rejected with 422; forwards need HTML on the outgoing message (inline forwards inherit the original's HTML, wrapped forwards need a caller body). `Message` gains `firstOpenedAt` and `openCount` (approximate/biased both ways — prefer `firstOpenedAt`; pixels can raise spam scores).
 
 ### Changed
 

@@ -124,8 +124,11 @@ class MessagesResource:
             track_opens: Embed an open-tracking pixel in the HTML body.
                 Requires ``body_html``; a plain-text-only send with
                 ``track_opens`` is rejected with 422. Opens surface as
-                ``first_opened_at``/``open_count`` (an upper bound; proxy
-                prefetch fires pixels). Note: pixels can raise spam scores.
+                ``first_opened_at``/``open_count``. ``open_count`` is
+                approximate (proxy prefetch inflates it; the per-window
+                debounce collapses repeats), so prefer ``first_opened_at``
+                as the reliable open signal. Note: pixels can raise spam
+                scores.
 
         Returns:
             The sent message metadata.

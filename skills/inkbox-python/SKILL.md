@@ -143,8 +143,9 @@ sent = identity.send_email(
 )
 # track_opens tracks sends only when an HTML body is present. Opens
 # surface on the returned Message as sent.first_opened_at / sent.open_count
-# (an upper bound — image proxies prefetch pixels; pixels can also raise
-# spam scores).
+# (approximate — proxy prefetch inflates it, the per-window debounce
+# collapses repeats, so it can read above or below the true count; prefer
+# first_opened_at. pixels can also raise spam scores).
 ```
 
 ### Read

@@ -236,8 +236,9 @@ const tracked = await identity.sendEmail({
 });
 console.log(tracked.firstOpenedAt, tracked.openCount);
 // Caveats: plain-text-only sends aren't tracked;
-// openCount is an upper bound (image proxies prefetch pixels); the pixel
-// can also raise spam scores.
+// openCount is approximate (proxy prefetch inflates it, the per-window
+// debounce collapses repeats — so it can read above or below the true
+// count); prefer firstOpenedAt. Pixels can also raise spam scores.
 
 // Iterate inbox (paginated automatically)
 for await (const msg of identity.iterEmails()) {

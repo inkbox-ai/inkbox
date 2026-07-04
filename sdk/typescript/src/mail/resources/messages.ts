@@ -91,8 +91,9 @@ export class MessagesResource {
    *   file content). Max total size: 25 MB. Blocked: `.exe`, `.bat`, `.scr`.
    * @param options.trackOpens - Embed an open-tracking pixel in the HTML body.
    *   Requires `bodyHtml`; a plain-text-only send with `trackOpens` is rejected
-   *   with 422. Opens surface as `firstOpenedAt`/`openCount` (an upper bound).
-   *   Note: pixels can raise spam scores.
+   *   with 422. Opens surface as `firstOpenedAt`/`openCount`; `openCount` is
+   *   approximate (proxy prefetch inflates it, the per-window debounce
+   *   collapses repeats) so prefer `firstOpenedAt`. Pixels can raise spam scores.
    */
   async send(
     emailAddress: string,

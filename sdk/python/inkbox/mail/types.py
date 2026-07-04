@@ -268,8 +268,10 @@ class Message:
     has_attachments: bool
     created_at: datetime
     # Open tracking (outbound sends with track_opens). ``first_opened_at`` is
-    # the signal; ``open_count`` is an upper bound (image proxies prefetch
-    # pixels). Both absent/None on old servers and untracked sends.
+    # the reliable "was it ever opened" signal; ``open_count`` is approximate
+    # — proxy prefetch (Apple MPP, Gmail) inflates it while the per-window
+    # debounce collapses repeats, so it can read above OR below the true
+    # count. Both absent/None on old servers and untracked sends.
     first_opened_at: datetime | None = None
     open_count: int = 0
 

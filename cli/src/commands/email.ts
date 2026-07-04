@@ -293,6 +293,8 @@ export function registerEmailCommands(program: Command): void {
             "direction",
             "fromAddress",
             "subject",
+            "openCount",
+            "firstOpenedAt",
             "createdAt",
           ],
         });
@@ -332,6 +334,8 @@ export function registerEmailCommands(program: Command): void {
             "direction",
             "fromAddress",
             "subject",
+            "openCount",
+            "firstOpenedAt",
             "createdAt",
           ],
         });
@@ -508,6 +512,8 @@ export function registerEmailCommands(program: Command): void {
               "fromAddress",
               "subject",
               "isRead",
+              "openCount",
+              "firstOpenedAt",
               "createdAt",
             ],
           });

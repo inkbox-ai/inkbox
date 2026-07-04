@@ -2,9 +2,10 @@
 tests/test_webhook_context_types.py
 
 Runtime round-trip of the conversation-context wire shapes
-(``data.context``) added to received-event payloads. Optional keys are
-absent (not null), and the asserts below check key presence/absence
-accordingly.
+(``data.context``) added to received-event payloads. Block-level optional
+keys (mode/requested/hours/skipped) and transcript entries are absent when
+unset; item-level nullable fields are present-with-``null``. The asserts
+below check each accordingly.
 """
 
 from __future__ import annotations
@@ -55,6 +56,9 @@ def _message_received_with_context() -> dict:
                             "direction": "inbound",
                             "from_address": "a@b.c",
                             "to_addresses": ["d@e.f"],
+                            # item nullable fields are present-with-null on the wire
+                            "subject": None,
+                            "snippet": None,
                             "created_at": "2026-07-01T00:00:00Z",
                         },
                         {
@@ -80,6 +84,10 @@ def _message_received_with_context() -> dict:
                             "direction": "inbound",
                             "text": "hello",
                             "text_truncated": False,
+                            # present-with-null item fields (media is {"count": N} or null)
+                            "sender": "+15551234567",
+                            "status": "received",
+                            "media": None,
                             "created_at": "2026-07-03T00:00:00Z",
                         },
                     ],
@@ -92,6 +100,11 @@ def _message_received_with_context() -> dict:
                     "items": [
                         {
                             "call_id": "c1",
+                            # far-end number + length in whole seconds (present-as-null)
+                            "direction": "inbound",
+                            "remote_number": "+15551234567",
+                            "duration": 42,
+                            "started_at": "2026-07-03T00:00:00Z",
                             "abridged": True,
                             "transcript": [
                                 {"party": "caller", "text": "hi", "ts_ms": 0},
@@ -115,10 +128,15 @@ def test_full_context_round_trips_all_three_classes():
     assert ctx["email"]["mode"] == "count"
     assert ctx["email"]["requested"] == 2
     assert ctx["email"]["items"][0]["from_address"] == "a@b.c"
-    # An item without subject/snippet simply omits the keys.
-    assert "subject" not in ctx["email"]["items"][0]
+    # Item nullable fields are present-with-null, not omitted.
+    assert ctx["email"]["items"][0]["subject"] is None
     assert ctx["email"]["items"][1]["subject"] == "re"
     assert ctx["texts"]["items"][0]["channel"] == "sms"
+    assert ctx["texts"]["items"][0]["media"] is None
+    # Call items carry remote_number + duration (seconds), the wire names.
+    call_item = ctx["calls"]["items"][0]
+    assert call_item["remote_number"] == "+15551234567"
+    assert call_item["duration"] == 42
     # window block carries hours, not requested.
     assert ctx["texts"]["hours"] == 24
     assert "requested" not in ctx["texts"]

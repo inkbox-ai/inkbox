@@ -181,7 +181,7 @@ describe("WebhookContext", () => {
           text: "Earlier text",
           text_truncated: false,
           status: "received",
-          media: { content_type: "image/png", size: 1234 },
+          media: { count: 1 },
           created_at: "2026-07-04T00:01:00Z",
         },
       ],
@@ -193,8 +193,8 @@ describe("WebhookContext", () => {
         {
           call_id: "call_1",
           direction: "inbound",
-          counterparty: "+15551234567",
-          duration_s: 42,
+          remote_number: "+15551234567",
+          duration: 42,
           started_at: "2026-07-04T00:02:00Z",
           abridged: true,
           transcript: [

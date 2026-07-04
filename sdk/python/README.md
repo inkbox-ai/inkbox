@@ -229,8 +229,9 @@ tracked = identity.send_email(
 )
 print(tracked.first_opened_at, tracked.open_count)
 # Caveats: plain-text-only sends aren't tracked;
-# open_count is an upper bound (image proxies prefetch pixels); the pixel
-# can also raise spam scores.
+# open_count is approximate (proxy prefetch inflates it, the per-window
+# debounce collapses repeats — so it can read above or below the true
+# count); prefer first_opened_at. Pixels can also raise spam scores.
 
 # Iterate inbox (paginated automatically)
 for msg in identity.iter_emails():
