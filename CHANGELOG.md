@@ -4,6 +4,13 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.19 — Hosted realtime voice config + live call control channel
+
+### Added
+
+- **Hosted realtime voice config.** A per-identity resource to opt an identity into platform-hosted realtime voice (the platform runs the voice agent, so you no longer host an audio bridge for it): `inkbox.hosted_realtime.get_config()` / `set_config(enabled=, voice=, model=, instructions=)` in Python (TS `inkbox.hostedRealtime.getConfig()` / `setConfig({ enabled, voice?, model?, instructions? })`, Rust `client.hosted_realtime().get_config(..)` / `set_config(..)`), reading and writing `GET`/`PUT /phone/hosted-realtime-config`. `voice` / `model` / `instructions` are nullable (server default applies). Identity delegators: `identity.get_hosted_realtime_config()` / `set_hosted_realtime_config(..)` (TS `getHostedRealtimeConfig()` / `setHostedRealtimeConfig(..)`, Rust `get_hosted_realtime_config()` / `set_hosted_realtime_config(..)`). CLI: `inkbox phone hosted-realtime get|set` (`--enabled` / `--disabled` `--voice` `--model` `--instructions` `-i`). New types: Python / TS `HostedRealtimeConfig`, Rust `HostedRealtimeConfig`.
+- **Live call observe + intervene control channel.** A streaming client that keeps your main agent informed as a hosted call happens and lets it step in. Python (async): `session = await inkbox.realtime.connect(call_id=..., agent_identity_id=...)`, then `async for event in session: ...`, with `answer_consult(..)`, `say(..)`, `inject_context(..)`, `approve_tool(..)`, `deny_tool(..)`, `update_instructions(..)`, `hang_up(..)`, `close()`. TypeScript: `const session = await inkbox.realtime.connect({ callId?, agentIdentityId? })` — an async-iterable of events plus the same intervene methods (camelCase). Rust (behind the `tunnels-runtime` feature): `client.realtime().connect(call_id, agent_identity_id).await?`, `session.next().await?`, and the same intervene methods. Identity helpers: `identity.connect_realtime()` (TS `connectRealtime()`). Typed observe events mirror the wire (`call.started`, `call.answered`, `transcript`, `barge_in`, `model.tool_call`, `consult.requested`, `call.ended`, plus `ack` / `error`); unknown event tags surface as an `unknown` variant so forward-compatibility holds.
+
 ## 0.4.18 — One live client per tunnel
 
 ### Changed

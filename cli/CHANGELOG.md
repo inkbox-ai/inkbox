@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.17 — Hosted realtime voice config
+
+### Added
+
+- **`inkbox phone hosted-realtime get|set`.** Reads and writes an identity's platform-hosted realtime voice config. `set` takes `--enabled` / `--disabled` (one required) plus optional `--voice` / `--model` / `--instructions`; both subcommands take `-i, --identity <handle>`.
+
+### Changed
+
+- CLI pins `@inkbox/sdk` at `^0.4.17`.
+
 ## 0.4.16 — Configurable webhook context + open tracking
 
 ### Added

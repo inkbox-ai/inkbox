@@ -227,3 +227,11 @@ INCOMING_CALL_ACTION_CONFIG_DICT = {
     "client_websocket_url": None,
     "incoming_call_webhook_url": "https://hooks.example.com/incoming-call",
 }
+
+HOSTED_REALTIME_CONFIG_DICT = {
+    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
+    "enabled": True,
+    "voice": "warm",
+    "model": "realtime-standard",
+    "instructions": "Be concise.",
+}

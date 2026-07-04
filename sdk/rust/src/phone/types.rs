@@ -347,6 +347,23 @@ pub struct IncomingCallActionConfig {
     pub incoming_call_webhook_url: Option<String>,
 }
 
+/// Per-identity platform-hosted realtime voice configuration.
+///
+/// When `enabled`, inbound calls are answered by the platform's realtime voice
+/// agent instead of bridging audio to a client-hosted socket. `voice` / `model`
+/// / `instructions` are `None` when the server default applies.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostedRealtimeConfig {
+    pub agent_identity_id: Uuid,
+    pub enabled: bool,
+    #[serde(default)]
+    pub voice: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub instructions: Option<String>,
+}
+
 /// A single media attachment in an MMS message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextMediaItem {

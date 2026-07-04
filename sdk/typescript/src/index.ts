@@ -151,6 +151,7 @@ export type {
   PhoneContactRule,
   PhoneIdentityContactRule,
   IncomingCallActionConfig,
+  HostedRealtimeConfig,
   RateLimitInfo,
   PhoneTranscript,
   SmsOptIn,
@@ -161,6 +162,30 @@ export type {
   TextConversationUpdateResult,
 } from "./phone/types.js";
 export type { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
+export type { HostedRealtimeResource } from "./phone/resources/hostedRealtime.js";
+export type {
+  RealtimeResource,
+  RealtimeControlSession,
+  ControlTransport,
+  TransportFactory,
+} from "./phone/realtime/session.js";
+export { RealtimeConnectError } from "./phone/realtime/session.js";
+export type {
+  RealtimeEvent,
+  CallStartedEvent,
+  CallAnsweredEvent,
+  TranscriptEvent,
+  BargeInEvent,
+  ModelToolCallEvent,
+  ConsultRequestedEvent,
+  CallEndedEvent,
+  ControlAckEvent,
+  ControlErrorEvent,
+  UnknownEvent,
+  TranscriptTurn,
+  PostCallAction,
+} from "./phone/realtime/events.js";
+export { parseEvent } from "./phone/realtime/events.js";
 export type {
   PhoneIdentityContactRulesResource,
   CreatePhoneIdentityContactRuleOptions,

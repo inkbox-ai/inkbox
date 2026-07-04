@@ -51,6 +51,7 @@ from inkbox.mail.types import (
 )
 from inkbox.phone.types import (
     CallOrigin,
+    HostedRealtimeConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -69,6 +70,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from inkbox.client import Inkbox
+    from inkbox.phone.realtime import RealtimeControlSession
 
 # `_UNSET` is imported from inkbox.identities.types above. Identity-based
 # `is not _UNSET` checks must compare against the SAME object across all
@@ -719,6 +721,44 @@ class AgentIdentity:
             client_websocket_url=client_websocket_url,
             incoming_call_webhook_url=incoming_call_webhook_url,
         )
+
+    def get_hosted_realtime_config(self) -> HostedRealtimeConfig:
+        """Get this identity's platform-hosted realtime voice config."""
+        return self._inkbox._hosted_realtime.get_config(agent_identity_id=self.id)
+
+    def set_hosted_realtime_config(
+        self,
+        *,
+        enabled: bool,
+        voice: str | None = None,
+        model: str | None = None,
+        instructions: str | None = None,
+    ) -> HostedRealtimeConfig:
+        """Set this identity's platform-hosted realtime voice config.
+
+        Args:
+            enabled: Whether the platform hosts the realtime voice agent
+                for this identity's inbound calls.
+            voice: Provider voice id, or ``None`` for the server default.
+            model: Realtime model id, or ``None`` for the server default.
+            instructions: Extra system instructions appended to the base
+                prompt, or ``None`` to leave unset.
+        """
+        return self._inkbox._hosted_realtime.set_config(
+            enabled=enabled,
+            voice=voice,
+            model=model,
+            instructions=instructions,
+            agent_identity_id=self.id,
+        )
+
+    async def connect_realtime(self) -> "RealtimeControlSession":
+        """Open the observe + intervene control channel for this identity.
+
+        Subscribes to all live and future calls for this identity; async
+        iterate the returned session for events.
+        """
+        return await self._inkbox._realtime.connect(agent_identity_id=self.id)
 
     ## Text message helpers
 

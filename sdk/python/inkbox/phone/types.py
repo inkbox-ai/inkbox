@@ -494,6 +494,33 @@ class IncomingCallActionConfig:
         )
 
 
+@dataclass
+class HostedRealtimeConfig:
+    """Per-identity platform-hosted realtime voice configuration.
+
+    When ``enabled``, inbound calls for the identity are answered by the
+    platform's realtime voice agent instead of bridging audio to a
+    client-hosted socket. ``voice`` / ``model`` / ``instructions`` are
+    null when the server default applies.
+    """
+
+    agent_identity_id: UUID
+    enabled: bool
+    voice: str | None
+    model: str | None
+    instructions: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedRealtimeConfig:
+        return cls(
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            enabled=bool(d["enabled"]),
+            voice=d.get("voice"),
+            model=d.get("model"),
+            instructions=d.get("instructions"),
+        )
+
+
 class SmsOptInStatus(StrEnum):
     """Consent state of a receiver number for the calling org."""
 

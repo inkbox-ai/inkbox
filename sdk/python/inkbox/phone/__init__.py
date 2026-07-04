@@ -5,6 +5,7 @@ inkbox.phone — phone types and exceptions.
 from inkbox.phone.exceptions import InkboxAPIError, InkboxError
 from inkbox.phone.types import (
     CallOrigin,
+    HostedRealtimeConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -27,6 +28,7 @@ __all__ = [
     "InkboxError",
     "InkboxAPIError",
     "CallOrigin",
+    "HostedRealtimeConfig",
     "IncomingCallAction",
     "IncomingCallActionConfig",
     "PhoneCall",

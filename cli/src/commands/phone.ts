@@ -91,6 +91,69 @@ export function registerPhoneCommands(program: Command): void {
       }),
     );
 
+  const hostedRealtime = phone
+    .command("hosted-realtime")
+    .description("Platform-hosted realtime voice config (identity-scoped)");
+
+  hostedRealtime
+    .command("get")
+    .description("Show the hosted realtime voice config")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const config = await identity.getHostedRealtimeConfig();
+        output(config, { json: !!opts.json });
+      }),
+    );
+
+  hostedRealtime
+    .command("set")
+    .description("Update the hosted realtime voice config")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--enabled", "Enable platform-hosted realtime voice")
+    .option("--disabled", "Disable platform-hosted realtime voice")
+    .option("--voice <voice>", "Provider voice id (server default if unset)")
+    .option("--model <model>", "Realtime model id (server default if unset)")
+    .option("--instructions <text>", "Extra system instructions")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        cmdOpts: {
+          identity: string;
+          enabled?: boolean;
+          disabled?: boolean;
+          voice?: string;
+          model?: string;
+          instructions?: string;
+        },
+      ) {
+        if (cmdOpts.enabled && cmdOpts.disabled) {
+          console.error("Error: pass only one of --enabled or --disabled.");
+          process.exit(1);
+        }
+        if (!cmdOpts.enabled && !cmdOpts.disabled) {
+          console.error("Error: pass --enabled or --disabled.");
+          process.exit(1);
+        }
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const config = await identity.setHostedRealtimeConfig({
+          enabled: !!cmdOpts.enabled,
+          voice: cmdOpts.voice,
+          model: cmdOpts.model,
+          instructions: cmdOpts.instructions,
+        });
+        output(config, { json: !!opts.json });
+      }),
+    );
+
   phone
     .command("search-transcripts")
     .description("Search call transcripts")

@@ -41,6 +41,7 @@ from inkbox.mail.types import (
 # Phone types
 from inkbox.phone.types import (
     CallOrigin,
+    HostedRealtimeConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -304,6 +305,7 @@ __all__ = [
     "ThreadFolder",
     # Phone types
     "CallOrigin",
+    "HostedRealtimeConfig",
     "IncomingCallAction",
     "IncomingCallActionConfig",
     "PhoneCall",

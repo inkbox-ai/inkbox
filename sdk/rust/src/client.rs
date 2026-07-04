@@ -38,6 +38,7 @@ use crate::mail::resources::threads::ThreadsResource;
 use crate::notes::resources::notes::NotesResource;
 use crate::phone::resources::calls::CallsResource;
 use crate::phone::resources::contact_rules::PhoneContactRulesResource;
+use crate::phone::resources::hosted_realtime::HostedRealtimeResource;
 use crate::phone::resources::identity_contact_rules::PhoneIdentityContactRulesResource;
 use crate::phone::resources::incoming_call_action::IncomingCallActionResource;
 use crate::phone::resources::numbers::PhoneNumbersResource;
@@ -141,6 +142,9 @@ pub struct Inkbox {
     phone_numbers: PhoneNumbersResource,
     texts: TextsResource,
     incoming_call_action: IncomingCallActionResource,
+    hosted_realtime: HostedRealtimeResource,
+    #[cfg(feature = "tunnels-runtime")]
+    realtime: crate::phone::realtime::RealtimeResource,
     phone_contact_rules: PhoneContactRulesResource,
     sms_opt_ins: SmsOptInsResource,
 
@@ -266,6 +270,12 @@ impl Inkbox {
             phone_numbers: PhoneNumbersResource::new(phone_http.clone()),
             texts: TextsResource::new(phone_http.clone()),
             incoming_call_action: IncomingCallActionResource::new(phone_http.clone()),
+            hosted_realtime: HostedRealtimeResource::new(phone_http.clone()),
+            #[cfg(feature = "tunnels-runtime")]
+            realtime: crate::phone::realtime::RealtimeResource::new(
+                api_key.clone(),
+                trimmed.to_string(),
+            ),
             phone_contact_rules: PhoneContactRulesResource::new(phone_http.clone()),
             sms_opt_ins: SmsOptInsResource::new(phone_http.clone()),
 
@@ -344,6 +354,20 @@ impl Inkbox {
     /// Identity-scoped inbound-call routing config (`get()` / `set()`).
     pub fn incoming_call_action(&self) -> &IncomingCallActionResource {
         &self.incoming_call_action
+    }
+    /// Identity-scoped platform-hosted realtime voice config
+    /// (`get_config()` / `set_config()`).
+    pub fn hosted_realtime(&self) -> &HostedRealtimeResource {
+        &self.hosted_realtime
+    }
+    /// Live call observe + intervene control channel
+    /// (`connect(call_id, agent_identity_id)`).
+    ///
+    /// Requires the `tunnels-runtime` feature (the streaming client reuses its
+    /// async runtime + WebSocket frame codec).
+    #[cfg(feature = "tunnels-runtime")]
+    pub fn realtime(&self) -> &crate::phone::realtime::RealtimeResource {
+        &self.realtime
     }
     /// Phone per-number allow/block rules (+ org-wide list).
     ///

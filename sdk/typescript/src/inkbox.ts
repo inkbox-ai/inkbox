@@ -25,6 +25,8 @@ import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
 import { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
+import { HostedRealtimeResource } from "./phone/resources/hostedRealtime.js";
+import { RealtimeResource } from "./phone/realtime/session.js";
 import { PhoneContactRulesResource } from "./phone/resources/contactRules.js";
 import { PhoneIdentityContactRulesResource } from "./phone/resources/identityContactRules.js";
 import { SmsOptInsResource } from "./phone/resources/smsOptIns.js";
@@ -159,6 +161,8 @@ export class Inkbox {
   readonly _imessages: IMessagesResource;
   readonly _imessageContactRules: IMessageContactRulesResource;
   readonly _incomingCallAction: IncomingCallActionResource;
+  readonly _hostedRealtime: HostedRealtimeResource;
+  readonly _realtime: RealtimeResource;
   readonly _phoneContactRules: PhoneContactRulesResource;
   readonly _phoneIdentityContactRules: PhoneIdentityContactRulesResource;
   readonly _smsOptIns: SmsOptInsResource;
@@ -236,6 +240,12 @@ export class Inkbox {
     this._calls            = new CallsResource(phoneHttp);
     this._texts            = new TextsResource(phoneHttp);
     this._incomingCallAction = new IncomingCallActionResource(phoneHttp);
+    this._hostedRealtime    = new HostedRealtimeResource(phoneHttp);
+    this._realtime          = new RealtimeResource({
+      apiKey,
+      baseUrl: baseUrl.replace(/\/$/, ""),
+      timeoutMs: ms,
+    });
     this._phoneContactRules = new PhoneContactRulesResource(phoneHttp);
     this._smsOptIns         = new SmsOptInsResource(phoneHttp);
 
@@ -314,6 +324,17 @@ export class Inkbox {
 
   /** Incoming-call routing config (get / set), keyed by agent identity. */
   get incomingCallAction(): IncomingCallActionResource { return this._incomingCallAction; }
+
+  /** Platform-hosted realtime voice config (get / set), keyed by agent identity. */
+  get hostedRealtime(): HostedRealtimeResource { return this._hostedRealtime; }
+
+  /**
+   * Live call observe + intervene control channel.
+   *
+   * `await inkbox.realtime.connect({ callId })` (or `{ agentIdentityId }`)
+   * returns an async-iterable session.
+   */
+  get realtime(): RealtimeResource { return this._realtime; }
 
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }

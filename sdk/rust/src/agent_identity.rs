@@ -52,10 +52,10 @@ use crate::mail::types::{
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    CallOrigin, ContactRuleStatus as PhoneContactRuleStatus, IncomingCallAction,
-    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
-    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
-    TextConversationUpdateResult, TextMessage,
+    CallOrigin, ContactRuleStatus as PhoneContactRuleStatus, HostedRealtimeConfig,
+    IncomingCallAction, IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit,
+    PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript,
+    TextConversationSummary, TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::Tunnel;
@@ -523,6 +523,30 @@ impl AgentIdentity {
             Some(&self.id().to_string()),
             client_websocket_url,
             incoming_call_webhook_url,
+        )
+    }
+
+    /// Get this identity's platform-hosted realtime voice config.
+    pub fn get_hosted_realtime_config(&self) -> Result<HostedRealtimeConfig> {
+        self.inkbox
+            .hosted_realtime()
+            .get_config(Some(&self.id().to_string()))
+    }
+
+    /// Set this identity's platform-hosted realtime voice config.
+    pub fn set_hosted_realtime_config(
+        &self,
+        enabled: bool,
+        voice: Option<&str>,
+        model: Option<&str>,
+        instructions: Option<&str>,
+    ) -> Result<HostedRealtimeConfig> {
+        self.inkbox.hosted_realtime().set_config(
+            enabled,
+            voice,
+            model,
+            instructions,
+            Some(&self.id().to_string()),
         )
     }
 

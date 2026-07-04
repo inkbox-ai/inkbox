@@ -265,6 +265,22 @@ export interface IncomingCallActionConfig {
   incomingCallWebhookUrl: string | null;
 }
 
+/**
+ * Per-identity platform-hosted realtime voice configuration.
+ *
+ * When `enabled`, inbound calls are answered by the platform's realtime
+ * voice agent instead of bridging audio to a client-hosted socket.
+ * `voice` / `model` / `instructions` are null when the server default
+ * applies.
+ */
+export interface HostedRealtimeConfig {
+  agentIdentityId: string;
+  enabled: boolean;
+  voice: string | null;
+  model: string | null;
+  instructions: string | null;
+}
+
 export interface TextMediaItem {
   contentType: string;
   size: number;
@@ -505,6 +521,14 @@ export interface RawIncomingCallActionConfig {
   incoming_call_webhook_url?: string | null;
 }
 
+export interface RawHostedRealtimeConfig {
+  agent_identity_id: string;
+  enabled: boolean;
+  voice?: string | null;
+  model?: string | null;
+  instructions?: string | null;
+}
+
 // ---- parsers ----
 
 export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
@@ -635,6 +659,18 @@ export function parseIncomingCallActionConfig(
     incomingCallAction: r.incoming_call_action as IncomingCallAction,
     clientWebsocketUrl: r.client_websocket_url ?? null,
     incomingCallWebhookUrl: r.incoming_call_webhook_url ?? null,
+  };
+}
+
+export function parseHostedRealtimeConfig(
+  r: RawHostedRealtimeConfig,
+): HostedRealtimeConfig {
+  return {
+    agentIdentityId: r.agent_identity_id,
+    enabled: r.enabled,
+    voice: r.voice ?? null,
+    model: r.model ?? null,
+    instructions: r.instructions ?? null,
   };
 }
 
