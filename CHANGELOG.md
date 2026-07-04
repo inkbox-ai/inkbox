@@ -2,7 +2,7 @@
 
 All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
-(Python), and `@inkbox/cli`.
+(Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
 ## 0.4.16 — Configurable webhook context + open tracking
 

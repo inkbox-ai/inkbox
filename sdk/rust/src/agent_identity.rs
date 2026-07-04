@@ -70,7 +70,7 @@ use crate::vault::types::{DecryptedVaultSecret, SecretPayload, VaultSecret};
 /// communicate directly:
 ///
 /// ```ignore
-/// identity.send_email(&["user@example.com".into()], "Hi", Some("Hello"), None, None, None, None, None)?;
+/// identity.send_email(&["user@example.com".into()], "Hi", Some("Hello"), None, None, None, None, None, false)?;
 /// for msg in identity.iter_emails(None, None)? { println!("{:?}", msg.subject); }
 /// ```
 pub struct AgentIdentity {
@@ -260,6 +260,8 @@ impl AgentIdentity {
     /// * `in_reply_to_message_id` - RFC 5322 Message-ID to thread a reply.
     /// * `attachments` - File attachments (see
     ///   [`crate::mail::resources::Attachment`]).
+    /// * `track_opens` - Embed an open-tracking pixel when `body_html` is
+    ///   present; opens surface as `first_opened_at` / `open_count`.
     #[allow(clippy::too_many_arguments)]
     pub fn send_email(
         &self,
@@ -271,6 +273,7 @@ impl AgentIdentity {
         bcc: Option<&[String]>,
         in_reply_to_message_id: Option<&str>,
         attachments: Option<&[crate::mail::resources::Attachment]>,
+        track_opens: bool,
     ) -> Result<Message> {
         let email = self.require_mailbox()?;
         self.inkbox.messages().send(
@@ -283,6 +286,7 @@ impl AgentIdentity {
             bcc,
             in_reply_to_message_id,
             attachments,
+            track_opens,
         )
     }
 
@@ -329,6 +333,9 @@ impl AgentIdentity {
     /// * `additional_attachments` - Optional caller-authored attachments.
     /// * `include_original_attachments` - `inline` mode only; default `true`.
     /// * `reply_to` - Optional Reply-To address for the forward's envelope.
+    /// * `track_opens` - Embed an open-tracking pixel (requires an HTML part —
+    ///   `inline` inherits the original email's HTML, `wrapped` needs a caller
+    ///   `body_html`); opens surface as `first_opened_at` / `open_count`.
     #[allow(clippy::too_many_arguments)]
     pub fn forward_email(
         &self,
@@ -343,6 +350,7 @@ impl AgentIdentity {
         additional_attachments: Option<&[crate::mail::resources::Attachment]>,
         include_original_attachments: bool,
         reply_to: Option<&str>,
+        track_opens: bool,
     ) -> Result<Message> {
         let email = self.require_mailbox()?;
         self.inkbox.messages().forward(
@@ -358,6 +366,7 @@ impl AgentIdentity {
             additional_attachments,
             include_original_attachments,
             reply_to,
+            track_opens,
         )
     }
 

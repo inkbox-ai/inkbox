@@ -102,7 +102,7 @@ impl InkboxBuilder {
 /// let inkbox = Inkbox::new("ApiKey_...")?;
 /// let identity = inkbox.create_identity("support-bot")?;
 /// identity.send_email(&["customer@example.com".into()], "Hello!", Some("Hi there"),
-///                      None, None, None, None, None)?;
+///                      None, None, None, None, None, false)?;
 /// # Ok(())
 /// # }
 /// ```

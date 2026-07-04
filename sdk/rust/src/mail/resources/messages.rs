@@ -87,6 +87,13 @@ impl MessagesResource {
 
     /// Get a message with full body content.
     ///
+    /// Fetching a single **inbound** message with an API key marks it read
+    /// server-side (`is_read` becomes `true`); list, thread, and attachment
+    /// routes do not. Agents that only read via `list` never flip `is_read` —
+    /// use `mark_read` for those workflows. `is_read` (agent consumed via API)
+    /// is distinct from `first_opened_at` (the recipient's mail client loaded
+    /// the tracking pixel).
+    ///
     /// # Arguments
     /// * `email_address` - Full email address of the owning mailbox.
     /// * `message_id` - UUID of the message.
@@ -114,6 +121,10 @@ impl MessagesResource {
     ///   replied to. Threads the reply automatically.
     /// * `attachments` - Optional file attachments. Max total size: 25 MB.
     ///   Blocked extensions: `.exe`, `.bat`, `.scr`.
+    /// * `track_opens` - Embed an open-tracking pixel in the HTML body. Requires
+    ///   `body_html`; a plain-text-only send with `track_opens` is rejected 422
+    ///   server-side. Opens surface as `first_opened_at` / `open_count`; prefer
+    ///   `first_opened_at` as the reliable "opened" signal.
     ///
     /// # Returns
     /// The sent message metadata.
@@ -129,6 +140,7 @@ impl MessagesResource {
         bcc: Option<&[String]>,
         in_reply_to_message_id: Option<&str>,
         attachments: Option<&[Attachment]>,
+        track_opens: bool,
     ) -> Result<Message> {
         // Recipients: `to` always present; `cc`/`bcc` only when non-empty
         // (Python tests truthiness, so empty lists are dropped).
@@ -162,6 +174,9 @@ impl MessagesResource {
         }
         if let Some(att) = attachments {
             body.insert("attachments".into(), json!(att));
+        }
+        if track_opens {
+            body.insert("track_opens".into(), Value::Bool(true));
         }
 
         let data = self.http.post(
@@ -244,6 +259,10 @@ impl MessagesResource {
     /// * `include_original_attachments` - `inline` mode only: re-attach the
     ///   original attachments. Ignored in `wrapped` mode.
     /// * `reply_to` - Optional Reply-To address for the outer envelope.
+    /// * `track_opens` - Embed an open-tracking pixel; requires an HTML part to
+    ///   inject into. `inline` forwards inherit the original email's HTML (no
+    ///   caller body needed); `wrapped` forwards need a caller `body_html`.
+    ///   Opens surface as `first_opened_at` / `open_count`.
     ///
     /// # Returns
     /// The newly forwarded message metadata.
@@ -262,6 +281,7 @@ impl MessagesResource {
         additional_attachments: Option<&[Attachment]>,
         include_original_attachments: bool,
         reply_to: Option<&str>,
+        track_opens: bool,
     ) -> Result<Message> {
         // Recipients map: each list is only added when non-empty (Python's
         // truthiness check), so an empty `to`/`cc`/`bcc` is omitted entirely.
@@ -303,6 +323,9 @@ impl MessagesResource {
         }
         if let Some(rt) = reply_to {
             body.insert("reply_to".into(), Value::String(rt.to_string()));
+        }
+        if track_opens {
+            body.insert("track_opens".into(), Value::Bool(true));
         }
 
         let data = self.http.post(

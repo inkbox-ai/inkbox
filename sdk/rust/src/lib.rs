@@ -19,7 +19,7 @@
 //!     &["customer@example.com".into()],
 //!     "Hello!",
 //!     Some("Hi there"),
-//!     None, None, None, None, None,
+//!     None, None, None, None, None, false,
 //! )?;
 //! # Ok(())
 //! # }
