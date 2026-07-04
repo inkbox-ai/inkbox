@@ -154,6 +154,170 @@ pub struct WebhookAgentIdentity {
     pub display_name: Option<String>,
 }
 
+// ---- Conversation context ------------------------------------------------
+
+/// Which conversation grain a context class was resolved over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WebhookContextScopeWire {
+    Thread,
+    Conversation,
+    Contact,
+}
+
+/// How a context class was bounded: last-N items or a time window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WebhookContextModeWire {
+    Count,
+    Window,
+}
+
+/// Why a configured context class shipped empty.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WebhookContextSkipReasonWire {
+    NoContact,
+    NoResource,
+    Unavailable,
+}
+
+/// Channel a merged texts-class context item came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WebhookContextTextChannelWire {
+    Sms,
+    Imessage,
+}
+
+/// Slim mail context item: metadata + snippet only; bodies are omitted.
+///
+/// Item-level nullable fields (`subject`/`snippet`) are present-with-`null` on
+/// the wire, not omitted; `Option` deserializes either form.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookContextMailItem {
+    pub id: String,
+    pub direction: String,
+    pub from_address: String,
+    pub to_addresses: Vec<String>,
+    pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snippet: Option<String>,
+}
+
+/// One merged texts-class context item (SMS or iMessage).
+///
+/// `media` is metadata only (`{"count": N}`), never URLs; kept as a free JSON
+/// object. Item-level nullable fields are present-with-`null` on the wire.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookContextTextItem {
+    pub id: String,
+    pub channel: WebhookContextTextChannelWire,
+    pub direction: String,
+    pub text: String,
+    pub text_truncated: bool,
+    pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<serde_json::Value>,
+}
+
+/// One transcript entry: a turn or the abridgment marker.
+///
+/// Every field is optional; the server omits unset keys. A turn carries
+/// `party`/`text`/`ts_ms` (plus `truncated` when char-cut); the abridgment
+/// marker carries `marker`/`omitted_turns`/`omitted_ms`. Discriminate on the
+/// presence of `marker`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookTranscriptEntry {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub party: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ts_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marker: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub omitted_turns: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub omitted_ms: Option<i64>,
+}
+
+/// One calls-class item: metadata plus its (possibly abridged) transcript.
+///
+/// `remote_number` is the far-end number; `duration` is the call length in
+/// whole seconds. Item-level nullable fields are present-with-`null` on the
+/// wire.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookContextCallItem {
+    pub call_id: String,
+    pub abridged: bool,
+    pub transcript: Vec<WebhookTranscriptEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+}
+
+/// A single item in a context block. Untagged: the wire shape has no
+/// discriminator, so receivers (and serde) discriminate on field presence —
+/// mail carries `from_address`, texts carry `channel`, calls carry `call_id`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WebhookContextItem {
+    Mail(WebhookContextMailItem),
+    Text(WebhookContextTextItem),
+    Call(WebhookContextCallItem),
+}
+
+/// One delivered context class under `data.context`.
+///
+/// Block-level optional fields (`mode`/`requested`/`hours`/`skipped`) are
+/// absent (not null) when unset — this differs from item-level nullable fields,
+/// which are present-with-`null`. `items` is chronological oldest-first and
+/// excludes the trigger; a skipped class ships `items: []` plus `skipped`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookContextBlock {
+    pub scope: WebhookContextScopeWire,
+    pub items: Vec<WebhookContextItem>,
+    pub truncated: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<WebhookContextModeWire>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requested: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hours: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skipped: Option<WebhookContextSkipReasonWire>,
+}
+
+/// `data.context` value — only configured classes appear.
+///
+/// Present only on received events whose subscription opted in via
+/// `context_config`. Capped at 256 KB; over-cap classes drop oldest items and
+/// set `truncated: true`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookContext {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<WebhookContextBlock>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub texts: Option<WebhookContextBlock>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calls: Option<WebhookContextBlock>,
+}
+
 // ---- Mail ----------------------------------------------------------------
 
 /// Mail webhook event-type discriminator.
@@ -244,6 +408,11 @@ pub struct MailWebhookData {
     pub message: MailWebhookMessage,
     pub contacts: Vec<WebhookMailContact>,
     pub agent_identities: Vec<WebhookMailAgentIdentity>,
+    // Present only on the channel's `*.received` event, and only when the
+    // subscription opted in via `context_config`. Absent on sent /
+    // delivery-status events even though this shared type permits the key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<WebhookContext>,
 }
 
 /// Top-level mail webhook payload (`{event_type, timestamp, data}` envelope).
@@ -321,6 +490,11 @@ pub struct TextWebhookData {
     pub contacts: Vec<WebhookContact>,
     pub agent_identities: Vec<WebhookAgentIdentity>,
     pub recipient_phone_number: Option<String>,
+    // Present only on the channel's `*.received` event, and only when the
+    // subscription opted in via `context_config`. Absent on sent /
+    // delivery-status events even though this shared type permits the key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<WebhookContext>,
 }
 
 /// Top-level phone-text webhook payload (`{event_type, timestamp, data}`).
@@ -523,6 +697,12 @@ pub struct IMessageWebhookData {
     pub reaction: Option<IMessageWebhookReaction>,
     pub contacts: Vec<WebhookContact>,
     pub agent_identities: Vec<WebhookAgentIdentity>,
+    // Present only on the channel's `*.received` event, and only when the
+    // subscription opted in via `context_config`. Absent on sent /
+    // delivery-status / reaction events even though this shared type permits
+    // the key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<WebhookContext>,
 }
 
 /// Top-level iMessage webhook payload (`{event_type, timestamp, data}`).

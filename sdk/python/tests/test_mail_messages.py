@@ -299,3 +299,33 @@ class TestMessagesDelete:
         res.delete(MBOX, MSG)
 
         http.delete.assert_called_once_with(f"/mailboxes/{MBOX}/messages/{MSG}")
+
+
+class TestMessagesTrackOpens:
+    def test_send_track_opens_sets_body_flag(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+        res.send(MBOX, to=["a@b.com"], subject="T", body_html="<p>x</p>", track_opens=True)
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["track_opens"] is True
+
+    def test_send_default_omits_track_opens(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+        res.send(MBOX, to=["a@b.com"], subject="T", body_html="<p>x</p>")
+        _, kwargs = http.post.call_args
+        assert "track_opens" not in kwargs["json"]
+
+    def test_forward_track_opens_sets_body_flag(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+        res.forward(MBOX, MSG, to=["a@b.com"], body_html="<p>x</p>", track_opens=True)
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["track_opens"] is True
+
+    def test_forward_default_omits_track_opens(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+        res.forward(MBOX, MSG, to=["a@b.com"])
+        _, kwargs = http.post.call_args
+        assert "track_opens" not in kwargs["json"]

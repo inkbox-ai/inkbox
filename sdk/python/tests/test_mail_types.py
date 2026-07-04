@@ -67,6 +67,22 @@ class TestMessageParsing:
         m = Message._from_dict(d)
         assert m.thread_id is None
 
+    def test_open_tracking_defaults_when_absent(self):
+        m = Message._from_dict(MESSAGE_DICT)
+        assert m.first_opened_at is None
+        assert m.open_count == 0
+
+    def test_open_tracking_parsed_when_present(self):
+        d = {**MESSAGE_DICT, "first_opened_at": "2026-03-10T00:00:00Z", "open_count": 3}
+        m = Message._from_dict(d)
+        assert isinstance(m.first_opened_at, datetime)
+        assert m.open_count == 3
+
+    def test_open_count_null_coerces_to_zero(self):
+        d = {**MESSAGE_DICT, "open_count": None}
+        m = Message._from_dict(d)
+        assert m.open_count == 0
+
 
 class TestMessageDetailParsing:
     def test_from_dict(self):

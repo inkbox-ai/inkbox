@@ -79,10 +79,11 @@ def test_python_sdk_signup_accepts_custom_handle_and_email_local_part(
             note_to_human="Python SDK integration signup test",
             agent_handle=agent_handle,
             email_local_part=email_local_part,
-            harness="claude-code",
+            harness="sdk-integration",
             base_url=cfg.base_url,
             timeout=cfg.http_timeout,
         )
+        ctx.register_org_for_cleanup(signup.organization_id)
         assert signup.agent_handle == agent_handle
         assert signup.email_address.startswith(f"{email_local_part}@")
 

@@ -164,6 +164,10 @@ export interface Message {
   isStarred: boolean;
   hasAttachments: boolean;
   createdAt: Date;
+  /** First observed recipient open (tracked sends only); `null` otherwise. */
+  firstOpenedAt: Date | null;
+  /** Observed opens; approximate (proxy prefetch inflates, the per-window debounce collapses repeats) — prefer `firstOpenedAt`. */
+  openCount: number;
 }
 
 /** Server-suggested To/Cc for a reply-all (sending mailbox and BCC excluded). */
@@ -286,6 +290,8 @@ export interface RawMessage {
   is_starred: boolean;
   has_attachments: boolean;
   created_at: string;
+  first_opened_at?: string | null;
+  open_count?: number;
   // detail-only fields
   body_text?: string | null;
   body_html?: string | null;
@@ -391,6 +397,8 @@ export function parseMessage(r: RawMessage): Message {
     isStarred: r.is_starred,
     hasAttachments: r.has_attachments,
     createdAt: new Date(r.created_at),
+    firstOpenedAt: r.first_opened_at ? new Date(r.first_opened_at) : null,
+    openCount: r.open_count ?? 0,
   };
 }
 

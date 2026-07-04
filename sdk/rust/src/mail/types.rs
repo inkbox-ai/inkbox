@@ -301,6 +301,13 @@ pub struct Message {
     pub is_starred: bool,
     pub has_attachments: bool,
     pub created_at: String,
+    // Open tracking (outbound sends with `track_opens`). `first_opened_at` is
+    // the reliable "was it ever opened" signal; `open_count` is approximate.
+    // Old servers omit both, so default them.
+    #[serde(default)]
+    pub open_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_opened_at: Option<String>,
 }
 
 /// Full message including body content.

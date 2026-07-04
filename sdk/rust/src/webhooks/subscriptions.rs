@@ -14,7 +14,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::error::{InkboxError, Result};
@@ -22,6 +22,66 @@ use crate::http::HttpTransport;
 
 const BASE: &str = "/webhooks/subscriptions";
 const INCOMING_CALL: &str = "phone.incoming_call";
+
+const CONTEXT_MAX_COUNT: u32 = 50;
+const CONTEXT_MAX_WINDOW_HOURS: u32 = 168;
+
+/// Per-class conversation-context config: count-mode or window-mode.
+///
+/// `Count` delivers the last `count` items of the class (1..=50); `Window`
+/// delivers items from the last `hours` hours (1..=168). Tagged on the wire by
+/// a `"mode"` field (`"count"` / `"window"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum WebhookContextClassConfig {
+    Count { count: u32 },
+    Window { hours: u32 },
+}
+
+/// Per-subscription conversation-context config, keyed by class.
+///
+/// Omit a class to leave it unconfigured. The server echoes unconfigured
+/// classes back as explicit `null`, which deserializes to `None`.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct WebhookContextConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<WebhookContextClassConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub texts: Option<WebhookContextClassConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calls: Option<WebhookContextClassConfig>,
+}
+
+/// Validate one class entry's numeric bound (count 1..=50, window 1..=168).
+fn assert_valid_context_entry(klass: &str, entry: &WebhookContextClassConfig) -> Result<()> {
+    let (value, hi, key) = match entry {
+        WebhookContextClassConfig::Count { count } => (*count, CONTEXT_MAX_COUNT, "count"),
+        WebhookContextClassConfig::Window { hours } => (*hours, CONTEXT_MAX_WINDOW_HOURS, "hours"),
+    };
+    if !(1..=hi).contains(&value) {
+        return Err(InkboxError::InvalidArgument(format!(
+            "context_config[{klass}].{key} must be an int in 1..{hi}"
+        )));
+    }
+    Ok(())
+}
+
+/// Validate a whole context_config against the server's numeric rules.
+///
+/// Unknown class keys and modes are impossible by construction in Rust, so
+/// only the count/window bounds are checked. A `None` class is skipped.
+fn assert_valid_context_config(cfg: &WebhookContextConfig) -> Result<()> {
+    if let Some(e) = &cfg.email {
+        assert_valid_context_entry("email", e)?;
+    }
+    if let Some(e) = &cfg.texts {
+        assert_valid_context_entry("texts", e)?;
+    }
+    if let Some(e) = &cfg.calls {
+        assert_valid_context_entry("calls", e)?;
+    }
+    Ok(())
+}
 
 /// Lifecycle status of a subscription row. Callers only ever see `"active"`;
 /// deleted subscriptions are not returned by `list` / `get`.
@@ -63,6 +123,10 @@ pub struct WebhookSubscription {
     // Resolved owning identity; absent on servers that predate the field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner_identity_id: Option<Uuid>,
+    // Per-class conversation-context config; absent on subscriptions that never
+    // opted in and on servers that predate the field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_config: Option<WebhookContextConfig>,
 }
 
 /// The response from creating a webhook subscription.
@@ -220,16 +284,22 @@ impl WebhookSubscriptionsResource {
     /// belonging to the owner's channel (mailbox -> `message.*`, phone number
     /// -> `text.*`, agent identity -> `imessage.*`).
     ///
+    /// `context_config` opts the subscription into per-class conversation
+    /// context (email/texts/calls) delivered on received events; pass `None`
+    /// for none. See [`WebhookContextConfig`].
+    ///
     /// # Arguments
     /// * `url` - HTTPS receiver endpoint.
     /// * `event_types` - non-empty, distinct event-type strings.
     /// * `mailbox_id` / `phone_number_id` / `agent_identity_id` - exactly one.
+    /// * `context_config` - optional per-class conversation-context config.
     ///
     /// # Returns
     /// A [`WebhookSubscriptionCreateResponse`]. Its `signing_key` is populated
     /// **once** when this is the first subscription for an identity that had no
     /// signing key yet — store it securely; it is the only time the plaintext
     /// secret is shown. Otherwise `signing_key` is `None`.
+    #[allow(clippy::too_many_arguments)]
     pub fn create(
         &self,
         url: &str,
@@ -237,6 +307,7 @@ impl WebhookSubscriptionsResource {
         mailbox_id: Option<Uuid>,
         phone_number_id: Option<Uuid>,
         agent_identity_id: Option<Uuid>,
+        context_config: Option<&WebhookContextConfig>,
     ) -> Result<WebhookSubscriptionCreateResponse> {
         // Exactly one owner FK must be set.
         let owners: [(&str, Option<Uuid>); 3] = [
@@ -268,22 +339,31 @@ impl WebhookSubscriptionsResource {
         body.insert("url".into(), json!(url));
         body.insert("event_types".into(), json!(event_types));
         body.insert(format!("{owner}_id"), json!(owner_id.to_string()));
+        if let Some(cfg) = context_config {
+            assert_valid_context_config(cfg)?;
+            body.insert("context_config".into(), json!(cfg));
+        }
         let body = serde_json::Value::Object(body);
         let data = self.http.post(BASE, Some(&body), crate::http::NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Update the URL and/or event-type list of a subscription.
+    /// Update the URL, event-type list, and/or context config.
     ///
     /// `event_types`, if supplied, replaces the stored list and must be
-    /// non-empty and distinct. Owner FKs are not mutable. Passing both
-    /// arguments as `None` issues a PATCH with an empty body (a no-op),
+    /// non-empty and distinct. Owner FKs are not mutable. Passing every
+    /// argument as `None` issues a PATCH with an empty body (a no-op),
     /// matching the Python `_UNSET` behaviour.
+    ///
+    /// `context_config` is tri-state — the one field where `null` is meaningful
+    /// on the wire: `None` omits the key (unchanged), `Some(None)` sends JSON
+    /// `null` (clear), `Some(Some(cfg))` validates and replaces.
     ///
     /// # Arguments
     /// * `sub_id` - subscription UUID.
     /// * `url` - `None` to leave unchanged, `Some` to replace.
     /// * `event_types` - `None` to leave unchanged, `Some` to replace.
+    /// * `context_config` - tri-state (see above).
     ///
     /// # Returns
     /// The updated subscription.
@@ -292,6 +372,7 @@ impl WebhookSubscriptionsResource {
         sub_id: Uuid,
         url: Option<&str>,
         event_types: Option<&[String]>,
+        context_config: Option<Option<&WebhookContextConfig>>,
     ) -> Result<WebhookSubscription> {
         // Only include keys the caller supplied (Python omits `_UNSET` keys).
         let mut body = serde_json::Map::new();
@@ -302,6 +383,17 @@ impl WebhookSubscriptionsResource {
             assert_event_types_non_empty_distinct(events)?;
             assert_no_incoming_call(events)?;
             body.insert("event_types".into(), json!(events));
+        }
+        if let Some(cfg) = context_config {
+            match cfg {
+                Some(cfg) => {
+                    assert_valid_context_config(cfg)?;
+                    body.insert("context_config".into(), json!(cfg));
+                }
+                None => {
+                    body.insert("context_config".into(), Value::Null);
+                }
+            }
         }
         let data = self.http.patch(
             &format!("{BASE}/{sub_id}"),

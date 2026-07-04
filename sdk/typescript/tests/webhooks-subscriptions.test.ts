@@ -62,6 +62,63 @@ describe("WebhookSubscriptionsResource.create", () => {
     expect(sub.phoneNumberId).toBeNull();
     expect(sub.eventTypes).toStrictEqual(["message.received", "message.bounced"]);
     expect(sub.createdAt).toBeInstanceOf(Date);
+    expect(sub.contextConfig).toBeNull();
+  });
+
+  it("posts context_config when contextConfig is provided", async () => {
+    const { resource, http } = makeResource();
+    http.post.mockResolvedValue({
+      ...RAW_SUBSCRIPTION,
+      context_config: {
+        email: { mode: "count", count: 10 },
+        texts: { mode: "window", hours: 24 },
+        calls: null,
+      },
+    });
+
+    const sub = await resource.create({
+      mailboxId: "22222222-2222-2222-2222-222222222222",
+      url: "https://customer.example.com/hook",
+      eventTypes: ["message.received"],
+      contextConfig: {
+        email: { mode: "count", count: 10 },
+        texts: { mode: "window", hours: 24 },
+      },
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      mailbox_id: "22222222-2222-2222-2222-222222222222",
+      url: "https://customer.example.com/hook",
+      event_types: ["message.received"],
+      context_config: {
+        email: { mode: "count", count: 10 },
+        texts: { mode: "window", hours: 24 },
+      },
+    });
+    expect(sub.contextConfig).toStrictEqual({
+      email: { mode: "count", count: 10 },
+      texts: { mode: "window", hours: 24 },
+      calls: null,
+    });
+  });
+
+  it("accepts null class values in contextConfig", async () => {
+    const { resource, http } = makeResource();
+    http.post.mockResolvedValue({
+      ...RAW_SUBSCRIPTION,
+      context_config: { email: null, texts: { mode: "count", count: 1 } },
+    });
+
+    await resource.create({
+      mailboxId: "m",
+      url: "https://x/y",
+      eventTypes: ["message.received"],
+      contextConfig: { email: null, texts: { mode: "count", count: 1 } },
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", expect.objectContaining({
+      context_config: { email: null, texts: { mode: "count", count: 1 } },
+    }));
   });
 
   it("rejects when both FKs are provided", async () => {
@@ -185,6 +242,29 @@ describe("WebhookSubscriptionsResource.create", () => {
     ).rejects.toThrow(/eventTypes must not be null/);
   });
 
+  it.each([
+    [{ email: { mode: "count", count: 0 } }, /integer in 1\.\.50/],
+    [{ email: { mode: "count", count: 51 } }, /integer in 1\.\.50/],
+    [{ email: { mode: "count", count: 1.5 } }, /integer in 1\.\.50/],
+    [{ texts: { mode: "window", hours: 0 } }, /integer in 1\.\.168/],
+    [{ texts: { mode: "window", hours: 169 } }, /integer in 1\.\.168/],
+    [{ calls: { mode: "latest", count: 5 } }, /mode must be 'count' or 'window'/],
+    [{ notes: { mode: "count", count: 5 } }, /unknown class key/],
+    [{ email: { mode: "count", count: 5, extra: true } }, /unknown key 'extra'/],
+    [{ email: { mode: "count" } }, /integer in 1\.\.50/],
+    [[], /must be an object/],
+  ])("rejects invalid contextConfig %#", async (contextConfig, error) => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        mailboxId: "m",
+        url: "https://x/y",
+        eventTypes: ["message.received"],
+        contextConfig: contextConfig as never,
+      }),
+    ).rejects.toThrow(error);
+  });
+
   it("accepts text.* for phone_number_id", async () => {
     const { resource, http } = makeResource();
     http.post.mockResolvedValue({
@@ -231,6 +311,48 @@ describe("WebhookSubscriptionsResource.update", () => {
     );
   });
 
+  it("omits context_config on update when contextConfig is undefined", async () => {
+    const { resource, http } = makeResource();
+    http.patch.mockResolvedValue(RAW_SUBSCRIPTION);
+
+    await resource.update("subid", {});
+
+    expect(http.patch).toHaveBeenCalledWith(
+      "/webhooks/subscriptions/subid",
+      {},
+    );
+  });
+
+  it("sends context_config: null on update when clearing contextConfig", async () => {
+    const { resource, http } = makeResource();
+    http.patch.mockResolvedValue({ ...RAW_SUBSCRIPTION, context_config: null });
+
+    const sub = await resource.update("subid", { contextConfig: null });
+
+    expect(http.patch).toHaveBeenCalledWith(
+      "/webhooks/subscriptions/subid",
+      { context_config: null },
+    );
+    expect(sub.contextConfig).toBeNull();
+  });
+
+  it("sends replacement context_config on update", async () => {
+    const { resource, http } = makeResource();
+    const contextConfig = {
+      email: { mode: "count", count: 2 },
+      calls: { mode: "window", hours: 12 },
+    } as const;
+    http.patch.mockResolvedValue({ ...RAW_SUBSCRIPTION, context_config: contextConfig });
+
+    const sub = await resource.update("subid", { contextConfig });
+
+    expect(http.patch).toHaveBeenCalledWith(
+      "/webhooks/subscriptions/subid",
+      { context_config: contextConfig },
+    );
+    expect(sub.contextConfig).toStrictEqual(contextConfig);
+  });
+
   it("rejects empty eventTypes", async () => {
     const { resource } = makeResource();
     await expect(
@@ -264,6 +386,15 @@ describe("WebhookSubscriptionsResource.update", () => {
     await expect(
       resource.update("subid", { eventTypes: null as unknown as string[] }),
     ).rejects.toThrow(/eventTypes must not be null/);
+  });
+
+  it("rejects invalid contextConfig on update", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.update("subid", {
+        contextConfig: { email: { mode: "window", hours: 200 } } as never,
+      }),
+    ).rejects.toThrow(/integer in 1\.\.168/);
   });
 
   it("does not run channel coherence on update", async () => {
@@ -314,6 +445,24 @@ describe("WebhookSubscriptionsResource.get / delete", () => {
     const sub = await resource.get(RAW_SUBSCRIPTION.id);
     expect(http.get).toHaveBeenCalledWith(`/webhooks/subscriptions/${RAW_SUBSCRIPTION.id}`);
     expect(sub.id).toBe(RAW_SUBSCRIPTION.id);
+  });
+
+  it("get parses echoed context_config", async () => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValue({
+      ...RAW_SUBSCRIPTION,
+      context_config: {
+        email: { mode: "count", count: 3 },
+        texts: null,
+        calls: null,
+      },
+    });
+    const sub = await resource.get(RAW_SUBSCRIPTION.id);
+    expect(sub.contextConfig).toStrictEqual({
+      email: { mode: "count", count: 3 },
+      texts: null,
+      calls: null,
+    });
   });
 
   it("delete calls DELETE on the path", async () => {

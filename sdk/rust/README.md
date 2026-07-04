@@ -41,7 +41,7 @@ fn main() -> inkbox::Result<()> {
         &["customer@example.com".into()],
         "Hello!",
         Some("Hi there"),
-        None, None, None, None, None,
+        None, None, None, None, None, false,
     )?;
 
     // Read the inbox.

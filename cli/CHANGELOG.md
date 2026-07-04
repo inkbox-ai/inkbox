@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.16 — Configurable webhook context + open tracking
+
+### Added
+
+- **Conversation-context flags on `webhook subscription`.** `create` / `update` accept `--context-email` / `--context-texts` / `--context-calls <count:N|window:H>`; `update` also accepts `--clear-context` (mutually exclusive with `--context-*`).
+- **`--track-opens` on `email send` / `email forward`.** Embeds an open-tracking pixel; `email send` requires `--body-html`, while `email forward` inline mode reuses the original's HTML. `email get` / `email list` surface `openCount` / `firstOpenedAt` when present.
+
+### Changed
+
+- **`inkbox email get` marks inbound messages read.** Fetching a single inbound message with an API key now flips its read flag server-side; list and thread routes do not.
+
 ## 0.4.12 — Tunnel DX
 
 ### Added

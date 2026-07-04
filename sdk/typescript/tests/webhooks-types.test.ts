@@ -12,9 +12,11 @@ import { join } from "path";
 import { describe, expect, it } from "vitest";
 import type {
   MailWebhookPayload,
+  IMessageWebhookPayload,
   PhoneIncomingCallWebhookPayload,
   RawTextMessageRecipient,
   TextWebhookPayload,
+  WebhookContext,
   WebhookMailContact,
   WebhookMailAgentIdentity,
 } from "../src/index.js";
@@ -144,6 +146,160 @@ describe("MailWebhookPayload", () => {
           break;
       }
     }
+  });
+});
+
+describe("WebhookContext", () => {
+  const context: WebhookContext = {
+    email: {
+      scope: "thread",
+      mode: "count",
+      requested: 2,
+      items: [
+        {
+          id: "msg_1",
+          direction: "inbound",
+          from_address: "customer@example.com",
+          to_addresses: ["agent@example.com"],
+          subject: "Earlier note",
+          snippet: "Can you help?",
+          created_at: "2026-07-04T00:00:00Z",
+        },
+      ],
+      truncated: false,
+    },
+    texts: {
+      scope: "conversation",
+      mode: "window",
+      hours: 24,
+      items: [
+        {
+          id: "txt_1",
+          channel: "sms",
+          direction: "inbound",
+          sender: "+15551234567",
+          text: "Earlier text",
+          text_truncated: false,
+          status: "received",
+          media: { count: 1 },
+          created_at: "2026-07-04T00:01:00Z",
+        },
+      ],
+      truncated: true,
+    },
+    calls: {
+      scope: "contact",
+      items: [
+        {
+          call_id: "call_1",
+          direction: "inbound",
+          remote_number: "+15551234567",
+          duration: 42,
+          started_at: "2026-07-04T00:02:00Z",
+          abridged: true,
+          transcript: [
+            { party: "remote", text: "Hello", ts_ms: 1000 },
+            { marker: "abridged", omitted_turns: 3, omitted_ms: 45000 },
+          ],
+        },
+      ],
+      truncated: false,
+    },
+  };
+
+  it("allows mail, text, and call context blocks under mail payload data", () => {
+    const payload: MailWebhookPayload = {
+      id: "evt_context_mail",
+      event_type: "message.received",
+      timestamp: "2026-07-04T00:03:00Z",
+      data: {
+        message: {
+          id: "msg_trigger",
+          mailbox_id: "mbx_1",
+          thread_id: "thr_1",
+          message_id: "<msg@example.com>",
+          from_address: "customer@example.com",
+          to_addresses: ["agent@example.com"],
+          cc_addresses: null,
+          bcc_addresses: null,
+          subject: "Trigger",
+          snippet: "Latest",
+          direction: "inbound",
+          status: "received",
+          has_attachments: false,
+          created_at: "2026-07-04T00:03:00Z",
+        },
+        contacts: [],
+        agent_identities: [],
+        context,
+      },
+    };
+
+    expect(payload.data.context?.email?.items[0]).toMatchObject({
+      id: "msg_1",
+      snippet: "Can you help?",
+    });
+    expect(payload.data.context?.texts?.hours).toBe(24);
+    expect(payload.data.context?.calls?.items[0]).toMatchObject({
+      call_id: "call_1",
+      abridged: true,
+    });
+  });
+
+  it("allows skipped context classes with omitted optional fields", () => {
+    const skipped: WebhookContext = {
+      calls: {
+        scope: "contact",
+        items: [],
+        truncated: false,
+        skipped: "no_resource",
+      },
+    };
+    expect(skipped.calls?.items).toStrictEqual([]);
+    expect(skipped.calls?.mode).toBeUndefined();
+    expect(skipped.calls?.skipped).toBe("no_resource");
+  });
+
+  it("allows context on text and identity-owned received payloads", () => {
+    const textPayload = loadFixture<TextWebhookPayload>("text_received.json");
+    textPayload.data.context = { texts: context.texts };
+    expect(textPayload.data.context?.texts?.items).toHaveLength(1);
+
+    const imessagePayload: IMessageWebhookPayload = {
+      id: "evt_context_imessage",
+      event_type: "imessage.received",
+      timestamp: "2026-07-04T00:04:00Z",
+      data: {
+        message: {
+          id: "imsg_1",
+          conversation_id: "conv_1",
+          assignment_id: "assign_1",
+          direction: "inbound",
+          remote_number: "+15551234567",
+          content: "Latest",
+          message_type: "message",
+          service: "imessage",
+          send_style: null,
+          media: null,
+          was_downgraded: null,
+          status: "received",
+          error_code: null,
+          error_message: null,
+          error_reason: null,
+          error_detail: null,
+          is_read: false,
+          recipients: null,
+          reactions: null,
+          created_at: "2026-07-04T00:04:00Z",
+          updated_at: "2026-07-04T00:04:00Z",
+        },
+        reaction: null,
+        contacts: [],
+        agent_identities: [],
+        context: { texts: context.texts },
+      },
+    };
+    expect(imessagePayload.data.context?.texts?.mode).toBe("window");
   });
 });
 

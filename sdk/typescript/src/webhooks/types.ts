@@ -81,6 +81,116 @@ export interface WebhookAgentIdentity {
   display_name: string | null;
 }
 
+// ---- Conversation context --------------------------------------------
+
+export type WebhookContextScopeWire = "thread" | "conversation" | "contact";
+export type WebhookContextModeWire = "count" | "window";
+export type WebhookContextSkipReasonWire =
+  | "no_contact"
+  | "no_resource"
+  | "unavailable";
+export type WebhookContextTextChannelWire = "sms" | "imessage";
+
+/** Media metadata for a context text item: a count only, never URLs. */
+export interface WebhookContextTextMedia {
+  count: number;
+}
+
+/**
+ * Slim mail context item: metadata + snippet only; bodies are omitted.
+ *
+ * Item-level nullable fields are present-with-`null` on the wire (not
+ * omitted), so `subject`/`snippet` are required keys typed `string | null`
+ * — narrow with `=== null`, not `!== undefined`.
+ */
+export interface WebhookContextMailItem {
+  id: string;
+  direction: string;
+  from_address: string;
+  to_addresses: string[];
+  created_at: string;
+  subject: string | null;
+  snippet: string | null;
+}
+
+/**
+ * One merged texts-class item (SMS or iMessage); `media` is metadata only
+ * (`{ count }`), never URLs. Nullable fields are present-with-`null`.
+ */
+export interface WebhookContextTextItem {
+  id: string;
+  channel: WebhookContextTextChannelWire;
+  direction: string;
+  text: string;
+  text_truncated: boolean;
+  created_at: string;
+  sender: string | null;
+  status: string | null;
+  media: WebhookContextTextMedia | null;
+}
+
+/**
+ * One transcript entry: a turn or the abridgment marker. Optional fields are
+ * omitted when unset — discriminate on `"marker" in entry`. A turn has
+ * `party`/`text`/`ts_ms` (plus `truncated` when char-cut); the marker has
+ * `marker`/`omitted_turns`/`omitted_ms`.
+ */
+export interface WebhookTranscriptEntry {
+  party?: string;
+  text?: string;
+  ts_ms?: number;
+  truncated?: boolean;
+  marker?: "abridged";
+  omitted_turns?: number;
+  omitted_ms?: number;
+}
+
+/**
+ * One calls-class item: metadata plus its (possibly abridged) transcript.
+ *
+ * `remote_number` is the far-end number; `duration` is the call length in
+ * whole seconds. Nullable fields are present-with-`null` on the wire.
+ */
+export interface WebhookContextCallItem {
+  call_id: string;
+  abridged: boolean;
+  transcript: WebhookTranscriptEntry[];
+  direction: string | null;
+  remote_number: string | null;
+  duration: number | null;
+  started_at: string | null;
+}
+
+/**
+ * One delivered context class under `data.context`. Block-level optional
+ * fields (`mode`/`requested`/`hours`/`skipped`) are absent (not null) when
+ * unset — item-level nullable fields, by contrast, are present-with-`null`
+ * (see the item types). `items` is chronological oldest-first and excludes
+ * the trigger; a skipped class ships `items: []` plus `skipped`.
+ */
+export interface WebhookContextBlock {
+  scope: WebhookContextScopeWire;
+  items: Array<
+    WebhookContextMailItem | WebhookContextTextItem | WebhookContextCallItem
+  >;
+  truncated: boolean;
+  mode?: WebhookContextModeWire;
+  requested?: number;
+  hours?: number;
+  skipped?: WebhookContextSkipReasonWire;
+}
+
+/**
+ * `data.context` value — only configured classes appear. Present only on
+ * received events whose subscription opted in via `contextConfig`. Capped at
+ * 256 KB; over-cap classes drop oldest items and set `truncated: true`.
+ */
+export interface WebhookContext {
+  email?: WebhookContextBlock;
+  texts?: WebhookContextBlock;
+  calls?: WebhookContextBlock;
+}
+
 // ---- Mail ------------------------------------------------------------
 
 export type MailWebhookEventType =
@@ -174,6 +284,14 @@ export interface MailWebhookPayload {
      * decide precedence.
      */
     agent_identities: WebhookMailAgentIdentity[];
+    /** Conversation context; present only when the subscription configured `contextConfig`. */
+    /**
+     * Present only on the channel's `*.received` event, and only when the
+     * subscription opted into it via `contextConfig`. Absent on
+     * sent/delivery-status/reaction events even though this shared data
+     * type permits the key.
+     */
+    context?: WebhookContext;
   };
 }
 
@@ -250,6 +368,14 @@ export interface TextWebhookPayload {
      * recipient).
      */
     recipient_phone_number: string | null;
+    /** Conversation context; present only when the subscription configured `contextConfig`. */
+    /**
+     * Present only on the channel's `*.received` event, and only when the
+     * subscription opted into it via `contextConfig`. Absent on
+     * sent/delivery-status/reaction events even though this shared data
+     * type permits the key.
+     */
+    context?: WebhookContext;
   };
 }
 
@@ -402,6 +528,14 @@ export interface IMessageWebhookPayload {
     contacts: WebhookContact[];
     /** Identity matches for the remote party. Always present, possibly empty. */
     agent_identities: WebhookAgentIdentity[];
+    /** Conversation context; present only when the subscription configured `contextConfig`. */
+    /**
+     * Present only on the channel's `*.received` event, and only when the
+     * subscription opted into it via `contextConfig`. Absent on
+     * sent/delivery-status/reaction events even though this shared data
+     * type permits the key.
+     */
+    context?: WebhookContext;
   };
 }
 

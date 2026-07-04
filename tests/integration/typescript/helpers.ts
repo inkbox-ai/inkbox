@@ -1,5 +1,7 @@
 // tests/integration/typescript/helpers.ts
 
+import fs from "node:fs";
+
 export interface SdkIntegrationConfig {
   baseUrl: string;
   interserviceSecret: string;
@@ -70,19 +72,24 @@ export async function bootstrapTestOrg(config: SdkIntegrationConfig): Promise<Bo
 export async function cleanupTestOrg(
   config: SdkIntegrationConfig,
   bootstrap: BootstrapResult,
+  extraCleanupOrgIds?: string[],
 ): Promise<Record<string, unknown>> {
   const apiUrl = `${config.baseUrl.replace(/\/$/, "")}/api/v1`;
+  const account: Record<string, unknown> = {
+    user_id: bootstrap.userId,
+    org_id: bootstrap.orgId,
+  };
+  // Omit when empty to stay compatible with servers predating the field.
+  if (extraCleanupOrgIds && extraCleanupOrgIds.length > 0) {
+    account.created_provisional_org_ids = extraCleanupOrgIds;
+  }
   const resp = await fetch(`${apiUrl}/testing/cleanup-test-user-organization`, {
     method: "POST",
     headers: {
       "X-Interservice-Secret": config.interserviceSecret,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      accounts: [
-        { user_id: bootstrap.userId, org_id: bootstrap.orgId },
-      ],
-    }),
+    body: JSON.stringify({ accounts: [account] }),
   });
   if (!resp.ok) {
     throw new Error(`Cleanup failed: ${resp.status} ${await resp.text()}`);
@@ -90,8 +97,24 @@ export async function cleanupTestOrg(
   return resp.json();
 }
 
+export function registerOrgForCleanup(orgId: string): void {
+  const file = process.env.SDK_INTEGRATION_CLEANUP_ORGS_FILE;
+  if (!file) return;
+  fs.appendFileSync(file, `${orgId}\n`);
+}
+
+export function readOrgCleanupIds(): string[] {
+  const file = process.env.SDK_INTEGRATION_CLEANUP_ORGS_FILE;
+  if (!file || !fs.existsSync(file)) return [];
+  return fs
+    .readFileSync(file, "utf-8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
 // Read bootstrap credentials that globalSetup.ts has stashed in env vars.
-// Lets each test file share the single Clerk org/user that globalSetup
+// Lets each test file share the single test org/user that globalSetup
 // provisioned for the whole vitest run.
 export function loadBootstrapFromEnv(): BootstrapResult {
   const required = {

@@ -138,7 +138,11 @@ const sent = await identity.sendEmail({
     contentType: "application/pdf",
     contentBase64: "<base64>",
   }],
+  trackOpens: true,                // optional; embed a tracking pixel
 });
+// trackOpens tracks sends only when an HTML body is present. Opens surface
+// on the returned Message as sent.firstOpenedAt / sent.openCount (an upper
+// bound — image proxies prefetch pixels; pixels can also raise spam scores).
 ```
 
 ### Read
@@ -163,6 +167,11 @@ for await (const msg of identity.iterUnreadEmails()) {
 const ids: string[] = [];
 for await (const msg of identity.iterUnreadEmails()) ids.push(msg.id);
 await identity.markEmailsRead(ids);
+// Note: fetching a single inbound message by id (inkbox.messages.get) with
+// an API key marks it read server-side; iterating does not, so
+// markEmailsRead is the way to clear unread for list-only workflows. isRead
+// (agent consumed via API) is distinct from firstOpenedAt (recipient's mail
+// client loaded the tracking pixel).
 
 // Get full thread (oldest-first)
 const thread = await identity.getThread(msg.threadId);
@@ -956,11 +965,22 @@ console.log(created.ownerIdentityId);
 if (created.signingKey) saveSecret(created.signingKey);   // populated once if the identity had no key yet
 ```
 
+**Conversation context:** opt a subscription into per-class history on **received** events (`message.received`, `text.received`, `imessage.received`) with `contextConfig` — `email` / `texts` / `calls`, each `{ mode: "count", count: N }` (1..50) or `{ mode: "window", hours: H }` (1..168). On `update` it is tri-state: omit = unchanged, `null` = clear, object = replace. Received-event payloads then carry an optional `payload.data.context` keyed by class; optional fields are absent, not `null`, so guard with `?.`. A skipped class ships `items: []` plus a `skipped` reason; call transcript entries are turns or an abridgment marker, discriminated on `"marker" in entry`. Config types `WebhookContextConfig` / `WebhookContextClassConfig` and payload types `WebhookContext` / `WebhookContextBlock` / `WebhookTranscriptEntry` (and the item types) are exported from `@inkbox/sdk`.
+
+```typescript
+await inkbox.webhooks.subscriptions.create({
+  mailboxId: mailbox.id, url: "https://example.com/hook",
+  eventTypes: ["message.received"],
+  contextConfig: { email: { mode: "count", count: 10 } },
+});
+await inkbox.webhooks.subscriptions.update(created.id, { contextConfig: null });  // clear
+```
+
 **Mail contact / identity resolution:** `data.contacts` and `data.agent_identities` are lists of `{ bucket, address, id, ... }` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)`. Outbound payloads also carry `data.message.bcc_addresses` (`null` on inbound, since BCC is not visible to recipients).
 
 **Phone/text contact / identity resolution:** `data.contacts` (text) and top-level `contacts` (inbound call) are lists of `{ id, name }` matches; `data.agent_identities` mirrors that for matched agent identities. Scoped to the identity that owns the receiving phone number; both default to `[]` when nothing matches. Group text events carry per-recipient delivery rows in `data.text_message.recipients`; **outbound group lifecycle** events name the event target in `data.recipient_phone_number` (one webhook per recipient leg). Inbound and outbound 1:1 events leave `data.recipient_phone_number` as `null` — the singular peer is already in `data.text_message.remote_phone_number` (inbound) or `data.text_message.recipients[0]` (outbound 1:1).
 
-Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `RawTextMessageRecipient`, plus event-type string unions (`MailWebhookEventType`, `TextWebhookEventType`, `IMessageWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case to match the raw JSON body.
+Exported wire types: `MailWebhookPayload`, `TextWebhookPayload`, `IMessageWebhookPayload`, `PhoneIncomingCallWebhookPayload`, `WebhookContact`, `WebhookAgentIdentity`, `WebhookMailContact`, `WebhookMailAgentIdentity`, `RawTextMessageRecipient`, the conversation-context shapes (`WebhookContext`, `WebhookContextBlock`, `WebhookTranscriptEntry`, and item types), plus event-type string unions (`MailWebhookEventType`, `TextWebhookEventType`, `IMessageWebhookEventType`) and wire enums (`MessageStatus`, `CallStatusWire`, `HangupReasonWire`, `SmsDeliveryStatusWire`, etc.). All fields are snake_case to match the raw JSON body.
 
 ## Error Handling
 

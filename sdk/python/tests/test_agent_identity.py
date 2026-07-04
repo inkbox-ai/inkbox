@@ -97,6 +97,7 @@ class TestAgentIdentityForwardEmail:
             additional_attachments=None,
             include_original_attachments=False,
             reply_to=None,
+            track_opens=False,
         )
 
     def test_forward_email_requires_mailbox(self):

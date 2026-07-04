@@ -267,6 +267,13 @@ class Message:
     is_starred: bool
     has_attachments: bool
     created_at: datetime
+    # Open tracking (outbound sends with track_opens). ``first_opened_at`` is
+    # the reliable "was it ever opened" signal; ``open_count`` is approximate
+    # — proxy prefetch (Apple MPP, Gmail) inflates it while the per-window
+    # debounce collapses repeats, so it can read above OR below the true
+    # count. Both absent/None on old servers and untracked sends.
+    first_opened_at: datetime | None = None
+    open_count: int = 0
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Message:
@@ -286,6 +293,8 @@ class Message:
             is_starred=d["is_starred"],
             has_attachments=d["has_attachments"],
             created_at=datetime.fromisoformat(d["created_at"]),
+            first_opened_at=_dt(d.get("first_opened_at")),
+            open_count=d.get("open_count") or 0,
         )
 
 

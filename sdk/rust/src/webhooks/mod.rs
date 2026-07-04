@@ -15,7 +15,7 @@ pub mod types;
 
 pub use deliveries::{WebhookDeliveriesResource, WebhookDelivery};
 pub use subscriptions::{
-    WebhookSubscription, WebhookSubscriptionCreateResponse, WebhookSubscriptionStatus,
-    WebhookSubscriptionsResource,
+    WebhookContextClassConfig, WebhookContextConfig, WebhookSubscription,
+    WebhookSubscriptionCreateResponse, WebhookSubscriptionStatus, WebhookSubscriptionsResource,
 };
 pub use types::*;

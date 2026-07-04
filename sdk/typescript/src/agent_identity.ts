@@ -342,6 +342,8 @@ export class AgentIdentity {
     bcc?: string[];
     inReplyToMessageId?: string;
     attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+    /** Embed an open-tracking pixel when `bodyHtml` is present; opens surface as `firstOpenedAt`/`openCount`. */
+    trackOpens?: boolean;
   }): Promise<Message> {
     this._requireMailbox();
     return this._inkbox._messages.send(this._mailbox!.emailAddress, options);
@@ -413,6 +415,8 @@ export class AgentIdentity {
       }>;
       includeOriginalAttachments?: boolean;
       replyTo?: string;
+      /** Embed an open-tracking pixel (requires an HTML part on the forward). */
+      trackOpens?: boolean;
     },
   ): Promise<Message> {
     this._requireMailbox();

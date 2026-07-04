@@ -2,7 +2,12 @@
 
 import { randomUUID } from "node:crypto";
 import { describe, it, expect, beforeAll } from "vitest";
-import { Inkbox, MessageDirection } from "@inkbox/sdk";
+import {
+  Inkbox,
+  MailRuleAction,
+  MailRuleMatchType,
+  MessageDirection,
+} from "@inkbox/sdk";
 import type { Message, DecryptedVaultSecret, APIKeyPayload } from "@inkbox/sdk";
 import {
   loadConfig,
@@ -252,8 +257,8 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
 
     logStep(config, "create a mail contact rule on alpha (identity-keyed)");
     const rule = await alpha.createMailContactRule({
-      action: "allow",
-      matchType: "exact_email",
+      action: MailRuleAction.ALLOW,
+      matchType: MailRuleMatchType.EXACT_EMAIL,
       matchTarget: "vip@example.com",
     });
     expect(rule.agentIdentityId).toBe(alpha.id);
