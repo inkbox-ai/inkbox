@@ -4,6 +4,14 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.17 — Inline images, CLI attachments, and mark-unread
+
+### Added
+
+- **Inline images.** Attachment entries on `messages.send(...)` / `reply_all(...)` (and the identity `send_email` / `reply_all_email`) accept `content_id` (TS `contentId`; Rust `Attachment.content_id`). A part with `content_id` renders inline in the HTML body — reference it as `cid:<content_id>` (e.g. `<img src="cid:chart1">`) — instead of as a download, and is not counted in `has_attachments`. Requires `body_html`, an `image/*` `content_type`, and a unique id per send (else 422). Not supported on forwards (`additional_attachments`) — 422. CLI: `--inline-image <cid=path>` on `email send` / `email reply-all` (requires `--body-html`; repeatable).
+- **`mark_emails_unread`** (TS `markEmailsUnread`) on the identity across the TypeScript, Python, and Rust SDKs — the batch counterpart to `mark_emails_read`. CLI: `email mark-unread <message-ids...>`.
+- **CLI attachments.** `email send` / `email reply-all` / `email forward` gain `--attach <path>` (repeatable) to attach files; the content type is inferred from the file extension. `email download-attachment <message-id> <filename>` returns a time-limited download URL for a stored attachment.
+
 ## 0.4.16 — Configurable webhook context + open tracking
 
 ### Added

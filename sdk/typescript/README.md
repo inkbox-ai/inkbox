@@ -226,6 +226,21 @@ await identity.sendEmail({
   }],
 });
 
+// Inline images: set contentId on an image attachment and reference it from
+// bodyHtml as cid:<contentId>. Requires bodyHtml + an image/* contentType, a
+// unique id per send, and is not supported on forwards.
+await identity.sendEmail({
+  to: ["user@example.com"],
+  subject: "Weekly report",
+  bodyHtml: '<p>Revenue:</p><img src="cid:chart">',
+  attachments: [{
+    filename: "chart.png",
+    contentType: "image/png",
+    contentBase64: "<base64-encoded-content>",
+    contentId: "chart",
+  }],
+});
+
 // Track opens: embed a tracking pixel when an HTML body is present. Opens
 // surface on the returned Message as firstOpenedAt / openCount.
 const tracked = await identity.sendEmail({
@@ -255,10 +270,11 @@ for await (const msg of identity.iterUnreadEmails()) {
   console.log(msg.subject);
 }
 
-// Mark messages as read
+// Mark messages as read (or unread)
 const unread: string[] = [];
 for await (const msg of identity.iterUnreadEmails()) unread.push(msg.id);
 await identity.markEmailsRead(unread);
+await identity.markEmailsUnread(["message-uuid"]);
 
 // Get all emails in a thread (threadId comes from msg.threadId)
 const thread = await identity.getThread(msg.threadId!);

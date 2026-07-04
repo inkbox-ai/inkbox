@@ -160,6 +160,28 @@ describe("MessagesResource.send", () => {
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["track_opens"]).toBeUndefined();
   });
+
+  it("serializes content_id only on inline-image attachments", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_MESSAGE);
+    const res = new MessagesResource(http);
+
+    await res.send(ADDR, {
+      to: ["a@example.com"],
+      subject: "Inline",
+      bodyHtml: '<img src="cid:chart">',
+      attachments: [
+        { filename: "chart.png", contentType: "image/png", contentBase64: "aGk=", contentId: "chart" },
+        { filename: "doc.pdf", contentType: "application/pdf", contentBase64: "cGRm" },
+      ],
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
+    expect(body["attachments"]).toEqual([
+      { filename: "chart.png", content_type: "image/png", content_base64: "aGk=", content_id: "chart" },
+      { filename: "doc.pdf", content_type: "application/pdf", content_base64: "cGRm" },
+    ]);
+  });
 });
 
 describe("MessagesResource.replyAll", () => {

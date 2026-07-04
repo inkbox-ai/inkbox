@@ -14,11 +14,18 @@ const DEFAULT_PAGE_SIZE: i64 = 50;
 ///
 /// Mirrors the Python `dict` shape: each entry must carry `filename`,
 /// `content_type` (MIME type), and `content_base64` (base64-encoded content).
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+///
+/// Set `content_id` to render the part inline in the HTML body (referenced as
+/// `cid:<content_id>`, e.g. `<img src="cid:chart1">`) instead of as a download.
+/// Inline parts require `body_html`, an `image/*` `content_type`, and a unique
+/// id per send; they are only honored on `send`/`reply_all` (forwards 422).
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Attachment {
     pub filename: String,
     pub content_type: String,
     pub content_base64: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_id: Option<String>,
 }
 
 pub struct MessagesResource {
@@ -120,7 +127,8 @@ impl MessagesResource {
     /// * `in_reply_to_message_id` - RFC 5322 Message-ID of the message being
     ///   replied to. Threads the reply automatically.
     /// * `attachments` - Optional file attachments. Max total size: 25 MB.
-    ///   Blocked extensions: `.exe`, `.bat`, `.scr`.
+    ///   Blocked extensions: `.exe`, `.bat`, `.scr`. Set `content_id` on an
+    ///   entry to render it inline in the HTML body (see [`Attachment`]).
     /// * `track_opens` - Embed an open-tracking pixel in the HTML body. Requires
     ///   `body_html`; a plain-text-only send with `track_opens` is rejected 422
     ///   server-side. Opens surface as `first_opened_at` / `open_count`; prefer
@@ -198,7 +206,8 @@ impl MessagesResource {
     /// * `subject` - Optional override; defaults server-side to
     ///   `"Re: " + original.subject`.
     /// * `body_text` / `body_html` - Optional reply body.
-    /// * `attachments` - Optional file attachments. Same shape as `send`.
+    /// * `attachments` - Optional file attachments. Same shape as `send`,
+    ///   including `content_id` for inline images.
     /// * `reply_to` - Optional Reply-To address.
     ///
     /// # Returns
@@ -255,7 +264,8 @@ impl MessagesResource {
     ///   `"Fwd: " + original.subject`.
     /// * `body_text` / `body_html` - Optional caller note.
     /// * `additional_attachments` - Optional caller-authored attachments. Same
-    ///   shape and limits as `send`.
+    ///   shape and limits as `send`, but inline images (`content_id`) are not
+    ///   supported on forwards (422).
     /// * `include_original_attachments` - `inline` mode only: re-attach the
     ///   original attachments. Ignored in `wrapped` mode.
     /// * `reply_to` - Optional Reply-To address for the outer envelope.
@@ -421,5 +431,34 @@ fn d_str(d: MessageDirection) -> &'static str {
     match d {
         MessageDirection::Inbound => "inbound",
         MessageDirection::Outbound => "outbound",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Attachment;
+
+    #[test]
+    fn content_id_omitted_when_none() {
+        let att = Attachment {
+            filename: "doc.pdf".into(),
+            content_type: "application/pdf".into(),
+            content_base64: "aGk=".into(),
+            content_id: None,
+        };
+        let v = serde_json::to_value(&att).unwrap();
+        assert!(v.get("content_id").is_none());
+    }
+
+    #[test]
+    fn content_id_serialized_when_set() {
+        let att = Attachment {
+            filename: "chart.png".into(),
+            content_type: "image/png".into(),
+            content_base64: "aGk=".into(),
+            content_id: Some("chart".into()),
+        };
+        let v = serde_json::to_value(&att).unwrap();
+        assert_eq!(v["content_id"], "chart");
     }
 }
