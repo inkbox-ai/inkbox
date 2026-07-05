@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from inkbox import Inkbox
+from inkbox._http import sdk_user_agent
 from inkbox.agent_signup.types import (
     AgentSignupResponse,
     AgentSignupResendResponse,
@@ -87,7 +88,7 @@ class TestSignup:
         client.request.assert_called_once_with(
             "POST",
             "https://inkbox.ai/api/v1/agent-signup",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "User-Agent": sdk_user_agent()},
             json={
                 "human_email": "human@example.com",
                 "display_name": "My Agent",
@@ -116,7 +117,7 @@ class TestSignup:
         client.request.assert_called_once_with(
             "POST",
             "https://inkbox.ai/api/v1/agent-signup",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "User-Agent": sdk_user_agent()},
             json={
                 "human_email": "human@example.com",
                 "note_to_human": "Please approve me",
@@ -138,7 +139,7 @@ class TestSignup:
         client.request.assert_called_once_with(
             "POST",
             "https://inkbox.ai/api/v1/agent-signup",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "User-Agent": sdk_user_agent()},
             json={
                 "human_email": "human@example.com",
                 "note_to_human": "Please approve me",
@@ -174,6 +175,7 @@ class TestVerifySignup:
             "https://inkbox.ai/api/v1/agent-signup/verify",
             headers={
                 "Accept": "application/json",
+                "User-Agent": sdk_user_agent(),
                 "X-API-Key": "ApiKey_abc",
             },
             json={"verification_code": "123456"},
@@ -197,6 +199,7 @@ class TestResendSignupVerification:
             "https://inkbox.ai/api/v1/agent-signup/resend-verification",
             headers={
                 "Accept": "application/json",
+                "User-Agent": sdk_user_agent(),
                 "X-API-Key": "ApiKey_abc",
             },
             json=None,
@@ -220,6 +223,7 @@ class TestGetSignupStatus:
             "https://inkbox.ai/api/v1/agent-signup/status",
             headers={
                 "Accept": "application/json",
+                "User-Agent": sdk_user_agent(),
                 "X-API-Key": "ApiKey_abc",
             },
             json=None,

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { CLI_VERSION } from "./client.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerSignupCommands } from "./commands/signup.js";
 import { registerIdentityCommands } from "./commands/identity.js";
@@ -23,7 +24,7 @@ import { registerDomainCommands } from "./commands/domain.js";
 const program = new Command()
   .name("inkbox")
   .description("CLI for the Inkbox API — email, phone, identities, and vault for AI agents")
-  .version("0.4.12")
+  .version(CLI_VERSION)
   .option("--api-key <key>", "Inkbox API key (or set INKBOX_API_KEY)")
   .option("--vault-key <key>", "Vault key for decrypt operations (or set INKBOX_VAULT_KEY)")
   .option("--base-url <url>", "Override API base URL (or set INKBOX_BASE_URL)")

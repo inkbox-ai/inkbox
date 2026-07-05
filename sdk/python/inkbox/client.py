@@ -12,7 +12,7 @@ from uuid import UUID
 
 import httpx
 
-from inkbox._http import HttpTransport
+from inkbox._http import HttpTransport, sdk_user_agent
 from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
 from inkbox.agent_identity import AgentIdentity
@@ -116,6 +116,7 @@ class Inkbox:
         base_url: str | None = None,
         timeout: float = 30.0,
         vault_key: str | None = None,
+        user_agent_prefix: str | None = None,
     ) -> None:
         """
         Create an Inkbox client.
@@ -133,6 +134,9 @@ class Inkbox:
             vault_key: Optional vault key or recovery code.  When provided,
                 the vault is unlocked automatically at construction so
                 ``identity.credentials`` is immediately available.
+            user_agent_prefix: Optional token prepended to the ``User-Agent``
+                header (e.g. ``"inkbox-cli/1.2.3"``) so a downstream tool
+                identifies itself ahead of the SDK's own token.
         """
         api_key, base_url, vault_key = resolve_client_settings(
             api_key=api_key, base_url=base_url, vault_key=vault_key,
@@ -155,6 +159,7 @@ class Inkbox:
         _api_base = f"{base_url.rstrip('/')}/api"
         _api_root = f"{base_url.rstrip('/')}/api/v1"
         _cookie_jar = CookieJar()
+        _ua = sdk_user_agent(user_agent_prefix)
 
         # Held for the tunnel-agent runtime, which authenticates the
         # data-plane hello with the same key used for the control plane.
@@ -165,54 +170,63 @@ class Inkbox:
             base_url=f"{_api_root}/mail",
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._contacts_http = HttpTransport(
             api_key=api_key,
             base_url=_api_root,
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._phone_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/phone",
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._imessage_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/imessage",
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._ids_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/identities",
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._vault_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/vault",
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._domains_http = HttpTransport(
             api_key=api_key,
             base_url=f"{_api_root}/domains",
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._root_api_http = HttpTransport(
             api_key=api_key,
             base_url=_api_base,
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
         self._api_http = HttpTransport(
             api_key=api_key,
             base_url=_api_root,
             timeout=timeout,
             cookie_jar=_cookie_jar,
+            user_agent=_ua,
         )
 
         self._mailboxes = MailboxesResource(self._mail_http)
@@ -551,7 +565,10 @@ class Inkbox:
         """One-shot HTTP request for agent-signup endpoints."""
         cls._validate_base_url(base_url)
         url = f"{base_url.rstrip('/')}/api/v1/agent-signup{path}"
-        headers: dict[str, str] = {"Accept": "application/json"}
+        headers: dict[str, str] = {
+            "Accept": "application/json",
+            "User-Agent": sdk_user_agent(),
+        }
         if api_key:
             headers["X-API-Key"] = api_key
 

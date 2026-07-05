@@ -6,6 +6,7 @@ Sync HTTP transport (internal). Shared by all resource packages.
 
 from __future__ import annotations
 
+import importlib.metadata
 from typing import Any
 
 import httpx
@@ -21,6 +22,20 @@ from inkbox.exceptions import (
 _DEFAULT_TIMEOUT = 30.0
 
 
+def _sdk_version() -> str:
+    try:
+        return importlib.metadata.version("inkbox")
+    except importlib.metadata.PackageNotFoundError:
+        return "0.0.0"
+
+
+def sdk_user_agent(prefix: str | None = None) -> str:
+    """``User-Agent`` announcing the SDK (e.g. ``inkbox-python/0.4.17``); an
+    optional caller token goes first (``inkbox-cli/1.2.3 inkbox-python/...``)."""
+    base = f"inkbox-python/{_sdk_version()}"
+    return f"{prefix} {base}" if prefix else base
+
+
 class HttpTransport:
     def __init__(
         self,
@@ -28,13 +43,17 @@ class HttpTransport:
         base_url: str,
         timeout: float = _DEFAULT_TIMEOUT,
         cookie_jar: CookieJar | None = None,
+        user_agent: str | None = None,
     ) -> None:
+        headers = {
+            "X-API-Key": api_key,
+            "Accept": "application/json",
+        }
+        if user_agent:
+            headers["User-Agent"] = user_agent
         self._client = httpx.Client(
             base_url=base_url,
-            headers={
-                "X-API-Key": api_key,
-                "Accept": "application/json",
-            },
+            headers=headers,
             timeout=timeout,
         )
         self._cookie_jar = cookie_jar or CookieJar()

@@ -54,12 +54,23 @@ use crate::whoami::types::{parse_whoami, WhoamiResponse};
 /// self-hosting or tests.
 pub const DEFAULT_BASE_URL: &str = "https://inkbox.ai";
 
+/// `User-Agent` announcing the SDK (e.g. `inkbox-rust/0.4.17`); an optional
+/// caller token goes first (`inkbox-cli/1.2.3 inkbox-rust/...`).
+fn sdk_user_agent(prefix: Option<&str>) -> String {
+    let base = concat!("inkbox-rust/", env!("CARGO_PKG_VERSION"));
+    match prefix {
+        Some(p) => format!("{p} {base}"),
+        None => base.to_string(),
+    }
+}
+
 /// Builder for [`Inkbox`], mirroring the Python `Inkbox(...)` keyword args.
 pub struct InkboxBuilder {
     api_key: String,
     base_url: String,
     timeout_secs: f64,
     vault_key: Option<String>,
+    user_agent_prefix: Option<String>,
 }
 
 impl InkboxBuilder {
@@ -83,6 +94,13 @@ impl InkboxBuilder {
         self
     }
 
+    /// Prepend a token to the `User-Agent` header (e.g. `"inkbox-cli/1.2.3"`)
+    /// so a downstream tool identifies itself ahead of the SDK's own token.
+    pub fn user_agent_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.user_agent_prefix = Some(prefix.into());
+        self
+    }
+
     /// Build the client.
     pub fn build(self) -> Result<Arc<Inkbox>> {
         Inkbox::build(
@@ -90,6 +108,7 @@ impl InkboxBuilder {
             self.base_url,
             self.timeout_secs,
             self.vault_key,
+            self.user_agent_prefix,
         )
     }
 }
@@ -164,6 +183,7 @@ impl Inkbox {
             base_url: DEFAULT_BASE_URL.to_string(),
             timeout_secs: default_timeout(),
             vault_key: None,
+            user_agent_prefix: None,
         }
     }
 
@@ -196,12 +216,14 @@ impl Inkbox {
         base_url: String,
         timeout: f64,
         vault_key: Option<String>,
+        user_agent_prefix: Option<String>,
     ) -> Result<Arc<Self>> {
         validate_base_url(&base_url)?;
         let trimmed = base_url.trim_end_matches('/');
         let api_base = format!("{trimmed}/api");
         let api_root = format!("{trimmed}/api/v1");
         let jar = Arc::new(CookieJar::new());
+        let user_agent = sdk_user_agent(user_agent_prefix.as_deref());
 
         // One transport per sub-base, mirroring client.py.
         let mk = |suffix: &str| -> Result<Arc<HttpTransport>> {
@@ -210,6 +232,7 @@ impl Inkbox {
                 suffix.to_string(),
                 timeout,
                 jar.clone(),
+                &user_agent,
             )?))
         };
         let mail_http = mk(&format!("{api_root}/mail"))?;
@@ -627,6 +650,7 @@ fn signup_request(
         .timeout(std::time::Duration::from_secs_f64(
             timeout_secs.unwrap_or(default_timeout()),
         ))
+        .user_agent(sdk_user_agent(None))
         .build()?;
     let m = reqwest::Method::from_bytes(method.as_bytes())
         .map_err(|_| InkboxError::InvalidArgument(format!("bad method {method}")))?;

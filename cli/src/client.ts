@@ -4,6 +4,9 @@ import * as path from "node:path";
 import { Inkbox } from "@inkbox/sdk";
 import type { Command } from "commander";
 
+// Keep in sync with package.json "version".
+export const CLI_VERSION = "0.4.17";
+
 export interface GlobalOpts {
   apiKey?: string;
   vaultKey?: string;
@@ -58,5 +61,6 @@ export function createClient(opts: GlobalOpts): Inkbox {
     apiKey,
     vaultKey: vaultKey || undefined,
     baseUrl,
+    userAgentPrefix: `inkbox-cli/${CLI_VERSION}`,
   });
 }
