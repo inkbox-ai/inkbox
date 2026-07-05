@@ -45,7 +45,6 @@ from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.calls import CallsResource
 from inkbox.phone.resources.hosted_realtime import HostedRealtimeResource
 from inkbox.phone.resources.incoming_call_action import IncomingCallActionResource
-from inkbox.phone.realtime import RealtimeResource
 from inkbox.phone.resources.contact_rules import PhoneContactRulesResource
 from inkbox.phone.resources.identity_contact_rules import (
     PhoneIdentityContactRulesResource,
@@ -242,9 +241,6 @@ class Inkbox:
         self._texts = TextsResource(self._phone_http)
         self._incoming_call_action = IncomingCallActionResource(self._phone_http)
         self._hosted_realtime = HostedRealtimeResource(self._phone_http)
-        self._realtime = RealtimeResource(
-            api_key=api_key, base_url=base_url.rstrip("/"), timeout=timeout,
-        )
         self._phone_contact_rules = PhoneContactRulesResource(self._phone_http)
         self._sms_opt_ins = SmsOptInsResource(self._phone_http)
 
@@ -352,15 +348,6 @@ class Inkbox:
     def hosted_realtime(self) -> HostedRealtimeResource:
         """Access per-identity platform-hosted realtime voice config (get, set)."""
         return self._hosted_realtime
-
-    @property
-    def realtime(self) -> RealtimeResource:
-        """Open the live call observe + intervene control channel.
-
-        ``await inkbox.realtime.connect(call_id=...)`` (or
-        ``agent_identity_id=...``) returns an async-iterable session.
-        """
-        return self._realtime
 
     @property
     def vault(self) -> VaultResource:

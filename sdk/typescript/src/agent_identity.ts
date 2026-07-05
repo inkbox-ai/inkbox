@@ -27,7 +27,6 @@ import type {
   HostedRealtimeConfig,
 } from "./phone/types.js";
 import { CallOrigin, IncomingCallAction } from "./phone/types.js";
-import type { RealtimeControlSession } from "./phone/realtime/session.js";
 import type {
   CreateMailIdentityContactRuleOptions,
   ListMailIdentityContactRulesOptions,
@@ -615,16 +614,6 @@ export class AgentIdentity {
       instructions: options.instructions,
       agentIdentityId: this.id,
     });
-  }
-
-  /**
-   * Open the observe + intervene control channel for this identity.
-   *
-   * Subscribes to all live and future calls for this identity; async
-   * iterate the returned session for events.
-   */
-  async connectRealtime(): Promise<RealtimeControlSession> {
-    return this._inkbox._realtime.connect({ agentIdentityId: this.id });
   }
 
   // ------------------------------------------------------------------

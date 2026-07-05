@@ -1,16 +1,12 @@
-//! Live call observe + intervene control channel.
+//! Observe + intervene frames for platform-hosted calls.
 //!
-//! The streaming client (`RealtimeResource` / `RealtimeControlSession`) is
-//! compiled only with the `tunnels-runtime` feature, which supplies the async
-//! runtime (`tokio` + `tokio-rustls`) and the shared WebSocket frame codec it
-//! reuses. The typed observe events are always available.
+//! These ride the one existing per-call WebSocket (the same connection the
+//! platform opens to your app): decode inbound frames with [`parse_event`],
+//! and build the outbound intervene frames with the helpers in
+//! [`intervene`]. Both surfaces are always available (no feature gate) — they
+//! are pure JSON codec, transport-agnostic.
 
 pub mod events;
+pub mod intervene;
 
 pub use events::{parse_event, PostCallAction, RealtimeEvent, TranscriptTurn};
-
-#[cfg(feature = "tunnels-runtime")]
-pub mod session;
-
-#[cfg(feature = "tunnels-runtime")]
-pub use session::{RealtimeControlSession, RealtimeResource};

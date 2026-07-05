@@ -70,7 +70,6 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from inkbox.client import Inkbox
-    from inkbox.phone.realtime import RealtimeControlSession
 
 # `_UNSET` is imported from inkbox.identities.types above. Identity-based
 # `is not _UNSET` checks must compare against the SAME object across all
@@ -751,14 +750,6 @@ class AgentIdentity:
             instructions=instructions,
             agent_identity_id=self.id,
         )
-
-    async def connect_realtime(self) -> "RealtimeControlSession":
-        """Open the observe + intervene control channel for this identity.
-
-        Subscribes to all live and future calls for this identity; async
-        iterate the returned session for events.
-        """
-        return await self._inkbox._realtime.connect(agent_identity_id=self.id)
 
     ## Text message helpers
 

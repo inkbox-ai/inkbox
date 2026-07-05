@@ -164,13 +164,6 @@ export type {
 export type { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
 export type { HostedRealtimeResource } from "./phone/resources/hostedRealtime.js";
 export type {
-  RealtimeResource,
-  RealtimeControlSession,
-  ControlTransport,
-  TransportFactory,
-} from "./phone/realtime/session.js";
-export { RealtimeConnectError } from "./phone/realtime/session.js";
-export type {
   RealtimeEvent,
   CallStartedEvent,
   CallAnsweredEvent,
@@ -179,13 +172,20 @@ export type {
   ModelToolCallEvent,
   ConsultRequestedEvent,
   CallEndedEvent,
-  ControlAckEvent,
-  ControlErrorEvent,
   UnknownEvent,
   TranscriptTurn,
   PostCallAction,
 } from "./phone/realtime/events.js";
 export { parseEvent } from "./phone/realtime/events.js";
+export {
+  consultAnswer,
+  say,
+  injectContext,
+  approveTool,
+  denyTool,
+  updateInstructions,
+  hangUp,
+} from "./phone/realtime/intervene.js";
 export type {
   PhoneIdentityContactRulesResource,
   CreatePhoneIdentityContactRuleOptions,
