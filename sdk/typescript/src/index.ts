@@ -1,4 +1,5 @@
 export { Inkbox } from "./inkbox.js";
+export { VERSION } from "./version.js";
 export { AgentIdentity } from "./agent_identity.js";
 export { Credentials } from "./credentials.js";
 export type { InkboxOptions, SignupOptions } from "./inkbox.js";

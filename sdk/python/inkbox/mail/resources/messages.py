@@ -121,6 +121,10 @@ class MessagesResource:
                 ``filename`` (str), ``content_type`` (MIME type str), and
                 ``content_base64`` (base64-encoded file content str).
                 Max total size: 25 MB. Blocked extensions: ``.exe``, ``.bat``, ``.scr``.
+                Add ``content_id`` (str) to an entry to render it inline in the
+                HTML body (referenced as ``cid:<content_id>``, e.g.
+                ``<img src="cid:chart1">``) instead of as a download; requires
+                ``body_html``, an ``image/*`` ``content_type``, and a unique id.
             track_opens: Embed an open-tracking pixel in the HTML body.
                 Requires ``body_html``; a plain-text-only send with
                 ``track_opens`` is rejected with 422. Opens surface as
@@ -179,7 +183,7 @@ class MessagesResource:
             body_text: Plain-text reply body.
             body_html: HTML reply body.
             attachments: Optional file attachments. Same shape as
-                ``send(attachments=...)``.
+                ``send(attachments=...)``, including ``content_id`` for inline images.
             reply_to: Optional Reply-To address.
         """
         body: dict[str, Any] = {}
@@ -241,7 +245,8 @@ class MessagesResource:
                 ride alongside the forwarded content. Same shape as
                 ``send(attachments=...)``: each entry must have ``filename``,
                 ``content_type``, and ``content_base64`` keys. Subject to the
-                same blocked-extension and 25 MB limits as ``send``.
+                same blocked-extension and 25 MB limits as ``send``. Inline
+                images (``content_id``) are not supported on forwards (422).
             include_original_attachments: ``inline`` mode only — when ``True``
                 (default) the original attachments are re-attached as direct
                 outbound parts. Ignored in ``wrapped`` mode (originals live

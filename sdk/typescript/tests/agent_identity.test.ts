@@ -61,6 +61,7 @@ function mockInkbox() {
       forward: vi.fn(),
       list: vi.fn(),
       markRead: vi.fn(),
+      markUnread: vi.fn(),
       get: vi.fn(),
     },
     _threads: { get: vi.fn() },
@@ -222,6 +223,23 @@ describe("AgentIdentity mail helpers", () => {
   it("markEmailsRead throws when no mailbox", async () => {
     const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
     await expect(identity.markEmailsRead(["msg-1"])).rejects.toThrow(InkboxError);
+  });
+
+  it("markEmailsUnread marks each message", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._messages.markUnread).mockResolvedValue(undefined);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.markEmailsUnread(["msg-1", "msg-2"]);
+
+    expect(ink._messages.markUnread).toHaveBeenCalledTimes(2);
+    expect(ink._messages.markUnread).toHaveBeenCalledWith(PARSED_MAILBOX.emailAddress, "msg-1");
+    expect(ink._messages.markUnread).toHaveBeenCalledWith(PARSED_MAILBOX.emailAddress, "msg-2");
+  });
+
+  it("markEmailsUnread throws when no mailbox", async () => {
+    const identity = new AgentIdentity(makeData({ mailbox: null }), mockInkbox());
+    await expect(identity.markEmailsUnread(["msg-1"])).rejects.toThrow(InkboxError);
   });
 
   it("getMessage delegates to messages resource", async () => {

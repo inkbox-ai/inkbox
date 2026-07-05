@@ -106,6 +106,28 @@ class TestMessagesSend:
         assert body["in_reply_to_message_id"] == "<orig@mail.com>"
         assert body["attachments"] == [{"filename": "f.txt", "content_type": "text/plain", "content_base64": "aGk="}]
 
+    def test_send_passes_inline_content_id(self):
+        res, http = _resource()
+        http.post.return_value = MESSAGE_DICT
+
+        res.send(
+            MBOX,
+            to=["a@b.com"],
+            subject="Inline",
+            body_html='<img src="cid:chart">',
+            attachments=[
+                {
+                    "filename": "chart.png",
+                    "content_type": "image/png",
+                    "content_base64": "aGk=",
+                    "content_id": "chart",
+                }
+            ],
+        )
+
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["attachments"][0]["content_id"] == "chart"
+
     def test_optional_fields_omitted(self):
         res, http = _resource()
         http.post.return_value = MESSAGE_DICT

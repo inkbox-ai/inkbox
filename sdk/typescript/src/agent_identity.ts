@@ -341,7 +341,8 @@ export class AgentIdentity {
     cc?: string[];
     bcc?: string[];
     inReplyToMessageId?: string;
-    attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+    /** `contentId` on an entry renders it inline in the HTML body (`cid:<contentId>`); requires `bodyHtml` + `image/*`. */
+    attachments?: Array<{ filename: string; contentType: string; contentBase64: string; contentId?: string }>;
     /** Embed an open-tracking pixel when `bodyHtml` is present; opens surface as `firstOpenedAt`/`openCount`. */
     trackOpens?: boolean;
   }): Promise<Message> {
@@ -365,7 +366,8 @@ export class AgentIdentity {
       subject?: string;
       bodyText?: string;
       bodyHtml?: string;
-      attachments?: Array<{ filename: string; contentType: string; contentBase64: string }>;
+      /** `contentId` on an entry renders it inline in the HTML body (`cid:<contentId>`); requires `bodyHtml` + `image/*`. */
+      attachments?: Array<{ filename: string; contentType: string; contentBase64: string; contentId?: string }>;
       replyTo?: string;
     } = {},
   ): Promise<Message> {
@@ -463,6 +465,18 @@ export class AgentIdentity {
     this._requireMailbox();
     for (const id of messageIds) {
       await this._inkbox._messages.markRead(this._mailbox!.emailAddress, id);
+    }
+  }
+
+  /**
+   * Mark a list of messages as unread.
+   *
+   * @param messageIds - IDs of the messages to mark as unread.
+   */
+  async markEmailsUnread(messageIds: string[]): Promise<void> {
+    this._requireMailbox();
+    for (const id of messageIds) {
+      await this._inkbox._messages.markUnread(this._mailbox!.emailAddress, id);
     }
   }
 

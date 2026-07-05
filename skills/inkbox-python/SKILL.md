@@ -138,6 +138,11 @@ sent = identity.send_email(
         "filename": "report.pdf",
         "content_type": "application/pdf",
         "content_base64": "<base64>",
+    }, {
+        "filename": "chart.png",        # inline image: set content_id and
+        "content_type": "image/png",    # reference it from body_html as
+        "content_base64": "<base64>",   # <img src="cid:chart">. needs body_html
+        "content_id": "chart",          # + image/*, unique per send; not on forwards.
     }],
     track_opens=True,               # optional; embed a tracking pixel
 )
@@ -166,6 +171,7 @@ for msg in identity.iter_unread_emails():
 # Mark as read
 ids = [msg.id for msg in identity.iter_unread_emails()]
 identity.mark_emails_read(ids)
+identity.mark_emails_unread(ids)   # batch counterpart
 # Note: fetching a single inbound message by id (inkbox.messages.get) with
 # an API key marks it read server-side; iterating does not, so
 # mark_emails_read is the way to clear unread for list-only workflows.

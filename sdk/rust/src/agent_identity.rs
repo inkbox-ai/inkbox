@@ -408,6 +408,15 @@ impl AgentIdentity {
         Ok(())
     }
 
+    /// Mark a list of messages as unread.
+    pub fn mark_emails_unread(&self, message_ids: &[String]) -> Result<()> {
+        let email = self.require_mailbox()?;
+        for mid in message_ids {
+            self.inkbox.messages().mark_unread(&email, mid)?;
+        }
+        Ok(())
+    }
+
     /// Get a single message with full body content.
     pub fn get_message(&self, message_id: &str) -> Result<MessageDetail> {
         let email = self.require_mailbox()?;

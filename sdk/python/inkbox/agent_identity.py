@@ -409,7 +409,9 @@ class AgentIdentity:
             bcc: Blind carbon-copy recipients.
             in_reply_to_message_id: RFC 5322 Message-ID to thread a reply.
             attachments: List of file attachment dicts with ``filename``,
-                ``content_type``, and ``content_base64`` keys.
+                ``content_type``, and ``content_base64`` keys. Add ``content_id``
+                to render an entry inline in the HTML body (``cid:<content_id>``);
+                requires ``body_html`` and an ``image/*`` ``content_type``.
             track_opens: Embed an open-tracking pixel when ``body_html`` is
                 present; opens surface as ``first_opened_at``/``open_count``.
         """
@@ -445,7 +447,9 @@ class AgentIdentity:
             body_text: Plain-text reply body.
             body_html: HTML reply body.
             attachments: List of file attachment dicts with ``filename``,
-                ``content_type``, and ``content_base64`` keys.
+                ``content_type``, and ``content_base64`` keys. Add ``content_id``
+                to render an entry inline in the HTML body (``cid:<content_id>``);
+                requires ``body_html`` and an ``image/*`` ``content_type``.
             reply_to: Optional Reply-To address.
         """
         self._require_mailbox()
@@ -570,6 +574,19 @@ class AgentIdentity:
         self._require_mailbox()
         for mid in message_ids:
             self._inkbox._messages.mark_read(
+                self._mailbox.email_address,  # type: ignore[union-attr]
+                mid,
+            )
+
+    def mark_emails_unread(self, message_ids: list[str]) -> None:
+        """Mark a list of messages as unread.
+
+        Args:
+            message_ids: IDs of the messages to mark as unread.
+        """
+        self._require_mailbox()
+        for mid in message_ids:
+            self._inkbox._messages.mark_unread(
                 self._mailbox.email_address,  # type: ignore[union-attr]
                 mid,
             )

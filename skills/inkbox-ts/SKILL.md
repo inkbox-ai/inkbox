@@ -137,6 +137,11 @@ const sent = await identity.sendEmail({
     filename: "report.pdf",
     contentType: "application/pdf",
     contentBase64: "<base64>",
+  }, {
+    filename: "chart.png",         // inline image: set contentId and reference
+    contentType: "image/png",      // it from bodyHtml as <img src="cid:chart">.
+    contentBase64: "<base64>",      // needs bodyHtml + image/*, unique per send;
+    contentId: "chart",            // not on forwards. Not counted in hasAttachments.
   }],
   trackOpens: true,                // optional; embed a tracking pixel
 });
@@ -167,6 +172,7 @@ for await (const msg of identity.iterUnreadEmails()) {
 const ids: string[] = [];
 for await (const msg of identity.iterUnreadEmails()) ids.push(msg.id);
 await identity.markEmailsRead(ids);
+await identity.markEmailsUnread(ids);   // batch counterpart
 // Note: fetching a single inbound message by id (inkbox.messages.get) with
 // an API key marks it read server-side; iterating does not, so
 // markEmailsRead is the way to clear unread for list-only workflows. isRead

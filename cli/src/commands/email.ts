@@ -1,9 +1,100 @@
+import { readFileSync } from "node:fs";
+import { basename, extname } from "node:path";
 import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import type { Message, MessageDirection, ThreadDetail } from "@inkbox/sdk";
 import { ForwardMode } from "@inkbox/sdk";
+
+type AttachmentInput = {
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+  contentId?: string;
+};
+
+const MIME_BY_EXT: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".bmp": "image/bmp",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+  ".ico": "image/x-icon",
+  ".avif": "image/avif",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".csv": "text/csv",
+  ".html": "text/html",
+  ".json": "application/json",
+  ".zip": "application/zip",
+};
+
+/** Accumulate a repeatable Commander option into an array. */
+function collect(value: string, previous: string[]): string[] {
+  return previous.concat([value]);
+}
+
+/** MIME type inferred from a file extension, defaulting to octet-stream. */
+export function contentTypeForPath(path: string): string {
+  return MIME_BY_EXT[extname(path).toLowerCase()] ?? "application/octet-stream";
+}
+
+/** Split a "<cid>=<path>" inline-image spec. Throws on malformed input. */
+export function parseInlineImageSpec(spec: string): { cid: string; path: string } {
+  const eq = spec.indexOf("=");
+  if (eq <= 0 || eq === spec.length - 1) {
+    throw new Error(`--inline-image must be <cid>=<path>, got: ${spec}`);
+  }
+  return { cid: spec.slice(0, eq).trim(), path: spec.slice(eq + 1).trim() };
+}
+
+/** Read a file into an SDK attachment; set contentId to embed it inline (cid:). */
+function fileToAttachment(path: string, contentId?: string): AttachmentInput {
+  let buf: Buffer;
+  try {
+    buf = readFileSync(path);
+  } catch {
+    console.error(`Cannot read attachment file: ${path}`);
+    process.exit(1);
+  }
+  const att: AttachmentInput = {
+    filename: basename(path),
+    contentType: contentTypeForPath(path),
+    contentBase64: buf.toString("base64"),
+  };
+  if (contentId !== undefined) att.contentId = contentId;
+  return att;
+}
+
+/** Build the attachments array from --attach paths and --inline-image cid=path specs. */
+function buildAttachments(attach: string[], inlineImage: string[]): AttachmentInput[] | undefined {
+  const attachments = attach.map((p) => fileToAttachment(p));
+  for (const spec of inlineImage) {
+    let parsed: { cid: string; path: string };
+    try {
+      parsed = parseInlineImageSpec(spec);
+    } catch (e) {
+      console.error((e as Error).message);
+      process.exit(1);
+    }
+    const att = fileToAttachment(parsed.path, parsed.cid);
+    if (!att.contentType.startsWith("image/")) {
+      console.error(
+        `--inline-image ${parsed.cid} must be an image; got ${att.contentType} for ${parsed.path}.`,
+      );
+      process.exit(1);
+    }
+    attachments.push(att);
+  }
+  return attachments.length > 0 ? attachments : undefined;
+}
 
 export function registerEmailCommands(program: Command): void {
   const email = program
@@ -22,6 +113,13 @@ export function registerEmailCommands(program: Command): void {
     .option("--bcc <addresses>", "Comma-separated BCC addresses")
     .option("--in-reply-to <message-id>", "Message ID to reply to")
     .option("--track-opens", "Embed an open-tracking pixel (requires --body-html)")
+    .option("--attach <path>", "Attach a file (repeatable)", collect, [])
+    .option(
+      "--inline-image <cid=path>",
+      "Embed an image inline in the HTML body, referenced as cid:<cid> (repeatable)",
+      collect,
+      [],
+    )
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -35,11 +133,17 @@ export function registerEmailCommands(program: Command): void {
           bcc?: string;
           inReplyTo?: string;
           trackOpens?: boolean;
+          attach: string[];
+          inlineImage: string[];
         },
       ) {
         const opts = getGlobalOpts(this);
         if (cmdOpts.trackOpens && !cmdOpts.bodyHtml) {
           console.error("--track-opens requires --body-html.");
+          process.exit(1);
+        }
+        if (cmdOpts.inlineImage.length > 0 && !cmdOpts.bodyHtml) {
+          console.error("--inline-image requires --body-html (reference it as cid:<cid>).");
           process.exit(1);
         }
         const inkbox = createClient(opts);
@@ -53,6 +157,7 @@ export function registerEmailCommands(program: Command): void {
           bcc: cmdOpts.bcc?.split(",").map((s) => s.trim()),
           inReplyToMessageId: cmdOpts.inReplyTo,
           trackOpens: cmdOpts.trackOpens,
+          attachments: buildAttachments(cmdOpts.attach, cmdOpts.inlineImage),
         });
         output(
           {
@@ -74,6 +179,13 @@ export function registerEmailCommands(program: Command): void {
     .option("--body-text <text>", "Plain text body")
     .option("--body-html <html>", "HTML body")
     .option("--reply-to <address>", "Reply-To address")
+    .option("--attach <path>", "Attach a file (repeatable)", collect, [])
+    .option(
+      "--inline-image <cid=path>",
+      "Embed an image inline in the HTML body, referenced as cid:<cid> (repeatable)",
+      collect,
+      [],
+    )
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -84,9 +196,15 @@ export function registerEmailCommands(program: Command): void {
           bodyText?: string;
           bodyHtml?: string;
           replyTo?: string;
+          attach: string[];
+          inlineImage: string[];
         },
       ) {
         const opts = getGlobalOpts(this);
+        if (cmdOpts.inlineImage.length > 0 && !cmdOpts.bodyHtml) {
+          console.error("--inline-image requires --body-html (reference it as cid:<cid>).");
+          process.exit(1);
+        }
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const msg = await identity.replyAllEmail(messageId, {
@@ -94,6 +212,7 @@ export function registerEmailCommands(program: Command): void {
           bodyText: cmdOpts.bodyText,
           bodyHtml: cmdOpts.bodyHtml,
           replyTo: cmdOpts.replyTo,
+          attachments: buildAttachments(cmdOpts.attach, cmdOpts.inlineImage),
         });
         output(
           {
@@ -128,6 +247,7 @@ export function registerEmailCommands(program: Command): void {
     )
     .option("--reply-to <address>", "Reply-To address for the forward")
     .option("--track-opens", "Embed an open-tracking pixel (inline forwards can reuse the original's HTML)")
+    .option("--attach <path>", "Attach an additional file alongside the forward (repeatable)", collect, [])
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -144,6 +264,7 @@ export function registerEmailCommands(program: Command): void {
           includeOriginalAttachments: boolean;
           replyTo?: string;
           trackOpens?: boolean;
+          attach: string[];
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -167,6 +288,7 @@ export function registerEmailCommands(program: Command): void {
           subject: cmdOpts.subject,
           bodyText: cmdOpts.bodyText,
           bodyHtml: cmdOpts.bodyHtml,
+          additionalAttachments: buildAttachments(cmdOpts.attach, []),
           includeOriginalAttachments: cmdOpts.includeOriginalAttachments,
           replyTo: cmdOpts.replyTo,
           trackOpens: cmdOpts.trackOpens,
@@ -357,6 +479,56 @@ export function registerEmailCommands(program: Command): void {
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         await identity.markEmailsRead(messageIds);
         console.log(`Marked ${messageIds.length} message(s) as read.`);
+      }),
+    );
+
+  email
+    .command("mark-unread <message-ids...>")
+    .description("Mark messages as unread")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageIds: string[],
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        await identity.markEmailsUnread(messageIds);
+        console.log(`Marked ${messageIds.length} message(s) as unread.`);
+      }),
+    );
+
+  email
+    .command("download-attachment <message-id> <filename>")
+    .description("Get a time-limited download URL for a message attachment")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        messageId: string,
+        filename: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        if (!identity.mailbox) {
+          console.error(
+            `Identity '${cmdOpts.identity}' has no mailbox assigned.`,
+          );
+          process.exit(1);
+        }
+        const att = await inkbox.messages.getAttachment(
+          identity.mailbox.emailAddress,
+          messageId,
+          filename,
+        );
+        output(
+          { url: att.url, filename: att.filename, expiresIn: att.expiresIn },
+          { json: !!opts.json },
+        );
       }),
     );
 

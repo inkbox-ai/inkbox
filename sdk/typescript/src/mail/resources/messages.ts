@@ -88,7 +88,9 @@ export class MessagesResource {
    *   replied to. Threads the reply automatically.
    * @param options.attachments - Optional file attachments. Each entry must have
    *   `filename`, `contentType` (MIME type), and `contentBase64` (base64-encoded
-   *   file content). Max total size: 25 MB. Blocked: `.exe`, `.bat`, `.scr`.
+   *   file content). Max total size: 25 MB. Blocked: `.exe`, `.bat`, `.scr`. Set
+   *   `contentId` on an entry to render it inline in the HTML body instead of as
+   *   a download (see the field doc).
    * @param options.trackOpens - Embed an open-tracking pixel in the HTML body.
    *   Requires `bodyHtml`; a plain-text-only send with `trackOpens` is rejected
    *   with 422. Opens surface as `firstOpenedAt`/`openCount`; `openCount` is
@@ -109,6 +111,13 @@ export class MessagesResource {
         filename: string;
         contentType: string;
         contentBase64: string;
+        /**
+         * Render this part inline in the HTML body (referenced as
+         * `cid:<contentId>`, e.g. `<img src="cid:chart1">`) instead of as a
+         * download. Requires `bodyHtml`, an `image/*` `contentType`, and a
+         * unique id per send.
+         */
+        contentId?: string;
       }>;
       trackOpens?: boolean;
     },
@@ -127,11 +136,15 @@ export class MessagesResource {
       body["in_reply_to_message_id"] = options.inReplyToMessageId;
     }
     if (options.attachments !== undefined) {
-      body["attachments"] = options.attachments.map((a) => ({
-        filename: a.filename,
-        content_type: a.contentType,
-        content_base64: a.contentBase64,
-      }));
+      body["attachments"] = options.attachments.map((a) => {
+        const att: Record<string, unknown> = {
+          filename: a.filename,
+          content_type: a.contentType,
+          content_base64: a.contentBase64,
+        };
+        if (a.contentId !== undefined) att["content_id"] = a.contentId;
+        return att;
+      });
     }
     if (options.trackOpens) body["track_opens"] = true;
 
@@ -153,7 +166,7 @@ export class MessagesResource {
    * @param options.bodyText - Plain-text reply body.
    * @param options.bodyHtml - HTML reply body.
    * @param options.attachments - Optional file attachments. Same shape as
-   *   `send({ attachments })`.
+   *   `send({ attachments })`, including `contentId` for inline images.
    * @param options.replyTo - Optional Reply-To address.
    */
   async replyAll(
@@ -167,6 +180,8 @@ export class MessagesResource {
         filename: string;
         contentType: string;
         contentBase64: string;
+        /** Render inline in the HTML body (`cid:<contentId>`); requires `bodyHtml`, `image/*`, unique per reply. */
+        contentId?: string;
       }>;
       replyTo?: string;
     } = {},
@@ -176,11 +191,15 @@ export class MessagesResource {
     if (options.bodyText !== undefined) body["body_text"] = options.bodyText;
     if (options.bodyHtml !== undefined) body["body_html"] = options.bodyHtml;
     if (options.attachments !== undefined) {
-      body["attachments"] = options.attachments.map((a) => ({
-        filename: a.filename,
-        content_type: a.contentType,
-        content_base64: a.contentBase64,
-      }));
+      body["attachments"] = options.attachments.map((a) => {
+        const att: Record<string, unknown> = {
+          filename: a.filename,
+          content_type: a.contentType,
+          content_base64: a.contentBase64,
+        };
+        if (a.contentId !== undefined) att["content_id"] = a.contentId;
+        return att;
+      });
     }
     if (options.replyTo !== undefined) body["reply_to"] = options.replyTo;
 

@@ -219,6 +219,21 @@ identity.send_email(
     }],
 )
 
+# Inline images: set content_id on an image attachment and reference it from
+# body_html as cid:<content_id>. Requires body_html + an image/* content_type,
+# a unique id per send, and is not supported on forwards.
+identity.send_email(
+    to=["user@example.com"],
+    subject="Weekly report",
+    body_html='<p>Revenue:</p><img src="cid:chart">',
+    attachments=[{
+        "filename": "chart.png",
+        "content_type": "image/png",
+        "content_base64": "<base64-encoded-content>",
+        "content_id": "chart",
+    }],
+)
+
 # Track opens: embed a tracking pixel when an HTML body is present. Opens
 # surface on the returned Message as first_opened_at / open_count.
 tracked = identity.send_email(
@@ -245,8 +260,9 @@ for msg in identity.iter_emails(direction="inbound"):
 for msg in identity.iter_unread_emails():
     print(msg.subject)
 
-# Mark messages as read
+# Mark messages as read (or unread)
 identity.mark_emails_read([msg.id for msg in identity.iter_unread_emails()])
+identity.mark_emails_unread(["message-uuid"])
 
 # Get all emails in a thread (thread_id comes from msg.thread_id)
 thread = identity.get_thread(msg.thread_id)

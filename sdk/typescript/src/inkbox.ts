@@ -5,6 +5,7 @@
  */
 
 import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
+import { VERSION } from "./version.js";
 import { resolveClientSettings } from "./_config.js";
 import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
 import { parseWhoamiResponse } from "./whoami/types.js";
@@ -62,6 +63,15 @@ import {
 
 const DEFAULT_BASE_URL = "https://inkbox.ai";
 
+/**
+ * `User-Agent` announcing the SDK (e.g. `inkbox-typescript/0.4.17`); an
+ * optional caller token goes first (`inkbox-cli/1.2.3 inkbox-typescript/...`).
+ */
+function sdkUserAgent(prefix?: string): string {
+  const base = `inkbox-typescript/${VERSION}`;
+  return prefix ? `${prefix} ${base}` : base;
+}
+
 export interface SignupOptions {
   /** Override the API base URL (useful for self-hosting or testing). */
   baseUrl?: string;
@@ -85,6 +95,12 @@ export interface InkboxOptions {
    * is immediately available.
    */
   vaultKey?: string;
+  /**
+   * Optional token prepended to the `User-Agent` header (e.g.
+   * `"inkbox-cli/1.2.3"`) so a downstream tool identifies itself ahead of
+   * the SDK's own token.
+   */
+  userAgentPrefix?: string;
 }
 
 /**
@@ -186,16 +202,17 @@ export class Inkbox {
     }
     const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;
+    const userAgent = sdkUserAgent(options.userAgentPrefix);
     const cookieJar = new CookieJar();
 
-    const mailHttp     = new HttpTransport(apiKey, `${apiRoot}/mail`, ms, cookieJar);
-    const phoneHttp    = new HttpTransport(apiKey, `${apiRoot}/phone`, ms, cookieJar);
-    const imessageHttp = new HttpTransport(apiKey, `${apiRoot}/imessage`, ms, cookieJar);
-    const idsHttp      = new HttpTransport(apiKey, `${apiRoot}/identities`, ms, cookieJar);
-    const vaultHttp    = new HttpTransport(apiKey, `${apiRoot}/vault`, ms, cookieJar);
-    const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar);
-    const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar);
-    const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar);
+    const mailHttp     = new HttpTransport(apiKey, `${apiRoot}/mail`, ms, cookieJar, userAgent);
+    const phoneHttp    = new HttpTransport(apiKey, `${apiRoot}/phone`, ms, cookieJar, userAgent);
+    const imessageHttp = new HttpTransport(apiKey, `${apiRoot}/imessage`, ms, cookieJar, userAgent);
+    const idsHttp      = new HttpTransport(apiKey, `${apiRoot}/identities`, ms, cookieJar, userAgent);
+    const vaultHttp    = new HttpTransport(apiKey, `${apiRoot}/vault`, ms, cookieJar, userAgent);
+    const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar, userAgent);
+    const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar, userAgent);
+    const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar, userAgent);
 
     this._mailboxes        = new MailboxesResource(mailHttp);
     this._messages         = new MessagesResource(mailHttp);
@@ -491,7 +508,10 @@ export class Inkbox {
     const url = `${base.replace(/\/$/, "")}/api/v1/agent-signup${path}`;
     const ms = opts.timeoutMs ?? 30_000;
 
-    const headers: Record<string, string> = { Accept: "application/json" };
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "User-Agent": sdkUserAgent(),
+    };
     if (opts.apiKey) headers["X-API-Key"] = opts.apiKey;
 
     let bodyStr: string | undefined;

@@ -205,22 +205,28 @@ All email commands are identity-scoped and require `-i <handle>`.
 inkbox email send -i <handle> \
   --to user@example.com \
   --subject "Hello" \
-  --body-html "<p>Hi</p>" \
+  --body-html '<p>Hi</p><img src="cid:chart">' \
+  --attach ./report.pdf \        # optional; repeatable file attachment
+  --inline-image chart=./chart.png \  # optional, repeatable; embeds <img src="cid:chart"> (needs --body-html, image/*)
   --track-opens                 # optional; embed a tracking pixel (needs --body-html)
 
-inkbox email forward <message-id> -i <handle> --to user@example.com --track-opens
+inkbox email reply-all <message-id> -i <handle> --body-html "<p>Thanks</p>" --attach ./notes.txt
+inkbox email forward <message-id> -i <handle> --to user@example.com --attach ./extra.pdf --track-opens
 
 inkbox email list -i <handle> --limit 10
 inkbox email get <message-id> -i <handle>   # fetching an inbound message marks it read
 inkbox email search -i <handle> -q "invoice"
 inkbox email unread -i <handle> --limit 10
 inkbox email mark-read <ids...> -i <handle>
+inkbox email mark-unread <ids...> -i <handle>
+inkbox email download-attachment <message-id> <filename> -i <handle>   # time-limited download URL
 inkbox email delete <message-id> -i <handle>
 inkbox email delete-thread <thread-id> -i <handle>
 inkbox email star <message-id> -i <handle>
 inkbox email unstar <message-id> -i <handle>
 inkbox email thread <thread-id> -i <handle>
 ```
+(`--inline-image` is send/reply-all only — forwards reject inline images.)
 
 Use `email search` only when the identity already has a mailbox assigned.
 

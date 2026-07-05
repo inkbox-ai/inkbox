@@ -70,6 +70,23 @@ class TestAgentIdentityGetMessage:
             identity.get_message("bbbb2222-0000-0000-0000-000000000001")
 
 
+class TestAgentIdentityMarkEmailsUnread:
+    def test_mark_emails_unread_delegates_per_message(self):
+        identity, inkbox = _identity_with_mailbox()
+
+        identity.mark_emails_unread(["msg-1", "msg-2"])
+
+        assert inkbox._messages.mark_unread.call_count == 2
+        inkbox._messages.mark_unread.assert_any_call("sales-agent@inkbox.ai", "msg-1")
+        inkbox._messages.mark_unread.assert_any_call("sales-agent@inkbox.ai", "msg-2")
+
+    def test_mark_emails_unread_requires_mailbox(self):
+        identity, _ = _identity_without_mailbox()
+
+        with pytest.raises(InkboxError, match="has no mailbox"):
+            identity.mark_emails_unread(["msg-1"])
+
+
 class TestAgentIdentityForwardEmail:
     def test_forward_email_delegates_to_messages_resource(self):
         identity, inkbox = _identity_with_mailbox()

@@ -133,6 +133,11 @@ inkbox email send -i <handle>                # Send an email
   --cc <addresses>                           #   Comma-separated CC
   --bcc <addresses>                          #   Comma-separated BCC
   --in-reply-to <message-id>                 #   Message ID to reply to
+  --attach <path>                            #   Attach a file (repeatable)
+  --inline-image <cid=path>                  #   Embed an image inline as cid:<cid>
+                                             #     (repeatable; requires --body-html,
+                                             #     image/*; reference it in the HTML
+                                             #     as <img src="cid:<cid>">)
   --track-opens                              #   Embed an open-tracking pixel
                                              #     (requires --body-html)
 
@@ -141,6 +146,9 @@ inkbox email reply-all <message-id> -i <handle>  # Reply to everyone on a messag
   --body-text <text>                         #   Plain text body
   --body-html <html>                         #   HTML body
   --reply-to <address>                       #   Reply-To address
+  --attach <path>                            #   Attach a file (repeatable)
+  --inline-image <cid=path>                  #   Embed an image inline as cid:<cid>
+                                             #     (repeatable; requires --body-html)
 
 inkbox email forward <message-id> -i <handle>    # Forward a message
   --to <addresses>                           #   Comma-separated recipients
@@ -153,6 +161,7 @@ inkbox email forward <message-id> -i <handle>    # Forward a message
   --body-html <html>                         #   HTML caller note
   --no-include-original-attachments          #   Drop originals (inline mode)
   --reply-to <address>                       #   Reply-To for the forward
+  --attach <path>                            #   Attach an additional file (repeatable)
   --track-opens                              #   Embed an open-tracking pixel
                                              #     (inline forwards reuse the
                                              #     original's HTML; server 422s
@@ -175,6 +184,8 @@ inkbox email unread -i <handle>              # List unread emails
   --limit <n>                                #   Max messages (default: 50)
 
 inkbox email mark-read <ids...> -i <handle>  # Mark messages as read
+inkbox email mark-unread <ids...> -i <handle>  # Mark messages as unread
+inkbox email download-attachment <message-id> <filename> -i <handle>  # Time-limited download URL
 inkbox email delete <message-id> -i <handle> # Delete a message
 inkbox email delete-thread <thread-id> -i <handle>  # Delete a thread
 inkbox email star <message-id> -i <handle>   # Star a message

@@ -1,8 +1,8 @@
 //! Blocking HTTP transport (internal). Shared by all resource modules.
 //!
 //! A faithful port of `inkbox/_http.py`'s `HttpTransport`: one transport per
-//! API sub-base, a shared [`CookieJar`], `X-API-Key` + `Accept` defaults, and
-//! the structured `_raise_for_status` error mapping. Built on
+//! API sub-base, a shared [`CookieJar`], `X-API-Key` + `Accept` + `User-Agent`
+//! defaults, and the structured `_raise_for_status` error mapping. Built on
 //! `reqwest::blocking` so the public SDK surface stays synchronous like the
 //! Python and TypeScript SDKs.
 
@@ -39,6 +39,7 @@ impl HttpTransport {
         base_url: impl Into<String>,
         timeout_secs: f64,
         cookie_jar: Arc<CookieJar>,
+        user_agent: &str,
     ) -> Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
@@ -49,6 +50,11 @@ impl HttpTransport {
         headers.insert(
             reqwest::header::ACCEPT,
             reqwest::header::HeaderValue::from_static("application/json"),
+        );
+        headers.insert(
+            reqwest::header::USER_AGENT,
+            reqwest::header::HeaderValue::from_str(user_agent)
+                .map_err(|_| InkboxError::InvalidArgument("invalid user_agent bytes".into()))?,
         );
         let client = Client::builder()
             .default_headers(headers)

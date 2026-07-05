@@ -240,17 +240,20 @@ export class HttpTransport {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly cookieJar: CookieJar;
+  private readonly userAgent?: string;
 
   constructor(
     apiKey: string,
     baseUrl: string,
     timeoutMs: number = 30_000,
     cookieJar?: CookieJar,
+    userAgent?: string,
   ) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
     this.cookieJar = cookieJar ?? new CookieJar();
+    this.userAgent = userAgent;
   }
 
   async get<T>(path: string, params?: Params, opts?: { timeoutMs?: number }): Promise<T> {
@@ -366,6 +369,9 @@ export class HttpTransport {
       "X-API-Key": this.apiKey,
       Accept: opts.accept ?? "application/json",
     };
+    if (this.userAgent) {
+      headers["User-Agent"] = this.userAgent;
+    }
     const cookieHeader = this.cookieJar.getHeaderValue(url);
     if (cookieHeader) {
       headers.Cookie = cookieHeader;
