@@ -12,6 +12,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - **`mark_emails_unread`** (TS `markEmailsUnread`) on the identity across the TypeScript, Python, and Rust SDKs — the batch counterpart to `mark_emails_read`. CLI: `email mark-unread <message-ids...>`.
 - **CLI attachments.** `email send` / `email reply-all` / `email forward` gain `--attach <path>` (repeatable) to attach files; the content type is inferred from the file extension. `email download-attachment <message-id> <filename>` returns a time-limited download URL for a stored attachment.
 
+### Changed
+
+- **Rust `Attachment` gains a `content_id` field.** This is source-breaking for code that builds `Attachment` with a struct literal; add `content_id: None` or use `..Default::default()`. The Python dict and TypeScript object attachment shapes are additive and unaffected.
+
 ## 0.4.16 — Configurable webhook context + open tracking
 
 ### Added

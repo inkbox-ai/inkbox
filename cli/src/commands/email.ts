@@ -21,6 +21,13 @@ const MIME_BY_EXT: Record<string, string> = {
   ".gif": "image/gif",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
+  ".bmp": "image/bmp",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+  ".ico": "image/x-icon",
+  ".avif": "image/avif",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
   ".pdf": "application/pdf",
   ".txt": "text/plain",
   ".csv": "text/csv",
@@ -77,7 +84,14 @@ function buildAttachments(attach: string[], inlineImage: string[]): AttachmentIn
       console.error((e as Error).message);
       process.exit(1);
     }
-    attachments.push(fileToAttachment(parsed.path, parsed.cid));
+    const att = fileToAttachment(parsed.path, parsed.cid);
+    if (!att.contentType.startsWith("image/")) {
+      console.error(
+        `--inline-image ${parsed.cid} must be an image; got ${att.contentType} for ${parsed.path}.`,
+      );
+      process.exit(1);
+    }
+    attachments.push(att);
   }
   return attachments.length > 0 ? attachments : undefined;
 }
