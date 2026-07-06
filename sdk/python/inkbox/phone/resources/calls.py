@@ -32,6 +32,9 @@ class CallsResource:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        tz: str | None = None,
     ) -> list[PhoneCall]:
         """List calls, newest first.
 
@@ -54,12 +57,26 @@ class CallsResource:
             offset: Pagination offset.
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            start_date: Inclusive lower bound on ``created_at`` (str). Bare
+                dates resolve to the start of that day; naive datetimes are
+                interpreted in ``tz``; zoned datetimes are exact instants.
+                ``None`` leaves the range open on this side.
+            end_date: Upper bound on ``created_at`` (str). A bare date is
+                whole-day inclusive. ``None`` leaves the range open.
+            tz: IANA timezone name (str) governing zone-less values;
+                ``None`` means UTC.
         """
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if agent_identity_id is not None:
             params["agent_identity_id"] = str(agent_identity_id)
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if start_date is not None:
+            params["start_date"] = start_date
+        if end_date is not None:
+            params["end_date"] = end_date
+        if tz is not None:
+            params["tz"] = tz
         data = self._http.get("/calls", params=params)
         return [PhoneCall._from_dict(c) for c in data]
 

@@ -43,6 +43,9 @@ export class CallsResource {
     limit?: number;
     offset?: number;
     isBlocked?: boolean;
+    startDate?: string;
+    endDate?: string;
+    tz?: string;
   }): Promise<PhoneCall[]> {
     const params: Record<string, string | number | boolean> = {
       limit: options?.limit ?? 50,
@@ -55,6 +58,9 @@ export class CallsResource {
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
     }
+    if (options?.startDate !== undefined) params["start_date"] = options.startDate;
+    if (options?.endDate !== undefined) params["end_date"] = options.endDate;
+    if (options?.tz !== undefined) params["tz"] = options.tz;
     const data = await this.http.get<RawPhoneCall[]>("/calls", params);
     return data.map(parsePhoneCall);
   }

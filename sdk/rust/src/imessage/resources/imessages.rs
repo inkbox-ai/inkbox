@@ -117,6 +117,11 @@ impl IMessagesResource {
     /// * `offset` - Pagination offset.
     /// * `is_read` - Filter by read state (`None` for all).
     /// * `is_blocked` - Tri-state filter (`None` for all).
+    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
+    ///   side open. UTC unless `tz` is set.
+    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
+    ///   dates; `None` leaves the side open.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -126,6 +131,9 @@ impl IMessagesResource {
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<IMessage>> {
         // limit/offset always sent; httpx renders bools lowercase.
         let mut params: Vec<(&str, String)> =
@@ -141,6 +149,15 @@ impl IMessagesResource {
         }
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
+        }
+        if let Some(v) = start_date {
+            params.push(("start_date", v.to_string()));
+        }
+        if let Some(v) = end_date {
+            params.push(("end_date", v.to_string()));
+        }
+        if let Some(v) = tz {
+            params.push(("tz", v.to_string()));
         }
         let data = self.http.get("/messages", &params)?;
         Ok(serde_json::from_value(data)?)
@@ -180,12 +197,21 @@ impl IMessagesResource {
     /// * `offset` - Pagination offset.
     /// * `is_blocked` - Tri-state filter applied to the underlying messages
     ///   (`None` for all).
+    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
+    ///   side open. UTC unless `tz` is set.
+    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
+    ///   dates; `None` leaves the side open.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_conversations(
         &self,
         agent_identity_id: Option<&Uuid>,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<IMessageConversationSummary>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -194,6 +220,15 @@ impl IMessagesResource {
         }
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
+        }
+        if let Some(v) = start_date {
+            params.push(("start_date", v.to_string()));
+        }
+        if let Some(v) = end_date {
+            params.push(("end_date", v.to_string()));
+        }
+        if let Some(v) = tz {
+            params.push(("tz", v.to_string()));
         }
         let data = self.http.get("/conversations", &params)?;
         Ok(serde_json::from_value(data)?)

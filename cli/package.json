@@ -1,6 +1,6 @@
 {
   "name": "@inkbox/cli",
-  "version": "0.4.19",
+  "version": "0.4.20",
   "description": "CLI for the Inkbox API",
   "license": "MIT",
   "type": "module",

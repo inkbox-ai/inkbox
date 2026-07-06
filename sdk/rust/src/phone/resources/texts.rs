@@ -91,6 +91,12 @@ impl TextsResource {
     /// * `is_read` - Filter by read state (`Some`/`None` for all).
     /// * `is_blocked` - Tri-state filter — `Some(true)` only blocked,
     ///   `Some(false)` only non-blocked, `None` all.
+    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
+    ///   side open. UTC unless `tz` is set.
+    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
+    ///   dates; `None` leaves the side open.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
+    #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
         phone_number_id: &str,
@@ -98,6 +104,9 @@ impl TextsResource {
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<TextMessage>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -106,6 +115,15 @@ impl TextsResource {
         }
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
+        }
+        if let Some(v) = start_date {
+            params.push(("start_date", v.to_string()));
+        }
+        if let Some(v) = end_date {
+            params.push(("end_date", v.to_string()));
+        }
+        if let Some(v) = tz {
+            params.push(("tz", v.to_string()));
         }
         let data = self
             .http
@@ -176,6 +194,12 @@ impl TextsResource {
     /// * `is_blocked` - Tri-state filter applied to the underlying messages.
     /// * `include_groups` - Include group conversations. The param is only sent
     ///   when `true`, matching the Python default-omit behaviour.
+    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
+    ///   side open. UTC unless `tz` is set.
+    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
+    ///   dates; `None` leaves the side open.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_conversations(
         &self,
         phone_number_id: &str,
@@ -183,6 +207,9 @@ impl TextsResource {
         offset: i64,
         is_blocked: Option<bool>,
         include_groups: bool,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<TextConversationSummary>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -191,6 +218,15 @@ impl TextsResource {
         }
         if include_groups {
             params.push(("include_groups", true.to_string()));
+        }
+        if let Some(v) = start_date {
+            params.push(("start_date", v.to_string()));
+        }
+        if let Some(v) = end_date {
+            params.push(("end_date", v.to_string()));
+        }
+        if let Some(v) = tz {
+            params.push(("tz", v.to_string()));
         }
         let data = self.http.get(
             &format!("/numbers/{phone_number_id}/texts/conversations"),

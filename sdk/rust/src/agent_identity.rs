@@ -71,7 +71,7 @@ use crate::vault::types::{DecryptedVaultSecret, SecretPayload, VaultSecret};
 ///
 /// ```ignore
 /// identity.send_email(&["user@example.com".into()], "Hi", Some("Hello"), None, None, None, None, None, false)?;
-/// for msg in identity.iter_emails(None, None)? { println!("{:?}", msg.subject); }
+/// for msg in identity.iter_emails(None, None, None, None, None)? { println!("{:?}", msg.subject); }
 /// ```
 pub struct AgentIdentity {
     /// Latest identity payload (handle, display name, channels). Mutated on
@@ -377,13 +377,23 @@ impl AgentIdentity {
     /// # Arguments
     /// * `page_size` - Messages fetched per API call (1-100); `None` for 50.
     /// * `direction` - Filter by direction.
+    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
+    ///   side open. UTC unless `tz` is set.
+    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
+    ///   dates; `None` leaves the side open.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
     pub fn iter_emails(
         &self,
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<Message>> {
         let email = self.require_mailbox()?;
-        self.inkbox.messages().list(&email, page_size, direction)
+        self.inkbox
+            .messages()
+            .list(&email, page_size, direction, start_date, end_date, tz)
     }
 
     /// Fetch all unread emails in this identity's inbox, newest first.
@@ -394,8 +404,11 @@ impl AgentIdentity {
         &self,
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<Message>> {
-        let all = self.iter_emails(page_size, direction)?;
+        let all = self.iter_emails(page_size, direction, start_date, end_date, tz)?;
         Ok(all.into_iter().filter(|m| !m.is_read).collect())
     }
 
@@ -487,16 +500,22 @@ impl AgentIdentity {
     /// * `limit` - Maximum number of results (default 50).
     /// * `offset` - Pagination offset (default 0).
     /// * `is_blocked` - Tri-state filter (`None` for all).
+    /// * `start_date` / `end_date` - `created_at` range bounds; `None` leaves
+    ///   the side open. Bare `end_date` is whole-day inclusive.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
     pub fn list_calls(
         &self,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<PhoneCall>> {
         let id = self.id().to_string();
         self.inkbox
             .calls()
-            .list(Some(&id), limit, offset, is_blocked)
+            .list(Some(&id), limit, offset, is_blocked, start_date, end_date, tz)
     }
 
     /// List transcript segments for a specific call.
@@ -560,17 +579,24 @@ impl AgentIdentity {
     /// * `limit` / `offset` - Pagination (defaults 50 / 0).
     /// * `is_read` - Filter by read state (`None` for all).
     /// * `is_blocked` - Tri-state filter (`None` for all).
+    /// * `start_date` / `end_date` - `created_at` range bounds; `None` leaves
+    ///   the side open. Bare `end_date` is whole-day inclusive.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_texts(
         &self,
         limit: i64,
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<TextMessage>> {
         let number_id = self.require_phone_id()?;
         self.inkbox
             .texts()
-            .list(&number_id, limit, offset, is_read, is_blocked)
+            .list(&number_id, limit, offset, is_read, is_blocked, start_date, end_date, tz)
     }
 
     /// Get a single text message by ID.
@@ -588,12 +614,19 @@ impl AgentIdentity {
     /// * `limit` / `offset` - Pagination (defaults 50 / 0).
     /// * `is_blocked` - Tri-state filter (`None` for all).
     /// * `include_groups` - Include group conversations (default `false`).
+    /// * `start_date` / `end_date` - `created_at` range bounds; `None` leaves
+    ///   the side open. Bare `end_date` is whole-day inclusive.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_text_conversations(
         &self,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
         include_groups: bool,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<TextConversationSummary>> {
         let number_id = self.require_phone_id()?;
         self.inkbox.texts().list_conversations(
@@ -602,6 +635,9 @@ impl AgentIdentity {
             offset,
             is_blocked,
             include_groups,
+            start_date,
+            end_date,
+            tz,
         )
     }
 
@@ -681,6 +717,7 @@ impl AgentIdentity {
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
     /// regardless of `is_blocked`.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_imessages(
         &self,
         conversation_id: Option<&Uuid>,
@@ -688,6 +725,9 @@ impl AgentIdentity {
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<IMessage>> {
         self.require_imessage()?;
         let id = self.id();
@@ -698,6 +738,9 @@ impl AgentIdentity {
             offset,
             is_read,
             is_blocked,
+            start_date,
+            end_date,
+            tz,
         )
     }
 
@@ -715,17 +758,21 @@ impl AgentIdentity {
     }
 
     /// List this identity's iMessage conversations.
+    #[allow(clippy::too_many_arguments)]
     pub fn list_imessage_conversations(
         &self,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<IMessageConversationSummary>> {
         self.require_imessage()?;
         let id = self.id();
         self.inkbox
             .imessages()
-            .list_conversations(Some(&id), limit, offset, is_blocked)
+            .list_conversations(Some(&id), limit, offset, is_blocked, start_date, end_date, tz)
     }
 
     /// Get one of this identity's iMessage conversations by ID.
@@ -1393,7 +1440,9 @@ mod tests {
             )]));
         });
         let identity = identity_at(&server.base_url(), false);
-        let calls = identity.list_calls(10, 2, Some(false)).unwrap();
+        let calls = identity
+            .list_calls(10, 2, Some(false), None, None, None)
+            .unwrap();
         mock.assert();
         assert_eq!(calls.len(), 1);
     }

@@ -311,6 +311,9 @@ export function registerEmailCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--direction <dir>", "Filter: inbound or outbound")
     .option("--limit <n>", "Max messages to show", "50")
+    .option("--start-date <date>", "Only emails with created_at >= this date/instant")
+    .option("--end-date <date>", "Only emails with created_at <= this date (bare date is whole-day inclusive)")
+    .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -318,6 +321,9 @@ export function registerEmailCommands(program: Command): void {
           identity: string;
           direction?: string;
           limit: string;
+          startDate?: string;
+          endDate?: string;
+          tz?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -327,6 +333,9 @@ export function registerEmailCommands(program: Command): void {
         const messages: Message[] = [];
         for await (const msg of identity.iterEmails({
           direction: cmdOpts.direction as MessageDirection | undefined,
+          startDate: cmdOpts.startDate,
+          endDate: cmdOpts.endDate,
+          tz: cmdOpts.tz,
         })) {
           messages.push(msg);
           if (messages.length >= limit) break;
@@ -429,6 +438,9 @@ export function registerEmailCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--direction <dir>", "Filter: inbound or outbound")
     .option("--limit <n>", "Max messages to show", "50")
+    .option("--start-date <date>", "Only emails with created_at >= this date/instant")
+    .option("--end-date <date>", "Only emails with created_at <= this date (bare date is whole-day inclusive)")
+    .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -436,6 +448,9 @@ export function registerEmailCommands(program: Command): void {
           identity: string;
           direction?: string;
           limit: string;
+          startDate?: string;
+          endDate?: string;
+          tz?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -445,6 +460,9 @@ export function registerEmailCommands(program: Command): void {
         const messages: Message[] = [];
         for await (const msg of identity.iterUnreadEmails({
           direction: cmdOpts.direction as MessageDirection | undefined,
+          startDate: cmdOpts.startDate,
+          endDate: cmdOpts.endDate,
+          tz: cmdOpts.tz,
         })) {
           messages.push(msg);
           if (messages.length >= limit) break;

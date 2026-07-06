@@ -31,12 +31,21 @@ impl CallsResource {
     /// * `offset` - Pagination offset.
     /// * `is_blocked` - Tri-state filter: `Some(true)` for only blocked,
     ///   `Some(false)` for only non-blocked, `None` for all.
+    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
+    ///   side open. UTC unless `tz` is set.
+    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
+    ///   dates; `None` leaves the side open.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
+    #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
         agent_identity_id: Option<&str>,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<PhoneCall>> {
         // Always send limit + offset; scope by identity + filter only when set.
         let mut params: Vec<(&str, String)> =
@@ -46,6 +55,15 @@ impl CallsResource {
         }
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
+        }
+        if let Some(v) = start_date {
+            params.push(("start_date", v.to_string()));
+        }
+        if let Some(v) = end_date {
+            params.push(("end_date", v.to_string()));
+        }
+        if let Some(v) = tz {
+            params.push(("tz", v.to_string()));
         }
         let data = self.http.get("/calls", &params)?;
         Ok(serde_json::from_value(data)?)
@@ -193,11 +211,40 @@ mod tests {
                 25,
                 5,
                 Some(true),
+                None,
+                None,
+                None,
             )
             .unwrap();
         mock.assert();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].remote_phone_number, "+15550002222");
+    }
+
+    #[test]
+    fn list_sends_date_range_params_when_set() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls")
+                .query_param("start_date", "2026-07-01")
+                .query_param("end_date", "2026-07-06")
+                .query_param("tz", "America/New_York");
+            then.status(200).json_body(json!([]));
+        });
+        client(&server)
+            .calls()
+            .list(
+                None,
+                50,
+                0,
+                None,
+                Some("2026-07-01"),
+                Some("2026-07-06"),
+                Some("America/New_York"),
+            )
+            .unwrap();
+        mock.assert();
     }
 
     #[test]
@@ -216,7 +263,10 @@ mod tests {
                 .matches(only_limit_and_offset);
             then.status(200).json_body(json!([]));
         });
-        let calls = client(&server).calls().list(None, 50, 0, None).unwrap();
+        let calls = client(&server)
+            .calls()
+            .list(None, 50, 0, None, None, None, None)
+            .unwrap();
         mock.assert();
         assert!(calls.is_empty());
     }
@@ -233,7 +283,7 @@ mod tests {
         });
         client(&server)
             .calls()
-            .list(None, 50, 0, Some(false))
+            .list(None, 50, 0, Some(false), None, None, None)
             .unwrap();
         mock.assert();
     }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.20 — Date-range filtering on high-value comms lists
+
+### Added
+
+- **Date-range filters.** `messages.list(...)` / `identity.iter_emails(...)` (and `iter_unread_emails`), `calls.list(...)` / `identity.list_calls(...)`, `texts.list(...)` / `identity.list_texts(...)`, `texts.list_conversations(...)` / `identity.list_text_conversations(...)`, `imessages.list(...)` / `identity.list_imessages(...)`, and `imessages.list_conversations(...)` / `identity.list_imessage_conversations(...)` accept keyword-only `start_date` / `end_date` / `tz` (all `str | None = None`). They filter on the resource's `created_at`: bare dates resolve to calendar days in `tz` (default UTC) with `end_date` whole-day inclusive; datetimes with an explicit `Z`/offset are exact instants (`tz` ignored); naive datetimes are interpreted in `tz`. Params are sent only when non-`None`, so omitting all three preserves current behavior exactly (no filtering; ordering and pagination unchanged). The server owns resolution.
+
 ## 0.4.16 — Configurable webhook context + open tracking
 
 ### Added

@@ -35,7 +35,13 @@ export class MessagesResource {
    */
   async *list(
     emailAddress: string,
-    options?: { pageSize?: number; direction?: MessageDirection },
+    options?: {
+      pageSize?: number;
+      direction?: MessageDirection;
+      startDate?: string;
+      endDate?: string;
+      tz?: string;
+    },
   ): AsyncGenerator<Message> {
     const limit = options?.pageSize ?? DEFAULT_PAGE_SIZE;
     let cursor: string | undefined;
@@ -43,6 +49,9 @@ export class MessagesResource {
     while (true) {
       const params: Record<string, string | number | undefined> = { limit, cursor };
       if (options?.direction !== undefined) params["direction"] = options.direction;
+      if (options?.startDate !== undefined) params["start_date"] = options.startDate;
+      if (options?.endDate !== undefined) params["end_date"] = options.endDate;
+      if (options?.tz !== undefined) params["tz"] = options.tz;
       const page = await this.http.get<RawCursorPage<RawMessage>>(
         `/mailboxes/${emailAddress}/messages`,
         params,

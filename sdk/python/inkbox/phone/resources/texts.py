@@ -88,6 +88,9 @@ class TextsResource:
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        tz: str | None = None,
     ) -> list[TextMessage]:
         """List text messages for a phone number, newest first.
 
@@ -105,6 +108,14 @@ class TextsResource:
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            start_date: Inclusive lower bound on ``created_at`` (str). Bare
+                dates resolve to the start of that day; naive datetimes are
+                interpreted in ``tz``; zoned datetimes are exact instants.
+                ``None`` leaves the range open on this side.
+            end_date: Upper bound on ``created_at`` (str). A bare date is
+                whole-day inclusive. ``None`` leaves the range open.
+            tz: IANA timezone name (str) governing zone-less values;
+                ``None`` means UTC.
         """
         params: dict[str, Any] = {
             "limit": limit,
@@ -114,6 +125,12 @@ class TextsResource:
             params["is_read"] = is_read
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if start_date is not None:
+            params["start_date"] = start_date
+        if end_date is not None:
+            params["end_date"] = end_date
+        if tz is not None:
+            params["tz"] = tz
         data = self._http.get(
             f"/numbers/{phone_number_id}/texts",
             params=params,
@@ -197,6 +214,9 @@ class TextsResource:
         offset: int = 0,
         is_blocked: bool | None = None,
         include_groups: bool = False,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        tz: str | None = None,
     ) -> list[TextConversationSummary]:
         """List conversation summaries with latest message preview.
 
@@ -217,12 +237,26 @@ class TextsResource:
                 non-blocked, ``None`` for all.
             include_groups: Include group conversations. Defaults to
                 ``False`` so old clients continue to see one-to-one rows only.
+            start_date: Inclusive lower bound on ``created_at`` (str). Bare
+                dates resolve to the start of that day; naive datetimes are
+                interpreted in ``tz``; zoned datetimes are exact instants.
+                ``None`` leaves the range open on this side.
+            end_date: Upper bound on ``created_at`` (str). A bare date is
+                whole-day inclusive. ``None`` leaves the range open.
+            tz: IANA timezone name (str) governing zone-less values;
+                ``None`` means UTC.
         """
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
         if include_groups:
             params["include_groups"] = True
+        if start_date is not None:
+            params["start_date"] = start_date
+        if end_date is not None:
+            params["end_date"] = end_date
+        if tz is not None:
+            params["tz"] = tz
         data = self._http.get(
             f"/numbers/{phone_number_id}/texts/conversations",
             params=params,

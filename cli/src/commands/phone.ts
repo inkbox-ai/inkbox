@@ -45,10 +45,20 @@ export function registerPhoneCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--start-date <date>", "Only calls with created_at >= this date/instant")
+    .option("--end-date <date>", "Only calls with created_at <= this date (bare date is whole-day inclusive)")
+    .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; limit: string; offset: string },
+        cmdOpts: {
+          identity: string;
+          limit: string;
+          offset: string;
+          startDate?: string;
+          endDate?: string;
+          tz?: string;
+        },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
@@ -56,6 +66,9 @@ export function registerPhoneCommands(program: Command): void {
         const calls = await identity.listCalls({
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
+          startDate: cmdOpts.startDate,
+          endDate: cmdOpts.endDate,
+          tz: cmdOpts.tz,
         });
         output(calls, {
           json: !!opts.json,

@@ -18,7 +18,7 @@ fn main() -> inkbox::Result<()> {
 
     // Identity-scoped call listing (agent-scoped key resolves its own identity;
     // pass None here). Blocked rows are filtered server-side.
-    let calls = inkbox.calls().list(None, 5, 0, None)?;
+    let calls = inkbox.calls().list(None, 5, 0, None, None, None, None)?;
     println!("calls (agent-scoped): {}", calls.len());
     if let Some(call) = calls.first() {
         println!(

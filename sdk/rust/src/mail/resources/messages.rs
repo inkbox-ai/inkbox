@@ -48,11 +48,19 @@ impl MessagesResource {
     /// * `page_size` - Number of messages fetched per API call (1-100). Pass
     ///   `None` for the default of 50.
     /// * `direction` - Filter by direction.
+    /// * `start_date` - Inclusive `created_at` lower bound. Bare dates cover the
+    ///   whole day; `None` leaves the side open. UTC unless `tz` is set.
+    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
+    ///   dates; `None` leaves the side open.
+    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
     pub fn list(
         &self,
         email_address: &str,
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
+        start_date: Option<&str>,
+        end_date: Option<&str>,
+        tz: Option<&str>,
     ) -> Result<Vec<Message>> {
         let page_size = page_size.unwrap_or(DEFAULT_PAGE_SIZE);
         let mut out: Vec<Message> = Vec::new();
@@ -66,6 +74,15 @@ impl MessagesResource {
             }
             if let Some(d) = direction {
                 params.push(("direction", d_str(d).to_string()));
+            }
+            if let Some(v) = start_date {
+                params.push(("start_date", v.to_string()));
+            }
+            if let Some(v) = end_date {
+                params.push(("end_date", v.to_string()));
+            }
+            if let Some(v) = tz {
+                params.push(("tz", v.to_string()));
             }
             let page = self
                 .http

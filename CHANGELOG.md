@@ -4,6 +4,17 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.20 — Date-range filtering on high-value comms lists
+
+### Added
+
+- **Date-range filters on comms list endpoints.** The message-, call-, text-, text-conversation-, iMessage-, and iMessage-conversation-listing methods accept three optional params — `start_date` / `end_date` / `tz` (TS `startDate` / `endDate` / `tz`; Rust `start_date` / `end_date` / `tz: Option<&str>`) — that filter on the resource's `created_at`. Bare dates (`2026-07-01`) resolve to calendar days in `tz` (default UTC), with `end_date` **whole-day inclusive** (all of the named day is returned); datetimes with an explicit `Z`/offset are exact instants (`tz` ignored); naive datetimes are interpreted in `tz`. The server owns resolution — the SDK forwards the raw strings and only sends a param when non-null, so omitting all three is byte-for-byte identical to prior behavior (no filtering, ordering/pagination unchanged). Covers `messages.list` / `identity.iter_emails` (+ `iter_unread_emails`), `calls.list` / `identity.list_calls`, `texts.list` / `identity.list_texts`, `texts.list_conversations` / `identity.list_text_conversations`, `imessages.list` / `identity.list_imessages`, and `imessages.list_conversations` / `identity.list_imessage_conversations`. CLI: `--start-date` / `--end-date` / `--tz` on `email list`, `email unread`, `phone calls`, `text list`, `text conversations`, `imessage list`, and `imessage conversations`.
+
+### Changed
+
+- **Rust list signatures gain three positional `Option<&str>` params** (`start_date`, `end_date`, `tz`) appended after the existing args on the affected resource and identity methods. This is source-breaking for positional callers; pass `None` to keep current behavior. Python and TypeScript are additive (keyword-only / optional-object fields) and unaffected.
+- Version bumped to 0.4.20 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+
 ## 0.4.19 — Inbound email body on webhooks
 
 ### Added

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.20 — Date-range filtering on high-value comms lists
+
+### Added
+
+- **`--start-date` / `--end-date` / `--tz` on comms list commands.** `email list`, `email unread`, `phone calls`, `text list`, `text conversations`, `imessage list`, and `imessage conversations` accept a date range that filters on `created_at`. Bare dates resolve to calendar days in `--tz` (default UTC), with `--end-date` whole-day inclusive; datetimes with an explicit `Z`/offset are exact instants (`--tz` ignored). Omitting the flags leaves listing behavior unchanged.
+
 ## 0.4.16 — Configurable webhook context + open tracking
 
 ### Added

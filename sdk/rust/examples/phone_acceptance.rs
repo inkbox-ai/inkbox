@@ -55,7 +55,7 @@ fn main() {
     let scope = identity_id.as_deref();
 
     // ---- Surface 1: calls.list ----
-    match inkbox.calls().list(scope, 25, 0, None) {
+    match inkbox.calls().list(scope, 25, 0, None, None, None, None) {
         Ok(calls) => {
             println!(
                 "[1] calls.list OK: {} calls (scope={:?})",
