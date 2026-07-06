@@ -283,9 +283,9 @@ impl TunnelRuntime {
             let conn = active.clone();
             let fd = force_down.clone();
             let sup = superseded.clone();
-            handles.push(tokio::spawn(
-                async move { me.intake_loop(conn, slot, fd, sup).await },
-            ));
+            handles.push(tokio::spawn(async move {
+                me.intake_loop(conn, slot, fd, sup).await
+            }));
         }
 
         // Supervise: return when the connection dies, a keepalive/owner-token
@@ -897,7 +897,9 @@ mod tests {
         assert!(is_superseded_goaway(&takeover));
 
         // Drain (NO_ERROR) and a generic backpressure code are NOT takeovers.
-        assert!(!is_superseded_goaway(&h2::Error::from(h2::Reason::NO_ERROR)));
+        assert!(!is_superseded_goaway(&h2::Error::from(
+            h2::Reason::NO_ERROR
+        )));
         assert!(!is_superseded_goaway(&h2::Error::from(
             h2::Reason::ENHANCE_YOUR_CALM
         )));
