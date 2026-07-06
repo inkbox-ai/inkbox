@@ -116,7 +116,7 @@ impl TextsResource {
     /// `created_at` [`DateRangeFilter`].
     ///
     /// Identical to [`TextsResource::list`] but also forwards the filter's
-    /// `start_date` / `end_date` / `tz`. A default filter sends nothing extra.
+    /// `start_datetime` / `end_datetime` / `tz`. A default filter sends nothing extra.
     ///
     /// # Arguments
     /// * `phone_number_id` / `limit` / `offset` / `is_read` / `is_blocked` -
@@ -234,7 +234,7 @@ impl TextsResource {
     /// [`DateRangeFilter`].
     ///
     /// Identical to [`TextsResource::list_conversations`] but also forwards the
-    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
     /// nothing extra.
     ///
     /// # Arguments

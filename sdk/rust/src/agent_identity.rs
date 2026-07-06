@@ -391,7 +391,7 @@ impl AgentIdentity {
     /// narrowed by a `created_at` [`DateRangeFilter`].
     ///
     /// Identical to [`AgentIdentity::iter_emails`] but also forwards the
-    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
     /// nothing extra.
     pub fn iter_emails_filtered(
         &self,
@@ -533,7 +533,7 @@ impl AgentIdentity {
     /// `created_at` [`DateRangeFilter`].
     ///
     /// Identical to [`AgentIdentity::list_calls`] but also forwards the
-    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
     /// nothing extra.
     pub fn list_calls_filtered(
         &self,
@@ -624,7 +624,7 @@ impl AgentIdentity {
     /// narrowed by a `created_at` [`DateRangeFilter`].
     ///
     /// Identical to [`AgentIdentity::list_texts`] but also forwards the
-    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
     /// nothing extra.
     #[allow(clippy::too_many_arguments)]
     pub fn list_texts_filtered(
@@ -677,7 +677,7 @@ impl AgentIdentity {
     /// [`DateRangeFilter`].
     ///
     /// Identical to [`AgentIdentity::list_text_conversations`] but also
-    /// forwards the filter's `start_date` / `end_date` / `tz`. A default filter
+    /// forwards the filter's `start_datetime` / `end_datetime` / `tz`. A default filter
     /// sends nothing extra.
     #[allow(clippy::too_many_arguments)]
     pub fn list_text_conversations_filtered(
@@ -798,7 +798,7 @@ impl AgentIdentity {
     /// [`DateRangeFilter`].
     ///
     /// Identical to [`AgentIdentity::list_imessages`] but also forwards the
-    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
     /// nothing extra.
     #[allow(clippy::too_many_arguments)]
     pub fn list_imessages_filtered(
@@ -856,7 +856,7 @@ impl AgentIdentity {
     /// `created_at` [`DateRangeFilter`].
     ///
     /// Identical to [`AgentIdentity::list_imessage_conversations`] but also
-    /// forwards the filter's `start_date` / `end_date` / `tz`. A default filter
+    /// forwards the filter's `start_datetime` / `end_datetime` / `tz`. A default filter
     /// sends nothing extra.
     pub fn list_imessage_conversations_filtered(
         &self,

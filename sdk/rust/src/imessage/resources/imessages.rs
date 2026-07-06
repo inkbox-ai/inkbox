@@ -145,7 +145,7 @@ impl IMessagesResource {
     /// [`DateRangeFilter`].
     ///
     /// Identical to [`IMessagesResource::list`] but also forwards the filter's
-    /// `start_date` / `end_date` / `tz`. A default filter sends nothing extra.
+    /// `start_datetime` / `end_datetime` / `tz`. A default filter sends nothing extra.
     ///
     /// # Arguments
     /// * `agent_identity_id` / `conversation_id` / `limit` / `offset` /
@@ -238,7 +238,7 @@ impl IMessagesResource {
     /// [`DateRangeFilter`].
     ///
     /// Identical to [`IMessagesResource::list_conversations`] but also forwards
-    /// the filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// the filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
     /// nothing extra.
     ///
     /// # Arguments

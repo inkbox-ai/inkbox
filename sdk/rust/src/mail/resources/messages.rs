@@ -64,14 +64,14 @@ impl MessagesResource {
     /// a `created_at` [`DateRangeFilter`].
     ///
     /// Identical to [`MessagesResource::list`] but also forwards the filter's
-    /// `start_date` / `end_date` / `tz`. A default filter sends nothing extra,
+    /// `start_datetime` / `end_datetime` / `tz`. A default filter sends nothing extra,
     /// so this behaves exactly like `list`.
     ///
     /// # Arguments
     /// * `email_address` / `page_size` / `direction` - See
     ///   [`MessagesResource::list`].
     /// * `filter` - Optional `created_at` date-range bounds. Bare dates cover
-    ///   the whole day; `end_date` is whole-day inclusive.
+    ///   the whole day; `end_datetime` is whole-day inclusive.
     pub fn list_filtered(
         &self,
         email_address: &str,

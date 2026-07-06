@@ -28,8 +28,8 @@ class MessagesResource:
         *,
         page_size: int = _DEFAULT_PAGE_SIZE,
         direction: MessageDirection | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
         tz: str | None = None,
     ) -> Iterator[Message]:
         """Iterator over all messages in a mailbox, newest first.
@@ -40,11 +40,11 @@ class MessagesResource:
             email_address: Full email address of the mailbox.
             page_size: Number of messages fetched per API call (1-100).
             direction: Filter by direction.
-            start_date: Inclusive lower bound on ``created_at`` (str). Bare
+            start_datetime: Inclusive lower bound on ``created_at`` (str). Bare
                 dates (``2026-07-01``) resolve to the start of that day; naive
                 datetimes are interpreted in ``tz``; zoned datetimes are exact
                 instants. ``None`` leaves the range open on this side.
-            end_date: Upper bound on ``created_at`` (str). A bare date is
+            end_datetime: Upper bound on ``created_at`` (str). A bare date is
                 whole-day inclusive (covers all of that calendar day). ``None``
                 leaves the range open on this side.
             tz: IANA timezone name (str, e.g. ``America/New_York``) governing
@@ -59,8 +59,8 @@ class MessagesResource:
             email_address,
             page_size=page_size,
             direction=direction,
-            start_date=start_date,
-            end_date=end_date,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
             tz=tz,
         )
 
@@ -70,8 +70,8 @@ class MessagesResource:
         *,
         page_size: int,
         direction: MessageDirection | None = None,
-        start_date: str | None = None,
-        end_date: str | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
         tz: str | None = None,
     ) -> Iterator[Message]:
         cursor: str | None = None
@@ -79,10 +79,10 @@ class MessagesResource:
             params: dict[str, Any] = {"limit": page_size, "cursor": cursor}
             if direction is not None:
                 params["direction"] = direction
-            if start_date is not None:
-                params["start_date"] = start_date
-            if end_date is not None:
-                params["end_date"] = end_date
+            if start_datetime is not None:
+                params["start_datetime"] = start_datetime
+            if end_datetime is not None:
+                params["end_datetime"] = end_datetime
             if tz is not None:
                 params["tz"] = tz
             page = self._http.get(

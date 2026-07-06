@@ -437,7 +437,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  iterEmails(options: { pageSize?: number; direction?: MessageDirection; startDate?: string; endDate?: string; tz?: string } = {}): AsyncGenerator<Message> {
+  iterEmails(options: { pageSize?: number; direction?: MessageDirection; startDatetime?: string; endDatetime?: string; tz?: string } = {}): AsyncGenerator<Message> {
     this._requireMailbox();
     return this._inkbox._messages.list(this._mailbox!.emailAddress, options);
   }
@@ -450,7 +450,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  async *iterUnreadEmails(options: { pageSize?: number; direction?: MessageDirection; startDate?: string; endDate?: string; tz?: string } = {}): AsyncGenerator<Message> {
+  async *iterUnreadEmails(options: { pageSize?: number; direction?: MessageDirection; startDatetime?: string; endDatetime?: string; tz?: string } = {}): AsyncGenerator<Message> {
     for await (const msg of this.iterEmails(options)) {
       if (!msg.isRead) yield msg;
     }
@@ -556,7 +556,7 @@ export class AgentIdentity {
    *   `false` for only non-blocked, omit for all.
    */
   async listCalls(
-    options: { limit?: number; offset?: number; isBlocked?: boolean; startDate?: string; endDate?: string; tz?: string } = {},
+    options: { limit?: number; offset?: number; isBlocked?: boolean; startDatetime?: string; endDatetime?: string; tz?: string } = {},
   ): Promise<PhoneCall[]> {
     // Scope by identity id — no phone number required (a shared-only
     // identity can still have calls).
@@ -647,8 +647,8 @@ export class AgentIdentity {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
-      startDate?: string;
-      endDate?: string;
+      startDatetime?: string;
+      endDatetime?: string;
       tz?: string;
     },
   ): Promise<TextMessage[]> {
@@ -687,8 +687,8 @@ export class AgentIdentity {
       offset?: number;
       isBlocked?: boolean;
       includeGroups?: boolean;
-      startDate?: string;
-      endDate?: string;
+      startDatetime?: string;
+      endDatetime?: string;
       tz?: string;
     },
   ): Promise<TextConversationSummary[]> {
@@ -804,8 +804,8 @@ export class AgentIdentity {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
-      startDate?: string;
-      endDate?: string;
+      startDatetime?: string;
+      endDatetime?: string;
       tz?: string;
     },
   ): Promise<IMessage[]> {
@@ -846,8 +846,8 @@ export class AgentIdentity {
       limit?: number;
       offset?: number;
       isBlocked?: boolean;
-      startDate?: string;
-      endDate?: string;
+      startDatetime?: string;
+      endDatetime?: string;
       tz?: string;
     },
   ): Promise<IMessageConversationSummary[]> {

@@ -54,7 +54,7 @@ impl CallsResource {
     /// [`DateRangeFilter`].
     ///
     /// Identical to [`CallsResource::list`] but also forwards the filter's
-    /// `start_date` / `end_date` / `tz`. A default filter sends nothing extra,
+    /// `start_datetime` / `end_datetime` / `tz`. A default filter sends nothing extra,
     /// so this behaves exactly like `list`.
     ///
     /// # Arguments
@@ -238,14 +238,14 @@ mod tests {
         let mock = server.mock(|when, then| {
             when.method(GET)
                 .path("/api/v1/phone/calls")
-                .query_param("start_date", "2026-07-01")
-                .query_param("end_date", "2026-07-06")
+                .query_param("start_datetime", "2026-07-01")
+                .query_param("end_datetime", "2026-07-06")
                 .query_param("tz", "America/New_York");
             then.status(200).json_body(json!([]));
         });
         let filter = crate::DateRangeFilter {
-            start_date: Some("2026-07-01".to_string()),
-            end_date: Some("2026-07-06".to_string()),
+            start_datetime: Some("2026-07-01".to_string()),
+            end_datetime: Some("2026-07-06".to_string()),
             tz: Some("America/New_York".to_string()),
         };
         client(&server)
