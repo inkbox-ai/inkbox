@@ -495,8 +495,8 @@ class TunnelRuntime:
                 )
                 self._notify_status("closed")
                 raise
-            except _TunnelSupersededError:
-                self._stop_superseded()
+            except _TunnelSupersededError as e:
+                self._stop_superseded(e)
             except Exception:
                 # A takeover GOAWAY that lands mid-hello sets _superseded but
                 # surfaces as a plain connection error; go terminal here so we
@@ -799,8 +799,12 @@ class TunnelRuntime:
             return
         self._mark_superseded()
 
-    def _stop_superseded(self) -> NoReturn:
-        """Log, notify, and raise the terminal takeover error (no reconnect)."""
+    def _stop_superseded(self, err: TunnelSupersededError | None = None) -> NoReturn:
+        """Log, notify, and raise the terminal takeover error (no reconnect).
+
+        Re-raises the original error when given, so its message (which
+        channel/slot observed the takeover) survives to the caller.
+        """
         logger.warning(
             "tunnel taken over: another client connected to this tunnel, so "
             "this client is stopping and will not reconnect. If this is "
@@ -808,6 +812,8 @@ class TunnelRuntime:
             "(only one live connection per tunnel is kept).",
         )
         self._notify_status("superseded")
+        if err is not None:
+            raise err
         raise _TunnelSupersededError(
             "another client connected to this tunnel; not reconnecting",
         )

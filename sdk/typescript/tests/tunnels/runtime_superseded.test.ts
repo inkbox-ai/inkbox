@@ -111,6 +111,8 @@ describe("TunnelRuntime — superseded (takeover) is terminal", () => {
     const runtime = makeRuntime();
     const servePromise = runtime.serveForever();
     await expect(servePromise).rejects.toBeInstanceOf(TunnelSupersededError);
+    // The original error's channel detail survives stopSuperseded's rethrow.
+    await expect(servePromise).rejects.toThrow(/during hello/);
     // Displaced hello does not redial and boot the winner.
     expect(fakeServer.helloCount()).toBe(1);
   }, 15_000);

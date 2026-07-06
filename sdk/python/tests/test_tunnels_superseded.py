@@ -226,8 +226,10 @@ async def test_serve_forever_stops_and_surfaces_on_superseded(monkeypatch):
 
     monkeypatch.setattr(runtime, "_run_once", _boom)
 
-    with pytest.raises(_TunnelSupersededError):
+    with pytest.raises(_TunnelSupersededError) as exc_info:
         await runtime.serve_forever()
+    # the original error (with its channel/slot detail) is re-raised verbatim
+    assert "taken over" in str(exc_info.value)
     # terminal status surfaced (not "reconnecting"/"closed"), no retry loop
     assert "superseded" in statuses
     assert "reconnecting" not in statuses

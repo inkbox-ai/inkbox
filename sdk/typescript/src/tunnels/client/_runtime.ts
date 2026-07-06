@@ -363,7 +363,7 @@ export class TunnelRuntime {
           throw err;
         }
         if (err instanceof TunnelSupersededError) {
-          this.stopSuperseded();
+          this.stopSuperseded(err);
         }
         // A takeover GOAWAY that lands mid-hello sets `superseded` but surfaces
         // as a plain connection error; go terminal here so we don't reconnect
@@ -572,8 +572,12 @@ export class TunnelRuntime {
     this.superseded = true;
   }
 
-  /** Log, notify, and throw the terminal takeover error (no reconnect). */
-  private stopSuperseded(): never {
+  /**
+   * Log, notify, and throw the terminal takeover error (no reconnect).
+   * Rethrows the original error when given, so its message (which
+   * channel/slot observed the takeover) survives to the caller.
+   */
+  private stopSuperseded(err?: TunnelSupersededError): never {
     // eslint-disable-next-line no-console
     console.warn(
       "tunnel taken over: another client connected to this tunnel, so " +
@@ -582,9 +586,10 @@ export class TunnelRuntime {
         "identity (only one live connection per tunnel is kept).",
     );
     this.notifyStatus("superseded");
-    throw new TunnelSupersededError(
-      "another client connected to this tunnel; not reconnecting",
-    );
+    throw err ??
+      new TunnelSupersededError(
+        "another client connected to this tunnel; not reconnecting",
+      );
   }
 
   /**
