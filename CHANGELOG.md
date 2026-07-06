@@ -4,6 +4,16 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.18 — One live client per tunnel
+
+### Changed
+
+- **A tunnel keeps a single live client; a newer client takes over.** When another client connects to the same tunnel, the earlier client now stops and does **not** reconnect — previously it would redial, and two clients on one tunnel could bounce back and forth. Run one client per tunnel; for redundancy, use separate identities. The runtime reports a new `"superseded"` status through the status callback (`onStatus` / `on_status`) and ends with a distinct terminal outcome instead of retrying: TypeScript throws `TunnelSupersededError`, Python stops out of `serve()` / `wait()`, and Rust returns a terminal `Err` from `serve_forever`. A normal server redeploy still reconnects seamlessly, unchanged.
+
+### Added
+
+- **`TunnelSupersededError`** (TypeScript) exported from the tunnels client alongside `TunnelAuthError`, thrown when another client takes over the tunnel — so an embedding app can notice, e.g., that an accidental second instance on the same identity went dark.
+
 ## 0.4.17 — Inline images, CLI attachments, and mark-unread
 
 ### Added

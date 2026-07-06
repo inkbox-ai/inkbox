@@ -76,7 +76,7 @@ export interface FakeH2Server {
   sessionCount(): number;
   /** Total `/_system/hello` POSTs seen since start. */
   helloCount(): number;
-  injectGoaway(errorCode?: number): void;
+  injectGoaway(errorCode?: number, opaqueData?: Buffer): void;
   injectRstStream(streamId: number, errorCode: number): void;
   receivedHelloHeaders(): http2.IncomingHttpHeaders | null;
   receivedIntakePosts(): Array<{ slot: number; ownerToken: string }>;
@@ -212,11 +212,9 @@ export async function startFakeH2Server(
         ":status": computed.status,
         "content-type": "application/json",
       });
-      if (computed.status === 200) {
-        stream.end(JSON.stringify(computed.body));
-      } else {
-        stream.end();
-      }
+      // Write the body on every status so non-200 responses (e.g. a
+      // terminal hello with a reason) carry their JSON payload.
+      stream.end(JSON.stringify(computed.body));
       return;
     }
     if (path === "/_system/intake") {
@@ -344,10 +342,13 @@ export async function startFakeH2Server(
     helloCount() {
       return helloCounter;
     },
-    injectGoaway(errorCode = http2.constants.NGHTTP2_NO_ERROR) {
+    injectGoaway(
+      errorCode = http2.constants.NGHTTP2_NO_ERROR,
+      opaqueData?: Buffer,
+    ) {
       for (const session of sessions) {
         try {
-          session.goaway(errorCode);
+          session.goaway(errorCode, undefined, opaqueData);
         } catch {
           /* swallow */
         }
