@@ -11,7 +11,7 @@
  */
 
 export interface TranscriptTurn {
-  speaker: string;
+  party: "local" | "remote";
   text: string;
 }
 
@@ -92,7 +92,10 @@ function optS(v: unknown): string | null {
 
 function turns(v: unknown): TranscriptTurn[] {
   if (!Array.isArray(v)) return [];
-  return v.map((t) => ({ speaker: s((t as any)?.speaker), text: s((t as any)?.text) }));
+  return v.map((t) => ({
+    party: (t as any)?.party === "local" ? "local" : "remote",
+    text: s((t as any)?.text),
+  }));
 }
 
 /** Decode one wire message into its typed observe event. */

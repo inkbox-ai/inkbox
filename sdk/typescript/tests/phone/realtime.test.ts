@@ -53,20 +53,22 @@ describe("parseEvent (observe)", () => {
   it("decodes consult.requested and call.ended", () => {
     const consult = parseEvent({
       event: "consult.requested", call_id: CALL_ID, consult_id: "c1", query: "refund?",
-      transcript_tail: [{ speaker: "remote", text: "hi" }],
+      transcript_tail: [{ party: "remote", text: "hi" }],
     }) as ConsultRequestedEvent;
     expect(consult.callId).toBe(CALL_ID);
     expect(consult.consultId).toBe("c1");
+    expect(consult.transcriptTail[0].party).toBe("remote");
     expect(consult.transcriptTail[0].text).toBe("hi");
 
     const ended = parseEvent({
       event: "call.ended", call_id: CALL_ID, reason: "hangup",
       post_call_actions: [{ action: "note", details: { x: 1 } }],
-      transcript: [{ speaker: "local", text: "bye" }],
+      transcript: [{ party: "local", text: "bye" }],
     }) as CallEndedEvent;
     expect(ended.callId).toBe(CALL_ID);
     expect(ended.reason).toBe("hangup");
     expect(ended.postCallActions[0].action).toBe("note");
+    expect(ended.transcript[0].party).toBe("local");
     expect(ended.transcript[0].text).toBe("bye");
   });
 

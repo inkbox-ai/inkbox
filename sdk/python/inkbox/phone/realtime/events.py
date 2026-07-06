@@ -19,12 +19,12 @@ from typing import Any
 class TranscriptTurn:
     """One turn in a transcript tail / post-call transcript."""
 
-    speaker: str
+    party: str  # "local" (agent) | "remote" (caller) — matches the wire
     text: str
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> TranscriptTurn:
-        return cls(speaker=d["speaker"], text=d["text"])
+        return cls(party=d["party"], text=d["text"])
 
 
 @dataclass

@@ -60,7 +60,7 @@ class TestParseObserveEvents:
         consult = parse_event({
             "event": "consult.requested", "call_id": CALL_ID, "consult_id": "c1",
             "query": "refund?",
-            "transcript_tail": [{"speaker": "remote", "text": "hi"}],
+            "transcript_tail": [{"party": "remote", "text": "hi"}],
         })
         assert isinstance(consult, ConsultRequested)
         assert consult.call_id == CALL_ID
@@ -70,7 +70,7 @@ class TestParseObserveEvents:
         ended = parse_event({
             "event": "call.ended", "call_id": CALL_ID, "reason": "hangup",
             "post_call_actions": [{"action": "note", "details": {"x": 1}}],
-            "transcript": [{"speaker": "local", "text": "bye"}],
+            "transcript": [{"party": "local", "text": "bye"}],
         })
         assert isinstance(ended, CallEnded)
         assert ended.call_id == CALL_ID

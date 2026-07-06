@@ -12,7 +12,8 @@ use serde_json::Value;
 /// One turn in a transcript tail / post-call transcript.
 #[derive(Debug, Clone, Deserialize)]
 pub struct TranscriptTurn {
-    pub speaker: String,
+    /// `"local"` (agent) or `"remote"` (caller) — matches the wire.
+    pub party: String,
     pub text: String,
 }
 
@@ -152,7 +153,7 @@ mod tests {
     fn parses_consult_and_call_ended_nested() {
         let consult = parse_event(
             r#"{"event":"consult.requested","call_id":"c1","consult_id":"q1",
-                "query":"refund?","transcript_tail":[{"speaker":"remote","text":"hi"}]}"#,
+                "query":"refund?","transcript_tail":[{"party":"remote","text":"hi"}]}"#,
         )
         .unwrap();
         match consult {
@@ -170,7 +171,7 @@ mod tests {
         let ended = parse_event(
             r#"{"event":"call.ended","call_id":"c1","reason":"hangup",
                 "post_call_actions":[{"action":"note","details":{"x":1}}],
-                "transcript":[{"speaker":"local","text":"bye"}]}"#,
+                "transcript":[{"party":"local","text":"bye"}]}"#,
         )
         .unwrap();
         match ended {
