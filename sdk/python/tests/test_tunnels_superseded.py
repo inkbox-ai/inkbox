@@ -6,6 +6,7 @@ make-before-break reconnect for an external takeover.
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -17,7 +18,7 @@ from inkbox.tunnels.client._runtime import (
     SUPERSEDED_GOAWAY_ERROR_CODE,
     TunnelRuntime,
     _Connection,
-    _hello_reason,
+    _parse_reason_json,
     _TunnelSupersededError,
 )
 
@@ -61,7 +62,6 @@ async def test_superseded_goaway_on_active_marks_terminal():
         _goaway(SUPERSEDED_GOAWAY_ERROR_CODE, b'{"reason":"superseded"}'), conn,
     )
     assert runtime._superseded is True
-    assert conn.superseded is True
 
 
 @pytest.mark.asyncio
@@ -162,9 +162,9 @@ async def test_intake_loop_terminal_on_superseded(monkeypatch):
 
 
 def test_hello_reason_parses_body():
-    assert _hello_reason(b'{"reason":"hello-superseded"}') == HELLO_REASON_SUPERSEDED
-    assert _hello_reason(b"") is None
-    assert _hello_reason(b"not json") is None
+    assert _parse_reason_json(b'{"reason":"hello-superseded"}') == HELLO_REASON_SUPERSEDED
+    assert _parse_reason_json(b"") is None
+    assert _parse_reason_json(b"not json") is None
 
 
 @pytest.mark.asyncio
@@ -231,6 +231,95 @@ async def test_serve_forever_stops_and_surfaces_on_superseded(monkeypatch):
     # terminal status surfaced (not "reconnecting"/"closed"), no retry loop
     assert "superseded" in statuses
     assert "reconnecting" not in statuses
+
+
+@pytest.mark.asyncio
+async def test_serve_forever_terminal_when_flag_set_on_plain_error(monkeypatch):
+    """A takeover GOAWAY that lands mid-hello sets _superseded but the hello
+    fails with a PLAIN error; serve_forever must stop, not reconnect."""
+    runtime = _make_runtime()
+    statuses: list[str] = []
+    monkeypatch.setattr(runtime, "_notify_status", lambda s: statuses.append(s))
+
+    async def _run_once_plain_error():
+        runtime._superseded = True  # set by the read loop mid-hello
+        raise RuntimeError("connection closed during hello")
+
+    monkeypatch.setattr(runtime, "_run_once", _run_once_plain_error)
+
+    with pytest.raises(_TunnelSupersededError):
+        await runtime.serve_forever()
+    assert "superseded" in statuses
+    assert "reconnecting" not in statuses
+
+
+@pytest.mark.asyncio
+async def test_hello_superseded_terminal_even_during_handoff(monkeypatch):
+    """hello-superseded is terminal even on a non-active/handoff connection, so
+    a handoff retry can't re-hello and boot the client that replaced us."""
+    runtime = _make_runtime()
+    _active_conn(runtime)  # a DIFFERENT active conn
+    runtime._handoff_in_flight = True
+    conn = _Connection(2)  # the replacement being helloed (not active)
+    conn.h2 = MagicMock()
+    conn.writer = MagicMock()
+    monkeypatch.setattr(runtime, "_open_stream_locked", lambda *a, **k: 1)
+
+    async def _flush(c):
+        return None
+
+    async def _await(sid, conn=None):
+        return 409, b'{"reason":"hello-superseded"}'
+
+    monkeypatch.setattr(runtime, "_flush_conn", _flush)
+    monkeypatch.setattr(runtime, "_await_response", _await)
+
+    with pytest.raises(_TunnelSupersededError):
+        await runtime._send_hello(conn)
+    assert runtime._superseded is True
+
+
+@pytest.mark.asyncio
+async def test_make_replacement_reraises_superseded_no_retry(monkeypatch):
+    """A takeover during the handoff hello propagates terminally instead of
+    being retried within the redial budget."""
+    runtime = _make_runtime()
+    attempts = {"n": 0}
+
+    async def _open(conn):
+        return None
+
+    async def _read_loop(conn):
+        await asyncio.sleep(3600)
+
+    async def _hello(conn):
+        attempts["n"] += 1
+        raise _TunnelSupersededError("taken over during handoff")
+
+    async def _close(conn):
+        return None
+
+    monkeypatch.setattr(runtime, "_open_connection", _open)
+    monkeypatch.setattr(runtime, "_read_loop", _read_loop)
+    monkeypatch.setattr(runtime, "_send_hello", _hello)
+    monkeypatch.setattr(runtime, "_force_reconnect_conn", lambda c: None)
+    monkeypatch.setattr(runtime, "_close_connection_writer", _close)
+
+    with pytest.raises(_TunnelSupersededError):
+        await runtime._make_replacement_connection()
+    assert attempts["n"] == 1  # did NOT retry the doomed hello
+
+
+def test_superseded_error_is_public_and_typed():
+    """The terminal error is the public TunnelSupersededError (a TunnelError),
+    reachable from inkbox and inkbox.tunnels, not a bare RuntimeError."""
+    import inkbox
+    from inkbox.tunnels import TunnelSupersededError
+    from inkbox.tunnels.exceptions import TunnelError
+
+    assert _TunnelSupersededError is TunnelSupersededError
+    assert inkbox.TunnelSupersededError is TunnelSupersededError
+    assert issubclass(TunnelSupersededError, TunnelError)
 
 
 def test_guard_helper_matrix():

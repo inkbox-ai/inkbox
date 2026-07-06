@@ -126,6 +126,48 @@ describe("TunnelRuntime — superseded (takeover) is terminal", () => {
     const servePromise = runtime.serveForever();
     await expect(servePromise).rejects.toBeInstanceOf(TunnelSupersededError);
   }, 15_000);
+
+  it("goes terminal when the flag is set but the error is plain (mid-hello GOAWAY)", async () => {
+    // A takeover GOAWAY landing mid-hello sets `superseded` but the hello
+    // fails with a plain error; serveForever must stop, not reconnect.
+    const statuses: string[] = [];
+    const runtime = makeRuntime((s) => statuses.push(s)) as unknown as {
+      superseded: boolean;
+      runOnce: () => Promise<void>;
+      serveForever: () => Promise<void>;
+    };
+    runtime.runOnce = async () => {
+      runtime.superseded = true;
+      throw new Error("connection closed during hello");
+    };
+    await expect(runtime.serveForever()).rejects.toBeInstanceOf(TunnelSupersededError);
+    expect(statuses).toContain("superseded");
+    expect(statuses).not.toContain("reconnecting");
+  });
+
+  it("makeReplacementConnection re-raises a takeover without retrying", async () => {
+    // A takeover during the handoff hello propagates terminally instead of
+    // being retried within the redial budget (which would boot the winner).
+    let attempts = 0;
+    const runtime = makeRuntime() as unknown as {
+      openConnection: (c: unknown) => Promise<void>;
+      sendHello: (c: unknown) => Promise<void>;
+      startServing: (c: unknown) => void;
+      closeConnection: (c: unknown) => Promise<void>;
+      makeReplacementConnection: () => Promise<unknown>;
+    };
+    runtime.openConnection = async () => undefined;
+    runtime.closeConnection = async () => undefined;
+    runtime.startServing = () => undefined;
+    runtime.sendHello = async () => {
+      attempts += 1;
+      throw new TunnelSupersededError("taken over during handoff");
+    };
+    await expect(
+      runtime.makeReplacementConnection(),
+    ).rejects.toBeInstanceOf(TunnelSupersededError);
+    expect(attempts).toBe(1);
+  });
 });
 
 describe("TunnelRuntime — takeover guard (deploy make-before-break)", () => {

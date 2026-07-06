@@ -265,7 +265,19 @@ impl TunnelRuntime {
 
         // Hello handshake — establishes the owner_token used to park intakes.
         // A displaced-during-hello loser returns the superseded tag here.
-        let active = self.send_hello(send).await?;
+        let active = match self.send_hello(send).await {
+            Ok(active) => active,
+            Err(e) => {
+                // A takeover GOAWAY can land mid-hello: the driver sets the
+                // flag while the hello itself fails as a plain transient error.
+                // Honor the flag so we stop instead of redialing and booting
+                // the client that replaced us.
+                if superseded.load(Ordering::SeqCst) {
+                    return Err(superseded_error("another client connected to this tunnel"));
+                }
+                return Err(e);
+            }
+        };
         let active = Arc::new(active);
         *self.active.lock().await = Some(active.clone());
         self.notify_status("connected");
@@ -821,7 +833,7 @@ fn superseded_error(msg: impl Into<String>) -> InkboxError {
 }
 
 fn is_superseded_error(err: &InkboxError) -> bool {
-    matches!(err, InkboxError::Tunnel(m) if m.starts_with("tunnel-superseded:"))
+    err.is_tunnel_superseded()
 }
 
 /// True iff a connection-driver `h2::Error` carries the dedicated superseded
@@ -886,6 +898,15 @@ mod tests {
         assert!(!is_superseded_error(&owner_token_invalid("x")));
         assert!(!is_auth_error(&superseded_error("x")));
         assert!(!is_owner_token_invalid(&superseded_error("x")));
+    }
+
+    #[test]
+    fn is_tunnel_superseded_is_public_and_structural() {
+        // Callers can distinguish a terminal takeover from a transient error
+        // structurally (no string matching on their side).
+        assert!(superseded_error("x").is_tunnel_superseded());
+        assert!(!transient("x").is_tunnel_superseded());
+        assert!(!tunnel_auth_error("x").is_tunnel_superseded());
     }
 
     #[test]
