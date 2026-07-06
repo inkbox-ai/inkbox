@@ -6,14 +6,11 @@ import type {
   CallEndedEvent,
   CallStartedEvent,
   ConsultRequestedEvent,
-  ModelToolCallEvent,
   TranscriptEvent,
   UnknownEvent,
 } from "../../src/phone/realtime/events.js";
 import {
-  approveTool,
   consultAnswer,
-  denyTool,
   hangUp,
   injectContext,
   say,
@@ -35,43 +32,39 @@ describe("parseEvent (observe)", () => {
     expect(started.phoneNumber).toBeNull(); // absent on some inbound legs
   });
 
-  it("decodes transcript and barge_in without a callId", () => {
+  it("decodes transcript and barge_in with a callId", () => {
     const transcript = parseEvent({
-      event: "transcript", party: "remote", text: "hello",
+      event: "transcript", call_id: CALL_ID, party: "remote", text: "hello",
       is_final: true, turn_id: "t1",
     }) as TranscriptEvent;
+    expect(transcript.callId).toBe(CALL_ID);
     expect(transcript.text).toBe("hello");
     expect(transcript.isFinal).toBe(true);
     expect(transcript.turnId).toBe("t1");
 
+    // barge_in carries only callId + optional turnId on the hosted-call wire.
     const barge = parseEvent({
-      event: "barge_in", trigger: "speech", text: "wait", tts_interrupted: true,
+      event: "barge_in", call_id: CALL_ID, turn_id: null,
     }) as BargeInEvent;
-    expect(barge.trigger).toBe("speech");
-    expect(barge.ttsInterrupted).toBe(true);
+    expect(barge.callId).toBe(CALL_ID);
     expect(barge.turnId).toBeNull(); // optional
   });
 
-  it("decodes tool_call, consult.requested and call.ended", () => {
-    const tool = parseEvent({
-      event: "model.tool_call", tool_call_id: "tc1", tool_name: "lookup_contact",
-      arguments: { name: "Ada" }, requires_approval: true,
-    }) as ModelToolCallEvent;
-    expect(tool.requiresApproval).toBe(true);
-    expect(tool.arguments).toEqual({ name: "Ada" });
-
+  it("decodes consult.requested and call.ended", () => {
     const consult = parseEvent({
-      event: "consult.requested", consult_id: "c1", query: "refund?",
+      event: "consult.requested", call_id: CALL_ID, consult_id: "c1", query: "refund?",
       transcript_tail: [{ speaker: "remote", text: "hi" }],
     }) as ConsultRequestedEvent;
+    expect(consult.callId).toBe(CALL_ID);
     expect(consult.consultId).toBe("c1");
     expect(consult.transcriptTail[0].text).toBe("hi");
 
     const ended = parseEvent({
-      event: "call.ended", reason: "hangup",
+      event: "call.ended", call_id: CALL_ID, reason: "hangup",
       post_call_actions: [{ action: "note", details: { x: 1 } }],
       transcript: [{ speaker: "local", text: "bye" }],
     }) as CallEndedEvent;
+    expect(ended.callId).toBe(CALL_ID);
     expect(ended.reason).toBe("hangup");
     expect(ended.postCallActions[0].action).toBe("note");
     expect(ended.transcript[0].text).toBe("bye");
@@ -99,15 +92,6 @@ describe("intervene builders", () => {
     expect(say("One moment")).toEqual({ event: "inject", mode: "say", text: "One moment" });
     expect(injectContext("VIP customer")).toEqual({
       event: "inject", mode: "context", text: "VIP customer",
-    });
-  });
-
-  it("approveTool and denyTool build tool decisions", () => {
-    expect(approveTool("tc1")).toEqual({
-      event: "tool.decision", tool_call_id: "tc1", decision: "approve",
-    });
-    expect(denyTool("tc2", "not allowed")).toEqual({
-      event: "tool.decision", tool_call_id: "tc2", decision: "deny", reason: "not allowed",
     });
   });
 

@@ -2,8 +2,9 @@
 //! identity runs on platform-hosted voice.
 //!
 //! Field names match the wire JSON (snake_case); `event` is the serde tag.
-//! These frames ride the one existing per-call WebSocket, so they carry no
-//! `call_id` — the socket *is* the call.
+//! These frames ride the one existing per-call WebSocket and each carries the
+//! `call_id` it belongs to; only the outbound intervene frames omit it (that
+//! socket is already scoped to one call — see [`super::intervene`]).
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -41,6 +42,7 @@ pub enum RealtimeEvent {
     CallAnswered { call_id: String },
     #[serde(rename = "transcript")]
     Transcript {
+        call_id: String,
         /// `"local"` (agent) or `"remote"` (caller).
         party: String,
         text: String,
@@ -50,25 +52,13 @@ pub enum RealtimeEvent {
     },
     #[serde(rename = "barge_in")]
     BargeIn {
-        #[serde(default)]
-        trigger: String,
-        #[serde(default)]
-        text: String,
-        #[serde(default)]
-        tts_interrupted: bool,
+        call_id: String,
         #[serde(default)]
         turn_id: Option<String>,
     },
-    #[serde(rename = "model.tool_call")]
-    ModelToolCall {
-        tool_call_id: String,
-        tool_name: String,
-        #[serde(default)]
-        arguments: Value,
-        requires_approval: bool,
-    },
     #[serde(rename = "consult.requested")]
     ConsultRequested {
+        call_id: String,
         consult_id: String,
         query: String,
         #[serde(default)]
@@ -76,6 +66,7 @@ pub enum RealtimeEvent {
     },
     #[serde(rename = "call.ended")]
     CallEnded {
+        call_id: String,
         #[serde(default)]
         reason: Option<String>,
         #[serde(default)]
@@ -98,19 +89,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_transcript_without_call_id() {
+    fn parses_transcript_with_call_id() {
         let event = parse_event(
-            r#"{"event":"transcript","party":"remote",
+            r#"{"event":"transcript","call_id":"c1","party":"remote",
                 "text":"hello","is_final":true,"turn_id":"t1"}"#,
         )
         .unwrap();
         match event {
             RealtimeEvent::Transcript {
+                call_id,
                 party,
                 text,
                 is_final,
                 turn_id,
             } => {
+                assert_eq!(call_id, "c1");
                 assert_eq!(party, "remote");
                 assert_eq!(text, "hello");
                 assert!(is_final);
@@ -144,40 +137,12 @@ mod tests {
 
     #[test]
     fn parses_barge_in_fields() {
-        let event = parse_event(
-            r#"{"event":"barge_in","trigger":"speech","text":"wait","tts_interrupted":true}"#,
-        )
-        .unwrap();
+        // barge_in carries only call_id + optional turn_id on the hosted-call wire.
+        let event = parse_event(r#"{"event":"barge_in","call_id":"c1","turn_id":null}"#).unwrap();
         match event {
-            RealtimeEvent::BargeIn {
-                trigger,
-                tts_interrupted,
-                turn_id,
-                ..
-            } => {
-                assert_eq!(trigger, "speech");
-                assert!(tts_interrupted);
+            RealtimeEvent::BargeIn { call_id, turn_id } => {
+                assert_eq!(call_id, "c1");
                 assert!(turn_id.is_none());
-            }
-            other => panic!("unexpected: {other:?}"),
-        }
-    }
-
-    #[test]
-    fn parses_tool_call_with_arguments() {
-        let event = parse_event(
-            r#"{"event":"model.tool_call","tool_call_id":"tc1",
-                "tool_name":"lookup","arguments":{"name":"Ada"},"requires_approval":true}"#,
-        )
-        .unwrap();
-        match event {
-            RealtimeEvent::ModelToolCall {
-                requires_approval,
-                arguments,
-                ..
-            } => {
-                assert!(requires_approval);
-                assert_eq!(arguments["name"], "Ada");
             }
             other => panic!("unexpected: {other:?}"),
         }
@@ -186,31 +151,36 @@ mod tests {
     #[test]
     fn parses_consult_and_call_ended_nested() {
         let consult = parse_event(
-            r#"{"event":"consult.requested","consult_id":"q1",
+            r#"{"event":"consult.requested","call_id":"c1","consult_id":"q1",
                 "query":"refund?","transcript_tail":[{"speaker":"remote","text":"hi"}]}"#,
         )
         .unwrap();
         match consult {
             RealtimeEvent::ConsultRequested {
-                transcript_tail, ..
+                call_id,
+                transcript_tail,
+                ..
             } => {
+                assert_eq!(call_id, "c1");
                 assert_eq!(transcript_tail[0].text, "hi");
             }
             other => panic!("unexpected: {other:?}"),
         }
 
         let ended = parse_event(
-            r#"{"event":"call.ended","reason":"hangup",
+            r#"{"event":"call.ended","call_id":"c1","reason":"hangup",
                 "post_call_actions":[{"action":"note","details":{"x":1}}],
                 "transcript":[{"speaker":"local","text":"bye"}]}"#,
         )
         .unwrap();
         match ended {
             RealtimeEvent::CallEnded {
+                call_id,
                 reason,
                 post_call_actions,
                 transcript,
             } => {
+                assert_eq!(call_id, "c1");
                 assert_eq!(reason.as_deref(), Some("hangup"));
                 assert_eq!(post_call_actions[0].action, "note");
                 assert_eq!(transcript[0].text, "bye");

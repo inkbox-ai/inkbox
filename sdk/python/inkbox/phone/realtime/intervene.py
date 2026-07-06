@@ -34,21 +34,6 @@ def inject_context(text: str) -> dict[str, Any]:
     return {"event": "inject", "mode": "context", "text": text}
 
 
-def approve_tool(tool_call_id: str) -> dict[str, Any]:
-    """Approve a tool call awaiting a decision."""
-    return {"event": "tool.decision", "tool_call_id": tool_call_id, "decision": "approve"}
-
-
-def deny_tool(tool_call_id: str, reason: str | None = None) -> dict[str, Any]:
-    """Deny a tool call awaiting a decision."""
-    command: dict[str, Any] = {
-        "event": "tool.decision", "tool_call_id": tool_call_id, "decision": "deny",
-    }
-    if reason is not None:
-        command["reason"] = reason
-    return command
-
-
 def update_instructions(instructions: str) -> dict[str, Any]:
     """Replace the live session instructions."""
     return {"event": "update_instructions", "instructions": instructions}

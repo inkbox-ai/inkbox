@@ -5,8 +5,9 @@
  * identity runs on platform-hosted voice. Field names match the wire JSON
  * (snake_case in, camelCase out); `event` is the discriminator. Every variant
  * keeps the full decoded `raw` payload so unknown fields stay reachable across
- * server versions. These frames ride the one existing per-call WebSocket, so
- * they carry no `callId` — the socket *is* the call.
+ * server versions. These frames ride the one existing per-call WebSocket and
+ * each carries the `callId` it belongs to; only the outbound intervene frames
+ * omit it (that socket is already scoped to one call — see `./intervene`).
  */
 
 export interface TranscriptTurn {
@@ -38,6 +39,7 @@ export interface CallAnsweredEvent extends Base {
 
 export interface TranscriptEvent extends Base {
   event: "transcript";
+  callId: string;
   party: "local" | "remote";
   text: string;
   isFinal: boolean;
@@ -46,22 +48,13 @@ export interface TranscriptEvent extends Base {
 
 export interface BargeInEvent extends Base {
   event: "barge_in";
-  trigger: string;
-  text: string;
-  ttsInterrupted: boolean;
+  callId: string;
   turnId: string | null;
-}
-
-export interface ModelToolCallEvent extends Base {
-  event: "model.tool_call";
-  toolCallId: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  requiresApproval: boolean;
 }
 
 export interface ConsultRequestedEvent extends Base {
   event: "consult.requested";
+  callId: string;
   consultId: string;
   query: string;
   transcriptTail: TranscriptTurn[];
@@ -69,6 +62,7 @@ export interface ConsultRequestedEvent extends Base {
 
 export interface CallEndedEvent extends Base {
   event: "call.ended";
+  callId: string;
   reason: string | null;
   postCallActions: PostCallAction[];
   transcript: TranscriptTurn[];
@@ -83,7 +77,6 @@ export type RealtimeEvent =
   | CallAnsweredEvent
   | TranscriptEvent
   | BargeInEvent
-  | ModelToolCallEvent
   | ConsultRequestedEvent
   | CallEndedEvent
   | UnknownEvent;
@@ -117,31 +110,23 @@ export function parseEvent(d: Record<string, unknown>): RealtimeEvent {
       return { event: "call.answered", raw, callId: s(d.call_id) };
     case "transcript":
       return {
-        event: "transcript", raw,
+        event: "transcript", raw, callId: s(d.call_id),
         party: d.party === "local" ? "local" : "remote", text: s(d.text),
         isFinal: Boolean(d.is_final), turnId: optS(d.turn_id),
       };
     case "barge_in":
       return {
-        event: "barge_in", raw, trigger: s(d.trigger), text: s(d.text),
-        ttsInterrupted: Boolean(d.tts_interrupted), turnId: optS(d.turn_id),
-      };
-    case "model.tool_call":
-      return {
-        event: "model.tool_call", raw,
-        toolCallId: s(d.tool_call_id), toolName: s(d.tool_name),
-        arguments: (d.arguments as Record<string, unknown>) ?? {},
-        requiresApproval: Boolean(d.requires_approval),
+        event: "barge_in", raw, callId: s(d.call_id), turnId: optS(d.turn_id),
       };
     case "consult.requested":
       return {
-        event: "consult.requested", raw,
+        event: "consult.requested", raw, callId: s(d.call_id),
         consultId: s(d.consult_id), query: s(d.query),
         transcriptTail: turns(d.transcript_tail),
       };
     case "call.ended":
       return {
-        event: "call.ended", raw, reason: optS(d.reason),
+        event: "call.ended", raw, callId: s(d.call_id), reason: optS(d.reason),
         postCallActions: Array.isArray(d.post_call_actions)
           ? (d.post_call_actions as any[]).map((a) => ({
               action: s(a?.action), details: a?.details ?? null,

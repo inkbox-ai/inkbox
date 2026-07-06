@@ -30,24 +30,6 @@ pub fn inject_context(text: &str) -> Value {
     json!({ "event": "inject", "mode": "context", "text": text })
 }
 
-/// Approve a tool call awaiting a decision.
-pub fn approve_tool(tool_call_id: &str) -> Value {
-    json!({ "event": "tool.decision", "tool_call_id": tool_call_id, "decision": "approve" })
-}
-
-/// Deny a tool call awaiting a decision.
-pub fn deny_tool(tool_call_id: &str, reason: Option<&str>) -> Value {
-    let mut command = json!({
-        "event": "tool.decision",
-        "tool_call_id": tool_call_id,
-        "decision": "deny",
-    });
-    if let Some(reason) = reason {
-        command["reason"] = json!(reason);
-    }
-    command
-}
-
 /// Replace the live session instructions.
 pub fn update_instructions(instructions: &str) -> Value {
     json!({ "event": "update_instructions", "instructions": instructions })
@@ -80,7 +62,7 @@ mod tests {
     }
 
     #[test]
-    fn inject_and_tool_decision_shapes() {
+    fn inject_shapes() {
         assert_eq!(
             say("hi"),
             json!({ "event": "inject", "mode": "say", "text": "hi" })
@@ -88,15 +70,6 @@ mod tests {
         assert_eq!(
             inject_context("vip"),
             json!({ "event": "inject", "mode": "context", "text": "vip" })
-        );
-        assert_eq!(
-            approve_tool("tc1"),
-            json!({ "event": "tool.decision", "tool_call_id": "tc1", "decision": "approve" })
-        );
-        assert_eq!(
-            deny_tool("tc2", Some("nope")),
-            json!({ "event": "tool.decision", "tool_call_id": "tc2",
-                    "decision": "deny", "reason": "nope" })
         );
     }
 

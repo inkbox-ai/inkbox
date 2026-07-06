@@ -13,7 +13,6 @@ from inkbox.phone.realtime.events import (
     CallEnded,
     CallStarted,
     ConsultRequested,
-    ModelToolCall,
     PostCallAction,
     RealtimeEvent,
     Transcript,
@@ -22,9 +21,7 @@ from inkbox.phone.realtime.events import (
     parse_event,
 )
 from inkbox.phone.realtime.intervene import (
-    approve_tool,
     consult_answer,
-    deny_tool,
     hang_up,
     inject_context,
     say,
@@ -38,7 +35,6 @@ __all__ = [
     "CallAnswered",
     "Transcript",
     "BargeIn",
-    "ModelToolCall",
     "ConsultRequested",
     "CallEnded",
     "UnknownEvent",
@@ -49,8 +45,6 @@ __all__ = [
     "consult_answer",
     "say",
     "inject_context",
-    "approve_tool",
-    "deny_tool",
     "update_instructions",
     "hang_up",
 ]

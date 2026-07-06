@@ -32,22 +32,6 @@ export function injectContext(text: string): Record<string, unknown> {
   return { event: "inject", mode: "context", text };
 }
 
-/** Approve a tool call awaiting a decision. */
-export function approveTool(toolCallId: string): Record<string, unknown> {
-  return { event: "tool.decision", tool_call_id: toolCallId, decision: "approve" };
-}
-
-/** Deny a tool call awaiting a decision. */
-export function denyTool(toolCallId: string, reason?: string): Record<string, unknown> {
-  const command: Record<string, unknown> = {
-    event: "tool.decision",
-    tool_call_id: toolCallId,
-    decision: "deny",
-  };
-  if (reason !== undefined) command["reason"] = reason;
-  return command;
-}
-
 /** Replace the live session instructions. */
 export function updateInstructions(instructions: string): Record<string, unknown> {
   return { event: "update_instructions", instructions };

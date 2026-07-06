@@ -11,6 +11,7 @@ import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import type {
+  CallEndedWebhookPayload,
   MailWebhookPayload,
   IMessageWebhookPayload,
   PhoneIncomingCallWebhookPayload,
@@ -39,6 +40,7 @@ const EXPECTED_FIXTURES = [
   "text_delivery_unconfirmed.json",
   "text_group_delivered.json",
   "phone_incoming_call.json",
+  "call_ended.json",
 ] as const;
 
 function loadFixture<T>(name: string): T {
@@ -441,5 +443,48 @@ describe("PhoneIncomingCallWebhookPayload", () => {
     expect(entry.id).toBeTypeOf("string");
     expect(entry.agent_handle).toBeTypeOf("string");
     expect(entry.display_name === null || typeof entry.display_name === "string").toBe(true);
+  });
+});
+
+describe("CallEndedWebhookPayload", () => {
+  it("parses the enveloped call.ended payload", () => {
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
+    expect(payload.event_type).toBe("call.ended");
+    expect(payload.id.startsWith("evt_")).toBe(true);
+    expect(payload.timestamp).toBeTypeOf("string");
+    // Enveloped, unlike the flat incoming-call callback.
+    expect(Object.prototype.hasOwnProperty.call(payload, "data")).toBe(true);
+  });
+
+  it("carries the call block without is_blocked", () => {
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
+    const call = payload.data.call;
+    expect(Object.prototype.hasOwnProperty.call(call, "is_blocked")).toBe(false);
+    expect(call.origin).toBe("dedicated_number");
+    expect(call.use_inkbox_agent).toBe(true);
+    expect(call.duration_seconds).toBe(123);
+    expect(call.status).toBe("completed");
+  });
+
+  it("always exposes transcript_url; inline transcript present for hosted calls", () => {
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
+    const data = payload.data;
+    expect(data.transcript_url.endsWith("/transcripts")).toBe(true);
+    // Inline block present because use_inkbox_agent is true.
+    expect(data.transcript).not.toBeNull();
+    if (data.transcript !== null) {
+      expect(data.transcript.abridged).toBe(true);
+      expect(data.transcript.url).toBe(data.transcript_url);
+      // Discriminate turn vs abridgment marker on "marker" in entry.
+      const marker = data.transcript.entries.find((e) => "marker" in e);
+      expect(marker?.marker).toBe("abridged");
+      expect(marker?.omitted_turns).toBe(12);
+    }
+  });
+
+  it("exposes contacts and agent_identities as lists", () => {
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
+    expect(Array.isArray(payload.data.contacts)).toBe(true);
+    expect(Array.isArray(payload.data.agent_identities)).toBe(true);
   });
 });

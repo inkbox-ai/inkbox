@@ -491,6 +491,8 @@ inkbox webhook subscription create --phone-number-id <id> --url <url> \
   --event-type text.received --event-type text.delivered
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type imessage.received --event-type imessage.reaction_received
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
+  --event-type call.ended
 # Opt into per-class conversation context on received events (count:N | window:H):
 inkbox webhook subscription create --mailbox-id <id> --url <url> \
   --event-type message.received --context-email count:10 --context-texts window:24
@@ -521,9 +523,17 @@ any of:
   `imessage.delivery_failed`. Subscribe via `inkbox webhook
   subscription create --agent-identity-id ...` — owned by the agent
   identity, since shared iMessage pool numbers are not org resources.
+- **Call lifecycle** (envelope, fire-and-forget + replayable):
+  `call.ended`. Subscribe via `inkbox webhook subscription create
+  --agent-identity-id ...` — owned by the agent identity, like iMessage.
+  The payload carries the call, resolved contacts/identities, an
+  always-present `data.transcript_url` (authoritative verbatim), and an
+  inline abridged `data.transcript` only for platform-hosted realtime
+  calls. One subscription carries a single channel, so an identity sub
+  cannot mix `imessage.*` with `call.ended`.
 - **Inbound call** (flat, no envelope; response controls call routing).
   Not subscribable; URL stays on the phone-number resource as
-  `incomingCallWebhookUrl`.
+  `incomingCallWebhookUrl` (contrast the replayable `call.ended` above).
 
 Mail and text payloads carry `data.contacts` and
 `data.agent_identities` (both always-present lists; mail entries also

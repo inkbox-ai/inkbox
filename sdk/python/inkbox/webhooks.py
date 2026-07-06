@@ -44,6 +44,8 @@ SmsDeliveryStatusWire = Literal[
 
 TextMessageOriginWire = Literal["user_initiated", "auto_reply"]
 
+CallOriginWire = Literal["dedicated_number", "shared_imessage_number"]
+
 CallDirectionWire = Literal["outbound", "inbound"]
 
 CallStatusWire = Literal[
@@ -592,3 +594,78 @@ class PhoneIncomingCallWebhookPayload(TypedDict):
     rate_limit: RateLimitInfoWire | None
     contacts: list[WebhookContact]
     agent_identities: list[WebhookAgentIdentity]
+
+
+# ---- Call lifecycle (post-call fan-out) __________________________________
+
+CallLifecycleWebhookEventType = Literal["call.ended"]
+"""Post-call lifecycle event types, delivered to an agent-identity-owned
+``call.ended`` subscription. Fire-and-forget and replayable (unlike the
+synchronous ``phone.incoming_call`` control-plane callback)."""
+
+
+class WebhookPhoneCall(TypedDict):
+    """
+    Stored phone call embedded in a call-lifecycle webhook payload.
+
+    Mirrors ``PhoneCallResponse`` minus ``is_blocked`` (blocked calls never
+    reach the webhook). ``local_phone_number`` is ``None`` and ``origin`` is
+    ``"shared_imessage_number"`` on shared-line hosted calls.
+    ``use_inkbox_agent`` is ``True`` when the platform hosted the realtime
+    voice agent for the call. ``duration_seconds`` is the connected length in
+    whole seconds, or ``None`` when the call never connected.
+    """
+    id: str
+    origin: CallOriginWire
+    local_phone_number: str | None
+    remote_phone_number: str
+    direction: CallDirectionWire
+    status: CallStatusWire
+    hangup_reason: HangupReasonWire | None
+    started_at: str | None
+    ended_at: str | None
+    created_at: str
+    updated_at: str
+    use_inkbox_agent: bool
+    duration_seconds: int | None
+
+
+class WebhookCallTranscript(TypedDict):
+    """
+    Inline transcript block on a ``call.ended`` payload.
+
+    Present only for platform-hosted realtime calls. ``entries`` reuses the
+    shared middle-cut ``WebhookTranscriptEntryWire`` shape -- discriminate a
+    turn from the abridgment marker on ``"marker" in entry``. ``abridged`` is
+    ``True`` when the middle was cut. ``url`` points at the authoritative
+    verbatim transcript (the same value as ``transcript_url`` on the data
+    wrapper).
+    """
+    entries: list[WebhookTranscriptEntryWire]
+    abridged: bool
+    url: str
+
+
+class CallEndedWebhookData(TypedDict):
+    """
+    Wrapper under ``CallEndedWebhookPayload.data``.
+
+    ``contacts`` / ``agent_identities`` resolve the caller and are always
+    present, possibly empty. ``transcript`` is a present-with-``null`` field:
+    the inline (possibly abridged) block is populated only when the call used
+    platform-hosted realtime voice (``call.use_inkbox_agent``), otherwise
+    ``None``. ``transcript_url`` is **always** present and is the
+    authoritative verbatim record (fetch with an admin API key).
+    """
+    call: WebhookPhoneCall
+    contacts: list[WebhookContact]
+    agent_identities: list[WebhookAgentIdentity]
+    transcript: WebhookCallTranscript | None
+    transcript_url: str
+
+
+class CallEndedWebhookPayload(TypedDict):
+    id: str  # stable per-event id (evt_...); idempotency key, stable across replays
+    event_type: CallLifecycleWebhookEventType
+    timestamp: str
+    data: CallEndedWebhookData

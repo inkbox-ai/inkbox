@@ -2,8 +2,9 @@
 sdk/python/tests/test_realtime.py
 
 Observe/intervene frames for platform-hosted calls: typed decoding of the
-inbound frames and construction of the outbound intervene frames. Both ride
-the one existing per-call WebSocket, so no ``call_id`` appears on them.
+inbound frames and construction of the outbound intervene frames. Observe
+frames carry the ``call_id`` they belong to; the outbound intervene frames
+omit it, since that socket is already scoped to one call.
 """
 
 from inkbox.phone.realtime import (
@@ -11,12 +12,9 @@ from inkbox.phone.realtime import (
     CallEnded,
     CallStarted,
     ConsultRequested,
-    ModelToolCall,
     Transcript,
     UnknownEvent,
-    approve_tool,
     consult_answer,
-    deny_tool,
     hang_up,
     inject_context,
     parse_event,
@@ -40,46 +38,42 @@ class TestParseObserveEvents:
         assert started.direction == "inbound"
         assert started.phone_number is None  # absent on some inbound legs
 
-    def test_transcript_and_barge_in_have_no_call_id(self):
+    def test_transcript_and_barge_in_carry_call_id(self):
         transcript = parse_event({
-            "event": "transcript", "party": "remote", "text": "hello",
-            "is_final": True, "turn_id": "t1",
+            "event": "transcript", "call_id": CALL_ID, "party": "remote",
+            "text": "hello", "is_final": True, "turn_id": "t1",
         })
         assert isinstance(transcript, Transcript)
+        assert transcript.call_id == CALL_ID
         assert transcript.party == "remote" and transcript.is_final is True
         assert transcript.turn_id == "t1"
 
+        # barge_in carries only call_id + optional turn_id on the hosted-call wire.
         barge = parse_event({
-            "event": "barge_in", "trigger": "speech", "text": "wait",
-            "tts_interrupted": True,
+            "event": "barge_in", "call_id": CALL_ID, "turn_id": None,
         })
         assert isinstance(barge, BargeIn)
-        assert barge.trigger == "speech" and barge.tts_interrupted is True
+        assert barge.call_id == CALL_ID
         assert barge.turn_id is None  # optional
 
-    def test_tool_call_consult_and_ended(self):
-        tool = parse_event({
-            "event": "model.tool_call", "tool_call_id": "tc1",
-            "tool_name": "lookup_contact", "arguments": {"name": "Ada"},
-            "requires_approval": True,
-        })
-        assert isinstance(tool, ModelToolCall)
-        assert tool.requires_approval is True and tool.arguments == {"name": "Ada"}
-
+    def test_consult_and_ended(self):
         consult = parse_event({
-            "event": "consult.requested", "consult_id": "c1", "query": "refund?",
+            "event": "consult.requested", "call_id": CALL_ID, "consult_id": "c1",
+            "query": "refund?",
             "transcript_tail": [{"speaker": "remote", "text": "hi"}],
         })
         assert isinstance(consult, ConsultRequested)
+        assert consult.call_id == CALL_ID
         assert consult.consult_id == "c1"
         assert consult.transcript_tail[0].text == "hi"
 
         ended = parse_event({
-            "event": "call.ended", "reason": "hangup",
+            "event": "call.ended", "call_id": CALL_ID, "reason": "hangup",
             "post_call_actions": [{"action": "note", "details": {"x": 1}}],
             "transcript": [{"speaker": "local", "text": "bye"}],
         })
         assert isinstance(ended, CallEnded)
+        assert ended.call_id == CALL_ID
         assert ended.reason == "hangup"
         assert ended.post_call_actions[0].action == "note"
         assert ended.transcript[0].text == "bye"
@@ -104,15 +98,6 @@ class TestInterveneBuilders:
         assert say("One moment") == {"event": "inject", "mode": "say", "text": "One moment"}
         assert inject_context("VIP customer") == {
             "event": "inject", "mode": "context", "text": "VIP customer",
-        }
-
-    def test_tool_decisions(self):
-        assert approve_tool("tc1") == {
-            "event": "tool.decision", "tool_call_id": "tc1", "decision": "approve",
-        }
-        assert deny_tool("tc2", reason="not allowed") == {
-            "event": "tool.decision", "tool_call_id": "tc2",
-            "decision": "deny", "reason": "not allowed",
         }
 
     def test_update_instructions_and_hang_up(self):

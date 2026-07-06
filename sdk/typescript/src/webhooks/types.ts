@@ -41,6 +41,8 @@ export type SmsDeliveryStatusWire =
 
 export type TextMessageOriginWire = "user_initiated" | "auto_reply";
 
+export type CallOriginWire = "dedicated_number" | "shared_imessage_number";
+
 export type CallDirectionWire = "outbound" | "inbound";
 
 export type CallStatusWire =
@@ -566,4 +568,83 @@ export interface PhoneIncomingCallWebhookPayload {
   contacts: WebhookContact[];
   /** Identity matches for the remote party. Always present, possibly empty. */
   agent_identities: WebhookAgentIdentity[];
+}
+
+// ---- Call lifecycle (post-call fan-out) ------------------------------
+
+/**
+ * Post-call lifecycle event types, delivered to an agent-identity-owned
+ * `call.ended` subscription. Fire-and-forget and replayable (unlike the
+ * synchronous `phone.incoming_call` control-plane callback).
+ */
+export type CallLifecycleWebhookEventType = "call.ended";
+
+/**
+ * Stored phone call embedded in a call-lifecycle webhook payload.
+ *
+ * Mirrors `PhoneCallResponse` minus `is_blocked` (blocked calls never reach
+ * the webhook). `local_phone_number` is `null` and `origin` is
+ * `"shared_imessage_number"` on shared-line hosted calls. `use_inkbox_agent`
+ * is `true` when the platform hosted the realtime voice agent for the call.
+ * `duration_seconds` is the connected length in whole seconds, or `null` when
+ * the call never connected.
+ */
+export interface WebhookPhoneCall {
+  id: string;
+  origin: CallOriginWire;
+  local_phone_number: string | null;
+  remote_phone_number: string;
+  direction: CallDirectionWire;
+  status: CallStatusWire;
+  hangup_reason: HangupReasonWire | null;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+  use_inkbox_agent: boolean;
+  duration_seconds: number | null;
+}
+
+/**
+ * Inline transcript block on a `call.ended` payload. Present only for
+ * platform-hosted realtime calls. `entries` reuses the shared middle-cut
+ * `WebhookTranscriptEntry` shape — discriminate a turn from the abridgment
+ * marker on `"marker" in entry`. `abridged` is `true` when the middle was cut.
+ * `url` points at the authoritative verbatim transcript (same value as
+ * `transcript_url` on the data wrapper).
+ */
+export interface WebhookCallTranscript {
+  entries: WebhookTranscriptEntry[];
+  abridged: boolean;
+  url: string;
+}
+
+/**
+ * Top-level `call.ended` webhook payload (`{ event_type, timestamp, data }`
+ * envelope).
+ */
+export interface CallEndedWebhookPayload {
+  /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
+  id: string;
+  event_type: CallLifecycleWebhookEventType;
+  /** ISO 8601 datetime. */
+  timestamp: string;
+  data: {
+    call: WebhookPhoneCall;
+    /** Address-book matches for the caller. Always present, possibly empty. */
+    contacts: WebhookContact[];
+    /** Identity matches for the caller. Always present, possibly empty. */
+    agent_identities: WebhookAgentIdentity[];
+    /**
+     * Inline (possibly abridged) transcript. Present-with-`null`: populated
+     * only when the call used platform-hosted realtime voice
+     * (`call.use_inkbox_agent`), otherwise `null`.
+     */
+    transcript: WebhookCallTranscript | null;
+    /**
+     * Always present; the authoritative verbatim transcript resource (fetch
+     * with an admin API key).
+     */
+    transcript_url: string;
+  };
 }

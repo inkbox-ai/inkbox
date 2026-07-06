@@ -4,8 +4,9 @@ inkbox/phone/realtime/events.py
 Typed observe events the platform emits on the call WebSocket when an
 identity runs on platform-hosted voice. Field names match the wire JSON
 (snake_case); the ``event`` field is the discriminator. These frames ride
-the one existing per-call WebSocket, so they carry no ``call_id`` — the
-socket *is* the call.
+the one existing per-call WebSocket and each carries the ``call_id`` it
+belongs to; only the outbound intervene frames omit it (that socket is
+already scoped to one call — see :mod:`inkbox.phone.realtime.intervene`).
 """
 
 from __future__ import annotations
@@ -65,6 +66,7 @@ class CallAnswered(RealtimeEvent):
 
 @dataclass
 class Transcript(RealtimeEvent):
+    call_id: str
     party: str  # "local" (agent) | "remote" (caller)
     text: str
     is_final: bool
@@ -73,22 +75,13 @@ class Transcript(RealtimeEvent):
 
 @dataclass
 class BargeIn(RealtimeEvent):
-    trigger: str
-    text: str
-    tts_interrupted: bool
+    call_id: str
     turn_id: str | None
 
 
 @dataclass
-class ModelToolCall(RealtimeEvent):
-    tool_call_id: str
-    tool_name: str
-    arguments: dict[str, Any]
-    requires_approval: bool
-
-
-@dataclass
 class ConsultRequested(RealtimeEvent):
+    call_id: str
     consult_id: str
     query: str
     transcript_tail: list[TranscriptTurn]
@@ -96,6 +89,7 @@ class ConsultRequested(RealtimeEvent):
 
 @dataclass
 class CallEnded(RealtimeEvent):
+    call_id: str
     reason: str | None
     post_call_actions: list[PostCallAction]
     transcript: list[TranscriptTurn]
@@ -119,31 +113,24 @@ def parse_event(d: dict[str, Any]) -> RealtimeEvent:
         return CallAnswered(event=kind, raw=d, call_id=d["call_id"])
     if kind == "transcript":
         return Transcript(
-            event=kind, raw=d, party=d["party"], text=d["text"],
+            event=kind, raw=d, call_id=d["call_id"], party=d["party"], text=d["text"],
             is_final=bool(d["is_final"]), turn_id=d.get("turn_id"),
         )
     if kind == "barge_in":
         return BargeIn(
-            event=kind, raw=d, trigger=d.get("trigger", ""), text=d.get("text", ""),
-            tts_interrupted=bool(d.get("tts_interrupted", False)),
-            turn_id=d.get("turn_id"),
-        )
-    if kind == "model.tool_call":
-        return ModelToolCall(
-            event=kind, raw=d, tool_call_id=d["tool_call_id"],
-            tool_name=d["tool_name"], arguments=d.get("arguments") or {},
-            requires_approval=bool(d["requires_approval"]),
+            event=kind, raw=d, call_id=d["call_id"], turn_id=d.get("turn_id"),
         )
     if kind == "consult.requested":
         return ConsultRequested(
-            event=kind, raw=d, consult_id=d["consult_id"], query=d["query"],
+            event=kind, raw=d, call_id=d["call_id"],
+            consult_id=d["consult_id"], query=d["query"],
             transcript_tail=[
                 TranscriptTurn._from_dict(t) for t in d.get("transcript_tail", [])
             ],
         )
     if kind == "call.ended":
         return CallEnded(
-            event=kind, raw=d, reason=d.get("reason"),
+            event=kind, raw=d, call_id=d["call_id"], reason=d.get("reason"),
             post_call_actions=[
                 PostCallAction._from_dict(a) for a in d.get("post_call_actions", [])
             ],
