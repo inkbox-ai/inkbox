@@ -5,6 +5,7 @@ use std::sync::Arc;
 use serde_json::Map;
 
 use crate::error::Result;
+use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript};
 
@@ -31,21 +32,42 @@ impl CallsResource {
     /// * `offset` - Pagination offset.
     /// * `is_blocked` - Tri-state filter: `Some(true)` for only blocked,
     ///   `Some(false)` for only non-blocked, `None` for all.
-    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
-    ///   side open. UTC unless `tz` is set.
-    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
-    ///   dates; `None` leaves the side open.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
-    #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
         agent_identity_id: Option<&str>,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<PhoneCall>> {
+        // Delegate to the filtered variant with an empty (default) date range,
+        // which sends no extra params — wire-identical to the original list.
+        self.list_filtered(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List calls, newest first, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`CallsResource::list`] but also forwards the filter's
+    /// `start_date` / `end_date` / `tz`. A default filter sends nothing extra,
+    /// so this behaves exactly like `list`.
+    ///
+    /// # Arguments
+    /// * `agent_identity_id` / `limit` / `offset` / `is_blocked` - See
+    ///   [`CallsResource::list`].
+    /// * `filter` - Optional `created_at` date-range bounds.
+    pub fn list_filtered(
+        &self,
+        agent_identity_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<PhoneCall>> {
         // Always send limit + offset; scope by identity + filter only when set.
         let mut params: Vec<(&str, String)> =
@@ -56,15 +78,7 @@ impl CallsResource {
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
         }
-        if let Some(v) = start_date {
-            params.push(("start_date", v.to_string()));
-        }
-        if let Some(v) = end_date {
-            params.push(("end_date", v.to_string()));
-        }
-        if let Some(v) = tz {
-            params.push(("tz", v.to_string()));
-        }
+        filter.apply(&mut params);
         let data = self.http.get("/calls", &params)?;
         Ok(serde_json::from_value(data)?)
     }
@@ -211,9 +225,6 @@ mod tests {
                 25,
                 5,
                 Some(true),
-                None,
-                None,
-                None,
             )
             .unwrap();
         mock.assert();
@@ -222,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn list_sends_date_range_params_when_set() {
+    fn list_filtered_sends_date_range_params_when_set() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(GET)
@@ -232,17 +243,14 @@ mod tests {
                 .query_param("tz", "America/New_York");
             then.status(200).json_body(json!([]));
         });
+        let filter = crate::DateRangeFilter {
+            start_date: Some("2026-07-01".to_string()),
+            end_date: Some("2026-07-06".to_string()),
+            tz: Some("America/New_York".to_string()),
+        };
         client(&server)
             .calls()
-            .list(
-                None,
-                50,
-                0,
-                None,
-                Some("2026-07-01"),
-                Some("2026-07-06"),
-                Some("America/New_York"),
-            )
+            .list_filtered(None, 50, 0, None, &filter)
             .unwrap();
         mock.assert();
     }
@@ -263,10 +271,7 @@ mod tests {
                 .matches(only_limit_and_offset);
             then.status(200).json_body(json!([]));
         });
-        let calls = client(&server)
-            .calls()
-            .list(None, 50, 0, None, None, None, None)
-            .unwrap();
+        let calls = client(&server).calls().list(None, 50, 0, None).unwrap();
         mock.assert();
         assert!(calls.is_empty());
     }
@@ -283,7 +288,7 @@ mod tests {
         });
         client(&server)
             .calls()
-            .list(None, 50, 0, Some(false), None, None, None)
+            .list(None, 50, 0, Some(false))
             .unwrap();
         mock.assert();
     }

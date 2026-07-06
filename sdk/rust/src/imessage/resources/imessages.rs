@@ -12,6 +12,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::error::Result;
+use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::imessage::types::{
     IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
@@ -117,11 +118,6 @@ impl IMessagesResource {
     /// * `offset` - Pagination offset.
     /// * `is_read` - Filter by read state (`None` for all).
     /// * `is_blocked` - Tri-state filter (`None` for all).
-    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
-    ///   side open. UTC unless `tz` is set.
-    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
-    ///   dates; `None` leaves the side open.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
     #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
@@ -131,9 +127,40 @@ impl IMessagesResource {
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<IMessage>> {
+        // Delegate with an empty (default) date range — wire-identical to the
+        // original list.
+        self.list_filtered(
+            agent_identity_id,
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List iMessages, newest first, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`IMessagesResource::list`] but also forwards the filter's
+    /// `start_date` / `end_date` / `tz`. A default filter sends nothing extra.
+    ///
+    /// # Arguments
+    /// * `agent_identity_id` / `conversation_id` / `limit` / `offset` /
+    ///   `is_read` / `is_blocked` - See [`IMessagesResource::list`].
+    /// * `filter` - Optional `created_at` date-range bounds.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_filtered(
+        &self,
+        agent_identity_id: Option<&Uuid>,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<IMessage>> {
         // limit/offset always sent; httpx renders bools lowercase.
         let mut params: Vec<(&str, String)> =
@@ -150,15 +177,7 @@ impl IMessagesResource {
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
         }
-        if let Some(v) = start_date {
-            params.push(("start_date", v.to_string()));
-        }
-        if let Some(v) = end_date {
-            params.push(("end_date", v.to_string()));
-        }
-        if let Some(v) = tz {
-            params.push(("tz", v.to_string()));
-        }
+        filter.apply(&mut params);
         let data = self.http.get("/messages", &params)?;
         Ok(serde_json::from_value(data)?)
     }
@@ -197,21 +216,42 @@ impl IMessagesResource {
     /// * `offset` - Pagination offset.
     /// * `is_blocked` - Tri-state filter applied to the underlying messages
     ///   (`None` for all).
-    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
-    ///   side open. UTC unless `tz` is set.
-    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
-    ///   dates; `None` leaves the side open.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
-    #[allow(clippy::too_many_arguments)]
     pub fn list_conversations(
         &self,
         agent_identity_id: Option<&Uuid>,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<IMessageConversationSummary>> {
+        // Delegate with an empty (default) date range — wire-identical to the
+        // original list_conversations.
+        self.list_conversations_filtered(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List iMessage conversations, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`IMessagesResource::list_conversations`] but also forwards
+    /// the filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// nothing extra.
+    ///
+    /// # Arguments
+    /// * `agent_identity_id` / `limit` / `offset` / `is_blocked` - See
+    ///   [`IMessagesResource::list_conversations`].
+    /// * `filter` - Optional `created_at` date-range bounds.
+    pub fn list_conversations_filtered(
+        &self,
+        agent_identity_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<IMessageConversationSummary>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -221,15 +261,7 @@ impl IMessagesResource {
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
         }
-        if let Some(v) = start_date {
-            params.push(("start_date", v.to_string()));
-        }
-        if let Some(v) = end_date {
-            params.push(("end_date", v.to_string()));
-        }
-        if let Some(v) = tz {
-            params.push(("tz", v.to_string()));
-        }
+        filter.apply(&mut params);
         let data = self.http.get("/conversations", &params)?;
         Ok(serde_json::from_value(data)?)
     }

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use serde_json::{json, Map, Value};
 
 use crate::error::Result;
+use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{TextConversationSummary, TextConversationUpdateResult, TextMessage};
 
@@ -91,12 +92,6 @@ impl TextsResource {
     /// * `is_read` - Filter by read state (`Some`/`None` for all).
     /// * `is_blocked` - Tri-state filter — `Some(true)` only blocked,
     ///   `Some(false)` only non-blocked, `None` all.
-    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
-    ///   side open. UTC unless `tz` is set.
-    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
-    ///   dates; `None` leaves the side open.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
-    #[allow(clippy::too_many_arguments)]
     pub fn list(
         &self,
         phone_number_id: &str,
@@ -104,9 +99,38 @@ impl TextsResource {
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<TextMessage>> {
+        // Delegate with an empty (default) date range — wire-identical to the
+        // original list.
+        self.list_filtered(
+            phone_number_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List text messages, newest first, additionally narrowed by a
+    /// `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`TextsResource::list`] but also forwards the filter's
+    /// `start_date` / `end_date` / `tz`. A default filter sends nothing extra.
+    ///
+    /// # Arguments
+    /// * `phone_number_id` / `limit` / `offset` / `is_read` / `is_blocked` -
+    ///   See [`TextsResource::list`].
+    /// * `filter` - Optional `created_at` date-range bounds.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_filtered(
+        &self,
+        phone_number_id: &str,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<TextMessage>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -116,15 +140,7 @@ impl TextsResource {
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
         }
-        if let Some(v) = start_date {
-            params.push(("start_date", v.to_string()));
-        }
-        if let Some(v) = end_date {
-            params.push(("end_date", v.to_string()));
-        }
-        if let Some(v) = tz {
-            params.push(("tz", v.to_string()));
-        }
+        filter.apply(&mut params);
         let data = self
             .http
             .get(&format!("/numbers/{phone_number_id}/texts"), &params)?;
@@ -194,12 +210,6 @@ impl TextsResource {
     /// * `is_blocked` - Tri-state filter applied to the underlying messages.
     /// * `include_groups` - Include group conversations. The param is only sent
     ///   when `true`, matching the Python default-omit behaviour.
-    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
-    ///   side open. UTC unless `tz` is set.
-    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
-    ///   dates; `None` leaves the side open.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
-    #[allow(clippy::too_many_arguments)]
     pub fn list_conversations(
         &self,
         phone_number_id: &str,
@@ -207,9 +217,39 @@ impl TextsResource {
         offset: i64,
         is_blocked: Option<bool>,
         include_groups: bool,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<TextConversationSummary>> {
+        // Delegate with an empty (default) date range — wire-identical to the
+        // original list_conversations.
+        self.list_conversations_filtered(
+            phone_number_id,
+            limit,
+            offset,
+            is_blocked,
+            include_groups,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List conversation summaries, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`TextsResource::list_conversations`] but also forwards the
+    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// nothing extra.
+    ///
+    /// # Arguments
+    /// * `phone_number_id` / `limit` / `offset` / `is_blocked` /
+    ///   `include_groups` - See [`TextsResource::list_conversations`].
+    /// * `filter` - Optional `created_at` date-range bounds.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_conversations_filtered(
+        &self,
+        phone_number_id: &str,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<TextConversationSummary>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -219,15 +259,7 @@ impl TextsResource {
         if include_groups {
             params.push(("include_groups", true.to_string()));
         }
-        if let Some(v) = start_date {
-            params.push(("start_date", v.to_string()));
-        }
-        if let Some(v) = end_date {
-            params.push(("end_date", v.to_string()));
-        }
-        if let Some(v) = tz {
-            params.push(("tz", v.to_string()));
-        }
+        filter.apply(&mut params);
         let data = self.http.get(
             &format!("/numbers/{phone_number_id}/texts/conversations"),
             &params,

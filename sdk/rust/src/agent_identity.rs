@@ -38,6 +38,7 @@ use uuid::Uuid;
 use crate::client::Inkbox;
 use crate::credentials::Credentials;
 use crate::error::{InkboxError, Result};
+use crate::filters::DateRangeFilter;
 use crate::identities::types::{
     AgentIdentityData, IdentityAccess, IdentityMailbox, IdentityPhoneNumber,
 };
@@ -71,7 +72,7 @@ use crate::vault::types::{DecryptedVaultSecret, SecretPayload, VaultSecret};
 ///
 /// ```ignore
 /// identity.send_email(&["user@example.com".into()], "Hi", Some("Hello"), None, None, None, None, None, false)?;
-/// for msg in identity.iter_emails(None, None, None, None, None)? { println!("{:?}", msg.subject); }
+/// for msg in identity.iter_emails(None, None)? { println!("{:?}", msg.subject); }
 /// ```
 pub struct AgentIdentity {
     /// Latest identity payload (handle, display name, channels). Mutated on
@@ -377,23 +378,31 @@ impl AgentIdentity {
     /// # Arguments
     /// * `page_size` - Messages fetched per API call (1-100); `None` for 50.
     /// * `direction` - Filter by direction.
-    /// * `start_date` - Inclusive `created_at` lower bound; `None` leaves the
-    ///   side open. UTC unless `tz` is set.
-    /// * `end_date` - `created_at` upper bound, whole-day inclusive for bare
-    ///   dates; `None` leaves the side open.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
     pub fn iter_emails(
         &self,
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<Message>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.iter_emails_filtered(page_size, direction, &DateRangeFilter::default())
+    }
+
+    /// Fetch all emails in this identity's inbox, newest first, additionally
+    /// narrowed by a `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::iter_emails`] but also forwards the
+    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// nothing extra.
+    pub fn iter_emails_filtered(
+        &self,
+        page_size: Option<i64>,
+        direction: Option<MessageDirection>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<Message>> {
         let email = self.require_mailbox()?;
         self.inkbox
             .messages()
-            .list(&email, page_size, direction, start_date, end_date, tz)
+            .list_filtered(&email, page_size, direction, filter)
     }
 
     /// Fetch all unread emails in this identity's inbox, newest first.
@@ -404,11 +413,21 @@ impl AgentIdentity {
         &self,
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
     ) -> Result<Vec<Message>> {
-        let all = self.iter_emails(page_size, direction, start_date, end_date, tz)?;
+        // Empty (default) date range — wire-identical to the original.
+        self.iter_unread_emails_filtered(page_size, direction, &DateRangeFilter::default())
+    }
+
+    /// Fetch all unread emails, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`]. A default filter behaves exactly like
+    /// [`AgentIdentity::iter_unread_emails`].
+    pub fn iter_unread_emails_filtered(
+        &self,
+        page_size: Option<i64>,
+        direction: Option<MessageDirection>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<Message>> {
+        let all = self.iter_emails_filtered(page_size, direction, filter)?;
         Ok(all.into_iter().filter(|m| !m.is_read).collect())
     }
 
@@ -500,22 +519,33 @@ impl AgentIdentity {
     /// * `limit` - Maximum number of results (default 50).
     /// * `offset` - Pagination offset (default 0).
     /// * `is_blocked` - Tri-state filter (`None` for all).
-    /// * `start_date` / `end_date` - `created_at` range bounds; `None` leaves
-    ///   the side open. Bare `end_date` is whole-day inclusive.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
     pub fn list_calls(
         &self,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<PhoneCall>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_calls_filtered(limit, offset, is_blocked, &DateRangeFilter::default())
+    }
+
+    /// List calls made to/from this identity, additionally narrowed by a
+    /// `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_calls`] but also forwards the
+    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// nothing extra.
+    pub fn list_calls_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<PhoneCall>> {
         let id = self.id().to_string();
         self.inkbox
             .calls()
-            .list(Some(&id), limit, offset, is_blocked, start_date, end_date, tz)
+            .list_filtered(Some(&id), limit, offset, is_blocked, filter)
     }
 
     /// List transcript segments for a specific call.
@@ -579,24 +609,36 @@ impl AgentIdentity {
     /// * `limit` / `offset` - Pagination (defaults 50 / 0).
     /// * `is_read` - Filter by read state (`None` for all).
     /// * `is_blocked` - Tri-state filter (`None` for all).
-    /// * `start_date` / `end_date` - `created_at` range bounds; `None` leaves
-    ///   the side open. Bare `end_date` is whole-day inclusive.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
-    #[allow(clippy::too_many_arguments)]
     pub fn list_texts(
         &self,
         limit: i64,
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<TextMessage>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_texts_filtered(limit, offset, is_read, is_blocked, &DateRangeFilter::default())
+    }
+
+    /// List text messages for this identity's phone number, additionally
+    /// narrowed by a `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_texts`] but also forwards the
+    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// nothing extra.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_texts_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<TextMessage>> {
         let number_id = self.require_phone_id()?;
         self.inkbox
             .texts()
-            .list(&number_id, limit, offset, is_read, is_blocked, start_date, end_date, tz)
+            .list_filtered(&number_id, limit, offset, is_read, is_blocked, filter)
     }
 
     /// Get a single text message by ID.
@@ -614,30 +656,46 @@ impl AgentIdentity {
     /// * `limit` / `offset` - Pagination (defaults 50 / 0).
     /// * `is_blocked` - Tri-state filter (`None` for all).
     /// * `include_groups` - Include group conversations (default `false`).
-    /// * `start_date` / `end_date` - `created_at` range bounds; `None` leaves
-    ///   the side open. Bare `end_date` is whole-day inclusive.
-    /// * `tz` - IANA timezone name for zone-less values; `None` is UTC.
-    #[allow(clippy::too_many_arguments)]
     pub fn list_text_conversations(
         &self,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
         include_groups: bool,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<TextConversationSummary>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_text_conversations_filtered(
+            limit,
+            offset,
+            is_blocked,
+            include_groups,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List text conversations, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_text_conversations`] but also
+    /// forwards the filter's `start_date` / `end_date` / `tz`. A default filter
+    /// sends nothing extra.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_text_conversations_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<TextConversationSummary>> {
         let number_id = self.require_phone_id()?;
-        self.inkbox.texts().list_conversations(
+        self.inkbox.texts().list_conversations_filtered(
             &number_id,
             limit,
             offset,
             is_blocked,
             include_groups,
-            start_date,
-            end_date,
-            tz,
+            filter,
         )
     }
 
@@ -717,7 +775,6 @@ impl AgentIdentity {
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
     /// regardless of `is_blocked`.
-    #[allow(clippy::too_many_arguments)]
     pub fn list_imessages(
         &self,
         conversation_id: Option<&Uuid>,
@@ -725,22 +782,44 @@ impl AgentIdentity {
         offset: i64,
         is_read: Option<bool>,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<IMessage>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_imessages_filtered(
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List this identity's iMessages, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_imessages`] but also forwards the
+    /// filter's `start_date` / `end_date` / `tz`. A default filter sends
+    /// nothing extra.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_imessages_filtered(
+        &self,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<IMessage>> {
         self.require_imessage()?;
         let id = self.id();
-        self.inkbox.imessages().list(
+        self.inkbox.imessages().list_filtered(
             Some(&id),
             conversation_id,
             limit,
             offset,
             is_read,
             is_blocked,
-            start_date,
-            end_date,
-            tz,
+            filter,
         )
     }
 
@@ -758,21 +837,39 @@ impl AgentIdentity {
     }
 
     /// List this identity's iMessage conversations.
-    #[allow(clippy::too_many_arguments)]
     pub fn list_imessage_conversations(
         &self,
         limit: i64,
         offset: i64,
         is_blocked: Option<bool>,
-        start_date: Option<&str>,
-        end_date: Option<&str>,
-        tz: Option<&str>,
+    ) -> Result<Vec<IMessageConversationSummary>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_imessage_conversations_filtered(
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List this identity's iMessage conversations, additionally narrowed by a
+    /// `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_imessage_conversations`] but also
+    /// forwards the filter's `start_date` / `end_date` / `tz`. A default filter
+    /// sends nothing extra.
+    pub fn list_imessage_conversations_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
     ) -> Result<Vec<IMessageConversationSummary>> {
         self.require_imessage()?;
         let id = self.id();
         self.inkbox
             .imessages()
-            .list_conversations(Some(&id), limit, offset, is_blocked, start_date, end_date, tz)
+            .list_conversations_filtered(Some(&id), limit, offset, is_blocked, filter)
     }
 
     /// Get one of this identity's iMessage conversations by ID.
@@ -1440,9 +1537,7 @@ mod tests {
             )]));
         });
         let identity = identity_at(&server.base_url(), false);
-        let calls = identity
-            .list_calls(10, 2, Some(false), None, None, None)
-            .unwrap();
+        let calls = identity.list_calls(10, 2, Some(false)).unwrap();
         mock.assert();
         assert_eq!(calls.len(), 1);
     }
