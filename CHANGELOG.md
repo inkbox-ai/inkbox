@@ -4,6 +4,12 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.18 — Dedicated iMessage-line call origin
+
+### Added
+
+- **`dedicated_imessage_number` call origin.** `CallOrigin` gains a third value (TS `CallOrigin.DEDICATED_IMESSAGE_NUMBER`, Rust `CallOrigin::DedicatedImessageNumber`) for calls that ride a single-org iMessage line bound to one agent identity. Unlike `shared_imessage_number` (which hides the line), a `dedicated_imessage_number` call surfaces its `local_phone_number`. Inbound `Call` objects now deserialize this origin across the TypeScript, Python, and Rust SDKs.
+
 ## 0.4.17 — Inline images, CLI attachments, and mark-unread
 
 ### Added

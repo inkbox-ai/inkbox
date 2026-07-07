@@ -65,11 +65,14 @@ class CallOrigin(StrEnum):
 
     ``dedicated_number`` uses the identity's own provisioned phone number;
     ``shared_imessage_number`` rides the shared iMessage service line, in
-    which case the call has no dedicated ``local_phone_number``.
+    which case the call has no dedicated ``local_phone_number``;
+    ``dedicated_imessage_number`` rides a single-org iMessage line bound to one
+    agent, which does surface its ``local_phone_number``.
     """
 
     DEDICATED_NUMBER = "dedicated_number"
     SHARED_IMESSAGE_NUMBER = "shared_imessage_number"
+    DEDICATED_IMESSAGE_NUMBER = "dedicated_imessage_number"
 
 
 class IncomingCallAction(StrEnum):

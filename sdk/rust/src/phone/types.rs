@@ -139,14 +139,17 @@ pub enum CallOrigin {
     #[default]
     DedicatedNumber,
     SharedImessageNumber,
+    DedicatedImessageNumber,
 }
 
 impl CallOrigin {
-    /// The wire string value (`"dedicated_number"` / `"shared_imessage_number"`).
+    /// The wire string value (`"dedicated_number"` / `"shared_imessage_number"`
+    /// / `"dedicated_imessage_number"`).
     pub fn as_str(&self) -> &'static str {
         match self {
             CallOrigin::DedicatedNumber => "dedicated_number",
             CallOrigin::SharedImessageNumber => "shared_imessage_number",
+            CallOrigin::DedicatedImessageNumber => "dedicated_imessage_number",
         }
     }
 }

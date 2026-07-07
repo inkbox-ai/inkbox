@@ -65,6 +65,7 @@ export enum TextMessageOrigin {
 export enum CallOrigin {
   DEDICATED_NUMBER = "dedicated_number",
   SHARED_IMESSAGE_NUMBER = "shared_imessage_number",
+  DEDICATED_IMESSAGE_NUMBER = "dedicated_imessage_number",
 }
 
 /** What happens when a call comes in for an agent identity. */
