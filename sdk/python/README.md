@@ -1018,6 +1018,14 @@ should pair to the source field by `(bucket, address)`.
 `data["message"]["bcc_addresses"]` is populated only on outbound
 events.
 
+On inbound `message.received`, `data["message"]` carries the plain-text
+`body`: the whole message when it fits the size cap, otherwise a prefix
+with `body_truncated: true` and `body_state: "truncated"` (else
+`"complete"`). When truncated, fetch the full message by id:
+`inkbox.messages.get(message["email_address"], message["id"])`. These
+fields are present-with-`null` on non-received events, and absent on
+payloads predating the feature — read with `.get(...)`.
+
 Phone-text payloads carry several fields for group sends:
 
 - `text_message["recipients"]` -- `None` on inbound, a one-element

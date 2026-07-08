@@ -111,6 +111,12 @@ export interface WebhookContextMailItem {
   created_at: string;
   subject: string | null;
   snippet: string | null;
+  /**
+   * Owning mailbox address; with `id`, fetch the full body via
+   * `messages.get(email_address, id)`. Optional: payloads predating the
+   * feature omit it.
+   */
+  email_address?: string | null;
 }
 
 /**
@@ -253,6 +259,23 @@ export interface MailWebhookMessage {
   bcc_addresses: string[] | null;
   subject: string | null;
   snippet: string | null;
+  /**
+   * Owning mailbox address; with `id`, fetch the full body via
+   * `messages.get(email_address, id)`. Optional: payloads predating the
+   * body feature omit it.
+   */
+  email_address?: string | null;
+  /**
+   * Plain-text body on inbound `message.received` only; present-with-`null`
+   * on other events. Whole under the size cap, else a prefix — see
+   * `body_state`/`body_truncated`. Optional: absent on pre-feature payloads.
+   */
+  body?: string | null;
+  body_state?: "complete" | "truncated" | "unavailable" | null;
+  /** `true` when `body` is a prefix; fetch the rest by `id`. */
+  body_truncated?: boolean | null;
+  body_total_chars?: number | null;
+  body_included_chars?: number | null;
   direction: MessageDirectionWire;
   status: MessageStatus;
   has_attachments: boolean;

@@ -512,7 +512,10 @@ any of:
 - **Mail** (envelope): `message.received`, `message.sent`,
   `message.forwarded`, `message.delivered`, `message.bounced`,
   `message.failed`. Subscribe via `inkbox webhook subscription create
-  --mailbox-id ...`.
+  --mailbox-id ...`. On `message.received`, `data.message` carries the
+  plain-text `body` (whole under a size cap, else a prefix with
+  `body_truncated: true`); when truncated, fetch the full message by its
+  `id` (via the API/SDK) — not `message_id` (the RFC 5322 header).
 - **Text** (envelope): `text.received`, `text.sent`, `text.delivered`,
   `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
   `inkbox webhook subscription create --phone-number-id ...`.
