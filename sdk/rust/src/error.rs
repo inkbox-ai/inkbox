@@ -92,6 +92,16 @@ pub enum InkboxError {
     Decode(#[from] serde_json::Error),
 }
 
+impl InkboxError {
+    /// True iff this is the terminal "another client took over this tunnel"
+    /// error surfaced by a tunnel client's `serve_forever`. Terminal by
+    /// design: the client has stopped and will not reconnect. Lets callers
+    /// tell a takeover apart from a transient, reconnectable tunnel error.
+    pub fn is_tunnel_superseded(&self) -> bool {
+        matches!(self, InkboxError::Tunnel(m) if m.starts_with("tunnel-superseded:"))
+    }
+}
+
 /// The `detail` payload on an [`InkboxError::Api`]: either a human-readable
 /// string or a structured object, matching the Python `str | dict` union.
 #[derive(Debug, Clone)]

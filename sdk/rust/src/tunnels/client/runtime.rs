@@ -61,9 +61,17 @@ pub const WS_CLOSE_AGENT_TIMEOUT: u16 = 4504;
 pub const DEFAULT_INBOUND_BODY_BYTES: usize = 32 * 1024 * 1024;
 pub const DEFAULT_OUTBOUND_BODY_BYTES: usize = 32 * 1024 * 1024;
 
+/// Signals that another client connected to this tunnel and took over: this
+/// client must stop and not reconnect. Delivered as a dedicated GOAWAY error
+/// code (the reliable channel this runtime keys on) plus matching reason
+/// strings on the intake / hello responses. Must stay in lockstep with the server.
+pub const SUPERSEDED_GOAWAY_ERROR_CODE: u32 = 0x1201;
+const INTAKE_REASON_SUPERSEDED: &str = "intake-superseded";
+const HELLO_REASON_SUPERSEDED: &str = "hello-superseded";
+
 /// Status strings passed to the `on_status` callback. Mirrors the Python
 /// status vocabulary (`"connecting"`, `"connected"`, `"reconnecting"`,
-/// `"closed"`).
+/// `"closed"`, `"superseded"`).
 pub type StatusCallback = Box<dyn Fn(&str) + Send + Sync>;
 
 /// Where inbound third-party traffic is forwarded.
@@ -198,6 +206,13 @@ impl TunnelRuntime {
                     self.notify_status("closed");
                     return Err(err);
                 }
+                // Another client connected to this tunnel and took over: stop
+                // and do not reconnect. Surface it terminally (like auth) so an
+                // accidental second instance on the same identity is visible.
+                Err(err) if is_superseded_error(&err) => {
+                    self.notify_status("superseded");
+                    return Err(err);
+                }
                 Err(_) => self.notify_status("reconnecting"),
             }
             if self.is_stopped() {
@@ -237,12 +252,32 @@ impl TunnelRuntime {
         // Fresh per connection so a stale signal can't kill the next one.
         let force_down = Arc::new(Notify::new());
 
+        // Reason channel: `force_down` is payloadless, so a takeover observed
+        // by the connection driver (GOAWAY code) or an intake loop (409 reason)
+        // is recorded here for the supervisor to read after the select.
+        let superseded = Arc::new(AtomicBool::new(false));
+
         // Dial + h2 handshake. The driver runs as a background task; when it
         // ends (GOAWAY / reset / TCP close) `conn_closed` fires.
-        let (send, conn_closed) = self.open_connection(force_down.clone()).await?;
+        let (send, conn_closed) = self
+            .open_connection(force_down.clone(), superseded.clone())
+            .await?;
 
         // Hello handshake — establishes the owner_token used to park intakes.
-        let active = self.send_hello(send).await?;
+        // A displaced-during-hello loser returns the superseded tag here.
+        let active = match self.send_hello(send).await {
+            Ok(active) => active,
+            Err(e) => {
+                // A takeover GOAWAY can land mid-hello: the driver sets the
+                // flag while the hello itself fails as a plain transient error.
+                // Honor the flag so we stop instead of redialing and booting
+                // the client that replaced us.
+                if superseded.load(Ordering::SeqCst) {
+                    return Err(superseded_error("another client connected to this tunnel"));
+                }
+                return Err(e);
+            }
+        };
         let active = Arc::new(active);
         *self.active.lock().await = Some(active.clone());
         self.notify_status("connected");
@@ -259,9 +294,10 @@ impl TunnelRuntime {
             let me = self.clone();
             let conn = active.clone();
             let fd = force_down.clone();
-            handles.push(tokio::spawn(
-                async move { me.intake_loop(conn, slot, fd).await },
-            ));
+            let sup = superseded.clone();
+            handles.push(tokio::spawn(async move {
+                me.intake_loop(conn, slot, fd, sup).await
+            }));
         }
 
         // Supervise: return when the connection dies, a keepalive/owner-token
@@ -278,6 +314,10 @@ impl TunnelRuntime {
             h.abort();
         }
         *self.active.lock().await = None;
+        // Another client took over this tunnel: stop, do not reconnect.
+        if superseded.load(Ordering::SeqCst) {
+            return Err(superseded_error("another client connected to this tunnel"));
+        }
         if self.is_stopped() {
             Ok(())
         } else {
@@ -292,6 +332,7 @@ impl TunnelRuntime {
     async fn open_connection(
         self: &Arc<Self>,
         force_down: Arc<Notify>,
+        superseded: Arc<AtomicBool>,
     ) -> Result<(SendRequest<Bytes>, tokio::sync::oneshot::Receiver<()>)> {
         use tokio::net::TcpStream;
         use tokio_rustls::TlsConnector;
@@ -331,7 +372,14 @@ impl TunnelRuntime {
         let mut connection = connection;
         let ping_pong = connection.ping_pong();
         tokio::spawn(async move {
-            let _ = connection.await;
+            // Classify the close: a GOAWAY carrying the dedicated superseded
+            // code is a takeover (stop, don't reconnect). Rust reads only the
+            // code, so this is the reliable channel; any other close reconnects.
+            if let Err(e) = connection.await {
+                if is_superseded_goaway(&e) {
+                    superseded.store(true, Ordering::SeqCst);
+                }
+            }
             let _ = closed_tx.send(());
         });
         if let Some(mut pp) = ping_pong {
@@ -392,6 +440,21 @@ impl TunnelRuntime {
                  admin-scoped key in the tunnel's org)"
             )));
         }
+        // Displaced during hello: another client won the race for this tunnel.
+        // Terminal (stop, don't reconnect) so we don't redial and boot the
+        // client that replaced us. Rust reconnects cold-sequentially, so there
+        // is no draining predecessor to guard against.
+        if status == 409 {
+            let reason = serde_json::from_slice::<serde_json::Value>(&body)
+                .ok()
+                .and_then(|v| v.get("reason").and_then(|r| r.as_str()).map(str::to_string))
+                .unwrap_or_default();
+            if reason == HELLO_REASON_SUPERSEDED {
+                return Err(superseded_error(
+                    "another client connected to this tunnel during hello",
+                ));
+            }
+        }
         if status != 200 {
             return Err(transient(format!(
                 "/_system/hello returned {status}; transient — will retry"
@@ -430,6 +493,7 @@ impl TunnelRuntime {
         conn: Arc<ActiveConn>,
         slot: usize,
         force_down: Arc<Notify>,
+        superseded: Arc<AtomicBool>,
     ) {
         while !self.is_stopped() {
             match self.park_one_intake(&conn, slot).await {
@@ -441,6 +505,13 @@ impl TunnelRuntime {
                     });
                 }
                 Ok(None) => continue,
+                // Another client took over: record it (force_down is
+                // payloadless) so the supervisor stops instead of reconnecting.
+                Err(e) if is_superseded_error(&e) => {
+                    superseded.store(true, Ordering::SeqCst);
+                    force_down.notify_one();
+                    return;
+                }
                 // The owner token is no longer valid (e.g. a sibling connection
                 // re-registered): force the supervisor down so it reconnects and
                 // re-hellos for a fresh token, then exit this slot.
@@ -477,6 +548,16 @@ impl TunnelRuntime {
         let body = read_body(resp.into_body(), self.cfg.max_inbound_body_bytes).await?;
 
         if status != 200 {
+            let reason = headers
+                .iter()
+                .find(|(k, _)| k == META_REASON)
+                .map(|(_, v)| v.as_str())
+                .unwrap_or("");
+            // Another client took over this tunnel: terminal (a drain uses a
+            // different reason and falls through to re-park as Ok(None)).
+            if reason == INTAKE_REASON_SUPERSEDED {
+                return Err(superseded_error(format!("intake slot={slot}: taken over")));
+            }
             if status == 401 {
                 return Err(owner_token_invalid(format!(
                     "intake slot={slot} status=401"
@@ -745,6 +826,23 @@ fn is_owner_token_invalid(err: &InkboxError) -> bool {
     matches!(err, InkboxError::Tunnel(m) if m.starts_with("owner-token-invalid:"))
 }
 
+/// Tag for a takeover: another client connected to this tunnel. The
+/// supervisor stops (does not reconnect) on this, like the auth failure.
+fn superseded_error(msg: impl Into<String>) -> InkboxError {
+    InkboxError::Tunnel(format!("tunnel-superseded: {}", msg.into()))
+}
+
+fn is_superseded_error(err: &InkboxError) -> bool {
+    err.is_tunnel_superseded()
+}
+
+/// True iff a connection-driver `h2::Error` carries the dedicated superseded
+/// GOAWAY code. Rust reads only the code (no debug bytes), so this is the
+/// reliable takeover channel on the connection itself.
+fn is_superseded_goaway(err: &h2::Error) -> bool {
+    err.reason() == Some(h2::Reason::from(SUPERSEDED_GOAWAY_ERROR_CODE))
+}
+
 /// Cheap pseudo-random in `[0, 1)` for backoff jitter (Python uses
 /// `random.random()`); derived from the clock nanos.
 fn pseudo_rand() -> f64 {
@@ -788,6 +886,44 @@ mod tests {
         assert!(is_auth_error(&tunnel_auth_error("nope")));
         assert!(!is_auth_error(&transient("transient")));
         assert!(is_owner_token_invalid(&owner_token_invalid("x")));
+    }
+
+    #[test]
+    fn superseded_error_classification() {
+        // A takeover is its own terminal reason, distinct from auth / transient
+        // / owner-token so the supervisor stops without reconnecting.
+        assert!(is_superseded_error(&superseded_error("x")));
+        assert!(!is_superseded_error(&transient("x")));
+        assert!(!is_superseded_error(&tunnel_auth_error("x")));
+        assert!(!is_superseded_error(&owner_token_invalid("x")));
+        assert!(!is_auth_error(&superseded_error("x")));
+        assert!(!is_owner_token_invalid(&superseded_error("x")));
+    }
+
+    #[test]
+    fn is_tunnel_superseded_is_public_and_structural() {
+        // Callers can distinguish a terminal takeover from a transient error
+        // structurally (no string matching on their side).
+        assert!(superseded_error("x").is_tunnel_superseded());
+        assert!(!transient("x").is_tunnel_superseded());
+        assert!(!tunnel_auth_error("x").is_tunnel_superseded());
+    }
+
+    #[test]
+    fn superseded_goaway_reads_the_dedicated_code() {
+        // Rust reads only the GOAWAY code, so the dedicated code is the reliable
+        // takeover channel. h2::Error::from(Reason) mirrors a received GOAWAY:
+        // reason() surfaces the code (the GOAWAY-then-close survival property).
+        let takeover = h2::Error::from(h2::Reason::from(SUPERSEDED_GOAWAY_ERROR_CODE));
+        assert!(is_superseded_goaway(&takeover));
+
+        // Drain (NO_ERROR) and a generic backpressure code are NOT takeovers.
+        assert!(!is_superseded_goaway(&h2::Error::from(
+            h2::Reason::NO_ERROR
+        )));
+        assert!(!is_superseded_goaway(&h2::Error::from(
+            h2::Reason::ENHANCE_YOUR_CALM
+        )));
     }
 
     #[tokio::test]

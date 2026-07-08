@@ -52,3 +52,13 @@ class TunnelNotProvisioned(TunnelError):
     """Raised by :func:`connect` when no tunnel exists for the supplied
     name in the calling org. Tunnels are provisioned atomically as part
     of ``inkbox.create_identity(...)``."""
+
+
+class TunnelSupersededError(TunnelError):
+    """Another client connected to the same tunnel and took over.
+
+    Raised out of ``serve()`` / ``wait()`` when a newer client displaces this
+    one. Terminal by design: the client stops and does not reconnect. Run one
+    client per tunnel; use separate identities for redundancy. Catch this to
+    react to the takeover (alert, exit, fail over to another identity).
+    """

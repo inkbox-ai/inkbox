@@ -30,7 +30,7 @@ import ssl
 import struct
 import time
 from contextlib import suppress
-from typing import Any, Callable
+from typing import Any, Callable, NoReturn
 from uuid import UUID
 
 import h2.config
@@ -41,6 +41,7 @@ import h2.exceptions
 import h2.settings
 import httpx
 
+from inkbox.tunnels.exceptions import TunnelSupersededError
 from inkbox.tunnels.client._asgi import AsgiResponseTooLarge, invoke_asgi_http
 from inkbox.tunnels.client._bridge import (
     BRIDGE_CLEANUP_SEND_TIMEOUT_SEC,
@@ -120,9 +121,23 @@ WS_CLOSE_AGENT_TIMEOUT = 4504
 DEFAULT_INBOUND_BODY_BYTES = 32 * 1024 * 1024
 DEFAULT_OUTBOUND_BODY_BYTES = 32 * 1024 * 1024
 
+# Signals that another client connected to this tunnel and took over: this
+# client must stop and not reconnect. Delivered as a dedicated GOAWAY error
+# code (the reliable channel) plus matching reason strings on the GOAWAY debug
+# data and the intake / hello responses. Must stay in lockstep with the server.
+SUPERSEDED_GOAWAY_ERROR_CODE = 0x1201
+GOAWAY_REASON_SUPERSEDED = "superseded"
+INTAKE_REASON_SUPERSEDED = "intake-superseded"
+HELLO_REASON_SUPERSEDED = "hello-superseded"
+
 
 class _TunnelAuthError(RuntimeError):
     """Permanent auth failure from /_system/hello; do not retry."""
+
+
+# Public terminal takeover error, aliased to the internal name the runtime
+# raises everywhere. Apps catch the public class; the alias keeps churn low.
+_TunnelSupersededError = TunnelSupersededError
 
 
 class _OwnerTokenInvalidError(RuntimeError):
@@ -188,6 +203,7 @@ class _Connection:
         "outstanding_ping_payload",
         "outstanding_ping_sent_at",
         "goaway_received",
+        "superseded",
     )
 
     def __init__(self, conn_id: int) -> None:
@@ -284,6 +300,9 @@ class TunnelRuntime:
         self._handoff_in_flight = False
         self._handoff_task: asyncio.Task[None] | None = None
         self._last_handoff_at = 0.0
+        # Set when another client took over this tunnel: serve_forever stops
+        # and does not reconnect. Distinct from a transient drop or a drain.
+        self._superseded = False
         # Wakes the supervisor when active is swapped mid-handoff.
         self._supervisor_wake: asyncio.Event = asyncio.Event()
         # Dispatch tasks are runtime-scoped (not per-connection): a
@@ -476,7 +495,14 @@ class TunnelRuntime:
                 )
                 self._notify_status("closed")
                 raise
+            except _TunnelSupersededError as e:
+                self._stop_superseded(e)
             except Exception:
+                # A takeover GOAWAY that lands mid-hello sets _superseded but
+                # surfaces as a plain connection error; go terminal here so we
+                # don't reconnect and boot the client that replaced us.
+                if self._superseded:
+                    self._stop_superseded()
                 consecutive_failures += 1
                 logger.exception(
                     "tunnel runtime: connection error (#%d); reconnecting",
@@ -529,6 +555,11 @@ class TunnelRuntime:
                     continue
                 if conn.read_task is None or conn.read_task.done():
                     break
+            # Another client took over this tunnel: stop, do not reconnect.
+            if self._superseded:
+                raise _TunnelSupersededError(
+                    "another client connected to this tunnel; not reconnecting",
+                )
         finally:
             await self._teardown_cold(conn)
 
@@ -626,6 +657,12 @@ class TunnelRuntime:
             self._supervisor_wake.set()
         except asyncio.CancelledError:
             raise
+        except _TunnelSupersededError:
+            # External takeover during the handoff hello: _superseded is set,
+            # so end the old conn and wake the supervisor to stop terminally
+            # (no cold redial, which would boot the client that replaced us).
+            self._force_reconnect_conn(old_conn)
+            self._supervisor_wake.set()
         except Exception:
             logger.warning(
                 "tunnel runtime: handoff failed; reconnecting cold",
@@ -665,8 +702,17 @@ class TunnelRuntime:
                     with suppress(asyncio.CancelledError, Exception):
                         await rt
                 await self._close_connection_writer(conn)
-                if isinstance(exc, _TunnelAuthError):
+                # A rejected key or a takeover is terminal; never retry either
+                # (retrying a takeover would boot the client that replaced us).
+                if isinstance(exc, (_TunnelAuthError, _TunnelSupersededError)):
                     raise
+                # A takeover GOAWAY that landed mid-hello sets _superseded but
+                # surfaces here as a plain reset/status-0 error; stop now so we
+                # don't re-hello and boot the client that replaced us.
+                if self._superseded:
+                    raise _TunnelSupersededError(
+                        "another client connected to this tunnel during handoff",
+                    )
                 if (time.monotonic() - start) > HANDOFF_REDIAL_BUDGET_SEC:
                     raise RuntimeError("handoff redial budget exhausted")
                 jitter = backoff * BACKOFF_JITTER * (2 * random.random() - 1)
@@ -717,6 +763,63 @@ class TunnelRuntime:
             return
         with suppress(Exception):
             writer.close()
+
+    def _superseded_is_terminal(self, conn: _Connection) -> bool:
+        """True iff a takeover signal on ``conn`` should stop the runtime.
+
+        Ignored only for a conn we ourselves put into make-before-break drain
+        (our own predecessor, tracked in ``self._draining``). A not-yet-active
+        replacement mid-handoff is a real external takeover, so it stays terminal.
+        """
+        return conn not in self._draining
+
+    def _mark_superseded(self) -> None:
+        """Record the takeover; serve_forever will stop and not reconnect."""
+        self._superseded = True
+
+    def _maybe_mark_superseded_goaway(
+        self, conn: _Connection, error_code: int, reason: str | None,
+    ) -> None:
+        """Classify a non-zero GOAWAY: takeover (terminal) vs infra (reconnect).
+
+        The dedicated error code is authoritative (survives a lost debug
+        blob); the reason string is a belt cross-check. Any other non-zero
+        GOAWAY is an infra fault -> let the read loop end and reconnect cold.
+        """
+        is_takeover = (
+            error_code == SUPERSEDED_GOAWAY_ERROR_CODE
+            or reason == GOAWAY_REASON_SUPERSEDED
+        )
+        if not is_takeover:
+            if reason is None:
+                logger.warning(
+                    "non-zero GOAWAY (code=%s) without a reason; reconnecting",
+                    error_code,
+                )
+            return
+        if not self._superseded_is_terminal(conn):
+            logger.info("takeover signal on our own draining predecessor; ignoring")
+            return
+        self._mark_superseded()
+
+    def _stop_superseded(self, err: TunnelSupersededError | None = None) -> NoReturn:
+        """Log, notify, and raise the terminal takeover error (no reconnect).
+
+        Re-raises the original error when given, so its message (which
+        channel/slot observed the takeover) survives to the caller.
+        """
+        logger.warning(
+            "tunnel taken over: another client connected to this tunnel, so "
+            "this client is stopping and will not reconnect. If this is "
+            "unexpected, check for a second instance running the same identity "
+            "(only one live connection per tunnel is kept).",
+        )
+        self._notify_status("superseded")
+        if err is not None:
+            raise err
+        raise _TunnelSupersededError(
+            "another client connected to this tunnel; not reconnecting",
+        )
 
     async def _open_connection(self, conn: _Connection) -> None:
         ctx = create_default_verify_context()
@@ -813,6 +916,15 @@ class TunnelRuntime:
                 "(check the key matches the tunnel's identity scope, or use "
                 "an admin-scoped key in the tunnel's org)",
             )
+        # Displaced during hello: a strictly-later hello (another client) won
+        # the tunnel. Always terminal, even mid-handoff: the server sends this
+        # only when a newer client has connected, so retrying would re-hello
+        # and boot the client that replaced us.
+        if status == 409 and _parse_reason_json(body) == HELLO_REASON_SUPERSEDED:
+            self._superseded = True
+            raise _TunnelSupersededError(
+                "another client connected to this tunnel during hello",
+            )
         if status != 200:
             raise RuntimeError(
                 f"/_system/hello returned {status}; transient — will retry",
@@ -908,6 +1020,12 @@ class TunnelRuntime:
                 envelope = await self._park_one_intake(conn, slot)
             except asyncio.CancelledError:
                 raise
+            except _TunnelSupersededError:
+                # Another client took over: force this conn down so the
+                # supervisor observes the terminal flag and stops (no reconnect).
+                self._mark_superseded()
+                self._force_reconnect_conn(conn)
+                return
             except _OwnerTokenInvalidError:
                 logger.warning(
                     "intake slot %d: owner_token rejected; reconnecting", slot,
@@ -985,6 +1103,16 @@ class TunnelRuntime:
                 "/_system/intake slot=%d -> status=%s reason=%r body=%r",
                 slot, status, reason, body_bytes,
             )
+            # Another client took over this tunnel. Terminal, unless this is
+            # our own draining predecessor (a normal reconnect), where it is
+            # ignored. A drain uses a different reason and falls through to
+            # re-park below.
+            if reason == INTAKE_REASON_SUPERSEDED:
+                if self._superseded_is_terminal(conn):
+                    raise _TunnelSupersededError(
+                        f"slot={slot}: another client connected to this tunnel",
+                    )
+                return None
             if status == "401":
                 raise _OwnerTokenInvalidError(
                     f"slot={slot} status=401 reason={reason!r}",
@@ -1143,7 +1271,7 @@ class TunnelRuntime:
                     debug = event.additional_data.decode("utf-8", errors="replace")
             except AttributeError:
                 pass
-            reason = _parse_goaway_reason(debug)
+            reason = _parse_reason_json(debug)
             # Log the parsed reason + length only; the raw debug field is
             # peer-controlled, so don't echo it verbatim at info level.
             logger.info(
@@ -1153,12 +1281,14 @@ class TunnelRuntime:
             # hyper-h2 flips the whole connection to CLOSED on GOAWAY
             # regardless of error code, so we cannot keep live bridges
             # running on this conn (unlike Node). A NO_ERROR (0) GOAWAY
-            # is the server's drain signal: hand off make-before-break
-            # instead of raising. A non-zero code is a real fault — let
-            # the read loop end and reconnect cold.
+            # is the drain signal: hand off make-before-break. A non-zero
+            # code is either a takeover (stop, don't reconnect) or a real
+            # fault (reconnect cold) — classified below.
             conn.goaway_received = True
             if event.error_code == 0 and conn is self._active:
                 self._begin_handoff(conn, reason=reason or "drain")
+            elif event.error_code != 0:
+                self._maybe_mark_superseded_goaway(conn, event.error_code, reason)
 
     # --- envelope dispatch --------------------------------------------------
 
@@ -2825,17 +2955,17 @@ class _BodyTooLarge(Exception):
     pass
 
 
-def _parse_goaway_reason(debug: str) -> str | None:
-    """Decode the GOAWAY debug data into a structured reason if present.
+def _parse_reason_json(data: bytes | str | None) -> str | None:
+    """Extract ``reason`` from a ``{"reason": ...}`` blob (GOAWAY debug or hello body).
 
-    The server may attach ``{"reason": "drain"}`` to a NO_ERROR GOAWAY.
-    The handoff behaves the same either way today; this is the seam an
-    app-level advance-notice would hang off of."""
-    if not debug:
+    ``json.loads`` accepts bytes or str, so one helper covers both. Returns
+    None on empty/unparseable input or a missing/non-string reason.
+    """
+    if not data:
         return None
     try:
-        parsed = json.loads(debug)
-    except (json.JSONDecodeError, ValueError):
+        parsed = json.loads(data)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
         return None
     if isinstance(parsed, dict):
         reason = parsed.get("reason")

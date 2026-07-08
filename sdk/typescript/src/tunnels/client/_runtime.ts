@@ -111,10 +111,26 @@ export const POST_ACTIVE_WAIT_MS = 5_000;
 export const DEFAULT_INBOUND_BODY_BYTES = 32 * 1024 * 1024;
 export const DEFAULT_OUTBOUND_BODY_BYTES = 32 * 1024 * 1024;
 
+// Signals that another client connected to this tunnel and took over: this
+// client must stop and not reconnect. Delivered as a dedicated GOAWAY error
+// code (the reliable channel) plus matching reason strings on the GOAWAY debug
+// data and the intake / hello responses. Must stay in lockstep with the server.
+export const SUPERSEDED_GOAWAY_ERROR_CODE = 0x1201;
+export const GOAWAY_REASON_SUPERSEDED = "superseded";
+export const INTAKE_REASON_SUPERSEDED = "intake-superseded";
+export const HELLO_REASON_SUPERSEDED = "hello-superseded";
+
 export class TunnelAuthError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "TunnelAuthError";
+  }
+}
+
+export class TunnelSupersededError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TunnelSupersededError";
   }
 }
 
@@ -152,8 +168,23 @@ function isSessionTerminalError(err: unknown): boolean {
   );
 }
 
+/** Extract a ``reason`` string from a JSON ``{"reason": ...}`` payload. */
+function parseReasonJson(buf: Buffer | undefined | null): string | null {
+  if (buf === undefined || buf === null || buf.length === 0) return null;
+  try {
+    const parsed: unknown = JSON.parse(buf.toString("utf-8"));
+    if (typeof parsed === "object" && parsed !== null) {
+      const reason = (parsed as { reason?: unknown }).reason;
+      if (typeof reason === "string") return reason;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export type StatusCallback = (
-  status: "connecting" | "connected" | "reconnecting" | "closed",
+  status: "connecting" | "connected" | "reconnecting" | "closed" | "superseded",
 ) => void;
 
 /**
@@ -278,6 +309,9 @@ export class TunnelRuntime {
   private wakeSupervisor: (() => void) | null = null;
 
   private stop = false;
+  // Set when another client took over this tunnel: serveForever stops and does
+  // not reconnect. Distinct from a transient drop or a drain.
+  private superseded = false;
   // Dispatch tasks are runtime-scoped (not per-connection): a handoff must
   // let an in-flight handler finish and post its reply on the NEW conn.
   private readonly tasks = new Set<Promise<unknown>>();
@@ -327,6 +361,15 @@ export class TunnelRuntime {
         if (err instanceof TunnelAuthError) {
           this.notifyStatus("closed");
           throw err;
+        }
+        if (err instanceof TunnelSupersededError) {
+          this.stopSuperseded(err);
+        }
+        // A takeover GOAWAY that lands mid-hello sets `superseded` but surfaces
+        // as a plain connection error; go terminal here so we don't reconnect
+        // and boot the client that replaced us.
+        if (this.superseded) {
+          this.stopSuperseded();
         }
         consecutiveFailures += 1;
         // eslint-disable-next-line no-console
@@ -461,6 +504,12 @@ export class TunnelRuntime {
         const session = conn.session;
         if (session === null || session.closed || session.destroyed) break;
       }
+      // Another client took over this tunnel: stop, do not reconnect.
+      if (this.superseded) {
+        throw new TunnelSupersededError(
+          "another client connected to this tunnel; not reconnecting",
+        );
+      }
     } finally {
       this.stopPingLoop(conn);
       conn.streams.clear();
@@ -505,6 +554,73 @@ export class TunnelRuntime {
     if (w !== null) w();
   }
 
+  // --- takeover (superseded) --------------------------------------------
+
+  /**
+   * True iff a takeover signal on `conn` should stop the runtime. Ignored only
+   * for a conn we ourselves put into make-before-break drain (our own
+   * predecessor, tracked in `this.draining`); a not-yet-active replacement
+   * mid-handoff is a real external takeover, so it stays terminal.
+   */
+  private supersededIsTerminal(conn: Connection): boolean {
+    return !this.draining.has(conn);
+  }
+
+  /** Record the takeover; the supervisor will stop and not reconnect. */
+  private markSuperseded(): void {
+    this.superseded = true;
+  }
+
+  /**
+   * Log, notify, and throw the terminal takeover error (no reconnect).
+   * Rethrows the original error when given, so its message (which
+   * channel/slot observed the takeover) survives to the caller.
+   */
+  private stopSuperseded(err?: TunnelSupersededError): never {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "tunnel taken over: another client connected to this tunnel, so " +
+        "this client is stopping and will not reconnect. If this is " +
+        "unexpected, check for a second instance running the same " +
+        "identity (only one live connection per tunnel is kept).",
+    );
+    this.notifyStatus("superseded");
+    throw err ??
+      new TunnelSupersededError(
+        "another client connected to this tunnel; not reconnecting",
+      );
+  }
+
+  /**
+   * Classify a non-zero GOAWAY: takeover (terminal) vs infra fault (reconnect).
+   * The dedicated code is authoritative; the reason is a belt cross-check.
+   */
+  private maybeMarkSupersededGoaway(
+    conn: Connection,
+    errorCode: number,
+    opaqueData: Buffer | undefined,
+  ): void {
+    const reason = parseReasonJson(opaqueData);
+    const isTakeover =
+      errorCode === SUPERSEDED_GOAWAY_ERROR_CODE ||
+      reason === GOAWAY_REASON_SUPERSEDED;
+    if (!isTakeover) {
+      if (reason === null) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `tunnel runtime: non-zero GOAWAY (code=${errorCode}) without a reason; reconnecting`,
+        );
+      }
+      return;
+    }
+    if (!this.supersededIsTerminal(conn)) {
+      // eslint-disable-next-line no-console
+      console.info("tunnel runtime: takeover signal on our own draining predecessor; ignoring");
+      return;
+    }
+    this.markSuperseded();
+  }
+
   // --- make-before-break handoff ----------------------------------------
 
   /**
@@ -538,13 +654,21 @@ export class TunnelRuntime {
       // Supervisor was watching oldConn; wake it to follow newConn.
       this.signalSupervisor();
     } catch (err) {
-      // Redial budget exhausted (or auth failure): give up on
-      // make-before-break and fall to the cold reconnect path by forcing
-      // the old session closed so the supervisor returns.
-      // eslint-disable-next-line no-console
-      console.warn("tunnel runtime: handoff failed; reconnecting cold", err);
-      try { oldConn.session?.destroy(); } catch { /* swallow */ }
-      this.signalSupervisor();
+      if (err instanceof TunnelSupersededError) {
+        // External takeover during the handoff hello: `superseded` is set, so
+        // end the old conn and wake the supervisor to stop terminally (no cold
+        // redial, which would boot the client that replaced us).
+        try { oldConn.session?.destroy(); } catch { /* swallow */ }
+        this.signalSupervisor();
+      } else {
+        // Redial budget exhausted (or auth failure): give up on
+        // make-before-break and fall to the cold reconnect path by forcing
+        // the old session closed so the supervisor returns.
+        // eslint-disable-next-line no-console
+        console.warn("tunnel runtime: handoff failed; reconnecting cold", err);
+        try { oldConn.session?.destroy(); } catch { /* swallow */ }
+        this.signalSupervisor();
+      }
     } finally {
       this.handoffInFlight = false;
       this.handoffPromise = null;
@@ -566,7 +690,19 @@ export class TunnelRuntime {
         return conn;
       } catch (err) {
         try { await this.closeConnection(conn); } catch { /* swallow */ }
-        if (err instanceof TunnelAuthError) throw err;
+        // A rejected key or a takeover is terminal; never retry either
+        // (retrying a takeover would boot the client that replaced us).
+        if (err instanceof TunnelAuthError || err instanceof TunnelSupersededError) {
+          throw err;
+        }
+        // A takeover GOAWAY that landed mid-hello set `superseded` but surfaced
+        // here as a plain reset/status-0 error; stop now so we don't re-hello
+        // and boot the client that replaced us.
+        if (this.superseded) {
+          throw new TunnelSupersededError(
+            "another client connected to this tunnel during handoff",
+          );
+        }
         if (Date.now() - start > HANDOFF_REDIAL_BUDGET_MS) {
           throw new Error("handoff redial budget exhausted");
         }
@@ -627,18 +763,24 @@ export class TunnelRuntime {
       // eslint-disable-next-line no-console
       console.warn("tunnel runtime: h2 session error", err);
     });
-    session.on("goaway", (errorCode: number, lastStreamId: number) => {
-      // eslint-disable-next-line no-console
-      console.info(
-        `tunnel runtime: GOAWAY received error_code=${errorCode} last_stream_id=${lastStreamId}`,
-      );
-      // NO_ERROR GOAWAY is the server's drain signal: stand up a fresh
-      // connection make-before-break. A non-zero code is a real fault —
-      // let the session close and reconnect cold.
-      if (errorCode === 0) {
-        this.beginHandoff(conn);
-      }
-    });
+    session.on(
+      "goaway",
+      (errorCode: number, lastStreamId: number, opaqueData?: Buffer) => {
+        // eslint-disable-next-line no-console
+        console.info(
+          `tunnel runtime: GOAWAY received error_code=${errorCode} last_stream_id=${lastStreamId}`,
+        );
+        // NO_ERROR GOAWAY = drain (make-before-break handoff). A non-zero code
+        // is a takeover (stop) or a real fault (reconnect cold), classified
+        // below; setting the takeover flag here wins over the 'error'/'close'
+        // reconnect path that the same GOAWAY also drives.
+        if (errorCode === 0) {
+          this.beginHandoff(conn);
+        } else {
+          this.maybeMarkSupersededGoaway(conn, errorCode, opaqueData);
+        }
+      },
+    );
     // Watch the underlying TCP/TLS socket directly. Node's h2 client
     // sometimes loses the connection without emitting ``error`` or
     // ``close`` on the session itself — the underlying socket reliably
@@ -736,6 +878,19 @@ export class TunnelRuntime {
     if (status === 401 || status === 403) {
       throw new TunnelAuthError(
         `${ControlPaths.HELLO} returned ${status}; the API key was rejected (check the key matches the tunnel's identity scope, or use an admin-scoped key in the tunnel's org)`,
+      );
+    }
+    // Displaced during hello: a strictly-later hello (another client) won the
+    // tunnel. Always terminal, even mid-handoff: the server sends this only
+    // when a newer client has connected, so retrying would re-hello and boot
+    // the client that replaced us.
+    if (
+      status === 409 &&
+      parseReasonJson(body) === HELLO_REASON_SUPERSEDED
+    ) {
+      this.superseded = true;
+      throw new TunnelSupersededError(
+        "another client connected to this tunnel during hello",
       );
     }
     if (status !== 200) {
@@ -898,6 +1053,13 @@ export class TunnelRuntime {
       try {
         envelope = await this.parkOneIntake(conn, slot);
       } catch (err) {
+        if (err instanceof TunnelSupersededError) {
+          // Another client took over: force this conn down so the supervisor
+          // observes the terminal flag and stops (no reconnect).
+          this.markSuperseded();
+          try { conn.session?.destroy(); } catch { /* swallow */ }
+          return;
+        }
         if (err instanceof OwnerTokenInvalidError) {
           // eslint-disable-next-line no-console
           console.warn(
@@ -993,6 +1155,17 @@ export class TunnelRuntime {
       console.warn(
         `${ControlPaths.INTAKE} slot=${slot} -> status=${status} reason=${reason}`,
       );
+      // Another client took over this tunnel. Terminal, unless this is our own
+      // draining predecessor (a normal reconnect). A drain uses a different
+      // reason and falls through to re-park below.
+      if (reason === INTAKE_REASON_SUPERSEDED) {
+        if (this.supersededIsTerminal(conn)) {
+          throw new TunnelSupersededError(
+            `slot=${slot}: another client connected to this tunnel`,
+          );
+        }
+        return null;
+      }
       if (status === "401") {
         throw new OwnerTokenInvalidError(
           `slot=${slot} status=401 reason=${reason}`,
@@ -2126,7 +2299,8 @@ export class TunnelRuntime {
     | "connecting"
     | "connected"
     | "reconnecting"
-    | "closed"): void {
+    | "closed"
+    | "superseded"): void {
     if (this.onStatus !== undefined) {
       try {
         this.onStatus(status);

@@ -10,7 +10,7 @@ import type { Tunnel } from "../types.js";
 import type { TunnelRuntime } from "./_runtime.js";
 
 export type TunnelStatusCallback = (
-  status: "connecting" | "connected" | "reconnecting" | "closed",
+  status: "connecting" | "connected" | "reconnecting" | "closed" | "superseded",
 ) => void;
 
 /**

@@ -15,6 +15,7 @@ from inkbox.tunnels.exceptions import (
     TunnelNotProvisioned,
     TunnelRemoved,
     TunnelStateConflict,
+    TunnelSupersededError,
     TunnelTLSModeMismatch,
 )
 from inkbox.tunnels._validation import (
@@ -36,6 +37,7 @@ __all__ = [
     "TunnelNotProvisioned",
     "TunnelRemoved",
     "TunnelStateConflict",
+    "TunnelSupersededError",
     "TunnelTLSModeMismatch",
     "normalize_agent_handle",
     "validate_agent_handle",

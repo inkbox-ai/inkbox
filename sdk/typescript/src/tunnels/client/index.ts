@@ -65,7 +65,7 @@ export {
   WsProtocolMismatch,
   WsServerDraining,
 } from "./_ws.js";
-export { TunnelAuthError } from "./_runtime.js";
+export { TunnelAuthError, TunnelSupersededError } from "./_runtime.js";
 
 /** Default tunnel zone — used when neither the server nor the state file specifies one. */
 export const PROD_ZONE = "inkboxwire.com";
