@@ -557,14 +557,13 @@ export class TunnelRuntime {
   // --- takeover (superseded) --------------------------------------------
 
   /**
-   * True iff a takeover signal on `conn` should stop the runtime. Ignored on
-   * a draining / handoff / non-active connection: that is this client's own
-   * make-before-break predecessor being replaced, not an external takeover.
+   * True iff a takeover signal on `conn` should stop the runtime. Ignored only
+   * for a conn we ourselves put into make-before-break drain (our own
+   * predecessor, tracked in `this.draining`); a not-yet-active replacement
+   * mid-handoff is a real external takeover, so it stays terminal.
    */
   private supersededIsTerminal(conn: Connection): boolean {
-    return (
-      conn === this.active && !conn.draining && !this.handoffInFlight
-    );
+    return !this.draining.has(conn);
   }
 
   /** Record the takeover; the supervisor will stop and not reconnect. */
@@ -616,7 +615,7 @@ export class TunnelRuntime {
     }
     if (!this.supersededIsTerminal(conn)) {
       // eslint-disable-next-line no-console
-      console.info("tunnel runtime: takeover signal on a draining/handoff connection; ignoring");
+      console.info("tunnel runtime: takeover signal on our own draining predecessor; ignoring");
       return;
     }
     this.markSuperseded();
@@ -1149,8 +1148,8 @@ export class TunnelRuntime {
         `${ControlPaths.INTAKE} slot=${slot} -> status=${status} reason=${reason}`,
       );
       // Another client took over this tunnel. Terminal, unless this is our own
-      // draining/handoff predecessor (a normal reconnect). A drain uses a
-      // different reason and falls through to re-park below.
+      // draining predecessor (a normal reconnect). A drain uses a different
+      // reason and falls through to re-park below.
       if (reason === INTAKE_REASON_SUPERSEDED) {
         if (this.supersededIsTerminal(conn)) {
           throw new TunnelSupersededError(

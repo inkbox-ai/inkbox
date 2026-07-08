@@ -15,10 +15,12 @@ import pytest
 
 from inkbox.tunnels.client._runtime import (
     HELLO_REASON_SUPERSEDED,
+    INTAKE_REASON_SUPERSEDED,
     SUPERSEDED_GOAWAY_ERROR_CODE,
     TunnelRuntime,
     _Connection,
     _parse_reason_json,
+    _StreamEvent,
     _TunnelSupersededError,
 )
 
@@ -87,6 +89,7 @@ async def test_superseded_goaway_ignored_when_draining():
     runtime = _make_runtime()
     conn = _active_conn(runtime)
     conn.draining = True
+    runtime._draining.add(conn)  # a real make-before-break predecessor
     await runtime._handle_event(
         _goaway(SUPERSEDED_GOAWAY_ERROR_CODE, b'{"reason":"superseded"}'), conn,
     )
@@ -94,25 +97,36 @@ async def test_superseded_goaway_ignored_when_draining():
 
 
 @pytest.mark.asyncio
-async def test_superseded_goaway_ignored_when_not_active():
+async def test_superseded_goaway_on_nonactive_replacement_is_terminal():
+    """Regression: a takeover on a non-active replacement (NOT a drain
+    predecessor) is terminal. Previously mis-suppressed by the non-active
+    guard, which let the runtime cold-reconnect and re-steal the tunnel."""
     runtime = _make_runtime()
     _active_conn(runtime)
-    other = _Connection(2)  # not the active connection
+    replacement = _Connection(2)  # not active, NOT in _draining
     await runtime._handle_event(
-        _goaway(SUPERSEDED_GOAWAY_ERROR_CODE, b'{"reason":"superseded"}'), other,
+        _goaway(SUPERSEDED_GOAWAY_ERROR_CODE, b'{"reason":"superseded"}'),
+        replacement,
     )
-    assert runtime._superseded is False
+    assert runtime._superseded is True
 
 
 @pytest.mark.asyncio
-async def test_superseded_goaway_ignored_during_handoff():
+async def test_superseded_goaway_on_replacement_during_handoff_is_terminal():
+    """Regression (the real race): mid-handoff, old A is the draining
+    predecessor and B is the in-flight replacement. A superseded GOAWAY on B
+    (an external takeover) must be terminal, not swallowed as a self-handoff."""
     runtime = _make_runtime()
-    conn = _active_conn(runtime)
+    old_a = _active_conn(runtime)
+    old_a.draining = True
+    runtime._draining.add(old_a)
     runtime._handoff_in_flight = True
+    replacement = _Connection(2)  # B: not active, NOT in _draining
     await runtime._handle_event(
-        _goaway(SUPERSEDED_GOAWAY_ERROR_CODE, b'{"reason":"superseded"}'), conn,
+        _goaway(SUPERSEDED_GOAWAY_ERROR_CODE, b'{"reason":"superseded"}'),
+        replacement,
     )
-    assert runtime._superseded is False
+    assert runtime._superseded is True
 
 
 @pytest.mark.asyncio
@@ -137,6 +151,41 @@ async def test_infra_goaway_different_reason_reconnects_not_terminal():
 
 
 # ── intake channel ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_intake_superseded_terminal_on_nonactive_replacement(monkeypatch):
+    """Regression: intake-superseded on a non-draining replacement conn (not
+    active, mid-handoff) is terminal. _park_one_intake must raise, not re-park.
+
+    An intake-superseded can't actually land while B's hello is in flight
+    (intakes only start after _start_serving), so this drives the intake
+    predicate directly rather than framing it as hello-in-flight.
+    """
+    runtime = _make_runtime()
+    _active_conn(runtime)  # a DIFFERENT active conn (old A)
+    runtime._handoff_in_flight = True
+    conn = _Connection(2)  # replacement B: not active, NOT in _draining
+    conn.owner_token = "owner_test"
+    conn.h2 = MagicMock()
+    conn.writer = MagicMock()
+    monkeypatch.setattr(runtime, "_open_stream_locked", lambda *a, **k: 7)
+
+    async def _flush(c):
+        return None
+
+    monkeypatch.setattr(runtime, "_flush_conn", _flush)
+
+    queue: asyncio.Queue = asyncio.Queue()
+    conn.streams[7] = queue
+    await queue.put(_StreamEvent(
+        "headers",
+        headers=[(":status", "409"), ("inkbox-reason", INTAKE_REASON_SUPERSEDED)],
+    ))
+    await queue.put(_StreamEvent("end"))
+
+    with pytest.raises(_TunnelSupersededError):
+        await runtime._park_one_intake(conn, slot=0)
 
 
 @pytest.mark.asyncio
@@ -325,11 +374,16 @@ def test_superseded_error_is_public_and_typed():
 
 
 def test_guard_helper_matrix():
+    """Terminal for any conn except one we put into make-before-break drain."""
     runtime = _make_runtime()
     conn = _active_conn(runtime)
+    # active conn, not a drain predecessor -> terminal
     assert runtime._superseded_is_terminal(conn) is True
-    conn.draining = True
-    assert runtime._superseded_is_terminal(conn) is False
-    conn.draining = False
+    # a not-yet-active replacement (not in _draining) is also terminal, even
+    # while a handoff is in flight
+    replacement = _Connection(2)
     runtime._handoff_in_flight = True
+    assert runtime._superseded_is_terminal(replacement) is True
+    # only our own draining predecessor is ignored
+    runtime._draining.add(conn)
     assert runtime._superseded_is_terminal(conn) is False

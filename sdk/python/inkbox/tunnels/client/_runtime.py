@@ -760,15 +760,11 @@ class TunnelRuntime:
     def _superseded_is_terminal(self, conn: _Connection) -> bool:
         """True iff a takeover signal on ``conn`` should stop the runtime.
 
-        Ignored on a draining / handoff / non-active connection: that is this
-        client's own make-before-break predecessor being replaced during a
-        reconnect, not an external client taking the tunnel over.
+        Ignored only for a conn we ourselves put into make-before-break drain
+        (our own predecessor, tracked in ``self._draining``). A not-yet-active
+        replacement mid-handoff is a real external takeover, so it stays terminal.
         """
-        return (
-            conn is self._active
-            and not conn.draining
-            and not self._handoff_in_flight
-        )
+        return conn not in self._draining
 
     def _mark_superseded(self) -> None:
         """Record the takeover; serve_forever will stop and not reconnect."""
@@ -795,7 +791,7 @@ class TunnelRuntime:
                 )
             return
         if not self._superseded_is_terminal(conn):
-            logger.info("takeover signal on a draining/handoff connection; ignoring")
+            logger.info("takeover signal on our own draining predecessor; ignoring")
             return
         self._mark_superseded()
 
@@ -1101,9 +1097,9 @@ class TunnelRuntime:
                 slot, status, reason, body_bytes,
             )
             # Another client took over this tunnel. Terminal, unless this is
-            # our own draining/handoff predecessor (a normal reconnect), where
-            # it is ignored. A drain uses a different reason and falls through
-            # to re-park below.
+            # our own draining predecessor (a normal reconnect), where it is
+            # ignored. A drain uses a different reason and falls through to
+            # re-park below.
             if reason == INTAKE_REASON_SUPERSEDED:
                 if self._superseded_is_terminal(conn):
                     raise _TunnelSupersededError(

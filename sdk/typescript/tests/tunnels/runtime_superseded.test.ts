@@ -173,12 +173,14 @@ describe("TunnelRuntime — superseded (takeover) is terminal", () => {
 });
 
 describe("TunnelRuntime — takeover guard (deploy make-before-break)", () => {
-  it("ignores a takeover signal on a draining / handoff / non-active conn", () => {
-    // Reach the private guard directly: a takeover on our own draining
-    // predecessor (or during a handoff) must NOT be treated as terminal.
+  it("is terminal for any conn except our own draining predecessor", () => {
+    // Reach the private guard directly. Only a conn we put into make-before-
+    // break drain (tracked in `draining`) is ignored; a not-yet-active
+    // replacement mid-handoff is a real external takeover and stays terminal.
     const runtime = makeRuntime() as unknown as {
       active: unknown;
       handoffInFlight: boolean;
+      draining: Set<unknown>;
       supersededIsTerminal: (c: unknown) => boolean;
       maybeMarkSupersededGoaway: (
         c: unknown,
@@ -187,25 +189,37 @@ describe("TunnelRuntime — takeover guard (deploy make-before-break)", () => {
       ) => void;
       superseded: boolean;
     };
-    const conn = { draining: false } as { draining: boolean };
-    runtime.active = conn;
+    const active = { draining: false } as { draining: boolean };
+    runtime.active = active;
     runtime.handoffInFlight = false;
-    expect(runtime.supersededIsTerminal(conn)).toBe(true);
+    // active conn, not a drain predecessor -> terminal
+    expect(runtime.supersededIsTerminal(active)).toBe(true);
 
-    conn.draining = true;
-    expect(runtime.supersededIsTerminal(conn)).toBe(false);
-
-    conn.draining = false;
+    // a not-yet-active replacement (not in `draining`) is terminal, even
+    // while a handoff is in flight (regression: previously swallowed)
+    const replacement = { draining: false };
     runtime.handoffInFlight = true;
-    expect(runtime.supersededIsTerminal(conn)).toBe(false);
+    expect(runtime.supersededIsTerminal(replacement)).toBe(true);
 
-    const other = { draining: false };
-    expect(runtime.supersededIsTerminal(other)).toBe(false); // not the active conn
+    // only our own draining predecessor is ignored
+    runtime.draining.add(active);
+    expect(runtime.supersededIsTerminal(active)).toBe(false);
 
-    // A superseded GOAWAY on the draining predecessor leaves us NOT terminal.
-    runtime.handoffInFlight = false;
-    conn.draining = true;
-    runtime.maybeMarkSupersededGoaway(conn, SUPERSEDED_GOAWAY_ERROR_CODE, SUPERSEDED_DEBUG);
+    // A superseded GOAWAY on the draining predecessor leaves us NOT terminal...
+    runtime.maybeMarkSupersededGoaway(
+      active,
+      SUPERSEDED_GOAWAY_ERROR_CODE,
+      SUPERSEDED_DEBUG,
+    );
     expect(runtime.superseded).toBe(false);
+
+    // ...but the same GOAWAY on the in-flight replacement IS terminal. The
+    // intake-superseded path shares this same predicate, so it is covered too.
+    runtime.maybeMarkSupersededGoaway(
+      replacement,
+      SUPERSEDED_GOAWAY_ERROR_CODE,
+      SUPERSEDED_DEBUG,
+    );
+    expect(runtime.superseded).toBe(true);
   });
 });
