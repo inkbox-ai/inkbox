@@ -695,6 +695,14 @@ export class TunnelRuntime {
         if (err instanceof TunnelAuthError || err instanceof TunnelSupersededError) {
           throw err;
         }
+        // A takeover GOAWAY that landed mid-hello set `superseded` but surfaced
+        // here as a plain reset/status-0 error; stop now so we don't re-hello
+        // and boot the client that replaced us.
+        if (this.superseded) {
+          throw new TunnelSupersededError(
+            "another client connected to this tunnel during handoff",
+          );
+        }
         if (Date.now() - start > HANDOFF_REDIAL_BUDGET_MS) {
           throw new Error("handoff redial budget exhausted");
         }

@@ -361,6 +361,40 @@ async def test_make_replacement_reraises_superseded_no_retry(monkeypatch):
     assert attempts["n"] == 1  # did NOT retry the doomed hello
 
 
+@pytest.mark.asyncio
+async def test_make_replacement_terminal_on_flag_set_plain_error(monkeypatch):
+    """Regression: a takeover GOAWAY landing mid-hello sets _superseded but the
+    hello fails with a PLAIN reset/status-0 error (not the typed exception).
+    The handoff helper must stop on the first attempt, not keep re-helloing
+    within the redial budget and repeatedly boot the client that replaced us."""
+    runtime = _make_runtime()
+    attempts = {"n": 0}
+
+    async def _open(conn):
+        return None
+
+    async def _read_loop(conn):
+        await asyncio.sleep(3600)
+
+    async def _hello(conn):
+        attempts["n"] += 1
+        runtime._superseded = True  # set by the read loop's GOAWAY handler
+        raise RuntimeError("connection reset during hello")  # plain, not typed
+
+    async def _close(conn):
+        return None
+
+    monkeypatch.setattr(runtime, "_open_connection", _open)
+    monkeypatch.setattr(runtime, "_read_loop", _read_loop)
+    monkeypatch.setattr(runtime, "_send_hello", _hello)
+    monkeypatch.setattr(runtime, "_force_reconnect_conn", lambda c: None)
+    monkeypatch.setattr(runtime, "_close_connection_writer", _close)
+
+    with pytest.raises(_TunnelSupersededError):
+        await runtime._make_replacement_connection()
+    assert attempts["n"] == 1  # stopped on the flag, did NOT redial
+
+
 def test_superseded_error_is_public_and_typed():
     """The terminal error is the public TunnelSupersededError (a TunnelError),
     reachable from inkbox and inkbox.tunnels, not a bare RuntimeError."""

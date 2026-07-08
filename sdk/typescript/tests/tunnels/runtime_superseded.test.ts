@@ -170,6 +170,34 @@ describe("TunnelRuntime — superseded (takeover) is terminal", () => {
     ).rejects.toBeInstanceOf(TunnelSupersededError);
     expect(attempts).toBe(1);
   });
+
+  it("makeReplacementConnection stops on the superseded flag despite a plain error", async () => {
+    // A takeover GOAWAY landing mid-hello sets `superseded` but the hello fails
+    // with a plain reset error (not the typed one). The handoff helper must
+    // stop on the first attempt, not keep re-helloing within the redial budget
+    // and repeatedly boot the client that replaced us.
+    let attempts = 0;
+    const runtime = makeRuntime() as unknown as {
+      openConnection: (c: unknown) => Promise<void>;
+      sendHello: (c: unknown) => Promise<void>;
+      startServing: (c: unknown) => void;
+      closeConnection: (c: unknown) => Promise<void>;
+      makeReplacementConnection: () => Promise<unknown>;
+      superseded: boolean;
+    };
+    runtime.openConnection = async () => undefined;
+    runtime.closeConnection = async () => undefined;
+    runtime.startServing = () => undefined;
+    runtime.sendHello = async () => {
+      attempts += 1;
+      runtime.superseded = true; // set by the read loop's GOAWAY handler
+      throw new Error("connection reset during hello"); // plain, not typed
+    };
+    await expect(
+      runtime.makeReplacementConnection(),
+    ).rejects.toBeInstanceOf(TunnelSupersededError);
+    expect(attempts).toBe(1);
+  });
 });
 
 describe("TunnelRuntime — takeover guard (deploy make-before-break)", () => {

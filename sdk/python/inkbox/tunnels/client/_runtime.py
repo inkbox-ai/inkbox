@@ -706,6 +706,13 @@ class TunnelRuntime:
                 # (retrying a takeover would boot the client that replaced us).
                 if isinstance(exc, (_TunnelAuthError, _TunnelSupersededError)):
                     raise
+                # A takeover GOAWAY that landed mid-hello sets _superseded but
+                # surfaces here as a plain reset/status-0 error; stop now so we
+                # don't re-hello and boot the client that replaced us.
+                if self._superseded:
+                    raise _TunnelSupersededError(
+                        "another client connected to this tunnel during handoff",
+                    )
                 if (time.monotonic() - start) > HANDOFF_REDIAL_BUDGET_SEC:
                     raise RuntimeError("handoff redial budget exhausted")
                 jitter = backoff * BACKOFF_JITTER * (2 * random.random() - 1)
