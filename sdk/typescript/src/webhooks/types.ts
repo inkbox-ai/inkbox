@@ -640,6 +640,27 @@ export interface WebhookCallTranscript {
   url: string;
 }
 
+/** Wrapper object under the `call.ended` webhook `data` field. */
+export interface CallEndedWebhookData {
+  call: WebhookPhoneCall;
+  /** Address-book matches for the caller. Always present, possibly empty. */
+  contacts: WebhookContact[];
+  /** Identity matches for the caller. Always present, possibly empty. */
+  agent_identities: WebhookAgentIdentity[];
+  /**
+   * Inline (possibly abridged) transcript. Present-with-`null`: populated
+   * only when the platform captured a transcript for the call, otherwise
+   * `null`.
+   */
+  transcript: WebhookCallTranscript | null;
+  /**
+   * Always present; the authoritative verbatim transcript resource (fetch
+   * with an API key that can access the call — the subscription
+   * owner's own key suffices).
+   */
+  transcript_url: string;
+}
+
 /**
  * Top-level `call.ended` webhook payload (`{ event_type, timestamp, data }`
  * envelope).
@@ -650,22 +671,5 @@ export interface CallEndedWebhookPayload {
   event_type: CallLifecycleWebhookEventType;
   /** ISO 8601 datetime. */
   timestamp: string;
-  data: {
-    call: WebhookPhoneCall;
-    /** Address-book matches for the caller. Always present, possibly empty. */
-    contacts: WebhookContact[];
-    /** Identity matches for the caller. Always present, possibly empty. */
-    agent_identities: WebhookAgentIdentity[];
-    /**
-     * Inline (possibly abridged) transcript. Present-with-`null`: populated
-     * only when the platform captured a transcript for the call, otherwise
-     * `null`.
-     */
-    transcript: WebhookCallTranscript | null;
-    /**
-     * Always present; the authoritative verbatim transcript resource (fetch
-     * with an admin API key).
-     */
-    transcript_url: string;
-  };
+  data: CallEndedWebhookData;
 }

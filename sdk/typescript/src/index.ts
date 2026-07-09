@@ -72,6 +72,7 @@ export type {
   CallLifecycleWebhookEventType,
   WebhookPhoneCall,
   WebhookCallTranscript,
+  CallEndedWebhookData,
   CallEndedWebhookPayload,
   WebhookContext,
   WebhookContextBlock,

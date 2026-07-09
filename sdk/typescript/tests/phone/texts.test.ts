@@ -120,6 +120,26 @@ describe("TextsResource.list", () => {
     expect(texts[0].isRead).toBe(false);
   });
 
+  it("forwards date-range params verbatim, only when set", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([]);
+    const res = new TextsResource(http);
+
+    await res.list(NUM_ID, {
+      startDatetime: "2026-07-01",
+      endDatetime: "2026-07-08T15:30:00Z",
+      tz: "America/New_York",
+    });
+
+    expect(http.get).toHaveBeenCalledWith(`/numbers/${NUM_ID}/texts`, {
+      limit: 50,
+      offset: 0,
+      start_datetime: "2026-07-01",
+      end_datetime: "2026-07-08T15:30:00Z",
+      tz: "America/New_York",
+    });
+  });
+
   it("passes isRead filter", async () => {
     const http = mockHttp();
     vi.mocked(http.get).mockResolvedValue([]);

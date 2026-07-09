@@ -846,7 +846,8 @@ pub struct WebhookCallTranscript {
 /// possibly empty. `transcript` is present-with-`null`: the inline (possibly
 /// abridged) block is populated only when the platform captured a transcript
 /// for the call, otherwise `None`. `transcript_url` is **always** present and
-/// is the authoritative verbatim record (fetch with an admin API key).
+/// is the authoritative verbatim record (fetch with an API key that can
+/// access the call — the subscription owner's own key suffices).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallEndedWebhookData {
     pub call: WebhookPhoneCall,

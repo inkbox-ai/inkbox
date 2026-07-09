@@ -136,6 +136,28 @@ class TestTextsList:
         )
         assert texts[0].is_blocked is True
 
+    def test_date_range_params_reach_the_wire(self, client, transport):
+        """start_datetime/end_datetime/tz are forwarded verbatim, only when set."""
+        transport.get.return_value = []
+
+        client._texts.list(
+            NUM_ID,
+            start_datetime="2026-07-01",
+            end_datetime="2026-07-08T15:30:00Z",
+            tz="America/New_York",
+        )
+
+        transport.get.assert_called_once_with(
+            f"/numbers/{NUM_ID}/texts",
+            params={
+                "limit": 50,
+                "offset": 0,
+                "start_datetime": "2026-07-01",
+                "end_datetime": "2026-07-08T15:30:00Z",
+                "tz": "America/New_York",
+            },
+        )
+
     def test_hydrates_spam_filter_blocked_row(self, client, transport):
         """A pre-carrier spam-filter block must not crash list() hydration."""
         transport.get.return_value = [TEXT_MESSAGE_SPAM_BLOCKED_DICT]
