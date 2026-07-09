@@ -576,6 +576,15 @@ export class AgentIdentity {
     return this._inkbox._calls.transcripts(callId);
   }
 
+  /**
+   * Hang up one of this identity's live calls, from outside the call.
+   *
+   * @param callId - ID of the call to hang up.
+   */
+  async hangupCall(callId: string): Promise<PhoneCall> {
+    return this._inkbox._calls.hangup(callId);
+  }
+
   /** Get this identity's inbound-call handling config. */
   async getIncomingCallAction(): Promise<IncomingCallActionConfig> {
     return this._inkbox._incomingCallAction.get({ agentIdentityId: this.id });

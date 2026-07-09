@@ -62,6 +62,28 @@ impl CallsResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// Hang up a live call by ID, from outside the call.
+    ///
+    /// The lever for anything not on the call itself (tests, operators,
+    /// another process); the agent on the call keeps ending it in-band. The
+    /// carrier confirms the teardown asynchronously, so the returned call can
+    /// still show its live status for a moment. A call that has already ended
+    /// (or has no active carrier leg yet) surfaces the server's 409 verbatim.
+    ///
+    /// # Arguments
+    /// * `call_id` - UUID (or string) of the call.
+    ///
+    /// # Returns
+    /// The call record as of the hangup request.
+    pub fn hangup(&self, call_id: &str) -> Result<PhoneCall> {
+        let data = self.http.post(
+            &format!("/calls/{call_id}/hangup"),
+            None::<&serde_json::Value>,
+            crate::http::NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
     /// List all transcript segments for a call, ordered by sequence number.
     ///
     /// # Arguments
@@ -290,6 +312,65 @@ mod tests {
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].seq, 0);
         assert_eq!(segments[1].text, "Hello!");
+    }
+
+    #[test]
+    fn hangup_posts_and_returns_call() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/hangup");
+            // Teardown is async at the carrier: the row can come back still live.
+            then.status(200).json_body(json!({
+                "id": "22222222-2222-2222-2222-222222222222",
+                "local_phone_number": "+15550001111",
+                "remote_phone_number": "+15550002222",
+                "direction": "outbound",
+                "status": "answered",
+                "hangup_reason": "local",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-01T00:00:01+00:00",
+                "is_blocked": false,
+                "origin": "dedicated_number"
+            }));
+        });
+        let call = client(&server)
+            .calls()
+            .hangup("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(call.status, "answered");
+        assert_eq!(call.hangup_reason.as_deref(), Some("local"));
+    }
+
+    #[test]
+    fn hangup_409_already_ended_maps_to_api_error() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/hangup");
+            then.status(409).json_body(json!({
+                "detail": {
+                    "error": "call_already_ended",
+                    "message": "Call has already ended."
+                }
+            }));
+        });
+        let err = client(&server)
+            .calls()
+            .hangup("22222222-2222-2222-2222-222222222222")
+            .unwrap_err();
+        match err {
+            InkboxError::Api {
+                status_code,
+                detail,
+            } => {
+                assert_eq!(status_code, 409);
+                let obj = detail.as_object().expect("structured detail");
+                assert_eq!(obj["error"], "call_already_ended");
+            }
+            other => panic!("expected InkboxError::Api, got {other:?}"),
+        }
     }
 
     #[test]

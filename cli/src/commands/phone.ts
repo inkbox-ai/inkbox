@@ -91,6 +91,32 @@ export function registerPhoneCommands(program: Command): void {
       }),
     );
 
+  phone
+    .command("hangup <call-id>")
+    .description("Hang up a live call")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        callId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const call = await identity.hangupCall(callId);
+        output(
+          {
+            id: call.id,
+            to: call.remotePhoneNumber,
+            status: call.status,
+            hangupReason: call.hangupReason,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
   const hostedRealtime = phone
     .command("hosted-realtime")
     .description("Platform-hosted realtime voice config (identity-scoped)");
