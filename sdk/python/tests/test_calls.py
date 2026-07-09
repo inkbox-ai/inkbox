@@ -371,6 +371,7 @@ class TestRemovedNumberScopedSurface:
         # Keyword-only surface: no positional number slot.
         assert list(params) == [
             "self", "agent_identity_id", "limit", "offset", "is_blocked",
+            "start_datetime", "end_datetime", "tz",
         ]
 
     def test_get_takes_only_call_id(self):

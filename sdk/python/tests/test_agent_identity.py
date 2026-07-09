@@ -309,6 +309,9 @@ class TestAgentIdentityListCalls:
             limit=50,
             offset=0,
             is_blocked=None,
+            start_datetime=None,
+            end_datetime=None,
+            tz=None,
         )
         assert result is inkbox._calls.list.return_value
 
@@ -323,6 +326,9 @@ class TestAgentIdentityListCalls:
             limit=10,
             offset=20,
             is_blocked=True,
+            start_datetime=None,
+            end_datetime=None,
+            tz=None,
         )
 
 
