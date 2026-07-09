@@ -553,6 +553,11 @@ impl AgentIdentity {
         self.inkbox.calls().transcripts(call_id)
     }
 
+    /// Hang up one of this identity's live calls, from outside the call.
+    pub fn hangup_call(&self, call_id: &str) -> Result<PhoneCall> {
+        self.inkbox.calls().hangup(call_id)
+    }
+
     /// Get this identity's inbound-call handling config.
     pub fn get_incoming_call_action(&self) -> Result<IncomingCallActionConfig> {
         self.inkbox
@@ -1540,6 +1545,33 @@ mod tests {
         let calls = identity.list_calls(10, 2, Some(false)).unwrap();
         mock.assert();
         assert_eq!(calls.len(), 1);
+    }
+
+    #[test]
+    fn hangup_call_delegates_to_calls_resource() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/hangup");
+            then.status(200).json_body(json!({
+                "id": "22222222-2222-2222-2222-222222222222",
+                "local_phone_number": "+15550001111",
+                "remote_phone_number": "+15550002222",
+                "direction": "outbound",
+                "status": "answered",
+                "hangup_reason": "local",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-01T00:00:01+00:00",
+                "is_blocked": false,
+                "origin": "dedicated_number"
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let call = identity
+            .hangup_call("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(call.hangup_reason.as_deref(), Some("local"));
     }
 
     #[test]

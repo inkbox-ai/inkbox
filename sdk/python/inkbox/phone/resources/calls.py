@@ -89,6 +89,22 @@ class CallsResource:
         data = self._http.get(f"/calls/{call_id}")
         return PhoneCall._from_dict(data)
 
+    def hangup(self, call_id: UUID | str) -> PhoneCall:
+        """Hang up a live call by ID, from outside the call.
+
+        The lever for anything not on the call itself (tests, operators,
+        another process); the agent on the call keeps ending it in-band.
+        The carrier confirms the teardown asynchronously, so the returned
+        call can still show its live status for a moment. A call that has
+        already ended (or has no active carrier leg yet) surfaces the
+        server's 409 verbatim.
+
+        Args:
+            call_id: UUID of the call.
+        """
+        data = self._http.post(f"/calls/{call_id}/hangup")
+        return PhoneCall._from_dict(data)
+
     def transcripts(self, call_id: UUID | str) -> list[PhoneTranscript]:
         """List all transcript segments for a call, ordered by sequence number.
 

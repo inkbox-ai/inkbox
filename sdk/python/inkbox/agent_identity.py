@@ -727,6 +727,14 @@ class AgentIdentity:
         """
         return self._inkbox._calls.transcripts(call_id)
 
+    def hangup_call(self, call_id: str) -> PhoneCall:
+        """Hang up one of this identity's live calls, from outside the call.
+
+        Args:
+            call_id: ID of the call to hang up.
+        """
+        return self._inkbox._calls.hangup(call_id)
+
     def get_incoming_call_action(self) -> IncomingCallActionConfig:
         """Get this identity's inbound-call handling config."""
         return self._inkbox._incoming_call_action.get(agent_identity_id=self.id)

@@ -1,10 +1,16 @@
 # Changelog
 
-## 0.4.20 — Date-range filtering on high-value comms lists
+## 0.4.20 — Date-range list filters + external call hangup
 
 ### Added
 
 - **`--start-datetime` / `--end-datetime` / `--tz` on comms list commands.** `email list`, `email unread`, `phone calls`, `text list`, `text conversations`, `imessage list`, and `imessage conversations` accept a date range that filters on `created_at`. Bare dates resolve to calendar days in `--tz` (default UTC), with `--end-datetime` whole-day inclusive; datetimes with an explicit `Z`/offset are exact instants (`--tz` ignored). Omitting the flags leaves listing behavior unchanged.
+
+- **`inkbox phone hangup <call-id>`.** Ends a live call from outside it; takes `-i, --identity <handle>` and prints `{id, direction, remotePhoneNumber, status, hangupReason}` (honors `--json`). The carrier confirms the teardown asynchronously, so the printed call can still show its live status; already-ended calls surface the server's 409.
+
+### Changed
+
+- CLI pins `@inkbox/sdk` at `^0.4.20`.
 
 ## 0.4.16 — Configurable webhook context + open tracking
 
