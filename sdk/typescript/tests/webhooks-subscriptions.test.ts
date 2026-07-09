@@ -525,6 +525,49 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
     ).rejects.toThrow(/phone_number/);
   });
 
+  it("accepts call.ended on an agent identity owner", async () => {
+    const { resource, http } = makeResource();
+    http.post.mockResolvedValue({
+      ...RAW_IDENTITY_SUBSCRIPTION,
+      event_types: ["call.ended"],
+    });
+
+    const sub = await resource.create({
+      agentIdentityId: IDENTITY_ID,
+      url: "https://customer.example.com/hook",
+      eventTypes: ["call.ended"],
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      url: "https://customer.example.com/hook",
+      event_types: ["call.ended"],
+      agent_identity_id: IDENTITY_ID,
+    });
+    expect(sub.agentIdentityId).toBe(IDENTITY_ID);
+  });
+
+  it("rejects mixing imessage.* with call.ended on one subscription", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        agentIdentityId: IDENTITY_ID,
+        url: "https://x.example.com/hook",
+        eventTypes: ["imessage.received", "call.ended"],
+      }),
+    ).rejects.toThrow(/same channel/);
+  });
+
+  it("rejects call.ended on a mailbox owner", async () => {
+    const { resource } = makeResource();
+    await expect(
+      resource.create({
+        mailboxId: "22222222-2222-2222-2222-222222222222",
+        url: "https://x.example.com/hook",
+        eventTypes: ["call.ended"],
+      }),
+    ).rejects.toThrow(/agent_identity/);
+  });
+
   it("rejects multiple owners including the identity", async () => {
     const { resource } = makeResource();
     await expect(

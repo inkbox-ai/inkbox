@@ -135,6 +135,32 @@ class TestCallsGet:
         assert call.ended_at is not None
 
 
+class TestCallsHangup:
+    def test_posts_hangup_and_returns_call(self, client, transport):
+        # Teardown is async at the carrier: the row can come back still live.
+        transport.post.return_value = {
+            **PHONE_CALL_DICT,
+            "status": "answered",
+            "hangup_reason": "local",
+            "ended_at": None,
+        }
+
+        call = client._calls.hangup(CALL_ID)
+
+        transport.post.assert_called_once_with(f"/calls/{CALL_ID}/hangup")
+        assert call.id == UUID(CALL_ID)
+        assert call.status == "answered"
+        assert call.hangup_reason == "local"
+        assert call.ended_at is None
+
+    def test_accepts_uuid(self, client, transport):
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.hangup(UUID(CALL_ID))
+
+        transport.post.assert_called_once_with(f"/calls/{CALL_ID}/hangup")
+
+
 class TestCallsTranscripts:
     def test_returns_transcripts(self, client, transport):
         second = {

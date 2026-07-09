@@ -155,6 +155,27 @@ describe("CallsResource.get", () => {
   });
 });
 
+describe("CallsResource.hangup", () => {
+  it("posts the hangup and returns the call", async () => {
+    const http = mockHttp();
+    // Teardown is async at the carrier: the row can come back still live.
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_PHONE_CALL,
+      status: "answered",
+      hangup_reason: "local",
+      ended_at: null,
+    });
+    const res = new CallsResource(http);
+
+    const call = await res.hangup(CALL_ID);
+
+    expect(http.post).toHaveBeenCalledWith(`/calls/${CALL_ID}/hangup`);
+    expect(call.status).toBe("answered");
+    expect(call.hangupReason).toBe("local");
+    expect(call.endedAt).toBeNull();
+  });
+});
+
 describe("CallsResource.transcripts", () => {
   it("returns transcript segments for a call", async () => {
     const http = mockHttp();
@@ -348,10 +369,10 @@ describe("CallsResource.place API errors", () => {
 });
 
 describe("CallsResource surface (identity-centered, v1.0.0)", () => {
-  it("exposes exactly list, get, transcripts, place", () => {
+  it("exposes exactly list, get, hangup, transcripts, place", () => {
     const methods = Object.getOwnPropertyNames(CallsResource.prototype)
       .filter((n) => n !== "constructor")
       .sort();
-    expect(methods).toEqual(["get", "list", "place", "transcripts"]);
+    expect(methods).toEqual(["get", "hangup", "list", "place", "transcripts"]);
   });
 });

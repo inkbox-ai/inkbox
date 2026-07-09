@@ -4,6 +4,14 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.20 — call.ended webhook + external call hangup
+
+### Added
+
+- **`call.ended` webhook.** A new post-call lifecycle webhook event that fires when a connected call ends. It is an **agent-identity-owned** subscription (`event_types=["call.ended"]`, `agent_identity_id`), delivered as the standard signed `{id, event_type, timestamp, data}` envelope, and is **fire-and-forget + replayable** (contrast the synchronous `phone.incoming_call` control-plane callback). The payload carries the call (`WebhookPhoneCall` — `PhoneCallResponse` minus `is_blocked`, plus derived `duration_seconds`), resolved `contacts` / `agent_identities`, and the transcript in two forms: an inline, middle-cut **abridged** block (`data.transcript`, present when the platform captured a transcript for the call, otherwise `null`; discriminate a turn from the abridgment marker on `"marker" in entry`) and an **always-present** `data.transcript_url` pointing at the authoritative verbatim transcript (`GET /phone/calls/{id}/transcripts`, needs an admin API key). New receiver types: Python `CallEndedWebhookPayload` / `CallEndedWebhookData` / `WebhookPhoneCall` / `WebhookCallTranscript` / `CallLifecycleWebhookEventType` / `CallOriginWire`; matching TS interfaces + literals; Rust `CallEndedWebhookPayload` / `CallEndedWebhookData` / `WebhookPhoneCall` / `WebhookCallTranscript` / `CallLifecycleWebhookEventType` / `CallOriginWire`. `verify_webhook` is unchanged (same HMAC).
+- **`call.ended` is subscribable on an agent identity.** `webhooks.subscriptions.create(...)` now accepts `call.ended` for an `agent_identity_id` owner (py/ts/rust). An identity may hold an iMessage subscription and a call-lifecycle subscription independently, but a single subscription still carries only one channel — mixing `imessage.*` with `call.ended` on one row is rejected client-side.
+- **External call hangup.** `calls.hangup(call_id)` (TS `calls.hangup(callId)`, Rust `calls().hangup(call_id)`) posts `POST /phone/calls/{id}/hangup` to end a live call from outside it — the lever for tests, operators, or any process not holding the call itself. The carrier confirms the teardown asynchronously, so the returned call may still show its live status; a call that has already ended (or has no active carrier leg yet) surfaces the server's 409. Identity delegators: `identity.hangup_call(call_id)` (TS `hangupCall`, Rust `hangup_call`). CLI: `inkbox phone hangup <call-id> -i <handle>`.
+
 ## 0.4.19 — Inbound email body on webhooks
 
 ### Added

@@ -5,10 +5,13 @@ Webhook subscriptions -- fan-out per ``(owner, url, event_types)``.
 
 Replaces the legacy per-resource ``webhook_url`` columns on mailboxes
 and phone numbers. Use this resource to attach HTTPS receivers to mail
-(``message.*``), phone-text (``text.*``), or iMessage (``imessage.*``)
-events. Mail and text subscriptions are owned by the mailbox / phone
-number; iMessage subscriptions are owned by the agent identity, since
-shared iMessage pool numbers are not org resources. Incoming-call
+(``message.*``), phone-text (``text.*``), iMessage (``imessage.*``), or
+post-call lifecycle (``call.ended``) events. Mail and text subscriptions
+are owned by the mailbox / phone number; iMessage and call-lifecycle
+subscriptions are owned by the agent identity, since shared iMessage pool
+numbers are not org resources and a call is only ever owned by its
+identity. An identity may hold an iMessage sub and a call-lifecycle sub,
+but a single subscription carries only one channel. Incoming-call
 webhooks (``phone.incoming_call``) are still set on the phone-number
 resource itself -- that channel is a synchronous control-plane
 callback whose response body drives call routing, so fan-out is not
@@ -173,10 +176,21 @@ def _assert_no_incoming_call(event_types: list[str]) -> None:
         )
 
 
+# Wire event-type prefix -> the owning resource whose channel it belongs to.
+# An agent identity owns two channels (iMessage + post-call lifecycle), so two
+# prefixes map to it; a single subscription may still only carry one channel.
+_EVENT_PREFIX_TO_OWNER = {
+    "message.": "mailbox",
+    "text.": "phone_number",
+    "imessage.": "agent_identity",
+    "call.": "agent_identity",
+}
+
+# Owner resource -> the event-type prefixes it may subscribe to.
 _OWNER_EVENT_PREFIXES = {
-    "mailbox": "message.",
-    "phone_number": "text.",
-    "agent_identity": "imessage.",
+    "mailbox": ("message.",),
+    "phone_number": ("text.",),
+    "agent_identity": ("imessage.", "call."),
 }
 
 
@@ -185,19 +199,28 @@ def _assert_channel_coherence(
     owner: str,
     event_types: list[str],
 ) -> None:
-    expected_prefix = _OWNER_EVENT_PREFIXES[owner]
+    allowed = _OWNER_EVENT_PREFIXES[owner]
+    # The first event's prefix fixes the channel; every event must share it so
+    # one subscription never straddles two channels (e.g. imessage.* + call.ended).
+    channel_prefix: str | None = None
     for e in event_types:
-        if e.startswith(expected_prefix):
-            continue
-        for other_owner, other_prefix in _OWNER_EVENT_PREFIXES.items():
-            if other_owner != owner and e.startswith(other_prefix):
-                raise ValueError(
-                    f"event_type {e!r} does not belong to the {owner!r} channel "
-                    f"(it belongs to {other_owner!r})",
-                )
-        raise ValueError(
-            f"event_type {e!r} does not belong to any known channel",
-        )
+        prefix = next((p for p in _EVENT_PREFIX_TO_OWNER if e.startswith(p)), None)
+        if prefix is None:
+            raise ValueError(
+                f"event_type {e!r} does not belong to any known channel",
+            )
+        if prefix not in allowed:
+            raise ValueError(
+                f"event_type {e!r} does not belong to the {owner!r} channel "
+                f"(it belongs to {_EVENT_PREFIX_TO_OWNER[prefix]!r})",
+            )
+        if channel_prefix is None:
+            channel_prefix = prefix
+        elif prefix != channel_prefix:
+            raise ValueError(
+                f"event_type {e!r} does not belong to the same channel as the "
+                f"other event types in this subscription",
+            )
 
 
 def _assert_valid_context_config(cfg: Any) -> None:
@@ -309,7 +332,9 @@ class WebhookSubscriptionsResource:
         ``agent_identity_id`` is required. ``event_types`` must be a
         non-empty list of distinct values belonging to the owner's
         channel (mailbox -> ``message.*``, phone number -> ``text.*``,
-        agent identity -> ``imessage.*``).
+        agent identity -> ``imessage.*`` or ``call.ended``). One
+        subscription carries a single channel, so an identity sub may not
+        mix ``imessage.*`` with ``call.ended``.
 
         ``context_config`` opts the subscription into per-class conversation
         context (email/texts/calls) delivered on received events; omit it

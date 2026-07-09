@@ -17,6 +17,7 @@ from typing import cast
 import pytest
 
 from inkbox import (
+    CallEndedWebhookPayload,
     MailWebhookPayload,
     PhoneIncomingCallWebhookPayload,
     TextWebhookPayload,
@@ -47,6 +48,7 @@ EXPECTED_FIXTURES = sorted([
     "text_delivery_unconfirmed.json",
     "text_group_delivered.json",
     "phone_incoming_call.json",
+    "call_ended.json",
 ])
 
 MAIL_FIXTURES = [
@@ -374,3 +376,59 @@ def test_phone_incoming_call_agent_identity_entry_keys():
     assert isinstance(entry["id"], str)
     assert isinstance(entry["agent_handle"], str)
     assert entry["display_name"] is None or isinstance(entry["display_name"], str)
+
+
+# ---- Call lifecycle (post-call fan-out) ________________________________
+
+def test_call_ended_payload_is_enveloped():
+    payload = cast(CallEndedWebhookPayload, _load("call_ended.json"))
+    assert payload["event_type"] == "call.ended"
+    assert payload["id"].startswith("evt_")
+    assert "timestamp" in payload
+    # Enveloped like mail/text/imessage, not flat like the incoming-call callback.
+    assert "data" in payload
+
+
+def test_call_ended_call_block_shape():
+    payload = cast(CallEndedWebhookPayload, _load("call_ended.json"))
+    call = payload["data"]["call"]
+    # is_blocked is never on the wire body.
+    assert "is_blocked" not in call
+    assert call["origin"] == "dedicated_number"
+    assert call["duration_seconds"] == 123
+    assert call["status"] == "completed"
+
+
+def test_call_ended_transcript_inline_and_url_always_present():
+    payload = cast(CallEndedWebhookPayload, _load("call_ended.json"))
+    data = payload["data"]
+    # transcript_url is authoritative and always present.
+    assert data["transcript_url"].endswith("/transcripts")
+    # Inline block present because the platform captured a transcript.
+    transcript = data["transcript"]
+    assert transcript is not None
+    assert transcript["abridged"] is True
+    assert transcript["url"] == data["transcript_url"]
+    # Discriminate turn vs abridgment marker on "marker" in entry.
+    marker = next(e for e in transcript["entries"] if "marker" in e)
+    assert marker["marker"] == "abridged"
+    assert marker["omitted_turns"] == 12
+    turn = transcript["entries"][0]
+    assert turn["party"] in ("local", "remote")
+
+
+def test_call_ended_transcript_is_null_when_none_captured():
+    payload = cast(CallEndedWebhookPayload, _load("call_ended.json"))
+    data = payload["data"]
+    # A call with no captured transcript ships transcript: null; the
+    # authoritative transcript_url stays present.
+    data["transcript"] = None
+    assert data["transcript"] is None
+    assert data["transcript_url"].endswith("/transcripts")
+
+
+def test_call_ended_contacts_and_identities_are_lists():
+    payload = cast(CallEndedWebhookPayload, _load("call_ended.json"))
+    data = payload["data"]
+    assert isinstance(data["contacts"], list)
+    assert isinstance(data["agent_identities"], list)
