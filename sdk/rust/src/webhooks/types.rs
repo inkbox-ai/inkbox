@@ -862,8 +862,8 @@ pub struct CallEndedWebhookData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallEndedWebhookPayload {
     /// Stable per-event id (`evt_...`); idempotency key, stable across replays.
-    // `serde(default)` so payloads that predate this field still deserialize.
-    #[serde(default)]
+    // Required: `call.ended` is new enough that every payload carries `id`,
+    // so a missing id is a hard deserialization error (matches Python/TS).
     pub id: String,
     pub event_type: CallLifecycleWebhookEventType,
     pub timestamp: String,

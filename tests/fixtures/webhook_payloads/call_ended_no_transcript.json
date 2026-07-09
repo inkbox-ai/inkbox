@@ -1,0 +1,25 @@
+{
+  "id": "evt_9d0e1f2a3b4c5d6e7f8091a2b3c4d5e6",
+  "event_type": "call.ended",
+  "timestamp": "2026-07-06T19:05:12Z",
+  "data": {
+    "call": {
+      "id": "8b1c9d2e-3f40-4a5b-8c6d-7e8f90a1b2c3",
+      "origin": "shared_imessage_number",
+      "local_phone_number": null,
+      "remote_phone_number": "+14155550999",
+      "direction": "inbound",
+      "status": "completed",
+      "hangup_reason": null,
+      "started_at": null,
+      "ended_at": "2026-07-06T19:05:12Z",
+      "created_at": "2026-07-06T19:04:58Z",
+      "updated_at": "2026-07-06T19:05:12Z",
+      "duration_seconds": null
+    },
+    "contacts": [],
+    "agent_identities": [],
+    "transcript": null,
+    "transcript_url": "https://api.inkbox.ai/api/v1/phone/calls/8b1c9d2e-3f40-4a5b-8c6d-7e8f90a1b2c3/transcripts"
+  }
+}

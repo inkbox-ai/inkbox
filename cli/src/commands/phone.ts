@@ -108,7 +108,10 @@ export function registerPhoneCommands(program: Command): void {
         output(
           {
             id: call.id,
-            to: call.remotePhoneNumber,
+            // Hangup applies to inbound calls too, so label the peer as the
+            // remote party (with direction) rather than a destination "to".
+            direction: call.direction,
+            remotePhoneNumber: call.remotePhoneNumber,
             status: call.status,
             hangupReason: call.hangupReason,
           },

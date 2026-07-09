@@ -41,6 +41,7 @@ const EXPECTED_FIXTURES = [
   "text_group_delivered.json",
   "phone_incoming_call.json",
   "call_ended.json",
+  "call_ended_no_transcript.json",
 ] as const;
 
 function loadFixture<T>(name: string): T {
@@ -504,12 +505,14 @@ describe("CallEndedWebhookPayload", () => {
   });
 
   it("permits transcript: null when none was captured", () => {
-    const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended_no_transcript.json");
     // A call with no captured transcript ships transcript: null; the
     // authoritative transcript_url stays present.
-    payload.data.transcript = null;
     expect(payload.data.transcript).toBeNull();
     expect(payload.data.transcript_url.endsWith("/transcripts")).toBe(true);
+    // Shared-line call: the pool line is never surfaced.
+    expect(payload.data.call.origin).toBe("shared_imessage_number");
+    expect(payload.data.call.local_phone_number).toBeNull();
   });
 
   it("exposes contacts and agent_identities as lists", () => {

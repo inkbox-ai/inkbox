@@ -49,6 +49,7 @@ EXPECTED_FIXTURES = sorted([
     "text_group_delivered.json",
     "phone_incoming_call.json",
     "call_ended.json",
+    "call_ended_no_transcript.json",
 ])
 
 MAIL_FIXTURES = [
@@ -418,13 +419,15 @@ def test_call_ended_transcript_inline_and_url_always_present():
 
 
 def test_call_ended_transcript_is_null_when_none_captured():
-    payload = cast(CallEndedWebhookPayload, _load("call_ended.json"))
+    payload = cast(CallEndedWebhookPayload, _load("call_ended_no_transcript.json"))
     data = payload["data"]
     # A call with no captured transcript ships transcript: null; the
     # authoritative transcript_url stays present.
-    data["transcript"] = None
     assert data["transcript"] is None
     assert data["transcript_url"].endswith("/transcripts")
+    # Shared-line call: the pool line is never surfaced.
+    assert data["call"]["origin"] == "shared_imessage_number"
+    assert data["call"]["local_phone_number"] is None
 
 
 def test_call_ended_contacts_and_identities_are_lists():
