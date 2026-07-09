@@ -5,6 +5,7 @@ use std::sync::Arc;
 use serde_json::Map;
 
 use crate::error::Result;
+use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript};
 
@@ -38,6 +39,36 @@ impl CallsResource {
         offset: i64,
         is_blocked: Option<bool>,
     ) -> Result<Vec<PhoneCall>> {
+        // Delegate to the filtered variant with an empty (default) date range,
+        // which sends no extra params — wire-identical to the original list.
+        self.list_filtered(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List calls, newest first, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`CallsResource::list`] but also forwards the filter's
+    /// `start_datetime` / `end_datetime` / `tz`. A default filter sends nothing extra,
+    /// so this behaves exactly like `list`.
+    ///
+    /// # Arguments
+    /// * `agent_identity_id` / `limit` / `offset` / `is_blocked` - See
+    ///   [`CallsResource::list`].
+    /// * `filter` - Optional `created_at` date-range bounds.
+    pub fn list_filtered(
+        &self,
+        agent_identity_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<PhoneCall>> {
         // Always send limit + offset; scope by identity + filter only when set.
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -47,6 +78,7 @@ impl CallsResource {
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
         }
+        filter.apply(&mut params);
         let data = self.http.get("/calls", &params)?;
         Ok(serde_json::from_value(data)?)
     }
@@ -198,6 +230,29 @@ mod tests {
         mock.assert();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].remote_phone_number, "+15550002222");
+    }
+
+    #[test]
+    fn list_filtered_sends_date_range_params_when_set() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls")
+                .query_param("start_datetime", "2026-07-01")
+                .query_param("end_datetime", "2026-07-06")
+                .query_param("tz", "America/New_York");
+            then.status(200).json_body(json!([]));
+        });
+        let filter = crate::DateRangeFilter {
+            start_datetime: Some("2026-07-01".to_string()),
+            end_datetime: Some("2026-07-06".to_string()),
+            tz: Some("America/New_York".to_string()),
+        };
+        client(&server)
+            .calls()
+            .list_filtered(None, 50, 0, None, &filter)
+            .unwrap();
+        mock.assert();
     }
 
     #[test]

@@ -29,6 +29,7 @@
 mod config;
 mod cookies;
 pub mod error;
+pub mod filters;
 pub mod http;
 
 // Org-level entry point + per-identity facade.
@@ -56,3 +57,4 @@ pub use agent_identity::AgentIdentity;
 pub use client::{Inkbox, InkboxBuilder, DEFAULT_BASE_URL};
 pub use credentials::Credentials;
 pub use error::{ApiErrorDetail, InkboxError, Result};
+pub use filters::DateRangeFilter;

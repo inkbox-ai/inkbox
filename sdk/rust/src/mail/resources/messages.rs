@@ -5,6 +5,7 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 
 use crate::error::Result;
+use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::mail::types::{ForwardMode, Message, MessageDetail, MessageDirection};
 
@@ -54,6 +55,30 @@ impl MessagesResource {
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
     ) -> Result<Vec<Message>> {
+        // Delegate with an empty (default) date range, which sends no extra
+        // params — wire-identical to the original list.
+        self.list_filtered(email_address, page_size, direction, &DateRangeFilter::default())
+    }
+
+    /// Fetch all messages in a mailbox, newest first, additionally narrowed by
+    /// a `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`MessagesResource::list`] but also forwards the filter's
+    /// `start_datetime` / `end_datetime` / `tz`. A default filter sends nothing extra,
+    /// so this behaves exactly like `list`.
+    ///
+    /// # Arguments
+    /// * `email_address` / `page_size` / `direction` - See
+    ///   [`MessagesResource::list`].
+    /// * `filter` - Optional `created_at` date-range bounds. Bare dates cover
+    ///   the whole day; `end_datetime` is whole-day inclusive.
+    pub fn list_filtered(
+        &self,
+        email_address: &str,
+        page_size: Option<i64>,
+        direction: Option<MessageDirection>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<Message>> {
         let page_size = page_size.unwrap_or(DEFAULT_PAGE_SIZE);
         let mut out: Vec<Message> = Vec::new();
         let mut cursor: Option<String> = None;
@@ -67,6 +92,7 @@ impl MessagesResource {
             if let Some(d) = direction {
                 params.push(("direction", d_str(d).to_string()));
             }
+            filter.apply(&mut params);
             let page = self
                 .http
                 .get(&format!("/mailboxes/{email_address}/messages"), &params)?;

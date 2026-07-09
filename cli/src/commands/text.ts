@@ -119,6 +119,9 @@ export function registerTextCommands(program: Command): void {
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--unread-only", "Show only unread messages")
+    .option("--start-datetime <date>", "Only texts with created_at >= this date/instant")
+    .option("--end-datetime <date>", "Only texts with created_at <= this date (bare date is whole-day inclusive)")
+    .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -127,6 +130,9 @@ export function registerTextCommands(program: Command): void {
           limit: string;
           offset: string;
           unreadOnly?: boolean;
+          startDatetime?: string;
+          endDatetime?: string;
+          tz?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -136,6 +142,9 @@ export function registerTextCommands(program: Command): void {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
           isRead: cmdOpts.unreadOnly ? false : undefined,
+          startDatetime: cmdOpts.startDatetime,
+          endDatetime: cmdOpts.endDatetime,
+          tz: cmdOpts.tz,
         });
         output(texts, {
           json: !!opts.json,
@@ -194,6 +203,9 @@ export function registerTextCommands(program: Command): void {
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--include-groups", "Include group conversations")
+    .option("--start-datetime <date>", "Only conversations with created_at >= this date/instant")
+    .option("--end-datetime <date>", "Only conversations with created_at <= this date (bare date is whole-day inclusive)")
+    .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -202,6 +214,9 @@ export function registerTextCommands(program: Command): void {
           limit: string;
           offset: string;
           includeGroups?: boolean;
+          startDatetime?: string;
+          endDatetime?: string;
+          tz?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -211,6 +226,9 @@ export function registerTextCommands(program: Command): void {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
           includeGroups: !!cmdOpts.includeGroups,
+          startDatetime: cmdOpts.startDatetime,
+          endDatetime: cmdOpts.endDatetime,
+          tz: cmdOpts.tz,
         });
         const rows = opts.json
           ? convos

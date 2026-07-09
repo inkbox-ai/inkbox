@@ -98,6 +98,9 @@ export class TextsResource {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<TextMessage[]> {
     const params: Record<string, string | number | boolean> = {
@@ -110,6 +113,9 @@ export class TextsResource {
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
     }
+    if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
+    if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
+    if (options?.tz !== undefined) params["tz"] = options.tz;
     const data = await this.http.get<RawTextMessage[]>(
       `/numbers/${phoneNumberId}/texts`,
       params,
@@ -208,6 +214,9 @@ export class TextsResource {
       offset?: number;
       isBlocked?: boolean;
       includeGroups?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<TextConversationSummary[]> {
     const params: Record<string, string | number | boolean> = {
@@ -220,6 +229,9 @@ export class TextsResource {
     if (options?.includeGroups) {
       params["include_groups"] = true;
     }
+    if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
+    if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
+    if (options?.tz !== undefined) params["tz"] = options.tz;
     const data = await this.http.get<RawTextConversationSummary[]>(
       `/numbers/${phoneNumberId}/texts/conversations`,
       params,
