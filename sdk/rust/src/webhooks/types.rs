@@ -378,6 +378,18 @@ pub struct WebhookMailAgentIdentity {
     pub display_name: Option<String>,
 }
 
+/// Fate of the body on an inbound `message.received` webhook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailBodyState {
+    /// The whole plain-text body shipped in `body`.
+    Complete,
+    /// `body` is a prefix; fetch the rest by message id.
+    Truncated,
+    /// The message had no usable plain-text body.
+    Unavailable,
+}
+
 /// Stored mail message. `message_id` is the RFC 5322 `Message-ID` header value
 /// (not Inkbox's row id -- that's `id`). `bcc_addresses` is only populated on
 /// outbound events; inbound payloads carry `None` (BCC is not visible to
@@ -402,9 +414,10 @@ pub struct MailWebhookMessage {
     /// elsewhere). Whole under the size cap, else a prefix — see `body_state`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
-    /// `complete` / `truncated` / `unavailable`.
+    /// `complete` / `truncated` / `unavailable`. Typed so consumers can match
+    /// exhaustively; an unknown value fails to deserialize rather than silently.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub body_state: Option<String>,
+    pub body_state: Option<MailBodyState>,
     /// `true` when `body` is a prefix; fetch the rest by `id`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body_truncated: Option<bool>,
@@ -798,7 +811,7 @@ mod tests {
         let msg: MailWebhookMessage = serde_json::from_str(&message_json(extra)).unwrap();
         assert_eq!(msg.email_address.as_deref(), Some("support@inkboxmail.com"));
         assert_eq!(msg.body.as_deref(), Some("full body text"));
-        assert_eq!(msg.body_state.as_deref(), Some("complete"));
+        assert_eq!(msg.body_state, Some(MailBodyState::Complete));
         assert_eq!(msg.body_truncated, Some(false));
         assert_eq!(msg.body_total_chars, Some(14));
     }
@@ -812,6 +825,17 @@ mod tests {
         assert!(msg.body_state.is_none());
         assert!(msg.body_truncated.is_none());
         assert!(msg.body_total_chars.is_none());
+    }
+
+    #[test]
+    fn body_state_maps_variants_and_rejects_unknown() {
+        let trunc = message_json(r#","body_state":"truncated""#);
+        let msg: MailWebhookMessage = serde_json::from_str(&trunc).unwrap();
+        assert_eq!(msg.body_state, Some(MailBodyState::Truncated));
+
+        // Typed discriminator: an unknown value fails rather than parsing silently.
+        let bad = message_json(r#","body_state":"partial""#);
+        assert!(serde_json::from_str::<MailWebhookMessage>(&bad).is_err());
     }
 
     #[test]
