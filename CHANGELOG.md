@@ -4,6 +4,13 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.19 — Inbound email body on webhooks
+
+### Added
+
+- **`message.received` webhooks now carry the email body.** `data.message` gains `body` (plain text), `body_state` (`"complete"` / `"truncated"` / `"unavailable"`), `body_truncated`, `body_total_chars`, and `body_included_chars`. The whole body ships when it fits a size cap; larger bodies ship a prefix with `body_truncated: true`, and the rest is fetched by id. `data.message` also gains `email_address` (the owning mailbox) so a receiver can hydrate: `messages.get(email_address, id)` — use `id` (the row id), not `message_id` (the RFC 5322 header). Mail context items (`data.context.email[]`) likewise carry `email_address`.
+- All fields are **backwards compatible**: present-with-`null` on non-received events, optional in the typed wire shapes across the TypeScript, Python, and Rust SDKs, so a client receiving an older (replayed) payload that omits them still parses.
+
 ## 0.4.18 — One live client per tunnel
 
 ### Changed

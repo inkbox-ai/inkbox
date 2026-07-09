@@ -165,10 +165,45 @@ def test_mail_required_fields_present_on_every_event():
         "from_address", "to_addresses", "cc_addresses", "bcc_addresses",
         "subject", "snippet", "direction", "status",
         "has_attachments", "created_at",
+        # Present-with-null on every live event; populated on received.
+        "email_address", "body", "body_state", "body_truncated",
+        "body_total_chars", "body_included_chars",
     }
     for fixture in MAIL_FIXTURES:
         payload = cast(MailWebhookPayload, _load(fixture))
         assert set(payload["data"]["message"].keys()) == required, fixture
+
+
+def test_received_carries_body_fields_populated():
+    received = cast(MailWebhookPayload, _load("message_received.json"))
+    message = received["data"]["message"]
+    assert message["email_address"] == "support@inkboxmail.com"
+    assert isinstance(message["body"], str)
+    assert message["body_state"] == "complete"
+    assert message["body_truncated"] is False
+    assert message["body_total_chars"] == message["body_included_chars"]
+
+
+def test_body_fields_null_on_outbound_events():
+    for fixture in ("message_sent.json", "message_delivered.json"):
+        message = cast(MailWebhookPayload, _load(fixture))["data"]["message"]
+        assert message["body"] is None
+        assert message["body_state"] is None
+        assert message["body_truncated"] is None
+
+
+def test_old_payload_without_body_fields_still_parses():
+    # Backwards compat: a replayed payload predating the body feature has
+    # none of the new keys. It must remain a valid MailWebhookMessage.
+    old = cast(MailWebhookPayload, _load("message_received.json"))
+    for key in (
+        "email_address", "body", "body_state", "body_truncated",
+        "body_total_chars", "body_included_chars",
+    ):
+        old["data"]["message"].pop(key, None)  # type: ignore[misc]
+    # No KeyError accessing the always-present fields; new keys just absent.
+    assert old["data"]["message"]["id"]
+    assert "body" not in old["data"]["message"]
 
 
 def test_mail_contact_entries_have_required_keys():

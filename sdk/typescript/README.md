@@ -1080,6 +1080,8 @@ app.post("/hooks/text", express.raw({ type: "*/*" }), (req, res) => {
 
 Wire shapes are intentionally **snake_case** (the raw JSON body, not the SDK's parsed camelCase types) so `JSON.parse(body) as MailWebhookPayload` round-trips without a transformer. Enum-valued fields like `direction`, `status`, and `delivery_status` are string-literal unions (e.g. `"inbound" | "outbound"`) rather than the SDK's TS `enum`s — `JSON.parse` produces bare strings, and literal unions narrow cleanly.
 
+On inbound `message.received`, `data.message` carries the plain-text `body`: the whole message under the size cap, else a prefix with `body_truncated: true` and `body_state: "truncated"` (otherwise `"complete"`). When truncated, fetch the full message by id — `messages.get(message.email_address, message.id)` (note: use `message.id`, the row id, **not** `message.message_id`, the RFC 5322 header). These fields are optional: present-with-`null` on non-received events and absent on payloads predating the feature.
+
 ---
 
 ## Whoami

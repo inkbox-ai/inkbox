@@ -205,6 +205,10 @@ pub struct WebhookContextMailItem {
     pub subject: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snippet: Option<String>,
+    /// Owning mailbox address; with `id`, fetch the full body via
+    /// `messages.get(email_address, id)`. `default` tolerates pre-feature payloads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email_address: Option<String>,
 }
 
 /// One merged texts-class context item (SMS or iMessage).
@@ -374,6 +378,18 @@ pub struct WebhookMailAgentIdentity {
     pub display_name: Option<String>,
 }
 
+/// Fate of the body on an inbound `message.received` webhook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailBodyState {
+    /// The whole plain-text body shipped in `body`.
+    Complete,
+    /// `body` is a prefix; fetch the rest by message id.
+    Truncated,
+    /// The message had no usable plain-text body.
+    Unavailable,
+}
+
 /// Stored mail message. `message_id` is the RFC 5322 `Message-ID` header value
 /// (not Inkbox's row id -- that's `id`). `bcc_addresses` is only populated on
 /// outbound events; inbound payloads carry `None` (BCC is not visible to
@@ -390,6 +406,25 @@ pub struct MailWebhookMessage {
     pub bcc_addresses: Option<Vec<String>>,
     pub subject: Option<String>,
     pub snippet: Option<String>,
+    /// Owning mailbox address; with `id`, fetch the full body via
+    /// `messages.get(email_address, id)`. `default` tolerates pre-feature payloads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email_address: Option<String>,
+    /// Plain-text body on inbound `message.received` only (present-with-`null`
+    /// elsewhere). Whole under the size cap, else a prefix — see `body_state`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
+    /// `complete` / `truncated` / `unavailable`. Typed so consumers can match
+    /// exhaustively; an unknown value fails to deserialize rather than silently.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_state: Option<MailBodyState>,
+    /// `true` when `body` is a prefix; fetch the rest by `id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_truncated: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_total_chars: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_included_chars: Option<u64>,
     pub direction: MessageDirectionWire,
     pub status: MessageStatus,
     pub has_attachments: bool,
@@ -743,4 +778,74 @@ pub struct PhoneIncomingCallWebhookPayload {
     pub rate_limit: Option<RateLimitInfoWire>,
     pub contacts: Vec<WebhookContact>,
     pub agent_identities: Vec<WebhookAgentIdentity>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn message_json(extra: &str) -> String {
+        format!(
+            r#"{{
+                "id": "d490b2a7-2ac8-4c57-bbdd-438c844e11d7",
+                "mailbox_id": "73fdb447-4d3a-4a31-bf05-7373d6dfdf74",
+                "thread_id": null,
+                "message_id": "<abc@example.com>",
+                "from_address": "customer@example.com",
+                "to_addresses": ["support@inkboxmail.com"],
+                "cc_addresses": null,
+                "bcc_addresses": null,
+                "subject": "Q",
+                "snippet": "hi"{extra},
+                "direction": "inbound",
+                "status": "received",
+                "has_attachments": false,
+                "created_at": null
+            }}"#
+        )
+    }
+
+    #[test]
+    fn received_message_parses_body_fields() {
+        let extra = r#","email_address":"support@inkboxmail.com","body":"full body text","body_state":"complete","body_truncated":false,"body_total_chars":14,"body_included_chars":14"#;
+        let msg: MailWebhookMessage = serde_json::from_str(&message_json(extra)).unwrap();
+        assert_eq!(msg.email_address.as_deref(), Some("support@inkboxmail.com"));
+        assert_eq!(msg.body.as_deref(), Some("full body text"));
+        assert_eq!(msg.body_state, Some(MailBodyState::Complete));
+        assert_eq!(msg.body_truncated, Some(false));
+        assert_eq!(msg.body_total_chars, Some(14));
+    }
+
+    #[test]
+    fn old_message_without_body_fields_still_parses() {
+        // Pre-feature payload: none of the new keys present -> all None.
+        let msg: MailWebhookMessage = serde_json::from_str(&message_json("")).unwrap();
+        assert!(msg.email_address.is_none());
+        assert!(msg.body.is_none());
+        assert!(msg.body_state.is_none());
+        assert!(msg.body_truncated.is_none());
+        assert!(msg.body_total_chars.is_none());
+    }
+
+    #[test]
+    fn body_state_maps_variants_and_rejects_unknown() {
+        let trunc = message_json(r#","body_state":"truncated""#);
+        let msg: MailWebhookMessage = serde_json::from_str(&trunc).unwrap();
+        assert_eq!(msg.body_state, Some(MailBodyState::Truncated));
+
+        // Typed discriminator: an unknown value fails rather than parsing silently.
+        let bad = message_json(r#","body_state":"partial""#);
+        assert!(serde_json::from_str::<MailWebhookMessage>(&bad).is_err());
+    }
+
+    #[test]
+    fn context_mail_item_email_address_is_optional() {
+        let with = r#"{"id":"a","direction":"outbound","from_address":"x@y.com","to_addresses":["z@w.com"],"created_at":"t","subject":null,"snippet":null,"email_address":"box@inkboxmail.com"}"#;
+        let item: WebhookContextMailItem = serde_json::from_str(with).unwrap();
+        assert_eq!(item.email_address.as_deref(), Some("box@inkboxmail.com"));
+
+        let without = r#"{"id":"a","direction":"outbound","from_address":"x@y.com","to_addresses":["z@w.com"],"created_at":"t","subject":null,"snippet":null}"#;
+        let item2: WebhookContextMailItem = serde_json::from_str(without).unwrap();
+        assert!(item2.email_address.is_none());
+    }
 }

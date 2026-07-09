@@ -132,6 +132,28 @@ describe("MailWebhookPayload", () => {
     expect(outbound.data.message.bcc_addresses).toContain("audit@inkboxmail.com");
   });
 
+  it("received carries populated body fields; outbound carries them null", () => {
+    const received = loadFixture<MailWebhookPayload>("message_received.json");
+    expect(received.data.message.email_address).toBe("support@inkboxmail.com");
+    expect(typeof received.data.message.body).toBe("string");
+    expect(received.data.message.body_state).toBe("complete");
+    expect(received.data.message.body_truncated).toBe(false);
+    const sent = loadFixture<MailWebhookPayload>("message_sent.json");
+    expect(sent.data.message.body).toBeNull();
+    expect(sent.data.message.body_state).toBeNull();
+  });
+
+  it("old payload without body fields still typechecks and parses", () => {
+    // Optional (`?:`) fields let a replayed pre-feature payload omit them.
+    const old: MailWebhookPayload = loadFixture<MailWebhookPayload>(
+      "message_received.json",
+    );
+    delete old.data.message.body;
+    delete old.data.message.email_address;
+    expect(old.data.message.body).toBeUndefined();
+    expect(old.data.message.id).toBeTypeOf("string");
+  });
+
   it("narrows event_type via switch", () => {
     const fixtures = mailEvents.map((f) => loadFixture<MailWebhookPayload>(f));
     for (const payload of fixtures) {

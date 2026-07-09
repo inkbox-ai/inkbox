@@ -146,6 +146,9 @@ class WebhookContextMailItemWire(TypedDict):
     created_at: str
     subject: str | None
     snippet: str | None
+    # Owning mailbox address; with ``id`` fetches the full body via
+    # messages.get(). NotRequired: payloads predating the feature omit it.
+    email_address: NotRequired[str | None]
 
 
 class WebhookContextTextItemWire(TypedDict):
@@ -296,6 +299,16 @@ class MailWebhookMessage(TypedDict):
     bcc_addresses: list[str] | None
     subject: str | None
     snippet: str | None
+    # Body fields: NotRequired because payloads predating the feature omit
+    # them. Present-with-``null`` on live payloads; populated (body_state
+    # ``complete``/``truncated``) only on inbound ``message.received``.
+    # ``email_address`` + ``id`` fetch the full body via messages.get().
+    email_address: NotRequired[str | None]
+    body: NotRequired[str | None]
+    body_state: NotRequired[Literal["complete", "truncated", "unavailable"] | None]
+    body_truncated: NotRequired[bool | None]
+    body_total_chars: NotRequired[int | None]
+    body_included_chars: NotRequired[int | None]
     direction: MessageDirectionWire
     status: MessageStatus
     has_attachments: bool
