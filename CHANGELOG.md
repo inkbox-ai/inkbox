@@ -4,6 +4,12 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.20 — Recognize spam-filter-blocked texts
+
+### Fixed
+
+- **`SmsDeliveryStatus` gains `blocked_spam_filter`.** The server persists this status on outbound texts blocked pre-carrier by the Inkbox outbound spam filter, and listing or fetching a conversation containing such a row crashed the Python SDK (`ValueError: 'blocked_spam_filter' is not a valid SmsDeliveryStatus`) and failed deserialization in Rust. All three SDKs now carry the variant. It appears on stored rows only (`texts.list` / `texts.get`); delivery webhooks never fire for blocked sends.
+
 ## 0.4.19 — Inbound email body on webhooks
 
 ### Added
