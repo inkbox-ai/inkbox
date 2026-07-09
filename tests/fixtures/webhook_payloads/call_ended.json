@@ -1,5 +1,5 @@
 {
-  "id": "evt_5c6f2a1e8b7d4f30a1c2e3d4f5a6b7c8",
+  "id": "evt_5c6f2a1e-8b7d-4f30-a1c2-e3d4f5a6b7c8",
   "event_type": "call.ended",
   "timestamp": "2026-07-06T18:22:41Z",
   "data": {
@@ -30,8 +30,8 @@
         {"party": "local", "text": "You're all set for Thursday at 2pm.", "ts_ms": 61200}
       ],
       "abridged": true,
-      "url": "https://api.inkbox.ai/api/v1/phone/calls/3eafefd0-a22f-4e9b-9eb1-8d59e3d9b85f/transcripts"
+      "url": "https://inkbox.ai/api/v1/phone/calls/3eafefd0-a22f-4e9b-9eb1-8d59e3d9b85f/transcripts"
     },
-    "transcript_url": "https://api.inkbox.ai/api/v1/phone/calls/3eafefd0-a22f-4e9b-9eb1-8d59e3d9b85f/transcripts"
+    "transcript_url": "https://inkbox.ai/api/v1/phone/calls/3eafefd0-a22f-4e9b-9eb1-8d59e3d9b85f/transcripts"
   }
 }
