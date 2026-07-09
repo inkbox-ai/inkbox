@@ -617,7 +617,13 @@ impl AgentIdentity {
         is_blocked: Option<bool>,
     ) -> Result<Vec<TextMessage>> {
         // Empty (default) date range — wire-identical to the original.
-        self.list_texts_filtered(limit, offset, is_read, is_blocked, &DateRangeFilter::default())
+        self.list_texts_filtered(
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
     }
 
     /// List text messages for this identity's phone number, additionally
@@ -867,9 +873,13 @@ impl AgentIdentity {
     ) -> Result<Vec<IMessageConversationSummary>> {
         self.require_imessage()?;
         let id = self.id();
-        self.inkbox
-            .imessages()
-            .list_conversations_filtered(Some(&id), limit, offset, is_blocked, filter)
+        self.inkbox.imessages().list_conversations_filtered(
+            Some(&id),
+            limit,
+            offset,
+            is_blocked,
+            filter,
+        )
     }
 
     /// Get one of this identity's iMessage conversations by ID.

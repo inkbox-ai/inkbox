@@ -57,7 +57,12 @@ impl MessagesResource {
     ) -> Result<Vec<Message>> {
         // Delegate with an empty (default) date range, which sends no extra
         // params — wire-identical to the original list.
-        self.list_filtered(email_address, page_size, direction, &DateRangeFilter::default())
+        self.list_filtered(
+            email_address,
+            page_size,
+            direction,
+            &DateRangeFilter::default(),
+        )
     }
 
     /// Fetch all messages in a mailbox, newest first, additionally narrowed by
