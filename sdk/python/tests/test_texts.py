@@ -14,6 +14,7 @@ from sample_data import (
     TEXT_MESSAGE_GROUP_DICT,
     TEXT_MESSAGE_MMS_DICT,
     TEXT_MESSAGE_OUTBOUND_QUEUED_DICT,
+    TEXT_MESSAGE_SPAM_BLOCKED_DICT,
 )
 from inkbox.phone.types import SmsDeliveryStatus, TextMessageOrigin
 
@@ -134,6 +135,15 @@ class TestTextsList:
             params={"limit": 50, "offset": 0, "is_blocked": True},
         )
         assert texts[0].is_blocked is True
+
+    def test_hydrates_spam_filter_blocked_row(self, client, transport):
+        """A pre-carrier spam-filter block must not crash list() hydration."""
+        transport.get.return_value = [TEXT_MESSAGE_SPAM_BLOCKED_DICT]
+
+        texts = client._texts.list(NUM_ID)
+
+        assert texts[0].delivery_status is SmsDeliveryStatus.BLOCKED_SPAM_FILTER
+        assert texts[0].error_code == "inkbox_spam_filter"
 
     def test_is_blocked_false(self, client, transport):
         """is_blocked=False keeps admin/JWT view clean of blocked spam."""
