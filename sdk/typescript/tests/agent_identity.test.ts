@@ -1,7 +1,7 @@
 // sdk/typescript/tests/agent_identity.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AgentIdentity } from "../src/agent_identity.js";
-import { CallOrigin, IncomingCallAction } from "../src/phone/types.js";
+import { CallMode, CallOrigin, IncomingCallAction } from "../src/phone/types.js";
 import { InkboxError } from "../src/_http.js";
 import type { Inkbox } from "../src/inkbox.js";
 import type { _AgentIdentityData } from "../src/identities/types.js";
@@ -66,8 +66,14 @@ function mockInkbox() {
     },
     _threads: { get: vi.fn() },
     _numbers: { provision: vi.fn() },
-    _calls: { place: vi.fn(), list: vi.fn(), transcripts: vi.fn() },
+    _calls: {
+      place: vi.fn(),
+      list: vi.fn(),
+      transcripts: vi.fn(),
+      postCallActions: vi.fn(),
+    },
     _incomingCallAction: { get: vi.fn(), set: vi.fn() },
+    _hostedAgent: { getConfig: vi.fn(), setConfig: vi.fn() },
     _texts: { send: vi.fn(), update: vi.fn(), updateConversation: vi.fn() },
     _idsResource: {
       get: vi.fn(),
@@ -340,6 +346,100 @@ describe("AgentIdentity phone helpers", () => {
     const result = await identity.placeCall({ toNumber: "+15551234567" });
 
     expect(result).toBe(placed);
+  });
+
+  it("placeCall forwards mode and reason for hosted placements", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.placeCall({
+      toNumber: "+15551234567",
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Book a table for two",
+    });
+
+    expect(ink._calls.place).toHaveBeenCalledWith({
+      toNumber: "+15551234567",
+      origination: CallOrigin.DEDICATED_NUMBER,
+      fromNumber: PARSED_PHONE.number,
+      clientWebsocketUrl: undefined,
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Book a table for two",
+    });
+  });
+
+  it("placeCall forwards mode and reason on shared origination too", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
+
+    await identity.placeCall({
+      toNumber: "+15551234567",
+      origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Confirm the appointment",
+    });
+
+    expect(ink._calls.place).toHaveBeenCalledWith({
+      toNumber: "+15551234567",
+      origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+      agentIdentityId: identity.id,
+      clientWebsocketUrl: undefined,
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Confirm the appointment",
+    });
+  });
+
+  it("listPostCallActions delegates to calls resource", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.postCallActions).mockResolvedValue([]);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    const result = await identity.listPostCallActions("call-1");
+
+    expect(ink._calls.postCallActions).toHaveBeenCalledWith("call-1");
+    expect(result).toEqual([]);
+  });
+
+  it("getHostedAgentConfig delegates scoped by identity id", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._hostedAgent.getConfig).mockResolvedValue({
+      agentIdentityId: "id-1",
+      voice: null,
+      model: null,
+      instructions: null,
+    });
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.getHostedAgentConfig();
+
+    expect(ink._hostedAgent.getConfig).toHaveBeenCalledWith({
+      agentIdentityId: identity.id,
+    });
+  });
+
+  it("setHostedAgentConfig delegates with identity id (full replace)", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._hostedAgent.setConfig).mockResolvedValue({
+      agentIdentityId: "id-1",
+      voice: "warm-voice",
+      model: null,
+      instructions: "Be brief.",
+    });
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.setHostedAgentConfig({
+      voice: "warm-voice",
+      instructions: "Be brief.",
+    });
+
+    expect(ink._hostedAgent.setConfig).toHaveBeenCalledWith({
+      voice: "warm-voice",
+      model: undefined,
+      instructions: "Be brief.",
+      agentIdentityId: identity.id,
+    });
   });
 
   it("listCalls delegates to calls resource scoped by identity id", async () => {

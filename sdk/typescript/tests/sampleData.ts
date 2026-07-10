@@ -108,6 +108,8 @@ export const RAW_PHONE_CALL = {
   ended_at: "2026-03-09T00:05:00Z",
   is_blocked: false,
   origin: "dedicated_number",
+  mode: "client_websocket",
+  reason: null,
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:05:00Z",
 };
@@ -158,6 +160,37 @@ export const RAW_INCOMING_CALL_ACTION_CONFIG = {
   incoming_call_action: "webhook",
   client_websocket_url: null,
   incoming_call_webhook_url: "https://agent.example.com/incoming-call",
+};
+
+export const RAW_HOSTED_AGENT_CONFIG = {
+  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
+  voice: "warm-voice",
+  model: "fast-model",
+  instructions: "Always offer to text a summary after the call.",
+};
+
+export const RAW_POST_CALL_ACTION = {
+  id: "ffff6666-0000-0000-0000-000000000001",
+  call_id: "bbbb2222-0000-0000-0000-000000000001",
+  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
+  seq: 1,
+  action: "Book cleaning Tue 9:30am",
+  details: "Dr. Chen's office confirmed availability.",
+  status: "open",
+  created_at: "2026-03-09T00:04:00Z",
+  updated_at: "2026-03-09T00:04:00Z",
+};
+
+export const RAW_POST_CALL_ACTION_CANCELED = {
+  id: "ffff6666-0000-0000-0000-000000000002",
+  call_id: "bbbb2222-0000-0000-0000-000000000001",
+  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
+  seq: 2,
+  action: "Send pricing PDF",
+  details: null,
+  status: "canceled",
+  created_at: "2026-03-09T00:04:30Z",
+  updated_at: "2026-03-09T00:04:45Z",
 };
 
 // ---- Texts ----

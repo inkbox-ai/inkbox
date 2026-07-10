@@ -111,3 +111,53 @@ describe("IncomingCallActionResource.set", () => {
     expect(config.incomingCallWebhookUrl).toBe("https://agent.example.com/incoming-call");
   });
 });
+
+describe("IncomingCallActionResource hosted_agent", () => {
+  it("sets hosted_agent with no URL keys on the wire", async () => {
+    const http = mockHttp();
+    vi.mocked(http.put).mockResolvedValue({
+      ...RAW_INCOMING_CALL_ACTION_CONFIG,
+      incoming_call_action: "hosted_agent",
+      incoming_call_webhook_url: null,
+    });
+    const res = new IncomingCallActionResource(http);
+
+    const config = await res.set({
+      incomingCallAction: IncomingCallAction.HOSTED_AGENT,
+      agentIdentityId: IDENTITY_ID,
+    });
+
+    // hosted_agent is the zero-prerequisite action: no URL keys sent.
+    expect(http.put).toHaveBeenCalledWith("/incoming-call-action", {
+      incoming_call_action: "hosted_agent",
+      agent_identity_id: IDENTITY_ID,
+    });
+    expect(config.incomingCallAction).toBe(IncomingCallAction.HOSTED_AGENT);
+    expect(config.clientWebsocketUrl).toBeNull();
+    expect(config.incomingCallWebhookUrl).toBeNull();
+  });
+
+  it("parses a hosted_agent config on get", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      ...RAW_INCOMING_CALL_ACTION_CONFIG,
+      incoming_call_action: "hosted_agent",
+      incoming_call_webhook_url: null,
+    });
+    const res = new IncomingCallActionResource(http);
+
+    const config = await res.get();
+
+    expect(config.incomingCallAction).toBe(IncomingCallAction.HOSTED_AGENT);
+  });
+
+  it("carries the hosted_agent wire value on the enum", () => {
+    expect(IncomingCallAction.HOSTED_AGENT).toBe("hosted_agent");
+    expect(Object.values(IncomingCallAction)).toEqual([
+      "auto_accept",
+      "auto_reject",
+      "webhook",
+      "hosted_agent",
+    ]);
+  });
+});

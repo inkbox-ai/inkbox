@@ -41,6 +41,7 @@ const EXPECTED_FIXTURES = [
   "text_group_delivered.json",
   "phone_incoming_call.json",
   "call_ended.json",
+  "call_ended_hosted.json",
   "call_ended_no_transcript.json",
 ] as const;
 
@@ -519,5 +520,37 @@ describe("CallEndedWebhookPayload", () => {
     const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
     expect(Array.isArray(payload.data.contacts)).toBe(true);
     expect(Array.isArray(payload.data.agent_identities)).toBe(true);
+  });
+
+  it("keeps parsing pre-hosted payloads that omit the new fields", () => {
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
+    // Optional keys: absent on old payloads, never a parse failure.
+    expect("mode" in payload.data.call).toBe(false);
+    expect("reason" in payload.data.call).toBe(false);
+    expect("outcome" in payload.data).toBe(false);
+    expect("post_call_actions" in payload.data).toBe(false);
+  });
+
+  it("rides mode/reason on data.call for hosted calls", () => {
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended_hosted.json");
+    const call = payload.data.call;
+    // mode/reason live on data.call (mirrors the call REST shape), not data.
+    expect(call.mode).toBe("hosted_agent");
+    expect(call.reason?.startsWith("Call the dental office")).toBe(true);
+    expect("mode" in payload.data).toBe(false);
+    expect("reason" in payload.data).toBe(false);
+  });
+
+  it("carries outcome and seq-ordered open post_call_actions for hosted calls", () => {
+    const payload = loadFixture<CallEndedWebhookPayload>("call_ended_hosted.json");
+    const data = payload.data;
+    expect(data.outcome).toBe("completed");
+    const actions = data.post_call_actions ?? [];
+    expect(actions.map((a) => a.seq)).toEqual([1, 2]);
+    expect(actions[0].action.startsWith("Add cleaning appointment")).toBe(true);
+    expect(actions[0].details).not.toBeNull();
+    expect(actions[1].details).toBeNull();
+    // Canceled rows are omitted from the payload — every shipped row is open.
+    expect(actions.every((a) => a.status === "open")).toBe(true);
   });
 });

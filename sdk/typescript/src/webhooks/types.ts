@@ -53,6 +53,10 @@ export type CallStatusWire =
   | "failed"
   | "canceled";
 
+export type CallModeWire = "client_websocket" | "hosted_agent";
+
+export type CallOutcomeWire = "completed" | "no_answer" | "declined" | "failed";
+
 export type HangupReasonWire =
   | "local"
   | "remote"
@@ -609,7 +613,10 @@ export type CallLifecycleWebhookEventType = "call.ended";
  * the webhook). `local_phone_number` is `null` and `origin` is
  * `"shared_imessage_number"` on shared-line calls (the pool line is never
  * surfaced). `duration_seconds` is the connected length in whole seconds, or
- * `null` when the call never connected.
+ * `null` when the call never connected. `mode` says who drove the call and
+ * `reason` carries the outbound hosted-call brief (`null` inbound and on
+ * `client_websocket` calls); both are optional only so payloads predating
+ * hosted calls still parse.
  */
 export interface WebhookPhoneCall {
   id: string;
@@ -624,6 +631,8 @@ export interface WebhookPhoneCall {
   created_at: string;
   updated_at: string;
   duration_seconds: number | null;
+  mode?: CallModeWire;
+  reason?: string | null;
 }
 
 /**
@@ -638,6 +647,21 @@ export interface WebhookCallTranscript {
   entries: WebhookTranscriptEntry[];
   abridged: boolean;
   url: string;
+}
+
+/**
+ * One open action item the hosted call agent recorded during the call.
+ *
+ * Rides `call.ended` in `seq` order. Canceled items are omitted from the
+ * payload (queryable via `GET /phone/calls/{id}/post-call-actions`), so
+ * `status` here is always `"open"`.
+ */
+export interface WebhookPostCallAction {
+  id: string;
+  seq: number;
+  action: string;
+  details: string | null;
+  status: string;
 }
 
 /** Wrapper object under the `call.ended` webhook `data` field. */
@@ -659,6 +683,18 @@ export interface CallEndedWebhookData {
    * owner's own key suffices).
    */
   transcript_url: string;
+  /**
+   * The hosted call's terminal result; `null` iff `data.call.mode` is
+   * `client_websocket`. Optional only so payloads predating hosted calls
+   * still parse.
+   */
+  outcome?: CallOutcomeWire | null;
+  /**
+   * The hosted agent's recorded todo list, `seq`-ascending. Always present
+   * on new payloads (empty for non-hosted calls / no todos); optional only
+   * so payloads predating hosted calls still parse.
+   */
+  post_call_actions?: WebhookPostCallAction[];
 }
 
 /**

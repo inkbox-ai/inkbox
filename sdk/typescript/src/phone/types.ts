@@ -72,11 +72,30 @@ export enum CallOrigin {
   SHARED_IMESSAGE_NUMBER = "shared_imessage_number",
 }
 
-/** What happens when a call comes in for an agent identity. */
+/**
+ * Who is the brain on a call.
+ *
+ * - `client_websocket` (default) — audio bridges to the caller's own
+ *   WebSocket server.
+ * - `hosted_agent` — the platform-hosted call agent drives the call; no
+ *   socket, no code, configured per identity via {@link HostedAgentConfig}.
+ */
+export enum CallMode {
+  CLIENT_WEBSOCKET = "client_websocket",
+  HOSTED_AGENT = "hosted_agent",
+}
+
+/**
+ * What happens when a call comes in for an agent identity.
+ *
+ * `hosted_agent` answers with the platform-hosted call agent and is the
+ * only action that requires neither a WebSocket nor a webhook URL.
+ */
 export enum IncomingCallAction {
   AUTO_ACCEPT = "auto_accept",
   AUTO_REJECT = "auto_reject",
   WEBHOOK = "webhook",
+  HOSTED_AGENT = "hosted_agent",
 }
 
 /**
@@ -228,6 +247,10 @@ export interface PhoneCall {
   isBlocked: boolean;
   /** Where this call originated. Defaults to `dedicated_number`. */
   origin: CallOrigin;
+  /** Who drove the call. Defaults to `"client_websocket"`. */
+  mode: string;
+  /** Outbound hosted-call brief; `null` on inbound and client-driven calls. */
+  reason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -268,6 +291,38 @@ export interface IncomingCallActionConfig {
   incomingCallAction: IncomingCallAction;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
+}
+
+/**
+ * Per-identity hosted call agent configuration.
+ *
+ * `voice` / `model` / `instructions` are all nullable — `null` means the
+ * server default applies for that field.
+ */
+export interface HostedAgentConfig {
+  agentIdentityId: string;
+  voice: string | null;
+  model: string | null;
+  instructions: string | null;
+}
+
+/**
+ * An action item the hosted call agent recorded during a call.
+ *
+ * `status` is `"open"` or `"canceled"`. Canceled rows are kept for audit
+ * and returned by `CallsResource.postCallActions`, but omitted from the
+ * `call.ended` webhook payload.
+ */
+export interface PostCallAction {
+  id: string;
+  callId: string;
+  agentIdentityId: string;
+  seq: number;
+  action: string;
+  details: string | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface TextMediaItem {
@@ -418,6 +473,10 @@ export interface RawPhoneCall {
   // Optional for back-compat; parser coerces missing/null to
   // dedicated_number.
   origin?: string;
+  // Optional for back-compat; parser coerces missing/null to
+  // client_websocket.
+  mode?: string | null;
+  reason?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -510,6 +569,25 @@ export interface RawIncomingCallActionConfig {
   incoming_call_webhook_url?: string | null;
 }
 
+export interface RawHostedAgentConfig {
+  agent_identity_id: string;
+  voice?: string | null;
+  model?: string | null;
+  instructions?: string | null;
+}
+
+export interface RawPostCallAction {
+  id: string;
+  call_id: string;
+  agent_identity_id: string;
+  seq: number;
+  action: string;
+  details?: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // ---- parsers ----
 
 export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
@@ -595,6 +673,9 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     endedAt: r.ended_at ? new Date(r.ended_at) : null,
     isBlocked: r.is_blocked ?? false,
     origin: (r.origin as CallOrigin) ?? CallOrigin.DEDICATED_NUMBER,
+    // Coerce a null/missing mode to client_websocket for back-compat.
+    mode: r.mode ?? CallMode.CLIENT_WEBSOCKET,
+    reason: r.reason ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -640,6 +721,29 @@ export function parseIncomingCallActionConfig(
     incomingCallAction: r.incoming_call_action as IncomingCallAction,
     clientWebsocketUrl: r.client_websocket_url ?? null,
     incomingCallWebhookUrl: r.incoming_call_webhook_url ?? null,
+  };
+}
+
+export function parseHostedAgentConfig(r: RawHostedAgentConfig): HostedAgentConfig {
+  return {
+    agentIdentityId: r.agent_identity_id,
+    voice: r.voice ?? null,
+    model: r.model ?? null,
+    instructions: r.instructions ?? null,
+  };
+}
+
+export function parsePostCallAction(r: RawPostCallAction): PostCallAction {
+  return {
+    id: r.id,
+    callId: r.call_id,
+    agentIdentityId: r.agent_identity_id,
+    seq: r.seq,
+    action: r.action,
+    details: r.details ?? null,
+    status: r.status,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
   };
 }
 
