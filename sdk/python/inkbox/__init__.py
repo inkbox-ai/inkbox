@@ -199,6 +199,10 @@ from inkbox.signing_keys import SigningKey, SigningKeyStatus, verify_webhook
 # Receiver-side webhook payload types
 from inkbox.webhooks import (
     CallDirectionWire,
+    CallEndedWebhookData,
+    CallEndedWebhookPayload,
+    CallLifecycleWebhookEventType,
+    CallOriginWire,
     CallStatusWire,
     HangupReasonWire,
     MailContactBucket,
@@ -235,6 +239,7 @@ from inkbox.webhooks import (
     TextWebhookMessage,
     TextWebhookPayload,
     WebhookAgentIdentity,
+    WebhookCallTranscript,
     WebhookContact,
     WebhookContextBlockWire,
     WebhookContextCallItemWire,
@@ -247,6 +252,7 @@ from inkbox.webhooks import (
     WebhookContextWire,
     WebhookMailAgentIdentity,
     WebhookMailContact,
+    WebhookPhoneCall,
     WebhookTranscriptEntryWire,
 )
 
@@ -431,6 +437,10 @@ __all__ = [
     "verify_webhook",
     # Receiver-side webhook payload types
     "CallDirectionWire",
+    "CallEndedWebhookData",
+    "CallEndedWebhookPayload",
+    "CallLifecycleWebhookEventType",
+    "CallOriginWire",
     "CallStatusWire",
     "HangupReasonWire",
     "MailContactBucket",
@@ -467,6 +477,7 @@ __all__ = [
     "TextWebhookMessage",
     "TextWebhookPayload",
     "WebhookAgentIdentity",
+    "WebhookCallTranscript",
     "WebhookContact",
     "WebhookContextBlockWire",
     "WebhookContextCallItemWire",
@@ -479,6 +490,7 @@ __all__ = [
     "WebhookContextWire",
     "WebhookMailAgentIdentity",
     "WebhookMailContact",
+    "WebhookPhoneCall",
     "WebhookTranscriptEntryWire",
     # Webhook subscriptions
     "WebhookContextClassConfig",

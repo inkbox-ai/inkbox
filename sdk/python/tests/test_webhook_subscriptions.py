@@ -361,6 +361,42 @@ class TestAgentIdentityOwner:
                 event_types=["text.received"],
             )
 
+    def test_accepts_call_ended_on_agent_identity_owner(self):
+        res, http = _resource()
+        http.post.return_value = {
+            **RAW_IDENTITY_SUBSCRIPTION,
+            "event_types": ["call.ended"],
+        }
+
+        sub = res.create(
+            agent_identity_id=_IDENTITY_ID,
+            url="https://x.example.com/hook",
+            event_types=["call.ended"],
+        )
+
+        _, kwargs = http.post.call_args
+        assert kwargs["json"]["event_types"] == ["call.ended"]
+        assert kwargs["json"]["agent_identity_id"] == _IDENTITY_ID
+        assert sub.agent_identity_id == UUID(_IDENTITY_ID)
+
+    def test_rejects_mixing_imessage_and_call_ended_on_one_sub(self):
+        res, _http = _resource()
+        with pytest.raises(ValueError, match="same channel"):
+            res.create(
+                agent_identity_id=_IDENTITY_ID,
+                url="https://x.example.com/hook",
+                event_types=["imessage.received", "call.ended"],
+            )
+
+    def test_rejects_call_ended_on_mailbox_owner(self):
+        res, _http = _resource()
+        with pytest.raises(ValueError, match="agent_identity"):
+            res.create(
+                mailbox_id=_MAILBOX_ID,
+                url="https://x.example.com/hook",
+                event_types=["call.ended"],
+            )
+
     def test_rejects_multiple_owners_including_identity(self):
         res, _http = _resource()
         with pytest.raises(ValueError, match="Exactly one"):

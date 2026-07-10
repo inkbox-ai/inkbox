@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.20 — Date-range filters, call.ended receivers, external hangup, spam-filter status
+
+### Added
+
+- **Date-range filters.** `messages.list(...)` / `identity.iterEmails(...)` (and `iterUnreadEmails`), `calls.list(...)` / `identity.listCalls(...)`, `texts.list(...)` / `identity.listTexts(...)`, `texts.listConversations(...)` / `identity.listTextConversations(...)`, `imessages.list(...)` / `identity.listIMessages(...)`, and `imessages.listConversations(...)` / `identity.listIMessageConversations(...)` accept optional `startDatetime` / `endDatetime` / `tz` on their options object. They filter on the resource's `created_at`: bare dates resolve to calendar days in `tz` (default UTC) with `endDatetime` whole-day inclusive; datetimes with an explicit `Z`/offset are exact instants (`tz` ignored); naive datetimes are interpreted in `tz`. Params are sent only when defined, so omitting all three preserves current behavior exactly (no filtering; ordering and pagination unchanged). The server owns resolution.
+- **`call.ended` webhook receivers + external hangup.** New receiver types `CallEndedWebhookPayload` (with `CallEndedWebhookData`) / `WebhookPhoneCall` / `WebhookCallTranscript` and the `CallLifecycleWebhookEventType` / `CallOriginWire` literals; `webhooks.subscriptions.create(...)` accepts `call.ended` on an `agentIdentityId` owner; `calls.hangup(callId)` and `identity.hangupCall(callId)` end a live call from outside it (`POST /phone/calls/{id}/hangup`; already-ended calls surface the server's 409).
+
+### Fixed
+
+- **`SmsDeliveryStatus` gains `BLOCKED_SPAM_FILTER`.** Stored rows blocked pre-carrier by the outbound spam filter now type-check; the value appears on stored rows only — delivery webhooks never fire for blocked sends.
+
+
 ## 0.4.16 — Configurable webhook context + open tracking
 
 ### Added

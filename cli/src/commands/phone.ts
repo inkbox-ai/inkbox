@@ -45,10 +45,20 @@ export function registerPhoneCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--start-datetime <date>", "Only calls with created_at >= this date/instant")
+    .option("--end-datetime <date>", "Only calls with created_at <= this date (bare date is whole-day inclusive)")
+    .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; limit: string; offset: string },
+        cmdOpts: {
+          identity: string;
+          limit: string;
+          offset: string;
+          startDatetime?: string;
+          endDatetime?: string;
+          tz?: string;
+        },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
@@ -56,6 +66,9 @@ export function registerPhoneCommands(program: Command): void {
         const calls = await identity.listCalls({
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
+          startDatetime: cmdOpts.startDatetime,
+          endDatetime: cmdOpts.endDatetime,
+          tz: cmdOpts.tz,
         });
         output(calls, {
           json: !!opts.json,
@@ -88,6 +101,35 @@ export function registerPhoneCommands(program: Command): void {
           json: !!opts.json,
           columns: ["seq", "party", "text", "createdAt"],
         });
+      }),
+    );
+
+  phone
+    .command("hangup <call-id>")
+    .description("Hang up a live call")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        callId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const call = await identity.hangupCall(callId);
+        output(
+          {
+            id: call.id,
+            // Hangup applies to inbound calls too, so label the peer as the
+            // remote party (with direction) rather than a destination "to".
+            direction: call.direction,
+            remotePhoneNumber: call.remotePhoneNumber,
+            status: call.status,
+            hangupReason: call.hangupReason,
+          },
+          { json: !!opts.json },
+        );
       }),
     );
 

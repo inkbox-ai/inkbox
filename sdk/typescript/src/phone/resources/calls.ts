@@ -43,6 +43,9 @@ export class CallsResource {
     limit?: number;
     offset?: number;
     isBlocked?: boolean;
+    startDatetime?: string;
+    endDatetime?: string;
+    tz?: string;
   }): Promise<PhoneCall[]> {
     const params: Record<string, string | number | boolean> = {
       limit: options?.limit ?? 50,
@@ -55,6 +58,9 @@ export class CallsResource {
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
     }
+    if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
+    if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
+    if (options?.tz !== undefined) params["tz"] = options.tz;
     const data = await this.http.get<RawPhoneCall[]>("/calls", params);
     return data.map(parsePhoneCall);
   }
@@ -66,6 +72,22 @@ export class CallsResource {
    */
   async get(callId: string): Promise<PhoneCall> {
     const data = await this.http.get<RawPhoneCall>(`/calls/${callId}`);
+    return parsePhoneCall(data);
+  }
+
+  /**
+   * Hang up a live call by ID, from outside the call.
+   *
+   * The lever for anything not on the call itself (tests, operators,
+   * another process); the agent on the call keeps ending it in-band. The
+   * carrier confirms the teardown asynchronously, so the returned call can
+   * still show its live status for a moment. A call that has already ended
+   * (or has no active carrier leg yet) surfaces the server's 409 verbatim.
+   *
+   * @param callId - UUID of the call.
+   */
+  async hangup(callId: string): Promise<PhoneCall> {
+    const data = await this.http.post<RawPhoneCall>(`/calls/${callId}/hangup`);
     return parsePhoneCall(data);
   }
 

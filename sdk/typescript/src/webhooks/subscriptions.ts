@@ -3,10 +3,13 @@
  *
  * Replaces the legacy per-resource `webhook_url` columns on mailboxes
  * and phone numbers. Use this resource to attach HTTPS receivers to
- * mail (`message.*`), phone-text (`text.*`), or iMessage (`imessage.*`)
- * events. Mail and text subscriptions are owned by the mailbox / phone
- * number; iMessage subscriptions are owned by the agent identity, since
- * shared iMessage pool numbers are not org resources. Incoming-call
+ * mail (`message.*`), phone-text (`text.*`), iMessage (`imessage.*`), or
+ * post-call lifecycle (`call.ended`) events. Mail and text subscriptions
+ * are owned by the mailbox / phone number; iMessage and call-lifecycle
+ * subscriptions are owned by the agent identity, since shared iMessage
+ * pool numbers are not org resources and a call is only ever owned by its
+ * identity. An identity may hold an iMessage sub and a call-lifecycle sub,
+ * but a single subscription carries only one channel. Incoming-call
  * webhooks (`phone.incoming_call`) are still set on the phone-number
  * resource itself — that channel is a synchronous control-plane
  * callback whose response body drives call routing, so fan-out is not
@@ -170,28 +173,51 @@ function assertNoIncomingCall(eventTypes: string[]): void {
   }
 }
 
-const OWNER_EVENT_PREFIXES: Record<string, string> = {
-  mailbox: "message.",
-  phone_number: "text.",
-  agent_identity: "imessage.",
+// Wire event-type prefix → the owning resource whose channel it belongs to.
+// An agent identity owns two channels (iMessage + post-call lifecycle), so two
+// prefixes map to it; a single subscription may still only carry one channel.
+const EVENT_PREFIX_TO_OWNER: Array<[string, string]> = [
+  ["message.", "mailbox"],
+  ["text.", "phone_number"],
+  ["imessage.", "agent_identity"],
+  ["call.", "agent_identity"],
+];
+
+// Owner resource → the event-type prefixes it may subscribe to.
+const OWNER_EVENT_PREFIXES: Record<string, string[]> = {
+  mailbox: ["message."],
+  phone_number: ["text."],
+  agent_identity: ["imessage.", "call."],
 };
 
 function assertChannelCoherence(
   owner: string,
   eventTypes: string[],
 ): void {
-  const expectedPrefix = OWNER_EVENT_PREFIXES[owner];
+  const allowed = OWNER_EVENT_PREFIXES[owner];
+  // The first event's prefix fixes the channel; every event must share it so
+  // one subscription never straddles two channels (e.g. imessage.* + call.ended).
+  let channelPrefix: string | null = null;
   for (const e of eventTypes) {
-    if (e.startsWith(expectedPrefix)) continue;
-    for (const [otherOwner, otherPrefix] of Object.entries(OWNER_EVENT_PREFIXES)) {
-      if (otherOwner !== owner && e.startsWith(otherPrefix)) {
-        throw new Error(
-          `event_type '${e}' does not belong to the ${owner} ` +
-          `channel (it belongs to ${otherOwner})`,
-        );
-      }
+    const match = EVENT_PREFIX_TO_OWNER.find(([prefix]) => e.startsWith(prefix));
+    if (match === undefined) {
+      throw new Error(`event_type '${e}' does not belong to any known channel`);
     }
-    throw new Error(`event_type '${e}' does not belong to any known channel`);
+    const [prefix, targetOwner] = match;
+    if (!allowed.includes(prefix)) {
+      throw new Error(
+        `event_type '${e}' does not belong to the ${owner} ` +
+        `channel (it belongs to ${targetOwner})`,
+      );
+    }
+    if (channelPrefix === null) {
+      channelPrefix = prefix;
+    } else if (prefix !== channelPrefix) {
+      throw new Error(
+        `event_type '${e}' does not belong to the same channel as the ` +
+        `other event types in this subscription`,
+      );
+    }
   }
   // INCOMING_CALL is rejected by assertNoIncomingCall earlier.
 }
@@ -306,7 +332,9 @@ export class WebhookSubscriptionsResource {
    * `phoneNumberId` / `agentIdentityId` is required; `eventTypes` must
    * be a non-empty list of distinct values belonging to the owner's
    * channel (mailbox → `message.*`, phone number → `text.*`, agent
-   * identity → `imessage.*`).
+   * identity → `imessage.*` or `call.ended`). One subscription carries a
+   * single channel, so an identity sub may not mix `imessage.*` with
+   * `call.ended`.
    *
    * Returns a {@link WebhookSubscriptionCreateResponse}. Its `signingKey`
    * is populated **once** when this is the first subscription for an

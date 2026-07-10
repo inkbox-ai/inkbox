@@ -38,6 +38,7 @@ use uuid::Uuid;
 use crate::client::Inkbox;
 use crate::credentials::Credentials;
 use crate::error::{InkboxError, Result};
+use crate::filters::DateRangeFilter;
 use crate::identities::types::{
     AgentIdentityData, IdentityAccess, IdentityMailbox, IdentityPhoneNumber,
 };
@@ -382,8 +383,26 @@ impl AgentIdentity {
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
     ) -> Result<Vec<Message>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.iter_emails_filtered(page_size, direction, &DateRangeFilter::default())
+    }
+
+    /// Fetch all emails in this identity's inbox, newest first, additionally
+    /// narrowed by a `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::iter_emails`] but also forwards the
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
+    /// nothing extra.
+    pub fn iter_emails_filtered(
+        &self,
+        page_size: Option<i64>,
+        direction: Option<MessageDirection>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<Message>> {
         let email = self.require_mailbox()?;
-        self.inkbox.messages().list(&email, page_size, direction)
+        self.inkbox
+            .messages()
+            .list_filtered(&email, page_size, direction, filter)
     }
 
     /// Fetch all unread emails in this identity's inbox, newest first.
@@ -395,7 +414,20 @@ impl AgentIdentity {
         page_size: Option<i64>,
         direction: Option<MessageDirection>,
     ) -> Result<Vec<Message>> {
-        let all = self.iter_emails(page_size, direction)?;
+        // Empty (default) date range — wire-identical to the original.
+        self.iter_unread_emails_filtered(page_size, direction, &DateRangeFilter::default())
+    }
+
+    /// Fetch all unread emails, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`]. A default filter behaves exactly like
+    /// [`AgentIdentity::iter_unread_emails`].
+    pub fn iter_unread_emails_filtered(
+        &self,
+        page_size: Option<i64>,
+        direction: Option<MessageDirection>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<Message>> {
+        let all = self.iter_emails_filtered(page_size, direction, filter)?;
         Ok(all.into_iter().filter(|m| !m.is_read).collect())
     }
 
@@ -493,15 +525,37 @@ impl AgentIdentity {
         offset: i64,
         is_blocked: Option<bool>,
     ) -> Result<Vec<PhoneCall>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_calls_filtered(limit, offset, is_blocked, &DateRangeFilter::default())
+    }
+
+    /// List calls made to/from this identity, additionally narrowed by a
+    /// `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_calls`] but also forwards the
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
+    /// nothing extra.
+    pub fn list_calls_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<PhoneCall>> {
         let id = self.id().to_string();
         self.inkbox
             .calls()
-            .list(Some(&id), limit, offset, is_blocked)
+            .list_filtered(Some(&id), limit, offset, is_blocked, filter)
     }
 
     /// List transcript segments for a specific call.
     pub fn list_transcripts(&self, call_id: &str) -> Result<Vec<PhoneTranscript>> {
         self.inkbox.calls().transcripts(call_id)
+    }
+
+    /// Hang up one of this identity's live calls, from outside the call.
+    pub fn hangup_call(&self, call_id: &str) -> Result<PhoneCall> {
+        self.inkbox.calls().hangup(call_id)
     }
 
     /// Get this identity's inbound-call handling config.
@@ -567,10 +621,35 @@ impl AgentIdentity {
         is_read: Option<bool>,
         is_blocked: Option<bool>,
     ) -> Result<Vec<TextMessage>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_texts_filtered(
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List text messages for this identity's phone number, additionally
+    /// narrowed by a `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_texts`] but also forwards the
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
+    /// nothing extra.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_texts_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<TextMessage>> {
         let number_id = self.require_phone_id()?;
         self.inkbox
             .texts()
-            .list(&number_id, limit, offset, is_read, is_blocked)
+            .list_filtered(&number_id, limit, offset, is_read, is_blocked, filter)
     }
 
     /// Get a single text message by ID.
@@ -595,13 +674,39 @@ impl AgentIdentity {
         is_blocked: Option<bool>,
         include_groups: bool,
     ) -> Result<Vec<TextConversationSummary>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_text_conversations_filtered(
+            limit,
+            offset,
+            is_blocked,
+            include_groups,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List text conversations, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_text_conversations`] but also
+    /// forwards the filter's `start_datetime` / `end_datetime` / `tz`. A default filter
+    /// sends nothing extra.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_text_conversations_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<TextConversationSummary>> {
         let number_id = self.require_phone_id()?;
-        self.inkbox.texts().list_conversations(
+        self.inkbox.texts().list_conversations_filtered(
             &number_id,
             limit,
             offset,
             is_blocked,
             include_groups,
+            filter,
         )
     }
 
@@ -689,15 +794,43 @@ impl AgentIdentity {
         is_read: Option<bool>,
         is_blocked: Option<bool>,
     ) -> Result<Vec<IMessage>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_imessages_filtered(
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List this identity's iMessages, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_imessages`] but also forwards the
+    /// filter's `start_datetime` / `end_datetime` / `tz`. A default filter sends
+    /// nothing extra.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_imessages_filtered(
+        &self,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<IMessage>> {
         self.require_imessage()?;
         let id = self.id();
-        self.inkbox.imessages().list(
+        self.inkbox.imessages().list_filtered(
             Some(&id),
             conversation_id,
             limit,
             offset,
             is_read,
             is_blocked,
+            filter,
         )
     }
 
@@ -721,11 +854,37 @@ impl AgentIdentity {
         offset: i64,
         is_blocked: Option<bool>,
     ) -> Result<Vec<IMessageConversationSummary>> {
+        // Empty (default) date range — wire-identical to the original.
+        self.list_imessage_conversations_filtered(
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List this identity's iMessage conversations, additionally narrowed by a
+    /// `created_at` [`DateRangeFilter`].
+    ///
+    /// Identical to [`AgentIdentity::list_imessage_conversations`] but also
+    /// forwards the filter's `start_datetime` / `end_datetime` / `tz`. A default filter
+    /// sends nothing extra.
+    pub fn list_imessage_conversations_filtered(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<IMessageConversationSummary>> {
         self.require_imessage()?;
         let id = self.id();
-        self.inkbox
-            .imessages()
-            .list_conversations(Some(&id), limit, offset, is_blocked)
+        self.inkbox.imessages().list_conversations_filtered(
+            Some(&id),
+            limit,
+            offset,
+            is_blocked,
+            filter,
+        )
     }
 
     /// Get one of this identity's iMessage conversations by ID.
@@ -1396,6 +1555,33 @@ mod tests {
         let calls = identity.list_calls(10, 2, Some(false)).unwrap();
         mock.assert();
         assert_eq!(calls.len(), 1);
+    }
+
+    #[test]
+    fn hangup_call_delegates_to_calls_resource() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/hangup");
+            then.status(200).json_body(json!({
+                "id": "22222222-2222-2222-2222-222222222222",
+                "local_phone_number": "+15550001111",
+                "remote_phone_number": "+15550002222",
+                "direction": "outbound",
+                "status": "answered",
+                "hangup_reason": "local",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-01T00:00:01+00:00",
+                "is_blocked": false,
+                "origin": "dedicated_number"
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let call = identity
+            .hangup_call("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(call.hangup_reason.as_deref(), Some("local"));
     }
 
     #[test]

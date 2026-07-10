@@ -239,11 +239,17 @@ All phone commands are identity-scoped and require `-i <handle>`.
 ```bash
 inkbox phone call -i <handle> --to +15551234567 --ws-url wss://example.com/ws
 inkbox phone calls -i <handle> --limit 10 --offset 0
+inkbox phone hangup <call-id> -i <handle>
 inkbox phone transcripts <call-id> -i <handle>
 inkbox phone search-transcripts -i <handle> -q "refund" --party remote
 ```
 
 Before placing a call, confirm the destination number and websocket URL with the user.
+
+`inkbox phone hangup` ends a live call from outside it. The carrier
+confirms the teardown asynchronously, so the printed call can still show
+its live status for a moment; a call that has already ended (or has no
+active carrier leg yet) surfaces the server's 409.
 
 ## Text Messages
 
@@ -491,6 +497,8 @@ inkbox webhook subscription create --phone-number-id <id> --url <url> \
   --event-type text.received --event-type text.delivered
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type imessage.received --event-type imessage.reaction_received
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
+  --event-type call.ended
 # Opt into per-class conversation context on received events (count:N | window:H):
 inkbox webhook subscription create --mailbox-id <id> --url <url> \
   --event-type message.received --context-email count:10 --context-texts window:24
@@ -524,9 +532,18 @@ any of:
   `imessage.delivery_failed`. Subscribe via `inkbox webhook
   subscription create --agent-identity-id ...` — owned by the agent
   identity, since shared iMessage pool numbers are not org resources.
+- **Call lifecycle** (envelope, fire-and-forget + replayable):
+  `call.ended`. Subscribe via `inkbox webhook subscription create
+  --agent-identity-id ...` — owned by the agent identity, like iMessage.
+  The payload carries the call, resolved contacts/identities, an
+  always-present `data.transcript_url` (authoritative verbatim), and an
+  inline abridged `data.transcript` when the platform captured a
+  transcript for the call (otherwise `null`). One subscription carries
+  a single channel, so an identity sub cannot mix `imessage.*` with
+  `call.ended`.
 - **Inbound call** (flat, no envelope; response controls call routing).
   Not subscribable; URL stays on the phone-number resource as
-  `incomingCallWebhookUrl`.
+  `incomingCallWebhookUrl` (contrast the replayable `call.ended` above).
 
 Mail and text payloads carry `data.contacts` and
 `data.agent_identities` (both always-present lists; mail entries also

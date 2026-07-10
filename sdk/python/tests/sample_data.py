@@ -108,6 +108,29 @@ TEXT_MESSAGE_MMS_DICT = {
     "updated_at": "2026-03-09T00:12:00Z",
 }
 
+TEXT_MESSAGE_SPAM_BLOCKED_DICT = {
+    "id": "dddd4444-0000-0000-0000-0000000000ee",
+    "direction": "outbound",
+    "local_phone_number": "+18335794607",
+    "remote_phone_number": "+15551234567",
+    "text": "**Bold** reads as bot traffic",
+    "type": "sms",
+    "media": None,
+    "is_read": True,
+    "delivery_status": "blocked_spam_filter",
+    "origin": "user_initiated",
+    "error_code": "inkbox_spam_filter",
+    "error_detail": "Markdown formatting reads as bot traffic in SMS.",
+    "sent_at": None,
+    "delivered_at": None,
+    "failed_at": "2026-03-09T00:12:00Z",
+    "conversation_id": "eeee1111-0000-0000-0000-000000000001",
+    "sender_phone_number": None,
+    "recipients": None,
+    "created_at": "2026-03-09T00:12:00Z",
+    "updated_at": "2026-03-09T00:12:00Z",
+}
+
 TEXT_MESSAGE_OUTBOUND_QUEUED_DICT = {
     "id": "dddd4444-0000-0000-0000-0000000000ff",
     "direction": "outbound",

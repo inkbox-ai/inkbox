@@ -5,6 +5,7 @@ use std::sync::Arc;
 use serde_json::Map;
 
 use crate::error::Result;
+use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript};
 
@@ -38,6 +39,36 @@ impl CallsResource {
         offset: i64,
         is_blocked: Option<bool>,
     ) -> Result<Vec<PhoneCall>> {
+        // Delegate to the filtered variant with an empty (default) date range,
+        // which sends no extra params — wire-identical to the original list.
+        self.list_filtered(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+        )
+    }
+
+    /// List calls, newest first, additionally narrowed by a `created_at`
+    /// [`DateRangeFilter`].
+    ///
+    /// Identical to [`CallsResource::list`] but also forwards the filter's
+    /// `start_datetime` / `end_datetime` / `tz`. A default filter sends nothing extra,
+    /// so this behaves exactly like `list`.
+    ///
+    /// # Arguments
+    /// * `agent_identity_id` / `limit` / `offset` / `is_blocked` - See
+    ///   [`CallsResource::list`].
+    /// * `filter` - Optional `created_at` date-range bounds.
+    pub fn list_filtered(
+        &self,
+        agent_identity_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<PhoneCall>> {
         // Always send limit + offset; scope by identity + filter only when set.
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -47,6 +78,7 @@ impl CallsResource {
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
         }
+        filter.apply(&mut params);
         let data = self.http.get("/calls", &params)?;
         Ok(serde_json::from_value(data)?)
     }
@@ -59,6 +91,28 @@ impl CallsResource {
         let data = self
             .http
             .get(&format!("/calls/{call_id}"), crate::http::NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Hang up a live call by ID, from outside the call.
+    ///
+    /// The lever for anything not on the call itself (tests, operators,
+    /// another process); the agent on the call keeps ending it in-band. The
+    /// carrier confirms the teardown asynchronously, so the returned call can
+    /// still show its live status for a moment. A call that has already ended
+    /// (or has no active carrier leg yet) surfaces the server's 409 verbatim.
+    ///
+    /// # Arguments
+    /// * `call_id` - UUID (or string) of the call.
+    ///
+    /// # Returns
+    /// The call record as of the hangup request.
+    pub fn hangup(&self, call_id: &str) -> Result<PhoneCall> {
+        let data = self.http.post(
+            &format!("/calls/{call_id}/hangup"),
+            None::<&serde_json::Value>,
+            crate::http::NO_QUERY,
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -201,6 +255,29 @@ mod tests {
     }
 
     #[test]
+    fn list_filtered_sends_date_range_params_when_set() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls")
+                .query_param("start_datetime", "2026-07-01")
+                .query_param("end_datetime", "2026-07-06")
+                .query_param("tz", "America/New_York");
+            then.status(200).json_body(json!([]));
+        });
+        let filter = crate::DateRangeFilter {
+            start_datetime: Some("2026-07-01".to_string()),
+            end_datetime: Some("2026-07-06".to_string()),
+            tz: Some("America/New_York".to_string()),
+        };
+        client(&server)
+            .calls()
+            .list_filtered(None, 50, 0, None, &filter)
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
     fn list_omits_identity_and_blocked_params_when_none() {
         // Custom matcher: exactly limit + offset, nothing else on the wire.
         fn only_limit_and_offset(req: &HttpMockRequest) -> bool {
@@ -290,6 +367,65 @@ mod tests {
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].seq, 0);
         assert_eq!(segments[1].text, "Hello!");
+    }
+
+    #[test]
+    fn hangup_posts_and_returns_call() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/hangup");
+            // Teardown is async at the carrier: the row can come back still live.
+            then.status(200).json_body(json!({
+                "id": "22222222-2222-2222-2222-222222222222",
+                "local_phone_number": "+15550001111",
+                "remote_phone_number": "+15550002222",
+                "direction": "outbound",
+                "status": "answered",
+                "hangup_reason": "local",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-01T00:00:01+00:00",
+                "is_blocked": false,
+                "origin": "dedicated_number"
+            }));
+        });
+        let call = client(&server)
+            .calls()
+            .hangup("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(call.status, "answered");
+        assert_eq!(call.hangup_reason.as_deref(), Some("local"));
+    }
+
+    #[test]
+    fn hangup_409_already_ended_maps_to_api_error() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/hangup");
+            then.status(409).json_body(json!({
+                "detail": {
+                    "error": "call_already_ended",
+                    "message": "Call has already ended."
+                }
+            }));
+        });
+        let err = client(&server)
+            .calls()
+            .hangup("22222222-2222-2222-2222-222222222222")
+            .unwrap_err();
+        match err {
+            InkboxError::Api {
+                status_code,
+                detail,
+            } => {
+                assert_eq!(status_code, 409);
+                let obj = detail.as_object().expect("structured detail");
+                assert_eq!(obj["error"], "call_already_ended");
+            }
+            other => panic!("expected InkboxError::Api, got {other:?}"),
+        }
     }
 
     #[test]

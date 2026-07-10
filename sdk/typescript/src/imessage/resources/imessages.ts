@@ -144,6 +144,9 @@ export class IMessagesResource {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<IMessage[]> {
     const params: Record<string, string | number | boolean> = {
@@ -162,6 +165,9 @@ export class IMessagesResource {
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
     }
+    if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
+    if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
+    if (options?.tz !== undefined) params["tz"] = options.tz;
     const data = await this.http.get<RawIMessage[]>("/messages", params);
     return data.map(parseIMessage);
   }
@@ -212,6 +218,9 @@ export class IMessagesResource {
       limit?: number;
       offset?: number;
       isBlocked?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<IMessageConversationSummary[]> {
     const params: Record<string, string | number | boolean> = {
@@ -224,6 +233,9 @@ export class IMessagesResource {
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
     }
+    if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
+    if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
+    if (options?.tz !== undefined) params["tz"] = options.tz;
     const data = await this.http.get<RawIMessageConversationSummary[]>(
       "/conversations",
       params,

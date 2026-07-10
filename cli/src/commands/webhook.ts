@@ -149,7 +149,7 @@ function registerSubscriptionCommands(parent: Command): void {
     .description("Create a webhook subscription. Exactly one of --mailbox-id / --phone-number-id / --agent-identity-id is required.")
     .option("--mailbox-id <id>", "Owning mailbox id")
     .option("--phone-number-id <id>", "Owning phone number id")
-    .option("--agent-identity-id <id>", "Owning agent identity id (for imessage.* events)")
+    .option("--agent-identity-id <id>", "Owning agent identity id (for imessage.* or call.ended events)")
     .requiredOption("--url <url>", "HTTPS destination for delivered events")
     .requiredOption(
       "--event-type <type>",

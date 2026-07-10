@@ -116,6 +116,9 @@ pub enum SmsDeliveryStatus {
     DeliveryFailed,
     DeliveryUnconfirmed,
     SendingFailed,
+    /// Blocked pre-carrier by the Inkbox outbound spam filter; appears on
+    /// stored rows (list/get), never on delivery webhooks.
+    BlockedSpamFilter,
 }
 
 /// Whether a text was user-initiated or an internal auto-reply.

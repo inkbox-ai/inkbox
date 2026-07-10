@@ -437,7 +437,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  iterEmails(options: { pageSize?: number; direction?: MessageDirection } = {}): AsyncGenerator<Message> {
+  iterEmails(options: { pageSize?: number; direction?: MessageDirection; startDatetime?: string; endDatetime?: string; tz?: string } = {}): AsyncGenerator<Message> {
     this._requireMailbox();
     return this._inkbox._messages.list(this._mailbox!.emailAddress, options);
   }
@@ -450,7 +450,7 @@ export class AgentIdentity {
    * @param options.pageSize - Messages fetched per API call (1–100). Defaults to 50.
    * @param options.direction - Filter by `"inbound"` or `"outbound"`.
    */
-  async *iterUnreadEmails(options: { pageSize?: number; direction?: MessageDirection } = {}): AsyncGenerator<Message> {
+  async *iterUnreadEmails(options: { pageSize?: number; direction?: MessageDirection; startDatetime?: string; endDatetime?: string; tz?: string } = {}): AsyncGenerator<Message> {
     for await (const msg of this.iterEmails(options)) {
       if (!msg.isRead) yield msg;
     }
@@ -556,7 +556,7 @@ export class AgentIdentity {
    *   `false` for only non-blocked, omit for all.
    */
   async listCalls(
-    options: { limit?: number; offset?: number; isBlocked?: boolean } = {},
+    options: { limit?: number; offset?: number; isBlocked?: boolean; startDatetime?: string; endDatetime?: string; tz?: string } = {},
   ): Promise<PhoneCall[]> {
     // Scope by identity id — no phone number required (a shared-only
     // identity can still have calls).
@@ -570,6 +570,15 @@ export class AgentIdentity {
    */
   async listTranscripts(callId: string): Promise<PhoneTranscript[]> {
     return this._inkbox._calls.transcripts(callId);
+  }
+
+  /**
+   * Hang up one of this identity's live calls, from outside the call.
+   *
+   * @param callId - ID of the call to hang up.
+   */
+  async hangupCall(callId: string): Promise<PhoneCall> {
+    return this._inkbox._calls.hangup(callId);
   }
 
   /** Get this identity's inbound-call handling config. */
@@ -647,6 +656,9 @@ export class AgentIdentity {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<TextMessage[]> {
     this._requirePhone();
@@ -684,6 +696,9 @@ export class AgentIdentity {
       offset?: number;
       isBlocked?: boolean;
       includeGroups?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<TextConversationSummary[]> {
     this._requirePhone();
@@ -798,6 +813,9 @@ export class AgentIdentity {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<IMessage[]> {
     this._requireIMessage();
@@ -837,6 +855,9 @@ export class AgentIdentity {
       limit?: number;
       offset?: number;
       isBlocked?: boolean;
+      startDatetime?: string;
+      endDatetime?: string;
+      tz?: string;
     },
   ): Promise<IMessageConversationSummary[]> {
     this._requireIMessage();

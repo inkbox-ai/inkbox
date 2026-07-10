@@ -46,6 +46,11 @@ export enum SmsDeliveryStatus {
   DELIVERY_FAILED = "delivery_failed",
   DELIVERY_UNCONFIRMED = "delivery_unconfirmed",
   SENDING_FAILED = "sending_failed",
+  /**
+   * Blocked pre-carrier by the Inkbox outbound spam filter; appears on
+   * stored rows (list/get), never on delivery webhooks.
+   */
+  BLOCKED_SPAM_FILTER = "blocked_spam_filter",
 }
 
 /** Whether a text was user-initiated or an internal auto-reply. */

@@ -527,6 +527,9 @@ class AgentIdentity:
         *,
         page_size: int = 50,
         direction: MessageDirection | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> Iterator[Message]:
         """Iterate over emails in this identity's inbox, newest first.
 
@@ -535,12 +538,21 @@ class AgentIdentity:
         Args:
             page_size: Messages fetched per API call (1-100).
             direction: Filter by direction.
+            start_datetime: Inclusive ``created_at`` lower bound (str). Bare dates
+                cover the whole day; ``None`` leaves the side open. UTC unless
+                ``tz`` is set.
+            end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
+                bare dates; ``None`` leaves the side open.
+            tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         self._require_mailbox()
         return self._inkbox._messages.list(
             self._mailbox.email_address,  # type: ignore[union-attr]
             page_size=page_size,
             direction=direction,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            tz=tz,
         )
 
     def iter_unread_emails(
@@ -548,6 +560,9 @@ class AgentIdentity:
         *,
         page_size: int = 50,
         direction: MessageDirection | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> Iterator[Message]:
         """Iterate over unread emails in this identity's inbox, newest first.
 
@@ -557,11 +572,19 @@ class AgentIdentity:
         Args:
             page_size: Messages fetched per API call (1-100).
             direction: Filter by direction.
+            start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
+                leaves the side open. UTC unless ``tz`` is set.
+            end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
+                bare dates; ``None`` leaves the side open.
+            tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         return (
             msg for msg in self.iter_emails(
                 page_size=page_size,
                 direction=direction,
+                start_datetime=start_datetime,
+                end_datetime=end_datetime,
+                tz=tz,
             ) if not msg.is_read
         )
 
@@ -666,6 +689,9 @@ class AgentIdentity:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[PhoneCall]:
         """List calls made to/from this identity.
 
@@ -677,12 +703,20 @@ class AgentIdentity:
             offset: Pagination offset (default 0).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
+                leaves the side open. UTC unless ``tz`` is set.
+            end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
+                bare dates; ``None`` leaves the side open.
+            tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         return self._inkbox._calls.list(
             agent_identity_id=self.id,
             limit=limit,
             offset=offset,
             is_blocked=is_blocked,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            tz=tz,
         )
 
     def list_transcripts(self, call_id: str) -> list[PhoneTranscript]:
@@ -692,6 +726,14 @@ class AgentIdentity:
             call_id: ID of the call to fetch transcripts for.
         """
         return self._inkbox._calls.transcripts(call_id)
+
+    def hangup_call(self, call_id: str) -> PhoneCall:
+        """Hang up one of this identity's live calls, from outside the call.
+
+        Args:
+            call_id: ID of the call to hang up.
+        """
+        return self._inkbox._calls.hangup(call_id)
 
     def get_incoming_call_action(self) -> IncomingCallActionConfig:
         """Get this identity's inbound-call handling config."""
@@ -779,6 +821,9 @@ class AgentIdentity:
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[TextMessage]:
         """List text messages for this identity's phone number.
 
@@ -791,6 +836,11 @@ class AgentIdentity:
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
+                leaves the side open. UTC unless ``tz`` is set.
+            end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
+                bare dates; ``None`` leaves the side open.
+            tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         self._require_phone()
         return self._inkbox._texts.list(
@@ -799,6 +849,9 @@ class AgentIdentity:
             offset=offset,
             is_read=is_read,
             is_blocked=is_blocked,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            tz=tz,
         )
 
     def get_text(self, text_id: str) -> TextMessage:
@@ -820,6 +873,9 @@ class AgentIdentity:
         offset: int = 0,
         is_blocked: bool | None = None,
         include_groups: bool = False,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[TextConversationSummary]:
         """List text conversations.
 
@@ -835,6 +891,11 @@ class AgentIdentity:
                 ``False`` for only non-blocked, ``None`` for all.
             include_groups: Include group conversations. Defaults to
                 ``False`` so old clients continue to see one-to-one rows only.
+            start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
+                leaves the side open. UTC unless ``tz`` is set.
+            end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
+                bare dates; ``None`` leaves the side open.
+            tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         self._require_phone()
         return self._inkbox._texts.list_conversations(
@@ -843,6 +904,9 @@ class AgentIdentity:
             offset=offset,
             is_blocked=is_blocked,
             include_groups=include_groups,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            tz=tz,
         )
 
     def get_text_conversation(
@@ -945,6 +1009,9 @@ class AgentIdentity:
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[IMessage]:
         """List this identity's iMessages, newest first.
 
@@ -958,6 +1025,11 @@ class AgentIdentity:
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
+                leaves the side open. UTC unless ``tz`` is set.
+            end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
+                bare dates; ``None`` leaves the side open.
+            tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         self._require_imessage()
         return self._inkbox._imessages.list(
@@ -967,6 +1039,9 @@ class AgentIdentity:
             offset=offset,
             is_read=is_read,
             is_blocked=is_blocked,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            tz=tz,
         )
 
     def list_imessage_assignments(
@@ -994,6 +1069,9 @@ class AgentIdentity:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
+        tz: str | None = None,
     ) -> list[IMessageConversationSummary]:
         """List this identity's iMessage conversations.
 
@@ -1003,6 +1081,11 @@ class AgentIdentity:
             is_blocked: Tri-state filter applied to the underlying
                 messages — ``True`` for only blocked, ``False`` for only
                 non-blocked, ``None`` for all.
+            start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
+                leaves the side open. UTC unless ``tz`` is set.
+            end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
+                bare dates; ``None`` leaves the side open.
+            tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         self._require_imessage()
         return self._inkbox._imessages.list_conversations(
@@ -1010,6 +1093,9 @@ class AgentIdentity:
             limit=limit,
             offset=offset,
             is_blocked=is_blocked,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
+            tz=tz,
         )
 
     def get_imessage_conversation(

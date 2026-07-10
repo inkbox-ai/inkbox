@@ -97,6 +97,15 @@ pub enum HangupReasonWire {
     Rejected,
 }
 
+/// Where a call originated: the identity's dedicated number or the shared
+/// iMessage line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallOriginWire {
+    DedicatedNumber,
+    SharedImessageNumber,
+}
+
 // ---- Nested wire shapes --------------------------------------------------
 
 /// MMS media attachment (snake_case wire shape).
@@ -780,6 +789,88 @@ pub struct PhoneIncomingCallWebhookPayload {
     pub agent_identities: Vec<WebhookAgentIdentity>,
 }
 
+// ---- Call lifecycle (post-call fan-out) ----------------------------------
+
+/// Post-call lifecycle webhook event-type discriminator.
+///
+/// Delivered to an agent-identity-owned `call.ended` subscription;
+/// fire-and-forget and replayable (unlike the synchronous
+/// `phone.incoming_call` control-plane callback).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CallLifecycleWebhookEventType {
+    #[serde(rename = "call.ended")]
+    CallEnded,
+}
+
+/// Stored phone call embedded in a call-lifecycle webhook payload.
+///
+/// Mirrors `PhoneCallResponse` minus `is_blocked` (blocked calls never reach
+/// the webhook). `local_phone_number` is `None` and `origin` is
+/// `SharedImessageNumber` on shared-line calls (the pool line is never
+/// surfaced). `duration_seconds` is the connected length in whole seconds,
+/// or `None` when the call never connected.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookPhoneCall {
+    pub id: String,
+    pub origin: CallOriginWire,
+    pub local_phone_number: Option<String>,
+    pub remote_phone_number: String,
+    pub direction: CallDirectionWire,
+    pub status: CallStatusWire,
+    pub hangup_reason: Option<HangupReasonWire>,
+    pub started_at: Option<String>,
+    pub ended_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub duration_seconds: Option<i64>,
+}
+
+/// Inline transcript block on a `call.ended` payload.
+///
+/// Present when the platform captured a transcript for the call. `entries`
+/// reuses the shared middle-cut [`WebhookTranscriptEntry`] shape --
+/// discriminate a turn from the abridgment marker on the presence of
+/// `marker`. `abridged` is `true` when the middle was cut. `url` points at
+/// the authoritative verbatim transcript (the same value as `transcript_url`
+/// on the data wrapper).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookCallTranscript {
+    pub entries: Vec<WebhookTranscriptEntry>,
+    pub abridged: bool,
+    pub url: String,
+}
+
+/// Wrapper under `CallEndedWebhookPayload.data`.
+///
+/// `contacts` / `agent_identities` resolve the caller and are always present,
+/// possibly empty. `transcript` is present-with-`null`: the inline (possibly
+/// abridged) block is populated only when the platform captured a transcript
+/// for the call, otherwise `None`. `transcript_url` is **always** present and
+/// is the authoritative verbatim record (fetch with an API key that can
+/// access the call — the subscription owner's own key suffices).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallEndedWebhookData {
+    pub call: WebhookPhoneCall,
+    pub contacts: Vec<WebhookContact>,
+    pub agent_identities: Vec<WebhookAgentIdentity>,
+    #[serde(default)]
+    pub transcript: Option<WebhookCallTranscript>,
+    pub transcript_url: String,
+}
+
+/// Top-level `call.ended` webhook payload (`{event_type, timestamp, data}`
+/// envelope).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallEndedWebhookPayload {
+    /// Stable per-event id (`evt_...`); idempotency key, stable across replays.
+    // Required: `call.ended` is new enough that every payload carries `id`,
+    // so a missing id is a hard deserialization error (matches Python/TS).
+    pub id: String,
+    pub event_type: CallLifecycleWebhookEventType,
+    pub timestamp: String,
+    pub data: CallEndedWebhookData,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -847,5 +938,81 @@ mod tests {
         let without = r#"{"id":"a","direction":"outbound","from_address":"x@y.com","to_addresses":["z@w.com"],"created_at":"t","subject":null,"snippet":null}"#;
         let item2: WebhookContextMailItem = serde_json::from_str(without).unwrap();
         assert!(item2.email_address.is_none());
+    }
+
+    #[test]
+    fn deserializes_call_ended_with_inline_transcript() {
+        let raw = r#"{
+            "id": "evt_abc",
+            "event_type": "call.ended",
+            "timestamp": "2026-07-06T18:22:41Z",
+            "data": {
+                "call": {
+                    "id": "c1", "origin": "dedicated_number",
+                    "local_phone_number": "+14155550100",
+                    "remote_phone_number": "+14155550999",
+                    "direction": "inbound", "status": "completed",
+                    "hangup_reason": "remote", "started_at": "t0", "ended_at": "t1",
+                    "created_at": "t0", "updated_at": "t1",
+                    "duration_seconds": 123,
+                    "some_future_field": true
+                },
+                "contacts": [{"id": "ct1", "name": "Jane"}],
+                "agent_identities": [],
+                "transcript": {
+                    "entries": [
+                        {"party": "remote", "text": "hi", "ts_ms": 0},
+                        {"marker": "abridged", "omitted_turns": 12, "omitted_ms": 40100}
+                    ],
+                    "abridged": true,
+                    "url": "https://x/api/v1/phone/calls/c1/transcripts"
+                },
+                "transcript_url": "https://x/api/v1/phone/calls/c1/transcripts"
+            }
+        }"#;
+        let payload: CallEndedWebhookPayload = serde_json::from_str(raw).unwrap();
+        assert_eq!(payload.event_type, CallLifecycleWebhookEventType::CallEnded);
+        assert_eq!(payload.data.call.origin, CallOriginWire::DedicatedNumber);
+        assert_eq!(payload.data.call.duration_seconds, Some(123));
+        let transcript = payload.data.transcript.expect("inline transcript present");
+        assert!(transcript.abridged);
+        assert_eq!(transcript.url, payload.data.transcript_url);
+        // The abridgment marker entry carries omitted_turns.
+        assert_eq!(transcript.entries[1].marker.as_deref(), Some("abridged"));
+        assert_eq!(transcript.entries[1].omitted_turns, Some(12));
+    }
+
+    #[test]
+    fn call_ended_omits_transcript_when_none_captured() {
+        // Shared-line call without a transcript: local_phone_number null, transcript null.
+        let raw = r#"{
+            "id": "evt_def",
+            "event_type": "call.ended",
+            "timestamp": "2026-07-06T18:22:41Z",
+            "data": {
+                "call": {
+                    "id": "c2", "origin": "shared_imessage_number",
+                    "local_phone_number": null,
+                    "remote_phone_number": "+14155550999",
+                    "direction": "inbound", "status": "completed",
+                    "hangup_reason": null, "started_at": null, "ended_at": "t1",
+                    "created_at": "t0", "updated_at": "t1",
+                    "duration_seconds": null
+                },
+                "contacts": [],
+                "agent_identities": [],
+                "transcript": null,
+                "transcript_url": "https://x/api/v1/phone/calls/c2/transcripts"
+            }
+        }"#;
+        let payload: CallEndedWebhookPayload = serde_json::from_str(raw).unwrap();
+        assert_eq!(
+            payload.data.call.origin,
+            CallOriginWire::SharedImessageNumber
+        );
+        assert!(payload.data.call.local_phone_number.is_none());
+        assert!(payload.data.transcript.is_none());
+        // transcript_url is always present.
+        assert!(payload.data.transcript_url.ends_with("/transcripts"));
     }
 }
