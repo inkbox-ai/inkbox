@@ -265,7 +265,7 @@ export function registerNumberCommands(program: Command): void {
     .description("Update phone number configuration")
     .option(
       "--incoming-call-action <action>",
-      "Incoming call action: auto_accept, auto_reject, or webhook",
+      "Incoming call action: auto_accept, auto_reject, webhook, or hosted_agent",
     )
     .option("--client-websocket-url <url>", "Client WebSocket URL for audio bridging")
     .option("--incoming-call-webhook-url <url>", "Webhook URL for incoming calls")
