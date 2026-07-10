@@ -154,29 +154,6 @@ impl CallOrigin {
     }
 }
 
-/// Who is the brain on a call.
-///
-/// `client_websocket` (default) bridges audio to the caller's own WebSocket
-/// server; `hosted_agent` runs the platform-hosted call agent — no socket,
-/// no code, configured per identity via [`HostedAgentConfig`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum CallMode {
-    #[default]
-    ClientWebsocket,
-    HostedAgent,
-}
-
-impl CallMode {
-    /// The wire string value (`"client_websocket"` / `"hosted_agent"`).
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            CallMode::ClientWebsocket => "client_websocket",
-            CallMode::HostedAgent => "hosted_agent",
-        }
-    }
-}
-
 /// Routing decision applied to inbound calls for an agent identity.
 ///
 /// `hosted_agent` answers with the platform-hosted call agent and is the
@@ -762,21 +739,6 @@ mod tests {
             let parsed: IncomingCallAction = serde_json::from_value(json!(wire)).unwrap();
             assert_eq!(parsed, variant);
         }
-    }
-
-    #[test]
-    fn call_mode_wire_strings_round_trip() {
-        let cases = [
-            (CallMode::ClientWebsocket, "client_websocket"),
-            (CallMode::HostedAgent, "hosted_agent"),
-        ];
-        for (variant, wire) in cases {
-            assert_eq!(variant.as_str(), wire);
-            assert_eq!(serde_json::to_value(variant).unwrap(), json!(wire));
-            let parsed: CallMode = serde_json::from_value(json!(wire)).unwrap();
-            assert_eq!(parsed, variant);
-        }
-        assert_eq!(CallMode::default(), CallMode::ClientWebsocket);
     }
 
     #[test]
