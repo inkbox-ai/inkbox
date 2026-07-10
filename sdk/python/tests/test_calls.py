@@ -13,11 +13,13 @@ import pytest
 from inkbox._http import HttpTransport
 from inkbox.exceptions import InkboxAPIError
 from inkbox.phone.resources.calls import CallsResource
-from inkbox.phone.types import CallOrigin
+from inkbox.phone.types import CallMode, CallOrigin
 from sample_data import (
     PHONE_CALL_BLOCKED_DICT,
     PHONE_CALL_DICT,
     PHONE_TRANSCRIPT_DICT,
+    POST_CALL_ACTION_CANCELED_DICT,
+    POST_CALL_ACTION_DICT,
     RATE_LIMIT_INFO_DICT,
 )
 
@@ -213,6 +215,7 @@ class TestCallsPlace:
             json={
                 "to_number": "+15551234567",
                 "origination": "dedicated_number",
+                "mode": "client_websocket",
                 "from_number": "+18335794607",
                 "client_websocket_url": "wss://agent.example.com/ws",
             },
@@ -233,6 +236,7 @@ class TestCallsPlace:
             json={
                 "to_number": "+15551234567",
                 "origination": "shared_imessage_number",
+                "mode": "client_websocket",
                 "agent_identity_id": IDENTITY_ID,
             },
         )
@@ -243,9 +247,12 @@ class TestCallsPlace:
         client._calls.place(to_number="+15551234567")
 
         _, kwargs = transport.post.call_args
+        # mode is always sent (server-side default mirrored on the wire);
+        # reason only rides hosted placements.
         assert kwargs["json"] == {
             "to_number": "+15551234567",
             "origination": "dedicated_number",
+            "mode": "client_websocket",
         }
 
     def test_string_origination_passed_verbatim(self, client, transport):
@@ -308,6 +315,111 @@ class TestCallsPlace:
         assert call.origin is CallOrigin.DEDICATED_NUMBER
 
 
+class TestCallsPlaceHosted:
+    def test_hosted_mode_and_reason_forwarded(self, client, transport):
+        transport.post.return_value = {
+            **PHONE_CALL_DICT,
+            "mode": "hosted_agent",
+            "reason": "Book a cleaning next week, mornings preferred",
+        }
+
+        call = client._calls.place(
+            to_number="+15551234567",
+            from_number="+18335794607",
+            mode=CallMode.HOSTED_AGENT,
+            reason="Book a cleaning next week, mornings preferred",
+        )
+
+        transport.post.assert_called_once_with(
+            "/place-call",
+            json={
+                "to_number": "+15551234567",
+                "origination": "dedicated_number",
+                "mode": "hosted_agent",
+                "from_number": "+18335794607",
+                "reason": "Book a cleaning next week, mornings preferred",
+            },
+        )
+        assert call.mode == "hosted_agent"
+        assert call.reason == "Book a cleaning next week, mornings preferred"
+
+    def test_string_mode_passed_verbatim(self, client, transport):
+        """A raw string mode is forwarded as-is (no enum coercion)."""
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.place(
+            to_number="+15551234567",
+            mode="hosted_agent",
+            reason="Ask about opening hours",
+        )
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["mode"] == "hosted_agent"
+
+    def test_reason_omitted_when_none(self, client, transport):
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.place(to_number="+15551234567", mode=CallMode.HOSTED_AGENT)
+
+        _, kwargs = transport.post.call_args
+        assert "reason" not in kwargs["json"]
+
+    def test_hosted_with_ws_url_is_forwarded_not_gated(self, client, transport):
+        """The SDK never client-gates the hosted/ws-url conflict — the server 422s."""
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.place(
+            to_number="+15551234567",
+            client_websocket_url="wss://agent.example.com/ws",
+            mode=CallMode.HOSTED_AGENT,
+            reason="Confirm the appointment",
+        )
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["client_websocket_url"] == "wss://agent.example.com/ws"
+        assert kwargs["json"]["mode"] == "hosted_agent"
+
+    def test_mode_defaults_when_missing_from_response(self, client, transport):
+        """Older responses without mode/reason parse to the client_websocket default."""
+        old_payload = {
+            k: v for k, v in PHONE_CALL_DICT.items() if k not in ("mode", "reason")
+        }
+        transport.post.return_value = old_payload
+
+        call = client._calls.place(to_number="+15551234567")
+
+        assert call.mode == "client_websocket"
+        assert call.reason is None
+
+
+class TestPostCallActions:
+    def test_returns_actions_in_seq_order(self, client, transport):
+        transport.get.return_value = [
+            POST_CALL_ACTION_DICT,
+            POST_CALL_ACTION_CANCELED_DICT,
+        ]
+
+        actions = client._calls.post_call_actions(CALL_ID)
+
+        transport.get.assert_called_once_with(f"/calls/{CALL_ID}/post-call-actions")
+        assert len(actions) == 2
+        assert actions[0].seq == 1
+        assert actions[0].action == "Book cleaning Tue 9:30am"
+        assert actions[0].details == "Dr. Chen's office confirmed availability."
+        assert actions[0].status == "open"
+        assert actions[0].call_id == UUID(CALL_ID)
+        # Canceled rows are part of the REST audit surface.
+        assert actions[1].status == "canceled"
+        assert actions[1].details is None
+
+    def test_accepts_uuid(self, client, transport):
+        transport.get.return_value = []
+
+        assert client._calls.post_call_actions(UUID(CALL_ID)) == []
+
+        transport.get.assert_called_once_with(f"/calls/{CALL_ID}/post-call-actions")
+
+
 def _calls_resource_returning(status_code: int, body: dict | list) -> CallsResource:
     """Build a CallsResource over a real HttpTransport backed by a canned response."""
     http = HttpTransport(api_key="sk-test", base_url="https://phone.test")
@@ -356,6 +468,46 @@ class TestCallsPlaceErrors:
         err = info.value
         assert err.status_code == 422
         assert err.detail == detail
+
+    def test_422_hosted_reason_required_surfaces(self):
+        """Server-side hosted validation (reason required) surfaces verbatim."""
+        detail = [
+            {
+                "loc": ["body", "reason"],
+                "msg": "reason is required with mode=hosted_agent",
+                "type": "value_error",
+            },
+        ]
+        calls = _calls_resource_returning(422, {"detail": detail})
+
+        with pytest.raises(InkboxAPIError) as info:
+            calls.place(
+                to_number="+15551234567",
+                from_number="+18335794607",
+                mode=CallMode.HOSTED_AGENT,
+            )
+
+        err = info.value
+        assert err.status_code == 422
+        assert err.detail == detail
+
+    def test_503_hosted_agent_at_capacity_surfaces(self):
+        """The hosted concurrency guard's 503 is surfaced verbatim."""
+        calls = _calls_resource_returning(
+            503, {"detail": {"error": "hosted_agent_at_capacity"}}
+        )
+
+        with pytest.raises(InkboxAPIError) as info:
+            calls.place(
+                to_number="+15551234567",
+                from_number="+18335794607",
+                mode=CallMode.HOSTED_AGENT,
+                reason="Confirm the appointment",
+            )
+
+        err = info.value
+        assert err.status_code == 503
+        assert err.detail["error"] == "hosted_agent_at_capacity"
 
 
 class TestRemovedNumberScopedSurface:

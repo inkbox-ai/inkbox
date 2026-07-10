@@ -124,3 +124,47 @@ class TestIncomingCallActionSet:
                 "agent_identity_id": IDENTITY_ID,
             },
         )
+
+    def test_set_hosted_agent_needs_no_urls(self, client, transport):
+        """hosted_agent is the zero-prerequisite action: no URL keys on the wire."""
+        transport.put.return_value = {
+            **INCOMING_CALL_ACTION_CONFIG_DICT,
+            "incoming_call_action": "hosted_agent",
+            "incoming_call_webhook_url": None,
+        }
+
+        cfg = client._incoming_call_action.set(
+            incoming_call_action=IncomingCallAction.HOSTED_AGENT,
+            agent_identity_id=IDENTITY_ID,
+        )
+
+        transport.put.assert_called_once_with(
+            "/incoming-call-action",
+            json={
+                "incoming_call_action": "hosted_agent",
+                "agent_identity_id": IDENTITY_ID,
+            },
+        )
+        assert cfg.incoming_call_action is IncomingCallAction.HOSTED_AGENT
+        assert cfg.client_websocket_url is None
+        assert cfg.incoming_call_webhook_url is None
+
+
+class TestIncomingCallActionEnum:
+    def test_hosted_agent_wire_value(self):
+        assert IncomingCallAction.HOSTED_AGENT.value == "hosted_agent"
+
+    def test_accepts_all_wire_strings(self):
+        for wire in ("auto_accept", "auto_reject", "webhook", "hosted_agent"):
+            assert IncomingCallAction(wire).value == wire
+
+    def test_get_parses_hosted_agent(self, client, transport):
+        transport.get.return_value = {
+            **INCOMING_CALL_ACTION_CONFIG_DICT,
+            "incoming_call_action": "hosted_agent",
+            "incoming_call_webhook_url": None,
+        }
+
+        cfg = client._incoming_call_action.get()
+
+        assert cfg.incoming_call_action is IncomingCallAction.HOSTED_AGENT

@@ -38,6 +38,7 @@ def client(transport: FakeHttpTransport) -> Inkbox:
     c._imessages._http = transport
     c._imessage_contact_rules._http = transport
     c._incoming_call_action._http = transport
+    c._hosted_agent._http = transport
     c._signing_keys._http = transport
     c._webhook_subscriptions._http = transport
     return c

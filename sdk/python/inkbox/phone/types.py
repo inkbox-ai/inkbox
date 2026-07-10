@@ -75,12 +75,30 @@ class CallOrigin(StrEnum):
     SHARED_IMESSAGE_NUMBER = "shared_imessage_number"
 
 
+class CallMode(StrEnum):
+    """Who is the brain on a call.
+
+    ``client_websocket`` (default) bridges audio to the caller's own
+    WebSocket server; ``hosted_agent`` runs the platform-hosted call
+    agent — no socket, no code, configured per identity via
+    :class:`HostedAgentConfig`.
+    """
+
+    CLIENT_WEBSOCKET = "client_websocket"
+    HOSTED_AGENT = "hosted_agent"
+
+
 class IncomingCallAction(StrEnum):
-    """What to do when an inbound call arrives for an identity."""
+    """What to do when an inbound call arrives for an identity.
+
+    ``hosted_agent`` answers with the platform-hosted call agent and is
+    the only action that requires neither a WebSocket nor a webhook URL.
+    """
 
     AUTO_ACCEPT = "auto_accept"
     AUTO_REJECT = "auto_reject"
     WEBHOOK = "webhook"
+    HOSTED_AGENT = "hosted_agent"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -201,6 +219,11 @@ class PhoneCall:
     # Which line the call rode. Older responses without this field predate
     # shared-iMessage calls and are always dedicated.
     origin: CallOrigin = CallOrigin.DEDICATED_NUMBER
+    # Who drove the call. Older responses without this field predate hosted
+    # calls and are always client-driven.
+    mode: str = "client_websocket"
+    # Outbound hosted-call brief; None on inbound and client_websocket calls.
+    reason: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -221,6 +244,9 @@ class PhoneCall:
             is_blocked=bool(d.get("is_blocked", False)),
             # Coerce a null/missing origin to dedicated for back-compat.
             origin=CallOrigin(d["origin"]) if d.get("origin") else CallOrigin.DEDICATED_NUMBER,
+            # Coerce a null/missing mode to client_websocket for back-compat.
+            mode=d.get("mode") or "client_websocket",
+            reason=d.get("reason"),
         )
 
 
@@ -494,6 +520,63 @@ class IncomingCallActionConfig:
             incoming_call_action=IncomingCallAction(d["incoming_call_action"]),
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
+        )
+
+
+@dataclass
+class HostedAgentConfig:
+    """Per-identity hosted call agent configuration.
+
+    ``voice`` / ``model`` / ``instructions`` are all nullable — ``None``
+    means the server default applies for that field.
+    """
+
+    agent_identity_id: UUID
+    voice: str | None
+    model: str | None
+    instructions: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentConfig:
+        return cls(
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            voice=d.get("voice"),
+            model=d.get("model"),
+            instructions=d.get("instructions"),
+        )
+
+
+@dataclass
+class PostCallAction:
+    """An action item the hosted call agent recorded during a call.
+
+    ``status`` is ``"open"`` or ``"canceled"``. Canceled rows are kept
+    for audit and returned by :meth:`CallsResource.post_call_actions`,
+    but omitted from the ``call.ended`` webhook payload.
+    """
+
+    id: UUID
+    call_id: UUID
+    agent_identity_id: UUID
+    seq: int
+    action: str
+    details: str | None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> PostCallAction:
+        return cls(
+            id=UUID(d["id"]),
+            call_id=UUID(d["call_id"]),
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            seq=d["seq"],
+            action=d["action"],
+            details=d.get("details"),
+            status=d["status"],
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
         )
 
 
