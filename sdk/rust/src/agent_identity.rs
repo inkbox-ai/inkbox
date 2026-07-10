@@ -53,9 +53,9 @@ use crate::mail::types::{
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    CallOrigin, ContactRuleStatus as PhoneContactRuleStatus, IncomingCallAction,
+    CallOrigin, ContactRuleStatus as PhoneContactRuleStatus, HostedAgentConfig, IncomingCallAction,
     IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
-    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
+    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, PostCallAction, TextConversationSummary,
     TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
@@ -548,9 +548,76 @@ impl AgentIdentity {
             .list_filtered(Some(&id), limit, offset, is_blocked, filter)
     }
 
+    /// Place an outbound call driven by the platform-hosted call agent.
+    ///
+    /// Sibling of [`AgentIdentity::place_call`] (which stays client-driven);
+    /// origination resolution is identical — dedicated calls ride this
+    /// identity's own number, shared calls scope by its id.
+    ///
+    /// # Arguments
+    /// * `to_number` - E.164 destination number.
+    /// * `origination` - How to place the call.
+    /// * `reason` - The hosted agent's task brief for the call.
+    pub fn place_hosted_call(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        reason: &str,
+    ) -> Result<PhoneCallWithRateLimit> {
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                // Dedicated origination needs this identity's own number.
+                let number = self.require_phone()?;
+                self.inkbox.calls().place_hosted(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    reason,
+                )
+            }
+            CallOrigin::SharedImessageNumber => {
+                // Shared-line origination scopes by identity id, no from_number.
+                let id = self.id().to_string();
+                self.inkbox
+                    .calls()
+                    .place_hosted(to_number, origination, None, Some(&id), reason)
+            }
+        }
+    }
+
     /// List transcript segments for a specific call.
     pub fn list_transcripts(&self, call_id: &str) -> Result<Vec<PhoneTranscript>> {
         self.inkbox.calls().transcripts(call_id)
+    }
+
+    /// List the hosted agent's recorded action items for a call.
+    pub fn list_post_call_actions(&self, call_id: &str) -> Result<Vec<PostCallAction>> {
+        self.inkbox.calls().post_call_actions(call_id)
+    }
+
+    /// Get this identity's hosted call agent config.
+    pub fn hosted_agent_config(&self) -> Result<HostedAgentConfig> {
+        self.inkbox
+            .hosted_agent()
+            .get_config(Some(&self.id().to_string()))
+    }
+
+    /// Set this identity's hosted call agent config (full replace).
+    ///
+    /// A field left `None` resets to the server default.
+    pub fn set_hosted_agent_config(
+        &self,
+        voice: Option<&str>,
+        model: Option<&str>,
+        instructions: Option<&str>,
+    ) -> Result<HostedAgentConfig> {
+        self.inkbox.hosted_agent().set_config(
+            Some(&self.id().to_string()),
+            voice,
+            model,
+            instructions,
+        )
     }
 
     /// Hang up one of this identity's live calls, from outside the call.
@@ -1534,6 +1601,144 @@ mod tests {
             )
             .unwrap();
         mock.assert();
+    }
+
+    #[test]
+    fn place_hosted_call_dedicated_uses_identitys_own_number() {
+        let server = MockServer::start();
+        // Exact body: hosted mode + reason ride the wire, no ws-url key.
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "mode": "hosted_agent",
+                    "reason": "Book a cleaning next week",
+                    "from_number": "+15550001111"
+                }));
+            then.status(200).json_body({
+                let mut v = call_json("dedicated_number", json!("+15550001111"));
+                v["mode"] = json!("hosted_agent");
+                v["reason"] = json!("Book a cleaning next week");
+                v
+            });
+        });
+        let identity = identity_at(&server.base_url(), true);
+        let placed = identity
+            .place_hosted_call(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                "Book a cleaning next week",
+            )
+            .unwrap();
+        mock.assert();
+        assert_eq!(placed.call.mode, "hosted_agent");
+        assert_eq!(
+            placed.call.reason.as_deref(),
+            Some("Book a cleaning next week")
+        );
+    }
+
+    #[test]
+    fn place_hosted_call_shared_scopes_by_identity_id() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "shared_imessage_number",
+                    "mode": "hosted_agent",
+                    "reason": "Confirm the appointment",
+                    "agent_identity_id": IDENTITY_ID
+                }));
+            then.status(200)
+                .json_body(call_json("shared_imessage_number", serde_json::Value::Null));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        identity
+            .place_hosted_call(
+                "+15550002222",
+                CallOrigin::SharedImessageNumber,
+                "Confirm the appointment",
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn list_post_call_actions_delegates_to_calls_resource() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/post-call-actions");
+            then.status(200).json_body(json!([{
+                "id": "44444444-4444-4444-4444-444444444444",
+                "call_id": "22222222-2222-2222-2222-222222222222",
+                "agent_identity_id": IDENTITY_ID,
+                "seq": 1,
+                "action": "Book cleaning Tue 9:30am",
+                "details": null,
+                "status": "open",
+                "created_at": "2026-06-01T00:04:00+00:00",
+                "updated_at": "2026-06-01T00:04:00+00:00"
+            }]));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let actions = identity
+            .list_post_call_actions("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0].action, "Book cleaning Tue 9:30am");
+    }
+
+    #[test]
+    fn hosted_agent_config_scopes_by_own_identity_id() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/hosted-agent-config")
+                .query_param("agent_identity_id", IDENTITY_ID);
+            then.status(200).json_body(json!({
+                "agent_identity_id": IDENTITY_ID,
+                "voice": "warm-voice",
+                "model": null,
+                "instructions": null
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let config = identity.hosted_agent_config().unwrap();
+        mock.assert();
+        assert_eq!(config.voice.as_deref(), Some("warm-voice"));
+        assert_eq!(config.model, None);
+    }
+
+    #[test]
+    fn set_hosted_agent_config_forwards_args_and_own_identity_id() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(PUT)
+                .path("/api/v1/phone/hosted-agent-config")
+                .json_body(json!({
+                    "agent_identity_id": IDENTITY_ID,
+                    "voice": "warm-voice",
+                    "instructions": "Be brief."
+                }));
+            then.status(200).json_body(json!({
+                "agent_identity_id": IDENTITY_ID,
+                "voice": "warm-voice",
+                "model": null,
+                "instructions": "Be brief."
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let config = identity
+            .set_hosted_agent_config(Some("warm-voice"), None, Some("Be brief."))
+            .unwrap();
+        mock.assert();
+        assert_eq!(config.instructions.as_deref(), Some("Be brief."));
     }
 
     #[test]

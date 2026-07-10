@@ -38,6 +38,7 @@ use crate::mail::resources::threads::ThreadsResource;
 use crate::notes::resources::notes::NotesResource;
 use crate::phone::resources::calls::CallsResource;
 use crate::phone::resources::contact_rules::PhoneContactRulesResource;
+use crate::phone::resources::hosted_agent::HostedAgentConfigResource;
 use crate::phone::resources::identity_contact_rules::PhoneIdentityContactRulesResource;
 use crate::phone::resources::incoming_call_action::IncomingCallActionResource;
 use crate::phone::resources::numbers::PhoneNumbersResource;
@@ -141,6 +142,7 @@ pub struct Inkbox {
     phone_numbers: PhoneNumbersResource,
     texts: TextsResource,
     incoming_call_action: IncomingCallActionResource,
+    hosted_agent: HostedAgentConfigResource,
     phone_contact_rules: PhoneContactRulesResource,
     sms_opt_ins: SmsOptInsResource,
 
@@ -266,6 +268,7 @@ impl Inkbox {
             phone_numbers: PhoneNumbersResource::new(phone_http.clone()),
             texts: TextsResource::new(phone_http.clone()),
             incoming_call_action: IncomingCallActionResource::new(phone_http.clone()),
+            hosted_agent: HostedAgentConfigResource::new(phone_http.clone()),
             phone_contact_rules: PhoneContactRulesResource::new(phone_http.clone()),
             sms_opt_ins: SmsOptInsResource::new(phone_http.clone()),
 
@@ -344,6 +347,10 @@ impl Inkbox {
     /// Identity-scoped inbound-call routing config (`get()` / `set()`).
     pub fn incoming_call_action(&self) -> &IncomingCallActionResource {
         &self.incoming_call_action
+    }
+    /// Identity-scoped hosted call agent config (`get_config()` / `set_config()`).
+    pub fn hosted_agent(&self) -> &HostedAgentConfigResource {
+        &self.hosted_agent
     }
     /// Phone per-number allow/block rules (+ org-wide list).
     ///

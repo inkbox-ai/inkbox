@@ -7,7 +7,9 @@ use serde_json::Map;
 use crate::error::Result;
 use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
-use crate::phone::types::{CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript};
+use crate::phone::types::{
+    CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript, PostCallAction,
+};
 
 pub struct CallsResource {
     http: Arc<HttpTransport>,
@@ -128,6 +130,21 @@ impl CallsResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// List the action items the hosted call agent recorded on a call.
+    ///
+    /// Ordered by `seq`, ascending. Includes canceled rows (the audit
+    /// surface); empty for calls the hosted agent didn't drive.
+    ///
+    /// # Arguments
+    /// * `call_id` - UUID (or string) of the call.
+    pub fn post_call_actions(&self, call_id: &str) -> Result<Vec<PostCallAction>> {
+        let data = self.http.get(
+            &format!("/calls/{call_id}/post-call-actions"),
+            crate::http::NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
     /// Place an outbound call.
     ///
     /// The server enforces the conditional requirements: `from_number` is
@@ -164,6 +181,50 @@ impl CallsResource {
         }
         if let Some(url) = client_websocket_url {
             body.insert("client_websocket_url".into(), url.into());
+        }
+        let data = self
+            .http
+            .post("/place-call", Some(&body), crate::http::NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Place an outbound call driven by the platform-hosted call agent.
+    ///
+    /// Sibling of [`CallsResource::place`] (which stays client-driven);
+    /// sends `mode=hosted_agent` plus the required `reason` brief and no
+    /// WebSocket URL. Origination rules are unchanged and server-enforced:
+    /// `from_number` for `dedicated_number`, `agent_identity_id` for
+    /// `shared_imessage_number` — violations surface as a server 422.
+    ///
+    /// # Arguments
+    /// * `to_number` - E.164 number to call.
+    /// * `origination` - Where the call originates.
+    /// * `from_number` - E.164 number to call from (dedicated origination).
+    /// * `agent_identity_id` - UUID of the placing identity (shared origination).
+    /// * `reason` - The hosted agent's task brief for the call — what to
+    ///   accomplish.
+    ///
+    /// # Returns
+    /// The created call record with current rate limit info.
+    pub fn place_hosted(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        from_number: Option<&str>,
+        agent_identity_id: Option<&str>,
+        reason: &str,
+    ) -> Result<PhoneCallWithRateLimit> {
+        // Always send origination + mode + reason; scope keys only when set.
+        let mut body = Map::new();
+        body.insert("to_number".into(), to_number.into());
+        body.insert("origination".into(), origination.as_str().into());
+        body.insert("mode".into(), "hosted_agent".into());
+        body.insert("reason".into(), reason.into());
+        if let Some(n) = from_number {
+            body.insert("from_number".into(), n.into());
+        }
+        if let Some(id) = agent_identity_id {
+            body.insert("agent_identity_id".into(), id.into());
         }
         let data = self
             .http
@@ -522,6 +583,182 @@ mod tests {
             )
             .unwrap();
         mock.assert();
+    }
+
+    #[test]
+    fn place_body_never_carries_mode_key() {
+        // The classic `place` stays byte-identical: the server defaults the
+        // mode, so the key must not appear on the wire.
+        fn body_has_no_mode(req: &HttpMockRequest) -> bool {
+            let body = req.body.clone().unwrap_or_default();
+            let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            v.get("mode").is_none() && v.get("reason").is_none()
+        }
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .matches(body_has_no_mode);
+            then.status(200)
+                .json_body(placed_json("dedicated_number", json!("+15550001111")));
+        });
+        client(&server)
+            .calls()
+            .place(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                None,
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn place_hosted_sends_mode_and_reason() {
+        let server = MockServer::start();
+        // Exact json_body match: hosted body carries mode + reason, no ws key.
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "mode": "hosted_agent",
+                    "reason": "Book a cleaning next week, mornings preferred",
+                    "from_number": "+15550001111"
+                }));
+            then.status(200).json_body({
+                let mut v = placed_json("dedicated_number", json!("+15550001111"));
+                v["mode"] = json!("hosted_agent");
+                v["reason"] = json!("Book a cleaning next week, mornings preferred");
+                v
+            });
+        });
+        let placed = client(&server)
+            .calls()
+            .place_hosted(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                "Book a cleaning next week, mornings preferred",
+            )
+            .unwrap();
+        mock.assert();
+        assert_eq!(placed.call.mode, "hosted_agent");
+        assert_eq!(
+            placed.call.reason.as_deref(),
+            Some("Book a cleaning next week, mornings preferred")
+        );
+    }
+
+    #[test]
+    fn place_hosted_shared_scopes_by_identity() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "shared_imessage_number",
+                    "mode": "hosted_agent",
+                    "reason": "Confirm the appointment",
+                    "agent_identity_id": "33333333-3333-3333-3333-333333333333"
+                }));
+            then.status(200).json_body(placed_json(
+                "shared_imessage_number",
+                serde_json::Value::Null,
+            ));
+        });
+        client(&server)
+            .calls()
+            .place_hosted(
+                "+15550002222",
+                CallOrigin::SharedImessageNumber,
+                None,
+                Some("33333333-3333-3333-3333-333333333333"),
+                "Confirm the appointment",
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn place_hosted_503_at_capacity_maps_to_api_error() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST).path("/api/v1/phone/place-call");
+            then.status(503).json_body(json!({
+                "detail": {"error": "hosted_agent_at_capacity"}
+            }));
+        });
+        let err = client(&server)
+            .calls()
+            .place_hosted(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                "Confirm the appointment",
+            )
+            .unwrap_err();
+        match err {
+            InkboxError::Api {
+                status_code,
+                detail,
+            } => {
+                assert_eq!(status_code, 503);
+                let obj = detail.as_object().expect("structured detail");
+                assert_eq!(obj["error"], "hosted_agent_at_capacity");
+            }
+            other => panic!("expected InkboxError::Api, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn post_call_actions_fetches_seq_ordered_rows() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/post-call-actions");
+            then.status(200).json_body(json!([
+                {
+                    "id": "44444444-4444-4444-4444-444444444444",
+                    "call_id": "22222222-2222-2222-2222-222222222222",
+                    "agent_identity_id": "33333333-3333-3333-3333-333333333333",
+                    "seq": 1,
+                    "action": "Book cleaning Tue 9:30am",
+                    "details": "Office confirmed availability.",
+                    "status": "open",
+                    "created_at": "2026-06-01T00:04:00+00:00",
+                    "updated_at": "2026-06-01T00:04:00+00:00"
+                },
+                {
+                    "id": "55555555-5555-5555-5555-555555555555",
+                    "call_id": "22222222-2222-2222-2222-222222222222",
+                    "agent_identity_id": "33333333-3333-3333-3333-333333333333",
+                    "seq": 2,
+                    "action": "Send pricing PDF",
+                    "details": null,
+                    "status": "canceled",
+                    "created_at": "2026-06-01T00:04:30+00:00",
+                    "updated_at": "2026-06-01T00:04:45+00:00"
+                }
+            ]));
+        });
+        let actions = client(&server)
+            .calls()
+            .post_call_actions("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(actions.len(), 2);
+        assert_eq!(actions[0].seq, 1);
+        assert_eq!(actions[0].action, "Book cleaning Tue 9:30am");
+        // Canceled rows are part of the REST audit surface.
+        assert_eq!(actions[1].status, "canceled");
+        assert_eq!(actions[1].details, None);
     }
 
     #[test]

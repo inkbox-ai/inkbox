@@ -808,7 +808,10 @@ pub enum CallLifecycleWebhookEventType {
 /// the webhook). `local_phone_number` is `None` and `origin` is
 /// `SharedImessageNumber` on shared-line calls (the pool line is never
 /// surfaced). `duration_seconds` is the connected length in whole seconds,
-/// or `None` when the call never connected.
+/// or `None` when the call never connected. `mode` says who drove the call
+/// (`"client_websocket"` / `"hosted_agent"`) and `reason` carries the
+/// outbound hosted-call brief (`None` inbound and on client-driven calls);
+/// both default so payloads predating hosted calls still parse.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookPhoneCall {
     pub id: String,
@@ -823,6 +826,31 @@ pub struct WebhookPhoneCall {
     pub created_at: String,
     pub updated_at: String,
     pub duration_seconds: Option<i64>,
+    #[serde(default = "default_webhook_call_mode")]
+    pub mode: String,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+fn default_webhook_call_mode() -> String {
+    // Payloads predating hosted calls omit the field; they were always
+    // client-driven.
+    "client_websocket".to_string()
+}
+
+/// One open action item the hosted call agent recorded during the call.
+///
+/// Rides `call.ended` in `seq` order. Canceled items are omitted from the
+/// payload (queryable via `GET /phone/calls/{id}/post-call-actions`), so
+/// `status` here is always `"open"`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookPostCallAction {
+    pub id: String,
+    pub seq: i64,
+    pub action: String,
+    #[serde(default)]
+    pub details: Option<String>,
+    pub status: String,
 }
 
 /// Inline transcript block on a `call.ended` payload.
@@ -848,6 +876,11 @@ pub struct WebhookCallTranscript {
 /// for the call, otherwise `None`. `transcript_url` is **always** present and
 /// is the authoritative verbatim record (fetch with an API key that can
 /// access the call — the subscription owner's own key suffices).
+/// `outcome` is the hosted call's terminal result (`"completed"` /
+/// `"no_answer"` / `"declined"` / `"failed"`; `None` iff `call.mode` is
+/// `client_websocket`) and `post_call_actions` its recorded todo list —
+/// always present on new payloads (empty for non-hosted calls / no todos);
+/// both default so payloads predating hosted calls still parse.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallEndedWebhookData {
     pub call: WebhookPhoneCall,
@@ -856,6 +889,10 @@ pub struct CallEndedWebhookData {
     #[serde(default)]
     pub transcript: Option<WebhookCallTranscript>,
     pub transcript_url: String,
+    #[serde(default)]
+    pub outcome: Option<String>,
+    #[serde(default)]
+    pub post_call_actions: Vec<WebhookPostCallAction>,
 }
 
 /// Top-level `call.ended` webhook payload (`{event_type, timestamp, data}`
@@ -980,6 +1017,83 @@ mod tests {
         // The abridgment marker entry carries omitted_turns.
         assert_eq!(transcript.entries[1].marker.as_deref(), Some("abridged"));
         assert_eq!(transcript.entries[1].omitted_turns, Some(12));
+    }
+
+    #[test]
+    fn call_ended_pre_hosted_payload_defaults_new_fields() {
+        // Phase-0 payload without mode/reason/outcome/post_call_actions.
+        let raw = r#"{
+            "id": "evt_old",
+            "event_type": "call.ended",
+            "timestamp": "2026-07-06T18:22:41Z",
+            "data": {
+                "call": {
+                    "id": "c1", "origin": "dedicated_number",
+                    "local_phone_number": "+14155550100",
+                    "remote_phone_number": "+14155550999",
+                    "direction": "inbound", "status": "completed",
+                    "hangup_reason": "remote", "started_at": "t0", "ended_at": "t1",
+                    "created_at": "t0", "updated_at": "t1",
+                    "duration_seconds": 123
+                },
+                "contacts": [],
+                "agent_identities": [],
+                "transcript": null,
+                "transcript_url": "https://x/api/v1/phone/calls/c1/transcripts"
+            }
+        }"#;
+        let payload: CallEndedWebhookPayload = serde_json::from_str(raw).unwrap();
+        assert_eq!(payload.data.call.mode, "client_websocket");
+        assert_eq!(payload.data.call.reason, None);
+        assert_eq!(payload.data.outcome, None);
+        assert!(payload.data.post_call_actions.is_empty());
+    }
+
+    #[test]
+    fn call_ended_hosted_carries_mode_reason_outcome_and_actions() {
+        let raw = r#"{
+            "id": "evt_hosted",
+            "event_type": "call.ended",
+            "timestamp": "2026-07-09T15:04:12Z",
+            "data": {
+                "call": {
+                    "id": "c3", "origin": "dedicated_number",
+                    "local_phone_number": "+14155550100",
+                    "remote_phone_number": "+14155550999",
+                    "direction": "outbound", "status": "completed",
+                    "hangup_reason": "local", "started_at": "t0", "ended_at": "t1",
+                    "created_at": "t0", "updated_at": "t1",
+                    "duration_seconds": 189,
+                    "mode": "hosted_agent",
+                    "reason": "Book a cleaning next week"
+                },
+                "contacts": [],
+                "agent_identities": [],
+                "transcript": null,
+                "transcript_url": "https://x/api/v1/phone/calls/c3/transcripts",
+                "outcome": "completed",
+                "post_call_actions": [
+                    {"id": "a1", "seq": 1, "action": "Add appointment to calendar",
+                     "details": "Tuesday 9:30am", "status": "open"},
+                    {"id": "a2", "seq": 2, "action": "Text a confirmation",
+                     "details": null, "status": "open"}
+                ]
+            }
+        }"#;
+        let payload: CallEndedWebhookPayload = serde_json::from_str(raw).unwrap();
+        // mode/reason ride data.call; outcome/actions ride data.
+        assert_eq!(payload.data.call.mode, "hosted_agent");
+        assert_eq!(
+            payload.data.call.reason.as_deref(),
+            Some("Book a cleaning next week")
+        );
+        assert_eq!(payload.data.outcome.as_deref(), Some("completed"));
+        let actions = &payload.data.post_call_actions;
+        assert_eq!(actions.len(), 2);
+        assert_eq!(actions[0].seq, 1);
+        assert_eq!(actions[1].details, None);
+        // Canceled rows are omitted from the payload — every row is open.
+        assert!(actions.iter().all(|a| a.status == "open"));
     }
 
     #[test]
