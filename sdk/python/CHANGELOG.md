@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.21 — Hosted call agent
+
+### Added
+
+- **Hosted call mode.** `calls.place(...)` and `identity.place_call(...)` accept keyword-only `mode` (`CallMode.CLIENT_WEBSOCKET`, the default, or `CallMode.HOSTED_AGENT` — the platform-run voice agent drives the call, no WebSocket needed) and `reason` (the hosted agent's task brief; required with `mode=hosted_agent`, invalid otherwise). Nothing is client-gated — server 422s/503s (`hosted_agent_at_capacity`, `hosted_agent_unavailable`) surface verbatim. `PhoneCall` gains `mode` (older responses default to `"client_websocket"`) and `reason` (nullable).
+- **`IncomingCallAction.HOSTED_AGENT`.** The hosted agent answers inbound calls; the only action needing neither `client_websocket_url` nor `incoming_call_webhook_url`. Accepted by `incoming_call_action.set(...)` / `identity.set_incoming_call_action(...)` URL-less.
+- **Hosted agent config.** `inkbox.hosted_agent.get_config(agent_identity_id=None)` / `set_config(voice=None, model=None, instructions=None, agent_identity_id=None)` (`GET`/`PUT /phone/hosted-agent-config`; full-replace PUT — a field left `None` resets to the server default). New `HostedAgentConfig` type. Identity delegators `identity.get_hosted_agent_config()` / `set_hosted_agent_config(...)`.
+- **Post-call actions.** `calls.post_call_actions(call_id)` / `identity.list_post_call_actions(call_id)` list the hosted agent's recorded action items (`PostCallAction`: `id`, `call_id`, `agent_identity_id`, `seq`, `action`, `details`, `status "open"|"canceled"`, timestamps), `seq`-ascending, including canceled audit rows.
+- **`call.ended` receiver types.** `WebhookPhoneCall` gains `mode` / `reason` (on `data["call"]`); `CallEndedWebhookData` gains `outcome` (`"completed"|"no_answer"|"declined"|"failed"`, `None` iff client-driven) and `post_call_actions` (open items only). All `NotRequired` — pre-hosted payloads parse unchanged. New exports: `CallModeWire`, `CallOutcomeWire`, `WebhookPostCallActionWire`.
+
 ## 0.4.20 — Date-range filters, call.ended receivers, external hangup, spam-filter status
 
 ### Added
