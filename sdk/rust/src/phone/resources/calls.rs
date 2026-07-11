@@ -735,7 +735,10 @@ mod tests {
         mock.assert();
         assert_eq!(call.post_call_action_items.len(), 2);
         assert_eq!(call.post_call_action_items[0].seq, 1);
-        assert_eq!(call.post_call_action_items[0].action, "Book cleaning Tue 9:30am");
+        assert_eq!(
+            call.post_call_action_items[0].action,
+            "Book cleaning Tue 9:30am"
+        );
         assert_eq!(call.post_call_action_items[1].details, None);
     }
 
