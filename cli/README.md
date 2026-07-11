@@ -201,10 +201,17 @@ Phone operations, scoped to an identity. Requires `-i <handle>`.
 inkbox phone call -i <handle>                # Place an outbound call
   --to <number>                              #   E.164 phone number (required)
   --ws-url <url>                             #   WebSocket URL (wss://) for audio bridging
+  --hosted                                   #   Let the hosted call agent drive the call
+                                             #     (requires --reason; conflicts with --ws-url)
+  --reason <text>                            #   The hosted agent's task brief — what to accomplish
 
 inkbox phone calls -i <handle>               # List calls
   --limit <n>                                #   Max results (default: 50)
   --offset <n>                               #   Pagination offset (default: 0)
+                                             #   mode / reason / post_call_action_items
+                                             #     ride each call; read them with --json
+
+inkbox phone hangup <call-id> -i <handle>    # Hang up a live call from outside it
 
 inkbox phone transcripts <call-id> -i <handle>  # Get call transcripts
 
@@ -212,6 +219,20 @@ inkbox phone search-transcripts -i <handle>  # Search transcripts
   -q, --query <query>                        #   Search query (required)
   --party <party>                            #   Filter: local or remote
   --limit <n>                                #   Max results (default: 50)
+
+inkbox phone incoming-action [action] -i <handle>  # Get (no action) or set the identity's
+                                             #   incoming-call action: auto_accept,
+                                             #   auto_reject, webhook, or hosted_agent
+                                             #   (hosted_agent needs no URL)
+  --ws-url <url>                             #   WebSocket URL (wss://) for audio bridging
+  --webhook-url <url>                        #   HTTPS receiver for the webhook action
+
+inkbox phone hosted-agent get -i <handle>    # Show the hosted call agent config
+inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitted flag
+                                             #   resets that field to the server default
+  --voice <voice>                            #   Voice override
+  --model <model>                            #   Model override
+  --instructions <text>                      #   Per-identity steering prompt
 ```
 
 ### text
@@ -414,10 +435,11 @@ inkbox number list                           # List all phone numbers
 inkbox number get <id>                       # Get phone number details
 inkbox number provision                      # Provision a new number
   --handle <handle>                          #   Agent handle (required)
-  --type <type>                              #   toll_free or local (default: toll_free)
+  --type <type>                              #   local (default); toll_free is no longer offered (422)
   --state <state>                            #   US state abbreviation (for local)
 inkbox number update <id>                    # Update phone number config
-  --incoming-call-action <action>            #   auto_accept, auto_reject, or webhook
+  --incoming-call-action <action>            #   auto_accept, auto_reject, webhook,
+                                             #     or hosted_agent (needs no URL)
   --client-websocket-url <url>               #   WebSocket URL for audio bridging
   --incoming-call-webhook-url <url>          #   Webhook URL for incoming calls
 inkbox number release <number-id>             # Release a phone number
@@ -455,14 +477,14 @@ inkbox webhook verify                        # Verify a webhook signature (local
 inkbox webhook subscription list             # List webhook subscriptions
   --mailbox-id <id>                          #   Filter by owning mailbox id
   --phone-number-id <id>                     #   Filter by owning phone number id
-  --agent-identity-id <id>                   #   Filter by owning agent identity id (iMessage)
+  --agent-identity-id <id>                   #   Filter by owning agent identity id (iMessage / call.ended)
   --url <url>                                #   Filter by destination URL (exact)
   --event-type <type>                        #   Filter by event_type wire value
 inkbox webhook subscription get <sub-id>     # Get one subscription
 inkbox webhook subscription create           # Create a subscription
   --mailbox-id <id>                          #   Owning mailbox id (exactly one of the
   --phone-number-id <id>                     #     three owner FKs is required)
-  --agent-identity-id <id>                   #   Owning agent identity id (iMessage events)
+  --agent-identity-id <id>                   #   Owning agent identity id (iMessage / call.ended events)
   --url <url>                                #   HTTPS destination (required)
   --event-type <type>                        #   Event type (repeatable; ≥1 required)
   --context-email <spec>                     #   Conversation context for the email

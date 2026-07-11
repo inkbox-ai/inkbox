@@ -95,8 +95,8 @@ console.log(identity.emailAddress);            // e.g. "sales-agent@inkboxmail.c
 console.log(identity.tunnel?.publicHost);      // e.g. "sales-agent.inkboxwire.com"
 
 // Phone numbers are still opt-in
-const phone = await identity.provisionPhoneNumber({ type: "toll_free" });
-console.log(phone.number);                     // e.g. "+18005551234"
+const phone = await identity.provisionPhoneNumber({ type: "local", state: "NY" });  // local only; toll_free is rejected (422)
+console.log(phone.number);                     // e.g. "+12125551234"
 
 // Release the phone number (vendor + local)
 await identity.releasePhoneNumber();
@@ -200,6 +200,8 @@ Low-level folder listing / per-thread updates (`list({ folder })`, `listFolders(
 ## Phone
 
 ```typescript
+import { CallMode, IncomingCallAction } from "@inkbox/sdk";
+
 // Place outbound call — stream audio via WebSocket
 const call = await identity.placeCall({
   toNumber: "+15551234567",
@@ -208,10 +210,27 @@ const call = await identity.placeCall({
 console.log(call.status);
 console.log(call.rateLimit.callsRemaining);
 
-// List calls (offset pagination)
+// Or let the platform-hosted call agent drive the call — no WebSocket,
+// no code. reason is the agent's task brief (required with
+// mode=hosted_agent, invalid otherwise; server 422).
+const hosted = await identity.placeCall({
+  toNumber: "+15551234567",
+  mode: CallMode.HOSTED_AGENT,   // default CallMode.CLIENT_WEBSOCKET
+  reason: "Confirm tomorrow's 3pm appointment; reschedule if needed.",
+});
+console.log(hosted.mode, hosted.reason);
+// Where hosted calling isn't available (or is at capacity), the server's
+// 503 (hosted_agent_unavailable / hosted_agent_at_capacity) surfaces verbatim.
+
+// List calls (offset pagination). Every call carries mode / reason plus
+// postCallActionItems — open items the hosted agent recorded
+// (seq-ascending; empty for client_websocket calls)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
 for (const c of calls) {
-  console.log(c.id, c.direction, c.remotePhoneNumber, c.status);
+  console.log(c.id, c.direction, c.remotePhoneNumber, c.status, c.mode);
+  for (const item of c.postCallActionItems) {
+    console.log(`  [${item.seq}] ${item.action}: ${item.details}`);
+  }
 }
 
 // Transcript segments (ordered by seq)
@@ -224,6 +243,19 @@ for (const t of segments) {
 // so the returned call can still show its live status; already-ended
 // calls surface the server's 409)
 const hungUp = await identity.hangupCall(calls[0].id);
+
+// Per-identity hosted call agent config: voice / model / instructions,
+// all nullable (null means the server default). setHostedAgentConfig is
+// a FULL REPLACE — an omitted field resets to the server default.
+const cfg = await identity.getHostedAgentConfig();
+await identity.setHostedAgentConfig({ instructions: "Be brief and friendly." });
+
+// Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent.
+// hosted_agent is the only action needing no URL — the hosted agent answers.
+await identity.setIncomingCallAction({
+  incomingCallAction: IncomingCallAction.HOSTED_AGENT,
+});
+console.log((await identity.getIncomingCallAction()).incomingCallAction);
 ```
 
 ## Text Messages (SMS/MMS)
@@ -659,16 +691,18 @@ await inkbox.createIdentity("sales-bot-2", { sendingDomain: null });
 ```typescript
 const numbers = await inkbox.phoneNumbers.list();
 const number  = await inkbox.phoneNumbers.get("phone-number-uuid");
-const num     = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "toll_free" });
-const local   = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "local", state: "NY" });
+const num     = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "local", state: "NY" });  // local only; toll_free is rejected (422)
 
 await inkbox.phoneNumbers.update(num.id, {
-  incomingCallAction: "webhook",               // "webhook", "auto_accept", or "auto_reject"
+  incomingCallAction: "webhook",               // "webhook", "auto_accept", "auto_reject", or "hosted_agent"
   incomingCallWebhookUrl: "https://...",
 });
 await inkbox.phoneNumbers.update(num.id, {
   incomingCallAction: "auto_accept",
   clientWebsocketUrl: "wss://...",
+});
+await inkbox.phoneNumbers.update(num.id, {
+  incomingCallAction: "hosted_agent",          // no URL — the hosted agent answers
 });
 
 const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", party: "remote", limit: 50 });
@@ -962,7 +996,7 @@ Algorithm: HMAC-SHA256 over `"{requestId}.{timestamp}.{body}"`.
 - **Mail** (envelope, fire-and-forget) — `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed`. Subscribe via `inkbox.webhooks.subscriptions.create({ mailboxId, url, eventTypes })`. On `message.received`, `data.message` includes the plain-text `body` (whole under a size cap, else a prefix with `body_truncated: true` / `body_state: "truncated"`); when truncated, hydrate with `inkbox.messages.get(message.email_address, message.id)` — use `id` (row id), not `message_id` (RFC 5322 header). Present-with-`null` on the other events, absent on pre-feature payloads.
 - **Text** (envelope, fire-and-forget) — `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via `inkbox.webhooks.subscriptions.create({ phoneNumberId, url, eventTypes })`. The text-message body carries `delivery_status` as an outbound message-level rollup; 1:1 traffic also hoists `error_code`, `error_detail`, `sent_at`, `delivered_at`, and `failed_at`. On group outbound those legacy detail fields are `null` and per-recipient state lives in `recipients[]`.
 - **iMessage** (envelope, fire-and-forget) — `imessage.received`, `imessage.reaction_received`, plus the outbound delivery lifecycle `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` (declined/error; details on the message object). Subscribe via `inkbox.webhooks.subscriptions.create({ agentIdentityId, url, eventTypes })` — owned by the **agent identity**, since shared iMessage pool numbers are not org resources. `data.message` is populated on `imessage.received` and the three delivery-lifecycle events; `data.reaction` on `imessage.reaction_received`. Fan-out only happens while the identity is active and `imessageEnabled`; contact-rule-blocked traffic is never delivered.
-- **Call lifecycle** (envelope, fire-and-forget + replayable) — `call.ended`, owned by the **agent identity** (like iMessage). Subscribe via `inkbox.webhooks.subscriptions.create({ agentIdentityId, url, eventTypes: ["call.ended"] })`. `CallEndedWebhookPayload.data` carries the `call` (`WebhookPhoneCall`, with derived `duration_seconds`), resolved `contacts` / `agent_identities`, an always-present `transcript_url` (authoritative verbatim, fetch with an admin API key), and an inline `transcript` block (`WebhookCallTranscript`, middle-cut/abridged) present when the platform captured a transcript for the call, otherwise `null` — discriminate a turn from the abridgment marker on `"marker" in entry`. An identity may hold a `call.ended` sub and an `imessage.*` sub independently, but one subscription carries a single channel.
+- **Call lifecycle** (envelope, fire-and-forget + replayable) — `call.ended`, owned by the **agent identity** (like iMessage). Subscribe via `inkbox.webhooks.subscriptions.create({ agentIdentityId, url, eventTypes: ["call.ended"] })`. `CallEndedWebhookPayload.data` carries the `call` (`WebhookPhoneCall`, with derived `duration_seconds`), resolved `contacts` / `agent_identities`, an always-present `transcript_url` (authoritative verbatim, fetch with an admin API key), and an inline `transcript` block (`WebhookCallTranscript`, middle-cut/abridged) present when the platform captured a transcript for the call, otherwise `null` — discriminate a turn from the abridgment marker on `"marker" in entry`. Hosted-call fields (all optional so pre-hosted payloads parse): `data.call` carries `mode` / `reason`; `data` carries `outcome` (`"completed" | "no_answer" | "declined" | "failed"`, `null` iff `mode` is `client_websocket`) and `post_call_action_items` (open items only, seq-ascending, mirroring `PhoneCall.postCallActionItems`). Hosted calls fire `call.ended` on **every** terminal state (including never-connected ones like `no_answer`), not just connected calls. An identity may hold a `call.ended` sub and an `imessage.*` sub independently, but one subscription carries a single channel.
 - **Inbound call** (flat, synchronous) — `PhoneIncomingCallWebhookPayload` on a phone number's `incomingCallWebhookUrl`. Not subscribable; the URL stays on the phone-number resource because the response (`action: "answer" | "reject"` + optional `clientWebsocketUrl`) decides the call's fate. Non-200, invalid bodies, and timeouts are treated as "decline routing" by Inkbox. (Contrast `call.ended` above, which is the replayable post-call fan-out.)
 
 **Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox, phone number, **or** agent identity), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, and one channel per subscription — `message.` / `text.` / `imessage.` / `call.` prefix matching the owner's channel, where an agent identity owns both `imessage.*` and `call.ended`) so most shape mistakes surface as `Error` before the request leaves the client. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
