@@ -13,12 +13,12 @@ import pytest
 from inkbox._http import HttpTransport
 from inkbox.exceptions import InkboxAPIError
 from inkbox.phone.resources.calls import CallsResource
-from inkbox.phone.types import CallMode, CallOrigin
+from inkbox.phone.types import CallMode, CallOrigin, PhoneCall
 from sample_data import (
     PHONE_CALL_BLOCKED_DICT,
     PHONE_CALL_DICT,
     PHONE_TRANSCRIPT_DICT,
-    POST_CALL_ACTION_CANCELED_DICT,
+    POST_CALL_ACTION_2_DICT,
     POST_CALL_ACTION_DICT,
     RATE_LIMIT_INFO_DICT,
 )
@@ -393,31 +393,36 @@ class TestCallsPlaceHosted:
 
 
 class TestPostCallActions:
-    def test_returns_actions_in_seq_order(self, client, transport):
-        transport.get.return_value = [
-            POST_CALL_ACTION_DICT,
-            POST_CALL_ACTION_CANCELED_DICT,
-        ]
+    """Post-call actions are surfaced inline on the parsed call resource."""
 
-        actions = client._calls.post_call_actions(CALL_ID)
+    def test_inline_actions_parse_in_seq_order(self):
+        # A hosted call carries its open action items inline, seq-ascending.
+        call = PhoneCall._from_dict(
+            {
+                **PHONE_CALL_DICT,
+                "post_call_actions": [
+                    POST_CALL_ACTION_DICT,
+                    POST_CALL_ACTION_2_DICT,
+                ],
+            }
+        )
 
-        transport.get.assert_called_once_with(f"/calls/{CALL_ID}/post-call-actions")
-        assert len(actions) == 2
-        assert actions[0].seq == 1
-        assert actions[0].action == "Book cleaning Tue 9:30am"
-        assert actions[0].details == "Dr. Chen's office confirmed availability."
-        assert actions[0].status == "open"
-        assert actions[0].call_id == UUID(CALL_ID)
-        # Canceled rows are part of the REST audit surface.
-        assert actions[1].status == "canceled"
-        assert actions[1].details is None
+        assert len(call.post_call_actions) == 2
+        assert call.post_call_actions[0].seq == 1
+        assert call.post_call_actions[0].action == "Book cleaning Tue 9:30am"
+        assert (
+            call.post_call_actions[0].details
+            == "Dr. Chen's office confirmed availability."
+        )
+        # Only open items reach the wire.
+        assert all(a.status == "open" for a in call.post_call_actions)
+        assert call.post_call_actions[1].details is None
 
-    def test_accepts_uuid(self, client, transport):
-        transport.get.return_value = []
+    def test_missing_key_yields_empty_list(self):
+        # Client-websocket calls (and hosted calls with no open items) omit it.
+        call = PhoneCall._from_dict(PHONE_CALL_DICT)
 
-        assert client._calls.post_call_actions(UUID(CALL_ID)) == []
-
-        transport.get.assert_called_once_with(f"/calls/{CALL_ID}/post-call-actions")
+        assert call.post_call_actions == []
 
 
 def _calls_resource_returning(status_code: int, body: dict | list) -> CallsResource:

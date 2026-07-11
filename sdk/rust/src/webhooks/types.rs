@@ -840,9 +840,9 @@ fn default_webhook_call_mode() -> String {
 
 /// One open action item the hosted call agent recorded during the call.
 ///
-/// Rides `call.ended` in `seq` order. Canceled items are omitted from the
-/// payload (queryable via `GET /phone/calls/{id}/post-call-actions`), so
-/// `status` here is always `"open"`.
+/// Rides `call.ended` in `seq` order, mirroring the call resource's inline
+/// `post_call_actions`. Only open items are surfaced, so `status` here is
+/// always `"open"`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookPostCallAction {
     pub id: String,

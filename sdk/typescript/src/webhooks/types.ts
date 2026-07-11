@@ -652,9 +652,9 @@ export interface WebhookCallTranscript {
 /**
  * One open action item the hosted call agent recorded during the call.
  *
- * Rides `call.ended` in `seq` order. Canceled items are omitted from the
- * payload (queryable via `GET /phone/calls/{id}/post-call-actions`), so
- * `status` here is always `"open"`.
+ * Rides `call.ended` in `seq` order, mirroring the inline
+ * `PhoneCall.postCallActions`. Canceled items are omitted, so `status`
+ * here is always `"open"`.
  */
 export interface WebhookPostCallAction {
   id: string;

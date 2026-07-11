@@ -169,28 +169,21 @@ export const RAW_HOSTED_AGENT_CONFIG = {
   instructions: "Always offer to text a summary after the call.",
 };
 
+// Slim, open-only rows as surfaced inline on the call resource.
 export const RAW_POST_CALL_ACTION = {
   id: "ffff6666-0000-0000-0000-000000000001",
-  call_id: "bbbb2222-0000-0000-0000-000000000001",
-  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   seq: 1,
   action: "Book cleaning Tue 9:30am",
   details: "Dr. Chen's office confirmed availability.",
   status: "open",
-  created_at: "2026-03-09T00:04:00Z",
-  updated_at: "2026-03-09T00:04:00Z",
 };
 
-export const RAW_POST_CALL_ACTION_CANCELED = {
+export const RAW_POST_CALL_ACTION_2 = {
   id: "ffff6666-0000-0000-0000-000000000002",
-  call_id: "bbbb2222-0000-0000-0000-000000000001",
-  agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   seq: 2,
   action: "Send pricing PDF",
   details: null,
-  status: "canceled",
-  created_at: "2026-03-09T00:04:30Z",
-  updated_at: "2026-03-09T00:04:45Z",
+  status: "open",
 };
 
 // ---- Texts ----

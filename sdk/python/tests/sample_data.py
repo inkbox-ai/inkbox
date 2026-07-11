@@ -260,26 +260,19 @@ HOSTED_AGENT_CONFIG_DICT = {
     "instructions": "Always offer to text a summary after the call.",
 }
 
+# Slim wire shape: surfaced inline on the call resource, open items only.
 POST_CALL_ACTION_DICT = {
     "id": "ffff6666-0000-0000-0000-000000000001",
-    "call_id": "bbbb2222-0000-0000-0000-000000000001",
-    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "seq": 1,
     "action": "Book cleaning Tue 9:30am",
     "details": "Dr. Chen's office confirmed availability.",
     "status": "open",
-    "created_at": "2026-03-09T00:04:00Z",
-    "updated_at": "2026-03-09T00:04:00Z",
 }
 
-POST_CALL_ACTION_CANCELED_DICT = {
+POST_CALL_ACTION_2_DICT = {
     "id": "ffff6666-0000-0000-0000-000000000002",
-    "call_id": "bbbb2222-0000-0000-0000-000000000001",
-    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "seq": 2,
     "action": "Send pricing PDF",
     "details": None,
-    "status": "canceled",
-    "created_at": "2026-03-09T00:04:30Z",
-    "updated_at": "2026-03-09T00:04:45Z",
+    "status": "open",
 }

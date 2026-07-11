@@ -58,7 +58,6 @@ from inkbox.phone.types import (
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneIdentityContactRule,
-    PostCallAction,
     PhoneRuleAction,
     PhoneRuleMatchType,
     PhoneTranscript,
@@ -747,14 +746,6 @@ class AgentIdentity:
             call_id: ID of the call to hang up.
         """
         return self._inkbox._calls.hangup(call_id)
-
-    def list_post_call_actions(self, call_id: str) -> list[PostCallAction]:
-        """List the hosted agent's recorded action items for a call.
-
-        Args:
-            call_id: ID of the call to fetch post-call actions for.
-        """
-        return self._inkbox._calls.post_call_actions(call_id)
 
     def get_hosted_agent_config(self) -> HostedAgentConfig:
         """Get this identity's hosted call agent config."""

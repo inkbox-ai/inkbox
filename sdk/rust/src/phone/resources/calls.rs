@@ -7,9 +7,7 @@ use serde_json::Map;
 use crate::error::Result;
 use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
-use crate::phone::types::{
-    CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript, PostCallAction,
-};
+use crate::phone::types::{CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript};
 
 pub struct CallsResource {
     http: Arc<HttpTransport>,
@@ -125,21 +123,6 @@ impl CallsResource {
     pub fn transcripts(&self, call_id: &str) -> Result<Vec<PhoneTranscript>> {
         let data = self.http.get(
             &format!("/calls/{call_id}/transcripts"),
-            crate::http::NO_QUERY,
-        )?;
-        Ok(serde_json::from_value(data)?)
-    }
-
-    /// List the action items the hosted call agent recorded on a call.
-    ///
-    /// Ordered by `seq`, ascending. Includes canceled rows (the audit
-    /// surface); empty for calls the hosted agent didn't drive.
-    ///
-    /// # Arguments
-    /// * `call_id` - UUID (or string) of the call.
-    pub fn post_call_actions(&self, call_id: &str) -> Result<Vec<PostCallAction>> {
-        let data = self.http.get(
-            &format!("/calls/{call_id}/post-call-actions"),
             crate::http::NO_QUERY,
         )?;
         Ok(serde_json::from_value(data)?)
@@ -718,47 +701,59 @@ mod tests {
     }
 
     #[test]
-    fn post_call_actions_fetches_seq_ordered_rows() {
+    fn get_exposes_inline_post_call_actions() {
+        let server = MockServer::start();
+        // A call carrying open action items inline on the resource.
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222");
+            then.status(200).json_body({
+                let mut v = call_json();
+                v["post_call_actions"] = json!([
+                    {
+                        "id": "44444444-4444-4444-4444-444444444444",
+                        "seq": 1,
+                        "action": "Book cleaning Tue 9:30am",
+                        "details": "Office confirmed availability.",
+                        "status": "open"
+                    },
+                    {
+                        "id": "55555555-5555-5555-5555-555555555555",
+                        "seq": 2,
+                        "action": "Send pricing PDF",
+                        "details": null,
+                        "status": "open"
+                    }
+                ]);
+                v
+            });
+        });
+        let call = client(&server)
+            .calls()
+            .get("22222222-2222-2222-2222-222222222222")
+            .unwrap();
+        mock.assert();
+        assert_eq!(call.post_call_actions.len(), 2);
+        assert_eq!(call.post_call_actions[0].seq, 1);
+        assert_eq!(call.post_call_actions[0].action, "Book cleaning Tue 9:30am");
+        assert_eq!(call.post_call_actions[1].details, None);
+    }
+
+    #[test]
+    fn post_call_actions_default_empty_when_key_absent() {
+        // The base fixture omits the key: it must parse to an empty Vec.
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(GET)
-                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/post-call-actions");
-            then.status(200).json_body(json!([
-                {
-                    "id": "44444444-4444-4444-4444-444444444444",
-                    "call_id": "22222222-2222-2222-2222-222222222222",
-                    "agent_identity_id": "33333333-3333-3333-3333-333333333333",
-                    "seq": 1,
-                    "action": "Book cleaning Tue 9:30am",
-                    "details": "Office confirmed availability.",
-                    "status": "open",
-                    "created_at": "2026-06-01T00:04:00+00:00",
-                    "updated_at": "2026-06-01T00:04:00+00:00"
-                },
-                {
-                    "id": "55555555-5555-5555-5555-555555555555",
-                    "call_id": "22222222-2222-2222-2222-222222222222",
-                    "agent_identity_id": "33333333-3333-3333-3333-333333333333",
-                    "seq": 2,
-                    "action": "Send pricing PDF",
-                    "details": null,
-                    "status": "canceled",
-                    "created_at": "2026-06-01T00:04:30+00:00",
-                    "updated_at": "2026-06-01T00:04:45+00:00"
-                }
-            ]));
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222");
+            then.status(200).json_body(call_json());
         });
-        let actions = client(&server)
+        let call = client(&server)
             .calls()
-            .post_call_actions("22222222-2222-2222-2222-222222222222")
+            .get("22222222-2222-2222-2222-222222222222")
             .unwrap();
         mock.assert();
-        assert_eq!(actions.len(), 2);
-        assert_eq!(actions[0].seq, 1);
-        assert_eq!(actions[0].action, "Book cleaning Tue 9:30am");
-        // Canceled rows are part of the REST audit surface.
-        assert_eq!(actions[1].status, "canceled");
-        assert_eq!(actions[1].details, None);
+        assert!(call.post_call_actions.is_empty());
     }
 
     #[test]

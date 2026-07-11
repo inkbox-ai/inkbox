@@ -25,7 +25,6 @@ import type {
   PhoneIdentityContactRule,
   IncomingCallActionConfig,
   HostedAgentConfig,
-  PostCallAction,
 } from "./phone/types.js";
 import { CallMode, CallOrigin, IncomingCallAction } from "./phone/types.js";
 import type {
@@ -593,15 +592,6 @@ export class AgentIdentity {
    */
   async hangupCall(callId: string): Promise<PhoneCall> {
     return this._inkbox._calls.hangup(callId);
-  }
-
-  /**
-   * List the hosted agent's recorded action items for a call.
-   *
-   * @param callId - ID of the call to fetch post-call actions for.
-   */
-  async listPostCallActions(callId: string): Promise<PostCallAction[]> {
-    return this._inkbox._calls.postCallActions(callId);
   }
 
   /** Get this identity's hosted call agent config. */

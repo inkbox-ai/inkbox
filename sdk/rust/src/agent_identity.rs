@@ -55,7 +55,7 @@ use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
     CallOrigin, ContactRuleStatus as PhoneContactRuleStatus, HostedAgentConfig, IncomingCallAction,
     IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
-    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, PostCallAction, TextConversationSummary,
+    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
     TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
@@ -589,11 +589,6 @@ impl AgentIdentity {
     /// List transcript segments for a specific call.
     pub fn list_transcripts(&self, call_id: &str) -> Result<Vec<PhoneTranscript>> {
         self.inkbox.calls().transcripts(call_id)
-    }
-
-    /// List the hosted agent's recorded action items for a call.
-    pub fn list_post_call_actions(&self, call_id: &str) -> Result<Vec<PostCallAction>> {
-        self.inkbox.calls().post_call_actions(call_id)
     }
 
     /// Get this identity's hosted call agent config.
@@ -1665,33 +1660,6 @@ mod tests {
             )
             .unwrap();
         mock.assert();
-    }
-
-    #[test]
-    fn list_post_call_actions_delegates_to_calls_resource() {
-        let server = MockServer::start();
-        let mock = server.mock(|when, then| {
-            when.method(GET)
-                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/post-call-actions");
-            then.status(200).json_body(json!([{
-                "id": "44444444-4444-4444-4444-444444444444",
-                "call_id": "22222222-2222-2222-2222-222222222222",
-                "agent_identity_id": IDENTITY_ID,
-                "seq": 1,
-                "action": "Book cleaning Tue 9:30am",
-                "details": null,
-                "status": "open",
-                "created_at": "2026-06-01T00:04:00+00:00",
-                "updated_at": "2026-06-01T00:04:00+00:00"
-            }]));
-        });
-        let identity = identity_at(&server.base_url(), false);
-        let actions = identity
-            .list_post_call_actions("22222222-2222-2222-2222-222222222222")
-            .unwrap();
-        mock.assert();
-        assert_eq!(actions.len(), 1);
-        assert_eq!(actions[0].action, "Book cleaning Tue 9:30am");
     }
 
     #[test]

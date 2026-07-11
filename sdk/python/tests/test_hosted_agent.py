@@ -9,8 +9,8 @@ from uuid import UUID
 
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
-from inkbox.phone.types import CallMode, HostedAgentConfig, PostCallAction
-from sample_data import HOSTED_AGENT_CONFIG_DICT, POST_CALL_ACTION_DICT
+from inkbox.phone.types import CallMode, HostedAgentConfig
+from sample_data import HOSTED_AGENT_CONFIG_DICT
 from sample_data_identities import IDENTITY_DETAIL_DICT
 
 
@@ -184,17 +184,6 @@ class TestAgentIdentityHostedAgentDelegation:
             instructions="Be brief.",
             agent_identity_id=identity.id,
         )
-
-    def test_list_post_call_actions_delegates(self):
-        identity, inkbox = _identity()
-        inkbox._calls.post_call_actions.return_value = [
-            PostCallAction._from_dict(POST_CALL_ACTION_DICT)
-        ]
-
-        actions = identity.list_post_call_actions("call-id")
-
-        inkbox._calls.post_call_actions.assert_called_once_with("call-id")
-        assert actions[0].action == "Book cleaning Tue 9:30am"
 
     def test_place_call_forwards_mode_and_reason(self):
         identity, inkbox = _identity()

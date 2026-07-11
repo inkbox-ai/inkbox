@@ -251,6 +251,11 @@ export interface PhoneCall {
   mode: string;
   /** Outbound hosted-call brief; `null` on inbound and client-driven calls. */
   reason: string | null;
+  /**
+   * Open action items the hosted call agent recorded, `seq`-ascending.
+   * Empty for client_websocket calls and hosted calls with no open items.
+   */
+  postCallActions: PostCallAction[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -309,20 +314,16 @@ export interface HostedAgentConfig {
 /**
  * An action item the hosted call agent recorded during a call.
  *
- * `status` is `"open"` or `"canceled"`. Canceled rows are kept for audit
- * and returned by `CallsResource.postCallActions`, but omitted from the
- * `call.ended` webhook payload.
+ * Surfaced inline on the call resource via `PhoneCall.postCallActions`
+ * (open items only, `seq`-ascending). Mirrors the rows on the
+ * `call.ended` webhook payload. `status` is always `"open"` on the wire.
  */
 export interface PostCallAction {
   id: string;
-  callId: string;
-  agentIdentityId: string;
   seq: number;
   action: string;
   details: string | null;
   status: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface TextMediaItem {
@@ -477,6 +478,8 @@ export interface RawPhoneCall {
   // client_websocket.
   mode?: string | null;
   reason?: string | null;
+  // Absent/empty for client_websocket calls and hosted calls with no open items.
+  post_call_actions?: RawPostCallAction[];
   created_at: string;
   updated_at: string;
 }
@@ -578,14 +581,10 @@ export interface RawHostedAgentConfig {
 
 export interface RawPostCallAction {
   id: string;
-  call_id: string;
-  agent_identity_id: string;
   seq: number;
   action: string;
   details?: string | null;
   status: string;
-  created_at: string;
-  updated_at: string;
 }
 
 // ---- parsers ----
@@ -676,6 +675,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     // Coerce a null/missing mode to client_websocket for back-compat.
     mode: r.mode ?? CallMode.CLIENT_WEBSOCKET,
     reason: r.reason ?? null,
+    postCallActions: (r.post_call_actions ?? []).map(parsePostCallAction),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -736,14 +736,10 @@ export function parseHostedAgentConfig(r: RawHostedAgentConfig): HostedAgentConf
 export function parsePostCallAction(r: RawPostCallAction): PostCallAction {
   return {
     id: r.id,
-    callId: r.call_id,
-    agentIdentityId: r.agent_identity_id,
     seq: r.seq,
     action: r.action,
     details: r.details ?? null,
     status: r.status,
-    createdAt: new Date(r.created_at),
-    updatedAt: new Date(r.updated_at),
   };
 }
 

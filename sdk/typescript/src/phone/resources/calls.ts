@@ -11,15 +11,12 @@ import {
   PhoneCall,
   PhoneCallWithRateLimit,
   PhoneTranscript,
-  PostCallAction,
   RawPhoneCall,
   RawPhoneCallWithRateLimit,
   RawPhoneTranscript,
-  RawPostCallAction,
   parsePhoneCall,
   parsePhoneCallWithRateLimit,
   parsePhoneTranscript,
-  parsePostCallAction,
 } from "../types.js";
 
 export class CallsResource {
@@ -105,21 +102,6 @@ export class CallsResource {
       `/calls/${callId}/transcripts`,
     );
     return data.map(parsePhoneTranscript);
-  }
-
-  /**
-   * List the action items the hosted call agent recorded on a call.
-   *
-   * Ordered by `seq`, ascending. Includes canceled rows (the audit
-   * surface); empty for calls the hosted agent didn't drive.
-   *
-   * @param callId - UUID of the call.
-   */
-  async postCallActions(callId: string): Promise<PostCallAction[]> {
-    const data = await this.http.get<RawPostCallAction[]>(
-      `/calls/${callId}/post-call-actions`,
-    );
-    return data.map(parsePostCallAction);
   }
 
   /**

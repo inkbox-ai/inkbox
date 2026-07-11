@@ -70,7 +70,6 @@ function mockInkbox() {
       place: vi.fn(),
       list: vi.fn(),
       transcripts: vi.fn(),
-      postCallActions: vi.fn(),
     },
     _incomingCallAction: { get: vi.fn(), set: vi.fn() },
     _hostedAgent: { getConfig: vi.fn(), setConfig: vi.fn() },
@@ -389,17 +388,6 @@ describe("AgentIdentity phone helpers", () => {
       mode: CallMode.HOSTED_AGENT,
       reason: "Confirm the appointment",
     });
-  });
-
-  it("listPostCallActions delegates to calls resource", async () => {
-    const ink = mockInkbox();
-    vi.mocked(ink._calls.postCallActions).mockResolvedValue([]);
-    const identity = new AgentIdentity(makeData(), ink);
-
-    const result = await identity.listPostCallActions("call-1");
-
-    expect(ink._calls.postCallActions).toHaveBeenCalledWith("call-1");
-    expect(result).toEqual([]);
   });
 
   it("getHostedAgentConfig delegates scoped by identity id", async () => {

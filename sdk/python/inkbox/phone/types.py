@@ -6,7 +6,7 @@ Dataclasses mirroring the Inkbox Phone API response models.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -224,6 +224,10 @@ class PhoneCall:
     mode: str = "client_websocket"
     # Outbound hosted-call brief; None on inbound and client_websocket calls.
     reason: str | None = None
+    # Hosted agent's recorded action items, surfaced inline (open items only,
+    # seq-ascending); empty for client_websocket calls and hosted calls with
+    # no open items.
+    post_call_actions: list[PostCallAction] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -247,6 +251,10 @@ class PhoneCall:
             # Coerce a null/missing mode to client_websocket for back-compat.
             mode=d.get("mode") or "client_websocket",
             reason=d.get("reason"),
+            # Open items only, seq-ascending; empty for client_websocket calls.
+            post_call_actions=[
+                PostCallAction._from_dict(a) for a in d.get("post_call_actions", [])
+            ],
         )
 
 
@@ -550,33 +558,25 @@ class HostedAgentConfig:
 class PostCallAction:
     """An action item the hosted call agent recorded during a call.
 
-    ``status`` is ``"open"`` or ``"canceled"``. Canceled rows are kept
-    for audit and returned by :meth:`CallsResource.post_call_actions`,
-    but omitted from the ``call.ended`` webhook payload.
+    Surfaced inline on the call resource (``PhoneCall.post_call_actions``).
+    Only open items reach the wire — canceled items are withdrawn — so
+    ``status`` is always ``"open"``. Mirrors the ``call.ended`` webhook.
     """
 
     id: UUID
-    call_id: UUID
-    agent_identity_id: UUID
     seq: int
     action: str
     details: str | None
     status: str
-    created_at: datetime
-    updated_at: datetime
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PostCallAction:
         return cls(
             id=UUID(d["id"]),
-            call_id=UUID(d["call_id"]),
-            agent_identity_id=UUID(d["agent_identity_id"]),
             seq=d["seq"],
             action=d["action"],
             details=d.get("details"),
             status=d["status"],
-            created_at=datetime.fromisoformat(d["created_at"]),
-            updated_at=datetime.fromisoformat(d["updated_at"]),
         )
 
 

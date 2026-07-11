@@ -9,7 +9,7 @@ import {
   RAW_PHONE_CALL_WITH_RATE_LIMIT,
   RAW_PHONE_TRANSCRIPT,
   RAW_POST_CALL_ACTION,
-  RAW_POST_CALL_ACTION_CANCELED,
+  RAW_POST_CALL_ACTION_2,
 } from "../sampleData.js";
 
 function mockHttp() {
@@ -359,33 +359,39 @@ describe("CallsResource.place hosted mode", () => {
   });
 });
 
-describe("CallsResource.postCallActions", () => {
-  it("returns actions in seq order, including canceled audit rows", async () => {
+describe("PhoneCall.postCallActions (inline on the call resource)", () => {
+  it("exposes slim, seq-ascending open actions when present", async () => {
     const http = mockHttp();
-    vi.mocked(http.get).mockResolvedValue([
-      RAW_POST_CALL_ACTION,
-      RAW_POST_CALL_ACTION_CANCELED,
-    ]);
+    vi.mocked(http.get).mockResolvedValue({
+      ...RAW_PHONE_CALL,
+      post_call_actions: [RAW_POST_CALL_ACTION, RAW_POST_CALL_ACTION_2],
+    });
     const res = new CallsResource(http);
 
-    const actions = await res.postCallActions(CALL_ID);
+    const call = await res.get(CALL_ID);
 
-    expect(http.get).toHaveBeenCalledWith(`/calls/${CALL_ID}/post-call-actions`);
-    expect(actions).toHaveLength(2);
-    expect(actions[0].seq).toBe(1);
-    expect(actions[0].action).toBe("Book cleaning Tue 9:30am");
-    expect(actions[0].status).toBe("open");
-    expect(actions[0].callId).toBe(CALL_ID);
-    expect(actions[0].createdAt).toBeInstanceOf(Date);
-    expect(actions[1].status).toBe("canceled");
-    expect(actions[1].details).toBeNull();
+    expect(call.postCallActions).toHaveLength(2);
+    expect(call.postCallActions[0].seq).toBe(1);
+    expect(call.postCallActions[0].action).toBe("Book cleaning Tue 9:30am");
+    expect(call.postCallActions[0].status).toBe("open");
+    expect(call.postCallActions[0].details).toBe(
+      "Dr. Chen's office confirmed availability.",
+    );
+    expect(call.postCallActions[1].details).toBeNull();
+    // Slim shape: no call/identity/timestamp fields leak through.
+    expect("callId" in call.postCallActions[0]).toBe(false);
+    expect("createdAt" in call.postCallActions[0]).toBe(false);
   });
 
-  it("returns empty array for calls without hosted actions", async () => {
+  it("defaults to an empty array when the key is absent", async () => {
     const http = mockHttp();
-    vi.mocked(http.get).mockResolvedValue([]);
+    // RAW_PHONE_CALL carries no post_call_actions key.
+    vi.mocked(http.get).mockResolvedValue(RAW_PHONE_CALL);
     const res = new CallsResource(http);
-    expect(await res.postCallActions(CALL_ID)).toEqual([]);
+
+    const call = await res.get(CALL_ID);
+
+    expect(call.postCallActions).toEqual([]);
   });
 });
 
@@ -465,10 +471,10 @@ describe("CallsResource.place API errors", () => {
 });
 
 describe("CallsResource surface (identity-centered, v1.0.0)", () => {
-  it("exposes exactly list, get, hangup, transcripts, place, postCallActions", () => {
+  it("exposes exactly list, get, hangup, transcripts, place", () => {
     const methods = Object.getOwnPropertyNames(CallsResource.prototype)
       .filter((n) => n !== "constructor")
       .sort();
-    expect(methods).toEqual(["get", "hangup", "list", "place", "postCallActions", "transcripts"]);
+    expect(methods).toEqual(["get", "hangup", "list", "place", "transcripts"]);
   });
 });

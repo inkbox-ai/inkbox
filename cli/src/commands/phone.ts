@@ -224,27 +224,6 @@ export function registerPhoneCommands(program: Command): void {
     );
 
   phone
-    .command("post-call-actions <call-id>")
-    .description("List the hosted agent's recorded action items for a call")
-    .requiredOption("-i, --identity <handle>", "Agent identity handle")
-    .action(
-      withErrorHandler(async function (
-        this: Command,
-        callId: string,
-        cmdOpts: { identity: string },
-      ) {
-        const opts = getGlobalOpts(this);
-        const inkbox = createClient(opts);
-        const identity = await inkbox.getIdentity(cmdOpts.identity);
-        const actions = await identity.listPostCallActions(callId);
-        output(actions, {
-          json: !!opts.json,
-          columns: ["seq", "action", "details", "status", "id"],
-        });
-      }),
-    );
-
-  phone
     .command("incoming-action [action]")
     .description(
       "Get, or set to auto_accept | auto_reject | webhook | hosted_agent, " +

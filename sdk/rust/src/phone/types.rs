@@ -342,6 +342,10 @@ pub struct PhoneCall {
     /// Outbound hosted-call brief; `None` on inbound and client-driven calls.
     #[serde(default)]
     pub reason: Option<String>,
+    /// Open action items the hosted agent recorded, `seq`-ascending. Empty for
+    /// client-driven calls and hosted calls with no open items.
+    #[serde(default)]
+    pub post_call_actions: Vec<PostCallAction>,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -400,21 +404,16 @@ pub struct HostedAgentConfig {
 
 /// An action item the hosted call agent recorded during a call.
 ///
-/// `status` is `"open"` or `"canceled"`. Canceled rows are kept for audit
-/// and returned by `calls().post_call_actions(...)`, but omitted from the
-/// `call.ended` webhook payload.
+/// Surfaced inline on the call resource via `calls().get(...).post_call_actions`
+/// (open items only, `seq`-ascending), mirroring the `call.ended` webhook.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostCallAction {
     pub id: Uuid,
-    pub call_id: Uuid,
-    pub agent_identity_id: Uuid,
     pub seq: i64,
     pub action: String,
     #[serde(default)]
     pub details: Option<String>,
     pub status: String,
-    pub created_at: String,
-    pub updated_at: String,
 }
 
 /// A single media attachment in an MMS message.
@@ -785,19 +784,15 @@ mod tests {
     fn post_call_action_parses_with_null_details() {
         let action: PostCallAction = serde_json::from_value(json!({
             "id": "44444444-4444-4444-4444-444444444444",
-            "call_id": "22222222-2222-2222-2222-222222222222",
-            "agent_identity_id": "33333333-3333-3333-3333-333333333333",
             "seq": 2,
             "action": "Send pricing PDF",
             "details": null,
-            "status": "canceled",
-            "created_at": "2026-06-01T00:04:30+00:00",
-            "updated_at": "2026-06-01T00:04:45+00:00"
+            "status": "open"
         }))
         .unwrap();
         assert_eq!(action.seq, 2);
         assert_eq!(action.details, None);
-        assert_eq!(action.status, "canceled");
+        assert_eq!(action.status, "open");
     }
 
     #[test]

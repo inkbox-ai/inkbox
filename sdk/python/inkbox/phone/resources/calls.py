@@ -15,7 +15,6 @@ from inkbox.phone.types import (
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneTranscript,
-    PostCallAction,
 )
 
 if TYPE_CHECKING:
@@ -115,18 +114,6 @@ class CallsResource:
         """
         data = self._http.get(f"/calls/{call_id}/transcripts")
         return [PhoneTranscript._from_dict(t) for t in data]
-
-    def post_call_actions(self, call_id: UUID | str) -> list[PostCallAction]:
-        """List the action items the hosted call agent recorded on a call.
-
-        Ordered by ``seq``, ascending. Includes canceled rows (the audit
-        surface); empty for calls the hosted agent didn't drive.
-
-        Args:
-            call_id: UUID of the call.
-        """
-        data = self._http.get(f"/calls/{call_id}/post-call-actions")
-        return [PostCallAction._from_dict(a) for a in data]
 
     def place(
         self,
