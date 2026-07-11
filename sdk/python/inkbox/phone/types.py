@@ -6,7 +6,7 @@ Dataclasses mirroring the Inkbox Phone API response models.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -75,12 +75,30 @@ class CallOrigin(StrEnum):
     SHARED_IMESSAGE_NUMBER = "shared_imessage_number"
 
 
+class CallMode(StrEnum):
+    """Who is the brain on a call.
+
+    ``client_websocket`` (default) bridges audio to the caller's own
+    WebSocket server; ``hosted_agent`` runs the platform-hosted call
+    agent — no socket, no code, configured per identity via
+    :class:`HostedAgentConfig`.
+    """
+
+    CLIENT_WEBSOCKET = "client_websocket"
+    HOSTED_AGENT = "hosted_agent"
+
+
 class IncomingCallAction(StrEnum):
-    """What to do when an inbound call arrives for an identity."""
+    """What to do when an inbound call arrives for an identity.
+
+    ``hosted_agent`` answers with the platform-hosted call agent and is
+    the only action that requires neither a WebSocket nor a webhook URL.
+    """
 
     AUTO_ACCEPT = "auto_accept"
     AUTO_REJECT = "auto_reject"
     WEBHOOK = "webhook"
+    HOSTED_AGENT = "hosted_agent"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -201,6 +219,15 @@ class PhoneCall:
     # Which line the call rode. Older responses without this field predate
     # shared-iMessage calls and are always dedicated.
     origin: CallOrigin = CallOrigin.DEDICATED_NUMBER
+    # Who drove the call. Older responses without this field predate hosted
+    # calls and are always client-driven.
+    mode: str = "client_websocket"
+    # Outbound hosted-call brief; None on inbound and client_websocket calls.
+    reason: str | None = None
+    # Hosted agent's recorded action items, surfaced inline (open items only,
+    # seq-ascending); empty for client_websocket calls and hosted calls with
+    # no open items.
+    post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -221,6 +248,13 @@ class PhoneCall:
             is_blocked=bool(d.get("is_blocked", False)),
             # Coerce a null/missing origin to dedicated for back-compat.
             origin=CallOrigin(d["origin"]) if d.get("origin") else CallOrigin.DEDICATED_NUMBER,
+            # Coerce a null/missing mode to client_websocket for back-compat.
+            mode=d.get("mode") or "client_websocket",
+            reason=d.get("reason"),
+            # Open items only, seq-ascending; empty for client_websocket calls.
+            post_call_action_items=[
+                PostCallActionItem._from_dict(a) for a in d.get("post_call_action_items", [])
+            ],
         )
 
 
@@ -494,6 +528,55 @@ class IncomingCallActionConfig:
             incoming_call_action=IncomingCallAction(d["incoming_call_action"]),
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
+        )
+
+
+@dataclass
+class HostedAgentConfig:
+    """Per-identity hosted call agent configuration.
+
+    ``voice`` / ``model`` / ``instructions`` are all nullable — ``None``
+    means the server default applies for that field.
+    """
+
+    agent_identity_id: UUID
+    voice: str | None
+    model: str | None
+    instructions: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentConfig:
+        return cls(
+            agent_identity_id=UUID(d["agent_identity_id"]),
+            voice=d.get("voice"),
+            model=d.get("model"),
+            instructions=d.get("instructions"),
+        )
+
+
+@dataclass
+class PostCallActionItem:
+    """An action item the hosted call agent recorded during a call.
+
+    Surfaced inline on the call resource (``PhoneCall.post_call_action_items``).
+    Only open items reach the wire — canceled items are withdrawn — so
+    ``status`` is always ``"open"``. Mirrors the ``call.ended`` webhook.
+    """
+
+    id: UUID
+    seq: int
+    action: str
+    details: str | None
+    status: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> PostCallActionItem:
+        return cls(
+            id=UUID(d["id"]),
+            seq=d["seq"],
+            action=d["action"],
+            details=d.get("details"),
+            status=d["status"],
         )
 
 

@@ -16,6 +16,7 @@ from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
 from inkbox.mail.types import ForwardMode, MessageDetail, ThreadDetail
 from inkbox.phone.types import (
+    CallMode,
     CallOrigin,
     IncomingCallAction,
     IncomingCallActionConfig,
@@ -238,6 +239,8 @@ class TestAgentIdentityPlaceCall:
             origination=CallOrigin.DEDICATED_NUMBER,
             from_number="+18335794607",
             client_websocket_url="wss://agent.example.com/ws",
+            mode=CallMode.CLIENT_WEBSOCKET,
+            reason=None,
         )
         assert result is inkbox._calls.place.return_value
 
@@ -253,6 +256,8 @@ class TestAgentIdentityPlaceCall:
             origination="dedicated_number",
             from_number="+18335794607",
             client_websocket_url=None,
+            mode=CallMode.CLIENT_WEBSOCKET,
+            reason=None,
         )
 
     def test_place_call_dedicated_requires_phone(self):
@@ -277,6 +282,8 @@ class TestAgentIdentityPlaceCall:
             origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
             agent_identity_id=IDENTITY_UUID,
             client_websocket_url="wss://agent.example.com/ws",
+            mode=CallMode.CLIENT_WEBSOCKET,
+            reason=None,
         )
 
     def test_place_call_shared_does_not_require_phone(self):
@@ -294,6 +301,8 @@ class TestAgentIdentityPlaceCall:
             origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
             agent_identity_id=IDENTITY_UUID,
             client_websocket_url=None,
+            mode=CallMode.CLIENT_WEBSOCKET,
+            reason=None,
         )
 
 

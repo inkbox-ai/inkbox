@@ -31,6 +31,8 @@ PHONE_CALL_DICT = {
     "started_at": "2026-03-09T00:01:00Z",
     "ended_at": "2026-03-09T00:05:00Z",
     "is_blocked": False,
+    "mode": "client_websocket",
+    "reason": None,
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:05:00Z",
 }
@@ -249,4 +251,28 @@ INCOMING_CALL_ACTION_CONFIG_DICT = {
     "incoming_call_action": "webhook",
     "client_websocket_url": None,
     "incoming_call_webhook_url": "https://hooks.example.com/incoming-call",
+}
+
+HOSTED_AGENT_CONFIG_DICT = {
+    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
+    "voice": "warm-voice",
+    "model": "fast-model",
+    "instructions": "Always offer to text a summary after the call.",
+}
+
+# Slim wire shape: surfaced inline on the call resource, open items only.
+POST_CALL_ACTION_ITEM_DICT = {
+    "id": "ffff6666-0000-0000-0000-000000000001",
+    "seq": 1,
+    "action": "Book cleaning Tue 9:30am",
+    "details": "Dr. Chen's office confirmed availability.",
+    "status": "open",
+}
+
+POST_CALL_ACTION_ITEM_2_DICT = {
+    "id": "ffff6666-0000-0000-0000-000000000002",
+    "seq": 2,
+    "action": "Send pricing PDF",
+    "details": None,
+    "status": "open",
 }

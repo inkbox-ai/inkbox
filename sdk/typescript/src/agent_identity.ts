@@ -21,8 +21,12 @@ import type {
   MessageDetail,
   ThreadDetail,
 } from "./mail/types.js";
-import type { PhoneIdentityContactRule, IncomingCallActionConfig } from "./phone/types.js";
-import { CallOrigin, IncomingCallAction } from "./phone/types.js";
+import type {
+  PhoneIdentityContactRule,
+  IncomingCallActionConfig,
+  HostedAgentConfig,
+} from "./phone/types.js";
+import { CallMode, CallOrigin, IncomingCallAction } from "./phone/types.js";
 import type {
   CreateMailIdentityContactRuleOptions,
   ListMailIdentityContactRulesOptions,
@@ -518,11 +522,16 @@ export class AgentIdentity {
    * @param options.origination - Where the call originates. Defaults to
    *   `dedicated_number`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
+   * @param options.mode - Who drives the call. Defaults to `client_websocket`.
+   * @param options.reason - The hosted agent's task brief for the call.
+   *   Required with `mode=hosted_agent`, invalid otherwise (server 422).
    */
   async placeCall(options: {
     toNumber: string;
     origination?: CallOrigin;
     clientWebsocketUrl?: string;
+    mode?: CallMode;
+    reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const origination = options.origination ?? CallOrigin.DEDICATED_NUMBER;
     if (origination === CallOrigin.DEDICATED_NUMBER) {
@@ -533,6 +542,8 @@ export class AgentIdentity {
         origination,
         fromNumber:          this._phoneNumber!.number,
         clientWebsocketUrl:  options.clientWebsocketUrl,
+        mode:                options.mode,
+        reason:              options.reason,
       });
     }
     // Shared-pool calls scope by identity id; no from_number.
@@ -541,6 +552,8 @@ export class AgentIdentity {
       origination,
       agentIdentityId:     this.id,
       clientWebsocketUrl:  options.clientWebsocketUrl,
+      mode:                options.mode,
+      reason:              options.reason,
     });
   }
 
@@ -579,6 +592,33 @@ export class AgentIdentity {
    */
   async hangupCall(callId: string): Promise<PhoneCall> {
     return this._inkbox._calls.hangup(callId);
+  }
+
+  /** Get this identity's hosted call agent config. */
+  async getHostedAgentConfig(): Promise<HostedAgentConfig> {
+    return this._inkbox._hostedAgent.getConfig({ agentIdentityId: this.id });
+  }
+
+  /**
+   * Set this identity's hosted call agent config (full replace).
+   *
+   * A field left undefined resets to the server default.
+   *
+   * @param options.voice - Voice override; omit for the server default.
+   * @param options.model - Model override; omit for the server default.
+   * @param options.instructions - Per-identity steering prompt; omit for none.
+   */
+  async setHostedAgentConfig(options?: {
+    voice?: string;
+    model?: string;
+    instructions?: string;
+  }): Promise<HostedAgentConfig> {
+    return this._inkbox._hostedAgent.setConfig({
+      voice: options?.voice,
+      model: options?.model,
+      instructions: options?.instructions,
+      agentIdentityId: this.id,
+    });
   }
 
   /** Get this identity's inbound-call handling config. */

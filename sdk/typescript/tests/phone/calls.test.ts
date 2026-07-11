@@ -1,13 +1,15 @@
 // sdk/typescript/tests/phone/calls.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CallsResource } from "../../src/phone/resources/calls.js";
-import { CallOrigin } from "../../src/phone/types.js";
+import { CallMode, CallOrigin } from "../../src/phone/types.js";
 import { HttpTransport, InkboxAPIError } from "../../src/_http.js";
 import {
   RAW_PHONE_CALL,
   RAW_PHONE_CALL_BLOCKED,
   RAW_PHONE_CALL_WITH_RATE_LIMIT,
   RAW_PHONE_TRANSCRIPT,
+  RAW_POST_CALL_ACTION_ITEM,
+  RAW_POST_CALL_ACTION_ITEM_2,
 } from "../sampleData.js";
 
 function mockHttp() {
@@ -213,6 +215,7 @@ describe("CallsResource.place", () => {
       from_number: "+18335794607",
       to_number: "+15551234567",
       origination: "dedicated_number",
+      mode: "client_websocket",
     });
     expect(call.rateLimit.callsUsed).toBe(5);
   });
@@ -231,6 +234,7 @@ describe("CallsResource.place", () => {
     expect(http.post).toHaveBeenCalledWith("/place-call", {
       to_number: "+15551234567",
       origination: "shared_imessage_number",
+      mode: "client_websocket",
       agent_identity_id: IDENTITY_ID,
     });
     // The from_number key must not be present at all on shared bodies.
@@ -263,6 +267,9 @@ describe("CallsResource.place", () => {
     const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["client_websocket_url"]).toBeUndefined();
     expect(body["agent_identity_id"]).toBeUndefined();
+    // reason only rides hosted placements; mode is always on the wire.
+    expect(body["reason"]).toBeUndefined();
+    expect(body["mode"]).toBe("client_websocket");
   });
 
   it("parses the response including origin and rateLimit", async () => {
@@ -290,6 +297,101 @@ describe("CallsResource.place", () => {
       minutesRemaining: 987.5,
       minutesLimit: 1000,
     });
+  });
+});
+
+describe("CallsResource.place hosted mode", () => {
+  it("sends mode=hosted_agent with the reason brief", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
+      mode: "hosted_agent",
+      reason: "Book a cleaning next week, mornings preferred",
+    });
+    const res = new CallsResource(http);
+
+    const call = await res.place({
+      toNumber: "+15551234567",
+      fromNumber: "+18335794607",
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Book a cleaning next week, mornings preferred",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/place-call", {
+      to_number: "+15551234567",
+      origination: "dedicated_number",
+      mode: "hosted_agent",
+      from_number: "+18335794607",
+      reason: "Book a cleaning next week, mornings preferred",
+    });
+    expect(call.mode).toBe("hosted_agent");
+    expect(call.reason).toBe("Book a cleaning next week, mornings preferred");
+  });
+
+  it("forwards a hosted call with ws-url instead of client-gating (server 422s)", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
+    const res = new CallsResource(http);
+
+    await res.place({
+      toNumber: "+15551234567",
+      clientWebsocketUrl: "wss://agent.example.com/ws",
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Confirm the appointment",
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [string, Record<string, unknown>];
+    expect(body["client_websocket_url"]).toBe("wss://agent.example.com/ws");
+    expect(body["mode"]).toBe("hosted_agent");
+  });
+
+  it("defaults mode to client_websocket when missing from response (back-compat)", async () => {
+    const http = mockHttp();
+    const { mode: _m, reason: _r, ...legacy } = RAW_PHONE_CALL_WITH_RATE_LIMIT as Record<string, unknown> & { mode?: unknown; reason?: unknown };
+    void _m; void _r;
+    vi.mocked(http.post).mockResolvedValue(legacy);
+    const res = new CallsResource(http);
+
+    const call = await res.place({ toNumber: "+15551234567", fromNumber: "+18335794607" });
+
+    expect(call.mode).toBe(CallMode.CLIENT_WEBSOCKET);
+    expect(call.reason).toBeNull();
+  });
+});
+
+describe("PhoneCall.postCallActionItems (inline on the call resource)", () => {
+  it("exposes slim, seq-ascending open actions when present", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      ...RAW_PHONE_CALL,
+      post_call_action_items: [RAW_POST_CALL_ACTION_ITEM, RAW_POST_CALL_ACTION_ITEM_2],
+    });
+    const res = new CallsResource(http);
+
+    const call = await res.get(CALL_ID);
+
+    expect(call.postCallActionItems).toHaveLength(2);
+    expect(call.postCallActionItems[0].seq).toBe(1);
+    expect(call.postCallActionItems[0].action).toBe("Book cleaning Tue 9:30am");
+    expect(call.postCallActionItems[0].status).toBe("open");
+    expect(call.postCallActionItems[0].details).toBe(
+      "Dr. Chen's office confirmed availability.",
+    );
+    expect(call.postCallActionItems[1].details).toBeNull();
+    // Slim shape: no call/identity/timestamp fields leak through.
+    expect("callId" in call.postCallActionItems[0]).toBe(false);
+    expect("createdAt" in call.postCallActionItems[0]).toBe(false);
+  });
+
+  it("defaults to an empty array when the key is absent", async () => {
+    const http = mockHttp();
+    // RAW_PHONE_CALL carries no post_call_action_items key.
+    vi.mocked(http.get).mockResolvedValue(RAW_PHONE_CALL);
+    const res = new CallsResource(http);
+
+    const call = await res.get(CALL_ID);
+
+    expect(call.postCallActionItems).toEqual([]);
   });
 });
 

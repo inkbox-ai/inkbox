@@ -40,7 +40,9 @@ from inkbox.mail.types import (
 
 # Phone types
 from inkbox.phone.types import (
+    CallMode,
     CallOrigin,
+    HostedAgentConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -51,6 +53,7 @@ from inkbox.phone.types import (
     PhoneRuleAction,
     PhoneRuleMatchType,
     PhoneTranscript,
+    PostCallActionItem,
     RateLimitInfo,
     SmsDeliveryStatus,
     SmsOptIn,
@@ -202,7 +205,9 @@ from inkbox.webhooks import (
     CallEndedWebhookData,
     CallEndedWebhookPayload,
     CallLifecycleWebhookEventType,
+    CallModeWire,
     CallOriginWire,
+    CallOutcomeWire,
     CallStatusWire,
     HangupReasonWire,
     MailContactBucket,
@@ -253,6 +258,7 @@ from inkbox.webhooks import (
     WebhookMailAgentIdentity,
     WebhookMailContact,
     WebhookPhoneCall,
+    WebhookPostCallActionItemWire,
     WebhookTranscriptEntryWire,
 )
 
@@ -309,7 +315,9 @@ __all__ = [
     "ThreadDetail",
     "ThreadFolder",
     # Phone types
+    "CallMode",
     "CallOrigin",
+    "HostedAgentConfig",
     "IncomingCallAction",
     "IncomingCallActionConfig",
     "PhoneCall",
@@ -320,6 +328,7 @@ __all__ = [
     "PhoneRuleAction",
     "PhoneRuleMatchType",
     "PhoneTranscript",
+    "PostCallActionItem",
     "RateLimitInfo",
     "SmsDeliveryStatus",
     "SmsOptIn",
@@ -440,7 +449,9 @@ __all__ = [
     "CallEndedWebhookData",
     "CallEndedWebhookPayload",
     "CallLifecycleWebhookEventType",
+    "CallModeWire",
     "CallOriginWire",
+    "CallOutcomeWire",
     "CallStatusWire",
     "HangupReasonWire",
     "MailContactBucket",
@@ -491,6 +502,7 @@ __all__ = [
     "WebhookMailAgentIdentity",
     "WebhookMailContact",
     "WebhookPhoneCall",
+    "WebhookPostCallActionItemWire",
     "WebhookTranscriptEntryWire",
     # Webhook subscriptions
     "WebhookContextClassConfig",

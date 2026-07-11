@@ -65,6 +65,10 @@ HangupReasonWire = Literal[
     "rejected",
 ]
 
+CallModeWire = Literal["client_websocket", "hosted_agent"]
+
+CallOutcomeWire = Literal["completed", "no_answer", "declined", "failed"]
+
 
 # ---- Nested wire shapes __________________________________________________
 
@@ -625,7 +629,10 @@ class WebhookPhoneCall(TypedDict):
     reach the webhook). ``local_phone_number`` is ``None`` and ``origin`` is
     ``"shared_imessage_number"`` on shared-line calls (the pool line is never
     surfaced). ``duration_seconds`` is the connected length in whole seconds,
-    or ``None`` when the call never connected.
+    or ``None`` when the call never connected. ``mode`` says who drove the
+    call and ``reason`` carries the outbound hosted-call brief (``None``
+    inbound and on ``client_websocket`` calls); both are ``NotRequired`` only
+    so payloads predating hosted calls still parse.
     """
     id: str
     origin: CallOriginWire
@@ -639,6 +646,8 @@ class WebhookPhoneCall(TypedDict):
     created_at: str
     updated_at: str
     duration_seconds: int | None
+    mode: NotRequired[CallModeWire]
+    reason: NotRequired[str | None]
 
 
 class WebhookCallTranscript(TypedDict):
@@ -657,6 +666,21 @@ class WebhookCallTranscript(TypedDict):
     url: str
 
 
+class WebhookPostCallActionItemWire(TypedDict):
+    """
+    One open action item the hosted call agent recorded during the call.
+
+    Rides ``call.ended`` in ``seq`` order, mirroring the inline
+    ``PhoneCall.post_call_action_items``. Canceled items are withdrawn, so
+    ``status`` here is always ``"open"``.
+    """
+    id: str
+    seq: int
+    action: str
+    details: str | None
+    status: str
+
+
 class CallEndedWebhookData(TypedDict):
     """
     Wrapper under ``CallEndedWebhookPayload.data``.
@@ -667,13 +691,19 @@ class CallEndedWebhookData(TypedDict):
     captured a transcript for the call, otherwise ``None``.
     ``transcript_url`` is **always** present and is the authoritative
     verbatim record (fetch with an API key that can access the call —
-    the subscription owner's own key suffices).
+    the subscription owner's own key suffices). ``outcome`` is the hosted
+    call's terminal result (``None`` iff ``data.call.mode`` is
+    ``client_websocket``) and ``post_call_action_items`` its recorded todo list
+    (always present, possibly empty); both are ``NotRequired`` only so
+    payloads predating hosted calls still parse.
     """
     call: WebhookPhoneCall
     contacts: list[WebhookContact]
     agent_identities: list[WebhookAgentIdentity]
     transcript: WebhookCallTranscript | None
     transcript_url: str
+    outcome: NotRequired[CallOutcomeWire | None]
+    post_call_action_items: NotRequired[list[WebhookPostCallActionItemWire]]
 
 
 class CallEndedWebhookPayload(TypedDict):

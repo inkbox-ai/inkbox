@@ -6,6 +6,7 @@
 
 import { HttpTransport } from "../../_http.js";
 import {
+  CallMode,
   CallOrigin,
   PhoneCall,
   PhoneCallWithRateLimit,
@@ -108,7 +109,9 @@ export class CallsResource {
    *
    * The server enforces the conditional requirements: `fromNumber` is
    * required for `dedicated_number`, `agentIdentityId` for
-   * `shared_imessage_number`. Omissions surface as a server 422.
+   * `shared_imessage_number`; `hosted_agent` mode requires `reason` and
+   * excludes `clientWebsocketUrl`. This method never client-gates —
+   * violations surface as a server 422.
    *
    * @param options.toNumber - E.164 number to call.
    * @param options.origination - Where the call originates. Defaults to
@@ -116,6 +119,9 @@ export class CallsResource {
    * @param options.fromNumber - E.164 number to call from (dedicated origination).
    * @param options.agentIdentityId - UUID of the placing identity (shared origination).
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
+   * @param options.mode - Who drives the call. Defaults to `client_websocket`.
+   * @param options.reason - The hosted agent's task brief for the call.
+   *   Required with `mode=hosted_agent`, invalid otherwise.
    * @returns The created call record with current rate limit info.
    */
   async place(options: {
@@ -124,11 +130,15 @@ export class CallsResource {
     fromNumber?: string;
     agentIdentityId?: string;
     clientWebsocketUrl?: string;
+    mode?: CallMode;
+    reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const body: Record<string, unknown> = {
       to_number: options.toNumber,
       // Always sent (defaults to dedicated_number).
       origination: options.origination ?? CallOrigin.DEDICATED_NUMBER,
+      // Always sent (defaults to client_websocket).
+      mode: options.mode ?? CallMode.CLIENT_WEBSOCKET,
     };
     if (options.fromNumber !== undefined) {
       body["from_number"] = options.fromNumber;
@@ -138,6 +148,9 @@ export class CallsResource {
     }
     if (options.clientWebsocketUrl !== undefined) {
       body["client_websocket_url"] = options.clientWebsocketUrl;
+    }
+    if (options.reason !== undefined) {
+      body["reason"] = options.reason;
     }
     const data = await this.http.post<RawPhoneCallWithRateLimit>("/place-call", body);
     return parsePhoneCallWithRateLimit(data);

@@ -4,13 +4,16 @@ inkbox.phone — phone types and exceptions.
 
 from inkbox.phone.exceptions import InkboxAPIError, InkboxError
 from inkbox.phone.types import (
+    CallMode,
     CallOrigin,
+    HostedAgentConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneNumber,
     PhoneTranscript,
+    PostCallActionItem,
     RateLimitInfo,
     SmsOptIn,
     SmsOptInSource,
@@ -26,13 +29,16 @@ from inkbox.signing_keys import SigningKey
 __all__ = [
     "InkboxError",
     "InkboxAPIError",
+    "CallMode",
     "CallOrigin",
+    "HostedAgentConfig",
     "IncomingCallAction",
     "IncomingCallActionConfig",
     "PhoneCall",
     "PhoneCallWithRateLimit",
     "PhoneNumber",
     "PhoneTranscript",
+    "PostCallActionItem",
     "RateLimitInfo",
     "SigningKey",
     "SmsOptIn",

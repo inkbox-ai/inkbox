@@ -50,7 +50,9 @@ from inkbox.mail.types import (
     ThreadDetail,
 )
 from inkbox.phone.types import (
+    CallMode,
     CallOrigin,
+    HostedAgentConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -648,6 +650,8 @@ class AgentIdentity:
         to_number: str,
         origination: CallOrigin | str = CallOrigin.DEDICATED_NUMBER,
         client_websocket_url: str | None = None,
+        mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
+        reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call as this identity.
 
@@ -661,6 +665,10 @@ class AgentIdentity:
             origination: How to place the call. Defaults to
                 ``dedicated_number``. See :class:`CallOrigin`.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
+            mode: Who drives the call. Defaults to ``client_websocket``.
+                See :class:`CallMode`.
+            reason: The hosted agent's task brief for the call. Required
+                with ``mode=hosted_agent``, invalid otherwise (server 422).
         """
         is_dedicated = (
             origination == CallOrigin.DEDICATED_NUMBER
@@ -674,6 +682,8 @@ class AgentIdentity:
                 origination=origination,
                 from_number=self._phone_number.number,  # type: ignore[union-attr]
                 client_websocket_url=client_websocket_url,
+                mode=mode,
+                reason=reason,
             )
         # Shared-line origination scopes by identity id, no from_number.
         return self._inkbox._calls.place(
@@ -681,6 +691,8 @@ class AgentIdentity:
             origination=origination,
             agent_identity_id=self.id,
             client_websocket_url=client_websocket_url,
+            mode=mode,
+            reason=reason,
         )
 
     def list_calls(
@@ -734,6 +746,33 @@ class AgentIdentity:
             call_id: ID of the call to hang up.
         """
         return self._inkbox._calls.hangup(call_id)
+
+    def get_hosted_agent_config(self) -> HostedAgentConfig:
+        """Get this identity's hosted call agent config."""
+        return self._inkbox._hosted_agent.get_config(agent_identity_id=self.id)
+
+    def set_hosted_agent_config(
+        self,
+        *,
+        voice: str | None = None,
+        model: str | None = None,
+        instructions: str | None = None,
+    ) -> HostedAgentConfig:
+        """Set this identity's hosted call agent config (full replace).
+
+        A field left at ``None`` resets to the server default.
+
+        Args:
+            voice: Voice override, or ``None`` for the server default.
+            model: Model override, or ``None`` for the server default.
+            instructions: Per-identity steering prompt, or ``None`` for none.
+        """
+        return self._inkbox._hosted_agent.set_config(
+            voice=voice,
+            model=model,
+            instructions=instructions,
+            agent_identity_id=self.id,
+        )
 
     def get_incoming_call_action(self) -> IncomingCallActionConfig:
         """Get this identity's inbound-call handling config."""

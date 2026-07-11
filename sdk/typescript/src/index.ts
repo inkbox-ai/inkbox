@@ -70,8 +70,11 @@ export type {
   CallDirectionWire,
   CallOriginWire,
   CallLifecycleWebhookEventType,
+  CallModeWire,
+  CallOutcomeWire,
   WebhookPhoneCall,
   WebhookCallTranscript,
+  WebhookPostCallActionItem,
   CallEndedWebhookData,
   CallEndedWebhookPayload,
   WebhookContext,
@@ -140,6 +143,7 @@ export type {
   UpdateMailIdentityContactRuleOptions,
 } from "./mail/resources/identityContactRules.js";
 export {
+  CallMode,
   CallOrigin,
   IncomingCallAction,
   PhoneRuleAction,
@@ -157,6 +161,8 @@ export type {
   PhoneContactRule,
   PhoneIdentityContactRule,
   IncomingCallActionConfig,
+  HostedAgentConfig,
+  PostCallActionItem,
   RateLimitInfo,
   PhoneTranscript,
   SmsOptIn,
@@ -167,6 +173,7 @@ export type {
   TextConversationUpdateResult,
 } from "./phone/types.js";
 export type { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
+export type { HostedAgentConfigResource } from "./phone/resources/hostedAgent.js";
 export type {
   PhoneIdentityContactRulesResource,
   CreatePhoneIdentityContactRuleOptions,

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.22 — Hosted call agent
+
+### Added
+
+- **`--hosted --reason "<text>"` on `inkbox phone call`.** Places a call the hosted call agent drives end to end. Fails fast on shape only: `--hosted` requires `--reason` and conflicts with `--ws-url`; everything else is server policy surfaced as an API error. Output gains `mode` / `reason`.
+- **`inkbox phone hosted-agent get|set`.** Shows / sets the identity's hosted call agent config (`--voice`, `--model`, `--instructions`). `set` is a full replace: an omitted flag resets that field to the server default.
+- **`inkbox phone incoming-action [action]`.** Without an action, prints the identity's incoming-call config; with one (`auto_accept` | `auto_reject` | `webhook` | `hosted_agent`), sets it (`--ws-url` / `--webhook-url` where applicable — `hosted_agent` needs neither). `inkbox number update --incoming-call-action hosted_agent` is accepted too.
+- **Post-call action items ride the call object.** The hosted agent's recorded action items (open items only, `seq`-ascending) ride each call returned by `inkbox phone calls` — no separate command. The default table output does not show `mode` or `post_call_action_items`; use `--json` to read them.
+
+### Changed
+
+- CLI pins `@inkbox/sdk` at `^0.4.22`.
+
 ## 0.4.20 — Date-range list filters + external call hangup
 
 ### Added

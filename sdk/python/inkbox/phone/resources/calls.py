@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from inkbox.phone.types import (
+    CallMode,
     CallOrigin,
     PhoneCall,
     PhoneCallWithRateLimit,
@@ -122,13 +123,17 @@ class CallsResource:
         from_number: str | None = None,
         agent_identity_id: UUID | str | None = None,
         client_websocket_url: str | None = None,
+        mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
+        reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call.
 
         The server enforces the conditional shape: ``from_number`` is
         required for ``dedicated_number`` origination, ``agent_identity_id``
-        for ``shared_imessage_number``. This method never client-gates —
-        it forwards whatever is provided and surfaces the server's 422.
+        for ``shared_imessage_number``; ``hosted_agent`` mode requires
+        ``reason`` and excludes ``client_websocket_url``. This method never
+        client-gates — it forwards whatever is provided and surfaces the
+        server's 422.
 
         Args:
             to_number: E.164 number to call.
@@ -139,6 +144,11 @@ class CallsResource:
             agent_identity_id: UUID of the placing identity (shared
                 origination), or ``None`` for an agent-scoped key.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
+            mode: Who drives the call. Defaults to ``client_websocket``.
+                See :class:`CallMode`.
+            reason: The hosted agent's task brief for the call — what to
+                accomplish. Required with ``mode=hosted_agent``, invalid
+                otherwise.
 
         Returns:
             The created call record with current rate limit info.
@@ -146,9 +156,11 @@ class CallsResource:
         origination_value = (
             origination.value if isinstance(origination, CallOrigin) else origination
         )
+        mode_value = mode.value if isinstance(mode, CallMode) else mode
         body: dict[str, Any] = {
             "to_number": to_number,
             "origination": origination_value,
+            "mode": mode_value,
         }
         if from_number is not None:
             body["from_number"] = from_number
@@ -156,5 +168,7 @@ class CallsResource:
             body["agent_identity_id"] = str(agent_identity_id)
         if client_websocket_url is not None:
             body["client_websocket_url"] = client_websocket_url
+        if reason is not None:
+            body["reason"] = reason
         data = self._http.post("/place-call", json=body)
         return PhoneCallWithRateLimit._from_dict(data)

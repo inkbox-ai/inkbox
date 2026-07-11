@@ -43,6 +43,7 @@ from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
 from inkbox.phone.resources.calls import CallsResource
+from inkbox.phone.resources.hosted_agent import HostedAgentConfigResource
 from inkbox.phone.resources.incoming_call_action import IncomingCallActionResource
 from inkbox.phone.resources.contact_rules import PhoneContactRulesResource
 from inkbox.phone.resources.identity_contact_rules import (
@@ -239,6 +240,7 @@ class Inkbox:
         self._numbers = PhoneNumbersResource(self._phone_http)
         self._texts = TextsResource(self._phone_http)
         self._incoming_call_action = IncomingCallActionResource(self._phone_http)
+        self._hosted_agent = HostedAgentConfigResource(self._phone_http)
         self._phone_contact_rules = PhoneContactRulesResource(self._phone_http)
         self._sms_opt_ins = SmsOptInsResource(self._phone_http)
 
@@ -341,6 +343,11 @@ class Inkbox:
     def incoming_call_action(self) -> IncomingCallActionResource:
         """Access per-identity inbound-call handling config (get, set)."""
         return self._incoming_call_action
+
+    @property
+    def hosted_agent(self) -> HostedAgentConfigResource:
+        """Access per-identity hosted call agent config (get_config, set_config)."""
+        return self._hosted_agent
 
     @property
     def vault(self) -> VaultResource:

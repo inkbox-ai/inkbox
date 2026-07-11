@@ -155,21 +155,27 @@ impl CallOrigin {
 }
 
 /// Routing decision applied to inbound calls for an agent identity.
+///
+/// `hosted_agent` answers with the platform-hosted call agent and is the
+/// only action that requires neither a WebSocket nor a webhook URL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IncomingCallAction {
     AutoAccept,
     AutoReject,
     Webhook,
+    HostedAgent,
 }
 
 impl IncomingCallAction {
-    /// The wire string value (`"auto_accept"` / `"auto_reject"` / `"webhook"`).
+    /// The wire string value (`"auto_accept"` / `"auto_reject"` / `"webhook"`
+    /// / `"hosted_agent"`).
     pub fn as_str(&self) -> &'static str {
         match self {
             IncomingCallAction::AutoAccept => "auto_accept",
             IncomingCallAction::AutoReject => "auto_reject",
             IncomingCallAction::Webhook => "webhook",
+            IncomingCallAction::HostedAgent => "hosted_agent",
         }
     }
 }
@@ -226,6 +232,22 @@ where
     D: serde::Deserializer<'de>,
 {
     Ok(Option::<CallOrigin>::deserialize(deserializer)?.unwrap_or_default())
+}
+
+fn default_call_mode_client_websocket() -> String {
+    // Older server responses predate the `mode` field; default to the
+    // client-driven mode for backwards compatibility.
+    "client_websocket".to_string()
+}
+
+/// Deserialize a call `mode` treating an explicit `null` like a missing key
+/// (coerced to `client_websocket` for back-compat).
+fn deserialize_call_mode_null_default<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?
+        .unwrap_or_else(default_call_mode_client_websocket))
 }
 
 // ---------------------------------------------------------------------------
@@ -309,6 +331,21 @@ pub struct PhoneCall {
     /// or null (older server responses predate the field).
     #[serde(default, deserialize_with = "deserialize_call_origin_null_default")]
     pub origin: CallOrigin,
+    /// Who drove the call (`"client_websocket"` / `"hosted_agent"`). Defaults
+    /// to `client_websocket` when absent or null (older server responses
+    /// predate the field).
+    #[serde(
+        default = "default_call_mode_client_websocket",
+        deserialize_with = "deserialize_call_mode_null_default"
+    )]
+    pub mode: String,
+    /// Outbound hosted-call brief; `None` on inbound and client-driven calls.
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// Open action items the hosted agent recorded, `seq`-ascending. Empty for
+    /// client-driven calls and hosted calls with no open items.
+    #[serde(default)]
+    pub post_call_action_items: Vec<PostCallActionItem>,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -348,6 +385,35 @@ pub struct IncomingCallActionConfig {
     pub client_websocket_url: Option<String>,
     #[serde(default)]
     pub incoming_call_webhook_url: Option<String>,
+}
+
+/// Per-identity hosted call agent configuration.
+///
+/// `voice` / `model` / `instructions` are all nullable — `None` means the
+/// server default applies for that field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostedAgentConfig {
+    pub agent_identity_id: Uuid,
+    #[serde(default)]
+    pub voice: Option<String>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub instructions: Option<String>,
+}
+
+/// An action item the hosted call agent recorded during a call.
+///
+/// Surfaced inline on the call resource via `calls().get(...).post_call_action_items`
+/// (open items only, `seq`-ascending), mirroring the `call.ended` webhook.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostCallActionItem {
+    pub id: Uuid,
+    pub seq: i64,
+    pub action: String,
+    #[serde(default)]
+    pub details: Option<String>,
+    pub status: String,
 }
 
 /// A single media attachment in an MMS message.
@@ -664,6 +730,7 @@ mod tests {
             (IncomingCallAction::AutoAccept, "auto_accept"),
             (IncomingCallAction::AutoReject, "auto_reject"),
             (IncomingCallAction::Webhook, "webhook"),
+            (IncomingCallAction::HostedAgent, "hosted_agent"),
         ];
         for (variant, wire) in cases {
             assert_eq!(variant.as_str(), wire);
@@ -671,6 +738,61 @@ mod tests {
             let parsed: IncomingCallAction = serde_json::from_value(json!(wire)).unwrap();
             assert_eq!(parsed, variant);
         }
+    }
+
+    #[test]
+    fn phone_call_missing_mode_key_defaults_to_client_websocket() {
+        // Older server responses predate the field entirely.
+        let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
+        assert_eq!(call.mode, "client_websocket");
+        assert_eq!(call.reason, None);
+    }
+
+    #[test]
+    fn phone_call_null_mode_defaults_to_client_websocket() {
+        let mut v = call_json();
+        v["mode"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.mode, "client_websocket");
+    }
+
+    #[test]
+    fn phone_call_hosted_mode_and_reason_parse() {
+        let mut v = call_json();
+        v["mode"] = json!("hosted_agent");
+        v["reason"] = json!("Book a cleaning next week");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.mode, "hosted_agent");
+        assert_eq!(call.reason.as_deref(), Some("Book a cleaning next week"));
+    }
+
+    #[test]
+    fn hosted_agent_config_parses_values_and_nulls() {
+        let cfg: HostedAgentConfig = serde_json::from_value(json!({
+            "agent_identity_id": "33333333-3333-3333-3333-333333333333",
+            "voice": "warm-voice",
+            "model": null,
+            "instructions": "Be brief."
+        }))
+        .unwrap();
+        assert_eq!(cfg.voice.as_deref(), Some("warm-voice"));
+        assert_eq!(cfg.model, None);
+        assert_eq!(cfg.instructions.as_deref(), Some("Be brief."));
+    }
+
+    #[test]
+    fn post_call_action_item_parses_with_null_details() {
+        let action: PostCallActionItem = serde_json::from_value(json!({
+            "id": "44444444-4444-4444-4444-444444444444",
+            "seq": 2,
+            "action": "Send pricing PDF",
+            "details": null,
+            "status": "open"
+        }))
+        .unwrap();
+        assert_eq!(action.seq, 2);
+        assert_eq!(action.details, None);
+        assert_eq!(action.status, "open");
     }
 
     #[test]

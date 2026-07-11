@@ -25,6 +25,7 @@ import { PhoneNumbersResource } from "./phone/resources/numbers.js";
 import { CallsResource } from "./phone/resources/calls.js";
 import { TextsResource } from "./phone/resources/texts.js";
 import { IncomingCallActionResource } from "./phone/resources/incomingCallAction.js";
+import { HostedAgentConfigResource } from "./phone/resources/hostedAgent.js";
 import { PhoneContactRulesResource } from "./phone/resources/contactRules.js";
 import { PhoneIdentityContactRulesResource } from "./phone/resources/identityContactRules.js";
 import { SmsOptInsResource } from "./phone/resources/smsOptIns.js";
@@ -159,6 +160,7 @@ export class Inkbox {
   readonly _imessages: IMessagesResource;
   readonly _imessageContactRules: IMessageContactRulesResource;
   readonly _incomingCallAction: IncomingCallActionResource;
+  readonly _hostedAgent: HostedAgentConfigResource;
   readonly _phoneContactRules: PhoneContactRulesResource;
   readonly _phoneIdentityContactRules: PhoneIdentityContactRulesResource;
   readonly _smsOptIns: SmsOptInsResource;
@@ -236,6 +238,7 @@ export class Inkbox {
     this._calls            = new CallsResource(phoneHttp);
     this._texts            = new TextsResource(phoneHttp);
     this._incomingCallAction = new IncomingCallActionResource(phoneHttp);
+    this._hostedAgent       = new HostedAgentConfigResource(phoneHttp);
     this._phoneContactRules = new PhoneContactRulesResource(phoneHttp);
     this._smsOptIns         = new SmsOptInsResource(phoneHttp);
 
@@ -314,6 +317,9 @@ export class Inkbox {
 
   /** Incoming-call routing config (get / set), keyed by agent identity. */
   get incomingCallAction(): IncomingCallActionResource { return this._incomingCallAction; }
+
+  /** Hosted call agent config (getConfig / setConfig), keyed by agent identity. */
+  get hostedAgent(): HostedAgentConfigResource { return this._hostedAgent; }
 
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }
