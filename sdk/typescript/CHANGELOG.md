@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.21 — Hosted call agent
+## 0.4.22 — Hosted call agent
 
 ### Added
 

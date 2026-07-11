@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.21 — Hosted call agent
+## 0.4.22 — Hosted call agent
 
 ### Added
 
@@ -11,7 +11,7 @@
 
 ### Changed
 
-- CLI pins `@inkbox/sdk` at `^0.4.21`.
+- CLI pins `@inkbox/sdk` at `^0.4.22`.
 
 ## 0.4.20 — Date-range list filters + external call hangup
 

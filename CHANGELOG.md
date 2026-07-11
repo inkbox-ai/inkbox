@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
-## 0.4.21 — Hosted call agent: call mode, config, post-call action items
+## 0.4.22 — Hosted call agent: call mode, config, post-call action items
 
 ### Added
 
@@ -17,7 +17,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
-- Version bumped to 0.4.21 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+- Version bumped to 0.4.22 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
 - Rust note: `IncomingCallAction` gains the `HostedAgent` variant — the enum is public and not `#[non_exhaustive]`, so a downstream exhaustive `match` needs a new arm (source-breaking, not wire-breaking), same as 0.4.20's `blocked_spam_filter`. `PhoneCall` gains `mode` / `reason` fields — source-breaking only for code constructing `PhoneCall` with a struct literal.
 
 ## 0.4.20 — Date-range comms filters, call.ended webhook, external hangup, spam-filter status
