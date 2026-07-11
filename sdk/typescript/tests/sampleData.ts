@@ -170,7 +170,7 @@ export const RAW_HOSTED_AGENT_CONFIG = {
 };
 
 // Slim, open-only rows as surfaced inline on the call resource.
-export const RAW_POST_CALL_ACTION = {
+export const RAW_POST_CALL_ACTION_ITEM = {
   id: "ffff6666-0000-0000-0000-000000000001",
   seq: 1,
   action: "Book cleaning Tue 9:30am",
@@ -178,7 +178,7 @@ export const RAW_POST_CALL_ACTION = {
   status: "open",
 };
 
-export const RAW_POST_CALL_ACTION_2 = {
+export const RAW_POST_CALL_ACTION_ITEM_2 = {
   id: "ffff6666-0000-0000-0000-000000000002",
   seq: 2,
   action: "Send pricing PDF",

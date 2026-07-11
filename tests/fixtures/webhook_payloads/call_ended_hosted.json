@@ -35,7 +35,7 @@
     },
     "transcript_url": "https://inkbox.ai/api/v1/phone/calls/7c1b0e9a-3d2f-4a5b-8c6d-1e0f9a8b7c6d/transcripts",
     "outcome": "completed",
-    "post_call_actions": [
+    "post_call_action_items": [
       {
         "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
         "seq": 1,

@@ -841,10 +841,10 @@ fn default_webhook_call_mode() -> String {
 /// One open action item the hosted call agent recorded during the call.
 ///
 /// Rides `call.ended` in `seq` order, mirroring the call resource's inline
-/// `post_call_actions`. Only open items are surfaced, so `status` here is
+/// `post_call_action_items`. Only open items are surfaced, so `status` here is
 /// always `"open"`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WebhookPostCallAction {
+pub struct WebhookPostCallActionItem {
     pub id: String,
     pub seq: i64,
     pub action: String,
@@ -878,7 +878,7 @@ pub struct WebhookCallTranscript {
 /// access the call — the subscription owner's own key suffices).
 /// `outcome` is the hosted call's terminal result (`"completed"` /
 /// `"no_answer"` / `"declined"` / `"failed"`; `None` iff `call.mode` is
-/// `client_websocket`) and `post_call_actions` its recorded todo list —
+/// `client_websocket`) and `post_call_action_items` its recorded todo list —
 /// always present on new payloads (empty for non-hosted calls / no todos);
 /// both default so payloads predating hosted calls still parse.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -892,7 +892,7 @@ pub struct CallEndedWebhookData {
     #[serde(default)]
     pub outcome: Option<String>,
     #[serde(default)]
-    pub post_call_actions: Vec<WebhookPostCallAction>,
+    pub post_call_action_items: Vec<WebhookPostCallActionItem>,
 }
 
 /// Top-level `call.ended` webhook payload (`{event_type, timestamp, data}`
@@ -1021,7 +1021,7 @@ mod tests {
 
     #[test]
     fn call_ended_pre_hosted_payload_defaults_new_fields() {
-        // Phase-0 payload without mode/reason/outcome/post_call_actions.
+        // Phase-0 payload without mode/reason/outcome/post_call_action_items.
         let raw = r#"{
             "id": "evt_old",
             "event_type": "call.ended",
@@ -1046,7 +1046,7 @@ mod tests {
         assert_eq!(payload.data.call.mode, "client_websocket");
         assert_eq!(payload.data.call.reason, None);
         assert_eq!(payload.data.outcome, None);
-        assert!(payload.data.post_call_actions.is_empty());
+        assert!(payload.data.post_call_action_items.is_empty());
     }
 
     #[test]
@@ -1072,7 +1072,7 @@ mod tests {
                 "transcript": null,
                 "transcript_url": "https://x/api/v1/phone/calls/c3/transcripts",
                 "outcome": "completed",
-                "post_call_actions": [
+                "post_call_action_items": [
                     {"id": "a1", "seq": 1, "action": "Add appointment to calendar",
                      "details": "Tuesday 9:30am", "status": "open"},
                     {"id": "a2", "seq": 2, "action": "Text a confirmation",
@@ -1088,7 +1088,7 @@ mod tests {
             Some("Book a cleaning next week")
         );
         assert_eq!(payload.data.outcome.as_deref(), Some("completed"));
-        let actions = &payload.data.post_call_actions;
+        let actions = &payload.data.post_call_action_items;
         assert_eq!(actions.len(), 2);
         assert_eq!(actions[0].seq, 1);
         assert_eq!(actions[1].details, None);

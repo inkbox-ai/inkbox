@@ -653,10 +653,10 @@ export interface WebhookCallTranscript {
  * One open action item the hosted call agent recorded during the call.
  *
  * Rides `call.ended` in `seq` order, mirroring the inline
- * `PhoneCall.postCallActions`. Canceled items are omitted, so `status`
+ * `PhoneCall.postCallActionItems`. Canceled items are omitted, so `status`
  * here is always `"open"`.
  */
-export interface WebhookPostCallAction {
+export interface WebhookPostCallActionItem {
   id: string;
   seq: number;
   action: string;
@@ -694,7 +694,7 @@ export interface CallEndedWebhookData {
    * on new payloads (empty for non-hosted calls / no todos); optional only
    * so payloads predating hosted calls still parse.
    */
-  post_call_actions?: WebhookPostCallAction[];
+  post_call_action_items?: WebhookPostCallActionItem[];
 }
 
 /**

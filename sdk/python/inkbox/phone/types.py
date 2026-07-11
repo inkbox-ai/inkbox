@@ -227,7 +227,7 @@ class PhoneCall:
     # Hosted agent's recorded action items, surfaced inline (open items only,
     # seq-ascending); empty for client_websocket calls and hosted calls with
     # no open items.
-    post_call_actions: list[PostCallAction] = field(default_factory=list)
+    post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -252,8 +252,8 @@ class PhoneCall:
             mode=d.get("mode") or "client_websocket",
             reason=d.get("reason"),
             # Open items only, seq-ascending; empty for client_websocket calls.
-            post_call_actions=[
-                PostCallAction._from_dict(a) for a in d.get("post_call_actions", [])
+            post_call_action_items=[
+                PostCallActionItem._from_dict(a) for a in d.get("post_call_action_items", [])
             ],
         )
 
@@ -555,10 +555,10 @@ class HostedAgentConfig:
 
 
 @dataclass
-class PostCallAction:
+class PostCallActionItem:
     """An action item the hosted call agent recorded during a call.
 
-    Surfaced inline on the call resource (``PhoneCall.post_call_actions``).
+    Surfaced inline on the call resource (``PhoneCall.post_call_action_items``).
     Only open items reach the wire — canceled items are withdrawn — so
     ``status`` is always ``"open"``. Mirrors the ``call.ended`` webhook.
     """
@@ -570,7 +570,7 @@ class PostCallAction:
     status: str
 
     @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> PostCallAction:
+    def _from_dict(cls, d: dict[str, Any]) -> PostCallActionItem:
         return cls(
             id=UUID(d["id"]),
             seq=d["seq"],

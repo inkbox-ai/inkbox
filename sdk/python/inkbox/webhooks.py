@@ -666,12 +666,12 @@ class WebhookCallTranscript(TypedDict):
     url: str
 
 
-class WebhookPostCallActionWire(TypedDict):
+class WebhookPostCallActionItemWire(TypedDict):
     """
     One open action item the hosted call agent recorded during the call.
 
     Rides ``call.ended`` in ``seq`` order, mirroring the inline
-    ``PhoneCall.post_call_actions``. Canceled items are withdrawn, so
+    ``PhoneCall.post_call_action_items``. Canceled items are withdrawn, so
     ``status`` here is always ``"open"``.
     """
     id: str
@@ -693,7 +693,7 @@ class CallEndedWebhookData(TypedDict):
     verbatim record (fetch with an API key that can access the call —
     the subscription owner's own key suffices). ``outcome`` is the hosted
     call's terminal result (``None`` iff ``data.call.mode`` is
-    ``client_websocket``) and ``post_call_actions`` its recorded todo list
+    ``client_websocket``) and ``post_call_action_items`` its recorded todo list
     (always present, possibly empty); both are ``NotRequired`` only so
     payloads predating hosted calls still parse.
     """
@@ -703,7 +703,7 @@ class CallEndedWebhookData(TypedDict):
     transcript: WebhookCallTranscript | None
     transcript_url: str
     outcome: NotRequired[CallOutcomeWire | None]
-    post_call_actions: NotRequired[list[WebhookPostCallActionWire]]
+    post_call_action_items: NotRequired[list[WebhookPostCallActionItemWire]]
 
 
 class CallEndedWebhookPayload(TypedDict):

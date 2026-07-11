@@ -261,7 +261,7 @@ HOSTED_AGENT_CONFIG_DICT = {
 }
 
 # Slim wire shape: surfaced inline on the call resource, open items only.
-POST_CALL_ACTION_DICT = {
+POST_CALL_ACTION_ITEM_DICT = {
     "id": "ffff6666-0000-0000-0000-000000000001",
     "seq": 1,
     "action": "Book cleaning Tue 9:30am",
@@ -269,7 +269,7 @@ POST_CALL_ACTION_DICT = {
     "status": "open",
 }
 
-POST_CALL_ACTION_2_DICT = {
+POST_CALL_ACTION_ITEM_2_DICT = {
     "id": "ffff6666-0000-0000-0000-000000000002",
     "seq": 2,
     "action": "Send pricing PDF",

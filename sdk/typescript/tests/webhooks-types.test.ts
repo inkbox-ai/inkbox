@@ -528,7 +528,7 @@ describe("CallEndedWebhookPayload", () => {
     expect("mode" in payload.data.call).toBe(false);
     expect("reason" in payload.data.call).toBe(false);
     expect("outcome" in payload.data).toBe(false);
-    expect("post_call_actions" in payload.data).toBe(false);
+    expect("post_call_action_items" in payload.data).toBe(false);
   });
 
   it("rides mode/reason on data.call for hosted calls", () => {
@@ -541,11 +541,11 @@ describe("CallEndedWebhookPayload", () => {
     expect("reason" in payload.data).toBe(false);
   });
 
-  it("carries outcome and seq-ordered open post_call_actions for hosted calls", () => {
+  it("carries outcome and seq-ordered open post_call_action_items for hosted calls", () => {
     const payload = loadFixture<CallEndedWebhookPayload>("call_ended_hosted.json");
     const data = payload.data;
     expect(data.outcome).toBe("completed");
-    const actions = data.post_call_actions ?? [];
+    const actions = data.post_call_action_items ?? [];
     expect(actions.map((a) => a.seq)).toEqual([1, 2]);
     expect(actions[0].action.startsWith("Add cleaning appointment")).toBe(true);
     expect(actions[0].details).not.toBeNull();

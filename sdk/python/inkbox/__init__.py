@@ -53,7 +53,7 @@ from inkbox.phone.types import (
     PhoneRuleAction,
     PhoneRuleMatchType,
     PhoneTranscript,
-    PostCallAction,
+    PostCallActionItem,
     RateLimitInfo,
     SmsDeliveryStatus,
     SmsOptIn,
@@ -258,7 +258,7 @@ from inkbox.webhooks import (
     WebhookMailAgentIdentity,
     WebhookMailContact,
     WebhookPhoneCall,
-    WebhookPostCallActionWire,
+    WebhookPostCallActionItemWire,
     WebhookTranscriptEntryWire,
 )
 
@@ -328,7 +328,7 @@ __all__ = [
     "PhoneRuleAction",
     "PhoneRuleMatchType",
     "PhoneTranscript",
-    "PostCallAction",
+    "PostCallActionItem",
     "RateLimitInfo",
     "SmsDeliveryStatus",
     "SmsOptIn",
@@ -502,7 +502,7 @@ __all__ = [
     "WebhookMailAgentIdentity",
     "WebhookMailContact",
     "WebhookPhoneCall",
-    "WebhookPostCallActionWire",
+    "WebhookPostCallActionItemWire",
     "WebhookTranscriptEntryWire",
     # Webhook subscriptions
     "WebhookContextClassConfig",

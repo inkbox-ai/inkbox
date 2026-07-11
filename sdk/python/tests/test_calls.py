@@ -18,8 +18,8 @@ from sample_data import (
     PHONE_CALL_BLOCKED_DICT,
     PHONE_CALL_DICT,
     PHONE_TRANSCRIPT_DICT,
-    POST_CALL_ACTION_2_DICT,
-    POST_CALL_ACTION_DICT,
+    POST_CALL_ACTION_ITEM_2_DICT,
+    POST_CALL_ACTION_ITEM_DICT,
     RATE_LIMIT_INFO_DICT,
 )
 
@@ -392,37 +392,37 @@ class TestCallsPlaceHosted:
         assert call.reason is None
 
 
-class TestPostCallActions:
-    """Post-call actions are surfaced inline on the parsed call resource."""
+class TestPostCallActionItems:
+    """Post-call action items are surfaced inline on the parsed call resource."""
 
     def test_inline_actions_parse_in_seq_order(self):
         # A hosted call carries its open action items inline, seq-ascending.
         call = PhoneCall._from_dict(
             {
                 **PHONE_CALL_DICT,
-                "post_call_actions": [
-                    POST_CALL_ACTION_DICT,
-                    POST_CALL_ACTION_2_DICT,
+                "post_call_action_items": [
+                    POST_CALL_ACTION_ITEM_DICT,
+                    POST_CALL_ACTION_ITEM_2_DICT,
                 ],
             }
         )
 
-        assert len(call.post_call_actions) == 2
-        assert call.post_call_actions[0].seq == 1
-        assert call.post_call_actions[0].action == "Book cleaning Tue 9:30am"
+        assert len(call.post_call_action_items) == 2
+        assert call.post_call_action_items[0].seq == 1
+        assert call.post_call_action_items[0].action == "Book cleaning Tue 9:30am"
         assert (
-            call.post_call_actions[0].details
+            call.post_call_action_items[0].details
             == "Dr. Chen's office confirmed availability."
         )
         # Only open items reach the wire.
-        assert all(a.status == "open" for a in call.post_call_actions)
-        assert call.post_call_actions[1].details is None
+        assert all(a.status == "open" for a in call.post_call_action_items)
+        assert call.post_call_action_items[1].details is None
 
     def test_missing_key_yields_empty_list(self):
         # Client-websocket calls (and hosted calls with no open items) omit it.
         call = PhoneCall._from_dict(PHONE_CALL_DICT)
 
-        assert call.post_call_actions == []
+        assert call.post_call_action_items == []
 
 
 def _calls_resource_returning(status_code: int, body: dict | list) -> CallsResource:

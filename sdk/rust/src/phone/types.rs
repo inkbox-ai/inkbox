@@ -345,7 +345,7 @@ pub struct PhoneCall {
     /// Open action items the hosted agent recorded, `seq`-ascending. Empty for
     /// client-driven calls and hosted calls with no open items.
     #[serde(default)]
-    pub post_call_actions: Vec<PostCallAction>,
+    pub post_call_action_items: Vec<PostCallActionItem>,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -404,10 +404,10 @@ pub struct HostedAgentConfig {
 
 /// An action item the hosted call agent recorded during a call.
 ///
-/// Surfaced inline on the call resource via `calls().get(...).post_call_actions`
+/// Surfaced inline on the call resource via `calls().get(...).post_call_action_items`
 /// (open items only, `seq`-ascending), mirroring the `call.ended` webhook.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PostCallAction {
+pub struct PostCallActionItem {
     pub id: Uuid,
     pub seq: i64,
     pub action: String,
@@ -781,8 +781,8 @@ mod tests {
     }
 
     #[test]
-    fn post_call_action_parses_with_null_details() {
-        let action: PostCallAction = serde_json::from_value(json!({
+    fn post_call_action_item_parses_with_null_details() {
+        let action: PostCallActionItem = serde_json::from_value(json!({
             "id": "44444444-4444-4444-4444-444444444444",
             "seq": 2,
             "action": "Send pricing PDF",

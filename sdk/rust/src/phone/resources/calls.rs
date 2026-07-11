@@ -701,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn get_exposes_inline_post_call_actions() {
+    fn get_exposes_inline_post_call_action_items() {
         let server = MockServer::start();
         // A call carrying open action items inline on the resource.
         let mock = server.mock(|when, then| {
@@ -709,7 +709,7 @@ mod tests {
                 .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222");
             then.status(200).json_body({
                 let mut v = call_json();
-                v["post_call_actions"] = json!([
+                v["post_call_action_items"] = json!([
                     {
                         "id": "44444444-4444-4444-4444-444444444444",
                         "seq": 1,
@@ -733,14 +733,14 @@ mod tests {
             .get("22222222-2222-2222-2222-222222222222")
             .unwrap();
         mock.assert();
-        assert_eq!(call.post_call_actions.len(), 2);
-        assert_eq!(call.post_call_actions[0].seq, 1);
-        assert_eq!(call.post_call_actions[0].action, "Book cleaning Tue 9:30am");
-        assert_eq!(call.post_call_actions[1].details, None);
+        assert_eq!(call.post_call_action_items.len(), 2);
+        assert_eq!(call.post_call_action_items[0].seq, 1);
+        assert_eq!(call.post_call_action_items[0].action, "Book cleaning Tue 9:30am");
+        assert_eq!(call.post_call_action_items[1].details, None);
     }
 
     #[test]
-    fn post_call_actions_default_empty_when_key_absent() {
+    fn post_call_action_items_default_empty_when_key_absent() {
         // The base fixture omits the key: it must parse to an empty Vec.
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
@@ -753,7 +753,7 @@ mod tests {
             .get("22222222-2222-2222-2222-222222222222")
             .unwrap();
         mock.assert();
-        assert!(call.post_call_actions.is_empty());
+        assert!(call.post_call_action_items.is_empty());
     }
 
     #[test]

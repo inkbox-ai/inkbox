@@ -446,7 +446,7 @@ def test_call_ended_pre_hosted_payload_omits_new_fields():
     assert "mode" not in data["call"]
     assert "reason" not in data["call"]
     assert "outcome" not in data
-    assert "post_call_actions" not in data
+    assert "post_call_action_items" not in data
 
 
 def test_call_ended_hosted_mode_and_reason_ride_the_call_block():
@@ -459,11 +459,11 @@ def test_call_ended_hosted_mode_and_reason_ride_the_call_block():
     assert "reason" not in payload["data"]
 
 
-def test_call_ended_hosted_outcome_and_post_call_actions():
+def test_call_ended_hosted_outcome_and_post_call_action_items():
     payload = cast(CallEndedWebhookPayload, _load("call_ended_hosted.json"))
     data = payload["data"]
     assert data["outcome"] == "completed"
-    actions = data["post_call_actions"]
+    actions = data["post_call_action_items"]
     assert [a["seq"] for a in actions] == [1, 2]
     assert actions[0]["action"].startswith("Add cleaning appointment")
     assert actions[0]["details"] is not None

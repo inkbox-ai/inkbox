@@ -8,8 +8,8 @@ import {
   RAW_PHONE_CALL_BLOCKED,
   RAW_PHONE_CALL_WITH_RATE_LIMIT,
   RAW_PHONE_TRANSCRIPT,
-  RAW_POST_CALL_ACTION,
-  RAW_POST_CALL_ACTION_2,
+  RAW_POST_CALL_ACTION_ITEM,
+  RAW_POST_CALL_ACTION_ITEM_2,
 } from "../sampleData.js";
 
 function mockHttp() {
@@ -359,39 +359,39 @@ describe("CallsResource.place hosted mode", () => {
   });
 });
 
-describe("PhoneCall.postCallActions (inline on the call resource)", () => {
+describe("PhoneCall.postCallActionItems (inline on the call resource)", () => {
   it("exposes slim, seq-ascending open actions when present", async () => {
     const http = mockHttp();
     vi.mocked(http.get).mockResolvedValue({
       ...RAW_PHONE_CALL,
-      post_call_actions: [RAW_POST_CALL_ACTION, RAW_POST_CALL_ACTION_2],
+      post_call_action_items: [RAW_POST_CALL_ACTION_ITEM, RAW_POST_CALL_ACTION_ITEM_2],
     });
     const res = new CallsResource(http);
 
     const call = await res.get(CALL_ID);
 
-    expect(call.postCallActions).toHaveLength(2);
-    expect(call.postCallActions[0].seq).toBe(1);
-    expect(call.postCallActions[0].action).toBe("Book cleaning Tue 9:30am");
-    expect(call.postCallActions[0].status).toBe("open");
-    expect(call.postCallActions[0].details).toBe(
+    expect(call.postCallActionItems).toHaveLength(2);
+    expect(call.postCallActionItems[0].seq).toBe(1);
+    expect(call.postCallActionItems[0].action).toBe("Book cleaning Tue 9:30am");
+    expect(call.postCallActionItems[0].status).toBe("open");
+    expect(call.postCallActionItems[0].details).toBe(
       "Dr. Chen's office confirmed availability.",
     );
-    expect(call.postCallActions[1].details).toBeNull();
+    expect(call.postCallActionItems[1].details).toBeNull();
     // Slim shape: no call/identity/timestamp fields leak through.
-    expect("callId" in call.postCallActions[0]).toBe(false);
-    expect("createdAt" in call.postCallActions[0]).toBe(false);
+    expect("callId" in call.postCallActionItems[0]).toBe(false);
+    expect("createdAt" in call.postCallActionItems[0]).toBe(false);
   });
 
   it("defaults to an empty array when the key is absent", async () => {
     const http = mockHttp();
-    // RAW_PHONE_CALL carries no post_call_actions key.
+    // RAW_PHONE_CALL carries no post_call_action_items key.
     vi.mocked(http.get).mockResolvedValue(RAW_PHONE_CALL);
     const res = new CallsResource(http);
 
     const call = await res.get(CALL_ID);
 
-    expect(call.postCallActions).toEqual([]);
+    expect(call.postCallActionItems).toEqual([]);
   });
 });
 
