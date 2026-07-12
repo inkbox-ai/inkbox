@@ -222,10 +222,10 @@ class PhoneCall:
     # Who drove the call. Older responses without this field predate hosted
     # calls and are always client-driven.
     mode: str = "client_websocket"
-    # Outbound hosted-call brief; None on inbound and client_websocket calls.
+    # Outbound Voice AI task brief; None on inbound and client_websocket calls.
     reason: str | None = None
     # Voice AI's recorded action items, surfaced inline (open items only,
-    # seq-ascending); empty for client_websocket calls and hosted calls with
+    # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
     post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
 

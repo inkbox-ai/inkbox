@@ -614,9 +614,9 @@ export type CallLifecycleWebhookEventType = "call.ended";
  * `"shared_imessage_number"` on shared-line calls (the pool line is never
  * surfaced). `duration_seconds` is the connected length in whole seconds, or
  * `null` when the call never connected. `mode` says who drove the call and
- * `reason` carries the outbound hosted-call brief (`null` inbound and on
+ * `reason` carries the outbound Voice AI task brief (`null` inbound and on
  * `client_websocket` calls); both are optional only so payloads predating
- * hosted calls still parse.
+ * Voice AI still parse.
  */
 export interface WebhookPhoneCall {
   id: string;
@@ -684,15 +684,15 @@ export interface CallEndedWebhookData {
    */
   transcript_url: string;
   /**
-   * The hosted call's terminal result; `null` iff `data.call.mode` is
-   * `client_websocket`. Optional only so payloads predating hosted calls
+   * the Voice AI call's terminal result; `null` iff `data.call.mode` is
+   * `client_websocket`. Optional only so payloads predating Voice AI
    * still parse.
    */
   outcome?: CallOutcomeWire | null;
   /**
    * Voice AI's recorded todo list, `seq`-ascending. Always present
-   * on new payloads (empty for non-hosted calls / no todos); optional only
-   * so payloads predating hosted calls still parse.
+   * on new payloads (empty for client-driven calls / no todos); optional only
+   * so payloads predating Voice AI still parse.
    */
   post_call_action_items?: WebhookPostCallActionItem[];
 }

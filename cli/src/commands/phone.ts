@@ -28,7 +28,7 @@ export function buildPlaceCallOptions(
     return { error: "--hosted requires --reason (the agent's task brief)." };
   }
   if (cmdOpts.hosted && cmdOpts.wsUrl) {
-    return { error: "--hosted conflicts with --ws-url (hosted calls need no socket)." };
+    return { error: "--hosted conflicts with --ws-url (Voice AI calls need no socket)." };
   }
   if (!cmdOpts.hosted && cmdOpts.reason) {
     return { error: "--reason is only valid with --hosted." };

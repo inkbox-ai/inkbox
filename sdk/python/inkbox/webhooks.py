@@ -630,9 +630,9 @@ class WebhookPhoneCall(TypedDict):
     ``"shared_imessage_number"`` on shared-line calls (the pool line is never
     surfaced). ``duration_seconds`` is the connected length in whole seconds,
     or ``None`` when the call never connected. ``mode`` says who drove the
-    call and ``reason`` carries the outbound hosted-call brief (``None``
+    call and ``reason`` carries the outbound Voice AI task brief (``None``
     inbound and on ``client_websocket`` calls); both are ``NotRequired`` only
-    so payloads predating hosted calls still parse.
+    so payloads predating Voice AI still parse.
     """
     id: str
     origin: CallOriginWire
@@ -695,7 +695,7 @@ class CallEndedWebhookData(TypedDict):
     call's terminal result (``None`` iff ``data.call.mode`` is
     ``client_websocket``) and ``post_call_action_items`` its recorded todo list
     (always present, possibly empty); both are ``NotRequired`` only so
-    payloads predating hosted calls still parse.
+    payloads predating Voice AI still parse.
     """
     call: WebhookPhoneCall
     contacts: list[WebhookContact]

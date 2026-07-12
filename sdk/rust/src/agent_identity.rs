@@ -1601,7 +1601,7 @@ mod tests {
     #[test]
     fn place_hosted_call_dedicated_uses_identitys_own_number() {
         let server = MockServer::start();
-        // Exact body: hosted mode + reason ride the wire, no ws-url key.
+        // Exact body: hosted_agent mode + reason ride the wire, no ws-url key.
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/v1/phone/place-call")

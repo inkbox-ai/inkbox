@@ -339,11 +339,11 @@ pub struct PhoneCall {
         deserialize_with = "deserialize_call_mode_null_default"
     )]
     pub mode: String,
-    /// Outbound hosted-call brief; `None` on inbound and client-driven calls.
+    /// Outbound Voice AI task brief; `None` on inbound and client-driven calls.
     #[serde(default)]
     pub reason: Option<String>,
     /// Open action items Voice AI recorded, `seq`-ascending. Empty for
-    /// client-driven calls and hosted calls with no open items.
+    /// client-driven calls and Voice AI calls with no open items.
     #[serde(default)]
     pub post_call_action_items: Vec<PostCallActionItem>,
 }
