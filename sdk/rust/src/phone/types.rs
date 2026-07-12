@@ -156,7 +156,7 @@ impl CallOrigin {
 
 /// Routing decision applied to inbound calls for an agent identity.
 ///
-/// `hosted_agent` answers with the platform-hosted call agent and is the
+/// `hosted_agent` answers with Inkbox Voice AI and is the
 /// only action that requires neither a WebSocket nor a webhook URL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -339,11 +339,11 @@ pub struct PhoneCall {
         deserialize_with = "deserialize_call_mode_null_default"
     )]
     pub mode: String,
-    /// Outbound hosted-call brief; `None` on inbound and client-driven calls.
+    /// Outbound Voice AI task brief; `None` on inbound and client-driven calls.
     #[serde(default)]
     pub reason: Option<String>,
-    /// Open action items the hosted agent recorded, `seq`-ascending. Empty for
-    /// client-driven calls and hosted calls with no open items.
+    /// Open action items Voice AI recorded, `seq`-ascending. Empty for
+    /// client-driven calls and Voice AI calls with no open items.
     #[serde(default)]
     pub post_call_action_items: Vec<PostCallActionItem>,
 }
@@ -387,7 +387,7 @@ pub struct IncomingCallActionConfig {
     pub incoming_call_webhook_url: Option<String>,
 }
 
-/// Per-identity hosted call agent configuration.
+/// Per-identity Inkbox Voice AI configuration.
 ///
 /// `voice` / `model` / `instructions` are all nullable — `None` means the
 /// server default applies for that field.
@@ -402,7 +402,7 @@ pub struct HostedAgentConfig {
     pub instructions: Option<String>,
 }
 
-/// An action item the hosted call agent recorded during a call.
+/// An action item Inkbox Voice AI recorded during a call.
 ///
 /// Surfaced inline on the call resource via `calls().get(...).post_call_action_items`
 /// (open items only, `seq`-ascending), mirroring the `call.ended` webhook.

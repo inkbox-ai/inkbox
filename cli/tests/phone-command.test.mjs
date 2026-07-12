@@ -68,7 +68,7 @@ test("buildPlaceCallOptions rejects --hosted with --ws-url", () => {
   });
 
   assert.deepEqual(result, {
-    error: "--hosted conflicts with --ws-url (hosted calls need no socket).",
+    error: "--hosted conflicts with --ws-url (Voice AI calls need no socket).",
   });
 });
 

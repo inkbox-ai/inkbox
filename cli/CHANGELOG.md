@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.23 — Mailbox storage caps + mail clients
+## 0.4.24 — Mailbox storage caps + mail clients
 
 ### Added
 
@@ -10,7 +10,13 @@
 
 ### Changed
 
-- CLI pins `@inkbox/sdk` at `^0.4.23`.
+- CLI pins `@inkbox/sdk` at `^0.4.24`.
+
+## 0.4.23 — Inkbox Voice AI rebrand
+
+### Changed
+
+- **Prose-only rebrand: the hosted call agent is now "Inkbox Voice AI".** `--help` text and the README now say "Inkbox Voice AI" / "Voice AI". Commands, flags, arguments, and output are unchanged — `inkbox phone hosted-agent`, `--hosted`, and the `hosted_agent` action keep their names.
 
 ## 0.4.22 — Hosted call agent
 

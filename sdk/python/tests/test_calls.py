@@ -396,7 +396,7 @@ class TestPostCallActionItems:
     """Post-call action items are surfaced inline on the parsed call resource."""
 
     def test_inline_actions_parse_in_seq_order(self):
-        # A hosted call carries its open action items inline, seq-ascending.
+        # A Voice AI call carries its open action items inline, seq-ascending.
         call = PhoneCall._from_dict(
             {
                 **PHONE_CALL_DICT,
@@ -419,7 +419,7 @@ class TestPostCallActionItems:
         assert call.post_call_action_items[1].details is None
 
     def test_missing_key_yields_empty_list(self):
-        # Client-websocket calls (and hosted calls with no open items) omit it.
+        # Client-websocket calls (and Voice AI calls with no open items) omit it.
         call = PhoneCall._from_dict(PHONE_CALL_DICT)
 
         assert call.post_call_action_items == []

@@ -146,7 +146,7 @@ class CallsResource:
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.
                 See :class:`CallMode`.
-            reason: The hosted agent's task brief for the call — what to
+            reason: Voice AI's task brief for the call — what to
                 accomplish. Required with ``mode=hosted_agent``, invalid
                 otherwise.
 

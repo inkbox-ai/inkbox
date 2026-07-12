@@ -300,7 +300,7 @@ describe("CallsResource.place", () => {
   });
 });
 
-describe("CallsResource.place hosted mode", () => {
+describe("CallsResource.place hosted_agent mode", () => {
   it("sends mode=hosted_agent with the reason brief", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue({
@@ -328,7 +328,7 @@ describe("CallsResource.place hosted mode", () => {
     expect(call.reason).toBe("Book a cleaning next week, mornings preferred");
   });
 
-  it("forwards a hosted call with ws-url instead of client-gating (server 422s)", async () => {
+  it("forwards a hosted_agent call with ws-url instead of client-gating (server 422s)", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
     const res = new CallsResource(http);

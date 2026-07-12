@@ -1,7 +1,7 @@
 /**
  * inkbox-phone/resources/hostedAgent.ts
  *
- * Identity-scoped hosted call agent config (getConfig / setConfig).
+ * Identity-scoped Inkbox Voice AI config (getConfig / setConfig).
  */
 
 import { HttpTransport } from "../../_http.js";
@@ -15,7 +15,7 @@ export class HostedAgentConfigResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
-   * Get the hosted call agent config.
+   * Get the Inkbox Voice AI config.
    *
    * Agent-scoped keys resolve their own identity; admin/JWT callers must
    * pass `agentIdentityId` (the server returns 422 otherwise).
@@ -38,7 +38,7 @@ export class HostedAgentConfigResource {
   }
 
   /**
-   * Set the hosted call agent config.
+   * Set the Inkbox Voice AI config.
    *
    * Full-replace PUT: every call sets all three fields, and a field left
    * undefined resets to the server default — there is no partial update.
@@ -46,7 +46,7 @@ export class HostedAgentConfigResource {
    * @param options.voice - Voice override; omit for the server default.
    * @param options.model - Model override; omit for the server default.
    * @param options.instructions - Per-identity steering prompt appended to
-   *   the hosted agent's system prompt; omit for none.
+   *   Voice AI's system prompt; omit for none.
    * @param options.agentIdentityId - UUID of the agent identity. Optional
    *   for agent-scoped keys; required under admin/JWT.
    */

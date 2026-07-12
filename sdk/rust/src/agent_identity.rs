@@ -562,7 +562,7 @@ impl AgentIdentity {
             .list_filtered(Some(&id), limit, offset, is_blocked, filter)
     }
 
-    /// Place an outbound call driven by the platform-hosted call agent.
+    /// Place an outbound call driven by Inkbox Voice AI.
     ///
     /// Sibling of [`AgentIdentity::place_call`] (which stays client-driven);
     /// origination resolution is identical — dedicated calls ride this
@@ -571,7 +571,7 @@ impl AgentIdentity {
     /// # Arguments
     /// * `to_number` - E.164 destination number.
     /// * `origination` - How to place the call.
-    /// * `reason` - The hosted agent's task brief for the call.
+    /// * `reason` - Voice AI's task brief for the call.
     pub fn place_hosted_call(
         &self,
         to_number: &str,
@@ -605,14 +605,14 @@ impl AgentIdentity {
         self.inkbox.calls().transcripts(call_id)
     }
 
-    /// Get this identity's hosted call agent config.
+    /// Get this identity's Inkbox Voice AI config.
     pub fn hosted_agent_config(&self) -> Result<HostedAgentConfig> {
         self.inkbox
             .hosted_agent()
             .get_config(Some(&self.id().to_string()))
     }
 
-    /// Set this identity's hosted call agent config (full replace).
+    /// Set this identity's Inkbox Voice AI config (full replace).
     ///
     /// A field left `None` resets to the server default.
     pub fn set_hosted_agent_config(
@@ -1615,7 +1615,7 @@ mod tests {
     #[test]
     fn place_hosted_call_dedicated_uses_identitys_own_number() {
         let server = MockServer::start();
-        // Exact body: hosted mode + reason ride the wire, no ws-url key.
+        // Exact body: hosted_agent mode + reason ride the wire, no ws-url key.
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/v1/phone/place-call")

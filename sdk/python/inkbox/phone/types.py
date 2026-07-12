@@ -79,8 +79,8 @@ class CallMode(StrEnum):
     """Who is the brain on a call.
 
     ``client_websocket`` (default) bridges audio to the caller's own
-    WebSocket server; ``hosted_agent`` runs the platform-hosted call
-    agent — no socket, no code, configured per identity via
+    WebSocket server; ``hosted_agent`` runs Inkbox Voice AI — no
+    socket, no code, configured per identity via
     :class:`HostedAgentConfig`.
     """
 
@@ -91,7 +91,7 @@ class CallMode(StrEnum):
 class IncomingCallAction(StrEnum):
     """What to do when an inbound call arrives for an identity.
 
-    ``hosted_agent`` answers with the platform-hosted call agent and is
+    ``hosted_agent`` answers with Inkbox Voice AI and is
     the only action that requires neither a WebSocket nor a webhook URL.
     """
 
@@ -222,10 +222,10 @@ class PhoneCall:
     # Who drove the call. Older responses without this field predate hosted
     # calls and are always client-driven.
     mode: str = "client_websocket"
-    # Outbound hosted-call brief; None on inbound and client_websocket calls.
+    # Outbound Voice AI task brief; None on inbound and client_websocket calls.
     reason: str | None = None
-    # Hosted agent's recorded action items, surfaced inline (open items only,
-    # seq-ascending); empty for client_websocket calls and hosted calls with
+    # Voice AI's recorded action items, surfaced inline (open items only,
+    # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
     post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
 
@@ -533,7 +533,7 @@ class IncomingCallActionConfig:
 
 @dataclass
 class HostedAgentConfig:
-    """Per-identity hosted call agent configuration.
+    """Per-identity Inkbox Voice AI configuration.
 
     ``voice`` / ``model`` / ``instructions`` are all nullable — ``None``
     means the server default applies for that field.
@@ -556,7 +556,7 @@ class HostedAgentConfig:
 
 @dataclass
 class PostCallActionItem:
-    """An action item the hosted call agent recorded during a call.
+    """An action item Inkbox Voice AI recorded during a call.
 
     Surfaced inline on the call resource (``PhoneCall.post_call_action_items``).
     Only open items reach the wire — canceled items are withdrawn — so

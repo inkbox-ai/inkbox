@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.23 — Mailbox storage caps, IMAP/SMTP
+## 0.4.24 — Mailbox storage caps, IMAP/SMTP
 
 ### Added
 
@@ -12,6 +12,12 @@
 
 - **Free plan:** a footer is appended to the **stored** body of outgoing mail, so `messages.get(...)` does not return byte-for-byte what you sent — a `sentBody === fetchedBody` round-trip assertion fails on Free plans. Documented on `send` / `replyAll` / `forward`.
 - TypeScript note: the `Mailbox` and `IdentityMailbox` interfaces gain **required** properties (`storageUsedBytes`, `storageLimitBytes`), so code constructing those object literals (fixtures, mocks) needs the new properties. Parsing is unaffected: responses missing the fields default to `0` / `null`.
+
+## 0.4.23 — Inkbox Voice AI rebrand
+
+### Changed
+
+- **Prose-only rebrand: the hosted call agent is now "Inkbox Voice AI".** JSDoc now uses the product name (short form "Voice AI"). No API changes: `CallMode.HOSTED_AGENT`, `IncomingCallAction.HOSTED_AGENT`, `inkbox.hostedAgent`, and `HostedAgentConfig` are all unchanged.
 
 ## 0.4.22 — Hosted call agent
 

@@ -810,8 +810,8 @@ pub enum CallLifecycleWebhookEventType {
 /// surfaced). `duration_seconds` is the connected length in whole seconds,
 /// or `None` when the call never connected. `mode` says who drove the call
 /// (`"client_websocket"` / `"hosted_agent"`) and `reason` carries the
-/// outbound hosted-call brief (`None` inbound and on client-driven calls);
-/// both default so payloads predating hosted calls still parse.
+/// outbound Voice AI task brief (`None` inbound and on client-driven calls);
+/// both default so payloads predating Voice AI still parse.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookPhoneCall {
     pub id: String,
@@ -833,12 +833,12 @@ pub struct WebhookPhoneCall {
 }
 
 fn default_webhook_call_mode() -> String {
-    // Payloads predating hosted calls omit the field; they were always
+    // Payloads predating Voice AI omit the field; they were always
     // client-driven.
     "client_websocket".to_string()
 }
 
-/// One open action item the hosted call agent recorded during the call.
+/// One open action item Inkbox Voice AI recorded during the call.
 ///
 /// Rides `call.ended` in `seq` order, mirroring the call resource's inline
 /// `post_call_action_items`. Only open items are surfaced, so `status` here is
@@ -876,11 +876,11 @@ pub struct WebhookCallTranscript {
 /// for the call, otherwise `None`. `transcript_url` is **always** present and
 /// is the authoritative verbatim record (fetch with an API key that can
 /// access the call — the subscription owner's own key suffices).
-/// `outcome` is the hosted call's terminal result (`"completed"` /
+/// `outcome` is the Voice AI call's terminal result (`"completed"` /
 /// `"no_answer"` / `"declined"` / `"failed"`; `None` iff `call.mode` is
 /// `client_websocket`) and `post_call_action_items` its recorded todo list —
-/// always present on new payloads (empty for non-hosted calls / no todos);
-/// both default so payloads predating hosted calls still parse.
+/// always present on new payloads (empty for client-driven calls / no todos);
+/// both default so payloads predating Voice AI still parse.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallEndedWebhookData {
     pub call: WebhookPhoneCall,

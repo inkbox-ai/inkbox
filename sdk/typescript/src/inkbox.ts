@@ -318,7 +318,7 @@ export class Inkbox {
   /** Incoming-call routing config (get / set), keyed by agent identity. */
   get incomingCallAction(): IncomingCallActionResource { return this._incomingCallAction; }
 
-  /** Hosted call agent config (getConfig / setConfig), keyed by agent identity. */
+  /** Inkbox Voice AI config (getConfig / setConfig), keyed by agent identity. */
   get hostedAgent(): HostedAgentConfigResource { return this._hostedAgent; }
 
   /** Encrypted vault (info, unlock, secrets). */
