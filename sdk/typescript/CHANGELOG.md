@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.23 — Inkbox Voice AI rebrand
+
+### Changed
+
+- **Prose-only rebrand: the hosted call agent is now "Inkbox Voice AI".** JSDoc now uses the product name (short form "Voice AI"). No API changes: `CallMode.HOSTED_AGENT`, `IncomingCallAction.HOSTED_AGENT`, `inkbox.hostedAgent`, and `HostedAgentConfig` are all unchanged.
+
 ## 0.4.22 — Hosted call agent
 
 ### Added

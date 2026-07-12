@@ -15,9 +15,11 @@ Each package has its own `publish.sh`: **dry run by default**, `--prod` to publi
 
 | File | Field |
 |---|---|
-| `sdk/python/pyproject.toml` | `version` |
+| `sdk/python/pyproject.toml` (+ `uv.lock` self-entry — run `uv lock`) | `version` |
 | `sdk/typescript/package.json` (+ `package-lock.json` self-version) | `version` |
+| `sdk/typescript/src/version.ts` | `VERSION` (User-Agent constant; unit-tested against package.json) |
 | `cli/package.json` (+ `package-lock.json`) | `version` **and** the `@inkbox/sdk` dependency → `^<new version>` |
+| `cli/src/client.ts` | `CLI_VERSION` (User-Agent constant) |
 | `sdk/rust/Cargo.toml` (+ `Cargo.lock` `inkbox` entry) | `version` |
 
 The CLI declares `@inkbox/sdk: ^<version>` and `cli/publish.sh` refuses to publish unless that matches `sdk/typescript`'s version — so bump it too.

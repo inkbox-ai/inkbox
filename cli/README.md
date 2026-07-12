@@ -201,9 +201,9 @@ Phone operations, scoped to an identity. Requires `-i <handle>`.
 inkbox phone call -i <handle>                # Place an outbound call
   --to <number>                              #   E.164 phone number (required)
   --ws-url <url>                             #   WebSocket URL (wss://) for audio bridging
-  --hosted                                   #   Let the hosted call agent drive the call
+  --hosted                                   #   Let Inkbox Voice AI drive the call
                                              #     (requires --reason; conflicts with --ws-url)
-  --reason <text>                            #   The hosted agent's task brief — what to accomplish
+  --reason <text>                            #   Voice AI's task brief — what to accomplish
 
 inkbox phone calls -i <handle>               # List calls
   --limit <n>                                #   Max results (default: 50)
@@ -227,7 +227,7 @@ inkbox phone incoming-action [action] -i <handle>  # Get (no action) or set the 
   --ws-url <url>                             #   WebSocket URL (wss://) for audio bridging
   --webhook-url <url>                        #   HTTPS receiver for the webhook action
 
-inkbox phone hosted-agent get -i <handle>    # Show the hosted call agent config
+inkbox phone hosted-agent get -i <handle>    # Show the Inkbox Voice AI config
 inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitted flag
                                              #   resets that field to the server default
   --voice <voice>                            #   Voice override

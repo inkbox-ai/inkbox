@@ -4,6 +4,12 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.23 — Inkbox Voice AI rebrand
+
+### Changed
+
+- **Prose-only rebrand: the hosted call agent is now "Inkbox Voice AI".** CLI `--help` text and README, Python docstrings, TypeScript JSDoc, Rust doc comments, and the agent skills now use the product name (short form "Voice AI"). No functional changes, and no identifier changes: `mode="hosted_agent"`, `incoming_call_action="hosted_agent"`, the `inkbox phone hosted-agent` command, and `HostedAgentConfig`-style type/method names are all unchanged.
+
 ## 0.4.22 — Hosted call agent: call mode, config, post-call action items
 
 ### Added

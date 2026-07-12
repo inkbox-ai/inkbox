@@ -120,7 +120,7 @@ export class CallsResource {
    * @param options.agentIdentityId - UUID of the placing identity (shared origination).
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
-   * @param options.reason - The hosted agent's task brief for the call.
+   * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise.
    * @returns The created call record with current rate limit info.
    */

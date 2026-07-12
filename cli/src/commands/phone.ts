@@ -28,7 +28,7 @@ export function buildPlaceCallOptions(
     return { error: "--hosted requires --reason (the agent's task brief)." };
   }
   if (cmdOpts.hosted && cmdOpts.wsUrl) {
-    return { error: "--hosted conflicts with --ws-url (hosted calls need no socket)." };
+    return { error: "--hosted conflicts with --ws-url (Voice AI calls need no socket)." };
   }
   if (!cmdOpts.hosted && cmdOpts.reason) {
     return { error: "--reason is only valid with --hosted." };
@@ -56,8 +56,8 @@ export function registerPhoneCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .requiredOption("--to <number>", "E.164 destination number")
     .option("--ws-url <url>", "WebSocket URL (wss://) for audio bridging")
-    .option("--hosted", "Let the hosted call agent drive the call (requires --reason)")
-    .option("--reason <text>", "The hosted agent's task brief — what to accomplish")
+    .option("--hosted", "Let Inkbox Voice AI drive the call (requires --reason)")
+    .option("--reason <text>", "Voice AI's task brief — what to accomplish")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -265,11 +265,11 @@ export function registerPhoneCommands(program: Command): void {
 
   const hostedAgent = phone
     .command("hosted-agent")
-    .description("Hosted call agent config (identity-scoped)");
+    .description("Inkbox Voice AI config (identity-scoped)");
 
   hostedAgent
     .command("get")
-    .description("Show this identity's hosted call agent config")
+    .description("Show this identity's Inkbox Voice AI config")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (
@@ -295,7 +295,7 @@ export function registerPhoneCommands(program: Command): void {
   hostedAgent
     .command("set")
     .description(
-      "Set this identity's hosted call agent config. Full replace: an " +
+      "Set this identity's Inkbox Voice AI config. Full replace: an " +
         "omitted flag resets that field to the server default",
     )
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
