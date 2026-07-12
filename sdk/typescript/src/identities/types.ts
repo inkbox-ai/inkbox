@@ -82,6 +82,13 @@ export interface IdentityMailbox {
   createdAt: Date;
   updatedAt: Date;
   filterModeChangeNotice: FilterModeChangeNotice | null;
+  /**
+   * Accepted for wire tolerance, but the identity embed does **not** report
+   * a real value today (reads `0`). Use `inkbox.mailboxes.get(...)`.
+   */
+  storageUsedBytes: number;
+  /** Same caveat as `storageUsedBytes` — the identity embed reads `null`. */
+  storageLimitBytes: number | null;
 }
 
 export interface IdentityPhoneNumber {
@@ -189,6 +196,8 @@ export interface RawIdentityMailbox {
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
+  storage_used_bytes?: number;
+  storage_limit_bytes?: number | null;
 }
 
 export interface RawIdentityPhoneNumber {
@@ -255,6 +264,8 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
     filterModeChangeNotice: r.filter_mode_change_notice
       ? parseFilterModeChangeNotice(r.filter_mode_change_notice)
       : null,
+    storageUsedBytes: r.storage_used_bytes ?? 0,
+    storageLimitBytes: r.storage_limit_bytes ?? null,
   };
 }
 

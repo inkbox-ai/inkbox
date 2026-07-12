@@ -47,7 +47,7 @@ export function registerDomainCommands(program: Command): void {
     .command("set-default <domain-name>")
     .description(
       "Set the org default sending domain (admin-scoped API key only). " +
-        "Pass the platform sending domain (e.g. 'inkboxmail.com' in prod) to clear.",
+        "Pass the platform sending domain ('inkboxmail.com') to clear.",
     )
     .action(
       withErrorHandler(async function (this: Command, domainName: string) {

@@ -5,18 +5,114 @@ import {
   MailRuleMatchType,
   ContactRuleStatus,
 } from "@inkbox/sdk";
-import { createClient, getGlobalOpts } from "../client.js";
+import type { Mailbox } from "@inkbox/sdk";
+import { createClient, getGlobalOpts, resolveBaseUrl } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 
 const MAILBOX_LIST_COLUMNS = [
   "emailAddress",
   "sendingDomain",
+  "storage",
   "id",
   "filterMode",
   "agentIdentityId",
   "createdAt",
 ];
+
+const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB"];
+
+// Storage caps are binary (2 GiB = 2 * 1024 ** 3), so this divides by 1024 and
+// labels GiB/MiB — never pair base-2 math with a decimal "GB".
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < BYTE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  if (unit === 0) return `${Math.round(value)} B`;
+  let rounded = Math.round(value * 10) / 10;
+  if (rounded >= 1024 && unit < BYTE_UNITS.length - 1) {
+    rounded = Math.round((rounded / 1024) * 10) / 10;
+    unit += 1;
+  }
+  return `${rounded} ${BYTE_UNITS[unit]}`;
+}
+
+/** "1.2 GiB / 4 GiB"; a null limit (unresolved cap) renders as a dash. */
+export function formatStorage(used: number, limit: number | null): string {
+  const usedText = formatBytes(used ?? 0);
+  return `${usedText} / ${limit === null || limit === undefined ? "-" : formatBytes(limit)}`;
+}
+
+export function mailboxListRow(mb: Mailbox): Record<string, unknown> {
+  return {
+    ...mb,
+    storage: formatStorage(mb.storageUsedBytes, mb.storageLimitBytes),
+  };
+}
+
+/** `humanize` adds the readable `storage` line; --json gets raw bytes only. */
+export function mailboxGetRecord(
+  mb: Mailbox,
+  opts: { humanize: boolean },
+): Record<string, unknown> {
+  const record: Record<string, unknown> = {
+    emailAddress: mb.emailAddress,
+    sendingDomain: mb.sendingDomain,
+    id: mb.id,
+    filterMode: mb.filterMode,
+    agentIdentityId: mb.agentIdentityId,
+    createdAt: mb.createdAt,
+    storageUsedBytes: mb.storageUsedBytes,
+    storageLimitBytes: mb.storageLimitBytes,
+  };
+  if (opts.humanize) {
+    record.storage = formatStorage(mb.storageUsedBytes, mb.storageLimitBytes);
+  }
+  return record;
+}
+
+const INKBOX_API_HOSTS = new Set(["inkbox.ai", "api.inkbox.ai"]);
+const INKBOX_MAIL_DOMAIN = "inkboxmail.com";
+
+export const UNRESOLVED_MAIL_HOSTS_ERROR =
+  "Can't determine the mail hosts for this API base URL.";
+
+/**
+ * The mail domain for the configured API base URL, or null when the URL isn't an
+ * Inkbox API host. Callers must print nothing on null — a mail client pointed at
+ * guessed hosts would talk to the wrong server.
+ */
+export function resolveMailDomain(baseUrl?: string): string | null {
+  if (!baseUrl) return INKBOX_MAIL_DOMAIN; // unset = the SDK's default API host
+  let host: string;
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  return INKBOX_API_HOSTS.has(host) ? INKBOX_MAIL_DOMAIN : null;
+}
+
+export function clientSettings(
+  emailAddress: string,
+  mailDomain: string,
+): Record<string, unknown> {
+  return {
+    imapHost: `imap.${mailDomain}`,
+    imapPort: 993,
+    imapSecurity: "IMAPS (implicit TLS)",
+    smtpHost: `smtp.${mailDomain}`,
+    smtpPort: 465,
+    smtpPortStarttls: 587,
+    username: emailAddress,
+    // Never printed: the caller supplies their own identity-scoped API key.
+    password: "<your identity-scoped API key (ApiKey_...)>",
+  };
+}
 
 function renderFilterModeChangeNotice(
   mb: { filterModeChangeNotice: unknown } | { filterModeChangeNotice?: unknown },
@@ -199,7 +295,8 @@ export function registerMailboxCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const mailboxes = await inkbox.mailboxes.list();
-        output(mailboxes, {
+        // --json keeps the raw byte counts; the table gets the humanized column.
+        output(opts.json ? mailboxes : mailboxes.map(mailboxListRow), {
           json: !!opts.json,
           columns: MAILBOX_LIST_COLUMNS,
         });
@@ -217,17 +314,9 @@ export function registerMailboxCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const mb = await inkbox.mailboxes.get(emailAddress);
-        output(
-          {
-            emailAddress: mb.emailAddress,
-            sendingDomain: mb.sendingDomain,
-            id: mb.id,
-            filterMode: mb.filterMode,
-            agentIdentityId: mb.agentIdentityId,
-            createdAt: mb.createdAt,
-          },
-          { json: !!opts.json },
-        );
+        output(mailboxGetRecord(mb, { humanize: !opts.json }), {
+          json: !!opts.json,
+        });
       }),
     );
 
@@ -261,6 +350,37 @@ export function registerMailboxCommands(program: Command): void {
           { json: !!opts.json },
         );
         renderFilterModeChangeNotice(mb);
+      }),
+    );
+
+  mailbox
+    .command("client-settings <email-address>")
+    .description(
+      "Print IMAP/SMTP settings for attaching this inbox to a mail client",
+    )
+    .action(
+      withErrorHandler(async function (this: Command, emailAddress: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const mailDomain = resolveMailDomain(resolveBaseUrl(opts));
+        // Bail before printing anything rather than emit hosts we had to guess.
+        if (!mailDomain) throw new Error(UNRESOLVED_MAIL_HOSTS_ERROR);
+        // Fetch so a typo'd / foreign address fails as a normal API error.
+        const mb = await inkbox.mailboxes.get(emailAddress);
+        const settings = clientSettings(mb.emailAddress, mailDomain);
+        output(settings, { json: !!opts.json });
+        if (opts.json) return;
+        console.log("");
+        console.log(
+          "Password: use an identity-scoped API key — mint one with " +
+            "'inkbox api-keys create --label <name> --identity-id <uuid>'. " +
+            "Admin-scoped keys are rejected (one key maps to one mailbox).",
+        );
+        console.log(
+          `The message From must be exactly ${mb.emailAddress}; aliases and ` +
+            "'send as' are rejected. On the Free plan, signed/encrypted mail " +
+            "(S/MIME, PGP) cannot be sent over SMTP.",
+        );
       }),
     );
 

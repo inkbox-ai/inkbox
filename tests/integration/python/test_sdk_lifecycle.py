@@ -168,6 +168,25 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         )
         assert forwarded_inbound.direction == "inbound"
 
+        # ── mailbox storage ───────────────────────────────────────
+        # Both fields are present and numeric on the mail mailbox routes.
+        # The over-cap 402 (StorageLimitExceededError) is unit-tested, not
+        # exercised here — filling a 2 GiB cap in CI is not practical.
+        log_step(ctx, "mailbox storage fields on list + get")
+        alpha_mailbox = inkbox.mailboxes.get(alpha.email_address)
+        assert isinstance(alpha_mailbox.storage_used_bytes, int)
+        assert alpha_mailbox.storage_used_bytes >= 0
+        assert alpha_mailbox.storage_limit_bytes is None or (
+            isinstance(alpha_mailbox.storage_limit_bytes, int)
+            and alpha_mailbox.storage_limit_bytes > 0
+        )
+
+        listed = inkbox.mailboxes.list()
+        listed_alpha = next(
+            m for m in listed if m.email_address == alpha.email_address
+        )
+        assert isinstance(listed_alpha.storage_used_bytes, int)
+
         # ── vault + credentials ───────────────────────────────────
         vault_key = "IntegrationTest-Key-01!"
         log_step(ctx, "initialize vault")

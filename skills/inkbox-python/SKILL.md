@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -151,6 +151,10 @@ sent = identity.send_email(
 # (approximate — proxy prefetch inflates it, the per-window debounce
 # collapses repeats, so it can read above or below the true count; prefer
 # first_opened_at. pixels can also raise spam scores).
+#
+# send_email / reply_all_email / forward_email all raise
+# StorageLimitExceededError (402) when the mailbox is at its storage cap —
+# see "Storage cap (402)" below.
 ```
 
 ### Read
@@ -194,6 +198,51 @@ from inkbox import ThreadFolder
 ```
 
 Low-level folder listing / per-thread updates (`list(folder=…)`, `list_folders(email)`, `update(..., folder=…)`) live on `ThreadsResource`. Passing `folder="blocked"` to `update` raises `ValueError` before the HTTP call.
+
+### Storage cap (402)
+
+Every mailbox has a plan storage cap. **All three send paths** — `send_email`, `reply_all_email`, and `forward_email` (and the `inkbox.messages.*` equivalents) — raise `StorageLimitExceededError` (HTTP 402) when the send would push the mailbox over it.
+
+```python
+from inkbox import StorageLimitExceededError
+
+try:
+    identity.send_email(to=["user@example.com"], subject="Hi", body_text="…")
+except StorageLimitExceededError as e:
+    print(e.message)      # human sentence, includes the limit
+    print(e.limit_bytes)  # e.g. 2147483648 (2 GiB)
+    print(e.upgrade_url)  # console billing page
+    # Free space — reclaim is immediate — or upgrade the plan:
+    inkbox.messages.delete(identity.email_address, "<message-uuid>")
+    inkbox.threads.delete(identity.email_address, "<thread-uuid>")
+```
+
+Read usage off the mailbox (`inkbox.mailboxes.get(...)`): `storage_used_bytes` and `storage_limit_bytes` (`None` = the server resolved no cap). The caps are **binary** — 2 GiB is `2 * 1024**3` = 2,147,483,648 bytes, so divide by 1024 and label GiB/MiB, never GB. `identity.mailbox` (the identity embed) does **not** carry real values; use `inkbox.mailboxes.get(...)`.
+
+**Free plan:** a footer is appended to the **stored** body of outgoing mail, so `inkbox.messages.get(...)` does not return byte-for-byte what you sent (a body-less send comes back with the footer as its body). Don't assert `sent_body == fetched_body` on a Free plan.
+
+## Mail Clients (IMAP/SMTP)
+
+An inbox can be attached to a regular mail client (Thunderbird, Apple Mail, mutt, …) with the API key you already have — there is no separate credential to create and **no SDK call involved**; the gateway speaks IMAP and SMTP, not HTTP.
+
+| Setting | Value |
+|---|---|
+| IMAP host | `imap.inkboxmail.com` |
+| IMAP port | `993` (IMAPS / implicit TLS) |
+| SMTP host | `smtp.inkboxmail.com` |
+| SMTP port | `465` (SMTPS / implicit TLS) or `587` (STARTTLS) |
+| Username | the inbox address (e.g. `sales-agent@inkboxmail.com`) |
+| Password | an **identity-scoped** API key (`ApiKey_...`) |
+
+The password is the same agent-scoped key an identity-scoped `Inkbox(...)` client authenticates with; mint one with `inkbox.api_keys.create(scoped_identity_id=...)`. Admin-scoped keys are rejected — one key maps to exactly one mailbox. Revoking the key revokes mail-client access.
+
+Constraints that bite:
+
+- **`From` must be the authenticated inbox address**, and exactly one address — aliases / "send as" are rejected.
+- **On the Free plan, signed/encrypted mail (S/MIME, PGP) cannot be sent over SMTP** — the required footer can't be injected without breaking the signature, so the send is refused. Send unsigned, or upgrade.
+- Leave "save a copy of sent messages" **on** — Inkbox recognizes the client's copy as the message it already stored, so you get one Sent entry, charged against the storage cap once.
+
+Full walkthrough: https://inkbox.ai/docs/capabilities/email/mail-clients
 
 ## Phone
 
@@ -628,6 +677,12 @@ if updated.filter_mode_change_notice:
 # `mailbox.sending_domain` is the bare domain the mailbox sends from
 # (platform default or a verified custom domain — see "Custom email domains" below).
 
+# Storage (list / get / update all carry these):
+print(mailbox.storage_used_bytes)               # bytes stored, e.g. 1288490188
+print(mailbox.storage_limit_bytes)              # plan cap, e.g. 2147483648 (2 GiB), or None
+used_gib = mailbox.storage_used_bytes / 1024**3  # caps are BINARY — GiB, not GB
+# Over-cap sends raise StorageLimitExceededError (402) — see "Storage cap (402)".
+
 results = inkbox.mailboxes.search(mailbox.email_address, q="invoice", limit=20)
 # Mailboxes are deleted via the owning identity's cascade — there is no standalone delete:
 #   identity.delete()  # removes the mailbox + tunnel atomically (cascade)
@@ -992,6 +1047,7 @@ from inkbox import (
     InkboxAPIError,
     DuplicateContactRuleError,
     RedundantContactAccessGrantError,
+    StorageLimitExceededError,
 )
 
 try:
@@ -1005,6 +1061,7 @@ except InkboxAPIError as e:
 
 - `DuplicateContactRuleError` — 409 when creating a contact rule with an already-taken `(match_type, match_target)` on the same resource. Exposes `.existing_rule_id: UUID`.
 - `RedundantContactAccessGrantError` — 409 when a contact-access grant is redundant (e.g. per-identity grant on top of an active wildcard). Exposes `.error` and `.detail_message`.
+- `StorageLimitExceededError` — 402 when a send / reply-all / forward would push the mailbox past its plan storage cap. Exposes `.message`, `.upgrade_url`, and `.limit_bytes`. Delete messages or threads to free space (immediate), or upgrade. A `402` whose `detail` is a plain string stays a plain `InkboxAPIError`.
 
 ## Key Conventions
 

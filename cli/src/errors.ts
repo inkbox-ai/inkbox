@@ -4,6 +4,7 @@ import {
   InkboxError,
   InkboxVaultKeyError,
   RedundantContactAccessGrantError,
+  StorageLimitExceededError,
 } from "@inkbox/sdk";
 
 function renderDetail(detail: string | Record<string, unknown>): string {
@@ -24,6 +25,16 @@ export function withErrorHandler<T extends unknown[]>(
       } else if (err instanceof RedundantContactAccessGrantError) {
         console.error(
           `Error: HTTP ${err.statusCode}: redundant grant — ${err.detailMessage}`,
+        );
+      } else if (err instanceof StorageLimitExceededError) {
+        console.error(
+          `Error: HTTP ${err.statusCode}: ${err.detailMessage || renderDetail(err.detail)}`,
+        );
+        console.error(
+          "Hint: Free space with 'inkbox email delete <message-id> -i <handle>' " +
+            "or 'inkbox email delete-thread <thread-id> -i <handle>' " +
+            "(reclaim is immediate), or upgrade the plan" +
+            (err.upgradeUrl ? `: ${err.upgradeUrl}` : "."),
         );
       } else if (err instanceof InkboxAPIError) {
         console.error(`Error: HTTP ${err.statusCode}: ${renderDetail(err.detail)}`);

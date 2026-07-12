@@ -105,6 +105,15 @@ export class MessagesResource {
    *   with 422. Opens surface as `firstOpenedAt`/`openCount`; `openCount` is
    *   approximate (proxy prefetch inflates it, the per-window debounce
    *   collapses repeats) so prefer `firstOpenedAt`. Pixels can raise spam scores.
+   *
+   * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
+   *   plan's storage cap. Free space with `messages.delete` / `threads.delete`
+   *   (reclaim is immediate), or upgrade the plan (`err.upgradeUrl`).
+   *
+   * On the **Free plan** a footer is appended to the *stored* body, so what
+   * `messages.get` returns is not byte-for-byte what you sent — a
+   * `sentBody === fetchedBody` round-trip assertion will fail. A send with no
+   * body comes back with the footer as its body.
    */
   async send(
     emailAddress: string,
@@ -177,6 +186,13 @@ export class MessagesResource {
    * @param options.attachments - Optional file attachments. Same shape as
    *   `send({ attachments })`, including `contentId` for inline images.
    * @param options.replyTo - Optional Reply-To address.
+   *
+   * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
+   *   plan's storage cap. Free space with `messages.delete` /
+   *   `threads.delete`, or upgrade the plan.
+   *
+   * On the **Free plan** the stored body carries an appended footer, so it
+   * will not match the body you sent (see {@link MessagesResource.send}).
    */
   async replyAll(
     emailAddress: string,
@@ -249,6 +265,13 @@ export class MessagesResource {
    * @param options.trackOpens - Embed an open-tracking pixel; requires HTML on
    *   the outgoing forward — inline mode inherits the original's HTML (no caller
    *   `bodyHtml` needed), wrapped mode needs one. A no-HTML forward returns 422.
+   *
+   * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
+   *   plan's storage cap. Free space with `messages.delete` /
+   *   `threads.delete`, or upgrade the plan.
+   *
+   * On the **Free plan** the stored body carries an appended footer, so it
+   * will not match the body you sent (see {@link MessagesResource.send}).
    */
   async forward(
     emailAddress: string,

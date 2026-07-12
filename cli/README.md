@@ -390,13 +390,26 @@ by `inkbox identity create` and removed by `inkbox identity delete`
 has moved to the identity; mailbox PATCH hard-rejects it with a 422.
 
 ```bash
-inkbox mailbox list                          # List all mailboxes
+inkbox mailbox list                          # List all mailboxes (incl. a 'storage' column)
 inkbox mailbox get <email-address>           # Get mailbox details
 inkbox mailbox update <email-address>        # Update a mailbox
   --filter-mode <mode>                       #   whitelist or blacklist (admin-only)
+inkbox mailbox client-settings <email-address>  # IMAP/SMTP settings for a mail client
 # To attach a webhook receiver, use `inkbox webhook subscription create
 # --mailbox-id <id> --url <url> --event-type message.received ...`.
 ```
+
+`mailbox list` shows a `storage` column (`1.2 GiB / 2 GiB`) and `mailbox get`
+adds `storageUsedBytes` / `storageLimitBytes` — raw byte counts under `--json`,
+humanized in the table. The caps are **binary** (2 GiB is `2 * 1024³` bytes),
+so the readouts are labeled GiB/MiB. A `-` limit means the server didn't
+resolve a cap.
+
+Sending from a mailbox that is at its cap fails with `HTTP 402` and a hint:
+free space with `inkbox email delete <message-id> -i <handle>` / `inkbox email
+delete-thread <thread-id> -i <handle>` (reclaim is immediate), or upgrade the
+plan. All three send paths (`email send`, `email reply-all`, `email forward`)
+are enforced.
 
 ### tunnel
 
@@ -501,6 +514,46 @@ inkbox webhook subscription update <sub-id>  # Update url, event_types, and/or c
                                              #     (mutually exclusive with --context-*)
 inkbox webhook subscription delete <sub-id>  # Remove a subscription
 ```
+
+## Mail clients (IMAP/SMTP)
+
+An Inkbox inbox can also be attached to a regular mail client (Thunderbird,
+Apple Mail, mutt, …) with the API key you already have. There is no separate
+credential to create. `inkbox mailbox client-settings <email-address>` prints
+these:
+
+| Setting | Value |
+|---|---|
+| IMAP host | `imap.inkboxmail.com` |
+| IMAP port | `993` (IMAPS / implicit TLS) |
+| SMTP host | `smtp.inkboxmail.com` |
+| SMTP port | `465` (SMTPS / implicit TLS) or `587` (STARTTLS) |
+| Username | the inbox address (e.g. `sales-bot@inkboxmail.com`) |
+| Password | an **identity-scoped** API key (`ApiKey_...`) |
+
+Mint the password with `inkbox api-keys create --label <name> --identity-id
+<uuid>`. Admin-scoped keys are rejected: one key maps to exactly one mailbox.
+Revoking the key revokes mail-client access.
+
+Two constraints that bite in practice:
+
+- **`From` must be the authenticated inbox address**, and exactly one address.
+  Aliases and "send as" identities are rejected.
+- **On the Free plan, signed/encrypted mail (S/MIME, PGP) cannot be sent over
+  SMTP.** The required footer can't be injected without breaking the signature,
+  so the send is refused. Send unsigned, or upgrade the plan.
+
+If your client saves its own copy of sent messages, leave that setting on:
+Inkbox recognizes the copy as the message it already stored, so you get one
+Sent entry, charged against your storage cap once.
+
+`mailbox client-settings` derives the hosts from the configured API base URL.
+When that URL isn't a recognized Inkbox API host, it errors instead of printing
+hosts it would have to guess — a mail client pointed at guessed hosts would talk
+to the wrong server.
+
+Full setup walkthrough:
+<https://inkbox.ai/docs/capabilities/email/mail-clients>
 
 ## Global options
 

@@ -76,6 +76,59 @@ describe("parseMailbox sendingDomain", () => {
   });
 });
 
+describe("parseMailbox storage", () => {
+  it("reads storage fields", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+
+    const mailbox = await res.get(ADDR);
+
+    expect(mailbox.storageUsedBytes).toBe(1_288_490_188);
+    expect(mailbox.storageLimitBytes).toBe(2_147_483_648);
+  });
+
+  it("keeps a null limit null", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({ ...RAW_MAILBOX, storage_limit_bytes: null });
+    const res = new MailboxesResource(http);
+
+    const mailbox = await res.get(ADDR);
+
+    expect(mailbox.storageLimitBytes).toBeNull();
+    expect(mailbox.storageUsedBytes).toBe(1_288_490_188);
+  });
+
+  it("defaults to 0/null when the fields are omitted (old server)", async () => {
+    const http = mockHttp();
+    const {
+      storage_used_bytes: _used,
+      storage_limit_bytes: _limit,
+      ...withoutStorage
+    } = RAW_MAILBOX;
+    void _used;
+    void _limit;
+    vi.mocked(http.get).mockResolvedValue(withoutStorage);
+    const res = new MailboxesResource(http);
+
+    const mailbox = await res.get(ADDR);
+
+    expect(mailbox.storageUsedBytes).toBe(0);
+    expect(mailbox.storageLimitBytes).toBeNull();
+  });
+
+  it("surfaces storage on list", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_MAILBOX]);
+    const res = new MailboxesResource(http);
+
+    const mailboxes = await res.list();
+
+    expect(mailboxes[0].storageUsedBytes).toBe(1_288_490_188);
+    expect(mailboxes[0].storageLimitBytes).toBe(2_147_483_648);
+  });
+});
+
 describe("MailboxesResource.update", () => {
   it("sends filter_mode", async () => {
     const http = mockHttp();

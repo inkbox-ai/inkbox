@@ -289,6 +289,33 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
         }
     }
 
+    if status == 402 {
+        if let Value::Object(map) = &raw_detail {
+            // Older servers send a plain-string detail here; those fall through
+            // to the generic `Api` variant below.
+            if map.get("error").and_then(|e| e.as_str()) == Some("storage_limit_exceeded") {
+                return Err(InkboxError::StorageLimitExceeded {
+                    status_code: status,
+                    message: map
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    upgrade_url: map
+                        .get("upgrade_url")
+                        .and_then(|u| u.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    limit_bytes: map
+                        .get("limit_bytes")
+                        .and_then(Value::as_u64)
+                        .unwrap_or_default(),
+                    detail: Box::new(raw_detail),
+                });
+            }
+        }
+    }
+
     if status == 403 {
         if let Value::Object(map) = &raw_detail {
             if map.get("error").and_then(|e| e.as_str()) == Some("recipient_blocked") {

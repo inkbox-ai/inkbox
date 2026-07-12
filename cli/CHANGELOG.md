@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.23 — Mailbox storage caps + mail clients
+
+### Added
+
+- **Storage visibility on `mailbox`.** `inkbox mailbox list` gains a `storage` column (`1.2 GiB / 2 GiB`) and `inkbox mailbox get` gains `storageUsedBytes` / `storageLimitBytes`. `--json` keeps the raw byte counts; the table humanizes them. Units are **binary** (2 GiB = `2 * 1024³`), so readouts are labeled GiB/MiB. A `-` limit means the server didn't resolve a cap.
+- **402 over-cap sends are rendered as themselves.** A send/reply-all/forward that would push the mailbox past its plan's storage cap now prints the server's message plus a hint: free space with `inkbox email delete <message-id> -i <handle>` / `inkbox email delete-thread <thread-id> -i <handle>`, or upgrade the plan (with the billing URL). A `402` whose detail is a plain string still falls back to the generic API error.
+- **`inkbox mailbox client-settings <email-address>`.** Prints the IMAP/SMTP settings for attaching the inbox to a regular mail client — hosts derived from the configured API base URL, username = the inbox address. The password is never printed: use an identity-scoped API key. When the configured base URL isn't a recognized Inkbox API host, the command errors instead of printing hosts it would have to guess.
+
+### Changed
+
+- CLI pins `@inkbox/sdk` at `^0.4.23`.
+
 ## 0.4.22 — Hosted call agent
 
 ### Added

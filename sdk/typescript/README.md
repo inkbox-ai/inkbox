@@ -291,6 +291,49 @@ This server-side `isRead` (the agent consumed the message via the API) is
 distinct from `firstOpenedAt` (the recipient's mail client loaded the
 tracking pixel).
 
+### Mailbox storage
+
+Every mailbox has a plan storage cap. Sends, reply-alls, and forwards that
+would push it over the cap are rejected with a `402` —
+`StorageLimitExceededError`:
+
+```ts
+import { StorageLimitExceededError } from "@inkbox/sdk";
+
+try {
+  await identity.sendEmail({ to: ["user@example.com"], subject: "Hi", bodyText: "…" });
+} catch (err) {
+  if (err instanceof StorageLimitExceededError) {
+    console.log(err.message);                    // human-readable, includes the limit
+    console.log(err.limitBytes, err.upgradeUrl); // e.g. 2147483648, https://…?tab=billing
+    // Free space (reclaim is immediate) or upgrade the plan:
+    await inkbox.messages.delete(mailbox.emailAddress, "message-uuid");
+    await inkbox.threads.delete(mailbox.emailAddress, "thread-uuid");
+  }
+}
+```
+
+Current usage lives on the mailbox (`inkbox.mailboxes.list()` / `.get()`):
+
+```ts
+const mailbox = await inkbox.mailboxes.get("abc-xyz@inkboxmail.com");
+console.log(mailbox.storageUsedBytes);  // e.g. 1288490188
+console.log(mailbox.storageLimitBytes); // e.g. 2147483648 (2 GiB), or null if unresolved
+
+const usedGiB = mailbox.storageUsedBytes / 1024 ** 3; // caps are binary — GiB, not GB
+```
+
+The caps are **binary**: 2 GiB is `2 * 1024 ** 3` = 2,147,483,648 bytes. Divide
+by 1024 and label the result GiB/MiB. The identity-embedded mailbox
+(`identity.mailbox`) does **not** carry real storage values today — read them
+from `inkbox.mailboxes.get(...)`.
+
+> **Free plan:** a footer is appended to the **stored** body of outgoing mail,
+> so what you read back with `inkbox.messages.get(...)` is not byte-for-byte
+> what you sent — a `sentBody === fetchedBody` round-trip assertion will fail
+> on Free plans (a send with no body comes back with the footer as its body).
+> Paid plans are unaffected.
+
 ---
 
 ## Phone
@@ -770,6 +813,8 @@ const mb = await inkbox.mailboxes.get("abc-xyz@inkboxmail.com");
 console.log(mb.emailAddress);
 console.log(mb.sendingDomain);  // bare domain the mailbox sends from
 console.log(mb.agentIdentityId); // non-null for live customer mailboxes (1:1 invariant)
+console.log(mb.storageUsedBytes);  // bytes currently stored
+console.log(mb.storageLimitBytes); // plan cap in bytes (binary GiB), or null
 
 // Filter mode now lives on the agent identity — set it via
 // identity.update({ mailFilterMode: ... }). display_name likewise moved
@@ -812,6 +857,45 @@ const newDefault = await inkbox.domains.setDefault("mail.acme.com");
 // Pass the platform domain (e.g. "inkboxmail.com" in prod) to revert.
 await inkbox.domains.setDefault("inkboxmail.com");  // -> null
 ```
+
+---
+
+## Mail clients (IMAP/SMTP)
+
+An Inkbox inbox can also be attached to a regular mail client (Thunderbird,
+Apple Mail, mutt, …) with the API key you already have. There is no separate
+credential to create and no SDK call involved — the gateway speaks IMAP and
+SMTP directly.
+
+| Setting | Value |
+|---|---|
+| IMAP host | `imap.inkboxmail.com` |
+| IMAP port | `993` (IMAPS / implicit TLS) |
+| SMTP host | `smtp.inkboxmail.com` |
+| SMTP port | `465` (SMTPS / implicit TLS) or `587` (STARTTLS) |
+| Username | the inbox address (e.g. `sales-bot@inkboxmail.com`) |
+| Password | an **identity-scoped** API key (`ApiKey_...`) |
+
+The password is an agent-scoped API key — the same key an identity-scoped
+`Inkbox(...)` client authenticates with. Mint one with
+`inkbox.apiKeys.create({ label, scopedIdentityId })`. Admin-scoped keys are
+rejected: one key maps to exactly one mailbox. Revoking the key revokes
+mail-client access.
+
+Two constraints that bite in practice:
+
+- **`From` must be the authenticated inbox address**, and exactly one address.
+  Aliases and "send as" identities are rejected.
+- **On the Free plan, signed/encrypted mail (S/MIME, PGP) cannot be sent over
+  SMTP.** The required footer can't be injected without breaking the signature,
+  so the send is refused. Send unsigned, or upgrade the plan.
+
+If your client saves its own copy of sent messages, leave that setting on:
+Inkbox recognizes the copy as the message it already stored, so you get one
+Sent entry, charged against your storage cap once.
+
+Full setup walkthrough:
+<https://inkbox.ai/docs/capabilities/email/mail-clients>
 
 ---
 

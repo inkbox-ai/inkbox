@@ -70,6 +70,36 @@ export class RecipientBlockedError extends InkboxAPIError {
   }
 }
 
+/**
+ * Thrown on 402 when an outbound send would push a mailbox past its plan's
+ * storage cap. Raised by `messages.send`, `messages.replyAll`, and
+ * `messages.forward`.
+ *
+ * Free space by deleting messages (`messages.delete`) or whole threads
+ * (`threads.delete`) — reclaim is immediate — or upgrade the plan.
+ */
+export class StorageLimitExceededError extends InkboxAPIError {
+  /** Console billing page to raise the cap. */
+  readonly upgradeUrl: string;
+  /** The cap that was hit, in bytes. Binary units — divide by 1024, label GiB/MiB. */
+  readonly limitBytes: number | null;
+  /** Alias of `message`, for symmetry with the sibling structured errors. */
+  readonly detailMessage: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "StorageLimitExceededError";
+    // The server's sentence is the useful one here; the base class's
+    // "HTTP 402: {json}" is not worth printing.
+    const serverMessage = String(detail["message"] ?? "");
+    if (serverMessage) this.message = serverMessage;
+    this.detailMessage = serverMessage;
+    this.upgradeUrl = String(detail["upgrade_url"] ?? "");
+    const raw = detail["limit_bytes"];
+    this.limitBytes = raw === null || raw === undefined ? null : Number(raw);
+  }
+}
+
 function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail): never {
   if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
     if ("existing_rule_id" in rawDetail) {
@@ -86,6 +116,16 @@ function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail):
     && rawDetail["error"] === "recipient_blocked"
   ) {
     throw new RecipientBlockedError(status, rawDetail);
+  }
+  // Older servers send a plain-string 402 detail; those fall through to the
+  // generic error rather than being mistyped.
+  if (
+    status === 402
+    && typeof rawDetail === "object"
+    && rawDetail !== null
+    && rawDetail["error"] === "storage_limit_exceeded"
+  ) {
+    throw new StorageLimitExceededError(status, rawDetail);
   }
   throw new InkboxAPIError(status, rawDetail);
 }

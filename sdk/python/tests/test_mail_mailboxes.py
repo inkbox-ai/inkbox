@@ -69,6 +69,47 @@ class TestMailboxParseSendingDomain:
         assert mailbox.sending_domain == "inkbox.ai"
 
 
+class TestMailboxStorage:
+    def test_reads_storage_fields(self):
+        res, http = _resource()
+        http.get.return_value = MAILBOX_DICT
+
+        mailbox = res.get("agent01@inkbox.ai")
+
+        assert mailbox.storage_used_bytes == 1_288_490_188
+        assert mailbox.storage_limit_bytes == 2_147_483_648
+
+    def test_null_limit(self):
+        res, http = _resource()
+        http.get.return_value = {**MAILBOX_DICT, "storage_limit_bytes": None}
+
+        mailbox = res.get("agent01@inkbox.ai")
+
+        assert mailbox.storage_limit_bytes is None
+        assert mailbox.storage_used_bytes == 1_288_490_188
+
+    def test_omitted_fields_old_server(self):
+        res, http = _resource()
+        d = {**MAILBOX_DICT}
+        d.pop("storage_used_bytes")
+        d.pop("storage_limit_bytes")
+        http.get.return_value = d
+
+        mailbox = res.get("agent01@inkbox.ai")
+
+        assert mailbox.storage_used_bytes == 0
+        assert mailbox.storage_limit_bytes is None
+
+    def test_storage_on_list(self):
+        res, http = _resource()
+        http.get.return_value = [MAILBOX_DICT]
+
+        mailbox = res.list()[0]
+
+        assert mailbox.storage_used_bytes == 1_288_490_188
+        assert mailbox.storage_limit_bytes == 2_147_483_648
+
+
 class TestMailboxesUpdate:
     def test_update_filter_mode(self):
         res, http = _resource()

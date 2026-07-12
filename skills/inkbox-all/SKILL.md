@@ -24,15 +24,15 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 - `inkbox-cli`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-cli/SKILL.md
-  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text, iMessage, vault, mailbox, number, signing key, and webhook operations.
+  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text, iMessage, vault, mailbox (including storage and IMAP/SMTP client settings), number, signing key, and webhook operations.
 
 - `inkbox-python`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
-  Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, iMessage, contacts, notes, contact rules, custom sending domains, vault, signing keys, and tunnels.
+  Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, iMessage, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
 - `inkbox-ts`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-ts/SKILL.md
-  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, phone, text/SMS, iMessage, contacts, notes, contact rules, custom sending domains, vault, signing keys, and tunnels.
+  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, phone, text/SMS, iMessage, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
 - `inkbox-tunnels`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-tunnels/SKILL.md
@@ -59,6 +59,14 @@ These example directories are useful references, but they are not standalone ski
 - `use-inkbox-vault`
   GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-vault
   Small Python and TypeScript examples showing how to create a login credential with TOTP, generate codes, and clean up.
+
+## Mail Clients (IMAP/SMTP) and Mailbox Storage
+
+Two cross-cutting mail facts worth knowing before you pick a skill. Each SDK/CLI skill above covers them in its own idiom.
+
+**An inbox can be attached to a regular mail client** (Thunderbird, Apple Mail, mutt, …) with the API key an agent already has — there is no separate credential to create, and **no HTTP endpoint or SDK method is involved**; the gateway speaks IMAP and SMTP directly. Username = the inbox address; password = an **identity-scoped** API key (admin-scoped keys are rejected — one key maps to exactly one mailbox; revoking the key revokes mail-client access). Hosts `imap.inkboxmail.com` / `smtp.inkboxmail.com`, ports 993 (IMAPS), 465 (SMTPS), 587 (STARTTLS). `inkbox mailbox client-settings <email-address>` prints the table. Constraints: the `From` must be the authenticated inbox address (exactly one; aliases and "send as" are rejected); on the Free plan signed/encrypted mail (S/MIME, PGP) cannot be sent over SMTP (the required footer would break the signature). Leave "save a copy of sent messages" on — Inkbox recognizes the client's copy as the message it already stored, so there is one Sent entry, charged once. Full walkthrough: https://inkbox.ai/docs/capabilities/email/mail-clients
+
+**Mailboxes have a plan storage cap.** `mailboxes.list` / `.get` / `.update` carry `storage_used_bytes` / `storage_limit_bytes` (TS `storageUsedBytes` / `storageLimitBytes`; `null` when the server resolved no cap). Sends, reply-alls, and forwards over the cap fail with HTTP 402 — `StorageLimitExceededError` (Rust `InkboxError::StorageLimitExceeded`), carrying `message`, `upgrade_url`, and `limit_bytes`. Deleting messages or threads frees space immediately. Caps are **binary**: 2 GiB = `2 * 1024³` = 2,147,483,648 bytes — divide by 1024 and label GiB/MiB, never GB. On the Free plan a footer is appended to the **stored** body of outgoing mail, so a fetched message is not byte-for-byte what was sent.
 
 ## How To Choose
 

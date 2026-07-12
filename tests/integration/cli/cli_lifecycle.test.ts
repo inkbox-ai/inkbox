@@ -183,6 +183,31 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     const forwardedInbound = alphaList.find((m) => m.subject === forwardSubject)!;
     expect(forwardedInbound.direction).toBe("inbound");
 
+    // ── mailbox storage ───────────────────────────────────────
+    // --json (always on here) keeps the raw byte counts; the humanized
+    // `storage` column is table-only. The over-cap 402 is unit-tested, not
+    // exercised here — filling a 2 GiB cap in CI is not practical.
+    logStep(config, "mailbox storage fields on get + list");
+    const alphaMailbox = inkboxJson<{
+      emailAddress: string;
+      storageUsedBytes: number;
+      storageLimitBytes: number | null;
+    }>(`mailbox get ${alphaMb.emailAddress}`, cliOpts);
+    expect(typeof alphaMailbox.storageUsedBytes).toBe("number");
+    expect(alphaMailbox.storageUsedBytes).toBeGreaterThanOrEqual(0);
+    if (alphaMailbox.storageLimitBytes !== null) {
+      expect(typeof alphaMailbox.storageLimitBytes).toBe("number");
+      expect(alphaMailbox.storageLimitBytes).toBeGreaterThan(0);
+    }
+
+    const mailboxList = inkboxJson<
+      Array<{ emailAddress: string; storageUsedBytes: number }>
+    >("mailbox list", cliOpts);
+    const listedAlpha = mailboxList.find(
+      (m) => m.emailAddress === alphaMb.emailAddress,
+    )!;
+    expect(typeof listedAlpha.storageUsedBytes).toBe("number");
+
     // ── identity-scoped contact rules + filter mode ───────────
     // (mail only — alpha has no phone number, and we don't provision
     // real numbers in CI; phone rules require a number server-side.)
