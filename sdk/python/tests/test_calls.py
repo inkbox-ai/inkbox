@@ -248,7 +248,7 @@ class TestCallsPlace:
 
         _, kwargs = transport.post.call_args
         # mode is always sent (server-side default mirrored on the wire);
-        # reason only rides hosted placements.
+        # reason only rides Voice AI placements.
         assert kwargs["json"] == {
             "to_number": "+15551234567",
             "origination": "dedicated_number",
@@ -365,7 +365,7 @@ class TestCallsPlaceHosted:
         assert "reason" not in kwargs["json"]
 
     def test_hosted_with_ws_url_is_forwarded_not_gated(self, client, transport):
-        """The SDK never client-gates the hosted/ws-url conflict — the server 422s."""
+        """The SDK never client-gates the hosted_agent/ws-url conflict — the server 422s."""
         transport.post.return_value = PHONE_CALL_DICT
 
         client._calls.place(
@@ -396,7 +396,7 @@ class TestPostCallActionItems:
     """Post-call action items are surfaced inline on the parsed call resource."""
 
     def test_inline_actions_parse_in_seq_order(self):
-        # A hosted call carries its open action items inline, seq-ascending.
+        # A Voice AI call carries its open action items inline, seq-ascending.
         call = PhoneCall._from_dict(
             {
                 **PHONE_CALL_DICT,
@@ -419,7 +419,7 @@ class TestPostCallActionItems:
         assert call.post_call_action_items[1].details is None
 
     def test_missing_key_yields_empty_list(self):
-        # Client-websocket calls (and hosted calls with no open items) omit it.
+        # Client-websocket calls (and Voice AI calls with no open items) omit it.
         call = PhoneCall._from_dict(PHONE_CALL_DICT)
 
         assert call.post_call_action_items == []
@@ -475,7 +475,7 @@ class TestCallsPlaceErrors:
         assert err.detail == detail
 
     def test_422_hosted_reason_required_surfaces(self):
-        """Server-side hosted validation (reason required) surfaces verbatim."""
+        """Server-side Voice AI validation (reason required) surfaces verbatim."""
         detail = [
             {
                 "loc": ["body", "reason"],
@@ -497,7 +497,7 @@ class TestCallsPlaceErrors:
         assert err.detail == detail
 
     def test_503_hosted_agent_at_capacity_surfaces(self):
-        """The hosted concurrency guard's 503 is surfaced verbatim."""
+        """The Voice AI concurrency guard's 503 is surfaced verbatim."""
         calls = _calls_resource_returning(
             503, {"detail": {"error": "hosted_agent_at_capacity"}}
         )

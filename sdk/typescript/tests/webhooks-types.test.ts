@@ -522,7 +522,7 @@ describe("CallEndedWebhookPayload", () => {
     expect(Array.isArray(payload.data.agent_identities)).toBe(true);
   });
 
-  it("keeps parsing pre-hosted payloads that omit the new fields", () => {
+  it("keeps parsing payloads predating Voice AI that omit the new fields", () => {
     const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
     // Optional keys: absent on old payloads, never a parse failure.
     expect("mode" in payload.data.call).toBe(false);
@@ -531,7 +531,7 @@ describe("CallEndedWebhookPayload", () => {
     expect("post_call_action_items" in payload.data).toBe(false);
   });
 
-  it("rides mode/reason on data.call for hosted calls", () => {
+  it("rides mode/reason on data.call for Voice AI calls", () => {
     const payload = loadFixture<CallEndedWebhookPayload>("call_ended_hosted.json");
     const call = payload.data.call;
     // mode/reason live on data.call (mirrors the call REST shape), not data.
@@ -541,7 +541,7 @@ describe("CallEndedWebhookPayload", () => {
     expect("reason" in payload.data).toBe(false);
   });
 
-  it("carries outcome and seq-ordered open post_call_action_items for hosted calls", () => {
+  it("carries outcome and seq-ordered open post_call_action_items for Voice AI calls", () => {
     const payload = loadFixture<CallEndedWebhookPayload>("call_ended_hosted.json");
     const data = payload.data;
     expect(data.outcome).toBe("completed");

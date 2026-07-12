@@ -601,7 +601,7 @@ mod tests {
     #[test]
     fn place_hosted_sends_mode_and_reason() {
         let server = MockServer::start();
-        // Exact json_body match: hosted body carries mode + reason, no ws key.
+        // Exact json_body match: hosted_agent body carries mode + reason, no ws key.
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/v1/phone/place-call")

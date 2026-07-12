@@ -249,11 +249,11 @@ export interface PhoneCall {
   origin: CallOrigin;
   /** Who drove the call. Defaults to `"client_websocket"`. */
   mode: string;
-  /** Outbound hosted-call brief; `null` on inbound and client-driven calls. */
+  /** Outbound Voice AI brief; `null` on inbound and client-driven calls. */
   reason: string | null;
   /**
    * Open action items Inkbox Voice AI recorded, `seq`-ascending.
-   * Empty for client_websocket calls and hosted calls with no open items.
+   * Empty for client_websocket calls and Voice AI calls with no open items.
    */
   postCallActionItems: PostCallActionItem[];
   createdAt: Date;
@@ -478,7 +478,7 @@ export interface RawPhoneCall {
   // client_websocket.
   mode?: string | null;
   reason?: string | null;
-  // Absent/empty for client_websocket calls and hosted calls with no open items.
+  // Absent/empty for client_websocket calls and Voice AI calls with no open items.
   post_call_action_items?: RawPostCallActionItem[];
   created_at: string;
   updated_at: string;

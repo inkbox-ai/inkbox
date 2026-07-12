@@ -439,7 +439,7 @@ def test_call_ended_contacts_and_identities_are_lists():
 
 
 def test_call_ended_pre_hosted_payload_omits_new_fields():
-    """Phase-0 payloads (no hosted fields) must keep parsing untouched."""
+    """Phase-0 payloads (no Voice AI fields) must keep parsing untouched."""
     payload = cast(CallEndedWebhookPayload, _load("call_ended.json"))
     data = payload["data"]
     # NotRequired keys: absent on old payloads, never a parse failure.

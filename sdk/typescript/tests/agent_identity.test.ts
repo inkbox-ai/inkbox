@@ -347,7 +347,7 @@ describe("AgentIdentity phone helpers", () => {
     expect(result).toBe(placed);
   });
 
-  it("placeCall forwards mode and reason for hosted placements", async () => {
+  it("placeCall forwards mode and reason for Voice AI placements", async () => {
     const ink = mockInkbox();
     vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
     const identity = new AgentIdentity(makeData(), ink);

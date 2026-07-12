@@ -250,7 +250,7 @@ inkbox phone hosted-agent get -i <handle>
 inkbox phone hosted-agent set -i <handle> --voice <voice> --model <model> --instructions <text>
 ```
 
-Before placing a call, confirm the destination number and the websocket URL (or the `--reason` task brief for hosted calls) with the user.
+Before placing a call, confirm the destination number and the websocket URL (or the `--reason` task brief for Voice AI calls) with the user.
 
 `--hosted` places a call Inkbox Voice AI drives end to end
 — no WebSocket, no code. It requires `--reason` (the agent's task brief)
@@ -566,7 +566,7 @@ any of:
   plus `data.outcome` (`completed` | `no_answer` | `declined` |
   `failed`; `null` iff the call was client-driven) and
   `data.post_call_action_items` (open items only, `seq`-ascending).
-  Hosted calls fire `call.ended` on every terminal state, not just
+  Voice AI calls fire `call.ended` on every terminal state, not just
   connected calls. One subscription carries a single channel, so an
   identity sub cannot mix `imessage.*` with `call.ended`.
 - **Inbound call** (flat, no envelope; response controls call routing).
