@@ -77,7 +77,7 @@ export enum CallOrigin {
  *
  * - `client_websocket` (default) — audio bridges to the caller's own
  *   WebSocket server.
- * - `hosted_agent` — the platform-hosted call agent drives the call; no
+ * - `hosted_agent` — Inkbox Voice AI drives the call; no
  *   socket, no code, configured per identity via {@link HostedAgentConfig}.
  */
 export enum CallMode {
@@ -88,7 +88,7 @@ export enum CallMode {
 /**
  * What happens when a call comes in for an agent identity.
  *
- * `hosted_agent` answers with the platform-hosted call agent and is the
+ * `hosted_agent` answers with Inkbox Voice AI and is the
  * only action that requires neither a WebSocket nor a webhook URL.
  */
 export enum IncomingCallAction {
@@ -252,7 +252,7 @@ export interface PhoneCall {
   /** Outbound hosted-call brief; `null` on inbound and client-driven calls. */
   reason: string | null;
   /**
-   * Open action items the hosted call agent recorded, `seq`-ascending.
+   * Open action items Inkbox Voice AI recorded, `seq`-ascending.
    * Empty for client_websocket calls and hosted calls with no open items.
    */
   postCallActionItems: PostCallActionItem[];
@@ -299,7 +299,7 @@ export interface IncomingCallActionConfig {
 }
 
 /**
- * Per-identity hosted call agent configuration.
+ * Per-identity Inkbox Voice AI configuration.
  *
  * `voice` / `model` / `instructions` are all nullable — `null` means the
  * server default applies for that field.
@@ -312,7 +312,7 @@ export interface HostedAgentConfig {
 }
 
 /**
- * An action item the hosted call agent recorded during a call.
+ * An action item Inkbox Voice AI recorded during a call.
  *
  * Surfaced inline on the call resource via `PhoneCall.postCallActionItems`
  * (open items only, `seq`-ascending). Mirrors the rows on the

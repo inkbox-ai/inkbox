@@ -171,7 +171,7 @@ impl CallsResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Place an outbound call driven by the platform-hosted call agent.
+    /// Place an outbound call driven by Inkbox Voice AI.
     ///
     /// Sibling of [`CallsResource::place`] (which stays client-driven);
     /// sends `mode=hosted_agent` plus the required `reason` brief and no
@@ -184,7 +184,7 @@ impl CallsResource {
     /// * `origination` - Where the call originates.
     /// * `from_number` - E.164 number to call from (dedicated origination).
     /// * `agent_identity_id` - UUID of the placing identity (shared origination).
-    /// * `reason` - The hosted agent's task brief for the call — what to
+    /// * `reason` - Voice AI's task brief for the call — what to
     ///   accomplish.
     ///
     /// # Returns

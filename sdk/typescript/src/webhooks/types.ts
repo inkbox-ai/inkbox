@@ -650,7 +650,7 @@ export interface WebhookCallTranscript {
 }
 
 /**
- * One open action item the hosted call agent recorded during the call.
+ * One open action item Inkbox Voice AI recorded during the call.
  *
  * Rides `call.ended` in `seq` order, mirroring the inline
  * `PhoneCall.postCallActionItems`. Canceled items are omitted, so `status`
@@ -690,7 +690,7 @@ export interface CallEndedWebhookData {
    */
   outcome?: CallOutcomeWire | null;
   /**
-   * The hosted agent's recorded todo list, `seq`-ascending. Always present
+   * Voice AI's recorded todo list, `seq`-ascending. Always present
    * on new payloads (empty for non-hosted calls / no todos); optional only
    * so payloads predating hosted calls still parse.
    */

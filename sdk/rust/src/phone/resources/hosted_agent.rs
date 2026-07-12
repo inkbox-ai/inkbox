@@ -1,4 +1,4 @@
-//! Identity-scoped hosted call agent config (get_config / set_config).
+//! Identity-scoped Inkbox Voice AI config (get_config / set_config).
 
 use std::sync::Arc;
 
@@ -17,7 +17,7 @@ impl HostedAgentConfigResource {
         Self { http }
     }
 
-    /// Get the hosted call agent config.
+    /// Get the Inkbox Voice AI config.
     ///
     /// Agent-scoped keys resolve their own identity; admin/JWT callers must
     /// pass `agent_identity_id` (the server returns 422 otherwise).
@@ -35,7 +35,7 @@ impl HostedAgentConfigResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Set the hosted call agent config.
+    /// Set the Inkbox Voice AI config.
     ///
     /// Full-replace PUT: every call sets all three fields, and a field left
     /// `None` resets to the server default — there is no partial update.

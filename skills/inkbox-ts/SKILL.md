@@ -210,7 +210,7 @@ const call = await identity.placeCall({
 console.log(call.status);
 console.log(call.rateLimit.callsRemaining);
 
-// Or let the platform-hosted call agent drive the call — no WebSocket,
+// Or let Inkbox Voice AI drive the call — no WebSocket,
 // no code. reason is the agent's task brief (required with
 // mode=hosted_agent, invalid otherwise; server 422).
 const hosted = await identity.placeCall({
@@ -223,7 +223,7 @@ console.log(hosted.mode, hosted.reason);
 // 503 (hosted_agent_unavailable / hosted_agent_at_capacity) surfaces verbatim.
 
 // List calls (offset pagination). Every call carries mode / reason plus
-// postCallActionItems — open items the hosted agent recorded
+// postCallActionItems — open items Voice AI recorded
 // (seq-ascending; empty for client_websocket calls)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
 for (const c of calls) {
@@ -244,14 +244,14 @@ for (const t of segments) {
 // calls surface the server's 409)
 const hungUp = await identity.hangupCall(calls[0].id);
 
-// Per-identity hosted call agent config: voice / model / instructions,
+// Per-identity Inkbox Voice AI config: voice / model / instructions,
 // all nullable (null means the server default). setHostedAgentConfig is
 // a FULL REPLACE — an omitted field resets to the server default.
 const cfg = await identity.getHostedAgentConfig();
 await identity.setHostedAgentConfig({ instructions: "Be brief and friendly." });
 
 // Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent.
-// hosted_agent is the only action needing no URL — the hosted agent answers.
+// hosted_agent is the only action needing no URL — Voice AI answers.
 await identity.setIncomingCallAction({
   incomingCallAction: IncomingCallAction.HOSTED_AGENT,
 });
@@ -702,7 +702,7 @@ await inkbox.phoneNumbers.update(num.id, {
   clientWebsocketUrl: "wss://...",
 });
 await inkbox.phoneNumbers.update(num.id, {
-  incomingCallAction: "hosted_agent",          // no URL — the hosted agent answers
+  incomingCallAction: "hosted_agent",          // no URL — Voice AI answers
 });
 
 const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", party: "remote", limit: 50 });

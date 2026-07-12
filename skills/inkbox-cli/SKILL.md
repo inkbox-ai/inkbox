@@ -252,12 +252,12 @@ inkbox phone hosted-agent set -i <handle> --voice <voice> --model <model> --inst
 
 Before placing a call, confirm the destination number and the websocket URL (or the `--reason` task brief for hosted calls) with the user.
 
-`--hosted` places a call the platform-hosted call agent drives end to end
+`--hosted` places a call Inkbox Voice AI drives end to end
 — no WebSocket, no code. It requires `--reason` (the agent's task brief)
 and conflicts with `--ws-url`; everything else is server policy surfaced
 as an API error (e.g. 503 `hosted_agent_unavailable` /
 `hosted_agent_at_capacity` where hosted calling isn't available). The
-call's `mode` / `reason` and the hosted agent's recorded
+call's `mode` / `reason` and Voice AI's recorded
 `post_call_action_items` (open items only, `seq`-ascending) ride the call
 object — read them with `--json` on `phone calls`; the default table
 does not show them.
@@ -265,7 +265,7 @@ does not show them.
 `inkbox phone incoming-action` gets or sets the identity's incoming-call
 action (`auto_accept` | `auto_reject` | `webhook` | `hosted_agent`, with
 `--ws-url` / `--webhook-url` where applicable). `hosted_agent` is the
-only action needing no URL — the hosted agent answers.
+only action needing no URL — Voice AI answers.
 
 `inkbox phone hosted-agent set` is a **full replace**: an omitted flag
 resets that field to the server default.

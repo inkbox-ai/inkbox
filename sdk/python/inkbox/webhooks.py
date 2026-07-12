@@ -668,7 +668,7 @@ class WebhookCallTranscript(TypedDict):
 
 class WebhookPostCallActionItemWire(TypedDict):
     """
-    One open action item the hosted call agent recorded during the call.
+    One open action item Inkbox Voice AI recorded during the call.
 
     Rides ``call.ended`` in ``seq`` order, mirroring the inline
     ``PhoneCall.post_call_action_items``. Canceled items are withdrawn, so

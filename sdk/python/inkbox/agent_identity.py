@@ -667,7 +667,7 @@ class AgentIdentity:
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.
                 See :class:`CallMode`.
-            reason: The hosted agent's task brief for the call. Required
+            reason: Voice AI's task brief for the call. Required
                 with ``mode=hosted_agent``, invalid otherwise (server 422).
         """
         is_dedicated = (
@@ -748,7 +748,7 @@ class AgentIdentity:
         return self._inkbox._calls.hangup(call_id)
 
     def get_hosted_agent_config(self) -> HostedAgentConfig:
-        """Get this identity's hosted call agent config."""
+        """Get this identity's Inkbox Voice AI config."""
         return self._inkbox._hosted_agent.get_config(agent_identity_id=self.id)
 
     def set_hosted_agent_config(
@@ -758,7 +758,7 @@ class AgentIdentity:
         model: str | None = None,
         instructions: str | None = None,
     ) -> HostedAgentConfig:
-        """Set this identity's hosted call agent config (full replace).
+        """Set this identity's Inkbox Voice AI config (full replace).
 
         A field left at ``None`` resets to the server default.
 

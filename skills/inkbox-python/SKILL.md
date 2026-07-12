@@ -206,7 +206,7 @@ call = identity.place_call(
 print(call.status)
 print(call.rate_limit.calls_remaining)
 
-# Or let the platform-hosted call agent drive the call — no WebSocket,
+# Or let Inkbox Voice AI drive the call — no WebSocket,
 # no code. reason is the agent's task brief (required with
 # mode="hosted_agent", invalid otherwise; server 422).
 call = identity.place_call(
@@ -219,7 +219,7 @@ print(call.mode, call.reason)
 # 503 (hosted_agent_unavailable / hosted_agent_at_capacity) surfaces verbatim.
 
 # List calls (offset pagination). Every call carries mode / reason plus
-# post_call_action_items — open items the hosted agent recorded
+# post_call_action_items — open items Voice AI recorded
 # (seq-ascending; empty for client_websocket calls)
 calls = identity.list_calls(limit=10, offset=0)
 for c in calls:
@@ -236,14 +236,14 @@ for t in identity.list_transcripts(calls[0].id):
 # calls surface the server's 409)
 call = identity.hangup_call(calls[0].id)
 
-# Per-identity hosted call agent config: voice / model / instructions,
+# Per-identity Inkbox Voice AI config: voice / model / instructions,
 # all nullable (None means the server default). set is a FULL REPLACE —
 # an omitted field resets to the server default.
 cfg = identity.get_hosted_agent_config()
 cfg = identity.set_hosted_agent_config(instructions="Be brief and friendly.")
 
 # Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent.
-# hosted_agent is the only action needing no URL — the hosted agent answers.
+# hosted_agent is the only action needing no URL — Voice AI answers.
 identity.set_incoming_call_action(incoming_call_action="hosted_agent")
 print(identity.get_incoming_call_action().incoming_call_action)
 ```
@@ -676,7 +676,7 @@ inkbox.phone_numbers.update(
 )
 inkbox.phone_numbers.update(
     number.id,
-    incoming_call_action="hosted_agent",       # no URL — the hosted agent answers
+    incoming_call_action="hosted_agent",       # no URL — Voice AI answers
 )
 
 hits = inkbox.phone_numbers.search_transcripts(number.id, q="refund", party="remote", limit=50)

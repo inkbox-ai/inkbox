@@ -1,7 +1,7 @@
 """
 inkbox/phone/resources/hosted_agent.py
 
-Per-identity hosted call agent config: get_config, set_config.
+Per-identity Inkbox Voice AI config: get_config, set_config.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ class HostedAgentConfigResource:
         *,
         agent_identity_id: UUID | str | None = None,
     ) -> HostedAgentConfig:
-        """Get the hosted call agent config for an identity.
+        """Get the Inkbox Voice AI config for an identity.
 
         ``agent_identity_id`` is optional — an agent-scoped key resolves
         its own identity; under admin/JWT the server 422s if it's omitted.
@@ -48,7 +48,7 @@ class HostedAgentConfigResource:
         instructions: str | None = None,
         agent_identity_id: UUID | str | None = None,
     ) -> HostedAgentConfig:
-        """Set the hosted call agent config for an identity.
+        """Set the Inkbox Voice AI config for an identity.
 
         Full-replace PUT: every call sets all three fields, and a field
         left at ``None`` resets to the server default — there is no
@@ -57,8 +57,8 @@ class HostedAgentConfigResource:
         Args:
             voice: Voice override, or ``None`` for the server default.
             model: Model override, or ``None`` for the server default.
-            instructions: Per-identity steering prompt appended to the
-                hosted agent's system prompt, or ``None`` for none.
+            instructions: Per-identity steering prompt appended to
+                Voice AI's system prompt, or ``None`` for none.
             agent_identity_id: UUID of the agent identity, or ``None`` for
                 an agent-scoped key.
         """

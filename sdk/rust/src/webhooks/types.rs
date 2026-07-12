@@ -838,7 +838,7 @@ fn default_webhook_call_mode() -> String {
     "client_websocket".to_string()
 }
 
-/// One open action item the hosted call agent recorded during the call.
+/// One open action item Inkbox Voice AI recorded during the call.
 ///
 /// Rides `call.ended` in `seq` order, mirroring the call resource's inline
 /// `post_call_action_items`. Only open items are surfaced, so `status` here is

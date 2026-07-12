@@ -523,7 +523,7 @@ export class AgentIdentity {
    *   `dedicated_number`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
-   * @param options.reason - The hosted agent's task brief for the call.
+   * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise (server 422).
    */
   async placeCall(options: {
@@ -594,13 +594,13 @@ export class AgentIdentity {
     return this._inkbox._calls.hangup(callId);
   }
 
-  /** Get this identity's hosted call agent config. */
+  /** Get this identity's Inkbox Voice AI config. */
   async getHostedAgentConfig(): Promise<HostedAgentConfig> {
     return this._inkbox._hostedAgent.getConfig({ agentIdentityId: this.id });
   }
 
   /**
-   * Set this identity's hosted call agent config (full replace).
+   * Set this identity's Inkbox Voice AI config (full replace).
    *
    * A field left undefined resets to the server default.
    *
