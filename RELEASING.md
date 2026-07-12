@@ -15,7 +15,7 @@ Each package has its own `publish.sh`: **dry run by default**, `--prod` to publi
 
 | File | Field |
 |---|---|
-| `sdk/python/pyproject.toml` | `version` |
+| `sdk/python/pyproject.toml` (+ `uv.lock` self-entry — run `uv lock`) | `version` |
 | `sdk/typescript/package.json` (+ `package-lock.json` self-version) | `version` |
 | `sdk/typescript/src/version.ts` | `VERSION` (User-Agent constant; unit-tested against package.json) |
 | `cli/package.json` (+ `package-lock.json`) | `version` **and** the `@inkbox/sdk` dependency → `^<new version>` |
