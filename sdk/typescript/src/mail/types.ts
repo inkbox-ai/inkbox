@@ -118,6 +118,12 @@ export interface FilterModeChangeNotice {
 /**
  * An Inkbox mailbox (an email address owned by your organization).
  *
+ * **Storage.** `storageUsedBytes` is what the mailbox currently holds;
+ * `storageLimitBytes` is the plan's cap (binary — 2 GiB is `2 * 1024 ** 3`),
+ * or `null` when the server didn't resolve it. Sends over the cap are
+ * rejected with {@link StorageLimitExceededError}; deleting messages or
+ * threads frees space immediately.
+ *
  * To deliver `message.*` events to an HTTPS endpoint, create a row on
  * the channel-agnostic subscription resource at
  * `inkbox.webhooks.subscriptions.create({ mailboxId, url, eventTypes })`.
@@ -144,6 +150,10 @@ export interface Mailbox {
   createdAt: Date;
   updatedAt: Date;
   filterModeChangeNotice: FilterModeChangeNotice | null;
+  /** Bytes currently stored. `0` on servers predating storage caps. */
+  storageUsedBytes: number;
+  /** Plan cap in bytes (binary — divide by 1024, label GiB/MiB), or `null` if unresolved. */
+  storageLimitBytes: number | null;
 }
 
 export interface Message {
@@ -260,6 +270,8 @@ export interface RawMailbox {
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
   updated_at: string;
+  storage_used_bytes?: number;
+  storage_limit_bytes?: number | null;
 }
 
 export interface RawDomain {
@@ -367,6 +379,9 @@ export function parseMailbox(r: RawMailbox): Mailbox {
     filterModeChangeNotice: r.filter_mode_change_notice
       ? parseFilterModeChangeNotice(r.filter_mode_change_notice)
       : null,
+    // Both absent on servers predating storage caps -> 0 / null.
+    storageUsedBytes: r.storage_used_bytes ?? 0,
+    storageLimitBytes: r.storage_limit_bytes ?? null,
   };
 }
 

@@ -416,6 +416,15 @@ class AgentIdentity:
                 requires ``body_html`` and an ``image/*`` ``content_type``.
             track_opens: Embed an open-tracking pixel when ``body_html`` is
                 present; opens surface as ``first_opened_at``/``open_count``.
+
+        Raises:
+            StorageLimitExceededError: 402 — the mailbox is at its plan's
+                storage cap. Delete messages/threads to free space (reclaim is
+                immediate), or upgrade the plan.
+
+        Note:
+            On the **Free plan** a footer is appended to the *stored* body, so
+            the body read back from the API is not byte-for-byte what you sent.
         """
         self._require_mailbox()
         return self._inkbox._messages.send(
@@ -453,6 +462,10 @@ class AgentIdentity:
                 to render an entry inline in the HTML body (``cid:<content_id>``);
                 requires ``body_html`` and an ``image/*`` ``content_type``.
             reply_to: Optional Reply-To address.
+
+        Raises:
+            StorageLimitExceededError: 402 — the mailbox is at its plan's
+                storage cap (see :meth:`send_email`).
         """
         self._require_mailbox()
         return self._inkbox._messages.reply_all(
@@ -506,6 +519,10 @@ class AgentIdentity:
             track_opens: Embed an open-tracking pixel (requires an HTML part
                 on the forward); opens surface as
                 ``first_opened_at``/``open_count``.
+
+        Raises:
+            StorageLimitExceededError: 402 — the mailbox is at its plan's
+                storage cap (see :meth:`send_email`).
         """
         self._require_mailbox()
         return self._inkbox._messages.forward(

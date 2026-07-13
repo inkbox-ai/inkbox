@@ -8,6 +8,7 @@ import {
   InkboxVaultKeyError,
   RecipientBlockedError,
   RedundantContactAccessGrantError,
+  StorageLimitExceededError,
 } from "../src/_http.js";
 
 const BASE = "https://inkbox.ai/api/v1";
@@ -192,6 +193,87 @@ describe("HttpTransport 409 routing", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(InkboxAPIError);
       expect(err).not.toBeInstanceOf(RecipientBlockedError);
+    }
+  });
+
+  it("routes storage_limit_exceeded 402 to StorageLimitExceededError", async () => {
+    const upgradeUrl = "https://inkbox.ai/console/organizations?tab=billing";
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(402, {
+        detail: {
+          error: "storage_limit_exceeded",
+          message:
+            "This inbox has reached its storage limit of 2 GiB. Delete messages "
+            + `to free space, or upgrade your plan for more: ${upgradeUrl}`,
+          upgrade_url: upgradeUrl,
+          limit_bytes: 2_147_483_648,
+        },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/mailboxes/agent01@inkbox.ai/messages");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(StorageLimitExceededError);
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      const e = err as StorageLimitExceededError;
+      expect(e.statusCode).toBe(402);
+      expect(e.limitBytes).toBe(2_147_483_648);
+      expect(e.upgradeUrl).toBe(upgradeUrl);
+      expect(e.message).toContain("storage limit");
+      expect(e.detailMessage).toBe(e.message);
+      expect(typeof e.detail).toBe("object");
+    }
+  });
+
+  it("plain-string 402 stays on InkboxAPIError (old server)", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(402, { detail: "This inbox has reached its storage limit." }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/mailboxes/agent01@inkbox.ai/messages");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      expect(err).not.toBeInstanceOf(StorageLimitExceededError);
+      expect((err as InkboxAPIError).statusCode).toBe(402);
+      expect((err as InkboxAPIError).detail).toBe("This inbox has reached its storage limit.");
+    }
+  });
+
+  it("unrelated 402 (sibling plan limit) stays on InkboxAPIError", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(402, {
+        detail: "You've reached your plan's limit of 3 identities.",
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/identities");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      expect(err).not.toBeInstanceOf(StorageLimitExceededError);
+    }
+  });
+
+  it("storage_limit_exceeded without limit_bytes has null limitBytes", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(402, {
+        detail: { error: "storage_limit_exceeded", message: "over cap" },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.post("/mailboxes/agent01@inkbox.ai/messages");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(StorageLimitExceededError);
+      const e = err as StorageLimitExceededError;
+      expect(e.limitBytes).toBeNull();
+      expect(e.upgradeUrl).toBe("");
     }
   });
 

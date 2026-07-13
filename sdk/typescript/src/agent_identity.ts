@@ -336,6 +336,13 @@ export class AgentIdentity {
    * @param options.bcc - Blind carbon-copy recipients.
    * @param options.inReplyToMessageId - RFC 5322 Message-ID to thread a reply.
    * @param options.attachments - File attachments.
+   *
+   * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
+   *   plan's storage cap. Delete messages/threads to free space (reclaim is
+   *   immediate), or upgrade the plan.
+   *
+   * On the **Free plan** a footer is appended to the *stored* body, so the
+   * body read back from the API is not byte-for-byte what you sent.
    */
   async sendEmail(options: {
     to: string[];
@@ -363,6 +370,9 @@ export class AgentIdentity {
    * @param options.bodyHtml - HTML reply body.
    * @param options.attachments - File attachments.
    * @param options.replyTo - Optional Reply-To address.
+   *
+   * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
+   *   plan's storage cap (see {@link AgentIdentity.sendEmail}).
    */
   async replyAllEmail(
     messageId: string,
@@ -403,6 +413,9 @@ export class AgentIdentity {
    *   `true` (default), original attachments are re-attached. Ignored in
    *   `wrapped` mode.
    * @param options.replyTo - Optional Reply-To address.
+   *
+   * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
+   *   plan's storage cap (see {@link AgentIdentity.sendEmail}).
    */
   async forwardEmail(
     messageId: string,

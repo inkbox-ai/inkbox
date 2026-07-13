@@ -7,6 +7,8 @@ MAILBOX_DICT = {
     "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:00:00Z",
+    "storage_used_bytes": 1_288_490_188,
+    "storage_limit_bytes": 2_147_483_648,  # 2 GiB (binary)
 }
 
 DOMAIN_VERIFIED_DICT = {

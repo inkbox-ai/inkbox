@@ -278,6 +278,44 @@ This server-side `is_read` (the agent consumed the message via the API)
 is distinct from `first_opened_at` (the recipient's mail client loaded
 the tracking pixel).
 
+### Mailbox storage
+
+Every mailbox has a plan storage cap. Sends, reply-alls, and forwards that
+would push it over the cap are rejected with a `402` —
+`StorageLimitExceededError`:
+
+```python
+from inkbox import StorageLimitExceededError
+
+try:
+    identity.send_email(to=["user@example.com"], subject="Hi", body_text="…")
+except StorageLimitExceededError as err:
+    print(err.message)                      # human-readable, includes the limit
+    print(err.limit_bytes, err.upgrade_url) # e.g. 2147483648, https://…?tab=billing
+    # Free space (reclaim is immediate) or upgrade the plan:
+    inkbox.messages.delete(mailbox.email_address, "message-uuid")
+    inkbox.threads.delete(mailbox.email_address, "thread-uuid")
+```
+
+Current usage lives on the mailbox (`inkbox.mailboxes.list()` / `.get()`):
+
+```python
+mailbox = inkbox.mailboxes.get("abc-xyz@inkboxmail.com")
+print(mailbox.storage_used_bytes)   # e.g. 1288490188
+print(mailbox.storage_limit_bytes)  # e.g. 2147483648 (2 GiB), or None if unresolved
+
+used_gib = mailbox.storage_used_bytes / 1024**3   # caps are binary — GiB, not GB
+```
+
+The caps are **binary**: 2 GiB is `2 * 1024**3` = 2,147,483,648 bytes. Divide by
+1024 and label the result GiB/MiB.
+
+> **Free plan:** a footer is appended to the **stored** body of outgoing mail,
+> so what you read back with `inkbox.messages.get(...)` is not byte-for-byte
+> what you sent — a `sent_body == fetched_body` round-trip assertion will fail
+> on Free plans (a send with no body comes back with the footer as its body).
+> Paid plans are unaffected.
+
 ---
 
 ## Phone
@@ -731,6 +769,8 @@ mailbox = inkbox.mailboxes.get("abc-xyz@inkboxmail.com")
 print(mailbox.email_address)
 print(mailbox.sending_domain)        # bare domain the mailbox sends from
 print(mailbox.agent_identity_id)     # non-null for live customer mailboxes (1:1 invariant)
+print(mailbox.storage_used_bytes)    # bytes currently stored
+print(mailbox.storage_limit_bytes)   # plan cap in bytes (binary GiB), or None
 
 # Filter mode now lives on the agent identity — set it via
 # identity.update(mail_filter_mode=...). display_name likewise moved to
@@ -770,6 +810,45 @@ new_default = inkbox.domains.set_default("mail.acme.com")
 # Pass the platform domain (e.g. "inkboxmail.com" in prod) to revert.
 inkbox.domains.set_default("inkboxmail.com")  # -> None
 ```
+
+---
+
+## Mail clients (IMAP/SMTP)
+
+An Inkbox inbox can also be attached to a regular mail client (Thunderbird,
+Apple Mail, mutt, …) with the API key you already have. There is no separate
+credential to create and no SDK call involved — the gateway speaks IMAP and
+SMTP directly.
+
+| Setting | Value |
+|---|---|
+| IMAP host | `imap.inkboxmail.com` |
+| IMAP port | `993` (IMAPS / implicit TLS) |
+| SMTP host | `smtp.inkboxmail.com` |
+| SMTP port | `465` (SMTPS / implicit TLS) or `587` (STARTTLS) |
+| Username | the inbox address (e.g. `sales-bot@inkboxmail.com`) |
+| Password | an **identity-scoped** API key (`ApiKey_...`) |
+
+The password is an agent-scoped API key — the same key an identity-scoped
+`Inkbox(...)` client authenticates with. Mint one with
+`inkbox.api_keys.create(scoped_identity_id=...)`. Admin-scoped keys are
+rejected: one key maps to exactly one mailbox. Revoking the key revokes
+mail-client access.
+
+Two constraints that bite in practice:
+
+- **`From` must be the authenticated inbox address**, and exactly one address.
+  Aliases and "send as" identities are rejected.
+- **On the Free plan, signed/encrypted mail (S/MIME, PGP) cannot be sent over
+  SMTP.** The required footer can't be injected without breaking the signature,
+  so the send is refused. Send unsigned, or upgrade the plan.
+
+If your client saves its own copy of sent messages, leave that setting on:
+Inkbox recognizes the copy as the message it already stored, so you get one
+Sent entry, charged against your storage cap once.
+
+Full setup walkthrough:
+<https://inkbox.ai/docs/capabilities/email/mail-clients>
 
 ---
 

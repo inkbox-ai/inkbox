@@ -167,6 +167,15 @@ impl MessagesResource {
     ///
     /// # Returns
     /// The sent message metadata.
+    ///
+    /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
+    /// (HTTP 402) when the mailbox has reached its plan's storage cap. Free
+    /// space with [`delete`](Self::delete) or `threads().delete()`, or upgrade
+    /// the plan at the error's `upgrade_url`.
+    ///
+    /// On the Free plan a footer is appended to the *stored* body, so what
+    /// [`get`](Self::get) reads back is not byte-for-byte what you sent (a send
+    /// with no body comes back with the footer as its body).
     #[allow(clippy::too_many_arguments)]
     pub fn send(
         &self,
@@ -243,6 +252,11 @@ impl MessagesResource {
     ///
     /// # Returns
     /// The sent reply's message metadata.
+    ///
+    /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
+    /// (HTTP 402) when the mailbox has reached its plan's storage cap, and — on
+    /// the Free plan — appends a footer to the stored body. See
+    /// [`send`](Self::send).
     #[allow(clippy::too_many_arguments)]
     pub fn reply_all(
         &self,
@@ -307,6 +321,11 @@ impl MessagesResource {
     ///
     /// # Returns
     /// The newly forwarded message metadata.
+    ///
+    /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
+    /// (HTTP 402) when the mailbox has reached its plan's storage cap, and — on
+    /// the Free plan — appends a footer to the stored body. See
+    /// [`send`](Self::send).
     #[allow(clippy::too_many_arguments)]
     pub fn forward(
         &self,
@@ -467,7 +486,207 @@ fn d_str(d: MessageDirection) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    use httpmock::prelude::*;
+    use serde_json::json;
+
     use super::Attachment;
+    use crate::client::Inkbox;
+    use crate::error::{ApiErrorDetail, InkboxError};
+    use crate::mail::types::ForwardMode;
+
+    const MAILBOX: &str = "agent-x@inkboxmail.com";
+    const MSG_ID: &str = "44444444-4444-4444-4444-444444444444";
+
+    fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
+        Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap()
+    }
+
+    /// The structured 402 the server emits once a mailbox is at its cap.
+    fn storage_limit_402() -> serde_json::Value {
+        json!({
+            "detail": {
+                "error": "storage_limit_exceeded",
+                "message": "This inbox has reached its storage limit of 2 GiB. \
+                            Delete messages to free space, or upgrade your plan \
+                            for more: https://inkbox.ai/console/billing",
+                "upgrade_url": "https://inkbox.ai/console/billing",
+                "limit_bytes": 2147483648u64
+            }
+        })
+    }
+
+    fn assert_storage_limit(err: InkboxError) {
+        match err {
+            InkboxError::StorageLimitExceeded {
+                status_code,
+                message,
+                upgrade_url,
+                limit_bytes,
+                ..
+            } => {
+                assert_eq!(status_code, 402);
+                assert!(message.contains("storage limit"));
+                assert_eq!(upgrade_url, "https://inkbox.ai/console/billing");
+                assert_eq!(limit_bytes, Some(2 * 1024 * 1024 * 1024));
+            }
+            other => panic!("expected InkboxError::StorageLimitExceeded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn send_402_maps_to_storage_limit_exceeded() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/messages"));
+            then.status(402).json_body(storage_limit_402());
+        });
+        let err = client(&server)
+            .messages()
+            .send(
+                MAILBOX,
+                &["dest@example.com".to_string()],
+                "hi",
+                Some("body"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+            )
+            .unwrap_err();
+        mock.assert();
+        assert_storage_limit(err);
+    }
+
+    #[test]
+    fn reply_all_402_maps_to_storage_limit_exceeded() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST).path(format!(
+                "/api/v1/mail/mailboxes/{MAILBOX}/messages/{MSG_ID}/reply-all"
+            ));
+            then.status(402).json_body(storage_limit_402());
+        });
+        let err = client(&server)
+            .messages()
+            .reply_all(MAILBOX, MSG_ID, None, Some("body"), None, None, None)
+            .unwrap_err();
+        mock.assert();
+        assert_storage_limit(err);
+    }
+
+    #[test]
+    fn forward_402_maps_to_storage_limit_exceeded() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST).path(format!(
+                "/api/v1/mail/mailboxes/{MAILBOX}/messages/{MSG_ID}/forward"
+            ));
+            then.status(402).json_body(storage_limit_402());
+        });
+        let err = client(&server)
+            .messages()
+            .forward(
+                MAILBOX,
+                MSG_ID,
+                Some(&["dest@example.com".to_string()]),
+                None,
+                None,
+                ForwardMode::Inline,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+                false,
+            )
+            .unwrap_err();
+        mock.assert();
+        assert_storage_limit(err);
+    }
+
+    #[test]
+    fn storage_limit_402_preserves_an_unavailable_limit_as_none() {
+        for detail in [
+            json!({
+                "error": "storage_limit_exceeded",
+                "message": "Storage limit reached",
+                "upgrade_url": "https://inkbox.ai/console/billing"
+            }),
+            json!({
+                "error": "storage_limit_exceeded",
+                "message": "Storage limit reached",
+                "upgrade_url": "https://inkbox.ai/console/billing",
+                "limit_bytes": "unknown"
+            }),
+        ] {
+            let server = MockServer::start();
+            let mock = server.mock(|when, then| {
+                when.method(POST).path(format!(
+                    "/api/v1/mail/mailboxes/{MAILBOX}/messages/{MSG_ID}/reply-all"
+                ));
+                then.status(402).json_body(json!({ "detail": detail }));
+            });
+            let err = client(&server)
+                .messages()
+                .reply_all(MAILBOX, MSG_ID, None, Some("body"), None, None, None)
+                .unwrap_err();
+            mock.assert();
+            match err {
+                InkboxError::StorageLimitExceeded { limit_bytes, .. } => {
+                    assert_eq!(limit_bytes, None);
+                }
+                other => panic!("expected InkboxError::StorageLimitExceeded, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn send_402_with_string_detail_falls_back_to_api_error() {
+        // Old server: plain-string detail, no discriminator. Must degrade to the
+        // generic Api variant rather than fail to parse.
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/messages"));
+            then.status(402)
+                .json_body(json!({"detail": "This inbox has reached its storage limit of 2 GiB."}));
+        });
+        let err = client(&server)
+            .messages()
+            .send(
+                MAILBOX,
+                &["dest@example.com".to_string()],
+                "hi",
+                Some("body"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+            )
+            .unwrap_err();
+        match err {
+            InkboxError::Api {
+                status_code,
+                detail,
+            } => {
+                assert_eq!(status_code, 402);
+                match detail {
+                    ApiErrorDetail::Message(m) => assert!(m.contains("storage limit")),
+                    other => panic!("expected message detail, got {other:?}"),
+                }
+            }
+            other => panic!("expected InkboxError::Api, got {other:?}"),
+        }
+    }
 
     #[test]
     fn content_id_omitted_when_none() {

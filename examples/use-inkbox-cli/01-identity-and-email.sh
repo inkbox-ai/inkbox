@@ -52,4 +52,20 @@ if [ "$MSG_ID" != "null" ] && [ -n "$MSG_ID" ]; then
   echo "   Marked $MSG_ID as read."
 fi
 
+echo ""
+echo "=> Mailbox storage headroom"
+# `mailbox list` has a humanized `storage` column (used / cap, binary GiB).
+# Sends past the cap fail with HTTP 402 — free space with `inkbox email delete
+# <message-id> -i <handle>` / `inkbox email delete-thread <thread-id> -i
+# <handle>`, or upgrade the plan.
+inkbox mailbox list
+
+# The same inbox can be attached to a regular mail client (Thunderbird, Apple
+# Mail, mutt, ...) — no new credential: username = the inbox address, password =
+# an identity-scoped API key. Print the IMAP/SMTP settings with:
+#   inkbox mailbox client-settings "${HANDLE}@inkboxmail.com"
+# The hosts are derived from the configured API base URL. If that URL isn't a
+# recognized Inkbox API host, the command errors out rather than guess.
+# https://inkbox.ai/docs/capabilities/email/mail-clients
+
 # cleanup runs via trap

@@ -4,6 +4,26 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.24 — Mailbox storage caps + mail clients (IMAP/SMTP)
+
+### Added
+
+- **Mailbox storage on the mailbox resource.** `Mailbox` gains `storage_used_bytes` (TS `storageUsedBytes`; Rust `storage_used_bytes: u64`) — the bytes the mailbox currently holds — and `storage_limit_bytes` (TS `storageLimitBytes`; Rust `Option<u64>`) — the resolved plan cap, or `null`/`None` when the server didn't resolve one. Populated by `mailboxes.list()` / `.get()` / `.update()` in all three SDKs. Caps are **binary**: the Free plan's 2 GiB is `2 * 1024³` = 2,147,483,648 bytes — divide by 1024 and label the result GiB/MiB, never GB. Nothing is added to `IdentityMailbox`, `Message`, or `MessageDetail`.
+- **`StorageLimitExceededError`** (Rust: `InkboxError::StorageLimitExceeded`). New typed error for the `402` returned when an outbound send would push a mailbox past its plan's storage cap. **All three send paths are enforced**: `messages.send`, `messages.reply_all` (TS `replyAll`), and `messages.forward` — plus the identity delegators (`identity.send_email` / `reply_all_email` / `forward_email`). It carries `message` (the server's human-readable sentence, including the limit), `upgrade_url` (TS `upgradeUrl`) and optional `limit_bytes` (TS `limitBytes`). Deleting messages (`messages.delete`) or whole threads (`threads.delete`) frees space immediately — there is no separate reclaim call. The SDKs branch on the structured discriminator (`402` + `detail.error == "storage_limit_exceeded"`), never on the message text.
+- **CLI storage visibility.** `inkbox mailbox list` gains a humanized `storage` column (`1.2 GiB / 2 GiB`; `-` when the server resolved no cap) and `inkbox mailbox get` gains `storageUsedBytes` / `storageLimitBytes`. `--json` keeps the raw byte counts; only the table humanizes them, in binary units. An over-cap send now prints the server's message plus a hint — free space with `inkbox email delete <message-id> -i <handle>` / `inkbox email delete-thread <thread-id> -i <handle>`, or upgrade at the printed billing URL — instead of a bare `HTTP 402`.
+- **Mail clients (IMAP/SMTP).** An Inkbox inbox can be attached to a regular mail client (Thunderbird, Apple Mail, mutt, …) with the API key you already have: **username = the inbox address, password = an identity-scoped API key** (admin-scoped keys are rejected — one key maps to exactly one mailbox; revoking the key revokes mail-client access). Documented in the Python/TypeScript SDK READMEs, the CLI README, and the `skills/` references, along with the two constraints that actually bite: the message `From` must be the authenticated inbox address (exactly one; aliases and "send as" are rejected), and the Free plan refuses signed/encrypted mail (S/MIME, PGP) over SMTP because the required footer cannot be injected without breaking the signature. If your client saves its own copy of sent messages, leave that on — Inkbox recognizes the copy as the message it already stored, so you get one Sent entry, charged once. There are **no new HTTP endpoints and no new SDK surface** here: the gateway speaks IMAP and SMTP, not HTTP. New CLI command `inkbox mailbox client-settings <email-address>` prints the settings table (it never prints a password).
+
+### Changed
+
+- Version bumped to 0.4.24 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+
+### Notes
+
+- **Free plan: the stored body is not the body you sent.** The Free-tier footer is appended to the **stored** body of outgoing mail, so what `messages.get(...)` returns is not byte-for-byte what you passed to `send` / `reply_all` / `forward` (a send with no body comes back with the footer as its body). Round-trip code asserting `sent_body == fetched_body` will fail on Free plans; the footer does not appear in the message snippet or in search text. Paid plans are unaffected.
+- **Rust note (source-breaking).** `inkbox::mail::types::Mailbox` gains two public fields, so struct-literal construction no longer compiles until they are added; and `InkboxError` gains a `StorageLimitExceeded` variant, so a downstream exhaustive `match` without a wildcard arm needs a new arm. Both are source-breaking, not wire-breaking — the same convention as 0.4.22's `IncomingCallAction::HostedAgent` and 0.4.17's `Attachment.content_id`.
+- **TypeScript note (source-breaking).** The `Mailbox` interface gains **required** properties (`storageUsedBytes`, `storageLimitBytes`), so code constructing those object literals (fixtures, mocks) no longer compiles until the new properties are added — the same caveat 0.4.22 carried for `PhoneCall`. Parsing is unaffected: responses missing the fields default to `0` / `null`.
+- **Wire tolerance.** A response that omits the storage fields parses as `0` / `null`, and a `402` whose `detail` is a plain string surfaces as a plain `InkboxAPIError` (Rust: `InkboxError::Api`) rather than being mistyped.
+
 ## 0.4.23 — Inkbox Voice AI rebrand
 
 ### Changed
@@ -29,8 +49,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Notes
 
-- **Availability.** Hosted calling is rolled out progressively; where it isn't yet enabled for your environment, hosted place-call returns `503 hosted_agent_unavailable` and inbound `hosted_agent` handling declines the call.
-- **Rollout window.** Placing a hosted call against an older Inkbox API that predates hosted calling is accepted as a normal client-driven call (the unknown `mode` / `reason` fields are ignored) — check `mode` on the returned call if you need to be sure the hosted agent picked it up.
+- **Availability.** When no hosted agent can take the call, hosted place-call returns `503 hosted_agent_unavailable` and inbound `hosted_agent` handling declines the call. Handle the 503 — fall back to `client_websocket` when the call has to go through.
+- **Older API servers.** Placing a hosted call against an older Inkbox API that predates hosted calling is accepted as a normal client-driven call (the unknown `mode` / `reason` fields are ignored) — check `mode` on the returned call if you need to be sure the hosted agent picked it up.
 
 ## 0.4.20 — Date-range comms filters, call.ended webhook, external hangup, spam-filter status
 

@@ -5,7 +5,7 @@ import { Inkbox } from "@inkbox/sdk";
 import type { Command } from "commander";
 
 // Keep in sync with package.json "version".
-export const CLI_VERSION = "0.4.23";
+export const CLI_VERSION = "0.4.24";
 
 export interface GlobalOpts {
   apiKey?: string;
@@ -42,6 +42,13 @@ function readConfigFile(): Record<string, string> {
   } catch {
     return {};
   }
+}
+
+/** Same precedence as createClient: flag, then env, then ~/.inkbox/config. */
+export function resolveBaseUrl(opts: GlobalOpts): string | undefined {
+  return (
+    opts.baseUrl ?? process.env.INKBOX_BASE_URL ?? readConfigFile().base_url
+  );
 }
 
 export function createClient(opts: GlobalOpts): Inkbox {

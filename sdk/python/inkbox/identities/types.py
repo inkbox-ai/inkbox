@@ -136,6 +136,7 @@ class IdentityMailbox:
 
     ``sending_domain`` is the bare domain the mailbox sends from, derived
     from ``email_address``.
+
     """
 
     id: UUID

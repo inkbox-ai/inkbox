@@ -19,6 +19,7 @@ export {
   InkboxVaultKeyError,
   RecipientBlockedError,
   RedundantContactAccessGrantError,
+  StorageLimitExceededError,
 } from "./_http.js";
 export type { InkboxAPIErrorDetail } from "./_http.js";
 export type {

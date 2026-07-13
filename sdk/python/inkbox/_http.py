@@ -17,6 +17,7 @@ from inkbox.exceptions import (
     InkboxAPIError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
+    StorageLimitExceededError,
 )
 
 _DEFAULT_TIMEOUT = 30.0
@@ -230,6 +231,17 @@ def _raise_for_status(resp: httpx.Response) -> None:
         and raw_detail.get("error") == "recipient_blocked"
     ):
         raise RecipientBlockedError(
+            status_code=resp.status_code, detail=raw_detail,
+        )
+
+    # Older servers send a plain-string 402 detail; those fall through to the
+    # generic error rather than being mistyped.
+    if (
+        resp.status_code == 402
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "storage_limit_exceeded"
+    ):
+        raise StorageLimitExceededError(
             status_code=resp.status_code, detail=raw_detail,
         )
 

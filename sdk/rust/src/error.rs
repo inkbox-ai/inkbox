@@ -68,6 +68,24 @@ pub enum InkboxError {
         detail: Box<Value>,
     },
 
+    /// 402 when an outbound mail send would push the mailbox past its plan's
+    /// storage cap. Raised by `messages().send()`, `reply_all()`, and
+    /// `forward()`. Free space with `messages().delete()` /
+    /// `threads().delete()`, or upgrade the plan at `upgrade_url`.
+    #[error("HTTP {status_code}: storage limit exceeded ({message})")]
+    StorageLimitExceeded {
+        status_code: u16,
+        /// Human-readable explanation from the server.
+        message: String,
+        /// Billing page where the plan can be upgraded.
+        upgrade_url: String,
+        /// The mailbox's storage cap in binary bytes, when supplied by the server.
+        limit_bytes: Option<u64>,
+        /// Full structured detail from the server. Boxed to keep `InkboxError`
+        /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
+        detail: Box<Value>,
+    },
+
     /// A vault key did not meet requirements, or a vault crypto operation failed.
     /// Mirrors `InkboxVaultKeyError`.
     #[error("vault key error: {0}")]

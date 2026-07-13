@@ -91,3 +91,107 @@ impl MailboxesResource {
 
 /// Default search result limit, matching the Python `limit: int = 50`.
 pub const DEFAULT_SEARCH_LIMIT: i64 = 50;
+
+#[cfg(test)]
+mod tests {
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    use crate::client::Inkbox;
+    use crate::mail::types::FilterMode;
+
+    fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
+        Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap()
+    }
+
+    /// A mailbox payload from a storage-caps-aware server.
+    fn mailbox_json() -> serde_json::Value {
+        json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "email_address": "agent-x@inkboxmail.com",
+            "sending_domain": "inkboxmail.com",
+            "filter_mode": "blacklist",
+            "created_at": "2026-06-01T00:00:00+00:00",
+            "updated_at": "2026-06-01T00:00:00+00:00",
+            "agent_identity_id": "33333333-3333-3333-3333-333333333333",
+            "storage_used_bytes": 1288490188u64,
+            "storage_limit_bytes": 2147483648u64
+        })
+    }
+
+    #[test]
+    fn get_parses_storage_fields() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/mail/mailboxes/agent-x@inkboxmail.com");
+            then.status(200).json_body(mailbox_json());
+        });
+        let mailbox = client(&server)
+            .mailboxes()
+            .get("agent-x@inkboxmail.com")
+            .unwrap();
+        mock.assert();
+        assert_eq!(mailbox.storage_used_bytes, 1_288_490_188);
+        // Binary GiB: the Free cap is 2 * 1024^3.
+        assert_eq!(mailbox.storage_limit_bytes, Some(2 * 1024 * 1024 * 1024));
+    }
+
+    #[test]
+    fn list_parses_storage_fields() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/mail/mailboxes");
+            then.status(200).json_body(json!([mailbox_json()]));
+        });
+        let mailboxes = client(&server).mailboxes().list().unwrap();
+        mock.assert();
+        assert_eq!(mailboxes.len(), 1);
+        assert_eq!(mailboxes[0].storage_used_bytes, 1_288_490_188);
+        assert_eq!(mailboxes[0].storage_limit_bytes, Some(2_147_483_648));
+    }
+
+    #[test]
+    fn storage_fields_default_when_server_omits_them() {
+        // Old server (pre storage caps): neither field on the wire.
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/mail/mailboxes/agent-x@inkboxmail.com");
+            then.status(200).json_body(json!({
+                "id": "11111111-1111-1111-1111-111111111111",
+                "email_address": "agent-x@inkboxmail.com",
+                "created_at": "2026-06-01T00:00:00+00:00",
+                "updated_at": "2026-06-01T00:00:00+00:00"
+            }));
+        });
+        let mailbox = client(&server)
+            .mailboxes()
+            .get("agent-x@inkboxmail.com")
+            .unwrap();
+        assert_eq!(mailbox.storage_used_bytes, 0);
+        assert_eq!(mailbox.storage_limit_bytes, None);
+        // Existing back-compat defaults still hold.
+        assert_eq!(mailbox.sending_domain, "inkboxmail.com");
+        assert!(matches!(mailbox.filter_mode, FilterMode::Blacklist));
+    }
+
+    #[test]
+    fn update_parses_storage_fields() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH)
+                .path("/api/v1/mail/mailboxes/agent-x@inkboxmail.com");
+            then.status(200).json_body(mailbox_json());
+        });
+        let mailbox = client(&server)
+            .mailboxes()
+            .update("agent-x@inkboxmail.com", Some(FilterMode::Blacklist))
+            .unwrap();
+        mock.assert();
+        assert_eq!(mailbox.storage_limit_bytes, Some(2_147_483_648));
+    }
+}

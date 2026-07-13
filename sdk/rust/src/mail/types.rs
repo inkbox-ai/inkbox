@@ -230,6 +230,16 @@ pub struct Mailbox {
     pub agent_identity_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter_mode_change_notice: Option<FilterModeChangeNotice>,
+    /// Stored mail counted against the mailbox's cap. `0` on servers that
+    /// predate storage caps. Deleting messages/threads frees space immediately.
+    #[serde(default)]
+    pub storage_used_bytes: u64,
+    /// The plan's storage cap, or `None` when the server did not resolve one.
+    /// Binary bytes (Free is 2 GiB = 2_147_483_648): divide by 1024 and label
+    /// GiB/MiB when displaying. Exceeding it fails sends with
+    /// [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage_limit_bytes: Option<u64>,
 }
 
 fn default_filter_mode() -> FilterMode {

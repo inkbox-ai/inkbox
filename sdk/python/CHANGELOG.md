@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.24 — Mailbox storage caps, IMAP/SMTP
+
+### Added
+
+- **Mailbox storage fields.** `Mailbox` gains `storage_used_bytes` (bytes currently stored) and `storage_limit_bytes` (the plan cap, or `None` when the server didn't resolve it), populated by `mailboxes.list()` / `.get()` / `.update()`. Caps are **binary** — 2 GiB is `2 * 1024 ** 3` = 2,147,483,648 bytes; divide by 1024 and label GiB/MiB.
+- **`StorageLimitExceededError`.** New `InkboxAPIError` subclass raised on `402` with `detail["error"] == "storage_limit_exceeded"` — from `messages.send`, `messages.reply_all`, and `messages.forward` (and the `identity.send_email` / `reply_all_email` / `forward_email` delegators) when the send would push the mailbox past its cap. Exposes `message`, `upgrade_url`, and `limit_bytes`. Deleting messages (`messages.delete`) or threads (`threads.delete`) frees space immediately. A `402` whose `detail` is a plain string still surfaces as a plain `InkboxAPIError`.
+- **Mail clients (IMAP/SMTP).** README section covering the gateway settings (hosts/ports, username = the inbox address, password = an identity-scoped API key — revoking the key revokes mail-client access) and the constraints that bite: `From` must be the authenticated inbox address, and Free-plan sends of signed/encrypted mail over SMTP are refused. No SDK surface — the gateway speaks IMAP/SMTP, not HTTP.
+
+### Notes
+
+- **Free plan:** a footer is appended to the **stored** body of outgoing mail, so `messages.get(...)` does not return byte-for-byte what you sent — a `sent_body == fetched_body` round-trip assertion fails on Free plans. Documented on `send` / `reply_all` / `forward`.
+- A response that omits the storage fields parses as `0` / `None`, so both fields are always readable.
+
 ## 0.4.23 — Inkbox Voice AI rebrand
 
 ### Changed

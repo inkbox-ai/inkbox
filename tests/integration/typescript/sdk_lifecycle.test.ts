@@ -184,6 +184,25 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     )!;
     expect(forwardedInbound.direction).toBe("inbound");
 
+    // ── mailbox storage ───────────────────────────────────────
+    // Both fields are present and numeric on the mail mailbox routes. The
+    // over-cap 402 (StorageLimitExceededError) is unit-tested, not exercised
+    // here — filling a 2 GiB cap in CI is not practical.
+    logStep(config, "mailbox storage fields on list + get");
+    const alphaMailbox = await inkbox.mailboxes.get(alpha.emailAddress!);
+    expect(typeof alphaMailbox.storageUsedBytes).toBe("number");
+    expect(alphaMailbox.storageUsedBytes).toBeGreaterThanOrEqual(0);
+    if (alphaMailbox.storageLimitBytes !== null) {
+      expect(typeof alphaMailbox.storageLimitBytes).toBe("number");
+      expect(alphaMailbox.storageLimitBytes).toBeGreaterThan(0);
+    }
+
+    const listedMailboxes = await inkbox.mailboxes.list();
+    const listedAlpha = listedMailboxes.find(
+      (m) => m.emailAddress === alpha.emailAddress,
+    )!;
+    expect(typeof listedAlpha.storageUsedBytes).toBe("number");
+
     // ── vault + credentials ───────────────────────────────────
     const vaultKey = "IntegrationTest-Key-01!";
     logStep(config, "initialize vault");

@@ -76,6 +76,31 @@ class RedundantContactAccessGrantError(InkboxAPIError):
         self.detail_message: str = str(detail.get("detail", ""))
 
 
+class StorageLimitExceededError(InkboxAPIError):
+    """
+    Raised on 402 when an outbound send would push a mailbox past its plan's
+    storage cap. Raised by ``messages.send``, ``messages.reply_all``, and
+    ``messages.forward``.
+
+    Free space by deleting messages (``messages.delete``) or whole threads
+    (``threads.delete``) — reclaim is immediate — or upgrade the plan.
+
+    Attributes:
+        message: Human-readable explanation from the server.
+        upgrade_url: Console billing page to raise the cap.
+        limit_bytes: The cap that was hit, in bytes. Binary units — divide by
+            1024 and label GiB/MiB.
+        detail: The full structured detail dict from the server.
+    """
+
+    def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.message: str = str(detail.get("message", ""))
+        self.upgrade_url: str = str(detail.get("upgrade_url", ""))
+        raw_limit = detail.get("limit_bytes")
+        self.limit_bytes: int | None = int(raw_limit) if raw_limit is not None else None
+
+
 class RecipientBlockedError(InkboxAPIError):
     """
     Raised on 403 when an SMS, call, or iMessage destination is blocked

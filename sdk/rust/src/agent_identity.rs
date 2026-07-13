@@ -263,6 +263,14 @@ impl AgentIdentity {
     ///   [`crate::mail::resources::Attachment`]).
     /// * `track_opens` - Embed an open-tracking pixel when `body_html` is
     ///   present; opens surface as `first_opened_at` / `open_count`.
+    ///
+    /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
+    /// (HTTP 402) when the mailbox has reached its plan's storage cap. Delete
+    /// messages/threads to free space (reclaim is immediate), or upgrade the
+    /// plan at the error's `upgrade_url`.
+    ///
+    /// On the Free plan a footer is appended to the *stored* body, so the body
+    /// read back later is not byte-for-byte what you sent.
     #[allow(clippy::too_many_arguments)]
     pub fn send_email(
         &self,
@@ -301,6 +309,9 @@ impl AgentIdentity {
     /// * `body_text` / `body_html` - Optional reply body.
     /// * `attachments` - Optional file attachments.
     /// * `reply_to` - Optional Reply-To address.
+    ///
+    /// Subject to the same storage cap and Free-plan footer as
+    /// [`send_email`](Self::send_email).
     #[allow(clippy::too_many_arguments)]
     pub fn reply_all_email(
         &self,
@@ -337,6 +348,9 @@ impl AgentIdentity {
     /// * `track_opens` - Embed an open-tracking pixel (requires an HTML part —
     ///   `inline` inherits the original email's HTML, `wrapped` needs a caller
     ///   `body_html`); opens surface as `first_opened_at` / `open_count`.
+    ///
+    /// Subject to the same storage cap and Free-plan footer as
+    /// [`send_email`](Self::send_email).
     #[allow(clippy::too_many_arguments)]
     pub fn forward_email(
         &self,

@@ -162,6 +162,13 @@ class Mailbox:
     from ``email_address``. Either the platform default or a verified
     custom domain registered to your org.
 
+    **Storage.** ``storage_used_bytes`` is what the mailbox currently holds;
+    ``storage_limit_bytes`` is the plan's cap (binary — 2 GiB is
+    ``2 * 1024 ** 3``), or ``None`` when the server didn't resolve it. Sends
+    over the cap are rejected with
+    :class:`inkbox.StorageLimitExceededError`; deleting messages or threads
+    frees space immediately.
+
     **Webhooks.** To deliver ``message.*`` events to an HTTPS endpoint,
     create a row on the channel-agnostic subscription resource:
     ``inkbox.webhooks.subscriptions.create(mailbox_id=..., url=..., event_types=[...])``.
@@ -180,6 +187,9 @@ class Mailbox:
     sending_domain: str = ""
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
+    # Both absent on servers predating storage caps -> 0 / None.
+    storage_used_bytes: int = 0
+    storage_limit_bytes: int | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Mailbox:
@@ -189,6 +199,7 @@ class Mailbox:
         if not sending_domain:
             email_address = d["email_address"]
             _, _, sending_domain = email_address.partition("@")
+        storage_limit = d.get("storage_limit_bytes")
 
         return cls(
             id=UUID(d["id"]),
@@ -206,6 +217,10 @@ class Mailbox:
                 FilterModeChangeNotice._from_dict(notice)
                 if notice
                 else None
+            ),
+            storage_used_bytes=d.get("storage_used_bytes") or 0,
+            storage_limit_bytes=(
+                int(storage_limit) if storage_limit is not None else None
             ),
         )
 

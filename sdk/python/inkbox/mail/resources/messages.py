@@ -160,6 +160,18 @@ class MessagesResource:
 
         Returns:
             The sent message metadata.
+
+        Raises:
+            StorageLimitExceededError: 402 — the mailbox is at its plan's
+                storage cap. Free space with ``messages.delete`` /
+                ``threads.delete`` (reclaim is immediate), or upgrade the
+                plan (``err.upgrade_url``).
+
+        Note:
+            On the **Free plan** a footer is appended to the *stored* body, so
+            what ``messages.get`` returns is not byte-for-byte what you sent —
+            a ``sent_body == fetched_body`` round-trip assertion will fail. A
+            send with no body comes back with the footer as its body.
         """
         recipients: dict[str, Any] = {"to": to}
         if cc:
@@ -209,6 +221,15 @@ class MessagesResource:
             attachments: Optional file attachments. Same shape as
                 ``send(attachments=...)``, including ``content_id`` for inline images.
             reply_to: Optional Reply-To address.
+
+        Raises:
+            StorageLimitExceededError: 402 — the mailbox is at its plan's
+                storage cap. Free space with ``messages.delete`` /
+                ``threads.delete``, or upgrade the plan.
+
+        Note:
+            On the **Free plan** the stored body carries an appended footer, so
+            it will not match the body you sent (see :meth:`send`).
         """
         body: dict[str, Any] = {}
         if subject is not None:
@@ -285,6 +306,15 @@ class MessagesResource:
 
         Returns:
             The newly forwarded message metadata.
+
+        Raises:
+            StorageLimitExceededError: 402 — the mailbox is at its plan's
+                storage cap. Free space with ``messages.delete`` /
+                ``threads.delete``, or upgrade the plan.
+
+        Note:
+            On the **Free plan** the stored body carries an appended footer, so
+            it will not match the body you sent (see :meth:`send`).
         """
         recipients: dict[str, Any] = {}
         if to:

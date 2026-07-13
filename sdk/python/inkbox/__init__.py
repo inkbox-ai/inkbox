@@ -14,6 +14,7 @@ from inkbox.exceptions import (
     InkboxVaultKeyError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
+    StorageLimitExceededError,
 )
 
 # Mail types
@@ -295,6 +296,7 @@ __all__ = [
     "DuplicateContactRuleError",
     "RecipientBlockedError",
     "RedundantContactAccessGrantError",
+    "StorageLimitExceededError",
     # Mail types
     "ContactRuleStatus",
     "Domain",

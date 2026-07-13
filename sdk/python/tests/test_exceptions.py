@@ -14,6 +14,7 @@ from inkbox.exceptions import (
     InkboxAPIError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
+    StorageLimitExceededError,
 )
 from inkbox.mail.exceptions import InkboxAPIError as MailAPIError
 from inkbox.phone.exceptions import InkboxAPIError as PhoneAPIError
@@ -160,6 +161,51 @@ class TestRaiseForStatusRecipientBlocked:
                 },
             },
         )
+        with pytest.raises(InkboxAPIError) as info:
+            _raise_for_status(resp)
+        assert type(info.value) is InkboxAPIError
+
+
+class TestRaiseForStatusStorageLimitExceeded:
+    def test_storage_limit_exceeded(self):
+        resp = _resp(
+            402,
+            {
+                "detail": {
+                    "error": "storage_limit_exceeded",
+                    "message": (
+                        "This inbox has reached its storage limit of 2 GiB. "
+                        "Delete messages to free space, or upgrade your plan "
+                        "for more: https://inkbox.ai/console/organizations?tab=billing"
+                    ),
+                    "upgrade_url": "https://inkbox.ai/console/organizations?tab=billing",
+                    "limit_bytes": 2_147_483_648,
+                },
+            },
+        )
+        with pytest.raises(StorageLimitExceededError) as info:
+            _raise_for_status(resp)
+        err = info.value
+        assert err.status_code == 402
+        assert err.limit_bytes == 2_147_483_648
+        assert err.upgrade_url.endswith("tab=billing")
+        assert "storage limit" in err.message
+        assert isinstance(err.detail, dict)
+        assert isinstance(err, InkboxAPIError)
+
+    def test_string_detail_402_stays_base_class(self):
+        # Old server: plain-string detail, no discriminator. Degrade, don't crash.
+        resp = _resp(402, {"detail": "This inbox has reached its storage limit."})
+        with pytest.raises(InkboxAPIError) as info:
+            _raise_for_status(resp)
+        err = info.value
+        assert type(err) is InkboxAPIError
+        assert not isinstance(err, StorageLimitExceededError)
+        assert err.status_code == 402
+
+    def test_unrelated_402_stays_base_class(self):
+        # Sibling plan-limit 402s (identities/phone/iMessage) are not this error.
+        resp = _resp(402, {"detail": "You've reached your plan's limit of 3 identities."})
         with pytest.raises(InkboxAPIError) as info:
             _raise_for_status(resp)
         assert type(info.value) is InkboxAPIError
