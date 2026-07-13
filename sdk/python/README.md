@@ -308,9 +308,7 @@ used_gib = mailbox.storage_used_bytes / 1024**3   # caps are binary — GiB, not
 ```
 
 The caps are **binary**: 2 GiB is `2 * 1024**3` = 2,147,483,648 bytes. Divide by
-1024 and label the result GiB/MiB. The identity-embedded mailbox
-(`identity.mailbox`) does **not** carry real storage values today — read them
-from `inkbox.mailboxes.get(...)`.
+1024 and label the result GiB/MiB.
 
 > **Free plan:** a footer is appended to the **stored** body of outgoing mail,
 > so what you read back with `inkbox.messages.get(...)` is not byte-for-byte

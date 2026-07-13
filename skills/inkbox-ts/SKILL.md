@@ -221,7 +221,7 @@ try {
 }
 ```
 
-Read usage off the mailbox (`inkbox.mailboxes.get(...)`): `storageUsedBytes` and `storageLimitBytes` (`null` = the server resolved no cap). The caps are **binary** — 2 GiB is `2 * 1024 ** 3` = 2,147,483,648 bytes, so divide by 1024 and label GiB/MiB, never GB. `identity.mailbox` (the identity embed) does **not** carry real values; use `inkbox.mailboxes.get(...)`.
+Read usage off the mailbox (`inkbox.mailboxes.get(...)`): `storageUsedBytes` and `storageLimitBytes` (`null` = the server resolved no cap). The caps are **binary** — 2 GiB is `2 * 1024 ** 3` = 2,147,483,648 bytes, so divide by 1024 and label GiB/MiB, never GB.
 
 **Free plan:** a footer is appended to the **stored** body of outgoing mail, so `inkbox.messages.get(...)` does not return byte-for-byte what you sent (a body-less send comes back with the footer as its body). Don't assert `sentBody === fetchedBody` on a Free plan.
 

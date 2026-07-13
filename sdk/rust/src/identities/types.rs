@@ -263,13 +263,6 @@ pub struct IdentityMailbox {
     pub agent_identity_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub filter_mode_change_notice: Option<FilterModeChangeNotice>,
-    /// Always `0` on the identity embed — the serializer omits it. Read real
-    /// usage from `mailboxes().get(...)`; the field exists for wire tolerance.
-    #[serde(default)]
-    pub storage_used_bytes: u64,
-    /// Always `None` on the identity embed — see [`Self::storage_used_bytes`].
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub storage_limit_bytes: Option<u64>,
 }
 
 impl IdentityMailbox {

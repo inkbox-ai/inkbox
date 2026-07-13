@@ -75,8 +75,14 @@ export function mailboxGetRecord(
   return record;
 }
 
-const INKBOX_API_HOSTS = new Set(["inkbox.ai", "api.inkbox.ai"]);
-const INKBOX_MAIL_DOMAIN = "inkboxmail.com";
+const MAIL_DOMAIN_BY_API_HOST = new Map([
+  ["inkbox.ai", "inkboxmail.com"],
+  ["api.inkbox.ai", "inkboxmail.com"],
+  ["beta.inkbox.ai", "beta.inkboxmail.com"],
+  ["api.beta.inkbox.ai", "beta.inkboxmail.com"],
+  ["development.inkbox.ai", "development.inkboxmail.com"],
+  ["api.development.inkbox.ai", "development.inkboxmail.com"],
+]);
 
 export const UNRESOLVED_MAIL_HOSTS_ERROR =
   "Can't determine the mail hosts for this API base URL.";
@@ -87,14 +93,14 @@ export const UNRESOLVED_MAIL_HOSTS_ERROR =
  * guessed hosts would talk to the wrong server.
  */
 export function resolveMailDomain(baseUrl?: string): string | null {
-  if (!baseUrl) return INKBOX_MAIL_DOMAIN; // unset = the SDK's default API host
+  if (!baseUrl) return "inkboxmail.com"; // unset = the SDK's default API host
   let host: string;
   try {
     host = new URL(baseUrl).hostname.toLowerCase();
   } catch {
     return null;
   }
-  return INKBOX_API_HOSTS.has(host) ? INKBOX_MAIL_DOMAIN : null;
+  return MAIL_DOMAIN_BY_API_HOST.get(host) ?? null;
 }
 
 export function clientSettings(

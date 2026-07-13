@@ -4,14 +4,14 @@
 
 ### Added
 
-- **Mailbox storage fields.** `Mailbox` gains `storageUsedBytes` (bytes currently stored) and `storageLimitBytes` (the plan cap, or `null` when the server didn't resolve it), populated by `mailboxes.list()` / `.get()` / `.update()`. Caps are **binary** — 2 GiB is `2 * 1024 ** 3` = 2,147,483,648 bytes; divide by 1024 and label GiB/MiB. `IdentityMailbox` accepts the same two fields for wire tolerance, but the identity embed does not report real values today (reads `0` / `null`) — use `mailboxes.get(...)`.
+- **Mailbox storage fields.** `Mailbox` gains `storageUsedBytes` (bytes currently stored) and `storageLimitBytes` (the plan cap, or `null` when the server didn't resolve it), populated by `mailboxes.list()` / `.get()` / `.update()`. Caps are **binary** — 2 GiB is `2 * 1024 ** 3` = 2,147,483,648 bytes; divide by 1024 and label GiB/MiB.
 - **`StorageLimitExceededError`.** New `InkboxAPIError` subclass thrown on `402` with `detail.error === "storage_limit_exceeded"` — raised by `messages.send`, `messages.replyAll`, and `messages.forward` (and the `identity.sendEmail` / `replyAllEmail` / `forwardEmail` delegators) when the send would push the mailbox past its cap. Exposes `message` (the server's sentence, also as `detailMessage`), `upgradeUrl`, and `limitBytes`. Deleting messages or threads frees space immediately. A `402` whose `detail` is a plain string still surfaces as a plain `InkboxAPIError`.
 - **Mail clients (IMAP/SMTP).** README section covering the gateway settings (hosts/ports, username = inbox address, password = an identity-scoped API key — revoking the key revokes mail-client access) and the constraints that bite: `From` must be the authenticated inbox address, and Free-plan sends of signed/encrypted mail over SMTP are refused. No SDK surface — the gateway speaks IMAP/SMTP, not HTTP.
 
 ### Notes
 
 - **Free plan:** a footer is appended to the **stored** body of outgoing mail, so `messages.get(...)` does not return byte-for-byte what you sent — a `sentBody === fetchedBody` round-trip assertion fails on Free plans. Documented on `send` / `replyAll` / `forward`.
-- TypeScript note: the `Mailbox` and `IdentityMailbox` interfaces gain **required** properties (`storageUsedBytes`, `storageLimitBytes`), so code constructing those object literals (fixtures, mocks) needs the new properties. Parsing is unaffected: responses missing the fields default to `0` / `null`.
+- TypeScript note: the `Mailbox` interface gains **required** properties (`storageUsedBytes`, `storageLimitBytes`), so code constructing those object literals (fixtures, mocks) needs the new properties. Parsing is unaffected: responses missing the fields default to `0` / `null`.
 
 ## 0.4.23 — Inkbox Voice AI rebrand
 

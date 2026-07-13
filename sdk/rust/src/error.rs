@@ -79,9 +79,8 @@ pub enum InkboxError {
         message: String,
         /// Billing page where the plan can be upgraded.
         upgrade_url: String,
-        /// The mailbox's storage cap. Binary bytes (Free is 2 GiB =
-        /// 2_147_483_648), so divide by 1024 and label GiB/MiB when displaying.
-        limit_bytes: u64,
+        /// The mailbox's storage cap in binary bytes, when supplied by the server.
+        limit_bytes: Option<u64>,
         /// Full structured detail from the server. Boxed to keep `InkboxError`
         /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
         detail: Box<Value>,

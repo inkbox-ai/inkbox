@@ -530,7 +530,7 @@ mod tests {
                 assert_eq!(status_code, 402);
                 assert!(message.contains("storage limit"));
                 assert_eq!(upgrade_url, "https://inkbox.ai/console/billing");
-                assert_eq!(limit_bytes, 2 * 1024 * 1024 * 1024);
+                assert_eq!(limit_bytes, Some(2 * 1024 * 1024 * 1024));
             }
             other => panic!("expected InkboxError::StorageLimitExceeded, got {other:?}"),
         }
@@ -609,6 +609,42 @@ mod tests {
             .unwrap_err();
         mock.assert();
         assert_storage_limit(err);
+    }
+
+    #[test]
+    fn storage_limit_402_preserves_an_unavailable_limit_as_none() {
+        for detail in [
+            json!({
+                "error": "storage_limit_exceeded",
+                "message": "Storage limit reached",
+                "upgrade_url": "https://inkbox.ai/console/billing"
+            }),
+            json!({
+                "error": "storage_limit_exceeded",
+                "message": "Storage limit reached",
+                "upgrade_url": "https://inkbox.ai/console/billing",
+                "limit_bytes": "unknown"
+            }),
+        ] {
+            let server = MockServer::start();
+            let mock = server.mock(|when, then| {
+                when.method(POST).path(format!(
+                    "/api/v1/mail/mailboxes/{MAILBOX}/messages/{MSG_ID}/reply-all"
+                ));
+                then.status(402).json_body(json!({ "detail": detail }));
+            });
+            let err = client(&server)
+                .messages()
+                .reply_all(MAILBOX, MSG_ID, None, Some("body"), None, None, None)
+                .unwrap_err();
+            mock.assert();
+            match err {
+                InkboxError::StorageLimitExceeded { limit_bytes, .. } => {
+                    assert_eq!(limit_bytes, None);
+                }
+                other => panic!("expected InkboxError::StorageLimitExceeded, got {other:?}"),
+            }
+        }
     }
 
     #[test]

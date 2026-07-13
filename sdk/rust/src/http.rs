@@ -306,10 +306,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .and_then(|u| u.as_str())
                         .unwrap_or("")
                         .to_string(),
-                    limit_bytes: map
-                        .get("limit_bytes")
-                        .and_then(Value::as_u64)
-                        .unwrap_or_default(),
+                    limit_bytes: map.get("limit_bytes").and_then(Value::as_u64),
                     detail: Box::new(raw_detail),
                 });
             }

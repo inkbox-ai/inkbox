@@ -74,11 +74,19 @@ test("mailboxGetRecord tolerates an old server (0 / null)", () => {
   assert.equal(record.storage, "0 B / -");
 });
 
-test("resolveMailDomain maps the Inkbox API host to the mail domain", () => {
+test("resolveMailDomain maps every supported API host to its mail domain", () => {
   assert.equal(resolveMailDomain(undefined), "inkboxmail.com");
   assert.equal(resolveMailDomain(""), "inkboxmail.com");
-  assert.equal(resolveMailDomain("https://inkbox.ai"), "inkboxmail.com");
-  assert.equal(resolveMailDomain("https://api.inkbox.ai"), "inkboxmail.com");
+  for (const [baseUrl, mailDomain] of [
+    ["https://inkbox.ai/api/v1", "inkboxmail.com"],
+    ["https://api.inkbox.ai/api/v1", "inkboxmail.com"],
+    ["https://beta.inkbox.ai/api/v1", "beta.inkboxmail.com"],
+    ["https://api.beta.inkbox.ai/api/v1", "beta.inkboxmail.com"],
+    ["https://development.inkbox.ai/api/v1", "development.inkboxmail.com"],
+    ["https://api.development.inkbox.ai/api/v1", "development.inkboxmail.com"],
+  ]) {
+    assert.equal(resolveMailDomain(baseUrl), mailDomain, baseUrl);
+  }
   assert.equal(resolveMailDomain("https://API.Inkbox.AI/api/v1"), "inkboxmail.com");
 });
 

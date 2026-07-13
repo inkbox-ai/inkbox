@@ -137,10 +137,6 @@ class IdentityMailbox:
     ``sending_domain`` is the bare domain the mailbox sends from, derived
     from ``email_address``.
 
-    ``storage_used_bytes`` / ``storage_limit_bytes`` are accepted for wire
-    tolerance but the identity embed does **not** report real values today
-    (they read 0 / ``None``). Fetch the real numbers with
-    ``inkbox.mailboxes.get(email_address)``.
     """
 
     id: UUID
@@ -151,8 +147,6 @@ class IdentityMailbox:
     sending_domain: str = ""
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
-    storage_used_bytes: int = 0
-    storage_limit_bytes: int | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityMailbox:
@@ -162,7 +156,6 @@ class IdentityMailbox:
         if not sending_domain:
             email_address = d["email_address"]
             _, _, sending_domain = email_address.partition("@")
-        storage_limit = d.get("storage_limit_bytes")
         return cls(
             id=UUID(d["id"]),
             email_address=d["email_address"],
@@ -173,10 +166,6 @@ class IdentityMailbox:
             agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
             filter_mode_change_notice=(
                 FilterModeChangeNotice._from_dict(notice) if notice else None
-            ),
-            storage_used_bytes=d.get("storage_used_bytes") or 0,
-            storage_limit_bytes=(
-                int(storage_limit) if storage_limit is not None else None
             ),
         )
 
