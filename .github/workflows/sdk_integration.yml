@@ -161,7 +161,8 @@ jobs:
       - name: Notify Google Chat on scheduled failure
         if: failure() && github.event_name == 'schedule'
         run: |
-          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+            "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
               "text": "⚠️ Python SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -246,7 +247,8 @@ jobs:
       - name: Notify Google Chat on scheduled failure
         if: failure() && github.event_name == 'schedule'
         run: |
-          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+            "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
               "text": "⚠️ TypeScript SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
@@ -330,7 +332,8 @@ jobs:
       - name: Notify Google Chat on scheduled failure
         if: failure() && github.event_name == 'schedule'
         run: |
-          curl -s -X POST "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+            "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
             -H 'Content-Type: application/json' \
             -d '{
               "text": "⚠️ CLI integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
