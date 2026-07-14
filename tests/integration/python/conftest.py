@@ -62,14 +62,65 @@ class SdkIntegrationContext:
         # Omit when empty to stay compatible with servers predating the field.
         if self.extra_cleanup_org_ids:
             account["created_provisional_org_ids"] = self.extra_cleanup_org_ids
-        resp = httpx.post(
+        resp = post_with_retry(
             f"{api_url}/testing/cleanup-test-user-organization",
             headers={"X-Interservice-Secret": self.config.interservice_secret},
             json={"accounts": [account]},
             timeout=self.config.http_timeout,
+            description="cleanup test org",
         )
         resp.raise_for_status()
         return resp.json()
+
+
+# ---------------------------------------------------------------------------
+# Retrying transport
+# ---------------------------------------------------------------------------
+
+# Gateway-level statuses only: the request provably never reached the app, so
+# replaying it can't double-create an org. A bare 500 is deliberately absent.
+RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+MAX_ATTEMPTS = 4
+BACKOFF_SECONDS = 2.0
+
+
+def post_with_retry(
+    url: str,
+    *,
+    headers: dict[str, str],
+    json: dict[str, Any],
+    timeout: float,
+    description: str,
+) -> httpx.Response:
+    # Hosted CI runners throw the occasional TLS/TCP reset on the way out. These
+    # calls sit in session-scoped setup/teardown, so one reset would otherwise
+    # take down the entire suite.
+    last_error = ""
+
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            resp = httpx.post(url, headers=headers, json=json, timeout=timeout)
+        except httpx.TransportError as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+        else:
+            if resp.status_code not in RETRYABLE_STATUS:
+                return resp
+            last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+
+        if attempt == MAX_ATTEMPTS:
+            break
+
+        delay = BACKOFF_SECONDS * 2 ** (attempt - 1)
+        print(
+            f"[sdk-integration] ⚠ {description} failed "
+            f"(attempt {attempt}/{MAX_ATTEMPTS}): {last_error} — retrying in {delay:.0f}s",
+            flush=True,
+        )
+        time.sleep(delay)
+
+    raise RuntimeError(
+        f"{description} failed after {MAX_ATTEMPTS} attempts. Last error: {last_error}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -103,11 +154,12 @@ def sdk_context(sdk_integration_config: SdkIntegrationConfig) -> Generator[SdkIn
     api_url = f"{cfg.base_url.rstrip('/')}/api/v1"
 
     # Bootstrap a fresh test user + org (with API key) via the testing subapp
-    resp = httpx.post(
+    resp = post_with_retry(
         f"{api_url}/testing/create-test-user-organization",
         headers={"X-Interservice-Secret": cfg.interservice_secret},
         json={"create_api_key": True},
         timeout=cfg.http_timeout,
+        description="bootstrap test org",
     )
     resp.raise_for_status()
     data = resp.json()
