@@ -206,7 +206,6 @@ impl Tunnel {
     }
 }
 
-
 /// Durable-config projection of a tunnel, embedded in identity payloads.
 ///
 /// Carries the routing and lifecycle facts identity views need, plus the ids
