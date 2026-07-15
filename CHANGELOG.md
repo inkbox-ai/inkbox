@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
-## 0.4.25 — Identity tunnel summaries + inlined vault access
+## 0.5.0 — Identity tunnel summaries + inlined vault access
 
 ### Added
 
@@ -15,7 +15,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Changed
 
 - **`identity.tunnel` is now a `TunnelSummary`** (was the full `Tunnel`) in all three SDKs, on both the identity object and the raw identity payload types. Code that read `identity.tunnel.public_host` / `.tls_mode` / `.status` / `.id` is unaffected; code that read `identity.tunnel.currently_connected` or cert fields should fetch the full tunnel via `tunnels.get(...)` — which also gets it fresher data than the embedded copy ever was.
-- Version bumped to 0.4.25 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+- Version bumped to 0.5.0 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
 
 ### Notes
 
