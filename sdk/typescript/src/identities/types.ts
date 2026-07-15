@@ -12,8 +12,8 @@ import {
   parseFilterModeChangeNotice,
 } from "../mail/types.js";
 import { SmsStatus } from "../phone/types.js";
-import type { RawTunnel, TLSMode, Tunnel } from "../tunnels/types.js";
-import { parseTunnel } from "../tunnels/types.js";
+import type { RawTunnelSummary, TLSMode, TunnelSummary } from "../tunnels/types.js";
+import { parseTunnelSummary } from "../tunnels/types.js";
 
 export interface IdentityMailboxCreateOptions {
   emailLocalPart?: string;
@@ -158,8 +158,13 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
-  /** Tunnel assigned to this identity. Non-null for live identities (1:1 invariant); null only on deleted rows. */
-  tunnel: Tunnel | null;
+  /**
+   * Durable-config summary of the tunnel assigned to this identity.
+   * Non-null for live identities (1:1 invariant); null only on deleted rows.
+   * For live connection state and cert material, fetch the full tunnel:
+   * `tunnels.get(identity.tunnel.id)`.
+   */
+  tunnel: TunnelSummary | null;
 }
 
 /**
@@ -231,7 +236,7 @@ export interface RawAgentIdentitySummary {
 export interface RawAgentIdentityData extends RawAgentIdentitySummary {
   mailbox: RawIdentityMailbox | null;
   phone_number: RawIdentityPhoneNumber | null;
-  tunnel: RawTunnel | null;
+  tunnel: RawTunnelSummary | null;
 }
 
 export interface RawIdentityAccess {
@@ -306,7 +311,7 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
     ...parseAgentIdentitySummary(r),
     mailbox: r.mailbox ? parseIdentityMailbox(r.mailbox) : null,
     phoneNumber: r.phone_number ? parseIdentityPhoneNumber(r.phone_number) : null,
-    tunnel: r.tunnel ? parseTunnel(r.tunnel) : null,
+    tunnel: r.tunnel ? parseTunnelSummary(r.tunnel) : null,
   };
 }
 

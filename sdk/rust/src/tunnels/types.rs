@@ -77,6 +77,10 @@ pub struct Tunnel {
     pub id: Uuid,
     pub organization_id: String,
     pub tunnel_name: String,
+    /// Owning identity id (tunnels are 1:1 with identities). `None` only for
+    /// pre-coupling tombstone rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_identity_id: Option<Uuid>,
     pub tls_mode: TLSMode,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cert_pem: Option<String>,
@@ -131,6 +135,11 @@ impl Tunnel {
         let organization_id = str_field(obj, "organization_id")?;
         let tunnel_name = str_field(obj, "tunnel_name")?;
 
+        let agent_identity_id = obj
+            .get("agent_identity_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok());
+
         // `tls_mode`: a closed enum — coerce the raw string through serde.
         let tls_mode: TLSMode =
             serde_json::from_value(obj.get("tls_mode").cloned().unwrap_or(Value::Null))?;
@@ -175,6 +184,7 @@ impl Tunnel {
             id,
             organization_id,
             tunnel_name,
+            agent_identity_id,
             tls_mode,
             cert_pem: opt_str(obj, "cert_pem"),
             cert_fingerprint_sha256: opt_str(obj, "cert_fingerprint_sha256"),
@@ -190,6 +200,110 @@ impl Tunnel {
             public_host,
             zone,
             metadata,
+            created_at: str_field(obj, "created_at")?,
+            updated_at: str_field(obj, "updated_at")?,
+        })
+    }
+}
+
+
+/// Durable-config projection of a tunnel, embedded in identity payloads.
+///
+/// Carries the routing and lifecycle facts identity views need, plus the ids
+/// to reach the full tunnel. Excludes runtime state (`currently_connected`)
+/// and cert material — fetch the full [`Tunnel`] via `tunnels().get(...)` for
+/// those; the tunnels endpoints always resolve connection state live.
+///
+/// `status` follows the same unknown-value contract as [`Tunnel`].
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TunnelSummary {
+    pub id: Uuid,
+    pub tunnel_name: String,
+    /// Owning identity id (tunnels are 1:1 with identities). `None` only for
+    /// pre-coupling tombstone rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_identity_id: Option<Uuid>,
+    pub tls_mode: TLSMode,
+    pub status: TunnelStatusValue,
+    /// Customer-facing hostname (e.g. `my-agent.inkboxwire.com`). Non-empty
+    /// for live tunnels.
+    pub public_host: String,
+    /// Zone endpoint for the data-plane. Non-empty for live tunnels.
+    pub zone: String,
+    /// ISO-8601 timestamp.
+    pub created_at: String,
+    /// ISO-8601 timestamp.
+    pub updated_at: String,
+}
+
+impl TunnelSummary {
+    /// Parse a raw server JSON object into a [`TunnelSummary`].
+    ///
+    /// Same contracts as [`Tunnel::from_value`]: unknown `status` values are
+    /// preserved as raw strings, and missing/empty `public_host` or `zone`
+    /// error.
+    ///
+    /// # Arguments
+    /// * `data` - The raw JSON object from the server.
+    ///
+    /// # Returns
+    /// The parsed [`TunnelSummary`].
+    pub fn from_value(data: &Value) -> Result<TunnelSummary> {
+        let obj = data
+            .as_object()
+            .ok_or_else(|| InkboxError::Decode(de_err("tunnel summary was not an object")))?;
+
+        let id = obj
+            .get("id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .ok_or_else(|| InkboxError::Decode(de_err("tunnel summary missing valid 'id'")))?;
+
+        let tunnel_name = str_field(obj, "tunnel_name")?;
+
+        let agent_identity_id = obj
+            .get("agent_identity_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok());
+
+        let tls_mode: TLSMode =
+            serde_json::from_value(obj.get("tls_mode").cloned().unwrap_or(Value::Null))?;
+
+        let raw_status = obj
+            .get("status")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| InkboxError::Decode(de_err("tunnel summary missing 'status'")))?;
+        let status = match serde_json::from_value::<TunnelStatus>(Value::String(raw_status.into()))
+        {
+            Ok(known) => TunnelStatusValue::Known(known),
+            Err(_) => TunnelStatusValue::Unknown(raw_status.to_string()),
+        };
+
+        let public_host = match obj.get("public_host").and_then(|v| v.as_str()) {
+            Some(s) if !s.is_empty() => s.to_string(),
+            _ => {
+                return Err(InkboxError::Decode(de_err(
+                    "tunnel summary missing required field 'public_host'",
+                )))
+            }
+        };
+        let zone = match obj.get("zone").and_then(|v| v.as_str()) {
+            Some(s) if !s.is_empty() => s.to_string(),
+            _ => {
+                return Err(InkboxError::Decode(de_err(
+                    "tunnel summary missing required field 'zone'",
+                )))
+            }
+        };
+
+        Ok(TunnelSummary {
+            id,
+            tunnel_name,
+            agent_identity_id,
+            tls_mode,
+            status,
+            public_host,
+            zone,
             created_at: str_field(obj, "created_at")?,
             updated_at: str_field(obj, "updated_at")?,
         })

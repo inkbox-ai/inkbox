@@ -50,14 +50,20 @@ export function registerTunnelCommands(program: Command): void {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
           idOrHandle,
         );
-        const t = isUuid
-          ? await inkbox.tunnels.get(idOrHandle)
-          : (await inkbox.getIdentity(idOrHandle)).tunnel;
-        if (!t) {
-          throw new Error(
-            `identity '${idOrHandle}' has no tunnel (only reachable on a deleted identity)`,
-          );
+        // A handle resolves through the identity's tunnel summary; the full
+        // record (live connection state, metadata) always comes from the
+        // tunnels endpoint.
+        let tunnelId = idOrHandle;
+        if (!isUuid) {
+          const summary = (await inkbox.getIdentity(idOrHandle)).tunnel;
+          if (!summary) {
+            throw new Error(
+              `identity '${idOrHandle}' has no tunnel (only reachable on a deleted identity)`,
+            );
+          }
+          tunnelId = summary.id;
         }
+        const t = await inkbox.tunnels.get(tunnelId);
         output(
           {
             id: t.id,

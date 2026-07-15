@@ -115,6 +115,11 @@ pub struct VaultKey {
 }
 
 /// Vault secret metadata (no encrypted payload).
+///
+/// `access` carries the secret's inlined access rules (who can read it) on
+/// list and single-secret reads, so callers don't need a per-secret
+/// `get_access` round-trip. Empty on server builds that don't inline it and
+/// on write-path responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultSecret {
     pub id: Uuid,
@@ -124,6 +129,8 @@ pub struct VaultSecret {
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub access: Vec<AccessRule>,
 }
 
 /// Vault secret including the encrypted payload (base64).
@@ -136,6 +143,8 @@ pub struct VaultSecretDetail {
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub access: Vec<AccessRule>,
     #[serde(default)]
     pub encrypted_payload: String,
 }

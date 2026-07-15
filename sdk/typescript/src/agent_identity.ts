@@ -63,7 +63,7 @@ import type {
   IdentityMailbox,
   IdentityPhoneNumber,
 } from "./identities/types.js";
-import type { Tunnel } from "./tunnels/types.js";
+import type { TunnelSummary } from "./tunnels/types.js";
 import type { Inkbox } from "./inkbox.js";
 
 export class AgentIdentity {
@@ -71,7 +71,7 @@ export class AgentIdentity {
   private readonly _inkbox: Inkbox;
   private _mailbox: IdentityMailbox | null;
   private _phoneNumber: IdentityPhoneNumber | null;
-  private _tunnel: Tunnel | null;
+  private _tunnel: TunnelSummary | null;
   private _credentials: Credentials | null = null;
   private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
@@ -124,7 +124,11 @@ export class AgentIdentity {
   get phoneNumber(): IdentityPhoneNumber | null { return this._phoneNumber; }
 
   /** The tunnel currently assigned to this identity. Non-null for live identities (1:1 invariant). */
-  get tunnel(): Tunnel | null { return this._tunnel; }
+  /**
+   * Durable-config summary of this identity's tunnel. For live connection
+   * state and cert material, fetch the full tunnel: `tunnels.get(id)`.
+   */
+  get tunnel(): TunnelSummary | null { return this._tunnel; }
 
   /**
    * Identity-scoped credential access.

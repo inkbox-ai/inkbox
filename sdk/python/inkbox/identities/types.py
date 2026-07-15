@@ -13,7 +13,7 @@ from uuid import UUID
 
 from inkbox.mail.types import FilterMode, FilterModeChangeNotice
 from inkbox.phone.types import SmsStatus
-from inkbox.tunnels.types import TLSMode, Tunnel
+from inkbox.tunnels.types import TLSMode, TunnelSummary
 
 # Sentinel for "field omitted" that's distinct from explicit ``None``.
 # Exported (intentionally underscore-named but referenced internally
@@ -299,7 +299,7 @@ class _AgentIdentityData(AgentIdentitySummary):
 
     mailbox: IdentityMailbox | None = field(default=None)
     phone_number: IdentityPhoneNumber | None = field(default=None)
-    tunnel: Tunnel | None = field(default=None)
+    tunnel: TunnelSummary | None = field(default=None)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> _AgentIdentityData:  # type: ignore[override]
@@ -311,7 +311,7 @@ class _AgentIdentityData(AgentIdentitySummary):
             **base.__dict__,
             mailbox=IdentityMailbox._from_dict(mailbox_data) if mailbox_data else None,
             phone_number=IdentityPhoneNumber._from_dict(phone_data) if phone_data else None,
-            tunnel=Tunnel._from_dict(tunnel_data) if tunnel_data else None,
+            tunnel=TunnelSummary._from_dict(tunnel_data) if tunnel_data else None,
         )
 
 

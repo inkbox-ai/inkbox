@@ -103,7 +103,13 @@ class VaultKey:
 
 @dataclass
 class VaultSecret:
-    """Vault secret metadata (no encrypted payload)."""
+    """Vault secret metadata (no encrypted payload).
+
+    ``access`` carries the secret's inlined access rules (who can read it)
+    on list and single-secret reads, so callers don't need a per-secret
+    ``get_access`` round-trip. Empty on server builds that don't inline it
+    and on write-path responses.
+    """
 
     id: UUID
     name: str
@@ -111,6 +117,7 @@ class VaultSecret:
     created_at: datetime
     updated_at: datetime
     description: str | None = None
+    access: list[AccessRule] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> VaultSecret:
@@ -121,6 +128,7 @@ class VaultSecret:
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             description=d.get("description"),
+            access=[AccessRule._from_dict(a) for a in d.get("access") or []],
         )
 
 
@@ -139,6 +147,7 @@ class VaultSecretDetail(VaultSecret):
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             description=d.get("description"),
+            access=[AccessRule._from_dict(a) for a in d.get("access") or []],
             encrypted_payload=d["encrypted_payload"],
         )
 

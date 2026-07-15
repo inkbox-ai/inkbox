@@ -59,7 +59,7 @@ use crate::phone::types::{
     TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
-use crate::tunnels::types::Tunnel;
+use crate::tunnels::types::TunnelSummary;
 use crate::vault::resources::vault::UnlockedVault;
 use crate::vault::totp::{TOTPCode, TOTPConfig};
 use crate::vault::types::{DecryptedVaultSecret, SecretPayload, VaultSecret};
@@ -85,7 +85,7 @@ pub struct AgentIdentity {
     /// Cached phone-number channel, cleared on release and refreshed on provision.
     phone_number: RefCell<Option<IdentityPhoneNumber>>,
     /// Cached tunnel channel.
-    tunnel: RefCell<Option<Tunnel>>,
+    tunnel: RefCell<Option<TunnelSummary>>,
 }
 
 impl AgentIdentity {
@@ -167,8 +167,10 @@ impl AgentIdentity {
         self.phone_number.borrow().clone()
     }
 
-    /// Tunnel linked to this identity. Non-null for live identities (1:1 invariant).
-    pub fn tunnel(&self) -> Option<Tunnel> {
+    /// Durable-config summary of this identity's tunnel. Non-null for live
+    /// identities (1:1 invariant). For live connection state and cert
+    /// material, fetch the full tunnel: `inkbox.tunnels().get(...)`.
+    pub fn tunnel(&self) -> Option<TunnelSummary> {
         self.tunnel.borrow().clone()
     }
 

@@ -20,7 +20,7 @@ pub mod validation;
 pub mod client;
 
 // Re-export the public types.
-pub use types::{SignedCert, TLSMode, Tunnel, TunnelStatus, TunnelStatusValue};
+pub use types::{SignedCert, TLSMode, Tunnel, TunnelStatus, TunnelStatusValue, TunnelSummary};
 
 // Re-export the exception surface.
 pub use exceptions::{map_sign_csr_error, TunnelError};

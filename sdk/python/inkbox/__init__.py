@@ -176,6 +176,7 @@ from inkbox.tunnels.types import (
     TLSMode,
     Tunnel,
     TunnelStatus,
+    TunnelSummary,
 )
 from inkbox.tunnels.exceptions import (
     TunnelCSRStateConflict,
@@ -428,6 +429,7 @@ __all__ = [
     "TLSMode",
     "Tunnel",
     "TunnelStatus",
+    "TunnelSummary",
     "TunnelCSRStateConflict",
     "TunnelError",
     "TunnelNameInvalid",

@@ -29,6 +29,8 @@ export interface Tunnel {
   id: string;
   organizationId: string;
   tunnelName: string;
+  /** Owning identity id (tunnels are 1:1 with identities). Null only for pre-coupling tombstone rows. */
+  agentIdentityId: string | null;
   tlsMode: TLSMode;
   certPem: string | null;
   certFingerprintSha256: string | null;
@@ -63,6 +65,7 @@ export interface RawTunnel {
   id: string;
   organization_id: string;
   tunnel_name: string;
+  agent_identity_id?: string | null;
   tls_mode: string;
   cert_pem: string | null;
   cert_fingerprint_sha256: string | null;
@@ -101,6 +104,7 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
     id: String(raw.id),
     organizationId: String(raw.organization_id),
     tunnelName: String(raw.tunnel_name),
+    agentIdentityId: raw.agent_identity_id ?? null,
     tlsMode: raw.tls_mode as TLSMode,
     certPem: raw.cert_pem ?? null,
     certFingerprintSha256: raw.cert_fingerprint_sha256 ?? null,
@@ -113,6 +117,60 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
     zone: raw.zone,
     metadata:
       raw.metadata && typeof raw.metadata === "object" ? { ...raw.metadata } : {},
+    createdAt: new Date(raw.created_at),
+    updatedAt: new Date(raw.updated_at),
+  };
+}
+
+/**
+ * Durable-config projection of a tunnel, embedded in identity payloads.
+ *
+ * Carries the routing and lifecycle facts identity views need, plus the ids
+ * to reach the full tunnel. Excludes runtime state (`currentlyConnected`)
+ * and cert material — fetch the full {@link Tunnel} via `tunnels.get(...)`
+ * for those; the tunnels endpoints always resolve connection state live.
+ */
+export interface TunnelSummary {
+  id: string;
+  tunnelName: string;
+  /** Owning identity id (tunnels are 1:1 with identities). Null only for pre-coupling tombstone rows. */
+  agentIdentityId: string | null;
+  tlsMode: TLSMode;
+  /** Same unknown-value contract as {@link Tunnel.status}. */
+  status: TunnelStatus | string;
+  publicHost: string;
+  zone: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RawTunnelSummary {
+  id: string;
+  tunnel_name: string;
+  agent_identity_id?: string | null;
+  tls_mode: string;
+  status: string;
+  public_host: string;
+  zone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function parseTunnelSummary(raw: RawTunnelSummary): TunnelSummary {
+  if (typeof raw.public_host !== "string" || raw.public_host === "") {
+    throw new Error("tunnel summary missing required field 'public_host'");
+  }
+  if (typeof raw.zone !== "string" || raw.zone === "") {
+    throw new Error("tunnel summary missing required field 'zone'");
+  }
+  return {
+    id: String(raw.id),
+    tunnelName: String(raw.tunnel_name),
+    agentIdentityId: raw.agent_identity_id ?? null,
+    tlsMode: raw.tls_mode as TLSMode,
+    status: raw.status,
+    publicHost: raw.public_host,
+    zone: raw.zone,
     createdAt: new Date(raw.created_at),
     updatedAt: new Date(raw.updated_at),
   };

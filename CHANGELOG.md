@@ -4,6 +4,26 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.25 — Identity tunnel summaries + inlined vault access
+
+### Added
+
+- **`TunnelSummary`** (py/ts/rust). Identity payloads now embed the tunnel as a durable-config summary: `id`, `tunnel_name` (TS `tunnelName`), `agent_identity_id` (TS `agentIdentityId`), `tls_mode`, `status`, `public_host`, `zone`, `created_at`, `updated_at`. Runtime state and cert material are deliberately not on it — the tunnels endpoints are the source of truth for those, and they always resolve `currently_connected` live, so a boolean you can read is never a stale placeholder. When you need live state or certs, fetch the full tunnel: `tunnels.get(identity.tunnel.id)` (Rust `tunnels().get(...)`).
+- **`Tunnel.agent_identity_id`** (TS `agentIdentityId: string | null`; Rust `Option<Uuid>`). Tunnel responses now name their owning identity (tunnels are 1:1 with identities), so tunnel→identity joins no longer need the tunnel-name-equals-handle convention. `null`/`None` only on pre-coupling tombstone rows, and absent on older servers (parses as `null`/`None`).
+- **`VaultSecret.access`** (all three SDKs). `vault.list_secrets()` and `vault.get_secret(...)` now inline each secret's access rules (the same `AccessRule` rows `get_access` returns), so rendering "who can read this secret" across N secrets no longer takes N follow-up calls. Empty on write-path responses and on servers that don't inline it; `get_access` / `grant_access` / `revoke_access` are unchanged.
+
+### Changed
+
+- **`identity.tunnel` is now a `TunnelSummary`** (was the full `Tunnel`) in all three SDKs, on both the identity object and the raw identity payload types. Code that read `identity.tunnel.public_host` / `.tls_mode` / `.status` / `.id` is unaffected; code that read `identity.tunnel.currently_connected` or cert fields should fetch the full tunnel via `tunnels.get(...)` — which also gets it fresher data than the embedded copy ever was.
+- Version bumped to 0.4.25 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+
+### Notes
+
+- **Wire tolerance.** The `TunnelSummary` parsers accept older identity payloads that still embed the full tunnel object (extra fields are ignored), and full-`Tunnel` parsing tolerates a missing `agent_identity_id`. `VaultSecret.access` defaults to empty when absent. All three SDKs work against servers on either side of this change.
+- **TypeScript note (source-breaking).** `Identity.tunnel` / `AgentIdentity.tunnel` narrow to `TunnelSummary | null`, and `VaultSecret` gains a required `access: AccessRule[]` — object literals built by hand (fixtures, mocks) need the new property; parsing defaults it to `[]`.
+- **Rust note (source-breaking).** `Tunnel` gains a public field (`agent_identity_id`), so struct-literal construction needs the new field; `AgentIdentity::tunnel()` now returns `Option<TunnelSummary>`; `VaultSecret` / `VaultSecretDetail` gain `access: Vec<AccessRule>`. Source-breaking, not wire-breaking — the same convention as 0.4.24's `Mailbox` fields.
+- **Python note (source-breaking).** `Tunnel` gains `agent_identity_id` as a positional dataclass field, and `AgentIdentity.tunnel` returns `TunnelSummary | None`. Keyword construction of `Tunnel(...)` in test fixtures needs the new argument.
+
 ## 0.4.24 — Mailbox storage caps + mail clients (IMAP/SMTP)
 
 ### Added

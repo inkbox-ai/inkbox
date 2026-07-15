@@ -19,21 +19,16 @@ IDENTITY_MAILBOX_DICT = {
     "updated_at": "2026-03-09T00:00:00Z",
 }
 
+# Identity payloads embed the tunnel as a durable-config summary; the full
+# tunnel (cert material, live connection state) comes from GET /tunnels/{id}.
 IDENTITY_TUNNEL_DICT = {
     "id": "ffff6666-0000-0000-0000-000000000001",
-    "organization_id": "org-abc123",
     "tunnel_name": "sales-agent",
+    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "tls_mode": "edge",
-    "cert_pem": None,
-    "cert_fingerprint_sha256": None,
-    "cert_expires_at": None,
     "status": "active",
-    "last_connected_at": None,
-    "last_connected_ip_addr": None,
-    "currently_connected": False,
     "public_host": "sales-agent.inkboxwire.com",
     "zone": "inkboxwire.com",
-    "metadata": {},
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:00:00Z",
 }

@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::mail::types::{FilterMode, FilterModeChangeNotice};
 use crate::phone::types::SmsStatus;
-use crate::tunnels::types::Tunnel;
+use crate::tunnels::types::TunnelSummary;
 
 // ---------------------------------------------------------------------------
 // Sentinel ("field omitted" vs explicit `null").
@@ -392,7 +392,7 @@ pub struct AgentIdentityData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phone_number: Option<IdentityPhoneNumber>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tunnel: Option<Tunnel>,
+    pub tunnel: Option<TunnelSummary>,
 }
 
 impl AgentIdentityData {
