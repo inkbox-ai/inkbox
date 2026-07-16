@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import os
 import stat as _stat
+import sys
 from pathlib import Path
 
 import pytest
+
+_posix_only = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="POSIX file-mode and symlink tests do not apply on Windows",
+)
 
 from inkbox.tunnels.client._envelope import parse_envelope
 from inkbox.tunnels.client._state import (
@@ -236,6 +242,7 @@ def test_save_and_load_state_roundtrip(tmp_path: Path):
     assert loaded == entry
 
 
+@_posix_only
 def test_state_file_is_chmod_0600(tmp_path: Path):
     entry = StateEntry(
         tunnel_id="abc", name="my-agent",
@@ -249,6 +256,7 @@ def test_state_file_is_chmod_0600(tmp_path: Path):
     assert mode == 0o600
 
 
+@_posix_only
 def test_state_dir_mode_0700(tmp_path: Path):
     state_dir = tmp_path / "tunnel"
     ensure_private_state_dir(state_dir)
@@ -267,6 +275,7 @@ def test_load_state_returns_none_for_corrupt(tmp_path: Path):
     assert load_state(state_dir) is None
 
 
+@_posix_only
 def test_symlinked_state_dir_is_refused(tmp_path: Path):
     real = tmp_path / "real"
     real.mkdir()
@@ -277,6 +286,7 @@ def test_symlinked_state_dir_is_refused(tmp_path: Path):
         ensure_private_state_dir(link)
 
 
+@_posix_only
 def test_write_private_file_creates_with_0600(tmp_path: Path):
     target = tmp_path / "private.pem"
     write_private_file(target, b"secret bytes")

@@ -8,10 +8,18 @@ URL-validation step let us through.
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from inkbox.tunnels.client import _listener
 from inkbox.tunnels.client._listener import connect
+
+
+_posix_only = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="connect() is POSIX-only; _check_posix() blocks on Windows",
+)
 
 
 class _FakeInkbox:
@@ -29,6 +37,7 @@ def _patch_bootstrap_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(_listener, "bootstrap", _stub)
 
 
+@_posix_only
 def test_forward_to_https_loopback_passes(monkeypatch: pytest.MonkeyPatch):
     """https:// loopback flows through validation cleanly."""
     _patch_bootstrap_raises(monkeypatch)
@@ -40,6 +49,7 @@ def test_forward_to_https_loopback_passes(monkeypatch: pytest.MonkeyPatch):
         )
 
 
+@_posix_only
 def test_forward_to_http_loopback_passes(monkeypatch: pytest.MonkeyPatch):
     """http:// loopback passes synchronous validation."""
     _patch_bootstrap_raises(monkeypatch)
@@ -51,6 +61,7 @@ def test_forward_to_http_loopback_passes(monkeypatch: pytest.MonkeyPatch):
         )
 
 
+@_posix_only
 def test_forward_to_callable_passes(monkeypatch: pytest.MonkeyPatch):
     """An ASGI callable as `forward_to` is accepted (no URL-only guard)."""
     _patch_bootstrap_raises(monkeypatch)
