@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import { CLI_VERSION } from "./client.js";
 import { registerWhoamiCommand } from "./commands/whoami.js";
 import { registerSignupCommands } from "./commands/signup.js";
@@ -20,6 +21,21 @@ import { registerWebhookCommands } from "./commands/webhook.js";
 import { registerContactsCommands } from "./commands/contacts.js";
 import { registerNotesCommands } from "./commands/notes.js";
 import { registerDomainCommands } from "./commands/domain.js";
+
+// Node's fetch ignores HTTP(S)_PROXY/NO_PROXY unless NODE_USE_ENV_PROXY is
+// enabled — a flag that only exists on Node 22.21+/24+ — which strands the
+// CLI in sandboxed/proxied environments. Install the env-proxy dispatcher
+// ourselves whenever proxy vars are present, on every supported Node
+// (NODE_USE_ENV_PROXY=0 opts out, matching Node's own semantics), and mark
+// it active so the SDK skips its proxy hint on connection errors.
+const proxyVars = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
+if (
+  process.env.NODE_USE_ENV_PROXY !== "0" &&
+  proxyVars.some((name) => process.env[name])
+) {
+  setGlobalDispatcher(new EnvHttpProxyAgent());
+  process.env.INKBOX_ENV_PROXY_ACTIVE = "1";
+}
 
 const program = new Command()
   .name("inkbox")

@@ -72,10 +72,15 @@ pub enum TunnelStatusValue {
 ///
 /// `public_host` and `zone` are guaranteed non-empty for live tunnels; the
 /// parser ([`Tunnel::from_value`]) errors on missing values.
+///
+/// `organization_id` and `currently_connected` are `None` when the server
+/// omits them — identity-embedded tunnel payloads may carry durable config
+/// only. Liveness is never fabricated; fetch the tunnel by id for live state.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Tunnel {
     pub id: Uuid,
-    pub organization_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organization_id: Option<String>,
     pub tunnel_name: String,
     pub tls_mode: TLSMode,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -91,12 +96,14 @@ pub struct Tunnel {
     pub last_connected_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_connected_ip_addr: Option<String>,
-    pub currently_connected: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currently_connected: Option<bool>,
     /// Customer-facing hostname (e.g. `my-agent.inkboxwire.com`). Non-empty
     /// for live tunnels.
     pub public_host: String,
     /// Zone endpoint for the data-plane. Non-empty for live tunnels.
     pub zone: String,
+    #[serde(default)]
     pub metadata: BTreeMap<String, Value>,
     /// ISO-8601 timestamp.
     pub created_at: String,
@@ -128,7 +135,7 @@ impl Tunnel {
             .and_then(|s| Uuid::parse_str(s).ok())
             .ok_or_else(|| InkboxError::Decode(de_err("tunnel response missing valid 'id'")))?;
 
-        let organization_id = str_field(obj, "organization_id")?;
+        let organization_id = opt_str(obj, "organization_id");
         let tunnel_name = str_field(obj, "tunnel_name")?;
 
         // `tls_mode`: a closed enum — coerce the raw string through serde.
@@ -182,11 +189,8 @@ impl Tunnel {
             status,
             last_connected_at: opt_str(obj, "last_connected_at"),
             last_connected_ip_addr: opt_str(obj, "last_connected_ip_addr"),
-            // `bool(data.get("currently_connected", False))`.
-            currently_connected: obj
-                .get("currently_connected")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false),
+            // `None` when the server didn't report liveness.
+            currently_connected: obj.get("currently_connected").and_then(|v| v.as_bool()),
             public_host,
             zone,
             metadata,
@@ -250,4 +254,47 @@ fn str_field(obj: &serde_json::Map<String, Value>, key: &str) -> Result<String> 
 /// Optional string field: `None` when absent or JSON null.
 fn opt_str(obj: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
     obj.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// Durable-config-only tunnel payload, as embedded in identity responses.
+    fn summary_json() -> Value {
+        json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "tunnel_name": "my-agent",
+            "agent_identity_id": "22222222-2222-2222-2222-222222222222",
+            "tls_mode": "edge",
+            "status": "active",
+            "public_host": "my-agent.inkboxwire.com",
+            "zone": "inkboxwire.com",
+            "created_at": "2025-01-01T00:00:00+00:00",
+            "updated_at": "2025-01-01T00:00:00+00:00",
+        })
+    }
+
+    #[test]
+    fn from_value_tolerates_omitted_fields() {
+        let t = Tunnel::from_value(&summary_json()).unwrap();
+        assert_eq!(t.organization_id, None);
+        assert_eq!(t.currently_connected, None);
+        assert_eq!(t.cert_pem, None);
+        assert_eq!(t.last_connected_at, None);
+        assert!(t.metadata.is_empty());
+        assert_eq!(t.public_host, "my-agent.inkboxwire.com");
+    }
+
+    #[test]
+    fn serde_derive_tolerates_omitted_fields() {
+        // The identity embed deserializes via the derive, not `from_value`.
+        let t: Tunnel = serde_json::from_value(summary_json()).unwrap();
+        assert_eq!(t.organization_id, None);
+        assert_eq!(t.currently_connected, None);
+        assert!(t.metadata.is_empty());
+        assert_eq!(t.status, TunnelStatusValue::Known(TunnelStatus::Active));
+    }
 }

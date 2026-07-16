@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.25 — Tunnel field tolerance
+
+### Changed
+
+- **Tunnel runtime/cert fields tolerate omission.** A future server release may slim identity-embedded tunnel payloads down to durable config. `Tunnel.organization_id` is now `str | None` and `Tunnel.currently_connected` is `bool | None` — `None` when the server doesn't report them (liveness is never fabricated as `False`; previously a missing `organization_id` raised `KeyError`). The certificate and last-connected fields were already nullable; a missing `metadata` still collapses to `{}`, and unknown keys are ignored. Fetch `tunnels.get(id)` for live state or cert material. Runtime behavior for full tunnel payloads is unchanged.
+- Version bumped to 0.4.25 in lockstep with `@inkbox/sdk`, `@inkbox/cli`, and the Rust crate. The proxy-support work in this release is TS/CLI-only — httpx already honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`.
+
 ## 0.4.24 — Mailbox storage caps, IMAP/SMTP
 
 ### Added

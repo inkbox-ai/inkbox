@@ -564,6 +564,10 @@ Full setup walkthrough:
 --json               Output as JSON (default: formatted tables)
 ```
 
+## Proxies
+
+The CLI honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` automatically on every supported Node version — no `NODE_USE_ENV_PROXY` needed. Set `NODE_USE_ENV_PROXY=0` to opt out.
+
 ## License
 
 MIT

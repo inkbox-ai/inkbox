@@ -27,7 +27,8 @@ export enum TunnelStatus {
 
 export interface Tunnel {
   id: string;
-  organizationId: string;
+  /** `null` when the server omits it (identity-embedded tunnel payloads may carry durable config only). */
+  organizationId: string | null;
   tunnelName: string;
   tlsMode: TLSMode;
   certPem: string | null;
@@ -42,7 +43,8 @@ export interface Tunnel {
   status: TunnelStatus | string;
   lastConnectedAt: Date | null;
   lastConnectedIpAddr: string | null;
-  currentlyConnected: boolean;
+  /** `null` when the server didn't report liveness (never fabricated) — fetch `tunnels.get(id)` for live state. */
+  currentlyConnected: boolean | null;
   /** Customer-facing hostname — e.g. `my-agent.inkboxwire.com` in production. Lower environments use a different tunnel zone. Non-null for live tunnels. */
   publicHost: string;
   /** Zone endpoint for the data-plane. Agents connect to `https://{zone}/_system/connect`. In production this is `inkboxwire.com`; lower environments use a different zone. Non-null for live tunnels. */
@@ -59,18 +61,20 @@ export interface SignedCert {
   certExpiresAt: Date;
 }
 
+// Fields the server may omit on identity-embedded tunnels (which can be
+// slimmed to durable config) are optional here.
 export interface RawTunnel {
   id: string;
-  organization_id: string;
+  organization_id?: string | null;
   tunnel_name: string;
   tls_mode: string;
-  cert_pem: string | null;
-  cert_fingerprint_sha256: string | null;
-  cert_expires_at: string | null;
+  cert_pem?: string | null;
+  cert_fingerprint_sha256?: string | null;
+  cert_expires_at?: string | null;
   status: string;
-  last_connected_at: string | null;
-  last_connected_ip_addr: string | null;
-  currently_connected: boolean;
+  last_connected_at?: string | null;
+  last_connected_ip_addr?: string | null;
+  currently_connected?: boolean | null;
   public_host: string;
   zone: string;
   metadata?: Record<string, unknown> | null;
@@ -99,7 +103,7 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
   }
   return {
     id: String(raw.id),
-    organizationId: String(raw.organization_id),
+    organizationId: raw.organization_id == null ? null : String(raw.organization_id),
     tunnelName: String(raw.tunnel_name),
     tlsMode: raw.tls_mode as TLSMode,
     certPem: raw.cert_pem ?? null,
@@ -108,7 +112,7 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
     status: raw.status,
     lastConnectedAt: parseDate(raw.last_connected_at),
     lastConnectedIpAddr: raw.last_connected_ip_addr ?? null,
-    currentlyConnected: Boolean(raw.currently_connected),
+    currentlyConnected: raw.currently_connected == null ? null : Boolean(raw.currently_connected),
     publicHost: raw.public_host,
     zone: raw.zone,
     metadata:

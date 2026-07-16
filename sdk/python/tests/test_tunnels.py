@@ -111,6 +111,31 @@ def test_metadata_always_dict(tunnels, http):
     assert out.metadata == {}
 
 
+def test_summary_payload_parses_with_omitted_fields(tunnels, http):
+    """A durable-config-only tunnel payload (as embedded in identity
+    responses) parses cleanly: omitted fields surface as None/{} rather
+    than fabricated values, and unknown keys are ignored."""
+    summary = {
+        "id": str(uuid4()),
+        "tunnel_name": "my-agent",
+        "agent_identity_id": str(uuid4()),
+        "tls_mode": "edge",
+        "status": "active",
+        "public_host": "my-agent.inkboxwire.com",
+        "zone": "inkboxwire.com",
+        "created_at": "2025-01-01T00:00:00+00:00",
+        "updated_at": "2025-01-01T00:00:00+00:00",
+    }
+    http.get.return_value = summary
+    out = tunnels.get("abc")
+    assert out.organization_id is None
+    assert out.currently_connected is None
+    assert out.cert_pem is None
+    assert out.last_connected_at is None
+    assert out.metadata == {}
+    assert out.public_host == "my-agent.inkboxwire.com"
+
+
 def test_missing_public_host_or_zone_raises(tunnels, http):
     bad = _server_tunnel()
     bad["public_host"] = ""

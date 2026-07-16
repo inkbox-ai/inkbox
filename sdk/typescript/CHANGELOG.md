@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.25 — Clearer connection errors, proxy hint, tunnel field tolerance
+
+### Added
+
+- **`InkboxConnectionError`.** New `InkboxError` subclass thrown when a request fails before any HTTP response exists — DNS failure, refused connection, TLS error, unreachable proxy. The message names the request URL and the underlying cause (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`) instead of Node's bare `TypeError: fetch failed`; the original fetch error is preserved on `cause`. When proxy environment variables (`HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`) are set but env-proxying can't actually be active, the message appends a hint: run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or configure a proxy-aware fetch dispatcher on older versions. The suppression is version-aware — `NODE_USE_ENV_PROXY` set on a Node that ignores it (pre-22.21 / 23.x) gets a dedicated warning naming the running version instead of silence.
+
+### Changed
+
+- **Tunnel runtime/cert fields tolerate omission.** A future server release may slim identity-embedded tunnel payloads down to durable config. `Tunnel.organizationId` is now `string | null` and `Tunnel.currentlyConnected` is `boolean | null` — `null` when the server doesn't report them (liveness is never fabricated as `false`). The certificate and last-connected fields were already nullable; a missing `metadata` still collapses to `{}`, and unknown keys are ignored. Fetch `tunnels.get(id)` for live state or cert material.
+
+### Notes
+
+- Scope of `InkboxConnectionError` is failures *before* a response: HTTP error responses still raise the `InkboxAPIError` family, and timeouts still surface as an abort. Code catching `InkboxError` picks the new error up automatically.
+- **Source-breaking.** The two `Tunnel` field types above changed (`string` → `string | null`, `boolean` → `boolean | null`), so strict-null consumers using them in non-null positions need a guard — the same caveat 0.4.24 carried for `Mailbox`.
+
 ## 0.4.24 — Mailbox storage caps, IMAP/SMTP
 
 ### Added
