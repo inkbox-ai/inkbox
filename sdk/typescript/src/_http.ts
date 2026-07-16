@@ -143,14 +143,36 @@ function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail):
   throw new InkboxAPIError(status, rawDetail);
 }
 
+/** NODE_USE_ENV_PROXY exists on Node 22.21+ within the 22.x line, and 24+. */
+export function nodeSupportsEnvProxy(version: string): boolean {
+  const [major = 0, minor = 0] = version.split(".").map(Number);
+  return major >= 24 || (major === 22 && minor >= 21);
+}
+
 // Node's fetch ignores HTTP(S)_PROXY/NO_PROXY unless NODE_USE_ENV_PROXY is
 // set, so behind a mandatory proxy every request dies with a bare
-// "fetch failed". Point the user at the fix.
+// "fetch failed". Point the user at the fix — unless env-proxying is
+// plausibly active: a proxy dispatcher was installed for this process
+// (INKBOX_ENV_PROXY_ACTIVE, set by the Inkbox CLI), or the flag is set on a
+// Node new enough to honor it. A flag pre-baked into the environment of an
+// older Node does nothing, so it must not silence the hint.
 function proxyHint(): string {
   const env = typeof process === "undefined" ? undefined : process.env;
-  if (!env || env.NODE_USE_ENV_PROXY) return "";
+  if (!env || env.INKBOX_ENV_PROXY_ACTIVE) return "";
   const vars = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"];
   if (!vars.some((name) => env[name])) return "";
+  const flag = env.NODE_USE_ENV_PROXY;
+  if (flag === "0") return ""; // explicit opt-out — the user knows the mechanism
+  const nodeVersion = process.versions?.node ?? "";
+  if (flag) {
+    if (nodeSupportsEnvProxy(nodeVersion)) return "";
+    return (
+      " NODE_USE_ENV_PROXY is set, but this Node version ignores it"
+      + ` (supported on Node 22.21+ / 24+; running ${nodeVersion}) — upgrade`
+      + " Node or configure a proxy-aware fetch dispatcher (e.g. undici's"
+      + " EnvHttpProxyAgent)."
+    );
+  }
   return (
     " Proxy environment variables are set, but Node's fetch ignores them by"
     + " default — run with NODE_USE_ENV_PROXY=1 (Node 22.21+ / 24+) or"

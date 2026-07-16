@@ -27,14 +27,14 @@ import { registerDomainCommands } from "./commands/domain.js";
 // CLI in sandboxed/proxied environments. Install the env-proxy dispatcher
 // ourselves whenever proxy vars are present, on every supported Node
 // (NODE_USE_ENV_PROXY=0 opts out, matching Node's own semantics), and mark
-// it enabled so the SDK skips its proxy hint on connection errors.
+// it active so the SDK skips its proxy hint on connection errors.
 const proxyVars = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
 if (
   process.env.NODE_USE_ENV_PROXY !== "0" &&
   proxyVars.some((name) => process.env[name])
 ) {
   setGlobalDispatcher(new EnvHttpProxyAgent());
-  process.env.NODE_USE_ENV_PROXY = "1";
+  process.env.INKBOX_ENV_PROXY_ACTIVE = "1";
 }
 
 const program = new Command()
