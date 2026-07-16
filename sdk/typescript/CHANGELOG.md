@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.25 — Clearer connection errors + proxy hint
+
+### Added
+
+- **`InkboxConnectionError`.** New `InkboxError` subclass thrown when a request fails before any HTTP response exists — DNS failure, refused connection, TLS error, unreachable proxy. The message names the request URL and the underlying cause (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`) instead of Node's bare `TypeError: fetch failed`; the original fetch error is preserved on `cause`. When proxy environment variables (`HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`) are set but Node isn't using them (no `NODE_USE_ENV_PROXY`), the message appends a hint: run with `NODE_USE_ENV_PROXY=1` or configure a proxy-aware fetch dispatcher.
+
+### Notes
+
+- Scope is failures *before* a response: HTTP error responses still raise the `InkboxAPIError` family, and timeouts still surface as an abort. Code catching `InkboxError` picks the new error up automatically.
+
 ## 0.4.24 — Mailbox storage caps, IMAP/SMTP
 
 ### Added

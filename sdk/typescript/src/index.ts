@@ -15,6 +15,7 @@ export type {
 export {
   DuplicateContactRuleError,
   InkboxAPIError,
+  InkboxConnectionError,
   InkboxError,
   InkboxVaultKeyError,
   RecipientBlockedError,

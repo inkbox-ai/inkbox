@@ -18,6 +18,19 @@ export class InkboxVaultKeyError extends InkboxError {
   }
 }
 
+/**
+ * Thrown when a request fails before any HTTP response is received —
+ * DNS failure, refused connection, TLS error, unreachable proxy.
+ * `cause` carries the underlying fetch error.
+ */
+export class InkboxConnectionError extends InkboxError {
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = "InkboxConnectionError";
+    this.cause = cause;
+  }
+}
+
 export type InkboxAPIErrorDetail = string | Record<string, unknown>;
 
 export class InkboxAPIError extends InkboxError {
@@ -128,6 +141,21 @@ function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail):
     throw new StorageLimitExceededError(status, rawDetail);
   }
   throw new InkboxAPIError(status, rawDetail);
+}
+
+// Node's fetch ignores HTTP(S)_PROXY/NO_PROXY unless NODE_USE_ENV_PROXY is
+// set, so behind a mandatory proxy every request dies with a bare
+// "fetch failed". Point the user at the fix.
+function proxyHint(): string {
+  const env = typeof process === "undefined" ? undefined : process.env;
+  if (!env || env.NODE_USE_ENV_PROXY) return "";
+  const vars = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"];
+  if (!vars.some((name) => env[name])) return "";
+  return (
+    " Proxy environment variables are set, but Node's fetch ignores them by"
+    + " default — run with NODE_USE_ENV_PROXY=1 or configure a proxy-aware"
+    + " fetch dispatcher."
+  );
 }
 
 async function readErrorDetail(resp: Response): Promise<InkboxAPIErrorDetail> {
@@ -441,6 +469,21 @@ export class HttpTransport {
         body: bodyPayload as BodyInit | undefined,
         signal: controller.signal,
       });
+    } catch (err) {
+      if (controller.signal.aborted) throw err;
+      // Node wraps the real error (ECONNREFUSED, ENOTFOUND, …) in a bare
+      // TypeError("fetch failed") whose cause holds the useful message.
+      const cause = err instanceof Error ? err.cause : undefined;
+      const reason =
+        cause instanceof Error && cause.message
+          ? cause.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      throw new InkboxConnectionError(
+        `Request to ${url} failed: ${reason}.${proxyHint()}`,
+        err,
+      );
     } finally {
       clearTimeout(timer);
     }

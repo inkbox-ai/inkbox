@@ -4,6 +4,22 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.25 — Proxy support in the CLI + clearer TypeScript connection errors
+
+### Added
+
+- **The CLI honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`.** Node's `fetch` ignores proxy environment variables unless `NODE_USE_ENV_PROXY` is set, so in sandboxed or proxied environments (where many agents run) every CLI command died with a bare `fetch failed`. The CLI now routes requests through the configured proxy automatically via undici's `EnvHttpProxyAgent` whenever a proxy variable is present; `NO_PROXY` is respected, and if `NODE_USE_ENV_PROXY` is already set the CLI defers to Node's own env-proxy handling instead. New runtime dependency for `@inkbox/cli`: `undici` (^7).
+- **`InkboxConnectionError` (TypeScript SDK).** New `InkboxError` subclass thrown when a request fails before any HTTP response exists — DNS failure, refused connection, TLS error, unreachable proxy. The message names the request URL and the underlying cause (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`) instead of Node's bare `TypeError: fetch failed`, and the original fetch error is preserved on `cause`. When proxy environment variables are set but Node isn't using them (no `NODE_USE_ENV_PROXY`), the message appends a hint: run with `NODE_USE_ENV_PROXY=1` or configure a proxy-aware fetch dispatcher.
+
+### Changed
+
+- Version bumped to 0.4.25 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+
+### Notes
+
+- The Python SDK (httpx) and Rust SDK (reqwest) already honor proxy environment variables by default — no changes there; versions move in lockstep.
+- Scope is failures *before* a response: HTTP error responses still raise the `InkboxAPIError` family, and timeouts still surface as an abort. Code that only catches `InkboxError` (or the CLI's error handler) picks the new error up automatically.
+
 ## 0.4.24 — Mailbox storage caps + mail clients (IMAP/SMTP)
 
 ### Added

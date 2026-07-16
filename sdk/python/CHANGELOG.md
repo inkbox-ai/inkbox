@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.25 — Lockstep release
+
+### Changed
+
+- Version bumped to 0.4.25 in lockstep with `@inkbox/sdk`, `@inkbox/cli`, and the Rust crate. No Python changes — httpx already honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`, which is what this release adds to the TypeScript CLI/SDK surface.
+
 ## 0.4.24 — Mailbox storage caps, IMAP/SMTP
 
 ### Added

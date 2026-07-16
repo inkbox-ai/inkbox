@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.25 — Proxy support (HTTP_PROXY / HTTPS_PROXY / NO_PROXY)
+
+### Added
+
+- **Proxy environment variables are honored.** Node's `fetch` ignores `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` unless `NODE_USE_ENV_PROXY` is set, so in sandboxed or proxied environments every command died with a bare `fetch failed`. The CLI now routes requests through the configured proxy automatically (undici's `EnvHttpProxyAgent`) whenever a proxy variable is present; `NO_PROXY` is respected, and if `NODE_USE_ENV_PROXY` is already set the CLI defers to Node's own env-proxy handling. New runtime dependency: `undici` (^7).
+- **Clearer connection errors.** A request that fails before any HTTP response (DNS failure, refused connection, unreachable proxy) now prints the request URL and the underlying cause — e.g. `Error: Request to https://… failed: getaddrinfo ENOTFOUND …` — instead of `Error: fetch failed` (via `@inkbox/sdk`'s new `InkboxConnectionError`).
+
 ## 0.4.24 — Mailbox storage caps + mail clients
 
 ### Added

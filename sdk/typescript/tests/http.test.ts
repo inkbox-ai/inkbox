@@ -1,6 +1,6 @@
 // sdk/typescript/tests/http.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HttpTransport, InkboxAPIError } from "../src/_http.js";
+import { HttpTransport, InkboxAPIError, InkboxConnectionError } from "../src/_http.js";
 
 const BASE = "https://inkbox.ai/api/v1";
 const API_KEY = "test-key";
@@ -40,6 +40,7 @@ describe("HttpTransport", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   function mockFetch(status: number, body: unknown, ok = status < 400) {
@@ -217,6 +218,59 @@ describe("HttpTransport", () => {
     const http = makeTransport();
 
     await expect(http.get("/fail")).rejects.toThrow("HTTP 502: Bad Gateway");
+  });
+
+  // --- Network errors ---
+
+  const PROXY_VARS = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"];
+
+  function stubProxyEnv(values: Record<string, string>) {
+    for (const name of PROXY_VARS) vi.stubEnv(name, values[name] ?? "");
+    vi.stubEnv("NODE_USE_ENV_PROXY", values.NODE_USE_ENV_PROXY ?? "");
+  }
+
+  it("wraps a network-level fetch failure with the underlying cause", async () => {
+    stubProxyEnv({});
+    vi.mocked(fetch).mockRejectedValue(
+      new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 203.0.113.1:443") }),
+    );
+    const http = makeTransport();
+
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InkboxConnectionError);
+    const connErr = err as InkboxConnectionError;
+    expect(connErr.message).toContain(`${BASE}/items`);
+    expect(connErr.message).toContain("connect ECONNREFUSED 203.0.113.1:443");
+    expect(connErr.message).not.toContain("NODE_USE_ENV_PROXY");
+    expect(connErr.cause).toBeInstanceOf(TypeError);
+  });
+
+  it("falls back to the fetch error message when there is no cause", async () => {
+    stubProxyEnv({});
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    await expect(http.get("/items")).rejects.toThrow("fetch failed");
+  });
+
+  it("hints about NODE_USE_ENV_PROXY when proxy env vars are set but unused", async () => {
+    stubProxyEnv({ HTTPS_PROXY: "http://proxy.example:3128" });
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    await expect(http.get("/items")).rejects.toThrow("NODE_USE_ENV_PROXY=1");
+  });
+
+  it("omits the proxy hint when NODE_USE_ENV_PROXY is already set", async () => {
+    stubProxyEnv({ HTTPS_PROXY: "http://proxy.example:3128", NODE_USE_ENV_PROXY: "1" });
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InkboxConnectionError);
+    expect((err as Error).message).not.toContain("NODE_USE_ENV_PROXY");
   });
 
   // --- Timeout ---
