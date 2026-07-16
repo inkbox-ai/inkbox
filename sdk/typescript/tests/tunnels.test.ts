@@ -117,6 +117,32 @@ describe("TunnelsResource", () => {
     expect(out.metadata).toEqual({});
   });
 
+  it("parses a durable-config-only payload without fabricating omitted fields", async () => {
+    // Identity-embedded tunnels may be slimmed to durable config; omitted
+    // fields must surface as null/{} and unknown keys must be ignored.
+    vi.mocked(fetch).mockResolvedValue(
+      makeResponse(200, {
+        id: "11111111-1111-1111-1111-111111111111",
+        tunnel_name: "my-agent",
+        agent_identity_id: "22222222-2222-2222-2222-222222222222",
+        tls_mode: "edge",
+        status: "active",
+        public_host: "my-agent.inkboxwire.com",
+        zone: "inkboxwire.com",
+        created_at: "2025-01-01T00:00:00+00:00",
+        updated_at: "2025-01-01T00:00:00+00:00",
+      }),
+    );
+    const t = tunnels();
+    const out = await t.get("abc");
+    expect(out.organizationId).toBeNull();
+    expect(out.currentlyConnected).toBeNull();
+    expect(out.certPem).toBeNull();
+    expect(out.lastConnectedAt).toBeNull();
+    expect(out.metadata).toEqual({});
+    expect(out.publicHost).toBe("my-agent.inkboxwire.com");
+  });
+
   // --- list() unwraps {tunnels: [...]} envelope ---
 
   it("list() unwraps the tunnels envelope", async () => {

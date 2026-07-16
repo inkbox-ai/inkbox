@@ -65,9 +65,14 @@ class Tunnel:
 
     ``public_host`` and ``zone`` are guaranteed non-empty for live
     tunnels; parser raises ``ValueError`` on missing values.
+
+    ``organization_id`` and ``currently_connected`` are ``None`` when the
+    server omits them — identity-embedded tunnel payloads may carry
+    durable config only. Liveness is never fabricated; fetch
+    ``tunnels.get(id)`` for live state.
     """
     id: UUID
-    organization_id: str
+    organization_id: str | None
     tunnel_name: str
     tls_mode: TLSMode
     cert_pem: str | None
@@ -76,7 +81,7 @@ class Tunnel:
     status: TunnelStatus | str
     last_connected_at: datetime | None
     last_connected_ip_addr: str | None
-    currently_connected: bool
+    currently_connected: bool | None
     public_host: str
     zone: str
     metadata: dict[str, Any]
@@ -102,9 +107,11 @@ class Tunnel:
             raise ValueError("tunnel response missing required field 'public_host'")
         if not isinstance(zone, str) or not zone:
             raise ValueError("tunnel response missing required field 'zone'")
+        raw_org = data.get("organization_id")
+        raw_connected = data.get("currently_connected")
         return cls(
             id=UUID(str(data["id"])),
-            organization_id=str(data["organization_id"]),
+            organization_id=None if raw_org is None else str(raw_org),
             tunnel_name=str(data["tunnel_name"]),
             tls_mode=TLSMode(str(data["tls_mode"])),
             cert_pem=data.get("cert_pem"),
@@ -113,7 +120,7 @@ class Tunnel:
             status=status,
             last_connected_at=_parse_dt(data.get("last_connected_at")),
             last_connected_ip_addr=data.get("last_connected_ip_addr"),
-            currently_connected=bool(data.get("currently_connected", False)),
+            currently_connected=None if raw_connected is None else bool(raw_connected),
             public_host=public_host,
             zone=zone,
             metadata=metadata,

@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
-## 0.4.25 — Proxy support in the CLI + clearer TypeScript connection errors
+## 0.4.25 — Proxy support in the CLI, clearer TS connection errors, tunnel field tolerance
 
 ### Added
 
@@ -13,12 +13,15 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- **Tunnel runtime/cert fields tolerate omission (all three SDKs).** A future server release may slim identity-embedded tunnel payloads down to durable config, dropping `organization_id`, `cert_pem`, `cert_fingerprint_sha256`, `cert_expires_at`, `currently_connected`, `last_connected_at`, `last_connected_ip_addr`, and `metadata`. Tunnel parsing in the Python, TypeScript, and Rust SDKs now tolerates all of those being absent: `organization_id` and `currently_connected` become nullable (`None`/`null` when not reported — liveness is never fabricated as `false`), the certificate and last-connected fields were already nullable, and a missing `metadata` still collapses to `{}`. Unknown keys (e.g. a future `agent_identity_id`) are ignored. Fetch the tunnel by id (`tunnels.get(...)`) when you need live connection state or cert material.
 - Version bumped to 0.4.25 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
 
 ### Notes
 
-- The Python SDK (httpx) and Rust SDK (reqwest) already honor proxy environment variables by default — no changes there; versions move in lockstep.
-- Scope is failures *before* a response: HTTP error responses still raise the `InkboxAPIError` family, and timeouts still surface as an abort. Code that only catches `InkboxError` (or the CLI's error handler) picks the new error up automatically.
+- The Python SDK (httpx) and Rust SDK (reqwest) already honor proxy environment variables by default — the proxy work is TS/CLI-only; versions move in lockstep.
+- Scope of `InkboxConnectionError` is failures *before* a response: HTTP error responses still raise the `InkboxAPIError` family, and timeouts still surface as an abort. Code that only catches `InkboxError` (or the CLI's error handler) picks the new error up automatically.
+- **Rust note (source-breaking).** `Tunnel.organization_id` is now `Option<String>` and `Tunnel.currently_connected` is now `Option<bool>`, so struct-literal construction and non-`Option` field reads no longer compile until adjusted — the same convention as 0.4.24's `Mailbox` fields.
+- **TypeScript note (source-breaking).** `Tunnel.organizationId` is now `string | null` and `Tunnel.currentlyConnected` is `boolean | null`, so strict-null consumers using them in non-null positions need a guard. Python is typing-only (`str | None` / `bool | None`); runtime behavior for full tunnel payloads is unchanged in all three.
 
 ## 0.4.24 — Mailbox storage caps + mail clients (IMAP/SMTP)
 
