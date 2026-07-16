@@ -23,10 +23,16 @@ import { registerNotesCommands } from "./commands/notes.js";
 import { registerDomainCommands } from "./commands/domain.js";
 
 // Node's fetch ignores HTTP(S)_PROXY/NO_PROXY unless NODE_USE_ENV_PROXY is
-// set, which strands the CLI in sandboxed/proxied environments. Honor them
-// ourselves, and set the flag so the SDK skips its proxy hint on errors.
+// enabled — a flag that only exists on Node 22.21+/24+ — which strands the
+// CLI in sandboxed/proxied environments. Install the env-proxy dispatcher
+// ourselves whenever proxy vars are present, on every supported Node
+// (NODE_USE_ENV_PROXY=0 opts out, matching Node's own semantics), and mark
+// it enabled so the SDK skips its proxy hint on connection errors.
 const proxyVars = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
-if (!process.env.NODE_USE_ENV_PROXY && proxyVars.some((name) => process.env[name])) {
+if (
+  process.env.NODE_USE_ENV_PROXY !== "0" &&
+  proxyVars.some((name) => process.env[name])
+) {
   setGlobalDispatcher(new EnvHttpProxyAgent());
   process.env.NODE_USE_ENV_PROXY = "1";
 }

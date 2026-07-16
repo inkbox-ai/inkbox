@@ -4,7 +4,7 @@
 
 ### Added
 
-- **`InkboxConnectionError`.** New `InkboxError` subclass thrown when a request fails before any HTTP response exists — DNS failure, refused connection, TLS error, unreachable proxy. The message names the request URL and the underlying cause (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`) instead of Node's bare `TypeError: fetch failed`; the original fetch error is preserved on `cause`. When proxy environment variables (`HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`) are set but Node isn't using them (no `NODE_USE_ENV_PROXY`), the message appends a hint: run with `NODE_USE_ENV_PROXY=1` or configure a proxy-aware fetch dispatcher.
+- **`InkboxConnectionError`.** New `InkboxError` subclass thrown when a request fails before any HTTP response exists — DNS failure, refused connection, TLS error, unreachable proxy. The message names the request URL and the underlying cause (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`) instead of Node's bare `TypeError: fetch failed`; the original fetch error is preserved on `cause`. When proxy environment variables (`HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`) are set but Node isn't using them (no `NODE_USE_ENV_PROXY`), the message appends a hint: run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or configure a proxy-aware fetch dispatcher on older versions.
 
 ### Changed
 

@@ -25,7 +25,7 @@ You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://i
 
 `new Inkbox(...)` resolves `apiKey` / `baseUrl` / `vaultKey` from the explicit option, then the matching env var (`INKBOX_API_KEY` / `INKBOX_BASE_URL` / `INKBOX_VAULT_KEY`), then a `~/.inkbox/config` file (`key = value` lines). The file fallback is handy for background/agent processes that don't inherit the shell's env, so `new Inkbox()` with no arguments works once the file is in place.
 
-**Behind a proxy?** The SDK uses Node's `fetch`, which ignores `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` by default — run with `NODE_USE_ENV_PROXY=1` or configure a proxy-aware fetch dispatcher (e.g. undici's `EnvHttpProxyAgent`). A request that can't connect throws `InkboxConnectionError` naming the URL and underlying cause, with this hint attached when proxy variables are set but unused.
+**Behind a proxy?** The SDK uses Node's `fetch`, which ignores `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` by default — run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or, on older versions, configure a proxy-aware fetch dispatcher (e.g. undici's `EnvHttpProxyAgent`). A request that can't connect throws `InkboxConnectionError` naming the URL and underlying cause, with this hint attached when proxy variables are set but unused.
 
 ## Quick start
 

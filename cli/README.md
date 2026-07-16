@@ -566,7 +566,7 @@ Full setup walkthrough:
 
 ## Proxies
 
-The CLI honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` automatically — no `NODE_USE_ENV_PROXY` needed. If `NODE_USE_ENV_PROXY` is already set, Node's own env-proxy handling is used instead.
+The CLI honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` automatically on every supported Node version — no `NODE_USE_ENV_PROXY` needed. Set `NODE_USE_ENV_PROXY=0` to opt out.
 
 ## License
 

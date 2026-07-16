@@ -153,8 +153,9 @@ function proxyHint(): string {
   if (!vars.some((name) => env[name])) return "";
   return (
     " Proxy environment variables are set, but Node's fetch ignores them by"
-    + " default — run with NODE_USE_ENV_PROXY=1 or configure a proxy-aware"
-    + " fetch dispatcher."
+    + " default — run with NODE_USE_ENV_PROXY=1 (Node 22.21+ / 24+) or"
+    + " configure a proxy-aware fetch dispatcher (e.g. undici's"
+    + " EnvHttpProxyAgent) on older versions."
   );
 }
 

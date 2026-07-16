@@ -259,7 +259,13 @@ describe("HttpTransport", () => {
     vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
     const http = makeTransport();
 
-    await expect(http.get("/items")).rejects.toThrow("NODE_USE_ENV_PROXY=1");
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect((err as Error).message).toContain("NODE_USE_ENV_PROXY=1");
+    // The flag only exists on Node 22.21+/24+; the hint must not send older
+    // runtimes down a dead end.
+    expect((err as Error).message).toContain("Node 22.21+ / 24+");
+    expect((err as Error).message).toContain("dispatcher");
   });
 
   it("omits the proxy hint when NODE_USE_ENV_PROXY is already set", async () => {
