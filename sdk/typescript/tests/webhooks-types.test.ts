@@ -397,6 +397,12 @@ describe("TextWebhookPayload", () => {
     const payload = loadFixture<TextWebhookPayload>("text_group_delivered.json");
     const message = payload.data.text_message;
     expect(message.remote_phone_number).toBeNull();
+    expect(message.delivery_status).toBe("delivered");
+    expect(message.sent_at).toBeNull();
+    expect(message.delivered_at).toBeNull();
+    expect(message.failed_at).toBeNull();
+    expect(message.error_code).toBeNull();
+    expect(message.error_detail).toBeNull();
     expect(message.type).toBe("mms");
     expect(message.media).toHaveLength(1);
     expect(message.conversation_id).toBeTypeOf("string");
@@ -420,6 +426,10 @@ describe("TextWebhookPayload", () => {
       for (const key of required) {
         expect(Object.prototype.hasOwnProperty.call(entry, key)).toBe(true);
       }
+      expect(entry.delivery_status).toBe("delivered");
+      expect(entry.sent_at).toBeTypeOf("string");
+      expect(entry.delivered_at).toBeTypeOf("string");
+      expect(entry.failed_at).toBeNull();
     }
     expect(payload.data.recipient_phone_number).toBe("+14155550999");
     expect(
