@@ -472,7 +472,7 @@ mod tests {
                     "limit": 1,
                     "current": 1,
                     "upgrade_url": "https://inkbox.ai/billing",
-                    "contact_email": "contact@inkbox.ai"
+                    "contact_email": "support@inkbox.ai"
                 }
             }));
         });

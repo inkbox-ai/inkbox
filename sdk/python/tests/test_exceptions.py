@@ -230,7 +230,7 @@ class TestDedicatedIMessageNumberErrors:
                     "limit": 2,
                     "current": 2,
                     "upgrade_url": "https://inkbox.ai/console/organizations?tab=billing",
-                    "contact_email": "contact@inkbox.ai",
+                    "contact_email": "support@inkbox.ai",
                 }
             },
         )
@@ -242,7 +242,7 @@ class TestDedicatedIMessageNumberErrors:
         assert err.number_type == "dedicated_outbound"
         assert err.limit == 2
         assert err.current == 2
-        assert err.contact_email == "contact@inkbox.ai"
+        assert err.contact_email == "support@inkbox.ai"
 
     def test_inventory_pending_prefers_retry_after_header(self):
         resp = httpx.Response(

@@ -240,7 +240,7 @@ describe("HttpTransport 409 routing", () => {
           limit: 2,
           current: 2,
           upgrade_url: "https://inkbox.ai/console/organizations?tab=billing",
-          contact_email: "contact@inkbox.ai",
+          contact_email: "support@inkbox.ai",
         },
       }),
     );
@@ -256,7 +256,7 @@ describe("HttpTransport 409 routing", () => {
       numberType: "dedicated_inbound",
       limit: 2,
       current: 2,
-      contactEmail: "contact@inkbox.ai",
+      contactEmail: "support@inkbox.ai",
     });
   });
 
