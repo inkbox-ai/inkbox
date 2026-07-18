@@ -4,10 +4,9 @@ inkbox/imessage/resources/imessages.py
 iMessage operations: send, list, conversations, reactions, read
 receipts, typing indicators, media upload.
 
-Unlike SMS, iMessage is not scoped to an org-owned phone number.
-Recipients are connected to an agent identity over a shared pool line
-by triage, so every method here keys off ``conversation_id`` /
-``agent_identity_id`` rather than a ``phone_number_id``.
+iMessage messaging operations are identity/assignment-scoped, so they key off
+``conversation_id`` / ``agent_identity_id`` rather than a local number ID.
+This resource also lists and claims organization-owned dedicated lines.
 """
 
 from __future__ import annotations
@@ -20,12 +19,15 @@ from inkbox.imessage.types import (
     IMessageAssignment,
     IMessageConversation,
     IMessageConversationSummary,
+    IMessageNumber,
+    IMessageNumberType,
     IMessageMarkReadResult,
     IMessageMediaUpload,
     IMessageReaction,
     IMessageReactionType,
     IMessageSendStyle,
     IMessageTriageNumber,
+    _dedicated_line_type,
 )
 
 if TYPE_CHECKING:
@@ -51,6 +53,36 @@ class IMessagesResource:
         data = self._http.get("/triage-number")
         return IMessageTriageNumber._from_dict(data)
 
+    def list_numbers(self) -> list[IMessageNumber]:
+        """List the organization's dedicated iMessage lines.
+
+        Attached and unattached lines are both returned. Released lines are
+        excluded by the server.
+        """
+        data = self._http.get("/numbers")
+        return [IMessageNumber._from_dict(line) for line in data]
+
+    def claim_number(
+        self,
+        *,
+        type: IMessageNumberType | str,
+    ) -> IMessageNumber:
+        """Claim a new dedicated iMessage line for the organization.
+
+        Dedicated inbound lines require the recipient to message first.
+        Dedicated outbound lines may start new conversations, subject to
+        server-side consent, contact-rule, and rate-limit checks.
+
+        Raises:
+            DedicatedIMessageLineQuotaExceededError: The organization has
+                reached its plan limit for the requested line type.
+            DedicatedIMessageLineInventoryPendingError: No matching line is
+                currently available; retry after the reported interval.
+        """
+        line_type = _dedicated_line_type(type).value
+        data = self._http.post("/numbers", json={"type": line_type})
+        return IMessageNumber._from_dict(data)
+
     def send(
         self,
         *,
@@ -61,11 +93,11 @@ class IMessagesResource:
         send_style: IMessageSendStyle | str | None = None,
         agent_identity_id: UUID | str | None = None,
     ) -> IMessage:
-        """Send an outbound iMessage through an existing assignment.
+        """Send an outbound iMessage.
 
-        Sends only work toward recipients that triage has already
-        connected to the agent identity — there is no cold outreach
-        over iMessage.
+        Shared and dedicated inbound service require an existing assignment.
+        An identity attached to a dedicated outbound line may start a new
+        conversation, subject to server-side policy checks.
 
         Args:
             to: E.164 recipient number. Mutually exclusive with

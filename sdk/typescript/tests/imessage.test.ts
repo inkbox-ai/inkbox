@@ -6,6 +6,8 @@ import { IMessageContactRulesResource } from "../src/imessage/resources/contactR
 import {
   IMessageAssignmentStatus,
   IMessageDeliveryStatus,
+  IMessageNumberStatus,
+  IMessageNumberType,
   IMessageReactionType,
   IMessageRuleAction,
   IMessageSendStyle,
@@ -22,6 +24,7 @@ const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
 const RULE_ID = "ffff6666-0000-0000-0000-000000000001";
 const REMOTE = "+15551234567";
 const HANDLE = "support-bot";
+const NUMBER_ID = "99999999-0000-0000-0000-000000000001";
 
 const IMESSAGE_DICT = {
   id: MSG_ID,
@@ -102,6 +105,16 @@ const CONTACT_RULE_DICT = {
   updated_at: "2026-06-01T00:00:00Z",
 };
 
+const NUMBER_DICT = {
+  id: NUMBER_ID,
+  number: "+15555550123",
+  type: "dedicated_outbound",
+  status: "active",
+  inbound_only: false,
+  agent_identity_id: IDENTITY_ID,
+  agent_handle: HANDLE,
+};
+
 function ok(body: unknown) {
   return {
     ok: true,
@@ -151,6 +164,57 @@ describe("IMessagesResource", () => {
     expect(msg.id).toBe(MSG_ID);
     expect(msg.service).toBe(IMessageService.IMESSAGE);
     expect(msg.status).toBe(IMessageDeliveryStatus.QUEUED);
+  });
+
+  it("lists attached and unattached organization-owned numbers", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok([
+      NUMBER_DICT,
+      {
+        ...NUMBER_DICT,
+        id: "99999999-0000-0000-0000-000000000002",
+        type: "dedicated_inbound",
+        status: "paused",
+        inbound_only: true,
+        agent_identity_id: null,
+        agent_handle: null,
+      },
+    ]));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const numbers = await resource.listNumbers();
+
+    const { url, init } = lastCall();
+    expect(url).toBe(`${BASE}/numbers`);
+    expect(init.method).toBe("GET");
+    expect(numbers[0]).toMatchObject({
+      type: IMessageNumberType.DEDICATED_OUTBOUND,
+      status: IMessageNumberStatus.ACTIVE,
+      inboundOnly: false,
+      agentIdentityId: IDENTITY_ID,
+      agentHandle: HANDLE,
+    });
+    expect(numbers[1]).toMatchObject({
+      type: IMessageNumberType.DEDICATED_INBOUND,
+      status: IMessageNumberStatus.PAUSED,
+      inboundOnly: true,
+      agentIdentityId: null,
+      agentHandle: null,
+    });
+  });
+
+  it("claims a number with the dedicated line type body", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok(NUMBER_DICT));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const number = await resource.claimNumber({
+      type: IMessageNumberType.DEDICATED_OUTBOUND,
+    });
+
+    const { url, init } = lastCall();
+    expect(url).toBe(`${BASE}/numbers`);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ type: "dedicated_outbound" });
+    expect(number.id).toBe(NUMBER_ID);
   });
 
   it("send by recipient omits the query string", async () => {

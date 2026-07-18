@@ -22,6 +22,7 @@ from inkbox.identities.types import (
     _AgentIdentityData,
     vault_secret_ids_to_wire,
 )
+from inkbox.imessage.types import IMessageNumberType, _dedicated_line_type
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -38,6 +39,7 @@ class IdentitiesResource:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        imessage_line_type: IMessageNumberType | str | None = None,
         mailbox: IdentityMailboxCreateOptions | None = None,
         tunnel: IdentityTunnelCreateOptions | None = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
@@ -56,9 +58,11 @@ class IdentitiesResource:
             description: Free-form org-internal description. Pass
                 ``None`` to leave the column null; omit entirely to defer
                 to the server default.
-            imessage_enabled: Whether the identity can be reached over
-                the shared iMessage service. Omit to defer to the server
-                default (``False``).
+            imessage_enabled: Whether the identity can use iMessage. Omit to
+                defer to the server default (``False``).
+            imessage_line_type: Claim and attach a new dedicated inbound or
+                outbound iMessage line atomically. Requires
+                ``imessage_enabled=True``.
             mailbox: Optional nested mailbox spec.
             tunnel: Optional nested tunnel spec (tls_mode only).
             phone_number: Optional phone-number provisioning payload.
@@ -75,6 +79,14 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if imessage_line_type is not None:
+            if imessage_enabled is not True:
+                raise ValueError(
+                    "imessage_line_type requires imessage_enabled=True"
+                )
+            body["imessage_line_type"] = _dedicated_line_type(
+                imessage_line_type
+            ).value
         if mailbox is not None:
             body["mailbox"] = mailbox.to_wire()
         if tunnel is not None:
@@ -108,6 +120,8 @@ class IdentitiesResource:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
+        imessage_line_type: IMessageNumberType | str | None = None,
         imessage_filter_mode: str | None = None,
         mail_filter_mode: str | None = None,
         phone_filter_mode: str | None = None,
@@ -126,7 +140,13 @@ class IdentitiesResource:
             new_handle: New handle value.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
-            imessage_enabled: Toggle shared-iMessage reachability.
+            imessage_enabled: Toggle iMessage reachability.
+            imessage_number_id: Attach an already-owned dedicated line by
+                UUID, pass ``None`` to move back to the shared service, or
+                omit to leave the current attachment unchanged.
+            imessage_line_type: Claim and attach a new dedicated line of the
+                requested type. Cannot be combined with
+                ``imessage_number_id``.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
             mail_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
@@ -146,6 +166,28 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if imessage_line_type is not None and imessage_number_id is not _UNSET:
+            raise ValueError(
+                "imessage_line_type and imessage_number_id cannot be set together"
+            )
+        if imessage_line_type is not None:
+            if imessage_enabled is False:
+                raise ValueError(
+                    "imessage_line_type cannot be set while disabling iMessage"
+                )
+            body["imessage_line_type"] = _dedicated_line_type(
+                imessage_line_type
+            ).value
+        if imessage_number_id is not _UNSET:
+            if imessage_enabled is False:
+                raise ValueError(
+                    "imessage_number_id cannot be set while disabling iMessage"
+                )
+            body["imessage_number_id"] = (
+                str(imessage_number_id)
+                if imessage_number_id is not None
+                else None
+            )
         if imessage_filter_mode is not None:
             body["imessage_filter_mode"] = imessage_filter_mode
         if mail_filter_mode is not None:

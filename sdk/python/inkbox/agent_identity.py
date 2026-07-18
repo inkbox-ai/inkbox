@@ -21,6 +21,7 @@ from inkbox.identities.types import (
     _UNSET,
     _AgentIdentityData,
     IdentityAccess,
+    IdentityIMessageNumber,
     IdentityMailbox,
     IdentityPhoneNumber,
 )
@@ -36,6 +37,7 @@ from inkbox.imessage.types import (
     IMessageReaction,
     IMessageReactionType,
     IMessageSendStyle,
+    IMessageNumberType,
 )
 from inkbox.mail.types import (
     ContactRuleStatus,
@@ -101,6 +103,7 @@ class AgentIdentity:
         self._inkbox = inkbox
         self._mailbox: IdentityMailbox | None = data.mailbox
         self._phone_number: IdentityPhoneNumber | None = data.phone_number
+        self._imessage_number: IdentityIMessageNumber | None = data.imessage_number
         self._tunnel: Tunnel | None = data.tunnel
         self._credentials: Credentials | None = None
         self._credentials_vault_ref: object | None = None  # tracks which _unlocked built the cache
@@ -138,7 +141,7 @@ class AgentIdentity:
 
     @property
     def imessage_enabled(self) -> bool:
-        """Whether this identity can be reached over the shared iMessage service."""
+        """Whether this identity can use iMessage."""
         return self._data.imessage_enabled
 
     @property
@@ -174,6 +177,11 @@ class AgentIdentity:
     @property
     def phone_number(self) -> IdentityPhoneNumber | None:
         return self._phone_number
+
+    @property
+    def imessage_number(self) -> IdentityIMessageNumber | None:
+        """Dedicated iMessage line attached to this identity, if any."""
+        return self._imessage_number
 
     @property
     def tunnel(self) -> Tunnel | None:
@@ -1028,9 +1036,9 @@ class AgentIdentity:
     ) -> IMessage:
         """Send an outbound iMessage as this identity.
 
-        Sends only work toward recipients that triage has already
-        connected to this identity over the shared iMessage service —
-        there is no cold outreach.
+        Shared and dedicated inbound service require the recipient to connect
+        first. A dedicated outbound line may start a conversation, subject to
+        server-side policy checks.
 
         Args:
             to: E.164 recipient number. Mutually exclusive with
@@ -1384,6 +1392,8 @@ class AgentIdentity:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
+        imessage_line_type: IMessageNumberType | str | None = None,
         imessage_filter_mode: FilterMode | str | None = None,
         mail_filter_mode: FilterMode | str | None = None,
         phone_filter_mode: FilterMode | str | None = None,
@@ -1401,7 +1411,13 @@ class AgentIdentity:
             new_handle: New agent handle.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
-            imessage_enabled: Toggle shared-iMessage reachability.
+            imessage_enabled: Toggle iMessage reachability.
+            imessage_number_id: Attach an already-owned dedicated line by
+                UUID, pass ``None`` to move back to the shared service, or
+                omit to keep the current attachment.
+            imessage_line_type: Claim and attach a new dedicated inbound or
+                outbound line. Cannot be combined with
+                ``imessage_number_id``.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
             mail_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
@@ -1423,6 +1439,10 @@ class AgentIdentity:
             update_kwargs["description"] = description
         if imessage_enabled is not None:
             update_kwargs["imessage_enabled"] = imessage_enabled
+        if imessage_number_id is not _UNSET:
+            update_kwargs["imessage_number_id"] = imessage_number_id
+        if imessage_line_type is not None:
+            update_kwargs["imessage_line_type"] = imessage_line_type
         if imessage_filter_mode is not None:
             update_kwargs["imessage_filter_mode"] = (
                 imessage_filter_mode.value
@@ -1461,12 +1481,18 @@ class AgentIdentity:
             phone_filter_mode=result.phone_filter_mode,
             mailbox=self._mailbox,
             phone_number=self._phone_number,
+            imessage_number=self._imessage_number,
             tunnel=self._tunnel,
         )
-        if new_handle is not None and self._tunnel is not None:
-            # The server renames the linked tunnel in the same transaction
-            # under the unified handle namespace; refresh to pick up the
-            # new tunnel_name / public_host on the cached tunnel.
+        if (
+            imessage_number_id is not _UNSET
+            or imessage_line_type is not None
+            or imessage_enabled is False
+            or (new_handle is not None and self._tunnel is not None)
+        ):
+            # Identity PATCH returns the summary shape, so refresh after line
+            # membership changes to hydrate the embedded iMessage number. A
+            # handle rename likewise needs the refreshed tunnel fields.
             self.refresh()
 
     def refresh(self) -> AgentIdentity:
@@ -1483,6 +1509,7 @@ class AgentIdentity:
         self._data = data
         self._mailbox = data.mailbox
         self._phone_number = data.phone_number
+        self._imessage_number = data.imessage_number
         self._tunnel = data.tunnel
         self._credentials = None
         return self

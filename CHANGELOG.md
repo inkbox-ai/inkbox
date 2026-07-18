@@ -4,6 +4,24 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.26 — Dedicated iMessage lines
+
+### Added
+
+- **Dedicated iMessage number management in all three SDKs.** The iMessage resource can list every dedicated number owned by the organization and claim a new `dedicated_inbound` or `dedicated_outbound` number. New `IMessageNumber`, `IMessageNumberType`, and `IMessageNumberStatus` types mirror the phone-number resource style while retaining iMessage-specific attachment and `inbound_only` fields.
+- **Atomic identity provisioning.** Identity creation and update accept `imessage_line_type` (TS `imessageLineType`) to claim and attach a dedicated number in the same operation. Identity update also exposes the existing `imessage_number_id` (TS `imessageNumberId`) attach/detach behavior, including explicit `null` to return to the shared service. Detailed identity responses now deserialize the attached iMessage number.
+- **Typed provisioning errors.** Dedicated-line quota (`402`) and inventory-pending (`503`) responses have dedicated error types with the structured quota, upgrade, contact, and retry fields available to callers.
+- **Dedicated-line examples and guidance.** The SDK documentation shows organization-level list/claim flows, create-time identity provisioning, swaps, shared-service fallback, and the distinction between inbound and outbound dedicated lines.
+
+### Changed
+
+- Version bumped to 0.4.26 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI has no new dedicated-line commands in this release; it moves in lockstep with the SDK packages.
+
+### Compatibility and rollout
+
+- Existing shared-service iMessage methods and unrelated identity operations are unchanged. The new number models tolerate nullable attachments, and detailed identity parsing tolerates responses that omit `imessage_number`.
+- Dedicated-line methods require an API version that exposes the iMessage number claim and identity provisioning fields. Quota exhaustion returns `402`; temporarily unavailable inventory returns `503` with a retry delay.
+
 ## 0.4.25 — Proxy support in the CLI, clearer TS connection errors, tunnel field tolerance
 
 ### Added

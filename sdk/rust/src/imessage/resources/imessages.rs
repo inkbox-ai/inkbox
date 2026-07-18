@@ -1,10 +1,9 @@
 //! iMessage operations: send, list, conversations, reactions, read
 //! receipts, typing indicators, media upload.
 //!
-//! Unlike SMS, iMessage is not scoped to an org-owned phone number.
-//! Recipients are connected to an agent identity over a shared pool line
-//! by triage, so every method here keys off `conversation_id` /
-//! `agent_identity_id` rather than a `phone_number_id`.
+//! Messages and conversations remain assignment-scoped. Dedicated number
+//! ownership is managed through [`IMessagesResource::list_numbers`] and
+//! [`IMessagesResource::claim_number`].
 
 use std::sync::Arc;
 
@@ -15,9 +14,9 @@ use crate::error::Result;
 use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::imessage::types::{
-    IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
-    IMessageMarkReadResult, IMessageMediaUpload, IMessageReaction, IMessageReactionType,
-    IMessageSendStyle, IMessageTriageNumber,
+    DedicatedIMessageLineType, IMessage, IMessageAssignment, IMessageConversation,
+    IMessageConversationSummary, IMessageMarkReadResult, IMessageMediaUpload, IMessageNumber,
+    IMessageReaction, IMessageReactionType, IMessageSendStyle, IMessageTriageNumber,
 };
 
 pub struct IMessagesResource {
@@ -42,10 +41,31 @@ impl IMessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// List the organization's dedicated iMessage lines, including lines that
+    /// are not currently attached to an identity.
+    pub fn list_numbers(&self) -> Result<Vec<IMessageNumber>> {
+        let data = self.http.get("/numbers", crate::http::NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Claim a dedicated iMessage line for the organization.
+    ///
+    /// The returned line is initially unattached. Pass its id to a line-aware
+    /// identity update to attach it, or claim and attach atomically through an
+    /// identity create/update operation.
+    pub fn claim_number(&self, line_type: DedicatedIMessageLineType) -> Result<IMessageNumber> {
+        let body = json!({ "type": line_type.as_str() });
+        let data = self
+            .http
+            .post("/numbers", Some(&body), crate::http::NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
     /// Send an outbound iMessage through an existing assignment.
     ///
-    /// Sends only work toward recipients that triage has already connected to
-    /// the agent identity — there is no cold outreach over iMessage.
+    /// Shared and dedicated-inbound lines require the recipient to connect
+    /// first. An identity attached to a dedicated-outbound line may initiate a
+    /// conversation, subject to server-side consent and rate limits.
     ///
     /// # Arguments
     /// * `to` - E.164 recipient number. Mutually exclusive with
@@ -360,5 +380,145 @@ impl IMessagesResource {
             content_type.unwrap_or("application/octet-stream"),
         )?;
         Ok(serde_json::from_value(data)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    use super::*;
+    use crate::client::Inkbox;
+    use crate::error::InkboxError;
+    use crate::imessage::types::{IMessageNumberStatus, IMessageNumberType};
+
+    fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
+        Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap()
+    }
+
+    fn number_json() -> serde_json::Value {
+        json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "number": "+15550001111",
+            "type": "dedicated_outbound",
+            "status": "active",
+            "inbound_only": false,
+            "agent_identity_id": null,
+            "agent_handle": null
+        })
+    }
+
+    #[test]
+    fn list_numbers_parses_unattached_line() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/imessage/numbers");
+            then.status(200).json_body(json!([number_json()]));
+        });
+
+        let numbers = client(&server).imessages().list_numbers().unwrap();
+        mock.assert();
+        assert_eq!(numbers.len(), 1);
+        assert_eq!(numbers[0].r#type, IMessageNumberType::DedicatedOutbound);
+        assert_eq!(numbers[0].status, IMessageNumberStatus::Active);
+        assert!(!numbers[0].inbound_only);
+        assert!(numbers[0].can_start_conversation());
+        assert_eq!(numbers[0].agent_identity_id, None);
+        assert_eq!(numbers[0].agent_handle, None);
+    }
+
+    #[test]
+    fn claim_number_sends_exact_line_type() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/imessage/numbers")
+                .json_body(json!({ "type": "dedicated_outbound" }));
+            then.status(201).json_body(number_json());
+        });
+
+        let number = client(&server)
+            .imessages()
+            .claim_number(DedicatedIMessageLineType::DedicatedOutbound)
+            .unwrap();
+        mock.assert();
+        assert_eq!(number.r#type, IMessageNumberType::DedicatedOutbound);
+    }
+
+    #[test]
+    fn claim_number_parses_quota_error() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/v1/imessage/numbers");
+            then.status(402).json_body(json!({
+                "detail": {
+                    "error": "dedicated_imessage_line_quota_exceeded",
+                    "message": "Line allowance reached.",
+                    "line_type": "dedicated_inbound",
+                    "limit": 1,
+                    "current": 1,
+                    "upgrade_url": "https://inkbox.ai/billing",
+                    "contact_email": "contact@inkbox.ai"
+                }
+            }));
+        });
+
+        let error = client(&server)
+            .imessages()
+            .claim_number(DedicatedIMessageLineType::DedicatedInbound)
+            .unwrap_err();
+        mock.assert();
+        match error {
+            InkboxError::DedicatedIMessageLineQuotaExceeded {
+                line_type,
+                limit,
+                current,
+                ..
+            } => {
+                assert_eq!(line_type.as_ref(), "dedicated_inbound");
+                assert_eq!(limit, 1);
+                assert_eq!(current, 1);
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn claim_number_parses_inventory_retry_after() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/v1/imessage/numbers");
+            then.status(503)
+                .header("Retry-After", "3600")
+                .json_body(json!({
+                    "detail": {
+                        "error": "dedicated_imessage_line_inventory_pending",
+                        "message": "More lines are being added.",
+                        "line_type": "dedicated_outbound",
+                        "retry_after_seconds": 86400
+                    }
+                }));
+        });
+
+        let error = client(&server)
+            .imessages()
+            .claim_number(DedicatedIMessageLineType::DedicatedOutbound)
+            .unwrap_err();
+        mock.assert();
+        match error {
+            InkboxError::DedicatedIMessageLineInventoryPending {
+                retry_after_seconds,
+                retry_after_header,
+                ..
+            } => {
+                assert_eq!(retry_after_seconds, 3_600);
+                assert_eq!(retry_after_header, Some(3_600));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 }

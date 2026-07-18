@@ -10,6 +10,7 @@ import {
   RAW_IDENTITY_DETAIL,
   RAW_IDENTITY_MAILBOX,
   RAW_IDENTITY_PHONE,
+  RAW_IDENTITY_IMESSAGE_NUMBER,
   RAW_IDENTITY,
   RAW_MAILBOX,
   RAW_MESSAGE,
@@ -39,6 +40,13 @@ const PARSED_PHONE = {
   updatedAt: RAW_IDENTITY_PHONE.updated_at,
 };
 
+const PARSED_IMESSAGE_NUMBER = {
+  id: RAW_IDENTITY_IMESSAGE_NUMBER.id,
+  number: RAW_IDENTITY_IMESSAGE_NUMBER.number,
+  type: RAW_IDENTITY_IMESSAGE_NUMBER.type,
+  inboundOnly: RAW_IDENTITY_IMESSAGE_NUMBER.inbound_only,
+};
+
 function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityData {
   return {
     id: RAW_IDENTITY_DETAIL.id,
@@ -49,6 +57,7 @@ function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityDa
     updatedAt: RAW_IDENTITY_DETAIL.updated_at,
     mailbox: PARSED_MAILBOX,
     phoneNumber: PARSED_PHONE,
+    imessageNumber: PARSED_IMESSAGE_NUMBER,
     ...overrides,
   };
 }
@@ -98,12 +107,17 @@ describe("AgentIdentity properties", () => {
     const identity = new AgentIdentity(makeData(), mockInkbox());
     expect(identity.mailbox).toEqual(PARSED_MAILBOX);
     expect(identity.phoneNumber).toEqual(PARSED_PHONE);
+    expect(identity.imessageNumber).toEqual(PARSED_IMESSAGE_NUMBER);
   });
 
   it("returns null for missing channels", () => {
-    const identity = new AgentIdentity(makeData({ mailbox: null, phoneNumber: null }), mockInkbox());
+    const identity = new AgentIdentity(
+      makeData({ mailbox: null, phoneNumber: null, imessageNumber: null }),
+      mockInkbox(),
+    );
     expect(identity.mailbox).toBeNull();
     expect(identity.phoneNumber).toBeNull();
+    expect(identity.imessageNumber).toBeNull();
   });
 });
 
@@ -730,6 +744,74 @@ describe("AgentIdentity management", () => {
     await identity.update({ displayName: "New Display" });
 
     expect(ink._idsResource.get).not.toHaveBeenCalled();
+  });
+
+  it("update refreshes the embedded iMessage number after claiming a line", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._idsResource.update).mockResolvedValue({
+      id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
+      agentHandle: RAW_IDENTITY.agent_handle,
+      emailAddress: RAW_IDENTITY.email_address,
+      createdAt: RAW_IDENTITY.created_at,
+      updatedAt: RAW_IDENTITY.updated_at,
+    });
+    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({
+      imessageNumber: PARSED_IMESSAGE_NUMBER,
+    }));
+    const identity = new AgentIdentity(makeData({ imessageNumber: null }), ink);
+
+    await identity.update({ imessageLineType: "dedicated_outbound" });
+
+    expect(ink._idsResource.update).toHaveBeenCalledWith("sales-agent", {
+      imessageLineType: "dedicated_outbound",
+    });
+    expect(ink._idsResource.get).toHaveBeenCalledWith("sales-agent");
+    expect(identity.imessageNumber).toEqual(PARSED_IMESSAGE_NUMBER);
+  });
+
+  it("update refreshes after moving back to shared iMessage", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._idsResource.update).mockResolvedValue({
+      id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
+      agentHandle: RAW_IDENTITY.agent_handle,
+      emailAddress: RAW_IDENTITY.email_address,
+      createdAt: RAW_IDENTITY.created_at,
+      updatedAt: RAW_IDENTITY.updated_at,
+    });
+    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({ imessageNumber: null }));
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.update({ imessageNumberId: null });
+
+    expect(ink._idsResource.get).toHaveBeenCalledWith("sales-agent");
+    expect(identity.imessageNumber).toBeNull();
+  });
+
+  it("update refreshes a detached number when disabling iMessage", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._idsResource.update).mockResolvedValue({
+      id: RAW_IDENTITY.id,
+      organizationId: RAW_IDENTITY.organization_id,
+      agentHandle: RAW_IDENTITY.agent_handle,
+      emailAddress: RAW_IDENTITY.email_address,
+      imessageEnabled: false,
+      createdAt: RAW_IDENTITY.created_at,
+      updatedAt: RAW_IDENTITY.updated_at,
+    });
+    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({
+      imessageEnabled: false,
+      imessageNumber: null,
+    }));
+    const identity = new AgentIdentity(makeData({
+      imessageNumber: PARSED_IMESSAGE_NUMBER,
+    }), ink);
+
+    await identity.update({ imessageEnabled: false });
+
+    expect(ink._idsResource.get).toHaveBeenCalledWith("sales-agent");
+    expect(identity.imessageNumber).toBeNull();
   });
 
   it("refresh re-fetches identity data", async () => {

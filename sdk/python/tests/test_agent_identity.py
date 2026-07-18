@@ -434,3 +434,57 @@ class TestAgentIdentityUpdate:
         identity.update(display_name="New Display")
 
         inkbox._ids_resource.get.assert_not_called()
+
+    def test_line_claim_refreshes_embedded_number(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(
+            IDENTITY_DICT
+        )
+        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(
+            IDENTITY_DETAIL_DICT
+        )
+
+        identity.update(imessage_line_type="dedicated_outbound")
+
+        inkbox._ids_resource.update.assert_called_once_with(
+            "sales-agent", imessage_line_type="dedicated_outbound"
+        )
+        inkbox._ids_resource.get.assert_called_once_with("sales-agent")
+        assert identity.imessage_number is not None
+        assert identity.imessage_number.can_start_conversations is True
+
+    def test_explicit_null_detach_refreshes_to_shared(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(
+            IDENTITY_DICT
+        )
+        shared_detail = {**IDENTITY_DETAIL_DICT, "imessage_number": None}
+        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(
+            shared_detail
+        )
+
+        identity.update(imessage_number_id=None)
+
+        inkbox._ids_resource.update.assert_called_once_with(
+            "sales-agent", imessage_number_id=None
+        )
+        assert identity.imessage_number is None
+
+    def test_disabling_imessage_refreshes_detached_number(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(
+            {**IDENTITY_DICT, "imessage_enabled": False}
+        )
+        shared_detail = {
+            **IDENTITY_DETAIL_DICT,
+            "imessage_enabled": False,
+            "imessage_number": None,
+        }
+        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(
+            shared_detail
+        )
+
+        identity.update(imessage_enabled=False)
+
+        inkbox._ids_resource.get.assert_called_once_with("sales-agent")
+        assert identity.imessage_number is None

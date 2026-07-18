@@ -44,11 +44,25 @@ def _read_blocking_namespace(detail: Any) -> BlockingNamespace:
 def map_identity_conflict_error(err: InkboxAPIError) -> Exception:
     """If ``err`` is a 409 collision from the identities surface,
     return a :class:`HandleUnavailableError`; else return ``err``."""
-    if err.status_code == 409:
+    detail = err.detail
+    is_handle_conflict = False
+    if isinstance(detail, dict):
+        is_handle_conflict = (
+            detail.get("code") == "agent_handle_unavailable"
+            or detail.get("error") == "agent_handle_unavailable"
+            or _read_blocking_namespace(detail) is not None
+        )
+    elif isinstance(detail, str):
+        normalized = detail.lower()
+        is_handle_conflict = "handle" in normalized and (
+            "unavailable" in normalized or "already" in normalized
+        )
+
+    if err.status_code == 409 and is_handle_conflict:
         return HandleUnavailableError(
             err.status_code,
-            err.detail,
-            _read_blocking_namespace(err.detail),
+            detail,
+            _read_blocking_namespace(detail),
         )
     return err
 

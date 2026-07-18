@@ -248,6 +248,12 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
         return Ok(resp);
     }
 
+    let retry_after_header = resp
+        .0
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
     let body = resp.0.text().unwrap_or_default();
     // `detail` is the `detail` field if the body is a JSON object, else the
     // raw text (matching `resp.json().get("detail", resp.text)`).
@@ -307,6 +313,65 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .unwrap_or("")
                         .to_string(),
                     limit_bytes: map.get("limit_bytes").and_then(Value::as_u64),
+                    detail: Box::new(raw_detail),
+                });
+            }
+            if map.get("error").and_then(|e| e.as_str())
+                == Some("dedicated_imessage_line_quota_exceeded")
+            {
+                return Err(InkboxError::DedicatedIMessageLineQuotaExceeded {
+                    status_code: status,
+                    message: map
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    line_type: map
+                        .get("line_type")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    limit: map.get("limit").and_then(Value::as_i64).unwrap_or(0),
+                    current: map.get("current").and_then(Value::as_i64).unwrap_or(0),
+                    upgrade_url: map
+                        .get("upgrade_url")
+                        .and_then(|u| u.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    contact_email: map
+                        .get("contact_email")
+                        .and_then(|e| e.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    detail: Box::new(raw_detail),
+                });
+            }
+        }
+    }
+
+    if status == 503 {
+        if let Value::Object(map) = &raw_detail {
+            if map.get("error").and_then(|e| e.as_str())
+                == Some("dedicated_imessage_line_inventory_pending")
+            {
+                let detail_retry_after = map
+                    .get("retry_after_seconds")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0);
+                return Err(InkboxError::DedicatedIMessageLineInventoryPending {
+                    status_code: status,
+                    message: map
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    line_type: map
+                        .get("line_type")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    retry_after_seconds: retry_after_header.unwrap_or(detail_retry_after),
+                    retry_after_header,
                     detail: Box::new(raw_detail),
                 });
             }

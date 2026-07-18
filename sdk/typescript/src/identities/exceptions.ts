@@ -52,7 +52,16 @@ export function readBlockingNamespace(detail: InkboxAPIErrorDetail): BlockingNam
  * error untouched so it propagates as-is.
  */
 export function mapIdentityConflictError(err: InkboxAPIError): Error {
-  if (err.statusCode === 409) {
+  const detail = err.detail;
+  const discriminator =
+    detail && typeof detail === "object" && !Array.isArray(detail)
+      ? String(
+          (detail as Record<string, unknown>)["code"]
+          ?? (detail as Record<string, unknown>)["error"]
+          ?? "",
+        )
+      : "";
+  if (err.statusCode === 409 && discriminator === "agent_handle_unavailable") {
     return new HandleUnavailableError(
       err.statusCode,
       err.detail,

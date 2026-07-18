@@ -13,6 +13,8 @@ import httpx
 
 from inkbox._cookies import CookieJar
 from inkbox.exceptions import (
+    DedicatedIMessageLineInventoryPendingError,
+    DedicatedIMessageLineQuotaExceededError,
     DuplicateContactRuleError,
     InkboxAPIError,
     RecipientBlockedError,
@@ -243,6 +245,26 @@ def _raise_for_status(resp: httpx.Response) -> None:
     ):
         raise StorageLimitExceededError(
             status_code=resp.status_code, detail=raw_detail,
+        )
+
+    if (
+        resp.status_code == 402
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "dedicated_imessage_line_quota_exceeded"
+    ):
+        raise DedicatedIMessageLineQuotaExceededError(
+            status_code=resp.status_code, detail=raw_detail,
+        )
+
+    if (
+        resp.status_code == 503
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "dedicated_imessage_line_inventory_pending"
+    ):
+        raise DedicatedIMessageLineInventoryPendingError(
+            status_code=resp.status_code,
+            detail=raw_detail,
+            retry_after=resp.headers.get("Retry-After"),
         )
 
     raise InkboxAPIError(status_code=resp.status_code, detail=raw_detail)

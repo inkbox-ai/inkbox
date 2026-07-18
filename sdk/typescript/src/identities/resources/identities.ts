@@ -8,6 +8,7 @@
  */
 
 import { HttpTransport, InkboxAPIError } from "../../_http.js";
+import type { IMessageDedicatedLineType } from "../../imessage/types.js";
 import { mapIdentityConflictError } from "../exceptions.js";
 import {
   AgentIdentitySummary,
@@ -15,6 +16,7 @@ import {
   IdentityMailboxCreateOptions,
   IdentityPhoneNumberCreateOptions,
   IdentityTunnelCreateOptions,
+  UpdateIdentityOptions,
   _AgentIdentityData,
   RawAgentIdentitySummary,
   RawAgentIdentityData,
@@ -43,8 +45,10 @@ export class IdentitiesResource {
    * @param options.description - Free-form org-internal description.
    *   `null` leaves the column null; omit to defer to server default.
    * @param options.imessageEnabled - Whether the identity can be reached
-   *   over the shared iMessage service. Omit to defer to the server
+   *   over iMessage. Omit to defer to the server
    *   default (`false`).
+   * @param options.imessageLineType - Dedicated line role to claim and
+   *   attach atomically. Requires `imessageEnabled: true`.
    * @param options.mailbox - Optional nested mailbox spec. Mailbox is
    *   always provisioned; this just lets the caller customize.
    * @param options.tunnel - Optional nested tunnel spec (tlsMode only).
@@ -57,15 +61,20 @@ export class IdentitiesResource {
     displayName?: string;
     description?: string | null;
     imessageEnabled?: boolean;
+    imessageLineType?: IMessageDedicatedLineType;
     mailbox?: IdentityMailboxCreateOptions;
     tunnel?: IdentityTunnelCreateOptions;
     phoneNumber?: IdentityPhoneNumberCreateOptions;
     vaultSecretIds?: string | string[] | "*" | "all";
   }): Promise<_AgentIdentityData> {
+    if (options.imessageLineType !== undefined && options.imessageEnabled !== true) {
+      throw new Error("imessageLineType requires imessageEnabled: true");
+    }
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if (options.imessageLineType !== undefined) body["imessage_line_type"] = options.imessageLineType;
     if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
     if (options.tunnel !== undefined) body["tunnel"] = identityTunnelCreateOptionsToWire(options.tunnel);
     if (options.phoneNumber !== undefined) body["phone_number"] = identityPhoneNumberCreateOptionsToWire(options.phoneNumber);
@@ -108,6 +117,9 @@ export class IdentitiesResource {
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
    * @param options.imessageEnabled - Toggle shared-iMessage reachability.
+   * @param options.imessageNumberId - Attach an owned dedicated line, or
+   *   pass `null` to return to shared service.
+   * @param options.imessageLineType - Claim and attach a new dedicated line.
    * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
    *   for iMessage contact rules (admin-only).
    * @param options.mailFilterMode - `"whitelist"` or `"blacklist"` for this
@@ -120,22 +132,25 @@ export class IdentitiesResource {
    */
   async update(
     agentHandle: string,
-    options: {
-      newHandle?: string;
-      displayName?: string | null;
-      description?: string | null;
-      imessageEnabled?: boolean;
-      imessageFilterMode?: "whitelist" | "blacklist";
-      mailFilterMode?: "whitelist" | "blacklist";
-      phoneFilterMode?: "whitelist" | "blacklist";
-      status?: "active" | "paused";
-    },
+    options: UpdateIdentityOptions,
   ): Promise<AgentIdentitySummary> {
+    const hasNumberId = "imessageNumberId" in options;
+    if (options.imessageLineType !== undefined && hasNumberId) {
+      throw new Error("imessageLineType and imessageNumberId cannot be set together");
+    }
+    if (
+      options.imessageEnabled === false
+      && (options.imessageLineType !== undefined || hasNumberId)
+    ) {
+      throw new Error("iMessage number changes cannot be combined with disabling iMessage");
+    }
     const body: Record<string, unknown> = {};
     if (options.newHandle !== undefined) body["agent_handle"] = options.newHandle;
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if ("imessageNumberId" in options) body["imessage_number_id"] = options.imessageNumberId;
+    if (options.imessageLineType !== undefined) body["imessage_line_type"] = options.imessageLineType;
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
     if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;

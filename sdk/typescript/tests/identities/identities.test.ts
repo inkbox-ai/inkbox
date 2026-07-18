@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { IdentitiesResource } from "../../src/identities/resources/identities.js";
 import type { HttpTransport } from "../../src/_http.js";
+import { IMessageNumberType } from "../../src/imessage/types.js";
 import {
   RAW_IDENTITY,
   RAW_IDENTITY_DETAIL,
@@ -97,6 +98,25 @@ describe("IdentitiesResource.create", () => {
       vault_secret_ids: "11111111-1111-1111-1111-111111111111",
     });
   });
+
+  it("claims and attaches a dedicated iMessage line during create", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_DETAIL);
+    const res = new IdentitiesResource(http);
+
+    const identity = await res.create({
+      agentHandle: HANDLE,
+      imessageEnabled: true,
+      imessageLineType: IMessageNumberType.DEDICATED_OUTBOUND,
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/", {
+      agent_handle: HANDLE,
+      imessage_enabled: true,
+      imessage_line_type: "dedicated_outbound",
+    });
+    expect(identity.imessageNumber?.type).toBe("dedicated_outbound");
+  });
 });
 
 describe("IdentitiesResource.list", () => {
@@ -154,6 +174,68 @@ describe("IdentitiesResource.update", () => {
 
     const [, body] = vi.mocked(http.patch).mock.calls[0] as [string, Record<string, unknown>];
     expect(body["agent_handle"]).toBe("new-handle");
+  });
+
+  it("claims a dedicated line during update", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
+    const res = new IdentitiesResource(http);
+
+    await res.update(HANDLE, {
+      imessageLineType: IMessageNumberType.DEDICATED_INBOUND,
+    });
+
+    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
+      imessage_line_type: "dedicated_inbound",
+    });
+  });
+
+  it("preserves explicit null when moving back to shared iMessage", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
+    const res = new IdentitiesResource(http);
+
+    await res.update(HANDLE, { imessageNumberId: null });
+
+    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
+      imessage_number_id: null,
+    });
+  });
+
+  it("passes through line attachment conflicts without remapping them as handle errors", async () => {
+    const http = mockHttp();
+    const { InkboxAPIError } = await import("../../src/_http.js");
+    vi.mocked(http.patch).mockRejectedValue(new InkboxAPIError(409, {
+      error: "line_already_attached",
+      message: "Choose another line.",
+    }));
+    const res = new IdentitiesResource(http);
+
+    const err = await res.update(HANDLE, {
+      imessageNumberId: "99999999-0000-0000-0000-000000000001",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InkboxAPIError);
+    expect(err).toMatchObject({ name: "InkboxAPIError" });
+  });
+
+  it("still maps an actual handle collision", async () => {
+    const http = mockHttp();
+    const { InkboxAPIError } = await import("../../src/_http.js");
+    const { HandleUnavailableError } = await import("../../src/identities/exceptions.js");
+    vi.mocked(http.patch).mockRejectedValue(new InkboxAPIError(409, {
+      code: "agent_handle_unavailable",
+      message: "That handle is unavailable.",
+      blocking_namespace: "identities",
+    }));
+    const res = new IdentitiesResource(http);
+
+    const err = await res.update(HANDLE, {
+      newHandle: "already-used",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(HandleUnavailableError);
+    expect(err).toMatchObject({ blockingNamespace: "identities" });
   });
 });
 

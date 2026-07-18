@@ -1,15 +1,99 @@
 //! Types mirroring the Inkbox iMessage API response models.
 //!
-//! iMessage routes by assignment, not by a number the org owns: a
-//! recipient is connected to an agent identity over a shared pool line,
-//! and every agent-facing shape is keyed by `conversation_id` /
-//! `remote_number`. The local pool number is never exposed.
+//! iMessage messages and conversations route by assignment and remain keyed by
+//! `conversation_id` / `remote_number`. Dedicated number ownership is exposed
+//! separately through [`IMessageNumber`].
 
 use uuid::Uuid;
 
 // `ContactRuleStatus` lives in the mail domain; Python imports it from
 // `inkbox.mail.types`, so we re-export the shared type rather than duplicate it.
 pub use crate::mail::types::ContactRuleStatus;
+
+/// Dedicated iMessage line role accepted by claim and identity operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DedicatedIMessageLineType {
+    DedicatedInbound,
+    DedicatedOutbound,
+}
+
+impl DedicatedIMessageLineType {
+    /// The value sent to the API.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DedicatedIMessageLineType::DedicatedInbound => "dedicated_inbound",
+            DedicatedIMessageLineType::DedicatedOutbound => "dedicated_outbound",
+        }
+    }
+}
+
+/// Role of an iMessage service number.
+///
+/// Organization number endpoints currently return dedicated lines, while the
+/// broader enum keeps response parsing compatible with every server role.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IMessageNumberType {
+    Triage,
+    SharedInbound,
+    DedicatedInbound,
+    DedicatedOutbound,
+}
+
+impl IMessageNumberType {
+    /// Whether this line may start a new conversation.
+    pub fn can_start_conversation(&self) -> bool {
+        matches!(self, IMessageNumberType::DedicatedOutbound)
+    }
+}
+
+/// Lifecycle state of an iMessage service number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IMessageNumberStatus {
+    Active,
+    Paused,
+    Released,
+}
+
+/// An organization-owned dedicated iMessage line.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IMessageNumber {
+    pub id: Uuid,
+    /// E.164 number.
+    pub number: String,
+    pub r#type: IMessageNumberType,
+    pub status: IMessageNumberStatus,
+    /// `false` only for a dedicated outbound line.
+    pub inbound_only: bool,
+    /// Attached identity, or `None` while the line is available to the org.
+    #[serde(default)]
+    pub agent_identity_id: Option<Uuid>,
+    /// Attached identity handle, or `None` while the line is available.
+    #[serde(default)]
+    pub agent_handle: Option<String>,
+}
+
+impl IMessageNumber {
+    /// Whether this line may start a new conversation.
+    pub fn can_start_conversation(&self) -> bool {
+        self.r#type.can_start_conversation()
+    }
+}
+
+/// Dedicated iMessage line embedded in a detailed identity response.
+///
+/// This shape is intentionally slimmer than [`IMessageNumber`]: attachment
+/// and lifecycle fields are only present on the organization number endpoints.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct IdentityIMessageNumber {
+    pub id: Uuid,
+    /// E.164 number.
+    pub number: String,
+    pub r#type: IMessageNumberType,
+    pub inbound_only: bool,
+}
 
 /// Transport a message actually went over (iMessage may downgrade).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -200,9 +284,8 @@ pub struct IMessageMessageReaction {
 
 /// An iMessage in an assignment-routed conversation.
 ///
-/// There is no local-number field: shared pool lines are hidden from
-/// agents, so messages are identified by `conversation_id` and the
-/// counterparty `remote_number` only.
+/// Message rows do not expose their local service number, so messages are
+/// identified by `conversation_id` and the counterparty `remote_number`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessage {
     pub id: Uuid,
@@ -358,4 +441,46 @@ pub struct IMessageContactRule {
 /// a missing/null value to `"active"`).
 fn default_assignment_status() -> IMessageAssignmentStatus {
     IMessageAssignmentStatus::Active
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn dedicated_line_type_serializes_to_wire_value() {
+        assert_eq!(
+            serde_json::to_value(DedicatedIMessageLineType::DedicatedInbound).unwrap(),
+            json!("dedicated_inbound")
+        );
+        assert_eq!(
+            serde_json::to_value(DedicatedIMessageLineType::DedicatedOutbound).unwrap(),
+            json!("dedicated_outbound")
+        );
+    }
+
+    #[test]
+    fn outbound_capability_is_derived_from_number_type() {
+        assert!(!IMessageNumberType::DedicatedInbound.can_start_conversation());
+        assert!(IMessageNumberType::DedicatedOutbound.can_start_conversation());
+        assert!(!IMessageNumberType::SharedInbound.can_start_conversation());
+    }
+
+    #[test]
+    fn number_attachment_fields_accept_null() {
+        let number: IMessageNumber = serde_json::from_value(json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "number": "+15550001111",
+            "type": "dedicated_inbound",
+            "status": "paused",
+            "inbound_only": true,
+            "agent_identity_id": null,
+            "agent_handle": null
+        }))
+        .unwrap();
+        assert_eq!(number.agent_identity_id, None);
+        assert_eq!(number.agent_handle, None);
+    }
 }

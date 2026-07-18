@@ -407,8 +407,10 @@ export class Inkbox {
    * @param options.description - Free-form org-internal description.
    *   Never surfaces in outbound mail. Omit to leave null.
    * @param options.imessageEnabled - Whether this identity can be reached
-   *   over the shared iMessage service. Defaults server-side to `false`;
+   *   over iMessage. Defaults server-side to `false`;
    *   pass `true` to opt in.
+   * @param options.imessageLineType - Dedicated iMessage line role to claim
+   *   and attach atomically. Requires `imessageEnabled: true`.
    * @param options.emailLocalPart - Optional requested mailbox local part.
    *   On the platform domain the server forces it to the handle; only
    *   meaningful on a custom sending domain.
@@ -439,6 +441,7 @@ export class Inkbox {
     if (options.displayName !== undefined) createArgs.displayName = options.displayName;
     if (options.description !== undefined) createArgs.description = options.description;
     if (options.imessageEnabled !== undefined) createArgs.imessageEnabled = options.imessageEnabled;
+    if (options.imessageLineType !== undefined) createArgs.imessageLineType = options.imessageLineType;
     if (options.tunnel !== undefined) createArgs.tunnel = options.tunnel;
     const data = await this._idsResource.create(createArgs);
     return new AgentIdentity(data, this);

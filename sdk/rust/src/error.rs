@@ -86,6 +86,34 @@ pub enum InkboxError {
         detail: Box<Value>,
     },
 
+    /// 402 when the organization has reached its dedicated iMessage line
+    /// allowance for the requested role.
+    #[error("HTTP {status_code}: dedicated iMessage line quota exceeded ({message})")]
+    DedicatedIMessageLineQuotaExceeded {
+        status_code: u16,
+        message: Box<str>,
+        /// Requested line role.
+        line_type: Box<str>,
+        limit: i64,
+        current: i64,
+        upgrade_url: Box<str>,
+        contact_email: Box<str>,
+        detail: Box<Value>,
+    },
+
+    /// 503 when no dedicated iMessage line is currently available to claim.
+    #[error("HTTP {status_code}: dedicated iMessage line inventory pending ({message})")]
+    DedicatedIMessageLineInventoryPending {
+        status_code: u16,
+        message: Box<str>,
+        /// Requested line role.
+        line_type: Box<str>,
+        retry_after_seconds: u64,
+        /// Parsed delta-seconds value from the HTTP `Retry-After` header.
+        retry_after_header: Option<u64>,
+        detail: Box<Value>,
+    },
+
     /// A vault key did not meet requirements, or a vault crypto operation failed.
     /// Mirrors `InkboxVaultKeyError`.
     #[error("vault key error: {0}")]

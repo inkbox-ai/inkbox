@@ -12,6 +12,7 @@ import {
   RAW_IDENTITY_DETAIL,
   RAW_IDENTITY_MAILBOX,
   RAW_IDENTITY_PHONE,
+  RAW_IDENTITY_IMESSAGE_NUMBER,
 } from "../sampleData.js";
 
 describe("parseAgentIdentitySummary", () => {
@@ -51,12 +52,35 @@ describe("parseAgentIdentityData", () => {
     expect(d.mailbox!.emailAddress).toBe("sales-agent@inkbox.ai");
     expect(d.phoneNumber).not.toBeNull();
     expect(d.phoneNumber!.number).toBe("+18335794607");
+    expect(d.imessageNumber).toEqual({
+      id: RAW_IDENTITY_IMESSAGE_NUMBER.id,
+      number: "+15555550123",
+      type: "dedicated_outbound",
+      inboundOnly: false,
+    });
   });
 
   it("returns null for missing channels", () => {
-    const d = parseAgentIdentityData({ ...RAW_IDENTITY, mailbox: null, phone_number: null });
+    const d = parseAgentIdentityData({
+      ...RAW_IDENTITY,
+      mailbox: null,
+      phone_number: null,
+      imessage_number: null,
+      tunnel: null,
+    });
     expect(d.mailbox).toBeNull();
     expect(d.phoneNumber).toBeNull();
+    expect(d.imessageNumber).toBeNull();
+  });
+
+  it("derives inboundOnly for older embedded line responses", () => {
+    const { inbound_only: _omitted, ...number } = RAW_IDENTITY_IMESSAGE_NUMBER;
+    const d = parseAgentIdentityData({
+      ...RAW_IDENTITY_DETAIL,
+      imessage_number: { ...number, type: "dedicated_inbound" },
+    });
+
+    expect(d.imessageNumber?.inboundOnly).toBe(true);
   });
 });
 

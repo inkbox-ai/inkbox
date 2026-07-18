@@ -1,13 +1,12 @@
 /**
  * inkbox-imessage/resources/imessages.ts
  *
- * iMessage operations: send, list, conversations, reactions, read
- * receipts, typing indicators, media upload.
+ * iMessage operations: dedicated lines, send, list, conversations,
+ * reactions, read receipts, typing indicators, media upload.
  *
- * Unlike SMS, iMessage is not scoped to an org-owned phone number.
- * Recipients are connected to an agent identity over a shared pool
- * line by triage, so every method here keys off `conversationId` /
- * `agentIdentityId` rather than a `phoneNumberId`.
+ * Conversation operations key off `conversationId` / `agentIdentityId`.
+ * Dedicated line inventory is managed through `listNumbers` and
+ * `claimNumber`.
  */
 
 import { HttpTransport } from "../../_http.js";
@@ -16,6 +15,8 @@ import {
   IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
+  IMessageDedicatedLineType,
+  IMessageNumber,
   IMessageMarkReadResult,
   IMessageMediaUpload,
   IMessageReaction,
@@ -26,12 +27,14 @@ import {
   RawIMessageAssignment,
   RawIMessageConversation,
   RawIMessageConversationSummary,
+  RawIMessageNumber,
   RawIMessageReaction,
   RawIMessageTriageNumber,
   parseIMessage,
   parseIMessageAssignment,
   parseIMessageConversation,
   parseIMessageConversationSummary,
+  parseIMessageNumber,
   parseIMessageReaction,
   parseIMessageTriageNumber,
 } from "../types.js";
@@ -55,10 +58,40 @@ export class IMessagesResource {
   }
 
   /**
+   * List every non-released dedicated iMessage line owned by the
+   * organization, including unattached lines.
+   */
+  async listNumbers(): Promise<IMessageNumber[]> {
+    const data = await this.http.get<RawIMessageNumber[]>("/numbers");
+    return data.map(parseIMessageNumber);
+  }
+
+  /**
+   * Claim one dedicated iMessage line for the organization.
+   *
+   * Claiming does not attach the line to an identity. Pass
+   * `imessageLineType` during identity creation or update to claim and
+   * attach atomically, or pass an owned line's id as `imessageNumberId`
+   * during identity update.
+   *
+   * @throws {DedicatedIMessageLineQuotaExceededError} 402 when the
+   *   organization has reached its quota for the requested line type.
+   * @throws {DedicatedIMessageLineInventoryPendingError} 503 when line
+   *   inventory is pending; inspect `retryAfterSeconds` before retrying.
+   */
+  async claimNumber(options: { type: IMessageDedicatedLineType }): Promise<IMessageNumber> {
+    const data = await this.http.post<RawIMessageNumber>("/numbers", {
+      type: options.type,
+    });
+    return parseIMessageNumber(data);
+  }
+
+  /**
    * Send an outbound iMessage through an existing assignment.
    *
-   * Sends only work toward recipients that triage has already connected
-   * to the agent identity — there is no cold outreach over iMessage.
+   * Shared and dedicated-inbound lines require the recipient to connect
+   * first. An identity attached to a dedicated-outbound line may initiate
+   * a conversation, subject to server-side consent and rate limits.
    * Inbound replies and reactions arrive via identity-owned webhook
    * subscriptions (`inkbox.webhooks.subscriptions.create({
    * agentIdentityId, url, eventTypes: ["imessage.received", ...] })`).

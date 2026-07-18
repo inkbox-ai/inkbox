@@ -104,3 +104,19 @@ class TestCreateIdentitySendingDomain:
         wire = kwargs["mailbox"].to_wire()
         assert wire == {"sending_domain": "mail.acme.com"}
         client.close()
+
+    def test_passes_atomic_imessage_line_claim(self):
+        client, mock_ids = self._client()
+        mock_ids.create.return_value = mock_ids.get.return_value
+
+        identity = client.create_identity(
+            "sales-agent",
+            imessage_enabled=True,
+            imessage_line_type="dedicated_outbound",
+        )
+
+        _, kwargs = mock_ids.create.call_args
+        assert kwargs["imessage_enabled"] is True
+        assert kwargs["imessage_line_type"] == "dedicated_outbound"
+        assert identity.imessage_number is not None
+        client.close()

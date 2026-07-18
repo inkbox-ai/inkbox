@@ -10,6 +10,7 @@ from uuid import UUID
 from sample_data_identities import (
     IDENTITY_DICT,
     IDENTITY_DETAIL_DICT,
+    IDENTITY_IMESSAGE_NUMBER_DICT,
     IDENTITY_MAILBOX_DICT,
     IDENTITY_PHONE_DICT,
 )
@@ -18,8 +19,10 @@ from inkbox.identities.types import (
     _AgentIdentityData,
     IdentityMailbox,
     IdentityMailboxCreateOptions,
+    IdentityIMessageNumber,
     IdentityPhoneNumber,
 )
+from inkbox.imessage.types import IMessageNumberType
 
 
 class TestAgentIdentitySummaryParsing:
@@ -43,12 +46,38 @@ class TestAgentIdentityDataParsing:
         assert d.mailbox.email_address == "sales-agent@inkbox.ai"
         assert isinstance(d.phone_number, IdentityPhoneNumber)
         assert d.phone_number.number == "+18335794607"
+        assert isinstance(d.imessage_number, IdentityIMessageNumber)
+        assert d.imessage_number.type is IMessageNumberType.DEDICATED_OUTBOUND
+        assert d.imessage_number.can_start_conversations is True
 
     def test_no_channels(self):
         d = _AgentIdentityData._from_dict(IDENTITY_DICT)
 
         assert d.mailbox is None
         assert d.phone_number is None
+        assert d.imessage_number is None
+
+
+class TestIdentityIMessageNumberParsing:
+    def test_parses_embedded_number(self):
+        number = IdentityIMessageNumber._from_dict(IDENTITY_IMESSAGE_NUMBER_DICT)
+
+        assert isinstance(number.id, UUID)
+        assert number.number == "+15551230001"
+        assert number.type is IMessageNumberType.DEDICATED_OUTBOUND
+        assert number.inbound_only is False
+
+    def test_derives_inbound_only_when_omitted(self):
+        payload = {
+            **IDENTITY_IMESSAGE_NUMBER_DICT,
+            "type": "dedicated_inbound",
+        }
+        payload.pop("inbound_only")
+
+        number = IdentityIMessageNumber._from_dict(payload)
+
+        assert number.inbound_only is True
+        assert number.can_start_conversations is False
 
 
 class TestIdentityMailboxParsing:

@@ -113,6 +113,50 @@ exposes channel-scoped convenience methods: `send_email`, `forward_email`,
 (`list_mail_contact_rules`, `create_phone_contact_rule`, ...), `create_signing_key`,
 and more.
 
+### Dedicated iMessage lines
+
+List or claim organization-owned dedicated lines through the iMessage resource:
+
+```rust
+use inkbox::imessage::DedicatedIMessageLineType;
+
+let available = inkbox.imessages().list_numbers()?;
+let line = inkbox
+    .imessages()
+    .claim_number(DedicatedIMessageLineType::DedicatedOutbound)?;
+
+assert!(!line.inbound_only);
+assert!(line.can_start_conversation());
+```
+
+A line can also be claimed and attached atomically while creating an identity:
+
+```rust
+use inkbox::identities::Unset;
+use inkbox::imessage::DedicatedIMessageLineType;
+
+let identity = inkbox.create_identity_with_imessage_line(
+    "support-bot",
+    None,
+    Unset::Omit,
+    Some(true),
+    None,
+    Unset::Omit,
+    None,
+    None,
+    None,
+    Some(DedicatedIMessageLineType::DedicatedInbound),
+)?;
+
+let line = identity.imessage_number().expect("dedicated line");
+assert!(line.inbound_only);
+```
+
+For an existing identity, `update_with_imessage_line` can attach an already
+owned line by id, move back to shared iMessage service with an explicit null, or
+claim and attach a new line by type. Dedicated outbound lines are the only line
+type that can start a new conversation.
+
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.

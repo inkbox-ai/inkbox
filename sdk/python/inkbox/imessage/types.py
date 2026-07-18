@@ -3,10 +3,9 @@ inkbox/imessage/types.py
 
 Dataclasses mirroring the Inkbox iMessage API response models.
 
-iMessage routes by assignment, not by a number the org owns: a
-recipient is connected to an agent identity over a shared pool line,
-and every agent-facing shape is keyed by ``conversation_id`` /
-``remote_number``. The local pool number is never exposed.
+iMessage records route by assignment and are keyed by ``conversation_id`` /
+``remote_number``. Shared local numbers are never exposed; dedicated-line
+ownership and attachment are represented separately by ``IMessageNumber``.
 """
 
 from __future__ import annotations
@@ -83,6 +82,34 @@ class IMessageAssignmentStatus(StrEnum):
     RELEASED = "released"
 
 
+class IMessageNumberType(StrEnum):
+    """Role of an iMessage service number."""
+
+    TRIAGE = "triage"
+    SHARED_INBOUND = "shared_inbound"
+    DEDICATED_INBOUND = "dedicated_inbound"
+    DEDICATED_OUTBOUND = "dedicated_outbound"
+
+
+class IMessageNumberStatus(StrEnum):
+    """Lifecycle status of an iMessage service number."""
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+    RELEASED = "released"
+
+
+def _dedicated_line_type(value: IMessageNumberType | str) -> IMessageNumberType:
+    """Validate a line role accepted by claim and identity provisioning."""
+    line_type = IMessageNumberType(value)
+    if line_type not in {
+        IMessageNumberType.DEDICATED_INBOUND,
+        IMessageNumberType.DEDICATED_OUTBOUND,
+    }:
+        raise ValueError("line type must be dedicated_inbound or dedicated_outbound")
+    return line_type
+
+
 class IMessageRuleAction(StrEnum):
     """Whether a matching remote number is allowed through or blocked."""
 
@@ -98,6 +125,48 @@ class IMessageRuleMatchType(StrEnum):
 
 def _dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
+
+
+@dataclass
+class IMessageNumber:
+    """An organization-owned dedicated iMessage line.
+
+    ``agent_identity_id`` and ``agent_handle`` are both ``None`` while the
+    line is unattached. Only dedicated outbound lines may start a new
+    conversation before the recipient messages first.
+    """
+
+    id: UUID
+    number: str
+    type: IMessageNumberType
+    status: IMessageNumberStatus
+    inbound_only: bool
+    agent_identity_id: UUID | None
+    agent_handle: str | None
+
+    @property
+    def can_start_conversations(self) -> bool:
+        """Whether this line may initiate a conversation."""
+        return self.type is IMessageNumberType.DEDICATED_OUTBOUND
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IMessageNumber:
+        raw_identity_id = d.get("agent_identity_id")
+        line_type = IMessageNumberType(d["type"])
+        return cls(
+            id=UUID(d["id"]),
+            number=d["number"],
+            type=line_type,
+            status=IMessageNumberStatus(d["status"]),
+            inbound_only=d.get(
+                "inbound_only",
+                line_type is not IMessageNumberType.DEDICATED_OUTBOUND,
+            ),
+            agent_identity_id=(
+                UUID(raw_identity_id) if raw_identity_id is not None else None
+            ),
+            agent_handle=d.get("agent_handle"),
+        )
 
 
 @dataclass
@@ -179,9 +248,9 @@ class IMessageMessageReaction:
 class IMessage:
     """An iMessage in an assignment-routed conversation.
 
-    There is no local-number field: shared pool lines are hidden from
-    agents, so messages are identified by ``conversation_id`` and the
-    counterparty ``remote_number`` only.
+    Message rows do not expose their local service number, so messages are
+    identified by ``conversation_id`` and the counterparty
+    ``remote_number``.
     """
 
     id: UUID

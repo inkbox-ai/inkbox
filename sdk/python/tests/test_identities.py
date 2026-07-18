@@ -7,6 +7,8 @@ Tests for IdentitiesResource.
 from unittest.mock import MagicMock
 from uuid import UUID
 
+import pytest
+
 from sample_data_identities import (
     IDENTITY_DICT,
     IDENTITY_DETAIL_DICT,
@@ -21,6 +23,7 @@ from inkbox.identities.types import (
     IdentityTunnelCreateOptions,
     _AgentIdentityData,
 )
+from inkbox.imessage.types import IMessageNumberType
 
 
 def _resource():
@@ -91,6 +94,38 @@ class TestIdentitiesCreate:
         )
         assert identity.email_address == "sales.team@inkboxmail.com"
 
+    def test_claims_imessage_line_atomically(self):
+        res, http = _resource()
+        http.post.return_value = IDENTITY_DETAIL_DICT
+
+        identity = res.create(
+            agent_handle=HANDLE,
+            imessage_enabled=True,
+            imessage_line_type=IMessageNumberType.DEDICATED_OUTBOUND,
+        )
+
+        http.post.assert_called_once_with(
+            "/",
+            json={
+                "agent_handle": HANDLE,
+                "imessage_enabled": True,
+                "imessage_line_type": "dedicated_outbound",
+            },
+        )
+        assert identity.imessage_number is not None
+        assert identity.imessage_number.can_start_conversations is True
+
+    def test_line_claim_requires_imessage_enabled_true(self):
+        res, http = _resource()
+
+        with pytest.raises(ValueError, match="imessage_enabled=True"):
+            res.create(
+                agent_handle=HANDLE,
+                imessage_line_type="dedicated_inbound",
+            )
+
+        http.post.assert_not_called()
+
     def test_creates_identity_with_single_vault_secret_id(self):
         res, http = _resource()
         http.post.return_value = IDENTITY_DICT
@@ -158,6 +193,60 @@ class TestIdentitiesUpdate:
 
         _, kwargs = http.patch.call_args
         assert "status" not in kwargs["json"]
+
+    def test_claims_new_imessage_line(self):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DICT
+
+        res.update(
+            HANDLE,
+            imessage_line_type=IMessageNumberType.DEDICATED_INBOUND,
+        )
+
+        http.patch.assert_called_once_with(
+            f"/{HANDLE}", json={"imessage_line_type": "dedicated_inbound"}
+        )
+
+    def test_attaches_owned_imessage_number(self):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DICT
+        number_id = UUID("99999999-0000-0000-0000-000000000001")
+
+        res.update(HANDLE, imessage_number_id=number_id)
+
+        http.patch.assert_called_once_with(
+            f"/{HANDLE}", json={"imessage_number_id": str(number_id)}
+        )
+
+    def test_explicit_null_moves_to_shared_service(self):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DICT
+
+        res.update(HANDLE, imessage_number_id=None)
+
+        http.patch.assert_called_once_with(
+            f"/{HANDLE}", json={"imessage_number_id": None}
+        )
+
+    def test_omits_imessage_number_id_by_default(self):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DICT
+
+        res.update(HANDLE, display_name="Sales")
+
+        assert "imessage_number_id" not in http.patch.call_args.kwargs["json"]
+
+    def test_rejects_line_type_with_number_id(self):
+        res, http = _resource()
+
+        with pytest.raises(ValueError, match="cannot be set together"):
+            res.update(
+                HANDLE,
+                imessage_line_type="dedicated_outbound",
+                imessage_number_id=None,
+            )
+
+        http.patch.assert_not_called()
 
 
 class TestIdentitiesDelete:

@@ -113,7 +113,57 @@ export class StorageLimitExceededError extends InkboxAPIError {
   }
 }
 
-function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail): never {
+/** Thrown when an organization has reached its dedicated iMessage line quota. */
+export class DedicatedIMessageLineQuotaExceededError extends InkboxAPIError {
+  readonly lineType: string;
+  readonly limit: number;
+  readonly current: number;
+  readonly upgradeUrl: string;
+  readonly contactEmail: string;
+  readonly detailMessage: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "DedicatedIMessageLineQuotaExceededError";
+    this.lineType = String(detail["line_type"] ?? "");
+    this.limit = Number(detail["limit"] ?? 0);
+    this.current = Number(detail["current"] ?? 0);
+    this.upgradeUrl = String(detail["upgrade_url"] ?? "");
+    this.contactEmail = String(detail["contact_email"] ?? "");
+    this.detailMessage = String(detail["message"] ?? "");
+    if (this.detailMessage) this.message = this.detailMessage;
+  }
+}
+
+/** Thrown when a requested dedicated iMessage line is not yet available. */
+export class DedicatedIMessageLineInventoryPendingError extends InkboxAPIError {
+  readonly lineType: string;
+  readonly retryAfterSeconds: number;
+  readonly detailMessage: string;
+
+  constructor(
+    statusCode: number,
+    detail: Record<string, unknown>,
+    retryAfterHeader: string | null,
+  ) {
+    super(statusCode, detail);
+    this.name = "DedicatedIMessageLineInventoryPendingError";
+    this.lineType = String(detail["line_type"] ?? "");
+    const headerSeconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
+    const detailSeconds = Number(detail["retry_after_seconds"] ?? 0);
+    this.retryAfterSeconds = Number.isFinite(headerSeconds) && headerSeconds >= 0
+      ? headerSeconds
+      : detailSeconds;
+    this.detailMessage = String(detail["message"] ?? "");
+    if (this.detailMessage) this.message = this.detailMessage;
+  }
+}
+
+function raiseForErrorResponse(
+  status: number,
+  rawDetail: InkboxAPIErrorDetail,
+  headers?: Headers,
+): never {
   if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
     if ("existing_rule_id" in rawDetail) {
       throw new DuplicateContactRuleError(status, rawDetail);
@@ -139,6 +189,26 @@ function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail):
     && rawDetail["error"] === "storage_limit_exceeded"
   ) {
     throw new StorageLimitExceededError(status, rawDetail);
+  }
+  if (
+    status === 402
+    && typeof rawDetail === "object"
+    && rawDetail !== null
+    && rawDetail["error"] === "dedicated_imessage_line_quota_exceeded"
+  ) {
+    throw new DedicatedIMessageLineQuotaExceededError(status, rawDetail);
+  }
+  if (
+    status === 503
+    && typeof rawDetail === "object"
+    && rawDetail !== null
+    && rawDetail["error"] === "dedicated_imessage_line_inventory_pending"
+  ) {
+    throw new DedicatedIMessageLineInventoryPendingError(
+      status,
+      rawDetail,
+      headers?.get("Retry-After") ?? null,
+    );
   }
   throw new InkboxAPIError(status, rawDetail);
 }
@@ -515,7 +585,7 @@ export class HttpTransport {
 
     if (!resp.ok) {
       const detail = await readErrorDetail(resp);
-      raiseForErrorResponse(resp.status, detail);
+      raiseForErrorResponse(resp.status, detail, resp.headers);
     }
 
     if (resp.status === 204) {

@@ -52,10 +52,18 @@ IDENTITY_PHONE_DICT = {
     "updated_at": "2026-03-09T00:00:00Z",
 }
 
+IDENTITY_IMESSAGE_NUMBER_DICT = {
+    "id": "99999999-0000-0000-0000-000000000001",
+    "number": "+15551230001",
+    "type": "dedicated_outbound",
+    "inbound_only": False,
+}
+
 IDENTITY_DETAIL_DICT = {
     **IDENTITY_DICT,
     "mailbox": IDENTITY_MAILBOX_DICT,
     "phone_number": IDENTITY_PHONE_DICT,
+    "imessage_number": IDENTITY_IMESSAGE_NUMBER_DICT,
     "tunnel": IDENTITY_TUNNEL_DICT,
 }
 

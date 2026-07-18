@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   DuplicateContactRuleError,
+  DedicatedIMessageLineInventoryPendingError,
+  DedicatedIMessageLineQuotaExceededError,
   HttpTransport,
   InkboxAPIError,
   InkboxError,
@@ -225,6 +227,68 @@ describe("HttpTransport 409 routing", () => {
       expect(e.detailMessage).toBe(e.message);
       expect(typeof e.detail).toBe("object");
     }
+  });
+
+  it("routes the dedicated iMessage line quota error", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(402, {
+        detail: {
+          error: "dedicated_imessage_line_quota_exceeded",
+          message: "Dedicated inbound iMessage line quota reached.",
+          line_type: "dedicated_inbound",
+          limit: 2,
+          current: 2,
+          upgrade_url: "https://inkbox.ai/console/organizations?tab=billing",
+          contact_email: "contact@inkbox.ai",
+        },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+
+    const err = await http.post("/imessage/numbers", {
+      type: "dedicated_inbound",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DedicatedIMessageLineQuotaExceededError);
+    expect(err).toMatchObject({
+      statusCode: 402,
+      lineType: "dedicated_inbound",
+      limit: 2,
+      current: 2,
+      contactEmail: "contact@inkbox.ai",
+    });
+  });
+
+  it("routes inventory pending and prefers the Retry-After header", async () => {
+    const response = makeErrorResponse(503, {
+      detail: {
+        error: "dedicated_imessage_line_inventory_pending",
+        message: "More dedicated lines are being added.",
+        line_type: "dedicated_outbound",
+        retry_after_seconds: 86_400,
+      },
+    });
+    Object.defineProperty(response, "headers", {
+      value: {
+        get(name: string) {
+          return name.toLowerCase() === "retry-after" ? "3600" : null;
+        },
+        getSetCookie() { return []; },
+      } as unknown as Headers,
+    });
+    vi.mocked(fetch).mockResolvedValue(response);
+    const http = new HttpTransport(API_KEY, BASE);
+
+    const err = await http.post("/imessage/numbers", {
+      type: "dedicated_outbound",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(DedicatedIMessageLineInventoryPendingError);
+    expect(err).toMatchObject({
+      statusCode: 503,
+      lineType: "dedicated_outbound",
+      retryAfterSeconds: 3600,
+    });
   });
 
   it("plain-string 402 stays on InkboxAPIError (old server)", async () => {

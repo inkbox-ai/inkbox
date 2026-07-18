@@ -36,6 +36,7 @@ from inkbox.identities.types import (  # noqa: I001
 )
 from inkbox.imessage.resources.contact_rules import IMessageContactRulesResource
 from inkbox.imessage.resources.imessages import IMessagesResource
+from inkbox.imessage.types import IMessageNumberType
 from inkbox.mail.resources.contact_rules import MailContactRulesResource
 from inkbox.mail.resources.identity_contact_rules import MailIdentityContactRulesResource
 from inkbox.mail.resources.domains import DomainsResource
@@ -449,6 +450,7 @@ class Inkbox:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        imessage_line_type: IMessageNumberType | str | None = None,
         email_local_part: str | None = None,
         sending_domain: str | None = _UNSET,  # type: ignore[assignment]
         tunnel: "IdentityTunnelCreateOptions | None" = None,
@@ -467,9 +469,11 @@ class Inkbox:
             description: Free-form org-internal description. Pass
                 ``None`` to leave the column null; omit to defer to the
                 server default. Never surfaces in outbound mail.
-            imessage_enabled: Whether this identity can be reached over
-                the shared iMessage service. Defaults server-side to
-                ``False``; pass ``True`` to opt in.
+            imessage_enabled: Whether this identity can use iMessage.
+                Defaults server-side to ``False``; pass ``True`` to opt in.
+            imessage_line_type: Claim and attach a dedicated inbound or
+                outbound iMessage line atomically. Requires
+                ``imessage_enabled=True``.
             email_local_part: Optional requested mailbox local part.
                 On the platform domain the server forces it to the
                 handle; only meaningful on a custom sending domain.
@@ -500,6 +504,7 @@ class Inkbox:
             display_name=display_name,
             description=description,
             imessage_enabled=imessage_enabled,
+            imessage_line_type=imessage_line_type,
             mailbox=mailbox,
             tunnel=tunnel,
             phone_number=phone_number,

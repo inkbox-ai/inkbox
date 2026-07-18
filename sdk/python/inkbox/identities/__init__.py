@@ -7,6 +7,7 @@ from inkbox.identities.types import (
     _AgentIdentityData,
     IdentityAccess,
     IdentityMailbox,
+    IdentityIMessageNumber,
     IdentityPhoneNumber,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "_AgentIdentityData",
     "IdentityAccess",
     "IdentityMailbox",
+    "IdentityIMessageNumber",
     "IdentityPhoneNumber",
 ]
