@@ -24,7 +24,7 @@ test("CLI_VERSION matches package.json version (the User-Agent constant must not
   assert.equal(CLI_VERSION, pkg.version);
 });
 
-test("all packages share one version and the CLI pins that exact SDK version", () => {
+test("all packages share one version and the CLI targets that SDK release", () => {
   const cliPackage = readJson("../package.json");
   const cliLock = readJson("../package-lock.json");
   const typescriptPackage = readJson("../../sdk/typescript/package.json");
@@ -34,11 +34,14 @@ test("all packages share one version and the CLI pins that exact SDK version", (
   assert.equal(typescriptPackage.version, cliPackage.version);
   assert.equal(pythonVersion, cliPackage.version);
   assert.equal(rustVersion, cliPackage.version);
-  assert.equal(cliPackage.dependencies["@inkbox/sdk"], cliPackage.version);
+  assert.equal(
+    cliPackage.dependencies["@inkbox/sdk"],
+    `^${cliPackage.version}`,
+  );
   assert.equal(cliLock.packages[""].version, cliPackage.version);
   assert.equal(
     cliLock.packages[""].dependencies["@inkbox/sdk"],
-    cliPackage.version,
+    `^${cliPackage.version}`,
   );
   assert.equal(
     cliLock.packages["../sdk/typescript"].version,
