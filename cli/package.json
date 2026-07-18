@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "inkbox": "./dist/index.js"
+    "inkbox": "dist/index.js"
   },
   "files": [
     "dist",
@@ -29,7 +29,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/inkbox-ai/inkbox",
+    "url": "git+https://github.com/inkbox-ai/inkbox.git",
     "directory": "cli"
   },
   "homepage": "https://inkbox.ai",

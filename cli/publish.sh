@@ -17,11 +17,10 @@ fi
 
 CLI_SDK_DEP="$(node -p "require('$REPO_ROOT/cli/package.json').dependencies['@inkbox/sdk']")"
 SDK_VERSION="$(node -p "require('$REPO_ROOT/sdk/typescript/package.json').version")"
-EXPECTED_CLI_SDK_DEP="^${SDK_VERSION}"
 
-if [[ "$CLI_SDK_DEP" != "$EXPECTED_CLI_SDK_DEP" ]]; then
+if [[ "$CLI_SDK_DEP" != "$SDK_VERSION" ]]; then
   echo "Error: cli/package.json depends on @inkbox/sdk@$CLI_SDK_DEP, but sdk/typescript/package.json is version $SDK_VERSION."
-  echo "Expected cli/package.json to declare @inkbox/sdk as $EXPECTED_CLI_SDK_DEP before publishing."
+  echo "Expected cli/package.json to pin @inkbox/sdk exactly to $SDK_VERSION before publishing."
   exit 1
 fi
 
