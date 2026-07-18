@@ -2,12 +2,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   DuplicateContactRuleError,
-  DedicatedIMessageLineInventoryPendingError,
-  DedicatedIMessageLineQuotaExceededError,
+  DedicatedIMessageNumberInventoryPendingError,
+  DedicatedIMessageNumberQuotaExceededError,
   HttpTransport,
   InkboxAPIError,
   InkboxError,
   InkboxVaultKeyError,
+  IdempotencyKeyReusedError,
   RecipientBlockedError,
   RedundantContactAccessGrantError,
   StorageLimitExceededError,
@@ -229,13 +230,13 @@ describe("HttpTransport 409 routing", () => {
     }
   });
 
-  it("routes the dedicated iMessage line quota error", async () => {
+  it("routes the dedicated iMessage number quota error", async () => {
     vi.mocked(fetch).mockResolvedValue(
       makeErrorResponse(402, {
         detail: {
-          error: "dedicated_imessage_line_quota_exceeded",
-          message: "Dedicated inbound iMessage line quota reached.",
-          line_type: "dedicated_inbound",
+          error: "dedicated_imessage_number_quota_exceeded",
+          message: "Dedicated inbound iMessage number quota reached.",
+          number_type: "dedicated_inbound",
           limit: 2,
           current: 2,
           upgrade_url: "https://inkbox.ai/console/organizations?tab=billing",
@@ -249,10 +250,10 @@ describe("HttpTransport 409 routing", () => {
       type: "dedicated_inbound",
     }).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(DedicatedIMessageLineQuotaExceededError);
+    expect(err).toBeInstanceOf(DedicatedIMessageNumberQuotaExceededError);
     expect(err).toMatchObject({
       statusCode: 402,
-      lineType: "dedicated_inbound",
+      numberType: "dedicated_inbound",
       limit: 2,
       current: 2,
       contactEmail: "contact@inkbox.ai",
@@ -262,9 +263,9 @@ describe("HttpTransport 409 routing", () => {
   it("routes inventory pending and prefers the Retry-After header", async () => {
     const response = makeErrorResponse(503, {
       detail: {
-        error: "dedicated_imessage_line_inventory_pending",
-        message: "More dedicated lines are being added.",
-        line_type: "dedicated_outbound",
+        error: "dedicated_imessage_number_inventory_pending",
+        message: "More dedicated numbers are being added.",
+        number_type: "dedicated_outbound",
         retry_after_seconds: 86_400,
       },
     });
@@ -283,11 +284,33 @@ describe("HttpTransport 409 routing", () => {
       type: "dedicated_outbound",
     }).catch((e: unknown) => e);
 
-    expect(err).toBeInstanceOf(DedicatedIMessageLineInventoryPendingError);
+    expect(err).toBeInstanceOf(DedicatedIMessageNumberInventoryPendingError);
     expect(err).toMatchObject({
       statusCode: 503,
-      lineType: "dedicated_outbound",
+      numberType: "dedicated_outbound",
       retryAfterSeconds: 3600,
+    });
+  });
+
+  it("routes an idempotency-key reuse conflict", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(409, {
+        detail: {
+          error: "idempotency_key_reused",
+          message: "Idempotency key was already used for another request.",
+        },
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+
+    const err = await http.post("/imessage/numbers", {
+      type: "dedicated_outbound",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(IdempotencyKeyReusedError);
+    expect(err).toMatchObject({
+      statusCode: 409,
+      detailMessage: "Idempotency key was already used for another request.",
     });
   });
 

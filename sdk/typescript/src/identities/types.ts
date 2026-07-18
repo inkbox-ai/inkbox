@@ -16,7 +16,7 @@ import type { RawTunnel, TLSMode, Tunnel } from "../tunnels/types.js";
 import { parseTunnel } from "../tunnels/types.js";
 import type {
   IdentityIMessageNumber,
-  IMessageDedicatedLineType,
+  IMessageDedicatedNumberType,
   RawIdentityIMessageNumber,
 } from "../imessage/types.js";
 import { parseIdentityIMessageNumber } from "../imessage/types.js";
@@ -58,10 +58,10 @@ export interface CreateIdentityOptions {
    */
   imessageEnabled?: boolean;
   /**
-   * Claim and attach a dedicated iMessage line atomically during identity
+   * Claim and attach a dedicated iMessage number atomically during identity
    * creation. Requires `imessageEnabled: true`.
    */
-  imessageLineType?: IMessageDedicatedLineType;
+  imessageNumberType?: IMessageDedicatedNumberType;
   emailLocalPart?: string;
   /**
    * Optional sending-domain selector by **bare domain name**. Presence
@@ -83,12 +83,17 @@ export interface UpdateIdentityOptions {
   description?: string | null;
   imessageEnabled?: boolean;
   /**
-   * Attach an already-owned dedicated line by id, atomically swap lines,
+   * Attach an already-owned dedicated number by id, atomically swap numbers,
    * or pass `null` to return to the shared iMessage service.
    */
   imessageNumberId?: string | null;
-  /** Claim and atomically attach or swap to a new dedicated line. */
-  imessageLineType?: IMessageDedicatedLineType;
+  /** Claim and atomically attach or swap to a new dedicated number. */
+  imessageNumberType?: IMessageDedicatedNumberType;
+  /**
+   * Stable caller-generated key for an `imessageNumberType` claim.
+   * Reuse it when retrying an ambiguous update.
+   */
+  idempotencyKey?: string;
   imessageFilterMode?: "whitelist" | "blacklist";
   mailFilterMode?: "whitelist" | "blacklist";
   phoneFilterMode?: "whitelist" | "blacklist";
@@ -187,7 +192,7 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
-  /** Dedicated iMessage line attached to this identity, or null on shared service. */
+  /** Dedicated iMessage number attached to this identity, or null on shared service. */
   imessageNumber: IdentityIMessageNumber | null;
   /** Tunnel assigned to this identity. Non-null for live identities (1:1 invariant); null only on deleted rows. */
   tunnel: Tunnel | null;

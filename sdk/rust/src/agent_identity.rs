@@ -43,8 +43,8 @@ use crate::identities::types::{
     AgentIdentityData, IdentityAccess, IdentityMailbox, IdentityPhoneNumber, Unset,
 };
 use crate::imessage::types::{
-    DedicatedIMessageLineType, IMessage, IMessageAssignment, IMessageConversation,
-    IMessageConversationSummary, IMessageMarkReadResult, IMessageMediaUpload, IMessageReaction,
+    IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
+    IMessageMarkReadResult, IMessageMediaUpload, IMessageNumberType, IMessageReaction,
     IMessageReactionType, IMessageSendStyle, IdentityIMessageNumber,
 };
 use crate::mail::types::{
@@ -167,7 +167,7 @@ impl AgentIdentity {
         self.phone_number.borrow().clone()
     }
 
-    /// Dedicated iMessage line attached to this identity, if any.
+    /// Dedicated iMessage number attached to this identity, if any.
     pub fn imessage_number(&self) -> Option<IdentityIMessageNumber> {
         self.data.borrow().imessage_number.clone()
     }
@@ -838,8 +838,8 @@ impl AgentIdentity {
 
     /// Send an outbound iMessage as this identity.
     ///
-    /// Shared and dedicated-inbound lines require the recipient to connect
-    /// first. A dedicated-outbound line may initiate a conversation, subject
+    /// Shared and dedicated-inbound numbers require the recipient to connect
+    /// first. A dedicated-outbound number may initiate a conversation, subject
     /// to server-side consent and rate limits.
     ///
     /// # Arguments
@@ -1234,8 +1234,7 @@ impl AgentIdentity {
         phone_filter_mode: Option<&str>,
         status: Option<&str>,
     ) -> Result<()> {
-        let result = self.inkbox.identities().update(
-            &self.agent_handle(),
+        self.update_with_imessage_number(
             new_handle,
             display_name,
             description,
@@ -1244,36 +1243,19 @@ impl AgentIdentity {
             mail_filter_mode,
             phone_filter_mode,
             status,
-        )?;
-
-        // Rebuild `_data` from the returned summary, preserving the cached
-        // channels (the update endpoint returns a summary without channels).
-        let new_data = AgentIdentityData {
-            summary: result,
-            mailbox: self.mailbox.borrow().clone(),
-            phone_number: self.phone_number.borrow().clone(),
-            imessage_number: self.data.borrow().imessage_number.clone(),
-            tunnel: self.tunnel.borrow().clone(),
-        };
-        *self.data.borrow_mut() = new_data;
-
-        // A handle rename also renames the linked tunnel in the same
-        // transaction; refresh to pick up the new tunnel_name / public_host.
-        if imessage_enabled == Some(false)
-            || (new_handle.is_some() && self.tunnel.borrow().is_some())
-        {
-            self.refresh()?;
-        }
-        Ok(())
+            Unset::Omit,
+            None,
+            None,
+        )
     }
 
-    /// Update this identity and optionally change its dedicated iMessage line.
+    /// Update this identity and optionally change its dedicated iMessage number.
     ///
-    /// Use `Unset::Value(Some(id))` to attach an already-owned line,
+    /// Use `Unset::Value(Some(id))` to attach an already-owned number,
     /// `Unset::Value(None)` to move back to shared iMessage service, or
-    /// `imessage_line_type` to atomically claim and attach a new line.
+    /// `imessage_number_type` to atomically claim and attach a new number.
     #[allow(clippy::too_many_arguments)]
-    pub fn update_with_imessage_line(
+    pub fn update_with_imessage_number(
         &self,
         new_handle: Option<&str>,
         display_name: Unset<String>,
@@ -1284,10 +1266,10 @@ impl AgentIdentity {
         phone_filter_mode: Option<&str>,
         status: Option<&str>,
         imessage_number_id: Unset<Uuid>,
-        imessage_line_type: Option<DedicatedIMessageLineType>,
+        imessage_number_type: Option<IMessageNumberType>,
+        idempotency_key: Option<&str>,
     ) -> Result<()> {
-        let line_changed = !imessage_number_id.is_omit() || imessage_line_type.is_some();
-        let result = self.inkbox.identities().update_with_imessage_line(
+        let data = self.inkbox.identities().update_with_imessage_number(
             &self.agent_handle(),
             new_handle,
             display_name,
@@ -1298,26 +1280,13 @@ impl AgentIdentity {
             phone_filter_mode,
             status,
             imessage_number_id,
-            imessage_line_type,
+            imessage_number_type,
+            idempotency_key,
         )?;
-
-        let new_data = AgentIdentityData {
-            summary: result,
-            mailbox: self.mailbox.borrow().clone(),
-            phone_number: self.phone_number.borrow().clone(),
-            imessage_number: self.data.borrow().imessage_number.clone(),
-            tunnel: self.tunnel.borrow().clone(),
-        };
-        *self.data.borrow_mut() = new_data;
-
-        // Line-changing PATCH responses are summaries, so refresh the detailed
-        // identity to expose the newly attached line immediately.
-        if line_changed
-            || imessage_enabled == Some(false)
-            || (new_handle.is_some() && self.tunnel.borrow().is_some())
-        {
-            self.refresh()?;
-        }
+        *self.mailbox.borrow_mut() = data.mailbox.clone();
+        *self.phone_number.borrow_mut() = data.phone_number.clone();
+        *self.tunnel.borrow_mut() = data.tunnel.clone();
+        *self.data.borrow_mut() = data;
         Ok(())
     }
 
@@ -1915,25 +1884,15 @@ mod tests {
     }
 
     #[test]
-    fn line_aware_update_refreshes_imessage_number() {
+    fn number_aware_update_uses_detailed_patch_response() {
         let server = MockServer::start();
         let patch = server.mock(|when, then| {
             when.method("PATCH")
                 .path("/api/v1/identities/support-bot")
+                .header("Idempotency-Key", "identity-claim-123")
                 .json_body(json!({
-                    "imessage_line_type": "dedicated_outbound"
+                    "imessage_number_type": "dedicated_outbound"
                 }));
-            then.status(200).json_body(json!({
-                "id": IDENTITY_ID,
-                "organization_id": "org_x",
-                "agent_handle": "support-bot",
-                "created_at": "2026-06-01T00:00:00+00:00",
-                "updated_at": "2026-06-01T00:00:01+00:00",
-                "imessage_enabled": true
-            }));
-        });
-        let get = server.mock(|when, then| {
-            when.method(GET).path("/api/v1/identities/support-bot");
             then.status(200).json_body(json!({
                 "id": IDENTITY_ID,
                 "organization_id": "org_x",
@@ -1944,15 +1903,14 @@ mod tests {
                 "imessage_number": {
                     "id": "66666666-6666-6666-6666-666666666666",
                     "number": "+15550006666",
-                    "type": "dedicated_outbound",
-                    "inbound_only": false
+                    "type": "dedicated_outbound"
                 }
             }));
         });
 
         let identity = identity_at(&server.base_url(), false);
         identity
-            .update_with_imessage_line(
+            .update_with_imessage_number(
                 None,
                 Unset::Omit,
                 Unset::Omit,
@@ -1962,34 +1920,23 @@ mod tests {
                 None,
                 None,
                 Unset::Omit,
-                Some(DedicatedIMessageLineType::DedicatedOutbound),
+                Some(IMessageNumberType::DedicatedOutbound),
+                Some("identity-claim-123"),
             )
             .unwrap();
         patch.assert();
-        get.assert();
         let number = identity.imessage_number().unwrap();
         assert_eq!(number.number, "+15550006666");
-        assert!(!number.inbound_only);
+        assert_eq!(number.r#type, IMessageNumberType::DedicatedOutbound);
     }
 
     #[test]
-    fn disabling_imessage_refreshes_detached_number() {
+    fn disabling_imessage_uses_detailed_response_for_detached_number() {
         let server = MockServer::start();
         let patch = server.mock(|when, then| {
             when.method("PATCH")
                 .path("/api/v1/identities/support-bot")
                 .json_body(json!({ "imessage_enabled": false }));
-            then.status(200).json_body(json!({
-                "id": IDENTITY_ID,
-                "organization_id": "org_x",
-                "agent_handle": "support-bot",
-                "created_at": "2026-06-01T00:00:00+00:00",
-                "updated_at": "2026-06-01T00:00:01+00:00",
-                "imessage_enabled": false
-            }));
-        });
-        let get = server.mock(|when, then| {
-            when.method(GET).path("/api/v1/identities/support-bot");
             then.status(200).json_body(json!({
                 "id": IDENTITY_ID,
                 "organization_id": "org_x",
@@ -2006,7 +1953,6 @@ mod tests {
             id: Uuid::parse_str("66666666-6666-6666-6666-666666666666").unwrap(),
             number: "+15550006666".into(),
             r#type: crate::imessage::types::IMessageNumberType::DedicatedOutbound,
-            inbound_only: false,
         });
         identity
             .update(
@@ -2022,7 +1968,6 @@ mod tests {
             .unwrap();
 
         patch.assert();
-        get.assert();
         assert!(identity.imessage_number().is_none());
     }
 }

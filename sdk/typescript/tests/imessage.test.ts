@@ -110,7 +110,6 @@ const NUMBER_DICT = {
   number: "+15555550123",
   type: "dedicated_outbound",
   status: "active",
-  inbound_only: false,
   agent_identity_id: IDENTITY_ID,
   agent_handle: HANDLE,
 };
@@ -174,7 +173,6 @@ describe("IMessagesResource", () => {
         id: "99999999-0000-0000-0000-000000000002",
         type: "dedicated_inbound",
         status: "paused",
-        inbound_only: true,
         agent_identity_id: null,
         agent_handle: null,
       },
@@ -186,35 +184,69 @@ describe("IMessagesResource", () => {
     const { url, init } = lastCall();
     expect(url).toBe(`${BASE}/numbers`);
     expect(init.method).toBe("GET");
-    expect(numbers[0]).toMatchObject({
+    expect(numbers[0]).toEqual({
+      id: NUMBER_ID,
+      number: "+15555550123",
       type: IMessageNumberType.DEDICATED_OUTBOUND,
       status: IMessageNumberStatus.ACTIVE,
-      inboundOnly: false,
       agentIdentityId: IDENTITY_ID,
       agentHandle: HANDLE,
     });
-    expect(numbers[1]).toMatchObject({
+    expect(numbers[1]).toEqual({
+      id: "99999999-0000-0000-0000-000000000002",
+      number: "+15555550123",
       type: IMessageNumberType.DEDICATED_INBOUND,
       status: IMessageNumberStatus.PAUSED,
-      inboundOnly: true,
       agentIdentityId: null,
       agentHandle: null,
     });
+    expect(numbers.map((number) => (
+      number.type === IMessageNumberType.DEDICATED_OUTBOUND
+    ))).toEqual([true, false]);
   });
 
-  it("claims a number with the dedicated line type body", async () => {
+  it("claims a number with the exact type body and idempotency key", async () => {
     vi.mocked(fetch).mockResolvedValue(ok(NUMBER_DICT));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
 
     const number = await resource.claimNumber({
       type: IMessageNumberType.DEDICATED_OUTBOUND,
+      idempotencyKey: "claim-number-123",
     });
 
     const { url, init } = lastCall();
     expect(url).toBe(`${BASE}/numbers`);
     expect(init.method).toBe("POST");
+    expect(new Headers(init.headers).get("Idempotency-Key")).toBe("claim-number-123");
     expect(JSON.parse(init.body as string)).toEqual({ type: "dedicated_outbound" });
     expect(number.id).toBe(NUMBER_ID);
+  });
+
+  it("rejects invalid idempotency keys before claiming", async () => {
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    await expect(resource.claimNumber({
+      type: IMessageNumberType.DEDICATED_INBOUND,
+      idempotencyKey: "",
+    })).rejects.toThrow("between 1 and 255 characters");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("retains a caller's key across an ambiguous retry", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok(NUMBER_DICT));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+    const options = {
+      type: IMessageNumberType.DEDICATED_OUTBOUND,
+      idempotencyKey: "stable-claim-key",
+    } as const;
+
+    await resource.claimNumber(options);
+    await resource.claimNumber(options);
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const [, init] of vi.mocked(fetch).mock.calls) {
+      expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("stable-claim-key");
+    }
   });
 
   it("send by recipient omits the query string", async () => {

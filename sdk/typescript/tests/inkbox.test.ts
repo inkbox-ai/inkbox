@@ -190,19 +190,19 @@ describe("Inkbox.createIdentity", () => {
     expect(call.mailbox?.sendingDomain).toBeNull();
   });
 
-  it("forwards dedicated iMessage line options", async () => {
+  it("forwards dedicated iMessage number options", async () => {
     const ink = makeInkbox();
     mockCreateReturnsDetail(ink);
 
     await ink.createIdentity("sales-agent", {
       imessageEnabled: true,
-      imessageLineType: "dedicated_outbound",
+      imessageNumberType: "dedicated_outbound",
     });
 
     expect(vi.mocked(ink._idsResource.create).mock.calls[0][0]).toMatchObject({
       agentHandle: "sales-agent",
       imessageEnabled: true,
-      imessageLineType: "dedicated_outbound",
+      imessageNumberType: "dedicated_outbound",
     });
   });
 });

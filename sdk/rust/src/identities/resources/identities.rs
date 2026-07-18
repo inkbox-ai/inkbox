@@ -12,13 +12,13 @@ use std::sync::Arc;
 use serde_json::{Map, Value};
 
 use crate::error::Result;
-use crate::http::HttpTransport;
+use crate::http::{validate_idempotency_key, HttpTransport};
 use crate::identities::exceptions::map_identity_conflict_error;
 use crate::identities::types::{
     AgentIdentityData, AgentIdentitySummary, IdentityAccess, IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions, Unset, VaultSecretIds,
 };
-use crate::imessage::types::DedicatedIMessageLineType;
+use crate::imessage::types::IMessageNumberType;
 use uuid::Uuid;
 
 pub struct IdentitiesResource {
@@ -61,7 +61,7 @@ impl IdentitiesResource {
         phone_number: Option<&IdentityPhoneNumberCreateOptions>,
         vault_secret_ids: Option<&VaultSecretIds>,
     ) -> Result<AgentIdentityData> {
-        self.create_with_imessage_line(
+        self.create_with_imessage_number(
             agent_handle,
             display_name,
             description,
@@ -75,11 +75,11 @@ impl IdentitiesResource {
     }
 
     /// Create an identity and optionally claim and attach a dedicated iMessage
-    /// line in the same operation.
+    /// number in the same operation.
     ///
-    /// `imessage_enabled` must be `Some(true)` when `imessage_line_type` is set.
+    /// `imessage_enabled` must be `Some(true)` when `imessage_number_type` is set.
     #[allow(clippy::too_many_arguments)]
-    pub fn create_with_imessage_line(
+    pub fn create_with_imessage_number(
         &self,
         agent_handle: &str,
         display_name: Option<&str>,
@@ -89,11 +89,11 @@ impl IdentitiesResource {
         tunnel: Option<&IdentityTunnelCreateOptions>,
         phone_number: Option<&IdentityPhoneNumberCreateOptions>,
         vault_secret_ids: Option<&VaultSecretIds>,
-        imessage_line_type: Option<DedicatedIMessageLineType>,
+        imessage_number_type: Option<IMessageNumberType>,
     ) -> Result<AgentIdentityData> {
-        if imessage_line_type.is_some() && imessage_enabled != Some(true) {
+        if imessage_number_type.is_some() && imessage_enabled != Some(true) {
             return Err(crate::error::InkboxError::InvalidArgument(
-                "imessage_line_type requires imessage_enabled=true".into(),
+                "imessage_number_type requires imessage_enabled=true".into(),
             ));
         }
         // Build the body conditionally, omitting any field left unset/None,
@@ -119,10 +119,10 @@ impl IdentitiesResource {
         if let Some(flag) = imessage_enabled {
             body.insert("imessage_enabled".into(), Value::Bool(flag));
         }
-        if let Some(line_type) = imessage_line_type {
+        if let Some(number_type) = imessage_number_type {
             body.insert(
-                "imessage_line_type".into(),
-                Value::String(line_type.as_str().to_string()),
+                "imessage_number_type".into(),
+                Value::String(number_type.as_str().to_string()),
             );
         }
         if let Some(m) = mailbox {
@@ -196,7 +196,7 @@ impl IdentitiesResource {
         phone_filter_mode: Option<&str>,
         status: Option<&str>,
     ) -> Result<AgentIdentitySummary> {
-        self.update_with_imessage_line(
+        self.update_with_imessage_number(
             agent_handle,
             new_handle,
             display_name,
@@ -208,18 +208,20 @@ impl IdentitiesResource {
             status,
             Unset::Omit,
             None,
+            None,
         )
+        .map(|data| data.summary)
     }
 
-    /// Update an identity and optionally change its dedicated iMessage line.
+    /// Update an identity and optionally change its dedicated iMessage number.
     ///
     /// `imessage_number_id` distinguishes omission from explicit `null`:
     /// `Unset::Value(None)` moves the identity back to shared iMessage service,
-    /// while `Unset::Value(Some(id))` attaches an already-owned line.
-    /// `imessage_line_type` atomically claims and attaches a new line and cannot
+    /// while `Unset::Value(Some(id))` attaches an already-owned number.
+    /// `imessage_number_type` atomically claims and attaches a new number and cannot
     /// be combined with an explicit `imessage_number_id`.
     #[allow(clippy::too_many_arguments)]
-    pub fn update_with_imessage_line(
+    pub fn update_with_imessage_number(
         &self,
         agent_handle: &str,
         new_handle: Option<&str>,
@@ -231,18 +233,29 @@ impl IdentitiesResource {
         phone_filter_mode: Option<&str>,
         status: Option<&str>,
         imessage_number_id: Unset<Uuid>,
-        imessage_line_type: Option<DedicatedIMessageLineType>,
-    ) -> Result<AgentIdentitySummary> {
+        imessage_number_type: Option<IMessageNumberType>,
+        idempotency_key: Option<&str>,
+    ) -> Result<AgentIdentityData> {
         let has_number_id = !imessage_number_id.is_omit();
-        if imessage_line_type.is_some() && has_number_id {
+        let attaches_number_id = matches!(&imessage_number_id, Unset::Value(Some(_)));
+        if imessage_number_type.is_some() && has_number_id {
             return Err(crate::error::InkboxError::InvalidArgument(
-                "imessage_line_type and imessage_number_id cannot be set together".into(),
+                "imessage_number_type and imessage_number_id cannot be set together".into(),
             ));
         }
-        if imessage_enabled == Some(false) && (imessage_line_type.is_some() || has_number_id) {
+        if imessage_enabled == Some(false) && (imessage_number_type.is_some() || attaches_number_id)
+        {
             return Err(crate::error::InkboxError::InvalidArgument(
                 "iMessage number changes cannot be combined with disabling iMessage".into(),
             ));
+        }
+        if imessage_number_type.is_some() && idempotency_key.is_none() {
+            return Err(crate::error::InkboxError::InvalidArgument(
+                "idempotency_key is required when imessage_number_type is set".into(),
+            ));
+        }
+        if let Some(key) = idempotency_key {
+            validate_idempotency_key(key)?;
         }
         let mut body = Map::new();
         if let Some(h) = new_handle {
@@ -278,10 +291,10 @@ impl IdentitiesResource {
                     .unwrap_or(Value::Null),
             );
         }
-        if let Some(line_type) = imessage_line_type {
+        if let Some(number_type) = imessage_number_type {
             body.insert(
-                "imessage_line_type".into(),
-                Value::String(line_type.as_str().to_string()),
+                "imessage_number_type".into(),
+                Value::String(number_type.as_str().to_string()),
             );
         }
         if let Some(mode) = imessage_filter_mode {
@@ -301,11 +314,16 @@ impl IdentitiesResource {
         }
 
         let body = Value::Object(body);
-        let data = self
-            .http
-            .patch(&format!("/{agent_handle}"), &body)
-            .map_err(map_identity_conflict_error)?;
-        Ok(serde_json::from_value(data)?)
+        let path = format!("/{agent_handle}");
+        let response = match idempotency_key {
+            Some(key) => {
+                let headers = [("Idempotency-Key", key)];
+                self.http.patch_with_headers(&path, &body, &headers)
+            }
+            None => self.http.patch(&path, &body),
+        };
+        let data = response.map_err(map_identity_conflict_error)?;
+        AgentIdentityData::from_value(data)
     }
 
     /// Delete an identity.
@@ -408,13 +426,12 @@ mod tests {
                 "id": "22222222-2222-2222-2222-222222222222",
                 "number": "+15550001111",
                 "type": "dedicated_inbound",
-                "inbound_only": true
             }
         })
     }
 
     #[test]
-    fn create_with_imessage_line_sends_type_and_parses_detail() {
+    fn create_with_imessage_number_sends_type_and_parses_detail() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST)
@@ -422,14 +439,14 @@ mod tests {
                 .json_body(json!({
                     "agent_handle": "support-bot",
                     "imessage_enabled": true,
-                    "imessage_line_type": "dedicated_inbound"
+                    "imessage_number_type": "dedicated_inbound"
                 }));
             then.status(201).json_body(identity_json());
         });
 
         let data = client(&server)
             .identities()
-            .create_with_imessage_line(
+            .create_with_imessage_number(
                 "support-bot",
                 None,
                 Unset::Omit,
@@ -438,13 +455,12 @@ mod tests {
                 None,
                 None,
                 None,
-                Some(DedicatedIMessageLineType::DedicatedInbound),
+                Some(IMessageNumberType::DedicatedInbound),
             )
             .unwrap();
         mock.assert();
         let number: IdentityIMessageNumber = data.imessage_number.unwrap();
         assert_eq!(number.r#type, IMessageNumberType::DedicatedInbound);
-        assert!(number.inbound_only);
     }
 
     #[test]
@@ -460,7 +476,7 @@ mod tests {
 
         client(&server)
             .identities()
-            .update_with_imessage_line(
+            .update_with_imessage_number(
                 "support-bot",
                 None,
                 Unset::Omit,
@@ -471,6 +487,7 @@ mod tests {
                 None,
                 None,
                 Unset::Value(Some(number_id)),
+                None,
                 None,
             )
             .unwrap();
@@ -483,14 +500,15 @@ mod tests {
         let claim = server.mock(|when, then| {
             when.method("PATCH")
                 .path("/api/v1/identities/support-bot")
+                .header("Idempotency-Key", "identity-claim-123")
                 .json_body(json!({
-                    "imessage_line_type": "dedicated_outbound"
+                    "imessage_number_type": "dedicated_outbound"
                 }));
             then.status(200).json_body(identity_json());
         });
         client(&server)
             .identities()
-            .update_with_imessage_line(
+            .update_with_imessage_number(
                 "support-bot",
                 None,
                 Unset::Omit,
@@ -501,7 +519,8 @@ mod tests {
                 None,
                 None,
                 Unset::Omit,
-                Some(DedicatedIMessageLineType::DedicatedOutbound),
+                Some(IMessageNumberType::DedicatedOutbound),
+                Some("identity-claim-123"),
             )
             .unwrap();
         claim.assert();
@@ -509,12 +528,38 @@ mod tests {
         let clear = server.mock(|when, then| {
             when.method("PATCH")
                 .path("/api/v1/identities/support-bot")
-                .json_body(json!({ "imessage_number_id": null }));
+                .json_body(json!({
+                    "imessage_enabled": false,
+                    "imessage_number_id": null
+                }));
             then.status(200).json_body(identity_json());
         });
         client(&server)
             .identities()
-            .update_with_imessage_line(
+            .update_with_imessage_number(
+                "support-bot",
+                None,
+                Unset::Omit,
+                Unset::Omit,
+                Some(false),
+                None,
+                None,
+                None,
+                None,
+                Unset::Value(None),
+                None,
+                None,
+            )
+            .unwrap();
+        clear.assert();
+    }
+
+    #[test]
+    fn update_claim_requires_idempotency_key() {
+        let server = MockServer::start();
+        let error = client(&server)
+            .identities()
+            .update_with_imessage_number(
                 "support-bot",
                 None,
                 Unset::Omit,
@@ -524,10 +569,14 @@ mod tests {
                 None,
                 None,
                 None,
-                Unset::Value(None),
+                Unset::Omit,
+                Some(IMessageNumberType::DedicatedInbound),
                 None,
             )
-            .unwrap();
-        clear.assert();
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            crate::error::InkboxError::InvalidArgument(_)
+        ));
     }
 }

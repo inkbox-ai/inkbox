@@ -8,11 +8,10 @@ pub mod types;
 
 pub use resources::{IMessageContactRulesResource, IMessagesResource};
 pub use types::{
-    ContactRuleStatus, DedicatedIMessageLineType, IMessage, IMessageAssignment,
-    IMessageAssignmentStatus, IMessageContactRule, IMessageConversation,
-    IMessageConversationSummary, IMessageDeliveryStatus, IMessageMarkReadResult, IMessageMediaItem,
-    IMessageMediaUpload, IMessageMessageReaction, IMessageNumber, IMessageNumberStatus,
-    IMessageNumberType, IMessageReaction, IMessageReactionType, IMessageRecipient,
-    IMessageRuleAction, IMessageRuleMatchType, IMessageSendStyle, IMessageService,
-    IMessageTriageNumber, IdentityIMessageNumber,
+    ContactRuleStatus, IMessage, IMessageAssignment, IMessageAssignmentStatus, IMessageContactRule,
+    IMessageConversation, IMessageConversationSummary, IMessageDeliveryStatus,
+    IMessageMarkReadResult, IMessageMediaItem, IMessageMediaUpload, IMessageMessageReaction,
+    IMessageNumber, IMessageNumberStatus, IMessageNumberType, IMessageReaction,
+    IMessageReactionType, IMessageRecipient, IMessageRuleAction, IMessageRuleMatchType,
+    IMessageSendStyle, IMessageService, IMessageTriageNumber, IdentityIMessageNumber,
 };

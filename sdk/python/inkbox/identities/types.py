@@ -235,34 +235,29 @@ class IdentityPhoneNumber:
 
 @dataclass
 class IdentityIMessageNumber:
-    """Dedicated iMessage line attached to an agent identity.
+    """Dedicated iMessage number attached to an agent identity.
 
     The identity-detail wire shape is intentionally smaller than the
-    organization-level dedicated-line response: it contains no lifecycle
+    organization-level dedicated-number response: it contains no lifecycle
     status or attachment fields because attachment is implied by nesting.
     """
 
     id: UUID
     number: str
     type: IMessageNumberType
-    inbound_only: bool
 
     @property
     def can_start_conversations(self) -> bool:
-        """Whether this line may initiate a conversation."""
+        """Whether this number may initiate a conversation."""
         return self.type is IMessageNumberType.DEDICATED_OUTBOUND
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityIMessageNumber:
-        line_type = IMessageNumberType(d["type"])
+        number_type = IMessageNumberType(d["type"])
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
-            type=line_type,
-            inbound_only=d.get(
-                "inbound_only",
-                line_type is not IMessageNumberType.DEDICATED_OUTBOUND,
-            ),
+            type=number_type,
         )
 
 
@@ -271,7 +266,7 @@ class AgentIdentitySummary:
     """Lightweight agent identity returned by list endpoints.
 
     ``imessage_enabled`` / ``imessage_filter_mode`` describe iMessage
-    reachability and filtering. A dedicated line, when present, is included
+    reachability and filtering. A dedicated number, when present, is included
     only in the detailed identity response.
 
     ``mail_filter_mode`` / ``phone_filter_mode`` are the whitelist/blacklist

@@ -1,22 +1,23 @@
 # Changelog
 
-## 0.4.26 — Self-serve dedicated iMessage lines
+## 0.4.26 — Self-serve dedicated iMessage numbers
 
 ### Added
 
-- **Dedicated iMessage line management.** `inkbox.imessages.listNumbers()` lists every non-released line owned by the organization, including unattached lines, and `claimNumber({ type })` claims a dedicated inbound or outbound line. New public models are `IMessageNumber`, `IMessageNumberType`, and `IMessageNumberStatus`; attachment fields are always present and nullable. Dedicated outbound capability is identified by `number.type === IMessageNumberType.DEDICATED_OUTBOUND`.
-- **Atomic identity provisioning.** `inkbox.createIdentity(...)` and `identity.update(...)` accept `imessageLineType` to claim and attach a dedicated line in the same operation. Updates also accept `imessageNumberId` to attach an already-owned line or `null` to return to shared service. Detailed identity responses and `AgentIdentity.imessageNumber` expose the attached line.
-- **Typed provisioning errors.** `DedicatedIMessageLineQuotaExceededError` exposes the requested line type, quota counts, upgrade URL, and contact email. `DedicatedIMessageLineInventoryPendingError` exposes the requested line type and `retryAfterSeconds`, preferring the HTTP `Retry-After` header when present.
+- **Dedicated iMessage number management.** `inkbox.imessages.listNumbers()` lists every non-released number owned by the organization, including unattached numbers, and `claimNumber({ type, idempotencyKey })` claims a dedicated inbound or outbound number. New public models are `IMessageNumber`, `IMessageNumberType`, and `IMessageNumberStatus`; attachment fields are always present and nullable. Dedicated outbound capability is identified by `number.type === IMessageNumberType.DEDICATED_OUTBOUND`.
+- **Atomic identity provisioning.** `inkbox.createIdentity(...)` and `identity.update(...)` accept `imessageNumberType` to claim and attach a dedicated number in the same operation. Updates require a stable caller-provided `idempotencyKey` with `imessageNumberType`, and also accept `imessageNumberId` to attach an already-owned number or `null` to return to shared service. Detailed identity responses and `AgentIdentity.imessageNumber` expose the attached number.
+- **Typed provisioning errors.** `DedicatedIMessageNumberQuotaExceededError` exposes the requested number type, quota counts, upgrade URL, and contact email. `DedicatedIMessageNumberInventoryPendingError` exposes the requested number type and `retryAfterSeconds`, preferring the HTTP `Retry-After` header when present. `IdempotencyKeyReusedError` represents reuse of a key with a different request.
 
 ### Changed
 
-- Identity line-changing updates refresh the detailed identity automatically so `identity.imessageNumber` reflects the committed attachment before the call returns.
-- Identity 409 handling now maps only actual handle collisions to `HandleUnavailableError`; dedicated-line conflicts remain ordinary `InkboxAPIError` instances with their original structured detail.
+- Identity updates consume the detailed PATCH response so `identity.imessageNumber` reflects the committed attachment before the call returns.
+- Identity 409 handling now maps only actual handle collisions to `HandleUnavailableError`; dedicated-number conflicts retain their original structured detail.
 - Version bumped to 0.4.26.
 
 ### Notes
 
-- `imessageLineType` and `imessageNumberId` cannot be combined in one identity update, and neither can be used while disabling iMessage.
+- `imessageNumberType` and `imessageNumberId` cannot be combined in one identity update. A new number cannot be selected while disabling iMessage; `imessageNumberId: null` may be sent with `imessageEnabled: false` to detach explicitly.
+- Idempotency keys must contain 1–255 characters. Reuse the same key after an ambiguous failure; generating a new key can claim another number.
 
 ## 0.4.25 — Clearer connection errors, proxy hint, tunnel field tolerance
 

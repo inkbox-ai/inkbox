@@ -65,18 +65,16 @@ class TestIdentityIMessageNumberParsing:
         assert isinstance(number.id, UUID)
         assert number.number == "+15551230001"
         assert number.type is IMessageNumberType.DEDICATED_OUTBOUND
-        assert number.inbound_only is False
+        assert number.can_start_conversations is True
 
-    def test_derives_inbound_only_when_omitted(self):
-        payload = {
-            **IDENTITY_IMESSAGE_NUMBER_DICT,
-            "type": "dedicated_inbound",
-        }
-        payload.pop("inbound_only")
+    def test_inbound_capability_is_derived_from_type(self):
+        number = IdentityIMessageNumber._from_dict(
+            {
+                **IDENTITY_IMESSAGE_NUMBER_DICT,
+                "type": "dedicated_inbound",
+            }
+        )
 
-        number = IdentityIMessageNumber._from_dict(payload)
-
-        assert number.inbound_only is True
         assert number.can_start_conversations is False
 
 

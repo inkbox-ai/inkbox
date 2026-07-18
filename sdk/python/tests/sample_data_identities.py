@@ -56,7 +56,6 @@ IDENTITY_IMESSAGE_NUMBER_DICT = {
     "id": "99999999-0000-0000-0000-000000000001",
     "number": "+15551230001",
     "type": "dedicated_outbound",
-    "inbound_only": False,
 }
 
 IDENTITY_DETAIL_DICT = {

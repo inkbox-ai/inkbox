@@ -1,21 +1,21 @@
 /**
  * inkbox-imessage/resources/imessages.ts
  *
- * iMessage operations: dedicated lines, send, list, conversations,
+ * iMessage operations: dedicated numbers, send, list, conversations,
  * reactions, read receipts, typing indicators, media upload.
  *
  * Conversation operations key off `conversationId` / `agentIdentityId`.
- * Dedicated line inventory is managed through `listNumbers` and
+ * Dedicated number inventory is managed through `listNumbers` and
  * `claimNumber`.
  */
 
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
 import {
   IMessage,
   IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
-  IMessageDedicatedLineType,
+  IMessageDedicatedNumberType,
   IMessageNumber,
   IMessageMarkReadResult,
   IMessageMediaUpload,
@@ -58,8 +58,8 @@ export class IMessagesResource {
   }
 
   /**
-   * List every non-released dedicated iMessage line owned by the
-   * organization, including unattached lines.
+   * List every non-released dedicated iMessage number owned by the
+   * organization, including unattached numbers.
    */
   async listNumbers(): Promise<IMessageNumber[]> {
     const data = await this.http.get<RawIMessageNumber[]>("/numbers");
@@ -67,21 +67,32 @@ export class IMessagesResource {
   }
 
   /**
-   * Claim one dedicated iMessage line for the organization.
+   * Claim one dedicated iMessage number for the organization.
    *
-   * Claiming does not attach the line to an identity. Pass
-   * `imessageLineType` during identity creation or update to claim and
-   * attach atomically, or pass an owned line's id as `imessageNumberId`
+   * Claiming does not attach the number to an identity. Pass
+   * `imessageNumberType` during identity creation or update to claim and
+   * attach atomically, or pass an owned number's id as `imessageNumberId`
    * during identity update.
    *
-   * @throws {DedicatedIMessageLineQuotaExceededError} 402 when the
-   *   organization has reached its quota for the requested line type.
-   * @throws {DedicatedIMessageLineInventoryPendingError} 503 when line
+   * Reuse the same caller-generated `idempotencyKey` when retrying an
+   * ambiguous request. A new key can claim another number.
+   *
+   * @throws {DedicatedIMessageNumberQuotaExceededError} 402 when the
+   *   organization has reached its quota for the requested number type.
+   * @throws {DedicatedIMessageNumberInventoryPendingError} 503 when number
    *   inventory is pending; inspect `retryAfterSeconds` before retrying.
+   * @throws {IdempotencyKeyReusedError} 409 when the key was already used
+   *   for a different request.
    */
-  async claimNumber(options: { type: IMessageDedicatedLineType }): Promise<IMessageNumber> {
+  async claimNumber(options: {
+    type: IMessageDedicatedNumberType;
+    idempotencyKey: string;
+  }): Promise<IMessageNumber> {
+    validateIdempotencyKey(options.idempotencyKey);
     const data = await this.http.post<RawIMessageNumber>("/numbers", {
       type: options.type,
+    }, {
+      headers: { "Idempotency-Key": options.idempotencyKey },
     });
     return parseIMessageNumber(data);
   }
@@ -89,8 +100,8 @@ export class IMessagesResource {
   /**
    * Send an outbound iMessage through an existing assignment.
    *
-   * Shared and dedicated-inbound lines require the recipient to connect
-   * first. An identity attached to a dedicated-outbound line may initiate
+   * Shared and dedicated-inbound numbers require the recipient to connect
+   * first. An identity attached to a dedicated-outbound number may initiate
    * a conversation, subject to server-side consent and rate limits.
    * Inbound replies and reactions arrive via identity-owned webhook
    * subscriptions (`inkbox.webhooks.subscriptions.create({

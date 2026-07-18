@@ -10,9 +10,10 @@ import pytest
 
 from inkbox._http import _raise_for_status
 from inkbox.exceptions import (
-    DedicatedIMessageLineInventoryPendingError,
-    DedicatedIMessageLineQuotaExceededError,
+    DedicatedIMessageNumberInventoryPendingError,
+    DedicatedIMessageNumberQuotaExceededError,
     DuplicateContactRuleError,
+    IdempotencyKeyReusedError,
     InkboxAPIError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
@@ -217,15 +218,15 @@ class TestRaiseForStatusStorageLimitExceeded:
         assert type(info.value) is InkboxAPIError
 
 
-class TestDedicatedIMessageLineErrors:
+class TestDedicatedIMessageNumberErrors:
     def test_quota_exceeded(self):
         resp = _resp(
             402,
             {
                 "detail": {
-                    "error": "dedicated_imessage_line_quota_exceeded",
-                    "message": "Upgrade to claim another line.",
-                    "line_type": "dedicated_outbound",
+                    "error": "dedicated_imessage_number_quota_exceeded",
+                    "message": "Upgrade to claim another number.",
+                    "number_type": "dedicated_outbound",
                     "limit": 2,
                     "current": 2,
                     "upgrade_url": "https://inkbox.ai/console/organizations?tab=billing",
@@ -234,11 +235,11 @@ class TestDedicatedIMessageLineErrors:
             },
         )
 
-        with pytest.raises(DedicatedIMessageLineQuotaExceededError) as info:
+        with pytest.raises(DedicatedIMessageNumberQuotaExceededError) as info:
             _raise_for_status(resp)
 
         err = info.value
-        assert err.line_type == "dedicated_outbound"
+        assert err.number_type == "dedicated_outbound"
         assert err.limit == 2
         assert err.current == 2
         assert err.contact_email == "contact@inkbox.ai"
@@ -249,20 +250,37 @@ class TestDedicatedIMessageLineErrors:
             headers={"Retry-After": "3600"},
             json={
                 "detail": {
-                    "error": "dedicated_imessage_line_inventory_pending",
+                    "error": "dedicated_imessage_number_inventory_pending",
                     "message": "Please try again later.",
-                    "line_type": "dedicated_inbound",
+                    "number_type": "dedicated_inbound",
                     "retry_after_seconds": 86_400,
                 }
             },
         )
 
-        with pytest.raises(DedicatedIMessageLineInventoryPendingError) as info:
+        with pytest.raises(DedicatedIMessageNumberInventoryPendingError) as info:
             _raise_for_status(resp)
 
         err = info.value
-        assert err.line_type == "dedicated_inbound"
+        assert err.number_type == "dedicated_inbound"
         assert err.retry_after_seconds == 3600
+
+    def test_idempotency_key_reused(self):
+        resp = _resp(
+            409,
+            {
+                "detail": {
+                    "error": "idempotency_key_reused",
+                    "message": "This key was already used for another request.",
+                }
+            },
+        )
+
+        with pytest.raises(IdempotencyKeyReusedError) as info:
+            _raise_for_status(resp)
+
+        assert info.value.status_code == 409
+        assert "another request" in info.value.message
 
 
 class TestIdentityConflictMapping:

@@ -14,8 +14,9 @@ export type {
 } from "./agent_signup/types.js";
 export {
   DuplicateContactRuleError,
-  DedicatedIMessageLineInventoryPendingError,
-  DedicatedIMessageLineQuotaExceededError,
+  DedicatedIMessageNumberInventoryPendingError,
+  DedicatedIMessageNumberQuotaExceededError,
+  IdempotencyKeyReusedError,
   InkboxAPIError,
   InkboxConnectionError,
   InkboxError,
@@ -197,7 +198,7 @@ export {
   IMessageService,
 } from "./imessage/types.js";
 export type {
-  IMessageDedicatedLineType,
+  IMessageDedicatedNumberType,
   IMessage,
   IMessageAssignment,
   IMessageContactRule,

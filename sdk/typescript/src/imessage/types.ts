@@ -4,7 +4,7 @@
  * Types mirroring the Inkbox iMessage API response models.
  *
  * Conversations are keyed by `conversationId` / `remoteNumber`. Shared
- * service numbers stay hidden, while dedicated lines owned by the
+ * service numbers stay hidden, while dedicated numbers owned by the
  * organization are exposed through the numbers resource.
  */
 
@@ -69,33 +69,30 @@ export enum IMessageAssignmentStatus {
   RELEASED = "released",
 }
 
-/** Role of an organization-owned dedicated iMessage line. */
+/** Role of an iMessage number. */
 export enum IMessageNumberType {
-  TRIAGE = "triage",
-  SHARED_INBOUND = "shared_inbound",
   DEDICATED_INBOUND = "dedicated_inbound",
   DEDICATED_OUTBOUND = "dedicated_outbound",
 }
 
-/** Dedicated variants accepted by self-serve line claiming. */
-export type IMessageDedicatedLineType =
+/** Dedicated variants accepted by self-serve number claiming. */
+export type IMessageDedicatedNumberType =
   | IMessageNumberType.DEDICATED_INBOUND
   | IMessageNumberType.DEDICATED_OUTBOUND
   | "dedicated_inbound"
   | "dedicated_outbound";
 
-/** Lifecycle state of an organization-owned dedicated iMessage line. */
+/** Lifecycle state of an iMessage number. */
 export enum IMessageNumberStatus {
   ACTIVE = "active",
   PAUSED = "paused",
-  RELEASED = "released",
 }
 
 /**
- * An organization-owned dedicated iMessage line.
+ * An organization-owned dedicated iMessage number.
  *
- * Unattached lines have both attachment fields set to `null`. A dedicated
- * outbound line may initiate conversations; callers can test
+ * Unattached numbers have both attachment fields set to `null`. A dedicated
+ * outbound number may initiate conversations; callers can test
  * `type === IMessageNumberType.DEDICATED_OUTBOUND`.
  */
 export interface IMessageNumber {
@@ -103,17 +100,15 @@ export interface IMessageNumber {
   number: string;
   type: IMessageNumberType;
   status: IMessageNumberStatus;
-  inboundOnly: boolean;
   agentIdentityId: string | null;
   agentHandle: string | null;
 }
 
-/** Dedicated iMessage line embedded on a detailed identity response. */
+/** Dedicated iMessage number embedded on a detailed identity response. */
 export interface IdentityIMessageNumber {
   id: string;
   number: string;
   type: IMessageNumberType;
-  inboundOnly: boolean;
 }
 
 /** Whether a matching remote number is allowed through or blocked. */
@@ -395,16 +390,14 @@ export interface RawIMessageNumber {
   number: string;
   type: string;
   status: string;
-  inbound_only: boolean;
-  agent_identity_id?: string | null;
-  agent_handle?: string | null;
+  agent_identity_id: string | null;
+  agent_handle: string | null;
 }
 
 export interface RawIdentityIMessageNumber {
   id: string;
   number: string;
   type: string;
-  inbound_only?: boolean;
 }
 
 export interface RawIMessageContactRule {
@@ -562,22 +555,18 @@ export function parseIMessageNumber(
     number: r.number,
     type: r.type as IMessageNumberType,
     status: r.status as IMessageNumberStatus,
-    inboundOnly: r.inbound_only,
-    agentIdentityId: r.agent_identity_id ?? null,
-    agentHandle: r.agent_handle ?? null,
+    agentIdentityId: r.agent_identity_id,
+    agentHandle: r.agent_handle,
   };
 }
 
 export function parseIdentityIMessageNumber(
   r: RawIdentityIMessageNumber,
 ): IdentityIMessageNumber {
-  const type = r.type as IMessageNumberType;
   return {
     id: r.id,
     number: r.number,
-    type,
-    inboundOnly:
-      r.inbound_only ?? type !== IMessageNumberType.DEDICATED_OUTBOUND,
+    type: r.type as IMessageNumberType,
   };
 }
 

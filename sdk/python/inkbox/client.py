@@ -450,7 +450,7 @@ class Inkbox:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
-        imessage_line_type: IMessageNumberType | str | None = None,
+        imessage_number_type: IMessageNumberType | str | None = None,
         email_local_part: str | None = None,
         sending_domain: str | None = _UNSET,  # type: ignore[assignment]
         tunnel: "IdentityTunnelCreateOptions | None" = None,
@@ -471,8 +471,8 @@ class Inkbox:
                 server default. Never surfaces in outbound mail.
             imessage_enabled: Whether this identity can use iMessage.
                 Defaults server-side to ``False``; pass ``True`` to opt in.
-            imessage_line_type: Claim and attach a dedicated inbound or
-                outbound iMessage line atomically. Requires
+            imessage_number_type: Claim and attach a dedicated inbound or
+                outbound iMessage number atomically. Requires
                 ``imessage_enabled=True``.
             email_local_part: Optional requested mailbox local part.
                 On the platform domain the server forces it to the
@@ -504,7 +504,7 @@ class Inkbox:
             display_name=display_name,
             description=description,
             imessage_enabled=imessage_enabled,
-            imessage_line_type=imessage_line_type,
+            imessage_number_type=imessage_number_type,
             mailbox=mailbox,
             tunnel=tunnel,
             phone_number=phone_number,

@@ -409,7 +409,7 @@ export class Inkbox {
    * @param options.imessageEnabled - Whether this identity can be reached
    *   over iMessage. Defaults server-side to `false`;
    *   pass `true` to opt in.
-   * @param options.imessageLineType - Dedicated iMessage line role to claim
+   * @param options.imessageNumberType - Dedicated iMessage number role to claim
    *   and attach atomically. Requires `imessageEnabled: true`.
    * @param options.emailLocalPart - Optional requested mailbox local part.
    *   On the platform domain the server forces it to the handle; only
@@ -441,7 +441,9 @@ export class Inkbox {
     if (options.displayName !== undefined) createArgs.displayName = options.displayName;
     if (options.description !== undefined) createArgs.description = options.description;
     if (options.imessageEnabled !== undefined) createArgs.imessageEnabled = options.imessageEnabled;
-    if (options.imessageLineType !== undefined) createArgs.imessageLineType = options.imessageLineType;
+    if (options.imessageNumberType !== undefined) {
+      createArgs.imessageNumberType = options.imessageNumberType;
+    }
     if (options.tunnel !== undefined) createArgs.tunnel = options.tunnel;
     const data = await this._idsResource.create(createArgs);
     return new AgentIdentity(data, this);

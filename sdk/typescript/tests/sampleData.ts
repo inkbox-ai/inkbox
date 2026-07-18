@@ -377,7 +377,6 @@ export const RAW_IDENTITY_IMESSAGE_NUMBER = {
   id: "99999999-0000-0000-0000-000000000001",
   number: "+15555550123",
   type: "dedicated_outbound",
-  inbound_only: false,
 };
 
 export const RAW_IDENTITY_DETAIL = {

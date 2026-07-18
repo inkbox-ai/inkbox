@@ -8,12 +8,13 @@ from inkbox.credentials import Credentials
 
 # Exceptions (canonical source)
 from inkbox.exceptions import (
-    DedicatedIMessageLineInventoryPendingError,
-    DedicatedIMessageLineQuotaExceededError,
+    DedicatedIMessageNumberInventoryPendingError,
+    DedicatedIMessageNumberQuotaExceededError,
     DuplicateContactRuleError,
     InkboxAPIError,
     InkboxError,
     InkboxVaultKeyError,
+    IdempotencyKeyReusedError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
@@ -299,9 +300,10 @@ __all__ = [
     "InkboxError",
     "InkboxAPIError",
     "InkboxVaultKeyError",
-    "DedicatedIMessageLineInventoryPendingError",
-    "DedicatedIMessageLineQuotaExceededError",
+    "DedicatedIMessageNumberInventoryPendingError",
+    "DedicatedIMessageNumberQuotaExceededError",
     "DuplicateContactRuleError",
+    "IdempotencyKeyReusedError",
     "RecipientBlockedError",
     "RedundantContactAccessGrantError",
     "StorageLimitExceededError",

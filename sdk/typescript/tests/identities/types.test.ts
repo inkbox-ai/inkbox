@@ -56,7 +56,6 @@ describe("parseAgentIdentityData", () => {
       id: RAW_IDENTITY_IMESSAGE_NUMBER.id,
       number: "+15555550123",
       type: "dedicated_outbound",
-      inboundOnly: false,
     });
   });
 
@@ -73,15 +72,6 @@ describe("parseAgentIdentityData", () => {
     expect(d.imessageNumber).toBeNull();
   });
 
-  it("derives inboundOnly for older embedded line responses", () => {
-    const { inbound_only: _omitted, ...number } = RAW_IDENTITY_IMESSAGE_NUMBER;
-    const d = parseAgentIdentityData({
-      ...RAW_IDENTITY_DETAIL,
-      imessage_number: { ...number, type: "dedicated_inbound" },
-    });
-
-    expect(d.imessageNumber?.inboundOnly).toBe(true);
-  });
 });
 
 describe("parseIdentityMailbox", () => {

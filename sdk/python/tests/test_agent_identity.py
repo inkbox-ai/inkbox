@@ -8,11 +8,11 @@ import pytest
 from unittest.mock import MagicMock
 from uuid import UUID
 
-from sample_data_identities import IDENTITY_DETAIL_DICT, IDENTITY_DICT
+from sample_data_identities import IDENTITY_DETAIL_DICT
 from sample_data_mail import MESSAGE_DETAIL_DICT, THREAD_DETAIL_DICT
 
 from inkbox.agent_identity import AgentIdentity
-from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
+from inkbox.identities.types import _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
 from inkbox.mail.types import ForwardMode, MessageDetail, ThreadDetail
 from inkbox.phone.types import (
@@ -287,7 +287,7 @@ class TestAgentIdentityPlaceCall:
         )
 
     def test_place_call_shared_does_not_require_phone(self):
-        # Shared-line calls work for identities with no dedicated number.
+        # Shared-number calls work for identities with no dedicated number.
         identity, inkbox = _identity_without_phone()
         inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
 
@@ -404,10 +404,8 @@ class TestAgentIdentityIncomingCallAction:
 
 
 class TestAgentIdentityUpdate:
-    def test_update_with_new_handle_refreshes_cached_tunnel(self):
+    def test_update_with_new_handle_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()
-        renamed = {**IDENTITY_DICT, "agent_handle": "new-handle"}
-        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(renamed)
         refreshed_detail = {
             **IDENTITY_DETAIL_DICT,
             "agent_handle": "new-handle",
@@ -417,49 +415,51 @@ class TestAgentIdentityUpdate:
                 "public_host": "new-handle.inkboxwire.com",
             },
         }
-        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(refreshed_detail)
+        inkbox._ids_resource.update.return_value = _AgentIdentityData._from_dict(
+            refreshed_detail
+        )
 
         identity.update(new_handle="new-handle")
 
-        inkbox._ids_resource.get.assert_called_once_with("new-handle")
+        inkbox._ids_resource.get.assert_not_called()
         assert identity.tunnel is not None
         assert identity.tunnel.tunnel_name == "new-handle"
         assert identity.tunnel.public_host == "new-handle.inkboxwire.com"
 
-    def test_update_without_new_handle_does_not_refresh(self):
+    def test_update_without_new_handle_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()
-        renamed = {**IDENTITY_DICT, "display_name": "New Display"}
-        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(renamed)
+        updated = {**IDENTITY_DETAIL_DICT, "display_name": "New Display"}
+        inkbox._ids_resource.update.return_value = _AgentIdentityData._from_dict(updated)
 
         identity.update(display_name="New Display")
 
         inkbox._ids_resource.get.assert_not_called()
+        assert identity.display_name == "New Display"
 
-    def test_line_claim_refreshes_embedded_number(self):
+    def test_number_claim_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()
-        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(
-            IDENTITY_DICT
-        )
-        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(
+        inkbox._ids_resource.update.return_value = _AgentIdentityData._from_dict(
             IDENTITY_DETAIL_DICT
         )
 
-        identity.update(imessage_line_type="dedicated_outbound")
+        identity.update(
+            imessage_number_type="dedicated_outbound",
+            idempotency_key="claim-sales-outbound",
+        )
 
         inkbox._ids_resource.update.assert_called_once_with(
-            "sales-agent", imessage_line_type="dedicated_outbound"
+            "sales-agent",
+            imessage_number_type="dedicated_outbound",
+            idempotency_key="claim-sales-outbound",
         )
-        inkbox._ids_resource.get.assert_called_once_with("sales-agent")
+        inkbox._ids_resource.get.assert_not_called()
         assert identity.imessage_number is not None
         assert identity.imessage_number.can_start_conversations is True
 
-    def test_explicit_null_detach_refreshes_to_shared(self):
+    def test_explicit_null_detach_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()
-        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(
-            IDENTITY_DICT
-        )
         shared_detail = {**IDENTITY_DETAIL_DICT, "imessage_number": None}
-        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(
+        inkbox._ids_resource.update.return_value = _AgentIdentityData._from_dict(
             shared_detail
         )
 
@@ -468,23 +468,21 @@ class TestAgentIdentityUpdate:
         inkbox._ids_resource.update.assert_called_once_with(
             "sales-agent", imessage_number_id=None
         )
+        inkbox._ids_resource.get.assert_not_called()
         assert identity.imessage_number is None
 
-    def test_disabling_imessage_refreshes_detached_number(self):
+    def test_disabling_imessage_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()
-        inkbox._ids_resource.update.return_value = AgentIdentitySummary._from_dict(
-            {**IDENTITY_DICT, "imessage_enabled": False}
-        )
         shared_detail = {
             **IDENTITY_DETAIL_DICT,
             "imessage_enabled": False,
             "imessage_number": None,
         }
-        inkbox._ids_resource.get.return_value = _AgentIdentityData._from_dict(
+        inkbox._ids_resource.update.return_value = _AgentIdentityData._from_dict(
             shared_detail
         )
 
         identity.update(imessage_enabled=False)
 
-        inkbox._ids_resource.get.assert_called_once_with("sales-agent")
+        inkbox._ids_resource.get.assert_not_called()
         assert identity.imessage_number is None

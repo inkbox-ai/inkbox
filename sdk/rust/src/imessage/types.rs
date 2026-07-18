@@ -6,43 +6,36 @@
 
 use uuid::Uuid;
 
+fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    <Option<T> as serde::Deserialize>::deserialize(deserializer)
+}
+
 // `ContactRuleStatus` lives in the mail domain; Python imports it from
 // `inkbox.mail.types`, so we re-export the shared type rather than duplicate it.
 pub use crate::mail::types::ContactRuleStatus;
 
-/// Dedicated iMessage line role accepted by claim and identity operations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DedicatedIMessageLineType {
-    DedicatedInbound,
-    DedicatedOutbound,
-}
-
-impl DedicatedIMessageLineType {
-    /// The value sent to the API.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DedicatedIMessageLineType::DedicatedInbound => "dedicated_inbound",
-            DedicatedIMessageLineType::DedicatedOutbound => "dedicated_outbound",
-        }
-    }
-}
-
-/// Role of an iMessage service number.
-///
-/// Organization number endpoints currently return dedicated lines, while the
-/// broader enum keeps response parsing compatible with every server role.
+/// Role of a dedicated iMessage number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IMessageNumberType {
-    Triage,
-    SharedInbound,
     DedicatedInbound,
     DedicatedOutbound,
 }
 
 impl IMessageNumberType {
-    /// Whether this line may start a new conversation.
+    /// The value sent to the API.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IMessageNumberType::DedicatedInbound => "dedicated_inbound",
+            IMessageNumberType::DedicatedOutbound => "dedicated_outbound",
+        }
+    }
+
+    /// Whether this number may start a new conversation.
     pub fn can_start_conversation(&self) -> bool {
         matches!(self, IMessageNumberType::DedicatedOutbound)
     }
@@ -54,10 +47,9 @@ impl IMessageNumberType {
 pub enum IMessageNumberStatus {
     Active,
     Paused,
-    Released,
 }
 
-/// An organization-owned dedicated iMessage line.
+/// An organization-owned dedicated iMessage number.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageNumber {
     pub id: Uuid,
@@ -65,24 +57,22 @@ pub struct IMessageNumber {
     pub number: String,
     pub r#type: IMessageNumberType,
     pub status: IMessageNumberStatus,
-    /// `false` only for a dedicated outbound line.
-    pub inbound_only: bool,
-    /// Attached identity, or `None` while the line is available to the org.
-    #[serde(default)]
+    /// Attached identity, or `None` while the number is available to the org.
+    #[serde(deserialize_with = "deserialize_required_nullable")]
     pub agent_identity_id: Option<Uuid>,
-    /// Attached identity handle, or `None` while the line is available.
-    #[serde(default)]
+    /// Attached identity handle, or `None` while the number is available.
+    #[serde(deserialize_with = "deserialize_required_nullable")]
     pub agent_handle: Option<String>,
 }
 
 impl IMessageNumber {
-    /// Whether this line may start a new conversation.
+    /// Whether this number may start a new conversation.
     pub fn can_start_conversation(&self) -> bool {
         self.r#type.can_start_conversation()
     }
 }
 
-/// Dedicated iMessage line embedded in a detailed identity response.
+/// Dedicated iMessage number embedded in a detailed identity response.
 ///
 /// This shape is intentionally slimmer than [`IMessageNumber`]: attachment
 /// and lifecycle fields are only present on the organization number endpoints.
@@ -92,7 +82,6 @@ pub struct IdentityIMessageNumber {
     /// E.164 number.
     pub number: String,
     pub r#type: IMessageNumberType,
-    pub inbound_only: bool,
 }
 
 /// Transport a message actually went over (iMessage may downgrade).
@@ -450,13 +439,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dedicated_line_type_serializes_to_wire_value() {
+    fn number_type_serializes_to_wire_value() {
         assert_eq!(
-            serde_json::to_value(DedicatedIMessageLineType::DedicatedInbound).unwrap(),
+            serde_json::to_value(IMessageNumberType::DedicatedInbound).unwrap(),
             json!("dedicated_inbound")
         );
         assert_eq!(
-            serde_json::to_value(DedicatedIMessageLineType::DedicatedOutbound).unwrap(),
+            serde_json::to_value(IMessageNumberType::DedicatedOutbound).unwrap(),
             json!("dedicated_outbound")
         );
     }
@@ -465,7 +454,6 @@ mod tests {
     fn outbound_capability_is_derived_from_number_type() {
         assert!(!IMessageNumberType::DedicatedInbound.can_start_conversation());
         assert!(IMessageNumberType::DedicatedOutbound.can_start_conversation());
-        assert!(!IMessageNumberType::SharedInbound.can_start_conversation());
     }
 
     #[test]
@@ -475,12 +463,22 @@ mod tests {
             "number": "+15550001111",
             "type": "dedicated_inbound",
             "status": "paused",
-            "inbound_only": true,
             "agent_identity_id": null,
             "agent_handle": null
         }))
         .unwrap();
         assert_eq!(number.agent_identity_id, None);
         assert_eq!(number.agent_handle, None);
+    }
+
+    #[test]
+    fn number_attachment_fields_are_required() {
+        let result = serde_json::from_value::<IMessageNumber>(json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "number": "+15550001111",
+            "type": "dedicated_inbound",
+            "status": "active"
+        }));
+        assert!(result.is_err());
     }
 }

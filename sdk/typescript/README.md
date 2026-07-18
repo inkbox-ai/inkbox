@@ -496,16 +496,17 @@ await inkbox.smsOptIns.optOut("+15551234567");
 
 ## iMessage
 
-Chat with humans over the shared Inkbox router or a dedicated line.
+Chat with humans over the shared Inkbox router or a dedicated number.
 iMessage is **opt-in per identity** (`imessageEnabled`). On the shared
-service and dedicated inbound lines, the human texts first. Dedicated
-outbound lines may initiate conversations, subject to consent and rate
+service and dedicated inbound numbers, the human texts first. Dedicated
+outbound numbers may initiate conversations, subject to consent and rate
 limits.
 
 ```ts
 import {
-  DedicatedIMessageLineInventoryPendingError,
-  DedicatedIMessageLineQuotaExceededError,
+  DedicatedIMessageNumberInventoryPendingError,
+  DedicatedIMessageNumberQuotaExceededError,
+  IdempotencyKeyReusedError,
   IMessageNumberType,
 } from "@inkbox/sdk";
 
@@ -548,7 +549,7 @@ await inkbox.imessageContactRules.create("my-agent", {
   matchTarget: "+15555550999",
 });
 
-// List every dedicated line owned by the organization. Unattached lines
+// List every dedicated number owned by the organization. Unattached numbers
 // have null agentIdentityId and agentHandle fields.
 const numbers = await inkbox.imessages.listNumbers();
 for (const number of numbers) {
@@ -556,17 +557,22 @@ for (const number of numbers) {
   console.log(number.number, number.agentHandle, canInitiate);
 }
 
-// Claim an unattached line for the organization.
+// Claim an unattached number for the organization. Generate the key once and
+// reuse it if the request has an ambiguous outcome; a new key can claim again.
+const claimKey = crypto.randomUUID();
 try {
   const claimed = await inkbox.imessages.claimNumber({
     type: IMessageNumberType.DEDICATED_INBOUND,
+    idempotencyKey: claimKey,
   });
   console.log(claimed.number);
 } catch (err) {
-  if (err instanceof DedicatedIMessageLineQuotaExceededError) {
+  if (err instanceof DedicatedIMessageNumberQuotaExceededError) {
     console.error(err.message, err.upgradeUrl);
-  } else if (err instanceof DedicatedIMessageLineInventoryPendingError) {
+  } else if (err instanceof DedicatedIMessageNumberInventoryPendingError) {
     console.error(`Try again in ${err.retryAfterSeconds} seconds`);
+  } else if (err instanceof IdempotencyKeyReusedError) {
+    console.error(err.message);
   } else {
     throw err;
   }
@@ -575,16 +581,17 @@ try {
 // Claim and attach atomically during identity creation.
 const outboundIdentity = await inkbox.createIdentity("outreach-agent", {
   imessageEnabled: true,
-  imessageLineType: IMessageNumberType.DEDICATED_OUTBOUND,
+  imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
 });
 console.log(outboundIdentity.imessageNumber?.number);
 
 // Claim and atomically attach/swap during update. To attach an already-owned
-// line, pass imessageNumberId instead. Pass imessageNumberId: null to move
-// back to shared service. imessageLineType and imessageNumberId cannot be
+// number, pass imessageNumberId instead. Pass imessageNumberId: null to move
+// back to shared service. imessageNumberType and imessageNumberId cannot be
 // combined in one update.
 await identity.update({
-  imessageLineType: IMessageNumberType.DEDICATED_INBOUND,
+  imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+  idempotencyKey: crypto.randomUUID(),
 });
 ```
 

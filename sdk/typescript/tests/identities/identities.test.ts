@@ -99,7 +99,7 @@ describe("IdentitiesResource.create", () => {
     });
   });
 
-  it("claims and attaches a dedicated iMessage line during create", async () => {
+  it("claims and attaches a dedicated iMessage number during create", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_DETAIL);
     const res = new IdentitiesResource(http);
@@ -107,15 +107,26 @@ describe("IdentitiesResource.create", () => {
     const identity = await res.create({
       agentHandle: HANDLE,
       imessageEnabled: true,
-      imessageLineType: IMessageNumberType.DEDICATED_OUTBOUND,
+      imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
     });
 
     expect(http.post).toHaveBeenCalledWith("/", {
       agent_handle: HANDLE,
       imessage_enabled: true,
-      imessage_line_type: "dedicated_outbound",
+      imessage_number_type: "dedicated_outbound",
     });
     expect(identity.imessageNumber?.type).toBe("dedicated_outbound");
+  });
+
+  it("requires iMessage to be enabled when claiming during create", async () => {
+    const http = mockHttp();
+    const res = new IdentitiesResource(http);
+
+    await expect(res.create({
+      agentHandle: HANDLE,
+      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+    })).rejects.toThrow("imessageNumberType requires imessageEnabled: true");
+    expect(http.post).not.toHaveBeenCalled();
   });
 });
 
@@ -176,18 +187,69 @@ describe("IdentitiesResource.update", () => {
     expect(body["agent_handle"]).toBe("new-handle");
   });
 
-  it("claims a dedicated line during update", async () => {
+  it("claims a dedicated number during update with a stable idempotency key", async () => {
     const http = mockHttp();
     vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
     const res = new IdentitiesResource(http);
 
     await res.update(HANDLE, {
-      imessageLineType: IMessageNumberType.DEDICATED_INBOUND,
+      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+      idempotencyKey: "identity-claim-123",
     });
 
-    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
-      imessage_line_type: "dedicated_inbound",
+    expect(http.patch).toHaveBeenCalledWith(
+      `/${HANDLE}`,
+      { imessage_number_type: "dedicated_inbound" },
+      { headers: { "Idempotency-Key": "identity-claim-123" } },
+    );
+  });
+
+  it("forwards a caller-provided idempotency key on other updates", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
+    const res = new IdentitiesResource(http);
+
+    await res.update(HANDLE, {
+      displayName: "Updated",
+      idempotencyKey: "profile-update-123",
     });
+
+    expect(http.patch).toHaveBeenCalledWith(
+      `/${HANDLE}`,
+      { display_name: "Updated" },
+      { headers: { "Idempotency-Key": "profile-update-123" } },
+    );
+  });
+
+  it("requires and validates the idempotency key for an update claim", async () => {
+    const http = mockHttp();
+    const res = new IdentitiesResource(http);
+
+    await expect(res.update(HANDLE, {
+      imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
+    })).rejects.toThrow("idempotencyKey is required with imessageNumberType");
+    await expect(res.update(HANDLE, {
+      imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
+      idempotencyKey: "x".repeat(256),
+    })).rejects.toThrow("between 1 and 255 characters");
+    expect(http.patch).not.toHaveBeenCalled();
+  });
+
+  it("rejects incompatible identity number changes", async () => {
+    const http = mockHttp();
+    const res = new IdentitiesResource(http);
+
+    await expect(res.update(HANDLE, {
+      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+      imessageNumberId: "99999999-0000-0000-0000-000000000001",
+      idempotencyKey: "identity-claim-123",
+    })).rejects.toThrow("imessageNumberType and imessageNumberId cannot be set together");
+    await expect(res.update(HANDLE, {
+      imessageEnabled: false,
+      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+      idempotencyKey: "identity-claim-456",
+    })).rejects.toThrow("cannot be combined with disabling iMessage");
+    expect(http.patch).not.toHaveBeenCalled();
   });
 
   it("preserves explicit null when moving back to shared iMessage", async () => {
@@ -202,12 +264,28 @@ describe("IdentitiesResource.update", () => {
     });
   });
 
-  it("passes through line attachment conflicts without remapping them as handle errors", async () => {
+  it("allows disabling iMessage while explicitly returning to shared service", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY_DETAIL);
+    const res = new IdentitiesResource(http);
+
+    await res.update(HANDLE, {
+      imessageEnabled: false,
+      imessageNumberId: null,
+    });
+
+    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
+      imessage_enabled: false,
+      imessage_number_id: null,
+    });
+  });
+
+  it("passes through number attachment conflicts without remapping them as handle errors", async () => {
     const http = mockHttp();
     const { InkboxAPIError } = await import("../../src/_http.js");
     vi.mocked(http.patch).mockRejectedValue(new InkboxAPIError(409, {
-      error: "line_already_attached",
-      message: "Choose another line.",
+      error: "number_already_attached",
+      message: "Choose another number.",
     }));
     const res = new IdentitiesResource(http);
 

@@ -23,8 +23,28 @@ const DEFAULT_TIMEOUT_SECS: f64 = 30.0;
 /// pushed by the caller, mirroring `_http.py`'s `{k: v for ... if v is not None}`.
 pub type Query<'a> = &'a [(&'a str, String)];
 
+/// Per-request HTTP headers.
+pub type Headers<'a> = &'a [(&'a str, &'a str)];
+
 /// Empty query helper for paths that take no parameters.
 pub const NO_QUERY: Query<'static> = &[];
+
+/// Empty per-request header helper.
+pub const NO_HEADERS: Headers<'static> = &[];
+
+/// Validate an idempotency key before building its HTTP header.
+pub(crate) fn validate_idempotency_key(key: &str) -> Result<()> {
+    let length = key.chars().count();
+    if !(1..=255).contains(&length) {
+        return Err(InkboxError::InvalidArgument(
+            "idempotency_key must contain 1 to 255 characters".into(),
+        ));
+    }
+    reqwest::header::HeaderValue::from_str(key).map_err(|_| {
+        InkboxError::InvalidArgument("idempotency_key is not a valid HTTP header value".into())
+    })?;
+    Ok(())
+}
 
 #[derive(Debug)]
 pub struct HttpTransport {
@@ -85,7 +105,21 @@ impl HttpTransport {
     }
 
     pub fn post<B: Serialize>(&self, path: &str, body: Option<&B>, params: Query) -> Result<Value> {
+        self.post_with_headers(path, body, params, NO_HEADERS)
+    }
+
+    /// `POST` with caller-supplied per-request headers.
+    pub fn post_with_headers<B: Serialize>(
+        &self,
+        path: &str,
+        body: Option<&B>,
+        params: Query,
+        headers: Headers,
+    ) -> Result<Value> {
         let mut rb = self.client.post(self.url(path)).query(params);
+        for (name, value) in headers {
+            rb = rb.header(*name, *value);
+        }
         if let Some(b) = body {
             rb = rb.json(b);
         }
@@ -121,7 +155,20 @@ impl HttpTransport {
     }
 
     pub fn patch<B: Serialize>(&self, path: &str, body: &B) -> Result<Value> {
-        let rb = self.client.patch(self.url(path)).json(body);
+        self.patch_with_headers(path, body, NO_HEADERS)
+    }
+
+    /// `PATCH` with caller-supplied per-request headers.
+    pub fn patch_with_headers<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+        headers: Headers,
+    ) -> Result<Value> {
+        let mut rb = self.client.patch(self.url(path)).json(body);
+        for (name, value) in headers {
+            rb = rb.header(*name, *value);
+        }
         raise_for_status(self.send(rb, &self.url(path))?)?.json_value()
     }
 
@@ -292,6 +339,17 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                     detail: Box::new(raw_detail),
                 });
             }
+            if map.get("error").and_then(|e| e.as_str()) == Some("idempotency_key_reused") {
+                return Err(InkboxError::IdempotencyKeyReused {
+                    status_code: status,
+                    message: map
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    detail: Box::new(raw_detail),
+                });
+            }
         }
     }
 
@@ -317,17 +375,17 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                 });
             }
             if map.get("error").and_then(|e| e.as_str())
-                == Some("dedicated_imessage_line_quota_exceeded")
+                == Some("dedicated_imessage_number_quota_exceeded")
             {
-                return Err(InkboxError::DedicatedIMessageLineQuotaExceeded {
+                return Err(InkboxError::DedicatedIMessageNumberQuotaExceeded {
                     status_code: status,
                     message: map
                         .get("message")
                         .and_then(|m| m.as_str())
                         .unwrap_or("")
                         .into(),
-                    line_type: map
-                        .get("line_type")
+                    number_type: map
+                        .get("number_type")
                         .and_then(|t| t.as_str())
                         .unwrap_or("")
                         .into(),
@@ -352,21 +410,21 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
     if status == 503 {
         if let Value::Object(map) = &raw_detail {
             if map.get("error").and_then(|e| e.as_str())
-                == Some("dedicated_imessage_line_inventory_pending")
+                == Some("dedicated_imessage_number_inventory_pending")
             {
                 let detail_retry_after = map
                     .get("retry_after_seconds")
                     .and_then(Value::as_u64)
                     .unwrap_or(0);
-                return Err(InkboxError::DedicatedIMessageLineInventoryPending {
+                return Err(InkboxError::DedicatedIMessageNumberInventoryPending {
                     status_code: status,
                     message: map
                         .get("message")
                         .and_then(|m| m.as_str())
                         .unwrap_or("")
                         .into(),
-                    line_type: map
-                        .get("line_type")
+                    number_type: map
+                        .get("number_type")
                         .and_then(|t| t.as_str())
                         .unwrap_or("")
                         .into(),

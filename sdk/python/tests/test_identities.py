@@ -94,14 +94,14 @@ class TestIdentitiesCreate:
         )
         assert identity.email_address == "sales.team@inkboxmail.com"
 
-    def test_claims_imessage_line_atomically(self):
+    def test_claims_imessage_number_atomically(self):
         res, http = _resource()
         http.post.return_value = IDENTITY_DETAIL_DICT
 
         identity = res.create(
             agent_handle=HANDLE,
             imessage_enabled=True,
-            imessage_line_type=IMessageNumberType.DEDICATED_OUTBOUND,
+            imessage_number_type=IMessageNumberType.DEDICATED_OUTBOUND,
         )
 
         http.post.assert_called_once_with(
@@ -109,19 +109,19 @@ class TestIdentitiesCreate:
             json={
                 "agent_handle": HANDLE,
                 "imessage_enabled": True,
-                "imessage_line_type": "dedicated_outbound",
+                "imessage_number_type": "dedicated_outbound",
             },
         )
         assert identity.imessage_number is not None
         assert identity.imessage_number.can_start_conversations is True
 
-    def test_line_claim_requires_imessage_enabled_true(self):
+    def test_number_claim_requires_imessage_enabled_true(self):
         res, http = _resource()
 
         with pytest.raises(ValueError, match="imessage_enabled=True"):
             res.create(
                 agent_handle=HANDLE,
-                imessage_line_type="dedicated_inbound",
+                imessage_number_type="dedicated_inbound",
             )
 
         http.post.assert_not_called()
@@ -176,7 +176,10 @@ class TestIdentitiesGet:
 class TestIdentitiesUpdate:
     def test_update_handle(self):
         res, http = _resource()
-        http.patch.return_value = {**IDENTITY_DICT, "agent_handle": "new-handle"}
+        http.patch.return_value = {
+            **IDENTITY_DETAIL_DICT,
+            "agent_handle": "new-handle",
+        }
 
         result = res.update(HANDLE, new_handle="new-handle")
 
@@ -187,29 +190,32 @@ class TestIdentitiesUpdate:
 
     def test_omitted_fields_not_sent(self):
         res, http = _resource()
-        http.patch.return_value = IDENTITY_DICT
+        http.patch.return_value = IDENTITY_DETAIL_DICT
 
         res.update(HANDLE, new_handle="new-handle")
 
         _, kwargs = http.patch.call_args
         assert "status" not in kwargs["json"]
 
-    def test_claims_new_imessage_line(self):
+    def test_claims_new_imessage_number(self):
         res, http = _resource()
-        http.patch.return_value = IDENTITY_DICT
+        http.patch.return_value = IDENTITY_DETAIL_DICT
 
         res.update(
             HANDLE,
-            imessage_line_type=IMessageNumberType.DEDICATED_INBOUND,
+            imessage_number_type=IMessageNumberType.DEDICATED_INBOUND,
+            idempotency_key="identity-claim-1",
         )
 
         http.patch.assert_called_once_with(
-            f"/{HANDLE}", json={"imessage_line_type": "dedicated_inbound"}
+            f"/{HANDLE}",
+            json={"imessage_number_type": "dedicated_inbound"},
+            headers={"Idempotency-Key": "identity-claim-1"},
         )
 
     def test_attaches_owned_imessage_number(self):
         res, http = _resource()
-        http.patch.return_value = IDENTITY_DICT
+        http.patch.return_value = IDENTITY_DETAIL_DICT
         number_id = UUID("99999999-0000-0000-0000-000000000001")
 
         res.update(HANDLE, imessage_number_id=number_id)
@@ -220,7 +226,7 @@ class TestIdentitiesUpdate:
 
     def test_explicit_null_moves_to_shared_service(self):
         res, http = _resource()
-        http.patch.return_value = IDENTITY_DICT
+        http.patch.return_value = IDENTITY_DETAIL_DICT
 
         res.update(HANDLE, imessage_number_id=None)
 
@@ -230,23 +236,49 @@ class TestIdentitiesUpdate:
 
     def test_omits_imessage_number_id_by_default(self):
         res, http = _resource()
-        http.patch.return_value = IDENTITY_DICT
+        http.patch.return_value = IDENTITY_DETAIL_DICT
 
         res.update(HANDLE, display_name="Sales")
 
         assert "imessage_number_id" not in http.patch.call_args.kwargs["json"]
 
-    def test_rejects_line_type_with_number_id(self):
+    def test_rejects_number_type_with_number_id(self):
         res, http = _resource()
 
         with pytest.raises(ValueError, match="cannot be set together"):
             res.update(
                 HANDLE,
-                imessage_line_type="dedicated_outbound",
+                imessage_number_type="dedicated_outbound",
                 imessage_number_id=None,
             )
 
         http.patch.assert_not_called()
+
+    def test_number_claim_requires_idempotency_key(self):
+        res, http = _resource()
+
+        with pytest.raises(ValueError, match="idempotency_key is required"):
+            res.update(
+                HANDLE,
+                imessage_number_type="dedicated_outbound",
+            )
+
+        http.patch.assert_not_called()
+
+    def test_explicit_null_can_be_combined_with_disable(self):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DETAIL_DICT
+
+        res.update(
+            HANDLE,
+            imessage_enabled=False,
+            imessage_number_id=None,
+        )
+
+        http.patch.assert_called_once_with(
+            f"/{HANDLE}",
+            json={"imessage_enabled": False, "imessage_number_id": None},
+        )
 
 
 class TestIdentitiesDelete:

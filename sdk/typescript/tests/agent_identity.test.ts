@@ -44,7 +44,6 @@ const PARSED_IMESSAGE_NUMBER = {
   id: RAW_IDENTITY_IMESSAGE_NUMBER.id,
   number: RAW_IDENTITY_IMESSAGE_NUMBER.number,
   type: RAW_IDENTITY_IMESSAGE_NUMBER.type,
-  inboundOnly: RAW_IDENTITY_IMESSAGE_NUMBER.inbound_only,
 };
 
 function makeData(overrides: Partial<_AgentIdentityData> = {}): _AgentIdentityData {
@@ -683,14 +682,7 @@ describe("AgentIdentity phone helpers", () => {
 describe("AgentIdentity management", () => {
   it("update refreshes internal data", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.update).mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: "new-handle",
-      emailAddress: RAW_IDENTITY.email_address,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
+    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({ agentHandle: "new-handle" }));
     const identity = new AgentIdentity(makeData(), ink);
 
     await identity.update({ newHandle: "new-handle" });
@@ -710,35 +702,22 @@ describe("AgentIdentity management", () => {
       metadata: {}, createdAt: new Date(), updatedAt: new Date(),
     };
     const renamedTunnel = { ...oldTunnel, tunnelName: "new-handle", publicHost: "new-handle.inkboxwire.com" };
-    vi.mocked(ink._idsResource.update).mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
+    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({
       agentHandle: "new-handle",
-      emailAddress: RAW_IDENTITY.email_address,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
-    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({ agentHandle: "new-handle", tunnel: renamedTunnel }));
+      tunnel: renamedTunnel,
+    }));
     const identity = new AgentIdentity(makeData({ tunnel: oldTunnel }), ink);
 
     await identity.update({ newHandle: "new-handle" });
 
-    expect(ink._idsResource.get).toHaveBeenCalledWith("new-handle");
+    expect(ink._idsResource.get).not.toHaveBeenCalled();
     expect(identity.tunnel?.tunnelName).toBe("new-handle");
     expect(identity.tunnel?.publicHost).toBe("new-handle.inkboxwire.com");
   });
 
   it("update without newHandle does not refresh", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.update).mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: RAW_IDENTITY.agent_handle,
-      displayName: "New Display",
-      emailAddress: RAW_IDENTITY.email_address,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
+    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({ displayName: "New Display" }));
     const identity = new AgentIdentity(makeData(), ink);
 
     await identity.update({ displayName: "New Display" });
@@ -746,61 +725,40 @@ describe("AgentIdentity management", () => {
     expect(ink._idsResource.get).not.toHaveBeenCalled();
   });
 
-  it("update refreshes the embedded iMessage number after claiming a line", async () => {
+  it("update applies the detailed response after claiming a number", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.update).mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: RAW_IDENTITY.agent_handle,
-      emailAddress: RAW_IDENTITY.email_address,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
-    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({
+    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({
       imessageNumber: PARSED_IMESSAGE_NUMBER,
     }));
     const identity = new AgentIdentity(makeData({ imessageNumber: null }), ink);
 
-    await identity.update({ imessageLineType: "dedicated_outbound" });
+    await identity.update({
+      imessageNumberType: "dedicated_outbound",
+      idempotencyKey: "identity-claim-123",
+    });
 
     expect(ink._idsResource.update).toHaveBeenCalledWith("sales-agent", {
-      imessageLineType: "dedicated_outbound",
+      imessageNumberType: "dedicated_outbound",
+      idempotencyKey: "identity-claim-123",
     });
-    expect(ink._idsResource.get).toHaveBeenCalledWith("sales-agent");
+    expect(ink._idsResource.get).not.toHaveBeenCalled();
     expect(identity.imessageNumber).toEqual(PARSED_IMESSAGE_NUMBER);
   });
 
-  it("update refreshes after moving back to shared iMessage", async () => {
+  it("update applies a move back to shared iMessage from the detailed response", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.update).mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: RAW_IDENTITY.agent_handle,
-      emailAddress: RAW_IDENTITY.email_address,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
-    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({ imessageNumber: null }));
+    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({ imessageNumber: null }));
     const identity = new AgentIdentity(makeData(), ink);
 
     await identity.update({ imessageNumberId: null });
 
-    expect(ink._idsResource.get).toHaveBeenCalledWith("sales-agent");
+    expect(ink._idsResource.get).not.toHaveBeenCalled();
     expect(identity.imessageNumber).toBeNull();
   });
 
-  it("update refreshes a detached number when disabling iMessage", async () => {
+  it("update applies a detached number when disabling iMessage", async () => {
     const ink = mockInkbox();
-    vi.mocked(ink._idsResource.update).mockResolvedValue({
-      id: RAW_IDENTITY.id,
-      organizationId: RAW_IDENTITY.organization_id,
-      agentHandle: RAW_IDENTITY.agent_handle,
-      emailAddress: RAW_IDENTITY.email_address,
-      imessageEnabled: false,
-      createdAt: RAW_IDENTITY.created_at,
-      updatedAt: RAW_IDENTITY.updated_at,
-    });
-    vi.mocked(ink._idsResource.get).mockResolvedValue(makeData({
+    vi.mocked(ink._idsResource.update).mockResolvedValue(makeData({
       imessageEnabled: false,
       imessageNumber: null,
     }));
@@ -810,7 +768,7 @@ describe("AgentIdentity management", () => {
 
     await identity.update({ imessageEnabled: false });
 
-    expect(ink._idsResource.get).toHaveBeenCalledWith("sales-agent");
+    expect(ink._idsResource.get).not.toHaveBeenCalled();
     expect(identity.imessageNumber).toBeNull();
   });
 

@@ -127,7 +127,7 @@ export class AgentIdentity {
   /** The phone number currently assigned to this identity, or `null` if none. */
   get phoneNumber(): IdentityPhoneNumber | null { return this._phoneNumber; }
 
-  /** Dedicated iMessage line attached to this identity, or `null` on shared service. */
+  /** Dedicated iMessage number attached to this identity, or `null` on shared service. */
   get imessageNumber(): IdentityIMessageNumber | null { return this._imessageNumber; }
 
   /** The tunnel currently assigned to this identity. Non-null for live identities (1:1 invariant). */
@@ -820,8 +820,8 @@ export class AgentIdentity {
   /**
    * Send an outbound iMessage as this identity.
    *
-   * Shared and dedicated-inbound lines require the recipient to connect
-   * first. A dedicated-outbound line may initiate a conversation, subject
+   * Shared and dedicated-inbound numbers require the recipient to connect
+   * first. A dedicated-outbound number may initiate a conversation, subject
    * to server-side consent and rate limits. Inbound replies and reactions arrive via
    * identity-owned webhook subscriptions
    * (`inkbox.webhooks.subscriptions.create({ agentIdentityId, url,
@@ -1118,10 +1118,12 @@ export class AgentIdentity {
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
    * @param options.imessageEnabled - Toggle shared-iMessage reachability.
-   * @param options.imessageNumberId - Attach an already-owned dedicated line,
+   * @param options.imessageNumberId - Attach an already-owned dedicated number,
    *   or pass `null` to return to shared service.
-   * @param options.imessageLineType - Claim and atomically attach or swap to
-   *   a new dedicated line.
+   * @param options.imessageNumberType - Claim and atomically attach or swap to
+   *   a new dedicated number.
+   * @param options.idempotencyKey - Stable caller-generated key required with
+   *   `imessageNumberType`; reuse it for an ambiguous retry.
    * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
    *   for iMessage contact rules (admin-only).
    * @param options.mailFilterMode - `"whitelist"` or `"blacklist"` for this
@@ -1135,25 +1137,12 @@ export class AgentIdentity {
    *   to remove the identity; `"deleted"` is rejected here.
    */
   async update(options: UpdateIdentityOptions): Promise<void> {
-    const result = await this._inkbox._idsResource.update(this.agentHandle, options);
-    this._data = {
-      ...result,
-      mailbox:          this._mailbox,
-      phoneNumber:      this._phoneNumber,
-      imessageNumber:   this._imessageNumber,
-      tunnel:           this._tunnel,
-    };
-    if (
-      (options.newHandle !== undefined && this._tunnel != null)
-      || "imessageNumberId" in options
-      || options.imessageLineType !== undefined
-      || options.imessageEnabled === false
-    ) {
-      // The server renames the linked tunnel in the same transaction
-      // under the unified handle namespace; refresh to pick up the
-      // new tunnelName / publicHost on the cached tunnel.
-      await this.refresh();
-    }
+    const data = await this._inkbox._idsResource.update(this.agentHandle, options);
+    this._data = data;
+    this._mailbox = data.mailbox;
+    this._phoneNumber = data.phoneNumber;
+    this._imessageNumber = data.imessageNumber;
+    this._tunnel = data.tunnel;
   }
 
   /**
