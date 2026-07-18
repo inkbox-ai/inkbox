@@ -131,10 +131,13 @@ class IMessagesResource:
 
         Raises:
             InkboxAPIError: 400 when the identity is not iMessage-enabled;
-                404 when the recipient has never connected (the detail
-                includes the connect command and router number); 409 when
-                the recipient disconnected or has not messaged first; 429
-                when the identity's rolling 24-hour send cap is reached.
+                404 when no assignment exists (shared service includes the
+                connect command and router number, while dedicated inbound
+                directs the recipient to the attached number); 409 when an
+                existing conversation is inactive or a recipient-first line
+                has not received a message yet, with setup-appropriate next
+                steps in the detail; 429 when the identity's rolling 24-hour
+                send cap is reached.
             RecipientBlockedError: 403 when the recipient is blocked by a
                 contact rule.
         """

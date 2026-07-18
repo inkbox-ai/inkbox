@@ -15,7 +15,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
-- Version bumped to 0.4.26 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI has no new dedicated-number commands in this release; it moves in lockstep with the SDK packages.
+- Version bumped to 0.4.26 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI pins exactly `@inkbox/sdk` 0.4.26 so the packages install and release in lockstep; it has no new dedicated-number commands in this release.
 
 ### Compatibility and rollout
 

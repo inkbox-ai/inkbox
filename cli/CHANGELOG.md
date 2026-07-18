@@ -4,7 +4,7 @@
 
 ### Changed
 
-- CLI version moved in lockstep with `@inkbox/sdk` 0.4.26. This release adds no new CLI commands; dedicated iMessage number management is available through the SDKs.
+- CLI version moved in lockstep with `@inkbox/sdk` 0.4.26 and pins that exact SDK version. This release adds no new CLI commands; dedicated iMessage number management is available through the SDKs.
 
 ## 0.4.25 — Proxy support (HTTP_PROXY / HTTPS_PROXY / NO_PROXY)
 
