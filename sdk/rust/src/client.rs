@@ -29,6 +29,7 @@ use crate::identities::types::{
 };
 use crate::imessage::resources::contact_rules::IMessageContactRulesResource;
 use crate::imessage::resources::imessages::IMessagesResource;
+use crate::imessage::types::IMessageNumberType;
 use crate::mail::resources::contact_rules::MailContactRulesResource;
 use crate::mail::resources::domains::DomainsResource;
 use crate::mail::resources::identity_contact_rules::MailIdentityContactRulesResource;
@@ -439,6 +440,36 @@ impl Inkbox {
         phone_number: Option<&IdentityPhoneNumberCreateOptions>,
         vault_secret_ids: Option<&VaultSecretIds>,
     ) -> Result<AgentIdentity> {
+        self.create_identity_with_imessage_number(
+            agent_handle,
+            display_name,
+            description,
+            imessage_enabled,
+            email_local_part,
+            sending_domain,
+            tunnel,
+            phone_number,
+            vault_secret_ids,
+            None,
+        )
+    }
+
+    /// Create an identity and optionally claim and attach a dedicated iMessage
+    /// number atomically.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_identity_with_imessage_number(
+        self: &Arc<Self>,
+        agent_handle: &str,
+        display_name: Option<&str>,
+        description: Unset<String>,
+        imessage_enabled: Option<bool>,
+        email_local_part: Option<&str>,
+        sending_domain: Unset<String>,
+        tunnel: Option<&IdentityTunnelCreateOptions>,
+        phone_number: Option<&IdentityPhoneNumberCreateOptions>,
+        vault_secret_ids: Option<&VaultSecretIds>,
+        imessage_number_type: Option<IMessageNumberType>,
+    ) -> Result<AgentIdentity> {
         // Assemble the nested mailbox spec only when a mailbox field was given,
         // matching the Python `mailbox_kwargs` construction.
         let mailbox = if email_local_part.is_some() || !sending_domain.is_omit() {
@@ -449,7 +480,7 @@ impl Inkbox {
         } else {
             None
         };
-        let data = self.identities.create(
+        let data = self.identities.create_with_imessage_number(
             agent_handle,
             display_name,
             description,
@@ -458,6 +489,7 @@ impl Inkbox {
             tunnel,
             phone_number,
             vault_secret_ids,
+            imessage_number_type,
         )?;
         Ok(AgentIdentity::new(data, self.clone()))
     }

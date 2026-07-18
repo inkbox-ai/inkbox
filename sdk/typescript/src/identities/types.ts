@@ -14,6 +14,12 @@ import {
 import { SmsStatus } from "../phone/types.js";
 import type { RawTunnel, TLSMode, Tunnel } from "../tunnels/types.js";
 import { parseTunnel } from "../tunnels/types.js";
+import type {
+  IdentityIMessageNumber,
+  IMessageDedicatedNumberType,
+  RawIdentityIMessageNumber,
+} from "../imessage/types.js";
+import { parseIdentityIMessageNumber } from "../imessage/types.js";
 
 export interface IdentityMailboxCreateOptions {
   emailLocalPart?: string;
@@ -51,6 +57,11 @@ export interface CreateIdentityOptions {
    * service. Defaults server-side to `false`; pass `true` to opt in.
    */
   imessageEnabled?: boolean;
+  /**
+   * Claim and attach a dedicated iMessage number atomically during identity
+   * creation. Requires `imessageEnabled: true`.
+   */
+  imessageNumberType?: IMessageDedicatedNumberType;
   emailLocalPart?: string;
   /**
    * Optional sending-domain selector by **bare domain name**. Presence
@@ -63,6 +74,30 @@ export interface CreateIdentityOptions {
   tunnel?: IdentityTunnelCreateOptions;
   phoneNumber?: IdentityPhoneNumberCreateOptions;
   vaultSecretIds?: string | string[] | "*" | "all";
+}
+
+/** Fields accepted by identity PATCH. Omitted fields remain unchanged. */
+export interface UpdateIdentityOptions {
+  newHandle?: string;
+  displayName?: string | null;
+  description?: string | null;
+  imessageEnabled?: boolean;
+  /**
+   * Attach an already-owned dedicated number by id, atomically swap numbers,
+   * or pass `null` to return to the shared iMessage service.
+   */
+  imessageNumberId?: string | null;
+  /** Claim and atomically attach or swap to a new dedicated number. */
+  imessageNumberType?: IMessageDedicatedNumberType;
+  /**
+   * Stable caller-generated key for an `imessageNumberType` claim.
+   * Reuse it when retrying an ambiguous update.
+   */
+  idempotencyKey?: string;
+  imessageFilterMode?: "whitelist" | "blacklist";
+  mailFilterMode?: "whitelist" | "blacklist";
+  phoneFilterMode?: "whitelist" | "blacklist";
+  status?: "active" | "paused";
 }
 
 export interface IdentityMailbox {
@@ -125,9 +160,8 @@ export interface AgentIdentitySummary {
   /** Email address assigned at creation time. Always trust this value — do not derive it from `agentHandle`. */
   emailAddress: string | null;
   /**
-   * Whether this identity can be reached over the shared iMessage
-   * service. There is no per-identity iMessage number, so this lives
-   * on the identity itself rather than on a channel object.
+   * Whether this identity can be reached over iMessage. A detailed identity
+   * may also carry an attached dedicated number.
    */
   imessageEnabled: boolean;
   /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
@@ -158,6 +192,8 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
+  /** Dedicated iMessage number attached to this identity, or null on shared service. */
+  imessageNumber: IdentityIMessageNumber | null;
   /** Tunnel assigned to this identity. Non-null for live identities (1:1 invariant); null only on deleted rows. */
   tunnel: Tunnel | null;
 }
@@ -231,6 +267,7 @@ export interface RawAgentIdentitySummary {
 export interface RawAgentIdentityData extends RawAgentIdentitySummary {
   mailbox: RawIdentityMailbox | null;
   phone_number: RawIdentityPhoneNumber | null;
+  imessage_number?: RawIdentityIMessageNumber | null;
   tunnel: RawTunnel | null;
 }
 
@@ -306,6 +343,9 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
     ...parseAgentIdentitySummary(r),
     mailbox: r.mailbox ? parseIdentityMailbox(r.mailbox) : null,
     phoneNumber: r.phone_number ? parseIdentityPhoneNumber(r.phone_number) : null,
+    imessageNumber: r.imessage_number
+      ? parseIdentityIMessageNumber(r.imessage_number)
+      : null,
     tunnel: r.tunnel ? parseTunnel(r.tunnel) : null,
   };
 }

@@ -1,21 +1,22 @@
 /**
  * inkbox-imessage/resources/imessages.ts
  *
- * iMessage operations: send, list, conversations, reactions, read
- * receipts, typing indicators, media upload.
+ * iMessage operations: dedicated numbers, send, list, conversations,
+ * reactions, read receipts, typing indicators, media upload.
  *
- * Unlike SMS, iMessage is not scoped to an org-owned phone number.
- * Recipients are connected to an agent identity over a shared pool
- * line by triage, so every method here keys off `conversationId` /
- * `agentIdentityId` rather than a `phoneNumberId`.
+ * Conversation operations key off `conversationId` / `agentIdentityId`.
+ * Dedicated number inventory is managed through `listNumbers` and
+ * `claimNumber`.
  */
 
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
 import {
   IMessage,
   IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
+  IMessageDedicatedNumberType,
+  IMessageNumber,
   IMessageMarkReadResult,
   IMessageMediaUpload,
   IMessageReaction,
@@ -26,12 +27,14 @@ import {
   RawIMessageAssignment,
   RawIMessageConversation,
   RawIMessageConversationSummary,
+  RawIMessageNumber,
   RawIMessageReaction,
   RawIMessageTriageNumber,
   parseIMessage,
   parseIMessageAssignment,
   parseIMessageConversation,
   parseIMessageConversationSummary,
+  parseIMessageNumber,
   parseIMessageReaction,
   parseIMessageTriageNumber,
 } from "../types.js";
@@ -55,10 +58,51 @@ export class IMessagesResource {
   }
 
   /**
+   * List every non-released dedicated iMessage number owned by the
+   * organization, including unattached numbers.
+   */
+  async listNumbers(): Promise<IMessageNumber[]> {
+    const data = await this.http.get<RawIMessageNumber[]>("/numbers");
+    return data.map(parseIMessageNumber);
+  }
+
+  /**
+   * Claim one dedicated iMessage number for the organization.
+   *
+   * Claiming does not attach the number to an identity. Pass
+   * `imessageNumberType` during identity creation or update to claim and
+   * attach atomically, or pass an owned number's id as `imessageNumberId`
+   * during identity update.
+   *
+   * Reuse the same caller-generated `idempotencyKey` when retrying an
+   * ambiguous request. A new key can claim another number.
+   *
+   * @throws {DedicatedIMessageNumberQuotaExceededError} 402 when the
+   *   organization has reached its quota for the requested number type.
+   * @throws {DedicatedIMessageNumberInventoryPendingError} 503 when number
+   *   inventory is pending; inspect `retryAfterSeconds` before retrying.
+   * @throws {IdempotencyKeyReusedError} 409 when the key was already used
+   *   for a different request.
+   */
+  async claimNumber(options: {
+    type: IMessageDedicatedNumberType;
+    idempotencyKey: string;
+  }): Promise<IMessageNumber> {
+    validateIdempotencyKey(options.idempotencyKey);
+    const data = await this.http.post<RawIMessageNumber>("/numbers", {
+      type: options.type,
+    }, {
+      headers: { "Idempotency-Key": options.idempotencyKey },
+    });
+    return parseIMessageNumber(data);
+  }
+
+  /**
    * Send an outbound iMessage through an existing assignment.
    *
-   * Sends only work toward recipients that triage has already connected
-   * to the agent identity — there is no cold outreach over iMessage.
+   * Shared and dedicated-inbound numbers require the recipient to connect
+   * first. An identity attached to a dedicated-outbound number may initiate
+   * a conversation, subject to server-side consent and rate limits.
    * Inbound replies and reactions arrive via identity-owned webhook
    * subscriptions (`inkbox.webhooks.subscriptions.create({
    * agentIdentityId, url, eventTypes: ["imessage.received", ...] })`).

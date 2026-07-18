@@ -373,10 +373,17 @@ export const RAW_IDENTITY = {
   updated_at: "2026-03-09T00:00:00Z",
 };
 
+export const RAW_IDENTITY_IMESSAGE_NUMBER = {
+  id: "99999999-0000-0000-0000-000000000001",
+  number: "+15555550123",
+  type: "dedicated_outbound",
+};
+
 export const RAW_IDENTITY_DETAIL = {
   ...RAW_IDENTITY,
   mailbox: RAW_IDENTITY_MAILBOX,
   phone_number: RAW_IDENTITY_PHONE,
+  imessage_number: RAW_IDENTITY_IMESSAGE_NUMBER,
 };
 
 export const RAW_IDENTITY_ACCESS_WILDCARD = {

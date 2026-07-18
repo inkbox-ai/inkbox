@@ -465,20 +465,49 @@ inkbox.sms_opt_ins.opt_out("+15551234567")
 
 ## iMessage
 
-Chat with humans over iMessage through the shared Inkbox router — no
-per-identity iMessage number. iMessage is **opt-in per identity**
-(`imessage_enabled`), and the **human always texts first**: they
-connect by texting `connect @<handle>` to the router number, after
-which the agent can reply into the conversation. Each identity can
-send up to 100 iMessages per rolling 24-hour window.
+Chat with humans over the shared iMessage router or a dedicated iMessage
+number. iMessage is **opt-in per identity** (`imessage_enabled`). Shared and
+`dedicated_inbound` service require the human to message first;
+`dedicated_outbound` numbers may start new conversations, subject to consent,
+contact-rule, and rate-limit checks.
 
 ```python
-# Opt an identity in (at create time or later).
+# Shared service: opt an identity in at create time or later.
 identity = inkbox.create_identity("my-agent", imessage_enabled=True)
 
 # Resolve the router number at runtime — never hardcode it.
 router = inkbox.imessages.get_triage_number()
 print(router.number, router.connect_command)  # e.g. 'connect @my-agent'
+
+# List every dedicated number owned by the organization, attached or not.
+numbers = inkbox.imessages.list_numbers()
+for number in numbers:
+    print(number.number, number.type, number.agent_handle)
+
+# Claim an unattached organization-owned number. Keep the caller-generated
+# key stable if the request's outcome is ambiguous and you retry it.
+number = inkbox.imessages.claim_number(
+    type="dedicated_outbound",
+    idempotency_key="claim-outbound-agent-2026-07-18",
+)
+print(number.can_start_conversations)  # True
+
+# Claim and attach atomically while creating an identity.
+outbound_identity = inkbox.create_identity(
+    "outbound-agent",
+    imessage_enabled=True,
+    imessage_number_type="dedicated_outbound",
+)
+print(outbound_identity.imessage_number.number)
+
+# Existing identities can atomically claim/swap a new number, attach an already
+# owned number by UUID, or move back to the shared service with explicit None.
+identity.update(
+    imessage_number_type="dedicated_inbound",
+    idempotency_key="swap-my-agent-inbound-2026-07-18",
+)
+identity.update(imessage_number_id=number.id)
+identity.update(imessage_number_id=None)
 
 # Once a human has connected and messaged, read and reply.
 convos = identity.list_imessage_conversations(limit=20)
@@ -511,6 +540,12 @@ inkbox.imessage_contact_rules.create(
     "my-agent", action="block", match_target="+15555550999",
 )
 ```
+
+Claiming can raise `DedicatedIMessageNumberQuotaExceededError` (inspect
+`number_type`, `limit`, `current`, and `upgrade_url`),
+`DedicatedIMessageNumberInventoryPendingError` (inspect
+`retry_after_seconds`), or `IdempotencyKeyReusedError` when a key is
+reused with a different request.
 
 Inbound messages, tapbacks, and outbound delivery status arrive via
 identity-owned webhook subscriptions — see [Webhooks](#webhooks) for

@@ -22,6 +22,11 @@ from inkbox.identities.types import (
     _AgentIdentityData,
     vault_secret_ids_to_wire,
 )
+from inkbox.imessage.types import (
+    IMessageNumberType,
+    _dedicated_number_type,
+    _validate_idempotency_key,
+)
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -38,6 +43,7 @@ class IdentitiesResource:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        imessage_number_type: IMessageNumberType | str | None = None,
         mailbox: IdentityMailboxCreateOptions | None = None,
         tunnel: IdentityTunnelCreateOptions | None = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
@@ -56,9 +62,11 @@ class IdentitiesResource:
             description: Free-form org-internal description. Pass
                 ``None`` to leave the column null; omit entirely to defer
                 to the server default.
-            imessage_enabled: Whether the identity can be reached over
-                the shared iMessage service. Omit to defer to the server
-                default (``False``).
+            imessage_enabled: Whether the identity can use iMessage. Omit to
+                defer to the server default (``False``).
+            imessage_number_type: Claim and attach a new dedicated inbound or
+                outbound iMessage number atomically. Requires
+                ``imessage_enabled=True``.
             mailbox: Optional nested mailbox spec.
             tunnel: Optional nested tunnel spec (tls_mode only).
             phone_number: Optional phone-number provisioning payload.
@@ -75,6 +83,14 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if imessage_number_type is not None:
+            if imessage_enabled is not True:
+                raise ValueError(
+                    "imessage_number_type requires imessage_enabled=True"
+                )
+            body["imessage_number_type"] = _dedicated_number_type(
+                imessage_number_type
+            ).value
         if mailbox is not None:
             body["mailbox"] = mailbox.to_wire()
         if tunnel is not None:
@@ -108,11 +124,14 @@ class IdentitiesResource:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
+        imessage_number_type: IMessageNumberType | str | None = None,
+        idempotency_key: str | None = None,
         imessage_filter_mode: str | None = None,
         mail_filter_mode: str | None = None,
         phone_filter_mode: str | None = None,
         status: str | None = None,
-    ) -> AgentIdentitySummary:
+    ) -> _AgentIdentityData:
         """Update an identity's handle, display name, description,
         iMessage reachability, contact-rule filter modes, and/or status.
 
@@ -126,7 +145,15 @@ class IdentitiesResource:
             new_handle: New handle value.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
-            imessage_enabled: Toggle shared-iMessage reachability.
+            imessage_enabled: Toggle iMessage reachability.
+            imessage_number_id: Attach an already-owned dedicated number by
+                UUID, pass ``None`` to move back to the shared service, or
+                omit to leave the current attachment unchanged.
+            imessage_number_type: Claim and attach a new dedicated number of the
+                requested type. Cannot be combined with
+                ``imessage_number_id`` and requires ``idempotency_key``.
+            idempotency_key: Stable caller-generated key for a dedicated-number
+                claim. Reuse the same value when retrying the same update.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
             mail_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
@@ -146,6 +173,32 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if imessage_number_type is not None and imessage_number_id is not _UNSET:
+            raise ValueError(
+                "imessage_number_type and imessage_number_id cannot be set together"
+            )
+        if imessage_number_type is not None:
+            if imessage_enabled is False:
+                raise ValueError(
+                    "imessage_number_type cannot be set while disabling iMessage"
+                )
+            if idempotency_key is None:
+                raise ValueError(
+                    "idempotency_key is required with imessage_number_type"
+                )
+            body["imessage_number_type"] = _dedicated_number_type(
+                imessage_number_type
+            ).value
+        if imessage_number_id is not _UNSET:
+            if imessage_number_id is not None and imessage_enabled is False:
+                raise ValueError(
+                    "imessage_number_id cannot be set while disabling iMessage"
+                )
+            body["imessage_number_id"] = (
+                str(imessage_number_id)
+                if imessage_number_id is not None
+                else None
+            )
         if imessage_filter_mode is not None:
             body["imessage_filter_mode"] = imessage_filter_mode
         if mail_filter_mode is not None:
@@ -154,11 +207,21 @@ class IdentitiesResource:
             body["phone_filter_mode"] = phone_filter_mode
         if status is not None:
             body["status"] = status
+        headers = None
+        if idempotency_key is not None:
+            headers = {
+                "Idempotency-Key": _validate_idempotency_key(idempotency_key),
+            }
         try:
-            data = self._http.patch(f"/{agent_handle}", json=body)
+            if headers is None:
+                data = self._http.patch(f"/{agent_handle}", json=body)
+            else:
+                data = self._http.patch(
+                    f"/{agent_handle}", json=body, headers=headers,
+                )
         except InkboxAPIError as err:
             raise map_identity_conflict_error(err) from err
-        return AgentIdentitySummary._from_dict(data)
+        return _AgentIdentityData._from_dict(data)
 
     def delete(self, agent_handle: str) -> None:
         """Delete an identity.

@@ -128,6 +128,7 @@ describe("Inkbox.createIdentity", () => {
       updatedAt: RAW_IDENTITY_DETAIL.updated_at,
       mailbox: null,
       phoneNumber: null,
+      imessageNumber: null,
       tunnel: null,
     });
   }
@@ -188,6 +189,22 @@ describe("Inkbox.createIdentity", () => {
     expect(call.mailbox).toBeDefined();
     expect(call.mailbox?.sendingDomain).toBeNull();
   });
+
+  it("forwards dedicated iMessage number options", async () => {
+    const ink = makeInkbox();
+    mockCreateReturnsDetail(ink);
+
+    await ink.createIdentity("sales-agent", {
+      imessageEnabled: true,
+      imessageNumberType: "dedicated_outbound",
+    });
+
+    expect(vi.mocked(ink._idsResource.create).mock.calls[0][0]).toMatchObject({
+      agentHandle: "sales-agent",
+      imessageEnabled: true,
+      imessageNumberType: "dedicated_outbound",
+    });
+  });
 });
 
 describe("Inkbox.getIdentity", () => {
@@ -202,6 +219,8 @@ describe("Inkbox.getIdentity", () => {
       updatedAt: RAW_IDENTITY_DETAIL.updated_at,
       mailbox: null,
       phoneNumber: null,
+      imessageNumber: null,
+      tunnel: null,
     });
 
     const identity = await ink.getIdentity("sales-agent");

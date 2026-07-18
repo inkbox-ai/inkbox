@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
+from inkbox.imessage.types import IMessageNumberType
 from inkbox.mail.types import FilterMode, FilterModeChangeNotice
 from inkbox.phone.types import SmsStatus
 from inkbox.tunnels.types import TLSMode, Tunnel
@@ -233,12 +234,40 @@ class IdentityPhoneNumber:
 
 
 @dataclass
+class IdentityIMessageNumber:
+    """Dedicated iMessage number attached to an agent identity.
+
+    The identity-detail wire shape is intentionally smaller than the
+    organization-level dedicated-number response: it contains no lifecycle
+    status or attachment fields because attachment is implied by nesting.
+    """
+
+    id: UUID
+    number: str
+    type: IMessageNumberType
+
+    @property
+    def can_start_conversations(self) -> bool:
+        """Whether this number may initiate a conversation."""
+        return self.type is IMessageNumberType.DEDICATED_OUTBOUND
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IdentityIMessageNumber:
+        number_type = IMessageNumberType(d["type"])
+        return cls(
+            id=UUID(d["id"]),
+            number=d["number"],
+            type=number_type,
+        )
+
+
+@dataclass
 class AgentIdentitySummary:
     """Lightweight agent identity returned by list endpoints.
 
-    ``imessage_enabled`` / ``imessage_filter_mode`` describe shared-pool
-    iMessage reachability — there is no per-identity iMessage number, so
-    these live on the identity itself rather than on a channel object.
+    ``imessage_enabled`` / ``imessage_filter_mode`` describe iMessage
+    reachability and filtering. A dedicated number, when present, is included
+    only in the detailed identity response.
 
     ``mail_filter_mode`` / ``phone_filter_mode`` are the whitelist/blacklist
     modes for this identity's mail and phone contact rules. They live on the
@@ -299,6 +328,7 @@ class _AgentIdentityData(AgentIdentitySummary):
 
     mailbox: IdentityMailbox | None = field(default=None)
     phone_number: IdentityPhoneNumber | None = field(default=None)
+    imessage_number: IdentityIMessageNumber | None = field(default=None)
     tunnel: Tunnel | None = field(default=None)
 
     @classmethod
@@ -306,11 +336,17 @@ class _AgentIdentityData(AgentIdentitySummary):
         base = AgentIdentitySummary._from_dict(d)
         mailbox_data = d.get("mailbox")
         phone_data = d.get("phone_number")
+        imessage_data = d.get("imessage_number")
         tunnel_data = d.get("tunnel")
         return cls(
             **base.__dict__,
             mailbox=IdentityMailbox._from_dict(mailbox_data) if mailbox_data else None,
             phone_number=IdentityPhoneNumber._from_dict(phone_data) if phone_data else None,
+            imessage_number=(
+                IdentityIMessageNumber._from_dict(imessage_data)
+                if imessage_data
+                else None
+            ),
             tunnel=Tunnel._from_dict(tunnel_data) if tunnel_data else None,
         )
 

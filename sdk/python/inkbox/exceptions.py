@@ -101,6 +101,51 @@ class StorageLimitExceededError(InkboxAPIError):
         self.limit_bytes: int | None = int(raw_limit) if raw_limit is not None else None
 
 
+class DedicatedIMessageNumberQuotaExceededError(InkboxAPIError):
+    """Raised when an organization has reached its dedicated-number quota."""
+
+    def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.message: str = str(detail.get("message", ""))
+        self.number_type: str = str(detail.get("number_type", ""))
+        self.limit: int = int(detail.get("limit", 0))
+        self.current: int = int(detail.get("current", 0))
+        self.upgrade_url: str = str(detail.get("upgrade_url", ""))
+        self.contact_email: str = str(detail.get("contact_email", ""))
+
+
+class DedicatedIMessageNumberInventoryPendingError(InkboxAPIError):
+    """Raised when dedicated-number inventory is temporarily unavailable."""
+
+    def __init__(
+        self,
+        status_code: int,
+        detail: dict[str, Any],
+        *,
+        retry_after: str | None = None,
+    ) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.message: str = str(detail.get("message", ""))
+        self.number_type: str = str(detail.get("number_type", ""))
+        raw_retry = detail.get("retry_after_seconds")
+        if retry_after is not None:
+            try:
+                raw_retry = int(retry_after)
+            except ValueError:
+                pass
+        self.retry_after_seconds: int | None = (
+            int(raw_retry) if raw_retry is not None else None
+        )
+
+
+class IdempotencyKeyReusedError(InkboxAPIError):
+    """Raised when an iMessage claim key is reused incompatibly."""
+
+    def __init__(self, status_code: int, detail: dict[str, Any]) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.message: str = str(detail.get("message", ""))
+
+
 class RecipientBlockedError(InkboxAPIError):
     """
     Raised on 403 when an SMS, call, or iMessage destination is blocked

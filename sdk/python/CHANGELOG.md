@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.26 — Self-serve dedicated iMessage numbers
+
+### Added
+
+- **Dedicated iMessage numbers.** `inkbox.imessages.list_numbers()` returns every active or paused dedicated number owned by the organization, including unattached numbers. `claim_number(type=..., idempotency_key=...)` claims `dedicated_inbound` or `dedicated_outbound` inventory and preserves the caller's stable key across an ambiguous retry. New public types mirror the phone SDK: `IMessageNumber`, `IMessageNumberType`, and `IMessageNumberStatus`. `IMessageNumber.can_start_conversations` is true only for dedicated outbound numbers.
+- **Atomic identity claims and swaps.** `Inkbox.create_identity(..., imessage_enabled=True, imessage_number_type=...)` claims and attaches a number in the identity-create transaction. `identity.update(imessage_number_type=..., idempotency_key=...)` claims and swaps atomically; `imessage_number_id=<uuid>` attaches an already-owned number, while explicit `None` moves back to shared service. Detailed create and update responses expose the attached `IdentityIMessageNumber` through `identity.imessage_number`.
+- **Typed claim errors.** `DedicatedIMessageNumberQuotaExceededError` exposes the requested number type, limit, current usage, upgrade URL, and contact email. `DedicatedIMessageNumberInventoryPendingError` exposes the requested number type and `retry_after_seconds`, preferring the HTTP `Retry-After` value when present. `IdempotencyKeyReusedError` identifies a key reused with a different request.
+
+### Fixed
+
+- Identity update now consumes the detailed PATCH response directly, keeping its channel state current without a follow-up GET. Unrelated identity `409` responses are no longer misclassified as handle collisions.
+
 ## 0.4.25 — Tunnel field tolerance
 
 ### Changed

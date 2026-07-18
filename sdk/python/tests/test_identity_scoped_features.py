@@ -17,7 +17,7 @@ import pytest
 from sample_data_identities import IDENTITY_DETAIL_DICT
 
 from inkbox.agent_identity import AgentIdentity
-from inkbox.identities.types import AgentIdentitySummary, _AgentIdentityData
+from inkbox.identities.types import _AgentIdentityData
 from inkbox.mail.exceptions import InkboxError
 from inkbox.mail.resources.identity_contact_rules import (
     MailIdentityContactRulesResource,
@@ -367,22 +367,11 @@ class TestAgentIdentitySigningKeyDelegation:
 
 
 class TestAgentIdentityFilterModeUpdate:
-    def test_update_sends_filter_modes_and_refreshes_cache(self):
+    def test_update_sends_filter_modes_and_uses_detailed_response(self):
         identity, inkbox = _identity()
-        # The server (mirrored) returns the updated summary including the
-        # new filter modes; the cache rebuild must carry them.
-        updated = AgentIdentitySummary._from_dict(
+        updated = _AgentIdentityData._from_dict(
             {
-                "id": str(identity.id),
-                "organization_id": identity._data.organization_id,
-                "agent_handle": identity.agent_handle,
-                "display_name": None,
-                "description": None,
-                "email_address": None,
-                "created_at": "2026-06-09T00:00:00Z",
-                "updated_at": "2026-06-09T00:00:00Z",
-                "imessage_enabled": False,
-                "imessage_filter_mode": "blacklist",
+                **IDENTITY_DETAIL_DICT,
                 "mail_filter_mode": "whitelist",
                 "phone_filter_mode": "whitelist",
             }
@@ -396,6 +385,6 @@ class TestAgentIdentityFilterModeUpdate:
             mail_filter_mode="whitelist",
             phone_filter_mode="whitelist",
         )
-        # Regression: rebuild must not reset the cached modes to default.
+        inkbox._ids_resource.get.assert_not_called()
         assert identity.mail_filter_mode == FilterMode.WHITELIST
         assert identity.phone_filter_mode == FilterMode.WHITELIST

@@ -4,10 +4,9 @@ inkbox/imessage/resources/imessages.py
 iMessage operations: send, list, conversations, reactions, read
 receipts, typing indicators, media upload.
 
-Unlike SMS, iMessage is not scoped to an org-owned phone number.
-Recipients are connected to an agent identity over a shared pool line
-by triage, so every method here keys off ``conversation_id`` /
-``agent_identity_id`` rather than a ``phone_number_id``.
+iMessage messaging operations are identity/assignment-scoped, so they key off
+``conversation_id`` / ``agent_identity_id`` rather than a local number ID.
+This resource also lists and claims organization-owned dedicated numbers.
 """
 
 from __future__ import annotations
@@ -20,12 +19,16 @@ from inkbox.imessage.types import (
     IMessageAssignment,
     IMessageConversation,
     IMessageConversationSummary,
+    IMessageNumber,
+    IMessageNumberType,
     IMessageMarkReadResult,
     IMessageMediaUpload,
     IMessageReaction,
     IMessageReactionType,
     IMessageSendStyle,
     IMessageTriageNumber,
+    _dedicated_number_type,
+    _validate_idempotency_key,
 )
 
 if TYPE_CHECKING:
@@ -38,18 +41,57 @@ class IMessagesResource:
         self._http = http
 
     def get_triage_number(self) -> IMessageTriageNumber:
-        """Return the active triage line and the connect command.
+        """Return the active triage number and the connect command.
 
         Recipients text the returned ``connect_command`` (e.g.
         ``connect @your-handle``) to the triage ``number`` to get
         connected to an agent identity. Resolve this at runtime instead
-        of hardcoding the number — the line can change.
+        of hardcoding the number — it can change.
 
         Raises:
-            InkboxAPIError: 404 when no triage line is active.
+            InkboxAPIError: 404 when no triage number is active.
         """
         data = self._http.get("/triage-number")
         return IMessageTriageNumber._from_dict(data)
+
+    def list_numbers(self) -> list[IMessageNumber]:
+        """List the organization's dedicated iMessage numbers.
+
+        Attached and unattached numbers are both returned. Released numbers are
+        excluded by the server.
+        """
+        data = self._http.get("/numbers")
+        return [IMessageNumber._from_dict(number) for number in data]
+
+    def claim_number(
+        self,
+        *,
+        type: IMessageNumberType | str,
+        idempotency_key: str,
+    ) -> IMessageNumber:
+        """Claim a new dedicated iMessage number for the organization.
+
+        ``idempotency_key`` must be stable across retries of the same logical
+        claim. Dedicated inbound numbers require the recipient to message first.
+        Dedicated outbound numbers may start new conversations, subject to
+        server-side consent, contact-rule, and rate-limit checks.
+
+        Raises:
+            DedicatedIMessageNumberQuotaExceededError: The organization has
+                reached its plan limit for the requested number type.
+            DedicatedIMessageNumberInventoryPendingError: No matching number is
+                currently available; retry after the reported interval.
+            IdempotencyKeyReusedError: The key was previously used for
+                a different claim.
+        """
+        number_type = _dedicated_number_type(type).value
+        key = _validate_idempotency_key(idempotency_key)
+        data = self._http.post(
+            "/numbers",
+            json={"type": number_type},
+            headers={"Idempotency-Key": key},
+        )
+        return IMessageNumber._from_dict(data)
 
     def send(
         self,
@@ -61,11 +103,11 @@ class IMessagesResource:
         send_style: IMessageSendStyle | str | None = None,
         agent_identity_id: UUID | str | None = None,
     ) -> IMessage:
-        """Send an outbound iMessage through an existing assignment.
+        """Send an outbound iMessage.
 
-        Sends only work toward recipients that triage has already
-        connected to the agent identity — there is no cold outreach
-        over iMessage.
+        Shared and dedicated inbound service require an existing assignment.
+        An identity attached to a dedicated outbound number may start a new
+        conversation, subject to server-side policy checks.
 
         Args:
             to: E.164 recipient number. Mutually exclusive with
@@ -89,10 +131,13 @@ class IMessagesResource:
 
         Raises:
             InkboxAPIError: 400 when the identity is not iMessage-enabled;
-                404 when the recipient has never connected (the detail
-                includes the connect command and router number); 409 when
-                the recipient disconnected or has not messaged first; 429
-                when the identity's rolling 24-hour send cap is reached.
+                404 when no assignment exists (shared service includes the
+                connect command and router number, while dedicated inbound
+                directs the recipient to the attached number); 409 when an
+                existing conversation is inactive or a recipient-first line
+                has not received a message yet, with setup-appropriate next
+                steps in the detail; 429 when the identity's rolling 24-hour
+                send cap is reached.
             RecipientBlockedError: 403 when the recipient is blocked by a
                 contact rule.
         """

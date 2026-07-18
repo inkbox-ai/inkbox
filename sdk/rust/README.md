@@ -113,6 +113,50 @@ exposes channel-scoped convenience methods: `send_email`, `forward_email`,
 (`list_mail_contact_rules`, `create_phone_contact_rule`, ...), `create_signing_key`,
 and more.
 
+### Dedicated iMessage numbers
+
+List or claim organization-owned dedicated numbers through the iMessage resource:
+
+```rust
+use inkbox::imessage::IMessageNumberType;
+
+let available = inkbox.imessages().list_numbers()?;
+let number = inkbox
+    .imessages()
+    .claim_number(IMessageNumberType::DedicatedOutbound, "setup-support-number-v1")?;
+
+assert!(number.can_start_conversation());
+```
+
+A number can also be claimed and attached atomically while creating an identity:
+
+```rust
+use inkbox::identities::Unset;
+use inkbox::imessage::IMessageNumberType;
+
+let identity = inkbox.create_identity_with_imessage_number(
+    "support-bot",
+    None,
+    Unset::Omit,
+    Some(true),
+    None,
+    Unset::Omit,
+    None,
+    None,
+    None,
+    Some(IMessageNumberType::DedicatedInbound),
+)?;
+
+let number = identity.imessage_number().expect("dedicated number");
+assert_eq!(number.r#type, IMessageNumberType::DedicatedInbound);
+```
+
+For an existing identity, `update_with_imessage_number` can attach an already
+owned number by id, move back to shared iMessage service with an explicit null,
+or claim and attach a new number by type. Claims require a stable 1–255 character
+idempotency key; reuse the same key after an ambiguous result. Dedicated outbound
+numbers are the only number type that can start a new conversation.
+
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.

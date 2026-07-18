@@ -21,6 +21,7 @@ from inkbox.identities.types import (
     _UNSET,
     _AgentIdentityData,
     IdentityAccess,
+    IdentityIMessageNumber,
     IdentityMailbox,
     IdentityPhoneNumber,
 )
@@ -36,6 +37,7 @@ from inkbox.imessage.types import (
     IMessageReaction,
     IMessageReactionType,
     IMessageSendStyle,
+    IMessageNumberType,
 )
 from inkbox.mail.types import (
     ContactRuleStatus,
@@ -101,6 +103,7 @@ class AgentIdentity:
         self._inkbox = inkbox
         self._mailbox: IdentityMailbox | None = data.mailbox
         self._phone_number: IdentityPhoneNumber | None = data.phone_number
+        self._imessage_number: IdentityIMessageNumber | None = data.imessage_number
         self._tunnel: Tunnel | None = data.tunnel
         self._credentials: Credentials | None = None
         self._credentials_vault_ref: object | None = None  # tracks which _unlocked built the cache
@@ -138,7 +141,7 @@ class AgentIdentity:
 
     @property
     def imessage_enabled(self) -> bool:
-        """Whether this identity can be reached over the shared iMessage service."""
+        """Whether this identity can use iMessage."""
         return self._data.imessage_enabled
 
     @property
@@ -174,6 +177,11 @@ class AgentIdentity:
     @property
     def phone_number(self) -> IdentityPhoneNumber | None:
         return self._phone_number
+
+    @property
+    def imessage_number(self) -> IdentityIMessageNumber | None:
+        """Dedicated iMessage number attached to this identity, if any."""
+        return self._imessage_number
 
     @property
     def tunnel(self) -> Tunnel | None:
@@ -674,7 +682,7 @@ class AgentIdentity:
 
         For ``dedicated_number`` origination the call rides this identity's
         provisioned phone number (requires one). For
-        ``shared_imessage_number`` it rides the shared line and is scoped
+        ``shared_imessage_number`` it rides the shared number and is scoped
         by this identity's id instead.
 
         Args:
@@ -702,7 +710,7 @@ class AgentIdentity:
                 mode=mode,
                 reason=reason,
             )
-        # Shared-line origination scopes by identity id, no from_number.
+        # Shared-number origination scopes by identity id, no from_number.
         return self._inkbox._calls.place(
             to_number=to_number,
             origination=origination,
@@ -1028,9 +1036,9 @@ class AgentIdentity:
     ) -> IMessage:
         """Send an outbound iMessage as this identity.
 
-        Sends only work toward recipients that triage has already
-        connected to this identity over the shared iMessage service —
-        there is no cold outreach.
+        Shared and dedicated inbound service require the recipient to connect
+        first. A dedicated outbound number may start a conversation, subject to
+        server-side policy checks.
 
         Args:
             to: E.164 recipient number. Mutually exclusive with
@@ -1384,6 +1392,9 @@ class AgentIdentity:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
+        imessage_number_type: IMessageNumberType | str | None = None,
+        idempotency_key: str | None = None,
         imessage_filter_mode: FilterMode | str | None = None,
         mail_filter_mode: FilterMode | str | None = None,
         phone_filter_mode: FilterMode | str | None = None,
@@ -1401,7 +1412,15 @@ class AgentIdentity:
             new_handle: New agent handle.
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
-            imessage_enabled: Toggle shared-iMessage reachability.
+            imessage_enabled: Toggle iMessage reachability.
+            imessage_number_id: Attach an already-owned dedicated number by
+                UUID, pass ``None`` to move back to the shared service, or
+                omit to keep the current attachment.
+            imessage_number_type: Claim and attach a new dedicated inbound or
+                outbound number. Cannot be combined with
+                ``imessage_number_id`` and requires ``idempotency_key``.
+            idempotency_key: Stable caller-generated key for a dedicated-number
+                claim. Reuse it when retrying the same logical update.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
             mail_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
@@ -1423,6 +1442,12 @@ class AgentIdentity:
             update_kwargs["description"] = description
         if imessage_enabled is not None:
             update_kwargs["imessage_enabled"] = imessage_enabled
+        if imessage_number_id is not _UNSET:
+            update_kwargs["imessage_number_id"] = imessage_number_id
+        if imessage_number_type is not None:
+            update_kwargs["imessage_number_type"] = imessage_number_type
+        if idempotency_key is not None:
+            update_kwargs["idempotency_key"] = idempotency_key
         if imessage_filter_mode is not None:
             update_kwargs["imessage_filter_mode"] = (
                 imessage_filter_mode.value
@@ -1446,28 +1471,14 @@ class AgentIdentity:
         result = self._inkbox._ids_resource.update(
             self.agent_handle, **update_kwargs,
         )
-        self._data = _AgentIdentityData(
-            id=result.id,
-            organization_id=result.organization_id,
-            agent_handle=result.agent_handle,
-            display_name=result.display_name,
-            description=result.description,
-            email_address=result.email_address,
-            created_at=result.created_at,
-            updated_at=result.updated_at,
-            imessage_enabled=result.imessage_enabled,
-            imessage_filter_mode=result.imessage_filter_mode,
-            mail_filter_mode=result.mail_filter_mode,
-            phone_filter_mode=result.phone_filter_mode,
-            mailbox=self._mailbox,
-            phone_number=self._phone_number,
-            tunnel=self._tunnel,
-        )
-        if new_handle is not None and self._tunnel is not None:
-            # The server renames the linked tunnel in the same transaction
-            # under the unified handle namespace; refresh to pick up the
-            # new tunnel_name / public_host on the cached tunnel.
-            self.refresh()
+        # PATCH returns the full detail shape, including the current dedicated
+        # number and renamed tunnel. Update every cached channel directly;
+        # there is no follow-up GET that could race the mutation response.
+        self._data = result
+        self._mailbox = result.mailbox
+        self._phone_number = result.phone_number
+        self._imessage_number = result.imessage_number
+        self._tunnel = result.tunnel
 
     def refresh(self) -> AgentIdentity:
         """Re-fetch this identity from the API and update cached channels.
@@ -1483,6 +1494,7 @@ class AgentIdentity:
         self._data = data
         self._mailbox = data.mailbox
         self._phone_number = data.phone_number
+        self._imessage_number = data.imessage_number
         self._tunnel = data.tunnel
         self._credentials = None
         return self

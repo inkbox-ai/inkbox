@@ -4,6 +4,8 @@
  * Async HTTP transport (internal). Zero runtime dependencies — uses native fetch.
  */
 
+import type { IMessageDedicatedNumberType } from "./imessage/types.js";
+
 export class InkboxError extends Error {
   constructor(message: string) {
     super(message);
@@ -15,6 +17,14 @@ export class InkboxVaultKeyError extends InkboxError {
   constructor(message: string) {
     super(message);
     this.name = "InkboxVaultKeyError";
+  }
+}
+
+/** @internal Validate the API's 1–255 character idempotency-key contract. */
+export function validateIdempotencyKey(key: string): void {
+  const length = Array.from(key).length;
+  if (length < 1 || length > 255) {
+    throw new RangeError("idempotencyKey must contain between 1 and 255 characters");
   }
 }
 
@@ -113,8 +123,73 @@ export class StorageLimitExceededError extends InkboxAPIError {
   }
 }
 
-function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail): never {
+/** Thrown when an organization has reached its dedicated iMessage number quota. */
+export class DedicatedIMessageNumberQuotaExceededError extends InkboxAPIError {
+  readonly numberType: IMessageDedicatedNumberType;
+  readonly limit: number;
+  readonly current: number;
+  readonly upgradeUrl: string;
+  readonly contactEmail: string;
+  readonly detailMessage: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "DedicatedIMessageNumberQuotaExceededError";
+    this.numberType = String(detail["number_type"] ?? "") as IMessageDedicatedNumberType;
+    this.limit = Number(detail["limit"] ?? 0);
+    this.current = Number(detail["current"] ?? 0);
+    this.upgradeUrl = String(detail["upgrade_url"] ?? "");
+    this.contactEmail = String(detail["contact_email"] ?? "");
+    this.detailMessage = String(detail["message"] ?? "");
+    if (this.detailMessage) this.message = this.detailMessage;
+  }
+}
+
+/** Thrown when a requested dedicated iMessage number is not yet available. */
+export class DedicatedIMessageNumberInventoryPendingError extends InkboxAPIError {
+  readonly numberType: IMessageDedicatedNumberType;
+  readonly retryAfterSeconds: number;
+  readonly detailMessage: string;
+
+  constructor(
+    statusCode: number,
+    detail: Record<string, unknown>,
+    retryAfterHeader: string | null,
+  ) {
+    super(statusCode, detail);
+    this.name = "DedicatedIMessageNumberInventoryPendingError";
+    this.numberType = String(detail["number_type"] ?? "") as IMessageDedicatedNumberType;
+    const headerSeconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
+    const detailSeconds = Number(detail["retry_after_seconds"] ?? 0);
+    this.retryAfterSeconds = Number.isFinite(headerSeconds) && headerSeconds >= 0
+      ? headerSeconds
+      : detailSeconds;
+    this.detailMessage = String(detail["message"] ?? "");
+    if (this.detailMessage) this.message = this.detailMessage;
+  }
+}
+
+/** Thrown when an idempotency key is reused with a different request. */
+export class IdempotencyKeyReusedError extends InkboxAPIError {
+  readonly detailMessage: string;
+
+  constructor(statusCode: number, detail: Record<string, unknown>) {
+    super(statusCode, detail);
+    this.name = "IdempotencyKeyReusedError";
+    this.detailMessage = String(detail["message"] ?? "");
+    if (this.detailMessage) this.message = this.detailMessage;
+  }
+}
+
+function raiseForErrorResponse(
+  status: number,
+  rawDetail: InkboxAPIErrorDetail,
+  headers?: Headers,
+): never {
   if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
+    if (rawDetail["error"] === "idempotency_key_reused") {
+      throw new IdempotencyKeyReusedError(status, rawDetail);
+    }
     if ("existing_rule_id" in rawDetail) {
       throw new DuplicateContactRuleError(status, rawDetail);
     }
@@ -139,6 +214,26 @@ function raiseForErrorResponse(status: number, rawDetail: InkboxAPIErrorDetail):
     && rawDetail["error"] === "storage_limit_exceeded"
   ) {
     throw new StorageLimitExceededError(status, rawDetail);
+  }
+  if (
+    status === 402
+    && typeof rawDetail === "object"
+    && rawDetail !== null
+    && rawDetail["error"] === "dedicated_imessage_number_quota_exceeded"
+  ) {
+    throw new DedicatedIMessageNumberQuotaExceededError(status, rawDetail);
+  }
+  if (
+    status === 503
+    && typeof rawDetail === "object"
+    && rawDetail !== null
+    && rawDetail["error"] === "dedicated_imessage_number_inventory_pending"
+  ) {
+    throw new DedicatedIMessageNumberInventoryPendingError(
+      status,
+      rawDetail,
+      headers?.get("Retry-After") ?? null,
+    );
   }
   throw new InkboxAPIError(status, rawDetail);
 }
@@ -354,12 +449,13 @@ export class HttpTransport {
   async post<T>(
     path: string,
     body?: unknown,
-    opts?: { timeoutMs?: number; params?: Params },
+    opts?: { timeoutMs?: number; params?: Params; headers?: Record<string, string> },
   ): Promise<T> {
     return this.request<T>("POST", path, {
       body,
       params: opts?.params,
       timeoutMs: opts?.timeoutMs,
+      headers: opts?.headers,
     });
   }
 
@@ -389,8 +485,16 @@ export class HttpTransport {
     return this.request<T>("PUT", path, { body, timeoutMs: opts?.timeoutMs });
   }
 
-  async patch<T>(path: string, body: unknown, opts?: { timeoutMs?: number }): Promise<T> {
-    return this.request<T>("PATCH", path, { body, timeoutMs: opts?.timeoutMs });
+  async patch<T>(
+    path: string,
+    body: unknown,
+    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+  ): Promise<T> {
+    return this.request<T>("PATCH", path, {
+      body,
+      timeoutMs: opts?.timeoutMs,
+      headers: opts?.headers,
+    });
   }
 
   async delete(path: string, opts?: { timeoutMs?: number }): Promise<void> {
@@ -441,6 +545,7 @@ export class HttpTransport {
       accept?: string;
       rawResponse?: "text" | "bytes";
       timeoutMs?: number;
+      headers?: Record<string, string>;
     } = {},
   ): Promise<T> {
     let url = `${this.baseUrl}${path}`;
@@ -462,6 +567,9 @@ export class HttpTransport {
     };
     if (this.userAgent) {
       headers["User-Agent"] = this.userAgent;
+    }
+    if (opts.headers) {
+      Object.assign(headers, opts.headers);
     }
     const cookieHeader = this.cookieJar.getHeaderValue(url);
     if (cookieHeader) {
@@ -515,7 +623,7 @@ export class HttpTransport {
 
     if (!resp.ok) {
       const detail = await readErrorDetail(resp);
-      raiseForErrorResponse(resp.status, detail);
+      raiseForErrorResponse(resp.status, detail, resp.headers);
     }
 
     if (resp.status === 204) {

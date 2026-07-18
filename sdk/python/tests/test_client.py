@@ -162,3 +162,26 @@ class TestInkboxCookies:
 
         assert seen["cookie"] == "AWSALB=exp-cookie"
         client.close()
+
+
+class TestPerRequestHeaders:
+    @pytest.mark.parametrize("method", ["post", "patch"])
+    def test_json_mutations_send_caller_headers(self, method):
+        client = Inkbox(api_key="sk-test", base_url="https://test.inkbox.ai")
+        seen: list[str | None] = []
+
+        def fake_send(request: httpx.Request) -> httpx.Response:
+            seen.append(request.headers.get("Idempotency-Key"))
+            return httpx.Response(200, json={}, request=request)
+
+        transport = client._imessage_http
+        transport._client.send = fake_send  # type: ignore[method-assign]
+        mutate = getattr(transport, method)
+        mutate(
+            "/numbers",
+            json={"type": "dedicated_outbound"},
+            headers={"Idempotency-Key": "stable-logical-operation"},
+        )
+
+        assert seen == ["stable-logical-operation"]
+        client.close()
