@@ -14,7 +14,11 @@ export type {
 } from "./agent_signup/types.js";
 export {
   DuplicateContactRuleError,
+  DedicatedIMessageNumberInventoryPendingError,
+  DedicatedIMessageNumberQuotaExceededError,
+  IdempotencyKeyReusedError,
   InkboxAPIError,
+  InkboxConnectionError,
   InkboxError,
   InkboxVaultKeyError,
   RecipientBlockedError,
@@ -184,6 +188,8 @@ export type {
 } from "./phone/resources/identityContactRules.js";
 export {
   IMessageAssignmentStatus,
+  IMessageNumberStatus,
+  IMessageNumberType,
   IMessageDeliveryStatus,
   IMessageReactionType,
   IMessageRuleAction,
@@ -192,11 +198,14 @@ export {
   IMessageService,
 } from "./imessage/types.js";
 export type {
+  IMessageDedicatedNumberType,
   IMessage,
   IMessageAssignment,
   IMessageContactRule,
   IMessageConversation,
   IMessageConversationSummary,
+  IMessageNumber,
+  IdentityIMessageNumber,
   IMessageMarkReadResult,
   IMessageMediaItem,
   IMessageMediaUpload,
@@ -224,6 +233,7 @@ export type {
   IdentityPhoneNumberCreateOptions,
   IdentityPhoneNumber,
   IdentityTunnelCreateOptions,
+  UpdateIdentityOptions,
 } from "./identities/types.js";
 export {
   HandleUnavailableError,

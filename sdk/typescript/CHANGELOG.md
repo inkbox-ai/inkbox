@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.4.26 — Self-serve dedicated iMessage numbers
+
+### Added
+
+- **Dedicated iMessage number management.** `inkbox.imessages.listNumbers()` lists every non-released number owned by the organization, including unattached numbers, and `claimNumber({ type, idempotencyKey })` claims a dedicated inbound or outbound number. New public models are `IMessageNumber`, `IMessageNumberType`, and `IMessageNumberStatus`; attachment fields are always present and nullable. Dedicated outbound capability is identified by `number.type === IMessageNumberType.DEDICATED_OUTBOUND`.
+- **Atomic identity provisioning.** `inkbox.createIdentity(...)` and `identity.update(...)` accept `imessageNumberType` to claim and attach a dedicated number in the same operation. Updates require a stable caller-provided `idempotencyKey` with `imessageNumberType`, and also accept `imessageNumberId` to attach an already-owned number or `null` to return to shared service. Detailed identity responses and `AgentIdentity.imessageNumber` expose the attached number.
+- **Typed provisioning errors.** `DedicatedIMessageNumberQuotaExceededError` exposes the requested number type, quota counts, upgrade URL, and contact email. `DedicatedIMessageNumberInventoryPendingError` exposes the requested number type and `retryAfterSeconds`, preferring the HTTP `Retry-After` header when present. `IdempotencyKeyReusedError` represents reuse of a key with a different request.
+
+### Changed
+
+- Identity updates consume the detailed PATCH response so `identity.imessageNumber` reflects the committed attachment before the call returns.
+- Identity 409 handling now maps only actual handle collisions to `HandleUnavailableError`; dedicated-number conflicts retain their original structured detail.
+- Version bumped to 0.4.26.
+
+### Notes
+
+- `imessageNumberType` and `imessageNumberId` cannot be combined in one identity update. A new number cannot be selected while disabling iMessage; `imessageNumberId: null` may be sent with `imessageEnabled: false` to detach explicitly.
+- Idempotency keys must contain 1–255 characters. Reuse the same key after an ambiguous failure; generating a new key can claim another number.
+
+## 0.4.25 — Clearer connection errors, proxy hint, tunnel field tolerance
+
+### Added
+
+- **`InkboxConnectionError`.** New `InkboxError` subclass thrown when a request fails before any HTTP response exists — DNS failure, refused connection, TLS error, unreachable proxy. The message names the request URL and the underlying cause (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`) instead of Node's bare `TypeError: fetch failed`; the original fetch error is preserved on `cause`. When proxy environment variables (`HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`) are set but env-proxying can't actually be active, the message appends a hint: run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or configure a proxy-aware fetch dispatcher on older versions. The suppression is version-aware — `NODE_USE_ENV_PROXY` set on a Node that ignores it (pre-22.21 / 23.x) gets a dedicated warning naming the running version instead of silence.
+
+### Changed
+
+- **Tunnel runtime/cert fields tolerate omission.** A future server release may slim identity-embedded tunnel payloads down to durable config. `Tunnel.organizationId` is now `string | null` and `Tunnel.currentlyConnected` is `boolean | null` — `null` when the server doesn't report them (liveness is never fabricated as `false`). The certificate and last-connected fields were already nullable; a missing `metadata` still collapses to `{}`, and unknown keys are ignored. Fetch `tunnels.get(id)` for live state or cert material.
+
+### Notes
+
+- Scope of `InkboxConnectionError` is failures *before* a response: HTTP error responses still raise the `InkboxAPIError` family, and timeouts still surface as an abort. Code catching `InkboxError` picks the new error up automatically.
+- **Source-breaking.** The two `Tunnel` field types above changed (`string` → `string | null`, `boolean` → `boolean | null`), so strict-null consumers using them in non-null positions need a guard — the same caveat 0.4.24 carried for `Mailbox`.
+
 ## 0.4.24 — Mailbox storage caps, IMAP/SMTP
 
 ### Added

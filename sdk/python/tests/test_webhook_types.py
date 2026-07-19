@@ -289,6 +289,12 @@ def test_text_group_lifecycle_identifies_recipient_that_changed_state():
     payload = cast(TextWebhookPayload, _load("text_group_delivered.json"))
     text = payload["data"]["text_message"]
     assert text["remote_phone_number"] is None
+    assert text["delivery_status"] == "delivered"
+    assert text["sent_at"] is None
+    assert text["delivered_at"] is None
+    assert text["failed_at"] is None
+    assert text["error_code"] is None
+    assert text["error_detail"] is None
     assert text["type"] == "mms"
     assert text["media"] is not None
     assert len(text["media"]) == 1
@@ -312,6 +318,10 @@ def test_text_group_lifecycle_identifies_recipient_that_changed_state():
     }
     for entry in recipients:
         assert set(entry.keys()) == required, entry
+        assert entry["delivery_status"] == "delivered"
+        assert isinstance(entry["sent_at"], str)
+        assert isinstance(entry["delivered_at"], str)
+        assert entry["failed_at"] is None
     top_level = payload["data"]["recipient_phone_number"]
     assert top_level == "+14155550999"
     assert top_level in {e["recipient_phone_number"] for e in recipients}

@@ -25,6 +25,8 @@ You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://i
 
 `new Inkbox(...)` resolves `apiKey` / `baseUrl` / `vaultKey` from the explicit option, then the matching env var (`INKBOX_API_KEY` / `INKBOX_BASE_URL` / `INKBOX_VAULT_KEY`), then a `~/.inkbox/config` file (`key = value` lines). The file fallback is handy for background/agent processes that don't inherit the shell's env, so `new Inkbox()` with no arguments works once the file is in place.
 
+**Behind a proxy?** The SDK uses Node's `fetch`, which ignores `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` by default — run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or, on older versions, configure a proxy-aware fetch dispatcher (e.g. undici's `EnvHttpProxyAgent`). A request that can't connect throws `InkboxConnectionError` naming the URL and underlying cause, with this hint attached when proxy variables are set but unused.
+
 ## Quick start
 
 ```ts
@@ -494,15 +496,21 @@ await inkbox.smsOptIns.optOut("+15551234567");
 
 ## iMessage
 
-Chat with humans over iMessage through the shared Inkbox router — no
-per-identity iMessage number. iMessage is **opt-in per identity**
-(`imessageEnabled`), and the **human always texts first**: they connect
-by texting `connect @<handle>` to the router number, after which the
-agent can reply into the conversation. Each identity can send up to
-100 iMessages per rolling 24-hour window.
+Chat with humans over the shared Inkbox router or a dedicated number.
+iMessage is **opt-in per identity** (`imessageEnabled`). On the shared
+service and dedicated inbound numbers, the human texts first. Dedicated
+outbound numbers may initiate conversations, subject to consent and rate
+limits.
 
 ```ts
-// Opt an identity in (at create time or later).
+import {
+  DedicatedIMessageNumberInventoryPendingError,
+  DedicatedIMessageNumberQuotaExceededError,
+  IdempotencyKeyReusedError,
+  IMessageNumberType,
+} from "@inkbox/sdk";
+
+// Shared service: opt an identity in at create time or later.
 const identity = await inkbox.createIdentity("my-agent", { imessageEnabled: true });
 
 // Resolve the router number at runtime — never hardcode it.
@@ -539,6 +547,51 @@ await identity.sendIMessage({ conversationId: convos[0].id, mediaUrls: [upload.m
 await inkbox.imessageContactRules.create("my-agent", {
   action: "block",
   matchTarget: "+15555550999",
+});
+
+// List every dedicated number owned by the organization. Unattached numbers
+// have null agentIdentityId and agentHandle fields.
+const numbers = await inkbox.imessages.listNumbers();
+for (const number of numbers) {
+  const canInitiate = number.type === IMessageNumberType.DEDICATED_OUTBOUND;
+  console.log(number.number, number.agentHandle, canInitiate);
+}
+
+// Claim an unattached number for the organization. Generate the key once and
+// reuse it if the request has an ambiguous outcome; a new key can claim again.
+const claimKey = crypto.randomUUID();
+try {
+  const claimed = await inkbox.imessages.claimNumber({
+    type: IMessageNumberType.DEDICATED_INBOUND,
+    idempotencyKey: claimKey,
+  });
+  console.log(claimed.number);
+} catch (err) {
+  if (err instanceof DedicatedIMessageNumberQuotaExceededError) {
+    console.error(err.message, err.upgradeUrl);
+  } else if (err instanceof DedicatedIMessageNumberInventoryPendingError) {
+    console.error(`Try again in ${err.retryAfterSeconds} seconds`);
+  } else if (err instanceof IdempotencyKeyReusedError) {
+    console.error(err.message);
+  } else {
+    throw err;
+  }
+}
+
+// Claim and attach atomically during identity creation.
+const outboundIdentity = await inkbox.createIdentity("outreach-agent", {
+  imessageEnabled: true,
+  imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
+});
+console.log(outboundIdentity.imessageNumber?.number);
+
+// Claim and atomically attach/swap during update. To attach an already-owned
+// number, pass imessageNumberId instead. Pass imessageNumberId: null to move
+// back to shared service. imessageNumberType and imessageNumberId cannot be
+// combined in one update.
+await identity.update({
+  imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+  idempotencyKey: crypto.randomUUID(),
 });
 ```
 

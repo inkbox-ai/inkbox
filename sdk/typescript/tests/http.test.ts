@@ -1,6 +1,11 @@
 // sdk/typescript/tests/http.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { HttpTransport, InkboxAPIError } from "../src/_http.js";
+import {
+  HttpTransport,
+  InkboxAPIError,
+  InkboxConnectionError,
+  nodeSupportsEnvProxy,
+} from "../src/_http.js";
 
 const BASE = "https://inkbox.ai/api/v1";
 const API_KEY = "test-key";
@@ -40,6 +45,8 @@ describe("HttpTransport", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   function mockFetch(status: number, body: unknown, ok = status < 400) {
@@ -217,6 +224,108 @@ describe("HttpTransport", () => {
     const http = makeTransport();
 
     await expect(http.get("/fail")).rejects.toThrow("HTTP 502: Bad Gateway");
+  });
+
+  // --- Network errors ---
+
+  const PROXY_VARS = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"];
+
+  function stubProxyEnv(values: Record<string, string>) {
+    for (const name of PROXY_VARS) vi.stubEnv(name, values[name] ?? "");
+    vi.stubEnv("NODE_USE_ENV_PROXY", values.NODE_USE_ENV_PROXY ?? "");
+    vi.stubEnv("INKBOX_ENV_PROXY_ACTIVE", values.INKBOX_ENV_PROXY_ACTIVE ?? "");
+  }
+
+  it("wraps a network-level fetch failure with the underlying cause", async () => {
+    stubProxyEnv({});
+    vi.mocked(fetch).mockRejectedValue(
+      new TypeError("fetch failed", { cause: new Error("connect ECONNREFUSED 203.0.113.1:443") }),
+    );
+    const http = makeTransport();
+
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InkboxConnectionError);
+    const connErr = err as InkboxConnectionError;
+    expect(connErr.message).toContain(`${BASE}/items`);
+    expect(connErr.message).toContain("connect ECONNREFUSED 203.0.113.1:443");
+    expect(connErr.message).not.toContain("NODE_USE_ENV_PROXY");
+    expect(connErr.cause).toBeInstanceOf(TypeError);
+  });
+
+  it("falls back to the fetch error message when there is no cause", async () => {
+    stubProxyEnv({});
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    await expect(http.get("/items")).rejects.toThrow("fetch failed");
+  });
+
+  it("hints about NODE_USE_ENV_PROXY when proxy env vars are set but unused", async () => {
+    stubProxyEnv({ HTTPS_PROXY: "http://proxy.example:3128" });
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect((err as Error).message).toContain("NODE_USE_ENV_PROXY=1");
+    // The flag only exists on Node 22.21+/24+; the hint must not send older
+    // runtimes down a dead end.
+    expect((err as Error).message).toContain("Node 22.21+ / 24+");
+    expect((err as Error).message).toContain("dispatcher");
+  });
+
+  it("omits the proxy hint when NODE_USE_ENV_PROXY is set and this Node honors it", async () => {
+    // The test process runs on a Node with native env-proxy support, so a
+    // set flag means proxying is genuinely active.
+    expect(nodeSupportsEnvProxy(process.versions.node)).toBe(true);
+    stubProxyEnv({ HTTPS_PROXY: "http://proxy.example:3128", NODE_USE_ENV_PROXY: "1" });
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InkboxConnectionError);
+    expect((err as Error).message).not.toContain("NODE_USE_ENV_PROXY");
+  });
+
+  it("warns when NODE_USE_ENV_PROXY is set but this Node ignores it", async () => {
+    // A pre-baked flag on an old Node does nothing — the hint must not be
+    // suppressed by its mere presence.
+    stubProxyEnv({ HTTPS_PROXY: "http://proxy.example:3128", NODE_USE_ENV_PROXY: "1" });
+    const realProcess = process;
+    vi.stubGlobal("process", {
+      ...realProcess,
+      env: realProcess.env,
+      versions: { ...realProcess.versions, node: "22.20.0" },
+    });
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect((err as Error).message).toContain("this Node version ignores it");
+    expect((err as Error).message).toContain("22.20.0");
+    expect((err as Error).message).toContain("dispatcher");
+  });
+
+  it("omits the proxy hint when the CLI's dispatcher marker is set", async () => {
+    stubProxyEnv({ HTTPS_PROXY: "http://proxy.example:3128", INKBOX_ENV_PROXY_ACTIVE: "1" });
+    vi.mocked(fetch).mockRejectedValue(new TypeError("fetch failed"));
+    const http = makeTransport();
+
+    const err = await http.get("/items").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InkboxConnectionError);
+    expect((err as Error).message).not.toContain("NODE_USE_ENV_PROXY");
+  });
+
+  it("maps Node versions to native env-proxy support", () => {
+    expect(nodeSupportsEnvProxy("22.20.0")).toBe(false);
+    expect(nodeSupportsEnvProxy("22.21.0")).toBe(true);
+    expect(nodeSupportsEnvProxy("23.11.0")).toBe(false);
+    expect(nodeSupportsEnvProxy("24.0.0")).toBe(true);
+    expect(nodeSupportsEnvProxy("25.1.0")).toBe(true);
   });
 
   // --- Timeout ---

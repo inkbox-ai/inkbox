@@ -4,15 +4,15 @@
 //! server error through the single [`crate::error::InkboxError`] enum rather
 //! than a Python-style exception hierarchy, so the Python `HandleUnavailableError`
 //! (an `InkboxAPIError` subclass) is reproduced here as a lightweight view over
-//! an [`InkboxError::Api`] 409 plus a mapping helper:
+//! an [`InkboxError::Api`] handle-collision 409 plus a mapping helper:
 //!
 //! * [`map_identity_conflict_error`] is the analogue of the Python helper of
 //!   the same name. Because there is no dedicated `InkboxError` variant for a
 //!   handle collision, it returns the error unchanged (a 409 stays an
 //!   [`InkboxError::Api`]); callers wanting the typed view call
 //!   [`HandleUnavailableError::from_error`].
-//! * [`HandleUnavailableError`] extracts the `blocking_namespace` from a 409
-//!   `detail`, exactly as the Python constructor did.
+//! * [`HandleUnavailableError`] recognizes the handle-collision discriminator
+//!   and extracts `blocking_namespace` from its structured detail.
 
 use crate::error::{ApiErrorDetail, InkboxError};
 
@@ -51,17 +51,23 @@ pub struct HandleUnavailableError {
 }
 
 impl HandleUnavailableError {
-    /// Build the typed view from a borrowed [`InkboxError`], if it is a 409
-    /// [`InkboxError::Api`]; otherwise `None`. The `blocking_namespace` is read
-    /// from `detail.blocking_namespace`, matching the Python
-    /// `_read_blocking_namespace`.
+    /// Build the typed view from a borrowed [`InkboxError`] when it is an
+    /// identity handle-collision 409; unrelated identity conflicts return
+    /// `None`.
     pub fn from_error(err: &InkboxError) -> Option<Self> {
         if let InkboxError::Api {
             status_code,
             detail,
         } = err
         {
-            if *status_code == 409 {
+            let is_handle_conflict = detail.as_object().is_some_and(|obj| {
+                obj.get("code")
+                    .or_else(|| obj.get("error"))
+                    .and_then(|value| value.as_str())
+                    == Some("agent_handle_unavailable")
+                    || read_blocking_namespace(detail).is_some()
+            });
+            if *status_code == 409 && is_handle_conflict {
                 return Some(Self {
                     status_code: *status_code,
                     detail: detail.clone(),
@@ -93,8 +99,35 @@ fn read_blocking_namespace(detail: &ApiErrorDetail) -> Option<BlockingNamespace>
 /// result for the typed `blocking_namespace` view.
 ///
 /// Kept as a named pass-through so call sites read identically to the Python
-/// (`map_identity_conflict_error(err)`), documenting that the 409 here is
-/// always a handle collision.
+/// (`map_identity_conflict_error(err)`).
 pub fn map_identity_conflict_error(err: InkboxError) -> InkboxError {
     err
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::HandleUnavailableError;
+    use crate::error::{ApiErrorDetail, InkboxError};
+
+    #[test]
+    fn typed_view_accepts_only_handle_conflicts() {
+        let handle = InkboxError::Api {
+            status_code: 409,
+            detail: ApiErrorDetail::Structured(json!({
+                "code": "agent_handle_unavailable",
+                "blocking_namespace": "identities"
+            })),
+        };
+        assert!(HandleUnavailableError::from_error(&handle).is_some());
+
+        let line = InkboxError::Api {
+            status_code: 409,
+            detail: ApiErrorDetail::Structured(json!({
+                "error": "line_already_attached"
+            })),
+        };
+        assert!(HandleUnavailableError::from_error(&line).is_none());
+    }
 }

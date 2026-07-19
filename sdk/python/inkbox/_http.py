@@ -13,8 +13,11 @@ import httpx
 
 from inkbox._cookies import CookieJar
 from inkbox.exceptions import (
+    DedicatedIMessageNumberInventoryPendingError,
+    DedicatedIMessageNumberQuotaExceededError,
     DuplicateContactRuleError,
     InkboxAPIError,
+    IdempotencyKeyReusedError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
@@ -77,10 +80,18 @@ class HttpTransport:
         *,
         json: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> Any:
         cleaned = {k: v for k, v in (params or {}).items() if v is not None}
-        resp = self._send("POST", path, json=json, params=cleaned, timeout=timeout)
+        resp = self._send(
+            "POST",
+            path,
+            json=json,
+            params=cleaned,
+            headers=headers,
+            timeout=timeout,
+        )
         _raise_for_status(resp)
         if resp.status_code == 204:
             return None
@@ -102,9 +113,10 @@ class HttpTransport:
         path: str,
         *,
         json: dict[str, Any],
+        headers: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> Any:
-        resp = self._send("PATCH", path, json=json, timeout=timeout)
+        resp = self._send("PATCH", path, json=json, headers=headers, timeout=timeout)
         _raise_for_status(resp)
         return resp.json()
 
@@ -243,6 +255,36 @@ def _raise_for_status(resp: httpx.Response) -> None:
     ):
         raise StorageLimitExceededError(
             status_code=resp.status_code, detail=raw_detail,
+        )
+
+    if (
+        resp.status_code == 402
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "dedicated_imessage_number_quota_exceeded"
+    ):
+        raise DedicatedIMessageNumberQuotaExceededError(
+            status_code=resp.status_code, detail=raw_detail,
+        )
+
+    if (
+        resp.status_code == 503
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "dedicated_imessage_number_inventory_pending"
+    ):
+        raise DedicatedIMessageNumberInventoryPendingError(
+            status_code=resp.status_code,
+            detail=raw_detail,
+            retry_after=resp.headers.get("Retry-After"),
+        )
+
+    if (
+        resp.status_code == 409
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "idempotency_key_reused"
+    ):
+        raise IdempotencyKeyReusedError(
+            status_code=resp.status_code,
+            detail=raw_detail,
         )
 
     raise InkboxAPIError(status_code=resp.status_code, detail=raw_detail)

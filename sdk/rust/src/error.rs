@@ -86,6 +86,42 @@ pub enum InkboxError {
         detail: Box<Value>,
     },
 
+    /// 402 when the organization has reached its dedicated iMessage number
+    /// allowance for the requested role.
+    #[error("HTTP {status_code}: dedicated iMessage number quota exceeded ({message})")]
+    DedicatedIMessageNumberQuotaExceeded {
+        status_code: u16,
+        message: Box<str>,
+        /// Requested number role.
+        number_type: Box<str>,
+        limit: i64,
+        current: i64,
+        upgrade_url: Box<str>,
+        contact_email: Box<str>,
+        detail: Box<Value>,
+    },
+
+    /// 503 when no dedicated iMessage number is currently available to claim.
+    #[error("HTTP {status_code}: dedicated iMessage number inventory pending ({message})")]
+    DedicatedIMessageNumberInventoryPending {
+        status_code: u16,
+        message: Box<str>,
+        /// Requested number role.
+        number_type: Box<str>,
+        retry_after_seconds: u64,
+        /// Parsed delta-seconds value from the HTTP `Retry-After` header.
+        retry_after_header: Option<u64>,
+        detail: Box<Value>,
+    },
+
+    /// 409 when an idempotency key is reused with an incompatible request.
+    #[error("HTTP {status_code}: idempotency key reused ({message})")]
+    IdempotencyKeyReused {
+        status_code: u16,
+        message: Box<str>,
+        detail: Box<Value>,
+    },
+
     /// A vault key did not meet requirements, or a vault crypto operation failed.
     /// Mirrors `InkboxVaultKeyError`.
     #[error("vault key error: {0}")]

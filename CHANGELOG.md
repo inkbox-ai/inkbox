@@ -24,6 +24,43 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - **Rust note (source-breaking).** `Tunnel` gains a public field (`agent_identity_id`), so struct-literal construction needs the new field; `AgentIdentity::tunnel()` now returns `Option<TunnelSummary>`; `VaultSecret` / `VaultSecretDetail` gain `access: Vec<AccessRule>`. Source-breaking, not wire-breaking — the same convention as 0.4.24's `Mailbox` fields.
 - **Python note (source-breaking).** `Tunnel` gains `agent_identity_id` as a positional dataclass field, and `AgentIdentity.tunnel` returns `TunnelSummary | None`. Keyword construction of `Tunnel(...)` in test fixtures needs the new argument.
 
+## 0.4.26 — Dedicated iMessage numbers
+
+### Added
+
+- **Dedicated iMessage number management in all three SDKs.** The iMessage resource can list every dedicated number owned by the organization and claim a new `dedicated_inbound` or `dedicated_outbound` number with a caller-generated idempotency key. New `IMessageNumber`, `IMessageNumberType`, and `IMessageNumberStatus` types mirror the phone-number resource style, including required-nullable identity attachment fields.
+- **Atomic identity provisioning.** Identity creation and update accept `imessage_number_type` (TS `imessageNumberType`) to claim and attach a dedicated number in the same operation. Claiming during an update requires a caller-generated idempotency key. Identity update also exposes the existing `imessage_number_id` (TS `imessageNumberId`) attach/detach behavior, including explicit `null` to return to the shared service. Detailed identity responses now deserialize the attached iMessage number.
+- **Typed provisioning errors.** Dedicated-number quota (`402`), idempotency-conflict (`409`), and inventory-pending (`503`) responses have dedicated error types with the structured quota, upgrade, contact, and retry fields available to callers.
+- **Dedicated-number examples and guidance.** The SDK documentation shows organization-level list/claim flows, create-time identity provisioning, idempotent swaps, shared-service fallback, and deriving outbound capability from `type === "dedicated_outbound"`.
+
+### Changed
+
+- Version bumped to 0.4.26 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.4.26`; it has no new dedicated-number commands in this release.
+
+### Compatibility and rollout
+
+- Existing shared-service iMessage methods and unrelated identity operations are unchanged. The new number models tolerate nullable attachments, and detailed identity parsing tolerates responses that omit `imessage_number`.
+- Dedicated-number methods require an API version that exposes the iMessage number claim and identity provisioning fields. Quota exhaustion returns `402`; reusing an idempotency key with a different request returns `409`; temporarily unavailable inventory returns `503` with a retry delay.
+
+## 0.4.25 — Proxy support in the CLI, clearer TS connection errors, tunnel field tolerance
+
+### Added
+
+- **The CLI honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY`.** Node's `fetch` ignores proxy environment variables unless `NODE_USE_ENV_PROXY` is set — a flag that only exists on Node 22.21+ / 24+ — so in sandboxed or proxied environments (where many agents run) every CLI command died with a bare `fetch failed`. The CLI now routes requests through the configured proxy automatically via undici's `EnvHttpProxyAgent` whenever a proxy variable is present, on every supported Node version; `NO_PROXY` is respected, and `NODE_USE_ENV_PROXY=0` opts out (matching Node's own semantics). New runtime dependency for `@inkbox/cli`: `undici` (^7).
+- **`InkboxConnectionError` (TypeScript SDK).** New `InkboxError` subclass thrown when a request fails before any HTTP response exists — DNS failure, refused connection, TLS error, unreachable proxy. The message names the request URL and the underlying cause (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`) instead of Node's bare `TypeError: fetch failed`, and the original fetch error is preserved on `cause`. When proxy environment variables are set but env-proxying can't actually be active, the message appends a hint: run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or configure a proxy-aware fetch dispatcher on older versions. The suppression is version-aware — `NODE_USE_ENV_PROXY` set on a Node that ignores it (pre-22.21 / 23.x) gets a dedicated warning naming the running version instead of silence.
+
+### Changed
+
+- **Tunnel runtime/cert fields tolerate omission (all three SDKs).** A future server release may slim identity-embedded tunnel payloads down to durable config, dropping `organization_id`, `cert_pem`, `cert_fingerprint_sha256`, `cert_expires_at`, `currently_connected`, `last_connected_at`, `last_connected_ip_addr`, and `metadata`. Tunnel parsing in the Python, TypeScript, and Rust SDKs now tolerates all of those being absent: `organization_id` and `currently_connected` become nullable (`None`/`null` when not reported — liveness is never fabricated as `false`), the certificate and last-connected fields were already nullable, and a missing `metadata` still collapses to `{}`. Unknown keys (e.g. a future `agent_identity_id`) are ignored. Fetch the tunnel by id (`tunnels.get(...)`) when you need live connection state or cert material.
+- Version bumped to 0.4.25 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+
+### Notes
+
+- The Python SDK (httpx) and Rust SDK (reqwest) already honor proxy environment variables by default — the proxy work is TS/CLI-only; versions move in lockstep.
+- Scope of `InkboxConnectionError` is failures *before* a response: HTTP error responses still raise the `InkboxAPIError` family, and timeouts still surface as an abort. Code that only catches `InkboxError` (or the CLI's error handler) picks the new error up automatically.
+- **Rust note (source-breaking).** `Tunnel.organization_id` is now `Option<String>` and `Tunnel.currently_connected` is now `Option<bool>`, so struct-literal construction and non-`Option` field reads no longer compile until adjusted — the same convention as 0.4.24's `Mailbox` fields.
+- **TypeScript note (source-breaking).** `Tunnel.organizationId` is now `string | null` and `Tunnel.currentlyConnected` is `boolean | null`, so strict-null consumers using them in non-null positions need a guard. Python is typing-only (`str | None` / `bool | None`); runtime behavior for full tunnel payloads is unchanged in all three.
+
 ## 0.4.24 — Mailbox storage caps + mail clients (IMAP/SMTP)
 
 ### Added

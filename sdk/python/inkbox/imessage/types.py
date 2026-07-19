@@ -3,10 +3,9 @@ inkbox/imessage/types.py
 
 Dataclasses mirroring the Inkbox iMessage API response models.
 
-iMessage routes by assignment, not by a number the org owns: a
-recipient is connected to an agent identity over a shared pool line,
-and every agent-facing shape is keyed by ``conversation_id`` /
-``remote_number``. The local pool number is never exposed.
+iMessage records route by assignment and are keyed by ``conversation_id`` /
+``remote_number``. Shared local numbers are never exposed; dedicated-number
+ownership and attachment are represented separately by ``IMessageNumber``.
 """
 
 from __future__ import annotations
@@ -83,6 +82,32 @@ class IMessageAssignmentStatus(StrEnum):
     RELEASED = "released"
 
 
+class IMessageNumberType(StrEnum):
+    """Type of an organization-owned dedicated iMessage number."""
+
+    DEDICATED_INBOUND = "dedicated_inbound"
+    DEDICATED_OUTBOUND = "dedicated_outbound"
+
+
+class IMessageNumberStatus(StrEnum):
+    """Lifecycle status of an iMessage service number."""
+
+    ACTIVE = "active"
+    PAUSED = "paused"
+
+
+def _dedicated_number_type(value: IMessageNumberType | str) -> IMessageNumberType:
+    """Validate a number role accepted by claim and identity provisioning."""
+    return IMessageNumberType(value)
+
+
+def _validate_idempotency_key(value: str) -> str:
+    """Validate a caller-generated idempotency key before sending it."""
+    if not 1 <= len(value) <= 255:
+        raise ValueError("idempotency_key must be between 1 and 255 characters")
+    return value
+
+
 class IMessageRuleAction(StrEnum):
     """Whether a matching remote number is allowed through or blocked."""
 
@@ -98,6 +123,43 @@ class IMessageRuleMatchType(StrEnum):
 
 def _dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
+
+
+@dataclass
+class IMessageNumber:
+    """An organization-owned dedicated iMessage number.
+
+    ``agent_identity_id`` and ``agent_handle`` are both ``None`` while the
+    number is unattached. Only dedicated outbound numbers may start a new
+    conversation before the recipient messages first.
+    """
+
+    id: UUID
+    number: str
+    type: IMessageNumberType
+    status: IMessageNumberStatus
+    agent_identity_id: UUID | None
+    agent_handle: str | None
+
+    @property
+    def can_start_conversations(self) -> bool:
+        """Whether this number may initiate a conversation."""
+        return self.type is IMessageNumberType.DEDICATED_OUTBOUND
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> IMessageNumber:
+        raw_identity_id = d["agent_identity_id"]
+        number_type = IMessageNumberType(d["type"])
+        return cls(
+            id=UUID(d["id"]),
+            number=d["number"],
+            type=number_type,
+            status=IMessageNumberStatus(d["status"]),
+            agent_identity_id=(
+                UUID(raw_identity_id) if raw_identity_id is not None else None
+            ),
+            agent_handle=d["agent_handle"],
+        )
 
 
 @dataclass
@@ -179,9 +241,9 @@ class IMessageMessageReaction:
 class IMessage:
     """An iMessage in an assignment-routed conversation.
 
-    There is no local-number field: shared pool lines are hidden from
-    agents, so messages are identified by ``conversation_id`` and the
-    counterparty ``remote_number`` only.
+    Message rows do not expose their local service number, so messages are
+    identified by ``conversation_id`` and the counterparty
+    ``remote_number``.
     """
 
     id: UUID
@@ -408,7 +470,7 @@ class IMessageAssignment:
 
 @dataclass
 class IMessageTriageNumber:
-    """The active triage line and how recipients start a connection."""
+    """The active triage number and how recipients start a connection."""
 
     number: str
     connect_command: str

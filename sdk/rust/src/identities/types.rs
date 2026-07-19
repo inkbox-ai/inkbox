@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use uuid::Uuid;
 
+use crate::imessage::types::IdentityIMessageNumber;
 use crate::mail::types::{FilterMode, FilterModeChangeNotice};
 use crate::phone::types::SmsStatus;
 use crate::tunnels::types::TunnelSummary;
@@ -334,9 +335,9 @@ pub struct IdentityPhoneNumber {
 
 /// Lightweight agent identity returned by list endpoints.
 ///
-/// `imessage_enabled` / `imessage_filter_mode` describe shared-pool iMessage
-/// reachability — there is no per-identity iMessage number, so these live on
-/// the identity itself rather than on a channel object.
+/// `imessage_enabled` / `imessage_filter_mode` describe iMessage reachability
+/// and filtering. Detailed identities may also carry an attached dedicated
+/// number.
 ///
 /// `mail_filter_mode` / `phone_filter_mode` are the whitelist/blacklist modes
 /// for this identity's mail and phone contact rules. They live on the identity
@@ -380,9 +381,9 @@ pub struct AgentIdentitySummary {
 
 /// Agent identity with linked communication channels and tunnel.
 ///
-/// Returned by identity-create and identity-get endpoints. Mirrors the Python
-/// internal `_AgentIdentityData`; users interact with [`crate::AgentIdentity`]
-/// instead. The summary fields are flattened so the wire shape is identical.
+/// Returned by identity-create and identity-get endpoints. Users normally
+/// interact with [`crate::AgentIdentity`] instead. The summary fields are
+/// flattened so the wire shape is identical.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentIdentityData {
     #[serde(flatten)]
@@ -391,6 +392,8 @@ pub struct AgentIdentityData {
     pub mailbox: Option<IdentityMailbox>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phone_number: Option<IdentityPhoneNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub imessage_number: Option<IdentityIMessageNumber>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tunnel: Option<TunnelSummary>,
 }

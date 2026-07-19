@@ -7,7 +7,8 @@
  * or tunnel create / link surface.
  */
 
-import { HttpTransport, InkboxAPIError } from "../../_http.js";
+import { HttpTransport, InkboxAPIError, validateIdempotencyKey } from "../../_http.js";
+import type { IMessageDedicatedNumberType } from "../../imessage/types.js";
 import { mapIdentityConflictError } from "../exceptions.js";
 import {
   AgentIdentitySummary,
@@ -15,6 +16,7 @@ import {
   IdentityMailboxCreateOptions,
   IdentityPhoneNumberCreateOptions,
   IdentityTunnelCreateOptions,
+  UpdateIdentityOptions,
   _AgentIdentityData,
   RawAgentIdentitySummary,
   RawAgentIdentityData,
@@ -43,8 +45,10 @@ export class IdentitiesResource {
    * @param options.description - Free-form org-internal description.
    *   `null` leaves the column null; omit to defer to server default.
    * @param options.imessageEnabled - Whether the identity can be reached
-   *   over the shared iMessage service. Omit to defer to the server
+   *   over iMessage. Omit to defer to the server
    *   default (`false`).
+   * @param options.imessageNumberType - Dedicated number role to claim and
+   *   attach atomically. Requires `imessageEnabled: true`.
    * @param options.mailbox - Optional nested mailbox spec. Mailbox is
    *   always provisioned; this just lets the caller customize.
    * @param options.tunnel - Optional nested tunnel spec (tlsMode only).
@@ -57,15 +61,22 @@ export class IdentitiesResource {
     displayName?: string;
     description?: string | null;
     imessageEnabled?: boolean;
+    imessageNumberType?: IMessageDedicatedNumberType;
     mailbox?: IdentityMailboxCreateOptions;
     tunnel?: IdentityTunnelCreateOptions;
     phoneNumber?: IdentityPhoneNumberCreateOptions;
     vaultSecretIds?: string | string[] | "*" | "all";
   }): Promise<_AgentIdentityData> {
+    if (options.imessageNumberType !== undefined && options.imessageEnabled !== true) {
+      throw new Error("imessageNumberType requires imessageEnabled: true");
+    }
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if (options.imessageNumberType !== undefined) {
+      body["imessage_number_type"] = options.imessageNumberType;
+    }
     if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
     if (options.tunnel !== undefined) body["tunnel"] = identityTunnelCreateOptionsToWire(options.tunnel);
     if (options.phoneNumber !== undefined) body["phone_number"] = identityPhoneNumberCreateOptionsToWire(options.phoneNumber);
@@ -108,6 +119,11 @@ export class IdentitiesResource {
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
    * @param options.imessageEnabled - Toggle shared-iMessage reachability.
+   * @param options.imessageNumberId - Attach an owned dedicated number, or
+   *   pass `null` to return to shared service.
+   * @param options.imessageNumberType - Claim and attach a new dedicated number.
+   * @param options.idempotencyKey - Stable caller-generated key required for
+   *   `imessageNumberType`. Reuse it after an ambiguous failure.
    * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
    *   for iMessage contact rules (admin-only).
    * @param options.mailFilterMode - `"whitelist"` or `"blacklist"` for this
@@ -120,29 +136,49 @@ export class IdentitiesResource {
    */
   async update(
     agentHandle: string,
-    options: {
-      newHandle?: string;
-      displayName?: string | null;
-      description?: string | null;
-      imessageEnabled?: boolean;
-      imessageFilterMode?: "whitelist" | "blacklist";
-      mailFilterMode?: "whitelist" | "blacklist";
-      phoneFilterMode?: "whitelist" | "blacklist";
-      status?: "active" | "paused";
-    },
-  ): Promise<AgentIdentitySummary> {
+    options: UpdateIdentityOptions,
+  ): Promise<_AgentIdentityData> {
+    const hasNumberId = "imessageNumberId" in options;
+    if (options.imessageNumberType !== undefined && hasNumberId) {
+      throw new Error("imessageNumberType and imessageNumberId cannot be set together");
+    }
+    if (
+      options.imessageEnabled === false
+      && (
+        options.imessageNumberType !== undefined
+        || (hasNumberId && options.imessageNumberId !== null)
+      )
+    ) {
+      throw new Error("iMessage number changes cannot be combined with disabling iMessage");
+    }
+    if (options.imessageNumberType !== undefined) {
+      if (options.idempotencyKey === undefined) {
+        throw new Error("idempotencyKey is required with imessageNumberType");
+      }
+    }
+    if (options.idempotencyKey !== undefined) {
+      validateIdempotencyKey(options.idempotencyKey);
+    }
     const body: Record<string, unknown> = {};
     if (options.newHandle !== undefined) body["agent_handle"] = options.newHandle;
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if ("imessageNumberId" in options) body["imessage_number_id"] = options.imessageNumberId;
+    if (options.imessageNumberType !== undefined) {
+      body["imessage_number_type"] = options.imessageNumberType;
+    }
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
     if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;
     if (options.status !== undefined) body["status"] = options.status;
     try {
-      const data = await this.http.patch<RawAgentIdentitySummary>(`/${agentHandle}`, body);
-      return parseAgentIdentitySummary(data);
+      const data = options.idempotencyKey === undefined
+        ? await this.http.patch<RawAgentIdentityData>(`/${agentHandle}`, body)
+        : await this.http.patch<RawAgentIdentityData>(`/${agentHandle}`, body, {
+          headers: { "Idempotency-Key": options.idempotencyKey },
+        });
+      return parseAgentIdentityData(data);
     } catch (err) {
       if (err instanceof InkboxAPIError) throw mapIdentityConflictError(err);
       throw err;

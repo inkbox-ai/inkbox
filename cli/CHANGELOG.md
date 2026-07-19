@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.26 — Dedicated iMessage number SDK support
+
+### Changed
+
+- CLI version moved in lockstep with `@inkbox/sdk` 0.4.26 and depends on `^0.4.26`. This release adds no new CLI commands; dedicated iMessage number management is available through the SDKs.
+
+## 0.4.25 — Proxy support (HTTP_PROXY / HTTPS_PROXY / NO_PROXY)
+
+### Added
+
+- **Proxy environment variables are honored.** Node's `fetch` ignores `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` unless `NODE_USE_ENV_PROXY` is set — a flag that only exists on Node 22.21+ / 24+ — so in sandboxed or proxied environments every command died with a bare `fetch failed`. The CLI now routes requests through the configured proxy automatically (undici's `EnvHttpProxyAgent`) whenever a proxy variable is present, on every supported Node version; `NO_PROXY` is respected, and `NODE_USE_ENV_PROXY=0` opts out (matching Node's own semantics). New runtime dependency: `undici` (^7).
+- **Clearer connection errors.** A request that fails before any HTTP response (DNS failure, refused connection, unreachable proxy) now prints the request URL and the underlying cause — e.g. `Error: Request to https://… failed: getaddrinfo ENOTFOUND …` — instead of `Error: fetch failed` (via `@inkbox/sdk`'s new `InkboxConnectionError`).
+
+### Changed
+
+- `inkbox tunnel get <handle>` (the identity-embedded path) may show `currentlyConnected: null` once servers slim identity-embedded tunnel payloads to durable config — `null` means "not reported", not "disconnected". `inkbox tunnel get <uuid>` always reflects live state.
+
 ## 0.4.24 — Mailbox storage caps + mail clients
 
 ### Added

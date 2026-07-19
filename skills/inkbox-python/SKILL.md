@@ -368,9 +368,9 @@ inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 
 ## iMessage
 
-iMessage works differently from SMS: there is no per-identity iMessage number. Recipients connect to an agent identity through a small shared pool of numbers — they ask the triage line to connect them to `@agent_handle`, and that creates an assignment between that one recipient and the identity. Everything agent-facing is keyed by `conversation_id` / `remote_number`; the shared local number is never exposed, and there is **no cold outreach** — you can only message recipients who connected first.
+iMessage can use the shared service or an organization-owned dedicated number. On shared service, recipients ask the triage number to connect them to `@agent_handle`; the shared local number is never exposed. Shared service and `dedicated_inbound` require the recipient to message first. A `dedicated_outbound` number may start a conversation, subject to consent, contact-rule, and rate-limit checks.
 
-Discover the router (triage) line at runtime — it can change, so never hardcode it:
+Discover the router (triage) number at runtime — it can change, so never hardcode it:
 
 ```python
 triage = inkbox.imessages.get_triage_number()
@@ -388,6 +388,50 @@ identity.update(imessage_enabled=True)
 identity.update(imessage_filter_mode="whitelist")
 print(identity.imessage_enabled, identity.imessage_filter_mode)
 ```
+
+Dedicated numbers follow the phone-number resource style: list or claim them on
+the org-level iMessage resource, then inspect the typed number model. Claims
+require admin credentials.
+
+```python
+from inkbox import IMessageNumberType
+
+numbers = inkbox.imessages.list_numbers()  # attached and unattached
+number = inkbox.imessages.claim_number(
+    type=IMessageNumberType.DEDICATED_OUTBOUND,
+    idempotency_key="claim-outbound-agent-2026-07-18",
+)
+print(number.number, number.status, number.agent_identity_id)
+print(number.can_start_conversations)  # True only for dedicated_outbound
+```
+
+Claim and attach atomically during identity create/update. Do not make a
+separate attach call after an atomic claim. `imessage_number_id=None` is
+intentional wire data that moves an identity back to shared service; omitting
+the argument leaves its attachment unchanged.
+
+```python
+identity = inkbox.create_identity(
+    "outbound-agent",
+    imessage_enabled=True,
+    imessage_number_type="dedicated_outbound",
+)
+print(identity.imessage_number.number)
+
+identity.update(
+    imessage_number_type="dedicated_inbound",
+    idempotency_key="swap-my-agent-inbound-2026-07-18",
+)                                                         # claim + swap
+identity.update(imessage_number_id=number.id)             # attach owned number
+identity.update(imessage_number_id=None)                  # return to shared
+```
+
+`claim_number` and atomic identity claims may raise
+`DedicatedIMessageNumberQuotaExceededError`,
+`DedicatedIMessageNumberInventoryPendingError`, or
+`IdempotencyKeyReusedError`. The inventory error exposes
+`retry_after_seconds`; do not retry sooner. Reuse the same caller-generated
+idempotency key when retrying an ambiguous claim.
 
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agent_identity_id` / `is_blocked` filters):
 
@@ -437,7 +481,7 @@ upload = identity.upload_imessage_media(
 identity.send_imessage(to="+15551234567", media_urls=[upload.media_url])
 ```
 
-Contact rules are scoped to the **identity** (not a phone number) because pool numbers are shared infrastructure:
+Contact rules are scoped to the **identity**, including when it has a dedicated number:
 
 ```python
 from inkbox import IMessageRuleAction
