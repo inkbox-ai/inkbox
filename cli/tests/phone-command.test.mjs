@@ -14,27 +14,60 @@ test("buildPlaceCallOptions builds a plain client-driven call", () => {
   });
 });
 
-test("buildPlaceCallOptions forwards the ws url on client-driven calls", () => {
+test("buildPlaceCallOptions forwards the ws url and origination on client-driven calls", () => {
   const result = buildPlaceCallOptions({
     identity: "support-bot",
     to: "+15551234567",
     wsUrl: "wss://agent.example.com/ws",
+    origination: "shared_imessage_number",
   });
 
   assert.deepEqual(result, {
     callOptions: {
       toNumber: "+15551234567",
       clientWebsocketUrl: "wss://agent.example.com/ws",
+      origination: "shared_imessage_number",
     },
   });
 });
 
-test("buildPlaceCallOptions builds a hosted call with mode and reason", () => {
+test("buildPlaceCallOptions forwards shared iMessage origination", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    origination: "shared_imessage_number",
+  });
+
+  assert.deepEqual(result, {
+    callOptions: {
+      toNumber: "+15551234567",
+      origination: "shared_imessage_number",
+    },
+  });
+});
+
+test("buildPlaceCallOptions forwards explicit dedicated origination", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    origination: "dedicated_number",
+  });
+
+  assert.deepEqual(result, {
+    callOptions: {
+      toNumber: "+15551234567",
+      origination: "dedicated_number",
+    },
+  });
+});
+
+test("buildPlaceCallOptions builds a shared hosted call with mode and reason", () => {
   const result = buildPlaceCallOptions({
     identity: "support-bot",
     to: "+15551234567",
     hosted: true,
     reason: "Book a cleaning next week, mornings preferred",
+    origination: "shared_imessage_number",
   });
 
   assert.deepEqual(result, {
@@ -42,6 +75,7 @@ test("buildPlaceCallOptions builds a hosted call with mode and reason", () => {
       toNumber: "+15551234567",
       mode: "hosted_agent",
       reason: "Book a cleaning next week, mornings preferred",
+      origination: "shared_imessage_number",
     },
   });
 });

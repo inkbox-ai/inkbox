@@ -204,6 +204,8 @@ inkbox phone call -i <handle>                # Place an outbound call
   --hosted                                   #   Let Inkbox Voice AI drive the call
                                              #     (requires --reason; conflicts with --ws-url)
   --reason <text>                            #   Voice AI's task brief — what to accomplish
+  --origination <origin>                     #   dedicated_number (default) or
+                                             #     shared_imessage_number
 
 inkbox phone calls -i <handle>               # List calls
   --limit <n>                                #   Max results (default: 50)
@@ -234,6 +236,11 @@ inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitt
   --model <model>                            #   Model override
   --instructions <text>                      #   Per-identity steering prompt
 ```
+
+Shared origination uses the identity's active iMessage-line assignment and
+does not require a dedicated phone number. The recipient must already have a
+shared iMessage connection to the identity; otherwise the call fails with
+`409 no_shared_connection`.
 
 ### text
 
