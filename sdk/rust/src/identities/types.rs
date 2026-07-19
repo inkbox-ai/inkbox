@@ -400,14 +400,17 @@ pub struct AgentIdentityData {
 
 impl AgentIdentityData {
     /// Deserialize from a raw transport value, applying the embedded mailbox's
-    /// `sending_domain` backfill (the nested `Tunnel` / `PhoneNumber` need no
-    /// post-processing).
+    /// `sending_domain` backfill and tunnel-summary validation.
     pub(crate) fn from_value(v: Value) -> crate::error::Result<Self> {
+        let tunnel = v.get("tunnel").cloned();
         let mut data: AgentIdentityData = serde_json::from_value(v)?;
         if let Some(mailbox) = data.mailbox.take() {
             // Re-run the sending_domain backfill through the dedicated path.
             let mailbox = serde_json::to_value(mailbox)?;
             data.mailbox = Some(IdentityMailbox::from_value(mailbox)?);
+        }
+        if let Some(tunnel) = tunnel.filter(|value| !value.is_null()) {
+            data.tunnel = Some(TunnelSummary::from_value(&tunnel)?);
         }
         Ok(data)
     }
@@ -425,4 +428,55 @@ pub struct IdentityAccess {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub viewer_identity_id: Option<Uuid>,
     pub created_at: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::AgentIdentityData;
+
+    fn identity_with_tunnel(public_host: &str) -> serde_json::Value {
+        json!({
+            "id": "eeee5555-0000-0000-0000-000000000001",
+            "organization_id": "org_test",
+            "agent_handle": "sales-agent",
+            "display_name": null,
+            "description": null,
+            "email_address": null,
+            "created_at": "2026-03-09T00:00:00Z",
+            "updated_at": "2026-03-09T00:00:00Z",
+            "mailbox": null,
+            "phone_number": null,
+            "imessage_number": null,
+            "tunnel": {
+                "id": "ffff6666-0000-0000-0000-000000000001",
+                "tunnel_name": "sales-agent",
+                "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
+                "tls_mode": "edge",
+                "status": "active",
+                "public_host": public_host,
+                "zone": "inkboxwire.com",
+                "created_at": "2026-03-09T00:00:00Z",
+                "updated_at": "2026-03-09T00:00:00Z"
+            }
+        })
+    }
+
+    #[test]
+    fn identity_tunnel_uses_summary_validation() {
+        let error = AgentIdentityData::from_value(identity_with_tunnel("")).unwrap_err();
+        assert!(error.to_string().contains("public_host"));
+    }
+
+    #[test]
+    fn identity_tunnel_parses_valid_summary() {
+        let data =
+            AgentIdentityData::from_value(identity_with_tunnel("sales-agent.inkboxwire.com"))
+                .unwrap();
+        assert_eq!(
+            data.tunnel.unwrap().public_host,
+            "sales-agent.inkboxwire.com"
+        );
+    }
 }

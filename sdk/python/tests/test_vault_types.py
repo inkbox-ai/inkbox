@@ -4,6 +4,7 @@ sdk/python/tests/test_vault_types.py
 Tests for vault type parsing.
 """
 
+from datetime import datetime
 from uuid import UUID
 
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT, VAULT_SECRET_DETAIL_DICT
@@ -57,6 +58,21 @@ class TestVaultSecretDetail:
         assert s.encrypted_payload == "abc123"
         assert s.name == "AWS Production"
         assert s.description == "Production AWS credentials"
+
+    def test_access_does_not_shift_existing_positional_arguments(self):
+        now = datetime.fromisoformat("2026-03-18T12:00:00+00:00")
+        secret = VaultSecretDetail(
+            UUID("cccc3333-0000-0000-0000-000000000001"),
+            "AWS Production",
+            "login",
+            now,
+            now,
+            "Production AWS credentials",
+            "abc123",
+        )
+
+        assert secret.encrypted_payload == "abc123"
+        assert secret.access == []
 
 
 class TestPayloadParsers:

@@ -117,7 +117,7 @@ class VaultSecret:
     created_at: datetime
     updated_at: datetime
     description: str | None = None
-    access: list[AccessRule] = field(default_factory=list)
+    access: list[AccessRule] = field(default_factory=list, kw_only=True)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> VaultSecret:

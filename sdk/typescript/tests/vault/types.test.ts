@@ -46,6 +46,12 @@ const RAW_SECRET: RawVaultSecret = {
   name: "AWS Production",
   description: null,
   secret_type: "login",
+  access: [{
+    id: "dddd4444-0000-0000-0000-000000000001",
+    vault_secret_id: "cccc3333-0000-0000-0000-000000000001",
+    identity_id: "eeee5555-0000-0000-0000-000000000001",
+    created_at: "2026-03-18T12:00:00Z",
+  }],
   created_at: "2026-03-18T12:00:00Z",
   updated_at: "2026-03-18T12:00:00Z",
 };
@@ -76,6 +82,8 @@ describe("parseVaultSecret", () => {
     expect(s.name).toBe("AWS Production");
     expect(s.description).toBeNull();
     expect(s.secretType).toBe("login");
+    expect(s.access).toHaveLength(1);
+    expect(s.access[0].identityId).toBe("eeee5555-0000-0000-0000-000000000001");
     expect(s.createdAt).toBeInstanceOf(Date);
   });
 });

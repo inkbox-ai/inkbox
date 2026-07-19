@@ -317,3 +317,47 @@ pub struct DecryptedVaultSecret {
     pub payload: SecretPayload,
     pub description: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{VaultSecret, VaultSecretDetail};
+
+    fn secret_json() -> serde_json::Value {
+        json!({
+            "id": "cccc3333-0000-0000-0000-000000000001",
+            "name": "AWS Production",
+            "description": null,
+            "secret_type": "login",
+            "created_at": "2026-03-18T12:00:00Z",
+            "updated_at": "2026-03-18T12:00:00Z"
+        })
+    }
+
+    #[test]
+    fn vault_secret_defaults_missing_access_to_empty() {
+        let secret: VaultSecret = serde_json::from_value(secret_json()).unwrap();
+        assert!(secret.access.is_empty());
+    }
+
+    #[test]
+    fn vault_secret_detail_parses_inlined_access() {
+        let mut value = secret_json();
+        let object = value.as_object_mut().unwrap();
+        object.insert("encrypted_payload".into(), json!("abc123"));
+        object.insert(
+            "access".into(),
+            json!([{
+                "id": "dddd4444-0000-0000-0000-000000000001",
+                "vault_secret_id": "cccc3333-0000-0000-0000-000000000001",
+                "identity_id": "eeee5555-0000-0000-0000-000000000001",
+                "created_at": "2026-03-18T12:00:00Z"
+            }]),
+        );
+
+        let secret: VaultSecretDetail = serde_json::from_value(value).unwrap();
+        assert_eq!(secret.encrypted_payload, "abc123");
+        assert_eq!(secret.access.len(), 1);
+    }
+}
