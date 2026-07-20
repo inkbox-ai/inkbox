@@ -334,6 +334,7 @@ export { TLSMode, TunnelStatus } from "./tunnels/types.js";
 export type {
   SignedCert,
   Tunnel,
+  TunnelSummary,
 } from "./tunnels/types.js";
 export type { UpdateTunnelOptions } from "./tunnels/resources/tunnels.js";
 export {

@@ -4,6 +4,7 @@ sdk/python/tests/test_vault_types.py
 Tests for vault type parsing.
 """
 
+from datetime import datetime
 from uuid import UUID
 
 from sample_data_vault import VAULT_INFO_DICT, VAULT_KEY_DICT, VAULT_SECRET_DICT, VAULT_SECRET_DETAIL_DICT
@@ -45,8 +46,8 @@ class TestVaultSecret:
     def test_from_dict(self):
         s = VaultSecret._from_dict(VAULT_SECRET_DICT)
         assert isinstance(s.id, UUID)
-        assert s.name == "AWS Production"
-        assert s.description == "Production AWS credentials"
+        assert s.name == "Cloud Service"
+        assert s.description == "Cloud service credentials"
         assert s.secret_type == "login"
 
 
@@ -55,8 +56,23 @@ class TestVaultSecretDetail:
         d = {**VAULT_SECRET_DETAIL_DICT, "encrypted_payload": "abc123"}
         s = VaultSecretDetail._from_dict(d)
         assert s.encrypted_payload == "abc123"
-        assert s.name == "AWS Production"
-        assert s.description == "Production AWS credentials"
+        assert s.name == "Cloud Service"
+        assert s.description == "Cloud service credentials"
+
+    def test_access_does_not_shift_existing_positional_arguments(self):
+        now = datetime.fromisoformat("2026-03-18T12:00:00+00:00")
+        secret = VaultSecretDetail(
+            UUID("cccc3333-0000-0000-0000-000000000001"),
+            "Cloud Service",
+            "login",
+            now,
+            now,
+            "Cloud service credentials",
+            "abc123",
+        )
+
+        assert secret.encrypted_payload == "abc123"
+        assert secret.access == []
 
 
 class TestPayloadParsers:
@@ -232,14 +248,14 @@ class TestKeyPairPayloadRoundtrip:
             access_key="AKIAIOSFODNN7EXAMPLE",
             secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             endpoint="https://s3.amazonaws.com",
-            notes="AWS prod",
+            notes="cloud service",
         )
         d = p._to_dict()
         assert d == {
             "access_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
             "endpoint": "https://s3.amazonaws.com",
-            "notes": "AWS prod",
+            "notes": "cloud service",
         }
         roundtripped = KeyPairPayload._from_dict(d)
         assert roundtripped.access_key == p.access_key

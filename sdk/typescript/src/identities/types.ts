@@ -12,8 +12,8 @@ import {
   parseFilterModeChangeNotice,
 } from "../mail/types.js";
 import { SmsStatus } from "../phone/types.js";
-import type { RawTunnel, TLSMode, Tunnel } from "../tunnels/types.js";
-import { parseTunnel } from "../tunnels/types.js";
+import type { RawTunnelSummary, TLSMode, TunnelSummary } from "../tunnels/types.js";
+import { parseTunnelSummary } from "../tunnels/types.js";
 import type {
   IdentityIMessageNumber,
   IMessageDedicatedNumberType,
@@ -150,7 +150,7 @@ export interface IdentityPhoneNumber {
   filterModeChangeNotice: FilterModeChangeNotice | null;
 }
 
-/** Lightweight identity returned by list endpoints. */
+/** Identity returned by list endpoints. */
 export interface AgentIdentitySummary {
   id: string;
   organizationId: string;
@@ -184,18 +184,32 @@ export interface AgentIdentitySummary {
   signingKeyConfigured: boolean;
   /** When the signing key was created, or `null` if none is configured. */
   signingKeyCreatedAt: Date | null;
+  /** Linked mailbox when included by the response. */
+  mailbox?: IdentityMailbox | null;
+  /** Linked phone number when included by the response. */
+  phoneNumber?: IdentityPhoneNumber | null;
+  /** Attached dedicated iMessage number when included by the response. */
+  imessageNumber?: IdentityIMessageNumber | null;
+  /** Linked tunnel summary when included by the response. */
+  tunnel?: TunnelSummary | null;
+  /** Visibility grants when included by the response. */
+  access?: IdentityAccess[];
 }
 
 /** @internal Full identity data with channels — users interact with AgentIdentity (the class) instead. */
 export interface _AgentIdentityData extends AgentIdentitySummary {
-  /** Mailbox assigned to this identity. Non-null for live identities (1:1 invariant); null only on deleted rows. */
+  /** Mailbox assigned to this identity, or `null` when unavailable. */
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
   /** Dedicated iMessage number attached to this identity, or null on shared service. */
   imessageNumber: IdentityIMessageNumber | null;
-  /** Tunnel assigned to this identity. Non-null for live identities (1:1 invariant); null only on deleted rows. */
-  tunnel: Tunnel | null;
+  /**
+   * Summary of the tunnel assigned to this identity, or `null` when unavailable.
+   * For connection state and certificate material, fetch the full tunnel:
+   * `tunnels.get(identity.tunnel.id)`.
+  */
+  tunnel: TunnelSummary | null;
 }
 
 /**
@@ -262,13 +276,18 @@ export interface RawAgentIdentitySummary {
   signing_key_created_at?: string | null;
   created_at: string;
   updated_at: string;
+  mailbox?: RawIdentityMailbox | null;
+  phone_number?: RawIdentityPhoneNumber | null;
+  imessage_number?: RawIdentityIMessageNumber | null;
+  tunnel?: RawTunnelSummary | null;
+  access?: RawIdentityAccess[] | null;
 }
 
 export interface RawAgentIdentityData extends RawAgentIdentitySummary {
   mailbox: RawIdentityMailbox | null;
   phone_number: RawIdentityPhoneNumber | null;
   imessage_number?: RawIdentityIMessageNumber | null;
-  tunnel: RawTunnel | null;
+  tunnel: RawTunnelSummary | null;
 }
 
 export interface RawIdentityAccess {
@@ -335,6 +354,13 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     updatedAt: new Date(r.updated_at),
     signingKeyConfigured: r.signing_key_configured ?? false,
     signingKeyCreatedAt: r.signing_key_created_at ? new Date(r.signing_key_created_at) : null,
+    mailbox: r.mailbox ? parseIdentityMailbox(r.mailbox) : null,
+    phoneNumber: r.phone_number ? parseIdentityPhoneNumber(r.phone_number) : null,
+    imessageNumber: r.imessage_number
+      ? parseIdentityIMessageNumber(r.imessage_number)
+      : null,
+    tunnel: r.tunnel ? parseTunnelSummary(r.tunnel) : null,
+    access: (r.access ?? []).map(parseIdentityAccess),
   };
 }
 
@@ -346,7 +372,7 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
     imessageNumber: r.imessage_number
       ? parseIdentityIMessageNumber(r.imessage_number)
       : null,
-    tunnel: r.tunnel ? parseTunnel(r.tunnel) : null,
+    tunnel: r.tunnel ? parseTunnelSummary(r.tunnel) : null,
   };
 }
 

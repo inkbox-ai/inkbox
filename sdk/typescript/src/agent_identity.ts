@@ -65,7 +65,7 @@ import type {
   IdentityPhoneNumber,
   UpdateIdentityOptions,
 } from "./identities/types.js";
-import type { Tunnel } from "./tunnels/types.js";
+import type { TunnelSummary } from "./tunnels/types.js";
 import type { Inkbox } from "./inkbox.js";
 
 export class AgentIdentity {
@@ -74,7 +74,7 @@ export class AgentIdentity {
   private _mailbox: IdentityMailbox | null;
   private _phoneNumber: IdentityPhoneNumber | null;
   private _imessageNumber: IdentityIMessageNumber | null;
-  private _tunnel: Tunnel | null;
+  private _tunnel: TunnelSummary | null;
   private _credentials: Credentials | null = null;
   private _credentialsVaultRef: object | null = null; // tracks which _unlocked built the cache
 
@@ -121,7 +121,7 @@ export class AgentIdentity {
   /** When this identity's signing key was created, or `null` if none is configured. */
   get signingKeyCreatedAt(): Date | null { return this._data.signingKeyCreatedAt; }
 
-  /** The mailbox currently assigned to this identity. Non-null for live identities (1:1 invariant). */
+  /** The mailbox currently assigned to this identity, when included. */
   get mailbox(): IdentityMailbox | null { return this._mailbox; }
 
   /** The phone number currently assigned to this identity, or `null` if none. */
@@ -130,8 +130,11 @@ export class AgentIdentity {
   /** Dedicated iMessage number attached to this identity, or `null` on shared service. */
   get imessageNumber(): IdentityIMessageNumber | null { return this._imessageNumber; }
 
-  /** The tunnel currently assigned to this identity. Non-null for live identities (1:1 invariant). */
-  get tunnel(): Tunnel | null { return this._tunnel; }
+  /**
+   * Summary of this identity's tunnel. For connection state and certificate
+   * material, fetch the full tunnel with `tunnels.get(id)`.
+   */
+  get tunnel(): TunnelSummary | null { return this._tunnel; }
 
   /**
    * Identity-scoped credential access.

@@ -151,7 +151,11 @@ impl IdentitiesResource {
     /// List all identities for your organisation.
     pub fn list(&self) -> Result<Vec<AgentIdentitySummary>> {
         let data = self.http.get("/", crate::http::NO_QUERY)?;
-        Ok(serde_json::from_value(data)?)
+        let items: Vec<Value> = serde_json::from_value(data)?;
+        items
+            .into_iter()
+            .map(AgentIdentitySummary::from_value)
+            .collect()
     }
 
     /// Get an identity with its linked channels (mailbox, phone number, tunnel).
@@ -430,6 +434,84 @@ mod tests {
         })
     }
 
+    fn identity_list_detail_json() -> serde_json::Value {
+        let mut identity = identity_json();
+        let object = identity.as_object_mut().unwrap();
+        object.insert(
+            "mailbox".into(),
+            json!({
+                "id": "33333333-3333-3333-3333-333333333333",
+                "email_address": "support-bot@inkbox.ai",
+                "created_at": "2026-07-01T00:00:00+00:00",
+                "updated_at": "2026-07-01T00:00:00+00:00"
+            }),
+        );
+        object.insert(
+            "tunnel".into(),
+            json!({
+                "id": "44444444-4444-4444-4444-444444444444",
+                "tunnel_name": "support-bot",
+                "agent_identity_id": "11111111-1111-1111-1111-111111111111",
+                "tls_mode": "edge",
+                "status": "active",
+                "public_host": "support-bot.inkboxwire.com",
+                "zone": "inkboxwire.com",
+                "created_at": "2026-07-01T00:00:00+00:00",
+                "updated_at": "2026-07-01T00:00:00+00:00"
+            }),
+        );
+        object.insert(
+            "access".into(),
+            json!([{
+                "id": "55555555-5555-5555-5555-555555555555",
+                "target_identity_id": "11111111-1111-1111-1111-111111111111",
+                "viewer_identity_id": null,
+                "created_at": "2026-07-01T00:00:00+00:00"
+            }]),
+        );
+        identity
+    }
+
+    #[test]
+    fn list_preserves_hydrated_fields() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/identities/");
+            then.status(200)
+                .json_body(json!([identity_list_detail_json()]));
+        });
+
+        let identities = client(&server).identities().list().unwrap();
+
+        mock.assert();
+        assert_eq!(
+            identities[0].mailbox.as_ref().unwrap().email_address,
+            "support-bot@inkbox.ai"
+        );
+        assert_eq!(
+            identities[0].tunnel.as_ref().unwrap().tunnel_name,
+            "support-bot"
+        );
+        assert!(identities[0].access[0].viewer_identity_id.is_none());
+    }
+
+    #[test]
+    fn list_accepts_older_summary_response() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/identities/");
+            then.status(200).json_body(json!([identity_json()]));
+        });
+
+        let identities = client(&server).identities().list().unwrap();
+
+        mock.assert();
+        assert_eq!(identities[0].agent_handle, "support-bot");
+        assert!(identities[0].mailbox.is_none());
+        assert!(identities[0].tunnel.is_none());
+        assert!(identities[0].access.is_empty());
+    }
+
     #[test]
     fn create_with_imessage_number_sends_type_and_parses_detail() {
         let server = MockServer::start();
@@ -459,7 +541,7 @@ mod tests {
             )
             .unwrap();
         mock.assert();
-        let number: IdentityIMessageNumber = data.imessage_number.unwrap();
+        let number: IdentityIMessageNumber = data.imessage_number.clone().unwrap();
         assert_eq!(number.r#type, IMessageNumberType::DedicatedInbound);
     }
 

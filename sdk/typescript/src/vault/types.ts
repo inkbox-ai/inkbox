@@ -73,6 +73,12 @@ export interface VaultSecret {
   description: string | null;
   /** `"login"` | `"ssh_key"` | `"api_key"` | `"other"` */
   secretType: string;
+  /**
+   * Inlined access rules (who can read this secret), populated on list and
+   * single-secret reads so callers don't need a per-secret `getAccess`
+   * round-trip. Empty when the response omits access rules.
+   */
+  access: AccessRule[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -230,6 +236,7 @@ export interface RawVaultSecret {
   name: string;
   description: string | null;
   secret_type: string;
+  access?: RawAccessRule[];
   created_at: string;
   updated_at: string;
 }
@@ -281,6 +288,7 @@ export function parseVaultSecret(r: RawVaultSecret): VaultSecret {
     name: r.name,
     description: r.description,
     secretType: r.secret_type,
+    access: (r.access ?? []).map(parseAccessRule),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };

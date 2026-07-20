@@ -7,7 +7,7 @@ import {
   TunnelNameInvalid,
   TunnelTLSModeMismatch,
 } from "../src/tunnels/exceptions.js";
-import { TunnelStatus } from "../src/tunnels/types.js";
+import { parseTunnelSummary, TunnelStatus } from "../src/tunnels/types.js";
 import { validateTunnelName } from "../src/tunnels/_validation.js";
 import {
   ForwardTargetRefused,
@@ -141,6 +141,15 @@ describe("TunnelsResource", () => {
     expect(out.lastConnectedAt).toBeNull();
     expect(out.metadata).toEqual({});
     expect(out.publicHost).toBe("my-agent.inkboxwire.com");
+  });
+
+  it("parses and validates an identity-embedded tunnel summary", () => {
+    const summary = parseTunnelSummary(serverTunnel());
+    expect(summary.agentIdentityId).toBeNull();
+    expect(summary.publicHost).toBe("my-agent.inkboxwire.com");
+    expect(() => parseTunnelSummary(serverTunnel({ public_host: "" }))).toThrow(
+      "public_host",
+    );
   });
 
   // --- list() unwraps {tunnels: [...]} envelope ---

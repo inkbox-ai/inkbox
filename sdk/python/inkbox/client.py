@@ -528,7 +528,7 @@ class Inkbox:
         )
 
     def list_identities(self) -> list[AgentIdentitySummary]:
-        """List all agent identities for your organisation."""
+        """List identities, including linked resources when provided."""
         return self._ids_resource.list()
 
     def whoami(self) -> WhoamiResponse:
