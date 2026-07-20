@@ -35,9 +35,7 @@ class TunnelStatus(StrEnum):
             exists but no cert has been signed yet. Inbound TLS handshakes
             will fail until you call :meth:`TunnelsResource.sign_csr`.
         ACTIVE: Routable end-to-end.
-        DELETED: Terminal. The tunnel is offline. Tunnels are deleted
-            exclusively via the identity-delete cascade — there is no
-            direct tunnel-delete surface.
+        DELETED: The tunnel is no longer active.
     """
     AWAITING_CERT = "awaiting_cert"
     ACTIVE = "active"
@@ -68,8 +66,8 @@ class Tunnel:
 
     ``organization_id`` and ``currently_connected`` are ``None`` when the
     server omits them — identity-embedded tunnel payloads may carry
-    durable config only. Liveness is never fabricated; fetch
-    ``tunnels.get(id)`` for live state.
+    summary fields only. Fetch ``tunnels.get(id)`` when connection state is
+    needed; a failed lookup does not establish the tunnel's current state.
     """
     id: UUID
     organization_id: str | None
@@ -134,13 +132,12 @@ class Tunnel:
 
 @dataclass(frozen=True)
 class TunnelSummary:
-    """Durable-config projection of a tunnel, embedded in identity payloads.
+    """Summary of a tunnel embedded in identity payloads.
 
     Carries the routing and lifecycle facts identity views need, plus the
     ids to reach the full tunnel. Excludes runtime state
     (``currently_connected``) and cert material — fetch the full
-    :class:`Tunnel` via :meth:`TunnelsResource.get` for those; the tunnels
-    endpoints always resolve connection state live.
+    :class:`Tunnel` via :meth:`TunnelsResource.get` for those fields.
 
     ``status`` follows the same unknown-value contract as :class:`Tunnel`:
     a :class:`TunnelStatus` when recognized, otherwise the raw string.

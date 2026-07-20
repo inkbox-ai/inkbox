@@ -33,9 +33,7 @@ pub enum TLSMode {
 ///   but no cert has been signed yet. Inbound TLS handshakes fail until you
 ///   call [`TunnelsResource::sign_csr`].
 /// - `active`: routable end-to-end.
-/// - `deleted`: terminal. The tunnel is offline. Tunnels are deleted
-///   exclusively via the identity-delete cascade — there is no direct
-///   tunnel-delete surface.
+/// - `deleted`: the tunnel is no longer active.
 ///
 /// [`TunnelsResource::sign_csr`]: crate::tunnels::resources::TunnelsResource::sign_csr
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -74,16 +72,15 @@ pub enum TunnelStatusValue {
 /// parser ([`Tunnel::from_value`]) errors on missing values.
 ///
 /// `organization_id` and `currently_connected` are `None` when the server
-/// omits them — identity-embedded tunnel payloads may carry durable config
-/// only. Liveness is never fabricated; fetch the tunnel by id for live state.
+/// omits them. Fetch the tunnel by id when connection state is needed; a
+/// failed lookup does not establish the tunnel's current state.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Tunnel {
     pub id: Uuid,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organization_id: Option<String>,
     pub tunnel_name: String,
-    /// Owning identity id (tunnels are 1:1 with identities). `None` only for
-    /// pre-coupling tombstone rows.
+    /// Owning identity id, or `None` when ownership information is unavailable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_identity_id: Option<Uuid>,
     pub tls_mode: TLSMode,
@@ -105,7 +102,7 @@ pub struct Tunnel {
     /// Customer-facing hostname (e.g. `my-agent.inkboxwire.com`). Non-empty
     /// for live tunnels.
     pub public_host: String,
-    /// Zone endpoint for the data-plane. Non-empty for live tunnels.
+    /// Tunnel zone hostname.
     pub zone: String,
     #[serde(default)]
     pub metadata: BTreeMap<String, Value>,
@@ -210,20 +207,19 @@ impl Tunnel {
     }
 }
 
-/// Durable-config projection of a tunnel, embedded in identity payloads.
+/// Summary of a tunnel embedded in identity payloads.
 ///
 /// Carries the routing and lifecycle facts identity views need, plus the ids
 /// to reach the full tunnel. Excludes runtime state (`currently_connected`)
-/// and cert material — fetch the full [`Tunnel`] via `tunnels().get(...)` for
-/// those; the tunnels endpoints always resolve connection state live.
+/// and cert material. Fetch the full [`Tunnel`] via `tunnels().get(...)` for
+/// those fields.
 ///
 /// `status` follows the same unknown-value contract as [`Tunnel`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TunnelSummary {
     pub id: Uuid,
     pub tunnel_name: String,
-    /// Owning identity id (tunnels are 1:1 with identities). `None` only for
-    /// pre-coupling tombstone rows.
+    /// Owning identity id, or `None` when ownership information is unavailable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_identity_id: Option<Uuid>,
     pub tls_mode: TLSMode,
@@ -231,7 +227,7 @@ pub struct TunnelSummary {
     /// Customer-facing hostname (e.g. `my-agent.inkboxwire.com`). Non-empty
     /// for live tunnels.
     pub public_host: String,
-    /// Zone endpoint for the data-plane. Non-empty for live tunnels.
+    /// Tunnel zone hostname.
     pub zone: String,
     /// ISO-8601 timestamp.
     pub created_at: String,

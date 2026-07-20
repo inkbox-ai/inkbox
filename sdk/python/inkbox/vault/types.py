@@ -27,8 +27,8 @@ class VaultSecretType(StrEnum):
     does not validate or enforce payload structure (it's opaque ciphertext).
 
     Attributes:
-        API_KEY: Single API token (e.g. OpenAI, Anthropic).
-        KEY_PAIR: Access key + secret key pair (e.g. AWS, Stripe).
+        API_KEY: Single API token.
+        KEY_PAIR: Access key + secret key pair.
         LOGIN: Username/password combination, optionally with URL.
         SSH_KEY: SSH private key, optionally with public key/fingerprint.
         OTHER: Freeform encrypted catch-all.
@@ -107,8 +107,7 @@ class VaultSecret:
 
     ``access`` carries the secret's inlined access rules (who can read it)
     on list and single-secret reads, so callers don't need a per-secret
-    ``get_access`` round-trip. Empty on server builds that don't inline it
-    and on write-path responses.
+    ``get_access`` round-trip. Empty when the response omits access rules.
     """
 
     id: UUID

@@ -90,7 +90,7 @@ export class IdentitiesResource {
     }
   }
 
-  /** List all identities for your organisation. */
+  /** List identities, preserving hydrated fields when provided. */
   async list(): Promise<AgentIdentitySummary[]> {
     const data = await this.http.get<RawAgentIdentitySummary[]>("/");
     return data.map(parseAgentIdentitySummary);

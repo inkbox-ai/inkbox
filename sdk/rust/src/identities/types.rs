@@ -333,11 +333,11 @@ pub struct IdentityPhoneNumber {
     pub filter_mode_change_notice: Option<FilterModeChangeNotice>,
 }
 
-/// Lightweight agent identity returned by list endpoints.
+/// Agent identity returned by list endpoints.
 ///
 /// `imessage_enabled` / `imessage_filter_mode` describe iMessage reachability
-/// and filtering. Detailed identities may also carry an attached dedicated
-/// number.
+/// and filtering. Newer responses also include linked channels and visibility
+/// grants; these fields default to empty values for older responses.
 ///
 /// `mail_filter_mode` / `phone_filter_mode` are the whitelist/blacklist modes
 /// for this identity's mail and phone contact rules. They live on the identity
@@ -377,6 +377,30 @@ pub struct AgentIdentitySummary {
     /// When the signing key was created, or `None` if none is configured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signing_key_created_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mailbox: Option<IdentityMailbox>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phone_number: Option<IdentityPhoneNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub imessage_number: Option<IdentityIMessageNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tunnel: Option<TunnelSummary>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub access: Vec<IdentityAccess>,
+}
+
+impl AgentIdentitySummary {
+    pub(crate) fn from_value(v: Value) -> crate::error::Result<Self> {
+        let tunnel = v.get("tunnel").cloned();
+        let mut summary: AgentIdentitySummary = serde_json::from_value(v)?;
+        if let Some(mailbox) = summary.mailbox.take() {
+            summary.mailbox = Some(IdentityMailbox::from_value(serde_json::to_value(mailbox)?)?);
+        }
+        if let Some(tunnel) = tunnel.filter(|value| !value.is_null()) {
+            summary.tunnel = Some(TunnelSummary::from_value(&tunnel)?);
+        }
+        Ok(summary)
+    }
 }
 
 /// Agent identity with linked communication channels and tunnel.
@@ -388,31 +412,29 @@ pub struct AgentIdentitySummary {
 pub struct AgentIdentityData {
     #[serde(flatten)]
     pub summary: AgentIdentitySummary,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mailbox: Option<IdentityMailbox>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub phone_number: Option<IdentityPhoneNumber>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub imessage_number: Option<IdentityIMessageNumber>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tunnel: Option<TunnelSummary>,
 }
 
 impl AgentIdentityData {
     /// Deserialize from a raw transport value, applying the embedded mailbox's
     /// `sending_domain` backfill and tunnel-summary validation.
     pub(crate) fn from_value(v: Value) -> crate::error::Result<Self> {
-        let tunnel = v.get("tunnel").cloned();
-        let mut data: AgentIdentityData = serde_json::from_value(v)?;
-        if let Some(mailbox) = data.mailbox.take() {
-            // Re-run the sending_domain backfill through the dedicated path.
-            let mailbox = serde_json::to_value(mailbox)?;
-            data.mailbox = Some(IdentityMailbox::from_value(mailbox)?);
-        }
-        if let Some(tunnel) = tunnel.filter(|value| !value.is_null()) {
-            data.tunnel = Some(TunnelSummary::from_value(&tunnel)?);
-        }
-        Ok(data)
+        Ok(Self {
+            summary: AgentIdentitySummary::from_value(v)?,
+        })
+    }
+}
+
+impl std::ops::Deref for AgentIdentityData {
+    type Target = AgentIdentitySummary;
+
+    fn deref(&self) -> &Self::Target {
+        &self.summary
+    }
+}
+
+impl std::ops::DerefMut for AgentIdentityData {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.summary
     }
 }
 
@@ -475,7 +497,7 @@ mod tests {
             AgentIdentityData::from_value(identity_with_tunnel("sales-agent.inkboxwire.com"))
                 .unwrap();
         assert_eq!(
-            data.tunnel.unwrap().public_host,
+            data.tunnel.as_ref().unwrap().public_host,
             "sales-agent.inkboxwire.com"
         );
     }

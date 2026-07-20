@@ -6,6 +6,7 @@ import { IMessageNumberType } from "../../src/imessage/types.js";
 import {
   RAW_IDENTITY,
   RAW_IDENTITY_DETAIL,
+  RAW_IDENTITY_LIST_DETAIL,
   RAW_IDENTITY_ACCESS_WILDCARD,
   RAW_IDENTITY_ACCESS_VIEWER,
 } from "../sampleData.js";
@@ -131,9 +132,9 @@ describe("IdentitiesResource.create", () => {
 });
 
 describe("IdentitiesResource.list", () => {
-  it("returns list of identities", async () => {
+  it("preserves hydrated fields", async () => {
     const http = mockHttp();
-    vi.mocked(http.get).mockResolvedValue([RAW_IDENTITY]);
+    vi.mocked(http.get).mockResolvedValue([RAW_IDENTITY_LIST_DETAIL]);
     const res = new IdentitiesResource(http);
 
     const identities = await res.list();
@@ -141,6 +142,22 @@ describe("IdentitiesResource.list", () => {
     expect(http.get).toHaveBeenCalledWith("/");
     expect(identities).toHaveLength(1);
     expect(identities[0].agentHandle).toBe(HANDLE);
+    expect(identities[0].mailbox?.emailAddress).toBe("sales-agent@inkbox.ai");
+    expect(identities[0].tunnel?.tunnelName).toBe(HANDLE);
+    expect(identities[0].access?.[0].viewerIdentityId).toBeNull();
+  });
+
+  it("accepts older summary responses", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_IDENTITY]);
+    const res = new IdentitiesResource(http);
+
+    const identity = (await res.list())[0];
+
+    expect(identity.agentHandle).toBe(HANDLE);
+    expect(identity.mailbox).toBeNull();
+    expect(identity.tunnel).toBeNull();
+    expect(identity.access).toEqual([]);
   });
 
   it("returns empty list", async () => {

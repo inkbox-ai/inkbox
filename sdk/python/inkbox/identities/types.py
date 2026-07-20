@@ -263,11 +263,12 @@ class IdentityIMessageNumber:
 
 @dataclass
 class AgentIdentitySummary:
-    """Lightweight agent identity returned by list endpoints.
+    """Agent identity returned by list endpoints.
 
     ``imessage_enabled`` / ``imessage_filter_mode`` describe iMessage
-    reachability and filtering. A dedicated number, when present, is included
-    only in the detailed identity response.
+    reachability and filtering. Newer responses also include linked channels
+    and visibility grants; these fields default to empty values for older
+    responses.
 
     ``mail_filter_mode`` / ``phone_filter_mode`` are the whitelist/blacklist
     modes for this identity's mail and phone contact rules. They live on the
@@ -290,10 +291,19 @@ class AgentIdentitySummary:
     # Webhook signing-key status (never the secret itself).
     signing_key_configured: bool = False
     signing_key_created_at: datetime | None = None
+    mailbox: IdentityMailbox | None = field(default=None)
+    phone_number: IdentityPhoneNumber | None = field(default=None)
+    imessage_number: IdentityIMessageNumber | None = field(default=None)
+    tunnel: TunnelSummary | None = field(default=None)
+    access: list[IdentityAccess] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentIdentitySummary:
         raw_signing_created_at = d.get("signing_key_created_at")
+        mailbox_data = d.get("mailbox")
+        phone_data = d.get("phone_number")
+        imessage_data = d.get("imessage_number")
+        tunnel_data = d.get("tunnel")
         return cls(
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
@@ -313,6 +323,17 @@ class AgentIdentitySummary:
                 if raw_signing_created_at
                 else None
             ),
+            mailbox=IdentityMailbox._from_dict(mailbox_data) if mailbox_data else None,
+            phone_number=(
+                IdentityPhoneNumber._from_dict(phone_data) if phone_data else None
+            ),
+            imessage_number=(
+                IdentityIMessageNumber._from_dict(imessage_data)
+                if imessage_data
+                else None
+            ),
+            tunnel=TunnelSummary._from_dict(tunnel_data) if tunnel_data else None,
+            access=[IdentityAccess._from_dict(a) for a in d.get("access") or []],
         )
 
 
@@ -326,29 +347,10 @@ class _AgentIdentityData(AgentIdentitySummary):
     instead.
     """
 
-    mailbox: IdentityMailbox | None = field(default=None)
-    phone_number: IdentityPhoneNumber | None = field(default=None)
-    imessage_number: IdentityIMessageNumber | None = field(default=None)
-    tunnel: TunnelSummary | None = field(default=None)
-
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> _AgentIdentityData:  # type: ignore[override]
         base = AgentIdentitySummary._from_dict(d)
-        mailbox_data = d.get("mailbox")
-        phone_data = d.get("phone_number")
-        imessage_data = d.get("imessage_number")
-        tunnel_data = d.get("tunnel")
-        return cls(
-            **base.__dict__,
-            mailbox=IdentityMailbox._from_dict(mailbox_data) if mailbox_data else None,
-            phone_number=IdentityPhoneNumber._from_dict(phone_data) if phone_data else None,
-            imessage_number=(
-                IdentityIMessageNumber._from_dict(imessage_data)
-                if imessage_data
-                else None
-            ),
-            tunnel=TunnelSummary._from_dict(tunnel_data) if tunnel_data else None,
-        )
+        return cls(**base.__dict__)
 
 
 @dataclass

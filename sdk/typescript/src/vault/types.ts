@@ -76,8 +76,7 @@ export interface VaultSecret {
   /**
    * Inlined access rules (who can read this secret), populated on list and
    * single-secret reads so callers don't need a per-secret `getAccess`
-   * round-trip. Empty on server builds that don't inline it and on
-   * write-path responses.
+   * round-trip. Empty when the response omits access rules.
    */
   access: AccessRule[];
   createdAt: Date;

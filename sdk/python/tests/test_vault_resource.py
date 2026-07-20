@@ -156,7 +156,7 @@ class TestVaultResourceUnlock:
         assert isinstance(unlocked, UnlockedVault)
         assert len(unlocked.secrets) == 1
         s = unlocked.secrets[0]
-        assert s.name == "AWS Production"
+        assert s.name == "Cloud Service"
         assert s.payload.username == "admin"
         assert s.payload.password == "s3cret"
 
@@ -230,7 +230,7 @@ class TestUnlockedVaultCreateSecret:
         unlocked = UnlockedVault(http=http, org_key=org_key, secrets_cache=[])
 
         result = unlocked.create_secret(
-            "AWS Prod",
+            "Cloud Service",
             LoginPayload(password="pw", username="admin"),
             description="Prod creds",
         )
@@ -238,7 +238,7 @@ class TestUnlockedVaultCreateSecret:
         assert isinstance(result, VaultSecret)
         http.post.assert_called_once()
         body = http.post.call_args.kwargs["json"]
-        assert body["name"] == "AWS Prod"
+        assert body["name"] == "Cloud Service"
         assert body["description"] == "Prod creds"
         assert body["secret_type"] == "login"
         assert "encrypted_payload" in body
@@ -257,7 +257,7 @@ class TestUnlockedVaultCreateSecret:
         unlocked.create_secret("Test", LoginPayload(password="pw", username="admin"))
 
         assert len(unlocked.secrets) == 1
-        assert unlocked.secrets[0].name == "AWS Production"
+        assert unlocked.secrets[0].name == "Cloud Service"
         assert unlocked.secrets[0].payload.username == "admin"
 
 
@@ -318,7 +318,7 @@ class TestUnlockedVaultGetSecret:
 
         secret = unlocked.get_secret("some-uuid")
         http.get.assert_called_once_with("/secrets/some-uuid")
-        assert secret.name == "AWS Production"
+        assert secret.name == "Cloud Service"
         assert secret.payload.username == "admin"
 
 
@@ -432,7 +432,7 @@ class TestUnlockIdentityFiltering:
         secret2_dict = {
             **VAULT_SECRET_DICT,
             "id": "cccc3333-0000-0000-0000-000000000002",
-            "name": "AWS Staging",
+            "name": "Staging Service",
             "encrypted_payload": encrypt_payload(
                 org_key, {"username": "admin2", "password": "pw2"},
                 secret_id="cccc3333-0000-0000-0000-000000000002",

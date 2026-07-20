@@ -171,7 +171,7 @@ class AgentIdentity:
 
     @property
     def mailbox(self) -> IdentityMailbox | None:
-        """Mailbox linked to this identity. Non-null for live identities (1:1 invariant)."""
+        """Mailbox linked to this identity, when included."""
         return self._mailbox
 
     @property
@@ -185,9 +185,9 @@ class AgentIdentity:
 
     @property
     def tunnel(self) -> TunnelSummary | None:
-        """Durable-config summary of this identity's tunnel. Non-null for live
-        identities (1:1 invariant). For live connection state and cert
-        material, fetch the full tunnel: ``inkbox.tunnels.get(identity.tunnel.id)``.
+        """Summary of this identity's tunnel, when included. For connection
+        state and certificate material, fetch the full tunnel with
+        ``inkbox.tunnels.get(identity.tunnel.id)``.
         """
         return self._tunnel
 

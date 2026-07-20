@@ -43,7 +43,7 @@ const RAW_KEY: RawVaultKey = {
 
 const RAW_SECRET: RawVaultSecret = {
   id: "cccc3333-0000-0000-0000-000000000001",
-  name: "AWS Production",
+  name: "Cloud Service",
   description: null,
   secret_type: "login",
   access: [{
@@ -79,7 +79,7 @@ describe("parseVaultKey", () => {
 describe("parseVaultSecret", () => {
   it("parses all fields", () => {
     const s = parseVaultSecret(RAW_SECRET);
-    expect(s.name).toBe("AWS Production");
+    expect(s.name).toBe("Cloud Service");
     expect(s.description).toBeNull();
     expect(s.secretType).toBe("login");
     expect(s.access).toHaveLength(1);
@@ -93,7 +93,7 @@ describe("parseVaultSecretDetail", () => {
     const raw: RawVaultSecretDetail = { ...RAW_SECRET, encrypted_payload: "abc123" };
     const s = parseVaultSecretDetail(raw);
     expect(s.encryptedPayload).toBe("abc123");
-    expect(s.name).toBe("AWS Production");
+    expect(s.name).toBe("Cloud Service");
     expect(s.description).toBeNull();
   });
 });
@@ -252,14 +252,14 @@ describe("KeyPairPayload roundtrip with all optional fields", () => {
       accessKey: "AKIAIOSFODNN7EXAMPLE",
       secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
       endpoint: "https://s3.amazonaws.com",
-      notes: "AWS production",
+      notes: "cloud service",
     };
     const serialized = serializePayload("key_pair", original);
     expect(serialized).toEqual({
       access_key: "AKIAIOSFODNN7EXAMPLE",
       secret_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
       endpoint: "https://s3.amazonaws.com",
-      notes: "AWS production",
+      notes: "cloud service",
     });
     const parsed = parsePayload("key_pair", serialized) as KeyPairPayload;
     expect(parsed).toEqual(original);

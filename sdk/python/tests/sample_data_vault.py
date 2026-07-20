@@ -20,8 +20,8 @@ VAULT_KEY_DICT = {
 
 VAULT_SECRET_DICT = {
     "id": "cccc3333-0000-0000-0000-000000000001",
-    "name": "AWS Production",
-    "description": "Production AWS credentials",
+    "name": "Cloud Service",
+    "description": "Cloud service credentials",
     "secret_type": "login",
     "created_at": "2026-03-18T12:00:00Z",
     "updated_at": "2026-03-18T12:00:00Z",

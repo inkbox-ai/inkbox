@@ -121,7 +121,7 @@ export class AgentIdentity {
   /** When this identity's signing key was created, or `null` if none is configured. */
   get signingKeyCreatedAt(): Date | null { return this._data.signingKeyCreatedAt; }
 
-  /** The mailbox currently assigned to this identity. Non-null for live identities (1:1 invariant). */
+  /** The mailbox currently assigned to this identity, when included. */
   get mailbox(): IdentityMailbox | null { return this._mailbox; }
 
   /** The phone number currently assigned to this identity, or `null` if none. */
@@ -131,8 +131,8 @@ export class AgentIdentity {
   get imessageNumber(): IdentityIMessageNumber | null { return this._imessageNumber; }
 
   /**
-   * Durable-config summary of this identity's tunnel. For live connection
-   * state and cert material, fetch the full tunnel: `tunnels.get(id)`.
+   * Summary of this identity's tunnel. For connection state and certificate
+   * material, fetch the full tunnel with `tunnels.get(id)`.
    */
   get tunnel(): TunnelSummary | null { return this._tunnel; }
 

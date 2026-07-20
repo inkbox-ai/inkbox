@@ -15,9 +15,7 @@ export enum TLSMode {
  * - `awaiting_cert`: passthrough-only intermediate state. Inbound TLS
  *   will fail until you call `tunnels.signCsr(...)`.
  * - `active`: routable end-to-end.
- * - `deleted`: terminal. The tunnel is offline. Tunnels are deleted
- *   exclusively via the identity-delete cascade — there is no direct
- *   tunnel-delete surface.
+ * - `deleted`: the tunnel is no longer active.
  */
 export enum TunnelStatus {
   AWAITING_CERT = "awaiting_cert",
@@ -27,10 +25,10 @@ export enum TunnelStatus {
 
 export interface Tunnel {
   id: string;
-  /** `null` when the server omits it (identity-embedded tunnel payloads may carry durable config only). */
+  /** `null` when the response omits it. */
   organizationId: string | null;
   tunnelName: string;
-  /** Owning identity id (tunnels are 1:1 with identities). Null only for pre-coupling tombstone rows. */
+  /** Owning identity id, or `null` when ownership information is unavailable. */
   agentIdentityId: string | null;
   tlsMode: TLSMode;
   certPem: string | null;
@@ -45,11 +43,11 @@ export interface Tunnel {
   status: TunnelStatus | string;
   lastConnectedAt: Date | null;
   lastConnectedIpAddr: string | null;
-  /** `null` when the server didn't report liveness (never fabricated) — fetch `tunnels.get(id)` for live state. */
+  /** `null` when connection state was not reported. A failed lookup does not establish current state. */
   currentlyConnected: boolean | null;
-  /** Customer-facing hostname — e.g. `my-agent.inkboxwire.com` in production. Lower environments use a different tunnel zone. Non-null for live tunnels. */
+  /** Customer-facing hostname. */
   publicHost: string;
-  /** Zone endpoint for the data-plane. Agents connect to `https://{zone}/_system/connect`. In production this is `inkboxwire.com`; lower environments use a different zone. Non-null for live tunnels. */
+  /** Tunnel zone hostname. */
   zone: string;
   metadata: Record<string, unknown>;
   createdAt: Date;
@@ -127,17 +125,17 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
 }
 
 /**
- * Durable-config projection of a tunnel, embedded in identity payloads.
+ * Summary of a tunnel embedded in identity payloads.
  *
  * Carries the routing and lifecycle facts identity views need, plus the ids
  * to reach the full tunnel. Excludes runtime state (`currentlyConnected`)
- * and cert material — fetch the full {@link Tunnel} via `tunnels.get(...)`
- * for those; the tunnels endpoints always resolve connection state live.
+ * and cert material. Fetch the full {@link Tunnel} via `tunnels.get(...)`
+ * for those fields.
  */
 export interface TunnelSummary {
   id: string;
   tunnelName: string;
-  /** Owning identity id (tunnels are 1:1 with identities). Null only for pre-coupling tombstone rows. */
+  /** Owning identity id, or `null` when ownership information is unavailable. */
   agentIdentityId: string | null;
   tlsMode: TLSMode;
   /** Same unknown-value contract as {@link Tunnel.status}. */

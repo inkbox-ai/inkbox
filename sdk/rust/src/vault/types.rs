@@ -24,9 +24,9 @@ use crate::vault::totp::TOTPConfig;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VaultSecretType {
-    /// Single API token (e.g. OpenAI, Anthropic).
+    /// Single API token.
     ApiKey,
-    /// Access key + secret key pair (e.g. AWS, Stripe).
+    /// Access key + secret key pair.
     KeyPair,
     /// Username/password combination, optionally with URL.
     Login,
@@ -118,8 +118,7 @@ pub struct VaultKey {
 ///
 /// `access` carries the secret's inlined access rules (who can read it) on
 /// list and single-secret reads, so callers don't need a per-secret
-/// `get_access` round-trip. Empty on server builds that don't inline it and
-/// on write-path responses.
+/// `get_access` round-trip. Empty when the response omits access rules.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultSecret {
     pub id: Uuid,
@@ -327,7 +326,7 @@ mod tests {
     fn secret_json() -> serde_json::Value {
         json!({
             "id": "cccc3333-0000-0000-0000-000000000001",
-            "name": "AWS Production",
+            "name": "Cloud Service",
             "description": null,
             "secret_type": "login",
             "created_at": "2026-03-18T12:00:00Z",

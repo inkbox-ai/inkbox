@@ -460,7 +460,7 @@ export class Inkbox {
   }
 
   /**
-   * List all agent identities for your organisation.
+   * List identities, including linked resources when provided.
    *
    * @returns Array of {@link AgentIdentitySummary}.
    */

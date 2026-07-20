@@ -80,7 +80,7 @@ pub struct AgentIdentity {
     data: RefCell<AgentIdentityData>,
     /// Back-reference to the owning client.
     inkbox: Arc<Inkbox>,
-    /// Cached mailbox channel (1:1 invariant for live identities).
+    /// Cached mailbox channel.
     mailbox: RefCell<Option<IdentityMailbox>>,
     /// Cached phone-number channel, cleared on release and refreshed on provision.
     phone_number: RefCell<Option<IdentityPhoneNumber>>,
@@ -157,7 +157,7 @@ impl AgentIdentity {
         self.data.borrow().summary.phone_filter_mode
     }
 
-    /// Mailbox linked to this identity. Non-null for live identities (1:1 invariant).
+    /// Mailbox linked to this identity, when included.
     pub fn mailbox(&self) -> Option<IdentityMailbox> {
         self.mailbox.borrow().clone()
     }
@@ -172,9 +172,8 @@ impl AgentIdentity {
         self.data.borrow().imessage_number.clone()
     }
 
-    /// Durable-config summary of this identity's tunnel. Non-null for live
-    /// identities (1:1 invariant). For live connection state and cert
-    /// material, fetch the full tunnel: `inkbox.tunnels().get(...)`.
+    /// Summary of this identity's tunnel. For connection state and certificate
+    /// material, fetch the full tunnel with `inkbox.tunnels().get(...)`.
     pub fn tunnel(&self) -> Option<TunnelSummary> {
         self.tunnel.borrow().clone()
     }

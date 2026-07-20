@@ -400,6 +400,22 @@ export const RAW_IDENTITY_ACCESS_VIEWER = {
   created_at: "2026-05-21T00:00:00Z",
 };
 
+export const RAW_IDENTITY_LIST_DETAIL = {
+  ...RAW_IDENTITY_DETAIL,
+  tunnel: {
+    id: "ffff6666-0000-0000-0000-000000000001",
+    tunnel_name: "sales-agent",
+    agent_identity_id: RAW_IDENTITY.id,
+    tls_mode: "edge",
+    status: "active",
+    public_host: "sales-agent.inkboxwire.com",
+    zone: "inkboxwire.com",
+    created_at: "2026-03-09T00:00:00Z",
+    updated_at: "2026-03-09T00:00:00Z",
+  },
+  access: [RAW_IDENTITY_ACCESS_WILDCARD],
+};
+
 // ---- Domains ----
 
 export const RAW_DOMAIN_VERIFIED = {
