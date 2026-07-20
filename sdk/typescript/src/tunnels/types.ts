@@ -15,9 +15,7 @@ export enum TLSMode {
  * - `awaiting_cert`: passthrough-only intermediate state. Inbound TLS
  *   will fail until you call `tunnels.signCsr(...)`.
  * - `active`: routable end-to-end.
- * - `deleted`: terminal. The tunnel is offline. Tunnels are deleted
- *   exclusively via the identity-delete cascade — there is no direct
- *   tunnel-delete surface.
+ * - `deleted`: the tunnel is no longer active.
  */
 export enum TunnelStatus {
   AWAITING_CERT = "awaiting_cert",
@@ -27,9 +25,11 @@ export enum TunnelStatus {
 
 export interface Tunnel {
   id: string;
-  /** `null` when the server omits it (identity-embedded tunnel payloads may carry durable config only). */
+  /** `null` when the response omits it. */
   organizationId: string | null;
   tunnelName: string;
+  /** Owning identity id, or `null` when ownership information is unavailable. */
+  agentIdentityId: string | null;
   tlsMode: TLSMode;
   certPem: string | null;
   certFingerprintSha256: string | null;
@@ -43,11 +43,11 @@ export interface Tunnel {
   status: TunnelStatus | string;
   lastConnectedAt: Date | null;
   lastConnectedIpAddr: string | null;
-  /** `null` when the server didn't report liveness (never fabricated) — fetch `tunnels.get(id)` for live state. */
+  /** `null` when connection state was not reported. A failed lookup does not establish current state. */
   currentlyConnected: boolean | null;
-  /** Customer-facing hostname — e.g. `my-agent.inkboxwire.com` in production. Lower environments use a different tunnel zone. Non-null for live tunnels. */
+  /** Customer-facing hostname. */
   publicHost: string;
-  /** Zone endpoint for the data-plane. Agents connect to `https://{zone}/_system/connect`. In production this is `inkboxwire.com`; lower environments use a different zone. Non-null for live tunnels. */
+  /** Tunnel zone hostname. */
   zone: string;
   metadata: Record<string, unknown>;
   createdAt: Date;
@@ -67,6 +67,7 @@ export interface RawTunnel {
   id: string;
   organization_id?: string | null;
   tunnel_name: string;
+  agent_identity_id?: string | null;
   tls_mode: string;
   cert_pem?: string | null;
   cert_fingerprint_sha256?: string | null;
@@ -105,6 +106,7 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
     id: String(raw.id),
     organizationId: raw.organization_id == null ? null : String(raw.organization_id),
     tunnelName: String(raw.tunnel_name),
+    agentIdentityId: raw.agent_identity_id ?? null,
     tlsMode: raw.tls_mode as TLSMode,
     certPem: raw.cert_pem ?? null,
     certFingerprintSha256: raw.cert_fingerprint_sha256 ?? null,
@@ -117,6 +119,60 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
     zone: raw.zone,
     metadata:
       raw.metadata && typeof raw.metadata === "object" ? { ...raw.metadata } : {},
+    createdAt: new Date(raw.created_at),
+    updatedAt: new Date(raw.updated_at),
+  };
+}
+
+/**
+ * Summary of a tunnel embedded in identity payloads.
+ *
+ * Carries the routing and lifecycle facts identity views need, plus the ids
+ * to reach the full tunnel. Excludes runtime state (`currentlyConnected`)
+ * and cert material. Fetch the full {@link Tunnel} via `tunnels.get(...)`
+ * for those fields.
+ */
+export interface TunnelSummary {
+  id: string;
+  tunnelName: string;
+  /** Owning identity id, or `null` when ownership information is unavailable. */
+  agentIdentityId: string | null;
+  tlsMode: TLSMode;
+  /** Same unknown-value contract as {@link Tunnel.status}. */
+  status: TunnelStatus | string;
+  publicHost: string;
+  zone: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RawTunnelSummary {
+  id: string;
+  tunnel_name: string;
+  agent_identity_id?: string | null;
+  tls_mode: string;
+  status: string;
+  public_host: string;
+  zone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export function parseTunnelSummary(raw: RawTunnelSummary): TunnelSummary {
+  if (typeof raw.public_host !== "string" || raw.public_host === "") {
+    throw new Error("tunnel summary missing required field 'public_host'");
+  }
+  if (typeof raw.zone !== "string" || raw.zone === "") {
+    throw new Error("tunnel summary missing required field 'zone'");
+  }
+  return {
+    id: String(raw.id),
+    tunnelName: String(raw.tunnel_name),
+    agentIdentityId: raw.agent_identity_id ?? null,
+    tlsMode: raw.tls_mode as TLSMode,
+    status: raw.status,
+    publicHost: raw.public_host,
+    zone: raw.zone,
     createdAt: new Date(raw.created_at),
     updatedAt: new Date(raw.updated_at),
   };

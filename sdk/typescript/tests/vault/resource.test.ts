@@ -45,7 +45,7 @@ const RAW_KEY: RawVaultKey = {
 
 const RAW_SECRET: RawVaultSecret = {
   id: "cccc3333-0000-0000-0000-000000000001",
-  name: "AWS Production",
+  name: "Cloud Service",
   description: null,
   secret_type: "login",
   created_at: "2026-03-18T12:00:00Z",
@@ -185,7 +185,7 @@ describe("VaultResource.unlock", () => {
 
     expect(unlocked.secrets).toHaveLength(1);
     const s = unlocked.secrets[0];
-    expect(s.name).toBe("AWS Production");
+    expect(s.name).toBe("Cloud Service");
     expect((s.payload as { username: string }).username).toBe("admin");
   });
 
@@ -259,15 +259,15 @@ describe("UnlockedVault.createSecret", () => {
     const unlocked = new UnlockedVault(http, orgKey, []);
 
     const result = await unlocked.createSecret({
-      name: "AWS Prod",
+      name: "Cloud Service",
       payload: { username: "admin", password: "pw" },
     });
 
-    expect(result.name).toBe("AWS Production");
+    expect(result.name).toBe("Cloud Service");
     const call = vi.mocked(http.post).mock.calls[0];
     expect(call[0]).toBe("/secrets");
     const body = call[1] as Record<string, unknown>;
-    expect(body.name).toBe("AWS Prod");
+    expect(body.name).toBe("Cloud Service");
     expect(body.secret_type).toBe("login");
     expect(typeof body.encrypted_payload).toBe("string");
   });
@@ -288,7 +288,7 @@ describe("UnlockedVault.createSecret", () => {
     });
 
     expect(unlocked.secrets).toHaveLength(1);
-    expect(unlocked.secrets[0].name).toBe("AWS Production");
+    expect(unlocked.secrets[0].name).toBe("Cloud Service");
     expect((unlocked.secrets[0].payload as { username: string }).username).toBe("admin");
   });
 });
@@ -352,7 +352,7 @@ describe("UnlockedVault.getSecret", () => {
 
     const secret = await unlocked.getSecret("some-uuid");
     expect(http.get).toHaveBeenCalledWith("/secrets/some-uuid");
-    expect(secret.name).toBe("AWS Production");
+    expect(secret.name).toBe("Cloud Service");
     expect((secret.payload as { username: string }).username).toBe("admin");
   });
 });
@@ -488,14 +488,14 @@ describe("UnlockedVault.setTotp", () => {
   it("sets TOTP with config object", async () => {
     const { unlocked, http } = unlockedWithLogin();
     const result = await unlocked.setTotp(SECRET_ID, { secret: TOTP_SECRET });
-    expect(result.name).toBe("AWS Production");
+    expect(result.name).toBe("Cloud Service");
     expect(vi.mocked(http.patch)).toHaveBeenCalled();
   });
 
   it("sets TOTP with URI string", async () => {
     const { unlocked, http } = unlockedWithLogin();
     const result = await unlocked.setTotp(SECRET_ID, `otpauth://totp/Test?secret=${TOTP_SECRET}&issuer=Test`);
-    expect(result.name).toBe("AWS Production");
+    expect(result.name).toBe("Cloud Service");
     expect(vi.mocked(http.patch)).toHaveBeenCalled();
   });
 
@@ -514,7 +514,7 @@ describe("UnlockedVault.removeTotp", () => {
     const totpConfig = { secret: TOTP_SECRET, algorithm: "sha1", digits: 6, period: 30 };
     const { unlocked, http } = unlockedWithLogin({ totpConfig });
     const result = await unlocked.removeTotp(SECRET_ID);
-    expect(result.name).toBe("AWS Production");
+    expect(result.name).toBe("Cloud Service");
     expect(vi.mocked(http.patch)).toHaveBeenCalled();
   });
 

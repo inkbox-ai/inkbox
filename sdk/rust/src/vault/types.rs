@@ -24,9 +24,9 @@ use crate::vault::totp::TOTPConfig;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VaultSecretType {
-    /// Single API token (e.g. OpenAI, Anthropic).
+    /// Single API token.
     ApiKey,
-    /// Access key + secret key pair (e.g. AWS, Stripe).
+    /// Access key + secret key pair.
     KeyPair,
     /// Username/password combination, optionally with URL.
     Login,
@@ -115,6 +115,10 @@ pub struct VaultKey {
 }
 
 /// Vault secret metadata (no encrypted payload).
+///
+/// `access` carries the secret's inlined access rules (who can read it) on
+/// list and single-secret reads, so callers don't need a per-secret
+/// `get_access` round-trip. Empty when the response omits access rules.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultSecret {
     pub id: Uuid,
@@ -124,6 +128,8 @@ pub struct VaultSecret {
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub access: Vec<AccessRule>,
 }
 
 /// Vault secret including the encrypted payload (base64).
@@ -136,6 +142,8 @@ pub struct VaultSecretDetail {
     pub updated_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub access: Vec<AccessRule>,
     #[serde(default)]
     pub encrypted_payload: String,
 }
@@ -307,4 +315,48 @@ pub struct DecryptedVaultSecret {
     pub updated_at: String,
     pub payload: SecretPayload,
     pub description: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{VaultSecret, VaultSecretDetail};
+
+    fn secret_json() -> serde_json::Value {
+        json!({
+            "id": "cccc3333-0000-0000-0000-000000000001",
+            "name": "Cloud Service",
+            "description": null,
+            "secret_type": "login",
+            "created_at": "2026-03-18T12:00:00Z",
+            "updated_at": "2026-03-18T12:00:00Z"
+        })
+    }
+
+    #[test]
+    fn vault_secret_defaults_missing_access_to_empty() {
+        let secret: VaultSecret = serde_json::from_value(secret_json()).unwrap();
+        assert!(secret.access.is_empty());
+    }
+
+    #[test]
+    fn vault_secret_detail_parses_inlined_access() {
+        let mut value = secret_json();
+        let object = value.as_object_mut().unwrap();
+        object.insert("encrypted_payload".into(), json!("abc123"));
+        object.insert(
+            "access".into(),
+            json!([{
+                "id": "dddd4444-0000-0000-0000-000000000001",
+                "vault_secret_id": "cccc3333-0000-0000-0000-000000000001",
+                "identity_id": "eeee5555-0000-0000-0000-000000000001",
+                "created_at": "2026-03-18T12:00:00Z"
+            }]),
+        );
+
+        let secret: VaultSecretDetail = serde_json::from_value(value).unwrap();
+        assert_eq!(secret.encrypted_payload, "abc123");
+        assert_eq!(secret.access.len(), 1);
+    }
 }

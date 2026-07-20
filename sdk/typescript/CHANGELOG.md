@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 — Identity tunnel summaries and inlined access
+
+### Added
+
+- Identity lists preserve linked mailbox, phone, iMessage, tunnel, and access fields when included. Older summary-only responses remain supported with empty defaults.
+- Tunnel summaries expose routing fields without connection state or certificate material. Fetch the full tunnel when those fields are needed.
+- Vault secret reads can include access rules; omitted access defaults to an empty list.
+
 ## 0.4.26 — Self-serve dedicated iMessage numbers
 
 ### Added
@@ -27,7 +35,7 @@
 
 ### Changed
 
-- **Tunnel runtime/cert fields tolerate omission.** A future server release may slim identity-embedded tunnel payloads down to durable config. `Tunnel.organizationId` is now `string | null` and `Tunnel.currentlyConnected` is `boolean | null` — `null` when the server doesn't report them (liveness is never fabricated as `false`). The certificate and last-connected fields were already nullable; a missing `metadata` still collapses to `{}`, and unknown keys are ignored. Fetch `tunnels.get(id)` for live state or cert material.
+- **Tunnel runtime/cert fields tolerate omission.** `Tunnel.organizationId` is now `string | null` and `Tunnel.currentlyConnected` is `boolean | null`, using `null` when the response omits them. The certificate and last-connected fields were already nullable; missing `metadata` still becomes `{}`, and unknown keys are ignored. Fetch `tunnels.get(id)` when connection state or certificate material is needed.
 
 ### Notes
 

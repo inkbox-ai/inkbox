@@ -12,6 +12,7 @@ import pytest
 from sample_data_identities import (
     IDENTITY_DICT,
     IDENTITY_DETAIL_DICT,
+    IDENTITY_LIST_DETAIL_DICT,
     IDENTITY_ACCESS_WILDCARD_DICT,
     IDENTITY_ACCESS_VIEWER_DICT,
 )
@@ -143,15 +144,29 @@ class TestIdentitiesCreate:
 
 
 class TestIdentitiesList:
-    def test_returns_list(self):
+    def test_preserves_hydrated_fields(self):
         res, http = _resource()
-        http.get.return_value = [IDENTITY_DICT]
+        http.get.return_value = [IDENTITY_LIST_DETAIL_DICT]
 
         identities = res.list()
 
         http.get.assert_called_once_with("/")
         assert len(identities) == 1
         assert identities[0].agent_handle == HANDLE
+        assert identities[0].mailbox.email_address == "sales-agent@inkbox.ai"
+        assert identities[0].tunnel.tunnel_name == HANDLE
+        assert identities[0].access[0].viewer_identity_id is None
+
+    def test_accepts_older_summary_response(self):
+        res, http = _resource()
+        http.get.return_value = [IDENTITY_DICT]
+
+        identity = res.list()[0]
+
+        assert identity.agent_handle == HANDLE
+        assert identity.mailbox is None
+        assert identity.tunnel is None
+        assert identity.access == []
 
     def test_empty_list(self):
         res, http = _resource()

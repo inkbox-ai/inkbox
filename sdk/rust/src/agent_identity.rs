@@ -59,7 +59,7 @@ use crate::phone::types::{
     TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
-use crate::tunnels::types::Tunnel;
+use crate::tunnels::types::TunnelSummary;
 use crate::vault::resources::vault::UnlockedVault;
 use crate::vault::totp::{TOTPCode, TOTPConfig};
 use crate::vault::types::{DecryptedVaultSecret, SecretPayload, VaultSecret};
@@ -80,12 +80,12 @@ pub struct AgentIdentity {
     data: RefCell<AgentIdentityData>,
     /// Back-reference to the owning client.
     inkbox: Arc<Inkbox>,
-    /// Cached mailbox channel (1:1 invariant for live identities).
+    /// Cached mailbox channel.
     mailbox: RefCell<Option<IdentityMailbox>>,
     /// Cached phone-number channel, cleared on release and refreshed on provision.
     phone_number: RefCell<Option<IdentityPhoneNumber>>,
     /// Cached tunnel channel.
-    tunnel: RefCell<Option<Tunnel>>,
+    tunnel: RefCell<Option<TunnelSummary>>,
 }
 
 impl AgentIdentity {
@@ -157,7 +157,7 @@ impl AgentIdentity {
         self.data.borrow().summary.phone_filter_mode
     }
 
-    /// Mailbox linked to this identity. Non-null for live identities (1:1 invariant).
+    /// Mailbox linked to this identity, when included.
     pub fn mailbox(&self) -> Option<IdentityMailbox> {
         self.mailbox.borrow().clone()
     }
@@ -172,8 +172,9 @@ impl AgentIdentity {
         self.data.borrow().imessage_number.clone()
     }
 
-    /// Tunnel linked to this identity. Non-null for live identities (1:1 invariant).
-    pub fn tunnel(&self) -> Option<Tunnel> {
+    /// Summary of this identity's tunnel. For connection state and certificate
+    /// material, fetch the full tunnel with `inkbox.tunnels().get(...)`.
+    pub fn tunnel(&self) -> Option<TunnelSummary> {
         self.tunnel.borrow().clone()
     }
 

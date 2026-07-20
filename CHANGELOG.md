@@ -4,6 +4,27 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.0 — Identity tunnel summaries + inlined vault access
+
+### Added
+
+- **`TunnelSummary`** (py/ts/rust). Identity payloads now embed a tunnel summary containing `id`, `tunnel_name` (TS `tunnelName`), `agent_identity_id` (TS `agentIdentityId`), `tls_mode`, `status`, `public_host`, `zone`, `created_at`, and `updated_at`. Runtime state and certificate material are not included. Fetch the full tunnel with `tunnels.get(identity.tunnel.id)` (Rust `tunnels().get(...)`) when those fields are needed.
+- **`Tunnel.agent_identity_id`** (TS `agentIdentityId: string | null`; Rust `Option<Uuid>`). Tunnel responses can name their owning identity. Responses that omit ownership information parse it as `null`/`None`.
+- **`VaultSecret.access`** (all three SDKs). `vault.list_secrets()` and `vault.get_secret(...)` can include each secret's access rules, avoiding a separate `get_access` call per secret. It defaults to an empty list when omitted; `get_access` / `grant_access` / `revoke_access` are unchanged.
+- **Hydrated identity lists** (all three SDKs). Identity list methods preserve linked mailbox, phone, iMessage, tunnel, and access fields when returned, while older summary-only responses continue to parse with empty defaults.
+
+### Changed
+
+- **`identity.tunnel` is now a `TunnelSummary`** (was the full `Tunnel`) in all three SDKs, on both the identity object and the raw identity payload types. Code that reads `identity.tunnel.public_host` / `.tls_mode` / `.status` / `.id` is unaffected; fetch the full tunnel via `tunnels.get(...)` for connection state or certificate fields.
+- Version bumped to 0.5.0 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
+
+### Notes
+
+- **Wire tolerance.** The `TunnelSummary` parsers accept older identity payloads that still embed the full tunnel object (extra fields are ignored), and full-`Tunnel` parsing tolerates a missing `agent_identity_id`. `VaultSecret.access` defaults to empty when absent. All three SDKs work against servers on either side of this change.
+- **TypeScript note (source-breaking).** `Identity.tunnel` / `AgentIdentity.tunnel` narrow to `TunnelSummary | null`, and `VaultSecret` gains a required `access: AccessRule[]` — object literals built by hand (fixtures, mocks) need the new property; parsing defaults it to `[]`.
+- **Rust note (source-breaking).** `AgentIdentitySummary` gains public `mailbox`, `phone_number`, `imessage_number`, `tunnel`, and `access` fields, so struct literals and exhaustive patterns must account for them. `Tunnel` gains `agent_identity_id`; `AgentIdentity::tunnel()` now returns `Option<TunnelSummary>`; `VaultSecret` / `VaultSecretDetail` gain `access: Vec<AccessRule>`. These changes are source-breaking, not wire-breaking.
+- **Python note (source-breaking).** `Tunnel` gains `agent_identity_id` as a positional dataclass field, and `AgentIdentity.tunnel` returns `TunnelSummary | None`. Keyword construction of `Tunnel(...)` in test fixtures needs the new argument. `VaultSecret.access` is keyword-only so existing positional `VaultSecretDetail(...)` construction keeps binding the encrypted payload correctly.
+
 ## 0.4.26 — Dedicated iMessage numbers
 
 ### Added
@@ -31,7 +52,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
-- **Tunnel runtime/cert fields tolerate omission (all three SDKs).** A future server release may slim identity-embedded tunnel payloads down to durable config, dropping `organization_id`, `cert_pem`, `cert_fingerprint_sha256`, `cert_expires_at`, `currently_connected`, `last_connected_at`, `last_connected_ip_addr`, and `metadata`. Tunnel parsing in the Python, TypeScript, and Rust SDKs now tolerates all of those being absent: `organization_id` and `currently_connected` become nullable (`None`/`null` when not reported — liveness is never fabricated as `false`), the certificate and last-connected fields were already nullable, and a missing `metadata` still collapses to `{}`. Unknown keys (e.g. a future `agent_identity_id`) are ignored. Fetch the tunnel by id (`tunnels.get(...)`) when you need live connection state or cert material.
+- **Tunnel runtime/cert fields tolerate omission (all three SDKs).** Tunnel parsing now accepts responses without `organization_id`, `cert_pem`, `cert_fingerprint_sha256`, `cert_expires_at`, `currently_connected`, `last_connected_at`, `last_connected_ip_addr`, or `metadata`. `organization_id` and `currently_connected` become nullable (`None`/`null` when not reported), the certificate and last-connected fields were already nullable, and missing `metadata` becomes `{}`. Unknown keys are ignored. Fetch the tunnel by id (`tunnels.get(...)`) when connection state or certificate material is needed.
 - Version bumped to 0.4.25 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust).
 
 ### Notes

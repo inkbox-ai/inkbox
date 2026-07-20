@@ -106,7 +106,7 @@ class IdentitiesResource:
         return _AgentIdentityData._from_dict(data)
 
     def list(self) -> list[AgentIdentitySummary]:
-        """List all identities for your organisation."""
+        """List identities, including hydrated fields when provided."""
         data = self._http.get("/")
         return [AgentIdentitySummary._from_dict(i) for i in data]
 

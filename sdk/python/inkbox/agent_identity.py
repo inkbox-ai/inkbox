@@ -25,7 +25,7 @@ from inkbox.identities.types import (
     IdentityMailbox,
     IdentityPhoneNumber,
 )
-from inkbox.tunnels.types import Tunnel
+from inkbox.tunnels.types import TunnelSummary
 from inkbox.exceptions import InkboxError
 from inkbox.imessage.types import (
     IMessage,
@@ -104,7 +104,7 @@ class AgentIdentity:
         self._mailbox: IdentityMailbox | None = data.mailbox
         self._phone_number: IdentityPhoneNumber | None = data.phone_number
         self._imessage_number: IdentityIMessageNumber | None = data.imessage_number
-        self._tunnel: Tunnel | None = data.tunnel
+        self._tunnel: TunnelSummary | None = data.tunnel
         self._credentials: Credentials | None = None
         self._credentials_vault_ref: object | None = None  # tracks which _unlocked built the cache
 
@@ -171,7 +171,7 @@ class AgentIdentity:
 
     @property
     def mailbox(self) -> IdentityMailbox | None:
-        """Mailbox linked to this identity. Non-null for live identities (1:1 invariant)."""
+        """Mailbox linked to this identity, when included."""
         return self._mailbox
 
     @property
@@ -184,8 +184,11 @@ class AgentIdentity:
         return self._imessage_number
 
     @property
-    def tunnel(self) -> Tunnel | None:
-        """Tunnel linked to this identity. Non-null for live identities (1:1 invariant)."""
+    def tunnel(self) -> TunnelSummary | None:
+        """Summary of this identity's tunnel, when included. For connection
+        state and certificate material, fetch the full tunnel with
+        ``inkbox.tunnels.get(identity.tunnel.id)``.
+        """
         return self._tunnel
 
     @property
