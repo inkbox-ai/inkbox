@@ -289,7 +289,8 @@ async function readErrorDetail(resp: Response): Promise<InkboxAPIErrorDetail> {
   }
 }
 
-type Params = Record<string, string | number | boolean | undefined | null>;
+type ParamValue = string | number | boolean;
+type Params = Record<string, ParamValue | readonly ParamValue[] | undefined | null>;
 
 type StoredCookie = {
   name: string;
@@ -553,7 +554,9 @@ export class HttpTransport {
     if (opts.params) {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(opts.params)) {
-        if (v !== undefined && v !== null) {
+        if (Array.isArray(v)) {
+          for (const item of v) qs.append(k, String(item));
+        } else if (v !== undefined && v !== null) {
           qs.set(k, String(v));
         }
       }

@@ -6,6 +6,8 @@
 
 import { HttpTransport } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
+import { ContactCorrespondenceResource } from "./correspondence.js";
+import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
 import {
   Contact,
@@ -14,6 +16,7 @@ import {
   ContactDate,
   ContactEmail,
   ContactPhone,
+  ContactReviewStatus,
   ContactWebsite,
   RawContact,
   contactAddressToWire,
@@ -32,6 +35,7 @@ export interface ListContactsOptions {
   order?: "name" | "recent" | string;
   limit?: number;
   offset?: number;
+  reviewStatus?: ContactReviewStatus[];
 }
 
 export interface LookupContactsOptions {
@@ -60,15 +64,10 @@ export interface CreateContactOptions {
   dates?: ContactDate[];
   addresses?: ContactAddress[];
   customFields?: ContactCustomField[];
-  /**
-   * Access control at create time.
-   *   - `undefined` (default) / `"wildcard"` — one wildcard row, every active
-   *     identity sees the contact.
-   *   - `[]` — zero grants (only admin + human callers see it).
-   *   - Explicit list of identity UUIDs — one per-identity grant each. Capped
-   *     at 500 entries server-side.
-   */
-  accessIdentityIds?: string[] | "wildcard" | null;
+}
+
+export interface GetContactOptions {
+  includeDismissed?: boolean;
 }
 
 export interface UpdateContactOptions {
@@ -89,23 +88,46 @@ export interface UpdateContactOptions {
   dates?: ContactDate[] | null;
   addresses?: ContactAddress[] | null;
   customFields?: ContactCustomField[] | null;
+  reviewStatus?: ContactReviewStatus;
+}
+
+export type ContactMergeField =
+  | "preferredName"
+  | "namePrefix"
+  | "givenName"
+  | "middleName"
+  | "familyName"
+  | "nameSuffix"
+  | "companyName"
+  | "jobTitle"
+  | "birthday"
+  | "notes";
+
+export interface MergeContactsOptions {
+  losingContactIds: string[];
+  fieldSources?: Partial<Record<ContactMergeField, string>>;
 }
 
 export class ContactsResource {
   readonly access: ContactAccessResource;
+  readonly correspondence: ContactCorrespondenceResource;
+  readonly facts: ContactFactsResource;
   readonly vcards: VCardsResource;
 
   constructor(private readonly http: HttpTransport) {
     this.access = new ContactAccessResource(http);
+    this.correspondence = new ContactCorrespondenceResource(http);
+    this.facts = new ContactFactsResource(http);
     this.vcards = new VCardsResource(http);
   }
 
   async list(options: ListContactsOptions = {}): Promise<Contact[]> {
-    const params: Record<string, string | number | undefined> = {};
+    const params: Record<string, string | number | readonly string[] | undefined> = {};
     if (options.q !== undefined) params.q = options.q;
     if (options.order !== undefined) params.order = options.order;
     if (options.limit !== undefined) params.limit = options.limit;
     if (options.offset !== undefined) params.offset = options.offset;
+    if (options.reviewStatus !== undefined) params.review_status = options.reviewStatus;
     const data = await this.http.get<{ items: RawContact[] } | RawContact[]>(
       BASE,
       params,
@@ -137,8 +159,11 @@ export class ContactsResource {
     return items.map(parseContact);
   }
 
-  async get(contactId: string): Promise<Contact> {
-    const data = await this.http.get<RawContact>(`${BASE}/${contactId}`);
+  async get(contactId: string, options: GetContactOptions = {}): Promise<Contact> {
+    const params = options.includeDismissed === undefined
+      ? undefined
+      : { include_dismissed: options.includeDismissed };
+    const data = await this.http.get<RawContact>(`${BASE}/${contactId}`, params);
     return parseContact(data);
   }
 
@@ -160,13 +185,6 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    if (options.accessIdentityIds === undefined || options.accessIdentityIds === "wildcard") {
-      // omit — server wildcards by default
-    } else if (options.accessIdentityIds === null) {
-      body.access_identity_ids = null;
-    } else {
-      body.access_identity_ids = options.accessIdentityIds;
-    }
     const data = await this.http.post<RawContact>(BASE, body);
     return parseContact(data);
   }
@@ -184,6 +202,7 @@ export class ContactsResource {
       ["jobTitle", "job_title"],
       ["birthday", "birthday"],
       ["notes", "notes"],
+      ["reviewStatus", "review_status"],
     ] as const) {
       if (key in options) body[wire] = (options as Record<string, unknown>)[key];
     }
@@ -207,6 +226,31 @@ export class ContactsResource {
         options.customFields === null ? null : options.customFields!.map(contactCustomFieldToWire);
     }
     const data = await this.http.patch<RawContact>(`${BASE}/${contactId}`, body);
+    return parseContact(data);
+  }
+
+  async merge(contactId: string, options: MergeContactsOptions): Promise<Contact> {
+    const fieldSources = Object.fromEntries(
+      Object.entries(options.fieldSources ?? {}).map(([key, value]) => [
+        {
+          preferredName: "preferred_name",
+          namePrefix: "name_prefix",
+          givenName: "given_name",
+          middleName: "middle_name",
+          familyName: "family_name",
+          nameSuffix: "name_suffix",
+          companyName: "company_name",
+          jobTitle: "job_title",
+          birthday: "birthday",
+          notes: "notes",
+        }[key as ContactMergeField],
+        value,
+      ]),
+    );
+    const data = await this.http.post<RawContact>(`${BASE}/${contactId}/merge`, {
+      losing_contact_ids: options.losingContactIds,
+      field_sources: fieldSources,
+    });
     return parseContact(data);
   }
 

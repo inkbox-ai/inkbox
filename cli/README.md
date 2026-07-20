@@ -411,6 +411,24 @@ delete-thread <thread-id> -i <handle>` (reclaim is immediate), or upgrade the
 plan. All three send paths (`email send`, `email reply-all`, `email forward`)
 are enforced.
 
+### contacts
+
+Organization-wide contacts, correspondence, and memory facts.
+
+```bash
+inkbox contacts list [--review-status <status>]       # Repeat or comma-separate statuses
+inkbox contacts get <contact-id> [--include-dismissed]
+inkbox contacts facts list <contact-id>
+inkbox contacts facts get <contact-id> <fact-id>
+inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
+inkbox contacts correspondence <contact-id> [-i <identity-id>]
+  [--channels <channel>] [--after <datetime>] [--before <datetime>]
+  [--limit-per-channel <n>] [--content <mode>] [--transcripts <mode>]
+inkbox contacts merge <survivor-id> --losing <contact-id...>
+  [--field-sources '{"preferredName":"<contact-id>"}']
+inkbox contacts access list <contact-id>              # Compatibility read only
+```
+
 ### tunnel
 
 Tunnel read + update + sign-csr. Tunnels are provisioned atomically by

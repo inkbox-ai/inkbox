@@ -2,36 +2,23 @@
 //!
 //! Port of `inkbox/contacts/resources/contacts.py`.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
 use crate::contacts::resources::contact_access::ContactAccessResource;
+use crate::contacts::resources::contact_facts::ContactFactsResource;
+use crate::contacts::resources::correspondence::ContactCorrespondenceResource;
 use crate::contacts::resources::vcards::VCardsResource;
 use crate::contacts::types::{
     Contact, ContactAddress, ContactCustomField, ContactDate, ContactEmail, ContactPhone,
-    ContactWebsite,
+    ContactReviewStatus, ContactWebsite,
 };
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
 const BASE: &str = "/contacts";
-
-/// How to seed access grants when creating a contact.
-///
-/// Mirrors the Python `access_identity_ids` tri-state:
-/// * `Wildcard` (default) — omit the key; one wildcard row, every active
-///   identity sees the contact.
-/// * `Null` — send `access_identity_ids: null` (same as wildcard server-side).
-/// * `Ids(vec)` — explicit per-identity grants. `[]` means zero grants (only
-///   admin + human callers see it). Capped at 500 entries server-side.
-#[derive(Debug, Clone, Default)]
-pub enum AccessIdentityIds {
-    #[default]
-    Wildcard,
-    Null,
-    Ids(Vec<String>),
-}
 
 /// Optional filters for [`ContactsResource::list`]. All fields default to None
 /// (the key is omitted from the query string).
@@ -46,6 +33,14 @@ pub struct ListContactsParams {
     pub limit: Option<i64>,
     /// Offset for paging.
     pub offset: Option<i64>,
+    /// Review states to include. Omit for active contacts awaiting or completing review.
+    pub review_status: Vec<ContactReviewStatus>,
+}
+
+/// Options for [`ContactsResource::get_with_params`].
+#[derive(Debug, Clone, Default)]
+pub struct GetContactParams {
+    pub include_dismissed: Option<bool>,
 }
 
 /// Fields for [`ContactsResource::create`]. Each `None` scalar is omitted; each
@@ -69,8 +64,6 @@ pub struct CreateContactParams {
     pub dates: Option<Vec<ContactDate>>,
     pub addresses: Option<Vec<ContactAddress>>,
     pub custom_fields: Option<Vec<ContactCustomField>>,
-    /// Access grants at create time (defaults to `Wildcard`).
-    pub access_identity_ids: AccessIdentityIds,
 }
 
 /// Fields for [`ContactsResource::update`] (JSON-merge-patch).
@@ -97,12 +90,22 @@ pub struct UpdateContactParams {
     pub dates: Option<Option<Vec<ContactDate>>>,
     pub addresses: Option<Option<Vec<ContactAddress>>>,
     pub custom_fields: Option<Option<Vec<ContactCustomField>>>,
+    pub review_status: Option<ContactReviewStatus>,
 }
 
-/// Org-wide contacts list with per-identity access control.
+/// Fields for merging contacts into a surviving contact.
+#[derive(Debug, Clone, Default)]
+pub struct MergeContactsParams {
+    pub losing_contact_ids: Vec<String>,
+    pub field_sources: HashMap<String, String>,
+}
+
+/// Organization-wide contacts and contact memory.
 pub struct ContactsResource {
     http: Arc<HttpTransport>,
     access: ContactAccessResource,
+    facts: ContactFactsResource,
+    correspondence: ContactCorrespondenceResource,
     vcards: VCardsResource,
 }
 
@@ -110,14 +113,26 @@ impl ContactsResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self {
             access: ContactAccessResource::new(http.clone()),
+            facts: ContactFactsResource::new(http.clone()),
+            correspondence: ContactCorrespondenceResource::new(http.clone()),
             vcards: VCardsResource::new(http.clone()),
             http,
         }
     }
 
-    /// Per-contact access grant management.
+    /// Compatibility access rows for a contact.
     pub fn access(&self) -> &ContactAccessResource {
         &self.access
+    }
+
+    /// Facts remembered about contacts.
+    pub fn facts(&self) -> &ContactFactsResource {
+        &self.facts
+    }
+
+    /// Unified correspondence across supported channels.
+    pub fn correspondence(&self) -> &ContactCorrespondenceResource {
+        &self.correspondence
     }
 
     /// vCard import / export.
@@ -140,6 +155,9 @@ impl ContactsResource {
         }
         if let Some(offset) = params.offset {
             query.push(("offset", offset.to_string()));
+        }
+        for status in &params.review_status {
+            query.push(("review_status", status.as_str().to_string()));
         }
         let data = self.http.get(BASE, &query)?;
         let items = unwrap_items(data);
@@ -184,7 +202,16 @@ impl ContactsResource {
 
     /// Fetch a single contact by id.
     pub fn get(&self, contact_id: &str) -> Result<Contact> {
-        let data = self.http.get(&format!("{BASE}/{contact_id}"), NO_QUERY)?;
+        self.get_with_params(contact_id, &GetContactParams::default())
+    }
+
+    /// Fetch a contact with lifecycle options.
+    pub fn get_with_params(&self, contact_id: &str, params: &GetContactParams) -> Result<Contact> {
+        let mut query = Vec::new();
+        if let Some(include_dismissed) = params.include_dismissed {
+            query.push(("include_dismissed", include_dismissed.to_string()));
+        }
+        let data = self.http.get(&format!("{BASE}/{contact_id}"), &query)?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -232,19 +259,6 @@ impl ContactsResource {
                 wire_list(custom_fields, ContactCustomField::to_wire),
             );
         }
-        // Access tri-state: Wildcard omits the key entirely.
-        match &params.access_identity_ids {
-            AccessIdentityIds::Wildcard => {}
-            AccessIdentityIds::Null => {
-                body.insert("access_identity_ids".into(), Value::Null);
-            }
-            AccessIdentityIds::Ids(ids) => {
-                body.insert(
-                    "access_identity_ids".into(),
-                    Value::Array(ids.iter().map(|i| Value::String(i.clone())).collect()),
-                );
-            }
-        }
         let data = self.http.post(BASE, Some(&Value::Object(body)), NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
@@ -288,6 +302,12 @@ impl ContactsResource {
             &params.custom_fields,
             ContactCustomField::to_wire,
         );
+        if let Some(review_status) = params.review_status {
+            body.insert(
+                "review_status".into(),
+                Value::String(review_status.as_str().to_string()),
+            );
+        }
         let data = self
             .http
             .patch(&format!("{BASE}/{contact_id}"), &Value::Object(body))?;
@@ -297,6 +317,18 @@ impl ContactsResource {
     /// Delete a contact.
     pub fn delete(&self, contact_id: &str) -> Result<()> {
         self.http.delete(&format!("{BASE}/{contact_id}"))
+    }
+
+    /// Merge contacts into `contact_id`, which remains as the survivor.
+    pub fn merge(&self, contact_id: &str, params: &MergeContactsParams) -> Result<Contact> {
+        let body = serde_json::json!({
+            "losing_contact_ids": params.losing_contact_ids,
+            "field_sources": params.field_sources,
+        });
+        let data = self
+            .http
+            .post(&format!("{BASE}/{contact_id}/merge"), Some(&body), NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
     }
 }
 
@@ -356,4 +388,169 @@ where
     F: Fn(&T) -> Value,
 {
     Value::Array(items.iter().map(&to_wire).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    use super::{
+        CreateContactParams, GetContactParams, ListContactsParams, MergeContactsParams,
+        UpdateContactParams,
+    };
+    use crate::client::Inkbox;
+    use crate::contacts::ContactReviewStatus;
+
+    const CONTACT_ID: &str = "11111111-1111-1111-1111-111111111111";
+    const LOSING_ID: &str = "22222222-2222-2222-2222-222222222222";
+
+    fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
+        Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap()
+    }
+
+    fn contact() -> serde_json::Value {
+        json!({
+            "id": CONTACT_ID,
+            "organization_id": "org_123",
+            "preferred_name": "Ada",
+            "name_prefix": null,
+            "given_name": "Ada",
+            "middle_name": null,
+            "family_name": null,
+            "name_suffix": null,
+            "company_name": null,
+            "job_title": null,
+            "birthday": null,
+            "notes": null,
+            "emails": [],
+            "phones": [],
+            "websites": [],
+            "dates": [],
+            "addresses": [],
+            "custom_fields": [],
+            "access": [],
+            "creation_source": "communication",
+            "review_status": "unreviewed",
+            "reviewed_at": null,
+            "reviewed_by": null,
+            "preferred_name_source": "mail_header",
+            "preferred_name_locked_at": null,
+            "created_by_identity_id": null,
+            "merged_into_contact_id": null,
+            "is_auto_created": true,
+            "is_confirmed": false,
+            "status": "active",
+            "created_at": "2026-07-20T12:00:00Z",
+            "updated_at": "2026-07-20T12:00:00Z"
+        })
+    }
+
+    #[test]
+    fn sends_lifecycle_list_and_get_params() {
+        let server = MockServer::start();
+        let list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/contacts")
+                .query_param("review_status", "dismissed");
+            then.status(200).json_body(json!([]));
+        });
+        let get = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/contacts/{CONTACT_ID}"))
+                .query_param("include_dismissed", "true");
+            then.status(200).json_body(contact());
+        });
+
+        let sdk = client(&server);
+        sdk.contacts()
+            .list(&ListContactsParams {
+                review_status: vec![ContactReviewStatus::Dismissed],
+                ..Default::default()
+            })
+            .unwrap();
+        let result = sdk
+            .contacts()
+            .get_with_params(
+                CONTACT_ID,
+                &GetContactParams {
+                    include_dismissed: Some(true),
+                },
+            )
+            .unwrap();
+
+        list.assert();
+        get.assert();
+        assert!(result.is_auto_created);
+        assert_eq!(result.review_status, ContactReviewStatus::Unreviewed);
+    }
+
+    #[test]
+    fn create_omits_access_restrictions() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/contacts")
+                .json_body(json!({"preferred_name": "Ada"}));
+            then.status(201).json_body(contact());
+        });
+
+        client(&server)
+            .contacts()
+            .create(&CreateContactParams {
+                preferred_name: Some("Ada".into()),
+                ..Default::default()
+            })
+            .unwrap();
+
+        request.assert();
+    }
+
+    #[test]
+    fn sends_review_update_and_merge() {
+        let server = MockServer::start();
+        let update = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH)
+                .path(format!("/api/v1/contacts/{CONTACT_ID}"))
+                .json_body(json!({"review_status": "confirmed"}));
+            then.status(200).json_body(contact());
+        });
+        let merge = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/contacts/{CONTACT_ID}/merge"))
+                .json_body(json!({
+                    "losing_contact_ids": [LOSING_ID],
+                    "field_sources": {"notes": LOSING_ID}
+                }));
+            then.status(200).json_body(contact());
+        });
+
+        let sdk = client(&server);
+        sdk.contacts()
+            .update(
+                CONTACT_ID,
+                &UpdateContactParams {
+                    review_status: Some(ContactReviewStatus::Confirmed),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        sdk.contacts()
+            .merge(
+                CONTACT_ID,
+                &MergeContactsParams {
+                    losing_contact_ids: vec![LOSING_ID.into()],
+                    field_sources: HashMap::from([("notes".into(), LOSING_ID.into())]),
+                },
+            )
+            .unwrap();
+
+        update.assert();
+        merge.assert();
+    }
 }

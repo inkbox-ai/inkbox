@@ -79,7 +79,7 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 - `identity signing-key rotate <handle>` (rotates that identity's webhook signing key)
 - `signing-key create` (DEPRECATED org-level path)
 
-`contacts delete`, `notes delete`, `identity mail-rules delete`, `identity phone-rules delete`, `mailbox rules delete` (deprecated), `number rules delete` (deprecated) affect downstream filtering and access — confirm intent before running.
+`contacts delete`, `notes delete`, `identity mail-rules delete`, `identity phone-rules delete`, `mailbox rules delete` (deprecated), and `number rules delete` (deprecated) remove data or affect downstream filtering — confirm intent before running.
 
 Also confirm before creating or rotating secrets if the values were not explicitly provided by the user.
 
@@ -493,22 +493,23 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 ## Contacts
 
-Admin-only address book. All commands hit the admin endpoints; agents see contacts they've been granted access to.
+Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
 ```bash
-inkbox contacts list [--q <query>] [--order name|recent] [--limit <n>] [--offset <n>]
-inkbox contacts get <contact-id>
+inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]
+inkbox contacts get <contact-id> [--include-dismissed]
 inkbox contacts create --json <payload>            # JSON matching CreateContactOptions
 inkbox contacts update <contact-id> --json <patch>  # JSON-merge-patch
 inkbox contacts delete <contact-id>
 inkbox contacts lookup (--email <email> | --email-contains <s> | --email-domain <d> | --phone <e164> | --phone-contains <s>)
 inkbox contacts import <file.vcf>                  # bulk vCard import (≤5 MiB, ≤1000 cards)
 inkbox contacts export <contact-id> [--out <file>] # vCard 4.0 to stdout or file
-
-# Per-contact access grants
-inkbox contacts access list <contact-id>
-inkbox contacts access grant <contact-id> (--identity <uuid> | --wildcard)   # admin + JWT only
-inkbox contacts access revoke <contact-id> <identity-id>
+inkbox contacts facts list <contact-id>
+inkbox contacts facts get <contact-id> <fact-id>
+inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
+inkbox contacts correspondence <contact-id> [--identity <uuid>] [--channels <channel>]
+inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <json>]
+inkbox contacts access list <contact-id>             # compatibility read only
 ```
 
 `contacts lookup` requires exactly one filter flag. For `create` / `update`, construct the payload carefully — fields include `preferredName`, `givenName`, `familyName`, `companyName`, `jobTitle`, `birthday`, `notes`, and lists `emails` / `phones` / `websites` / `dates` / `addresses` / `customFields` (each list item has `label` / `value`).

@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
 from inkbox.contacts.resources.contact_access import ContactAccessResource
+from inkbox.contacts.resources.contact_facts import ContactFactsResource
+from inkbox.contacts.resources.correspondence import ContactCorrespondenceResource
 from inkbox.contacts.resources.vcards import VCardsResource
 from inkbox.contacts.types import (
     Contact,
@@ -19,6 +21,7 @@ from inkbox.contacts.types import (
     ContactDate,
     ContactEmail,
     ContactPhone,
+    ContactReviewStatus,
     ContactWebsite,
 )
 
@@ -36,17 +39,29 @@ def _items_to_wire(items: list[Any] | None) -> list[dict[str, Any]] | None:
 
 
 class ContactsResource:
-    """Org-wide contacts list with per-identity access control."""
+    """Organization-wide contacts and contact memory."""
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
         self._access = ContactAccessResource(http)
+        self._facts = ContactFactsResource(http)
+        self._correspondence = ContactCorrespondenceResource(http)
         self._vcards = VCardsResource(http)
 
     @property
     def access(self) -> ContactAccessResource:
-        """Per-contact access grant management."""
+        """Compatibility access records (read-only)."""
         return self._access
+
+    @property
+    def facts(self) -> ContactFactsResource:
+        """Facts recorded for contacts."""
+        return self._facts
+
+    @property
+    def correspondence(self) -> ContactCorrespondenceResource:
+        """Correspondence across contact channels."""
+        return self._correspondence
 
     @property
     def vcards(self) -> VCardsResource:
@@ -60,6 +75,7 @@ class ContactsResource:
         order: Literal["name", "recent"] | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        review_status: list[ContactReviewStatus | str] | None = None,
     ) -> list[Contact]:
         """List contacts with optional substring search.
 
@@ -80,6 +96,8 @@ class ContactsResource:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
+        if review_status is not None:
+            params["review_status"] = [str(status) for status in review_status]
         data = self._http.get(_BASE, params=params)
         items = data["items"] if isinstance(data, dict) and "items" in data else data
         return [Contact._from_dict(c) for c in items]
@@ -115,9 +133,17 @@ class ContactsResource:
         items = data["items"] if isinstance(data, dict) and "items" in data else data
         return [Contact._from_dict(c) for c in items]
 
-    def get(self, contact_id: UUID | str) -> Contact:
+    def get(
+        self, contact_id: UUID | str, *, include_dismissed: bool | None = None
+    ) -> Contact:
         """Fetch a single contact by id."""
-        data = self._http.get(f"{_BASE}/{contact_id}")
+        if include_dismissed is None:
+            data = self._http.get(f"{_BASE}/{contact_id}")
+        else:
+            data = self._http.get(
+                f"{_BASE}/{contact_id}",
+                params={"include_dismissed": include_dismissed},
+            )
         return Contact._from_dict(data)
 
     def create(
@@ -139,17 +165,11 @@ class ContactsResource:
         dates: list[ContactDate] | None = None,
         addresses: list[ContactAddress] | None = None,
         custom_fields: list[ContactCustomField] | None = None,
-        access_identity_ids: list[UUID | str] | None | Literal["wildcard"] = "wildcard",
     ) -> Contact:
         """Create a new contact.
 
         Args:
             birthday: Optional ISO date (``YYYY-MM-DD``) or :class:`datetime.date`.
-            access_identity_ids: Controls access grants at create time.
-                - ``"wildcard"`` (default) / ``None`` — one wildcard row, every
-                  active identity sees the contact.
-                - ``[]`` — zero grants (only admin + human callers see it).
-                - Explicit list — one per-identity grant each. Capped at 500.
         """
         body: dict[str, Any] = {}
         for name, value in (
@@ -166,7 +186,9 @@ class ContactsResource:
             if value is not None:
                 body[name] = value
         if birthday is not None:
-            body["birthday"] = birthday.isoformat() if isinstance(birthday, date) else birthday
+            body["birthday"] = (
+                birthday.isoformat() if isinstance(birthday, date) else birthday
+            )
         for name, items in (
             ("emails", emails),
             ("phones", phones),
@@ -178,12 +200,6 @@ class ContactsResource:
             wire = _items_to_wire(items)
             if wire is not None:
                 body[name] = wire
-        if access_identity_ids == "wildcard":
-            pass
-        elif access_identity_ids is None:
-            body["access_identity_ids"] = None
-        else:
-            body["access_identity_ids"] = [str(i) for i in access_identity_ids]
         data = self._http.post(_BASE, json=body)
         return Contact._from_dict(data)
 
@@ -207,6 +223,7 @@ class ContactsResource:
         dates: list[ContactDate] | None = _UNSET,  # type: ignore[assignment]
         addresses: list[ContactAddress] | None = _UNSET,  # type: ignore[assignment]
         custom_fields: list[ContactCustomField] | None = _UNSET,  # type: ignore[assignment]
+        review_status: ContactReviewStatus | str = _UNSET,  # type: ignore[assignment]
     ) -> Contact:
         """JSON-merge-patch update.
 
@@ -228,6 +245,8 @@ class ContactsResource:
         for name, value in scalar_fields:
             if value is not _UNSET:
                 body[name] = value
+        if review_status is not _UNSET:
+            body["review_status"] = review_status
         if birthday is not _UNSET:
             body["birthday"] = (
                 birthday.isoformat() if isinstance(birthday, date) else birthday
@@ -245,6 +264,23 @@ class ContactsResource:
                 continue
             body[name] = _items_to_wire(items) if items is not None else None
         data = self._http.patch(f"{_BASE}/{contact_id}", json=body)
+        return Contact._from_dict(data)
+
+    def merge(
+        self,
+        contact_id: UUID | str,
+        *,
+        losing_contact_ids: list[UUID | str],
+        field_sources: dict[str, UUID | str] | None = None,
+    ) -> Contact:
+        """Merge contacts into the contact identified by ``contact_id``."""
+        body = {
+            "losing_contact_ids": [str(value) for value in losing_contact_ids],
+            "field_sources": {
+                name: str(value) for name, value in (field_sources or {}).items()
+            },
+        }
+        data = self._http.post(f"{_BASE}/{contact_id}/merge", json=body)
         return Contact._from_dict(data)
 
     def delete(self, contact_id: UUID | str) -> None:

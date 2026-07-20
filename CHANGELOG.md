@@ -4,6 +4,23 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.4.27 — Contact memory
+
+### Added
+
+- **Contact memory in all three SDKs.** Contacts now expose lifecycle metadata and filtering, unified email/SMS/iMessage/call correspondence, generated facts with source citations, and explicit duplicate-contact merging.
+- **Contact memory in the CLI.** Use `inkbox contacts facts list|get|citation`, `inkbox contacts correspondence`, and `inkbox contacts merge`. Contact list/get/correspondence commands include the applicable lifecycle filters, and correspondence supports channel, time, pagination, content, transcript, and per-channel limit options.
+- **vCard conflict results.** Bulk imports now identify identifier conflicts and the existing contact involved.
+
+### Changed
+
+- Version bumped to 0.4.27 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.4.27`.
+- Contacts are organization-wide. The compatibility access-list API and `inkbox contacts access list` remain available as read-only metadata.
+
+### Removed
+
+- **Source-breaking:** contact access grant/revoke methods were removed from the Python, TypeScript, and Rust SDKs, and `inkbox contacts access grant|revoke` were removed from the CLI. Create-contact access options were also removed: `access_identity_ids` (Python), `accessIdentityIds` (TypeScript), and the corresponding Rust create field are no longer accepted. Remove those calls/options before upgrading.
+
 ## 0.4.26 — Dedicated iMessage numbers
 
 ### Added

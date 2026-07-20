@@ -47,6 +47,15 @@ export interface ContactAccess {
   createdAt: Date;
 }
 
+export type ContactCreationSource = "manual" | "vcard" | "communication" | "backfill";
+export type ContactReviewStatus = "unreviewed" | "confirmed" | "dismissed";
+export type ContactNameSource =
+  | "manual"
+  | "vcard"
+  | "provider"
+  | "mail_header"
+  | "identifier_fallback";
+
 export interface Contact {
   id: string;
   organizationId: string | null;
@@ -68,6 +77,16 @@ export interface Contact {
   addresses: ContactAddress[];
   customFields: ContactCustomField[];
   access: ContactAccess[];
+  creationSource: ContactCreationSource;
+  reviewStatus: ContactReviewStatus;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+  preferredNameSource: ContactNameSource;
+  preferredNameLockedAt: Date | null;
+  createdByIdentityId: string | null;
+  mergedIntoContactId: string | null;
+  isAutoCreated: boolean;
+  isConfirmed: boolean;
   status: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -82,9 +101,10 @@ export interface Contact {
 export interface ContactImportResultItem {
   /** 0-based position within the uploaded vCard stream. */
   index: number;
-  status: "created" | "error";
+  status: "created" | "conflict" | "error";
   contact: Contact | null;
   error: string | null;
+  conflictingContactId: string | null;
 }
 
 export interface ContactImportResult {
@@ -163,6 +183,16 @@ export interface RawContact {
   addresses: RawContactAddress[] | null;
   custom_fields: RawContactCustomField[] | null;
   access: RawContactAccess[] | null;
+  creation_source?: ContactCreationSource;
+  review_status?: ContactReviewStatus;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  preferred_name_source?: ContactNameSource;
+  preferred_name_locked_at?: string | null;
+  created_by_identity_id?: string | null;
+  merged_into_contact_id?: string | null;
+  is_auto_created?: boolean;
+  is_confirmed?: boolean;
   status?: string | null;
   created_at: string;
   updated_at: string;
@@ -170,9 +200,10 @@ export interface RawContact {
 
 export interface RawContactImportResultItem {
   index: number;
-  status: "created" | "error";
+  status: "created" | "conflict" | "error";
   contact?: RawContact | null;
   error?: string | null;
+  conflicting_contact_id?: string | null;
 }
 
 export interface RawContactImportResult {
@@ -254,6 +285,18 @@ export function parseContact(r: RawContact): Contact {
     addresses: (r.addresses ?? []).map(parseContactAddress),
     customFields: (r.custom_fields ?? []).map(parseContactCustomField),
     access: (r.access ?? []).map(parseContactAccess),
+    creationSource: r.creation_source ?? "backfill",
+    reviewStatus: r.review_status ?? "confirmed",
+    reviewedAt: r.reviewed_at ? new Date(r.reviewed_at) : null,
+    reviewedBy: r.reviewed_by ?? null,
+    preferredNameSource: r.preferred_name_source ?? "manual",
+    preferredNameLockedAt: r.preferred_name_locked_at
+      ? new Date(r.preferred_name_locked_at)
+      : null,
+    createdByIdentityId: r.created_by_identity_id ?? null,
+    mergedIntoContactId: r.merged_into_contact_id ?? null,
+    isAutoCreated: r.is_auto_created ?? false,
+    isConfirmed: r.is_confirmed ?? true,
     status: r.status ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
@@ -268,6 +311,7 @@ export function parseContactImportResultItem(
     status: r.status,
     contact: r.contact ? parseContact(r.contact) : null,
     error: r.error ?? null,
+    conflictingContactId: r.conflicting_contact_id ?? null,
   };
 }
 

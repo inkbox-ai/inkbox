@@ -43,7 +43,7 @@ Inkbox (admin-only client)
 ├── .mail_contact_rules       → MailContactRulesResource   (DEPRECATED — per-mailbox)
 ├── .phone_contact_rules      → PhoneContactRulesResource  (DEPRECATED — per-number)
 ├── .sms_opt_ins              → SmsOptInsResource
-├── .contacts                 → ContactsResource  (.access, .vcards)
+├── .contacts                 → ContactsResource  (.facts, .correspondence, .access, .vcards)
 ├── .notes                    → NotesResource     (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → WhoamiResponse
@@ -865,12 +865,12 @@ inkbox.phone_contact_rules.create(
 
 ## Contacts
 
-Admin-only address book with per-identity access grants and vCard import/export.
+Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
 ```python
 from inkbox import (
-    Contact, ContactEmail, ContactPhone, ContactAddress,
-    RedundantContactAccessGrantError,
+    Contact, ContactCorrespondenceOptions, ContactEmail, ContactPhone,
+    ContactAddress, ContactReviewStatus,
 )
 
 # CRUD
@@ -879,12 +879,12 @@ contact = inkbox.contacts.create(
     family_name="Lovelace",
     emails=[ContactEmail(label="work", value="ada@example.com")],
     phones=[ContactPhone(label="mobile", value="+15551234567")],
-    # access_identity_ids defaults to "wildcard" (every active identity);
-    # pass [] for admin-only, or a list of identity UUIDs for explicit grants.
 )
 inkbox.contacts.get(str(contact.id))
-inkbox.contacts.list(q="ada", order="recent", limit=50, offset=0)
-inkbox.contacts.update(str(contact.id), job_title="Analyst")       # JSON-merge-patch via kwargs
+inkbox.contacts.list(
+    q="ada", order="recent", review_status=[ContactReviewStatus.CONFIRMED]
+)
+inkbox.contacts.update(str(contact.id), job_title="Analyst")
 inkbox.contacts.delete(str(contact.id))
 
 # Reverse-lookup — exactly one filter required (else ValueError before HTTP)
@@ -894,17 +894,20 @@ inkbox.contacts.lookup(phone="+15551234567")
 inkbox.contacts.lookup(email_contains="ada")
 inkbox.contacts.lookup(phone_contains="555")
 
-# Access grants (admin + JWT only; agents can self-revoke)
+# Compatibility access information is read-only
 inkbox.contacts.access.list(str(contact.id))
-inkbox.contacts.access.grant(str(contact.id), identity_id="agent-uuid")
-inkbox.contacts.access.grant(str(contact.id), wildcard=True)       # every active identity
-inkbox.contacts.access.revoke(str(contact.id), "agent-uuid")
 
-# Redundant grants (e.g. per-identity on top of wildcard) raise 409
-try:
-    inkbox.contacts.access.grant(str(contact.id), identity_id="agent-uuid")
-except RedundantContactAccessGrantError as e:
-    print(e.error, e.detail_message)
+# Facts, citations, correspondence, and duplicate merging
+facts = inkbox.contacts.facts.list(str(contact.id))
+if facts and facts[0].citations and facts[0].citations[0].source_url:
+    print(facts[0].citations[0].source_url)
+history = inkbox.contacts.correspondence.get(
+    str(contact.id),
+    ContactCorrespondenceOptions(identity_id="identity-uuid", channels=["email", "sms"]),
+)
+survivor = inkbox.contacts.merge(
+    str(contact.id), losing_contact_ids=["duplicate-contact-uuid"]
+)
 
 # vCards
 result = inkbox.contacts.vcards.import_vcards(vcf_text)   # bulk, ≤5 MiB, ≤1000 cards
@@ -1104,7 +1107,7 @@ except InkboxAPIError as e:
 `InkboxAPIError.detail` can now be a `dict` for structured responses (e.g. contact-rule / access conflicts). Catch the narrower subclasses when you need the parsed fields:
 
 - `DuplicateContactRuleError` — 409 when creating a contact rule with an already-taken `(match_type, match_target)` on the same resource. Exposes `.existing_rule_id: UUID`.
-- `RedundantContactAccessGrantError` — 409 when a contact-access grant is redundant (e.g. per-identity grant on top of an active wildcard). Exposes `.error` and `.detail_message`.
+- `RedundantContactAccessGrantError` — 409 when an identity-viewer grant is redundant (e.g. a specific viewer on top of an active wildcard). Exposes `.error` and `.detail_message`.
 - `StorageLimitExceededError` — 402 when a send / reply-all / forward would push the mailbox past its plan storage cap. Exposes `.message`, `.upgrade_url`, and `.limit_bytes`. Delete messages or threads to free space (immediate), or upgrade. A `402` whose `detail` is a plain string stays a plain `InkboxAPIError`.
 
 ## Key Conventions

@@ -324,7 +324,7 @@ export class Inkbox {
   /** Encrypted vault (info, unlock, secrets). */
   get vault(): VaultResource { return this._vaultResource; }
 
-  /** Org-wide contacts (list, get, create, update, delete, lookup, access, vCards). */
+  /** Org-wide contacts, memory, correspondence, access information, and vCards. */
   get contacts(): ContactsResource { return this._contacts; }
 
   /** Org-scoped notes with per-identity access grants. */

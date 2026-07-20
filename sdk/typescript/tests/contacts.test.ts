@@ -32,6 +32,16 @@ const CONTACT_DICT = {
       created_at: "2026-04-20T00:00:00Z",
     },
   ],
+  creation_source: "manual",
+  review_status: "confirmed",
+  reviewed_at: "2026-04-21T00:00:00Z",
+  reviewed_by: "user_test",
+  preferred_name_source: "manual",
+  preferred_name_locked_at: null,
+  created_by_identity_id: null,
+  merged_into_contact_id: null,
+  is_auto_created: false,
+  is_confirmed: true,
   status: "active",
   created_at: "2026-04-20T00:00:00Z",
   updated_at: "2026-04-20T00:00:00Z",
@@ -91,7 +101,7 @@ describe("ContactsResource", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("create with wildcard default omits access_identity_ids", async () => {
+  it("create omits access_identity_ids", async () => {
     vi.mocked(fetch).mockResolvedValue(makeOkResponse(CONTACT_DICT));
     const http = new HttpTransport("k", BASE);
     const resource = new ContactsResource(http);
@@ -102,18 +112,6 @@ describe("ContactsResource", () => {
     const body = JSON.parse(call.body as string);
     expect(body.preferred_name).toBe("Alex");
     expect("access_identity_ids" in body).toBe(false);
-  });
-
-  it("create with empty-list access_identity_ids sends []", async () => {
-    vi.mocked(fetch).mockResolvedValue(makeOkResponse(CONTACT_DICT));
-    const http = new HttpTransport("k", BASE);
-    const resource = new ContactsResource(http);
-
-    await resource.create({ accessIdentityIds: [] });
-
-    const call = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
-    const body = JSON.parse(call.body as string);
-    expect(body.access_identity_ids).toEqual([]);
   });
 
   it("create serializes full name fields and birthday", async () => {
@@ -174,34 +172,81 @@ describe("ContactsResource", () => {
     expect(c.birthday).toBe("1990-01-01");
     expect(c.organizationId).toBe("org_test");
     expect(c.status).toBe("active");
+    expect(c.creationSource).toBe("manual");
+    expect(c.reviewStatus).toBe("confirmed");
+    expect(c.reviewedAt).toEqual(new Date("2026-04-21T00:00:00Z"));
+    expect(c.isConfirmed).toBe(true);
   });
 
-  it("grant with both identity and wildcard throws", async () => {
+  it("defaults lifecycle fields omitted by older responses", async () => {
+    const legacy = { ...CONTACT_DICT } as Record<string, unknown>;
+    for (const key of [
+      "creation_source", "review_status", "reviewed_at", "reviewed_by",
+      "preferred_name_source", "preferred_name_locked_at", "created_by_identity_id",
+      "merged_into_contact_id", "is_auto_created", "is_confirmed",
+    ]) delete legacy[key];
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse(legacy));
+
+    const contact = await new ContactsResource(new HttpTransport("k", BASE)).get(CONTACT_DICT.id);
+
+    expect(contact.creationSource).toBe("backfill");
+    expect(contact.reviewStatus).toBe("confirmed");
+    expect(contact.preferredNameSource).toBe("manual");
+    expect(contact.isAutoCreated).toBe(false);
+    expect(contact.isConfirmed).toBe(true);
+  });
+
+  it("lists repeated review statuses and includes dismissed on get", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeOkResponse([CONTACT_DICT]))
+      .mockResolvedValueOnce(makeOkResponse(CONTACT_DICT));
     const http = new HttpTransport("k", BASE);
     const resource = new ContactsResource(http);
 
-    await expect(
-      resource.access.grant("abc", { identityId: "x", wildcard: true }),
-    ).rejects.toThrow();
+    await resource.list({ reviewStatus: ["unreviewed", "dismissed"] });
+    await resource.get(CONTACT_DICT.id, { includeDismissed: true });
+
+    const listParams = new URL(vi.mocked(fetch).mock.calls[0][0] as string).searchParams;
+    expect(listParams.getAll("review_status")).toEqual(["unreviewed", "dismissed"]);
+    const getParams = new URL(vi.mocked(fetch).mock.calls[1][0] as string).searchParams;
+    expect(getParams.get("include_dismissed")).toBe("true");
   });
 
-  it("grant wildcard sends identity_id: null", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeOkResponse({
-        id: "b1",
-        contact_id: "c1",
-        identity_id: null,
-        created_at: "2026-04-20T00:00:00Z",
-      }),
+  it("updates review status and merges contacts", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse(CONTACT_DICT));
+    const http = new HttpTransport("k", BASE);
+    const resource = new ContactsResource(http);
+
+    await resource.update(CONTACT_DICT.id, { reviewStatus: "confirmed" });
+    await resource.merge(CONTACT_DICT.id, {
+      losingContactIds: ["contact-loser"],
+      fieldSources: { preferredName: "contact-loser" },
+    });
+
+    const updateBody = JSON.parse(
+      (vi.mocked(fetch).mock.calls[0][1] as RequestInit).body as string,
     );
+    expect(updateBody.review_status).toBe("confirmed");
+    const mergeBody = JSON.parse(
+      (vi.mocked(fetch).mock.calls[1][1] as RequestInit).body as string,
+    );
+    expect(mergeBody).toEqual({
+      losing_contact_ids: ["contact-loser"],
+      field_sources: { preferred_name: "contact-loser" },
+    });
+  });
+
+  it("keeps contact access listing read-only", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse(CONTACT_DICT.access));
     const http = new HttpTransport("k", BASE);
     const resource = new ContactsResource(http);
 
-    await resource.access.grant("c1", { wildcard: true });
+    const access = await resource.access.list(CONTACT_DICT.id);
 
-    const call = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
-    const body = JSON.parse(call.body as string);
-    expect(body).toEqual({ identity_id: null });
+    expect(access).toHaveLength(1);
+    expect(access[0].identityId).toBeNull();
+    expect("grant" in resource.access).toBe(false);
+    expect("revoke" in resource.access).toBe(false);
   });
 });
 
@@ -241,6 +286,26 @@ describe("VCardsResource", () => {
     expect(result.results[0].contact?.id).toBe(CONTACT_DICT.id);
     expect(result.results[1].status).toBe("error");
     expect(result.results[1].error).toBe("bad FN");
+  });
+
+  it("parses identifier conflicts", async () => {
+    const conflictId = "aaaa1111-0000-0000-0000-000000000009";
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse({
+      created_count: 0,
+      error_count: 1,
+      results: [{
+        index: 0,
+        status: "conflict",
+        contact: null,
+        error: "duplicate contact identifier",
+        conflicting_contact_id: conflictId,
+      }],
+    }));
+
+    const result = await new VCardsResource(new HttpTransport("k", BASE)).import("BEGIN:VCARD\r\nEND:VCARD\r\n");
+
+    expect(result.results[0].status).toBe("conflict");
+    expect(result.results[0].conflictingContactId).toBe(conflictId);
   });
 
   it("import then export is a coherent round-trip", async () => {

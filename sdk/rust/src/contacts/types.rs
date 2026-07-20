@@ -9,6 +9,49 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
 
+/// How a contact was created.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactCreationSource {
+    Manual,
+    Vcard,
+    Communication,
+    #[default]
+    Backfill,
+}
+
+/// Contact review state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactReviewStatus {
+    Unreviewed,
+    #[default]
+    Confirmed,
+    Dismissed,
+}
+
+impl ContactReviewStatus {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Unreviewed => "unreviewed",
+            Self::Confirmed => "confirmed",
+            Self::Dismissed => "dismissed",
+        }
+    }
+}
+
+/// Source used to select a contact's preferred name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactNameSource {
+    #[default]
+    Manual,
+    Vcard,
+    Provider,
+    MailHeader,
+    IdentifierFallback,
+}
+
 /// An email address on a contact card.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactEmail {
@@ -216,6 +259,26 @@ pub struct Contact {
     #[serde(default)]
     pub organization_id: Option<String>,
     #[serde(default)]
+    pub creation_source: ContactCreationSource,
+    #[serde(default)]
+    pub review_status: ContactReviewStatus,
+    #[serde(default)]
+    pub reviewed_at: Option<String>,
+    #[serde(default)]
+    pub reviewed_by: Option<String>,
+    #[serde(default)]
+    pub preferred_name_source: ContactNameSource,
+    #[serde(default)]
+    pub preferred_name_locked_at: Option<String>,
+    #[serde(default)]
+    pub created_by_identity_id: Option<Uuid>,
+    #[serde(default)]
+    pub merged_into_contact_id: Option<Uuid>,
+    #[serde(default)]
+    pub is_auto_created: bool,
+    #[serde(default = "default_true")]
+    pub is_confirmed: bool,
+    #[serde(default)]
     pub status: Option<String>,
     /// ISO-8601 timestamp string.
     pub created_at: String,
@@ -223,19 +286,87 @@ pub struct Contact {
     pub updated_at: String,
 }
 
+/// Availability of a fact's source to the current caller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactFactCitationAvailability {
+    Available,
+    Purged,
+    SourceUnavailableToCaller,
+}
+
+/// A citation supporting a contact fact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactFactCitation {
+    pub source_type: String,
+    pub availability: ContactFactCitationAvailability,
+    #[serde(default)]
+    pub source_id: Option<Uuid>,
+    #[serde(default)]
+    pub source_url: Option<String>,
+    #[serde(default)]
+    pub source_locator: Option<Value>,
+}
+
+/// How a contact fact was created.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactFactOrigin {
+    Generated,
+    User,
+}
+
+/// A fact remembered about a contact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactFact {
+    pub id: Uuid,
+    pub contact_id: Uuid,
+    pub content: String,
+    #[serde(default)]
+    pub confidence: Option<f64>,
+    pub origin: ContactFactOrigin,
+    #[serde(default)]
+    pub locked_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default, deserialize_with = "null_as_default")]
+    pub citations: Vec<ContactFactCitation>,
+}
+
+/// Resolved details for a fact citation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactFactCitationDetail {
+    pub source_type: String,
+    pub source_id: Uuid,
+    pub source_locator: Value,
+    #[serde(default)]
+    pub source_url: Option<String>,
+}
+
+/// Outcome for one card in a bulk vCard import.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactImportStatus {
+    Created,
+    Conflict,
+    Error,
+}
+
 /// One card's result inside a bulk vCard import response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactImportResultItem {
     /// 0-based position within the uploaded vCard stream.
     pub index: i64,
-    /// `"created"` if the card was stored, `"error"` otherwise.
-    pub status: String,
+    pub status: ContactImportStatus,
     /// The resulting contact when `status == "created"`; None otherwise.
     #[serde(default)]
     pub contact: Option<Contact>,
     /// The rejection reason when `status == "error"`; None otherwise.
     #[serde(default)]
     pub error: Option<String>,
+    /// Existing contact that owns a conflicting identifier.
+    #[serde(default)]
+    pub conflicting_contact_id: Option<Uuid>,
 }
 
 /// Result of a bulk vCard import (always 200 when the request parsed).
@@ -263,7 +394,7 @@ impl ContactImportResult {
     pub fn errors(&self) -> Vec<&ContactImportResultItem> {
         self.results
             .iter()
-            .filter(|item| item.status == "error")
+            .filter(|item| item.status == ContactImportStatus::Error)
             .collect()
     }
 }
@@ -277,4 +408,64 @@ where
 {
     let opt: Option<Vec<T>> = Option::deserialize(deserializer)?;
     Ok(opt.unwrap_or_default())
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::{Contact, ContactImportResult, ContactImportStatus};
+
+    #[test]
+    fn defaults_contact_lifecycle_fields() {
+        let contact: Contact = serde_json::from_value(json!({
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "preferred_name": "Alex",
+            "given_name": "Alex",
+            "family_name": null,
+            "company_name": null,
+            "job_title": null,
+            "notes": null,
+            "emails": [],
+            "phones": [],
+            "websites": [],
+            "dates": [],
+            "addresses": [],
+            "custom_fields": [],
+            "access": [],
+            "created_at": "2026-07-20T12:00:00Z",
+            "updated_at": "2026-07-20T12:00:00Z"
+        }))
+        .unwrap();
+
+        assert_eq!(
+            contact.creation_source,
+            super::ContactCreationSource::Backfill
+        );
+        assert_eq!(contact.review_status, super::ContactReviewStatus::Confirmed);
+        assert!(contact.is_confirmed);
+    }
+
+    #[test]
+    fn parses_vcard_identifier_conflict() {
+        let result: ContactImportResult = serde_json::from_value(json!({
+            "created_count": 0,
+            "error_count": 1,
+            "results": [{
+                "index": 0,
+                "status": "conflict",
+                "contact": null,
+                "error": "duplicate contact identifier",
+                "conflicting_contact_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+            }]
+        }))
+        .unwrap();
+
+        assert_eq!(result.results[0].status, ContactImportStatus::Conflict);
+        assert!(result.results[0].conflicting_contact_id.is_some());
+    }
 }
