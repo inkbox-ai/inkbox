@@ -50,13 +50,14 @@ def contact_payload():
         "merged_into_contact_id": None,
         "is_auto_created": True,
         "is_confirmed": False,
+        "memory_count": 3,
         "status": "active",
         "created_at": NOW,
         "updated_at": NOW,
     }
 
 
-def test_contact_lifecycle_and_read_options():
+def test_contact_lifecycle_and_review_filtering():
     transport = MagicMock()
     transport.get.return_value = [contact_payload()]
     resource = ContactsResource(transport)
@@ -65,11 +66,12 @@ def test_contact_lifecycle_and_read_options():
 
     assert contacts[0].is_auto_created is True
     assert contacts[0].created_by_identity_id is not None
+    assert contacts[0].memory_count == 3
     assert transport.get.call_args.kwargs["params"]["review_status"] == ["unreviewed"]
 
     transport.get.return_value = contact_payload()
-    resource.get(CONTACT_ID, include_dismissed=True)
-    assert transport.get.call_args.kwargs["params"] == {"include_dismissed": True}
+    resource.get(CONTACT_ID)
+    transport.get.assert_called_with(f"/contacts/{CONTACT_ID}")
 
 
 def test_update_review_status_and_merge():
@@ -118,6 +120,7 @@ def test_facts_and_citation_parsing():
     facts = resource.facts.list(CONTACT_ID)
     assert str(facts[0].confidence) == "0.95"
     assert facts[0].citations[0].source_id is not None
+    transport.get.assert_called_with(f"/contacts/{CONTACT_ID}/facts")
 
     transport.get.return_value = {
         "source_type": "email",

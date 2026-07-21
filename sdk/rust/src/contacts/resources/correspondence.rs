@@ -29,7 +29,6 @@ pub struct CorrespondenceQuery {
     pub transcripts: Option<CorrespondenceTranscriptMode>,
     pub include_failed: Option<bool>,
     pub identity_id: Option<Uuid>,
-    pub include_dismissed: Option<bool>,
 }
 
 pub struct ContactCorrespondenceResource {
@@ -70,7 +69,6 @@ impl ContactCorrespondenceResource {
         }
         push_display(&mut params, "include_failed", query.include_failed);
         push_display(&mut params, "identity_id", query.identity_id);
-        push_display(&mut params, "include_dismissed", query.include_dismissed);
 
         let data = self
             .http

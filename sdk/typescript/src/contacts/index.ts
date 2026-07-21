@@ -3,7 +3,6 @@ export * from "./facts.js";
 export * from "./correspondence.js";
 export type {
   CreateContactOptions,
-  GetContactOptions,
   ListContactsOptions,
   LookupContactsOptions,
   ContactMergeField,

@@ -66,10 +66,6 @@ export interface CreateContactOptions {
   customFields?: ContactCustomField[];
 }
 
-export interface GetContactOptions {
-  includeDismissed?: boolean;
-}
-
 export interface UpdateContactOptions {
   preferredName?: string | null;
   namePrefix?: string | null;
@@ -159,11 +155,8 @@ export class ContactsResource {
     return items.map(parseContact);
   }
 
-  async get(contactId: string, options: GetContactOptions = {}): Promise<Contact> {
-    const params = options.includeDismissed === undefined
-      ? undefined
-      : { include_dismissed: options.includeDismissed };
-    const data = await this.http.get<RawContact>(`${BASE}/${contactId}`, params);
+  async get(contactId: string): Promise<Contact> {
+    const data = await this.http.get<RawContact>(`${BASE}/${contactId}`);
     return parseContact(data);
   }
 

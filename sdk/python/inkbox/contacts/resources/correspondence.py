@@ -35,7 +35,6 @@ class ContactCorrespondenceOptions:
     transcripts: CorrespondenceTranscriptMode | str | None = None
     include_failed: bool | None = None
     identity_id: UUID | str | None = None
-    include_dismissed: bool | None = None
 
     def _to_params(self) -> dict[str, Any]:
         params: dict[str, Any] = {}
@@ -57,7 +56,6 @@ class ContactCorrespondenceOptions:
             "transcripts",
             "include_failed",
             "identity_id",
-            "include_dismissed",
         ):
             value = getattr(self, name)
             if value is not None:

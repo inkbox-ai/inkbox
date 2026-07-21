@@ -26,7 +26,6 @@ export interface ContactCorrespondenceOptions {
   transcripts?: CorrespondenceTranscriptMode;
   includeFailed?: boolean;
   identityId?: string;
-  includeDismissed?: boolean;
 }
 
 export type GetContactCorrespondenceOptions = ContactCorrespondenceOptions;
@@ -60,7 +59,6 @@ export class ContactCorrespondenceResource {
       transcripts: options.transcripts,
       include_failed: options.includeFailed,
       identity_id: options.identityId,
-      include_dismissed: options.includeDismissed,
     };
     const data = await this.http.get<RawContactCorrespondence>(
       `${BASE}/${contactId}/correspondence`,

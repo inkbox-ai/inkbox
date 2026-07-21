@@ -27,7 +27,6 @@ pub enum ContactReviewStatus {
     Unreviewed,
     #[default]
     Confirmed,
-    Dismissed,
 }
 
 impl ContactReviewStatus {
@@ -35,7 +34,6 @@ impl ContactReviewStatus {
         match self {
             Self::Unreviewed => "unreviewed",
             Self::Confirmed => "confirmed",
-            Self::Dismissed => "dismissed",
         }
     }
 }
@@ -278,6 +276,8 @@ pub struct Contact {
     pub is_auto_created: bool,
     #[serde(default = "default_true")]
     pub is_confirmed: bool,
+    #[serde(default)]
+    pub memory_count: Option<u64>,
     #[serde(default)]
     pub status: Option<String>,
     /// ISO-8601 timestamp string.

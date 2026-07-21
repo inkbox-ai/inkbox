@@ -42,6 +42,7 @@ const CONTACT_DICT = {
   merged_into_contact_id: null,
   is_auto_created: false,
   is_confirmed: true,
+  memory_count: 3,
   status: "active",
   created_at: "2026-04-20T00:00:00Z",
   updated_at: "2026-04-20T00:00:00Z",
@@ -79,6 +80,7 @@ describe("ContactsResource", () => {
 
     expect(rows.length).toBe(1);
     expect(rows[0].preferredName).toBe("Alex");
+    expect(rows[0].memoryCount).toBe(3);
     const url = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(url).toContain("q=al");
     expect(url).toContain("order=name");
@@ -184,6 +186,7 @@ describe("ContactsResource", () => {
       "creation_source", "review_status", "reviewed_at", "reviewed_by",
       "preferred_name_source", "preferred_name_locked_at", "created_by_identity_id",
       "merged_into_contact_id", "is_auto_created", "is_confirmed",
+      "memory_count",
     ]) delete legacy[key];
     vi.mocked(fetch).mockResolvedValue(makeOkResponse(legacy));
 
@@ -194,22 +197,23 @@ describe("ContactsResource", () => {
     expect(contact.preferredNameSource).toBe("manual");
     expect(contact.isAutoCreated).toBe(false);
     expect(contact.isConfirmed).toBe(true);
+    expect(contact.memoryCount).toBeNull();
   });
 
-  it("lists repeated review statuses and includes dismissed on get", async () => {
+  it("lists repeated review statuses and gets a contact", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(makeOkResponse([CONTACT_DICT]))
       .mockResolvedValueOnce(makeOkResponse(CONTACT_DICT));
     const http = new HttpTransport("k", BASE);
     const resource = new ContactsResource(http);
 
-    await resource.list({ reviewStatus: ["unreviewed", "dismissed"] });
-    await resource.get(CONTACT_DICT.id, { includeDismissed: true });
+    await resource.list({ reviewStatus: ["unreviewed", "confirmed"] });
+    await resource.get(CONTACT_DICT.id);
 
     const listParams = new URL(vi.mocked(fetch).mock.calls[0][0] as string).searchParams;
-    expect(listParams.getAll("review_status")).toEqual(["unreviewed", "dismissed"]);
+    expect(listParams.getAll("review_status")).toEqual(["unreviewed", "confirmed"]);
     const getParams = new URL(vi.mocked(fetch).mock.calls[1][0] as string).searchParams;
-    expect(getParams.get("include_dismissed")).toBe("true");
+    expect([...getParams]).toEqual([]);
   });
 
   it("updates review status and merges contacts", async () => {

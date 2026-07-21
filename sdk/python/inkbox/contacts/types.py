@@ -38,7 +38,6 @@ class ContactCreationSource(StrEnum):
 class ContactReviewStatus(StrEnum):
     UNREVIEWED = "unreviewed"
     CONFIRMED = "confirmed"
-    DISMISSED = "dismissed"
 
 
 class ContactNameSource(StrEnum):
@@ -230,6 +229,7 @@ class Contact:
     merged_into_contact_id: UUID | None = None
     is_auto_created: bool = False
     is_confirmed: bool = True
+    memory_count: int | None = None
     organization_id: str | None = None
     status: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.fromtimestamp(0))
@@ -270,6 +270,7 @@ class Contact:
             merged_into_contact_id=_opt_uuid(d.get("merged_into_contact_id")),
             is_auto_created=bool(d.get("is_auto_created", False)),
             is_confirmed=bool(d.get("is_confirmed", True)),
+            memory_count=d.get("memory_count"),
             organization_id=d.get("organization_id"),
             status=d.get("status"),
             created_at=datetime.fromisoformat(d["created_at"]),

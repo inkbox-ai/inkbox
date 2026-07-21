@@ -48,7 +48,7 @@ export interface ContactAccess {
 }
 
 export type ContactCreationSource = "manual" | "vcard" | "communication" | "backfill";
-export type ContactReviewStatus = "unreviewed" | "confirmed" | "dismissed";
+export type ContactReviewStatus = "unreviewed" | "confirmed";
 export type ContactNameSource =
   | "manual"
   | "vcard"
@@ -87,6 +87,7 @@ export interface Contact {
   mergedIntoContactId: string | null;
   isAutoCreated: boolean;
   isConfirmed: boolean;
+  memoryCount: number | null;
   status: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -193,6 +194,7 @@ export interface RawContact {
   merged_into_contact_id?: string | null;
   is_auto_created?: boolean;
   is_confirmed?: boolean;
+  memory_count?: number | null;
   status?: string | null;
   created_at: string;
   updated_at: string;
@@ -297,6 +299,7 @@ export function parseContact(r: RawContact): Contact {
     mergedIntoContactId: r.merged_into_contact_id ?? null,
     isAutoCreated: r.is_auto_created ?? false,
     isConfirmed: r.is_confirmed ?? true,
+    memoryCount: r.memory_count ?? null,
     status: r.status ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),

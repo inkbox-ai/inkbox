@@ -20,15 +20,16 @@ test("contacts exposes contact-memory commands", () => {
 
 test("contact facts exposes list, get, and citation", () => {
   const text = help("contacts", "facts");
-  assert.match(text, /list <contact-id>/);
+  assert.match(text, /list (?:\[options\] )?<contact-id>/);
   assert.match(text, /get <contact-id> <fact-id>/);
   assert.match(text, /citation <contact-id> <fact-id> <citation-id>/);
 });
 
 test("contact lifecycle options are discoverable", () => {
   assert.match(help("contacts", "list"), /--review-status <status>/);
-  assert.match(help("contacts", "get"), /--include-dismissed/);
-  assert.match(help("contacts", "correspondence"), /--include-dismissed/);
+  assert.doesNotMatch(help("contacts", "get"), /--include-dismissed/);
+  assert.doesNotMatch(help("contacts", "correspondence"), /--include-dismissed/);
+  assert.doesNotMatch(help("contacts", "facts", "list"), /--include-dismissed/);
 });
 
 test("contact access retains list and removes mutation commands", () => {

@@ -113,7 +113,7 @@ export function registerContactsCommands(program: Command): void {
     .option("--order <order>", "name or recent")
     .option(
       "--review-status <status>",
-      "Filter by confirmed, unreviewed, or dismissed (repeat or comma-separate)",
+      "Filter by confirmed or unreviewed (repeat or comma-separate)",
       collectValues,
     )
     .option("--limit <n>", "Max rows", (v) => parseInt(v, 10))
@@ -143,6 +143,7 @@ export function registerContactsCommands(program: Command): void {
             "familyName",
             "companyName",
             "jobTitle",
+            "memoryCount",
             "updatedAt",
           ],
         });
@@ -152,15 +153,10 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("get <contact-id>")
     .description("Fetch a single contact")
-    .option("--include-dismissed", "Include a dismissed contact", false)
     .action(
-      withErrorHandler(async function (
-        this: Command,
-        contactId: string,
-        cmdOpts: { includeDismissed?: boolean },
-      ) {
+      withErrorHandler(async function (this: Command, contactId: string) {
         const opts = getGlobalOpts(this);
-        const contact = await createClient(opts).contacts.get(contactId, cmdOpts);
+        const contact = await createClient(opts).contacts.get(contactId);
         output(contact as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
     );
@@ -182,7 +178,6 @@ export function registerContactsCommands(program: Command): void {
     .option("--content <mode>", "metadata, preview, or full")
     .option("--transcripts <mode>", "none, abridged, or full")
     .option("--include-failed", "Include failed correspondence", false)
-    .option("--include-dismissed", "Include a dismissed contact", false)
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -202,7 +197,6 @@ export function registerContactsCommands(program: Command): void {
           content?: string;
           transcripts?: string;
           includeFailed?: boolean;
-          includeDismissed?: boolean;
         },
       ) {
         const opts = getGlobalOpts(this);

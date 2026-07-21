@@ -417,7 +417,7 @@ Organization-wide contacts, correspondence, and memory facts.
 
 ```bash
 inkbox contacts list [--review-status <status>]       # Repeat or comma-separate statuses
-inkbox contacts get <contact-id> [--include-dismissed]
+inkbox contacts get <contact-id>
 inkbox contacts facts list <contact-id>
 inkbox contacts facts get <contact-id> <fact-id>
 inkbox contacts facts citation <contact-id> <fact-id> <citation-id>

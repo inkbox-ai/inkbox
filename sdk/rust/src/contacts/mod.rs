@@ -15,8 +15,8 @@ pub use correspondence::{
 pub use resources::contact_access::ContactAccessResource;
 pub use resources::contact_facts::ContactFactsResource;
 pub use resources::contacts::{
-    ContactsResource, CreateContactParams, GetContactParams, ListContactsParams,
-    MergeContactsParams, UpdateContactParams,
+    ContactsResource, CreateContactParams, ListContactsParams, MergeContactsParams,
+    UpdateContactParams,
 };
 pub use resources::correspondence::{ContactCorrespondenceResource, CorrespondenceQuery};
 pub use resources::vcards::VCardsResource;

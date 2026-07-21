@@ -280,7 +280,6 @@ export type {
   IMessageCorrespondenceItem,
   CallCorrespondenceItem,
   CreateContactOptions,
-  GetContactOptions,
   GetContactCorrespondenceOptions,
   ListContactsOptions,
   LookupContactsOptions,

@@ -37,12 +37,6 @@ pub struct ListContactsParams {
     pub review_status: Vec<ContactReviewStatus>,
 }
 
-/// Options for [`ContactsResource::get_with_params`].
-#[derive(Debug, Clone, Default)]
-pub struct GetContactParams {
-    pub include_dismissed: Option<bool>,
-}
-
 /// Fields for [`ContactsResource::create`]. Each `None` scalar is omitted; each
 /// `Some` list is sent (encoded to its wire shape).
 #[derive(Debug, Clone, Default)]
@@ -202,16 +196,7 @@ impl ContactsResource {
 
     /// Fetch a single contact by id.
     pub fn get(&self, contact_id: &str) -> Result<Contact> {
-        self.get_with_params(contact_id, &GetContactParams::default())
-    }
-
-    /// Fetch a contact with lifecycle options.
-    pub fn get_with_params(&self, contact_id: &str, params: &GetContactParams) -> Result<Contact> {
-        let mut query = Vec::new();
-        if let Some(include_dismissed) = params.include_dismissed {
-            query.push(("include_dismissed", include_dismissed.to_string()));
-        }
-        let data = self.http.get(&format!("{BASE}/{contact_id}"), &query)?;
+        let data = self.http.get(&format!("{BASE}/{contact_id}"), NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -398,8 +383,7 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        CreateContactParams, GetContactParams, ListContactsParams, MergeContactsParams,
-        UpdateContactParams,
+        CreateContactParams, ListContactsParams, MergeContactsParams, UpdateContactParams,
     };
     use crate::client::Inkbox;
     use crate::contacts::ContactReviewStatus;
@@ -452,37 +436,28 @@ mod tests {
     }
 
     #[test]
-    fn sends_lifecycle_list_and_get_params() {
+    fn sends_review_status_list_params_and_gets_contact() {
         let server = MockServer::start();
         let list = server.mock(|when, then| {
             when.method(GET)
                 .path("/api/v1/contacts")
-                .query_param("review_status", "dismissed");
+                .query_param("review_status", "unreviewed");
             then.status(200).json_body(json!([]));
         });
         let get = server.mock(|when, then| {
             when.method(GET)
-                .path(format!("/api/v1/contacts/{CONTACT_ID}"))
-                .query_param("include_dismissed", "true");
+                .path(format!("/api/v1/contacts/{CONTACT_ID}"));
             then.status(200).json_body(contact());
         });
 
         let sdk = client(&server);
         sdk.contacts()
             .list(&ListContactsParams {
-                review_status: vec![ContactReviewStatus::Dismissed],
+                review_status: vec![ContactReviewStatus::Unreviewed],
                 ..Default::default()
             })
             .unwrap();
-        let result = sdk
-            .contacts()
-            .get_with_params(
-                CONTACT_ID,
-                &GetContactParams {
-                    include_dismissed: Some(true),
-                },
-            )
-            .unwrap();
+        let result = sdk.contacts().get(CONTACT_ID).unwrap();
 
         list.assert();
         get.assert();

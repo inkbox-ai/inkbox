@@ -9,6 +9,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - **Contact memory in all three SDKs.** Contacts now expose lifecycle metadata and filtering, unified email/SMS/iMessage/call correspondence, generated facts with source citations, and explicit duplicate-contact merging.
+- **Contact memory counts.** Contact list and mutation responses expose the active `memory_count` (TS `memoryCount`).
 - **Contact memory in the CLI.** Use `inkbox contacts facts list|get|citation`, `inkbox contacts correspondence`, and `inkbox contacts merge`. Contact list/get/correspondence commands include the applicable lifecycle filters, and correspondence supports channel, time, pagination, content, transcript, and per-channel limit options.
 - **vCard conflict results.** Bulk imports now identify identifier conflicts and the existing contact involved.
 
@@ -20,6 +21,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Removed
 
 - **Source-breaking:** contact access grant/revoke methods were removed from the Python, TypeScript, and Rust SDKs, and `inkbox contacts access grant|revoke` were removed from the CLI. Create-contact access options were also removed: `access_identity_ids` (Python), `accessIdentityIds` (TypeScript), and the corresponding Rust create field are no longer accepted. Remove those calls/options before upgrading.
+- **Source-breaking:** the dismissed contact review state and all `include_dismissed` / `includeDismissed` SDK and CLI options were removed. Reject unwanted suggestions by deleting them.
 
 ## 0.5.0 — Identity tunnel summaries + inlined vault access
 

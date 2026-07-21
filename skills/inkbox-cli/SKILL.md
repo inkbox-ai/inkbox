@@ -497,7 +497,7 @@ Organization-wide address book with lifecycle review, memory, correspondence, an
 
 ```bash
 inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]
-inkbox contacts get <contact-id> [--include-dismissed]
+inkbox contacts get <contact-id>
 inkbox contacts create --json <payload>            # JSON matching CreateContactOptions
 inkbox contacts update <contact-id> --json <patch>  # JSON-merge-patch
 inkbox contacts delete <contact-id>

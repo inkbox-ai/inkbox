@@ -133,17 +133,9 @@ class ContactsResource:
         items = data["items"] if isinstance(data, dict) and "items" in data else data
         return [Contact._from_dict(c) for c in items]
 
-    def get(
-        self, contact_id: UUID | str, *, include_dismissed: bool | None = None
-    ) -> Contact:
+    def get(self, contact_id: UUID | str) -> Contact:
         """Fetch a single contact by id."""
-        if include_dismissed is None:
-            data = self._http.get(f"{_BASE}/{contact_id}")
-        else:
-            data = self._http.get(
-                f"{_BASE}/{contact_id}",
-                params={"include_dismissed": include_dismissed},
-            )
+        data = self._http.get(f"{_BASE}/{contact_id}")
         return Contact._from_dict(data)
 
     def create(
