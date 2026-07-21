@@ -17,7 +17,6 @@ import {
   parseAgentIdentitySummary,
 } from "../src/identities/types.js";
 import {
-  ContactRuleStatus,
   FilterMode,
   MailIdentityContactRule,
   MailRuleAction,
@@ -153,10 +152,10 @@ describe("MailIdentityContactRulesResource", () => {
       `/identities/my-agent/mail-contact-rules/${rid}`,
     );
 
-    await resource.update("my-agent", rid, { status: ContactRuleStatus.PAUSED });
+    await resource.update("my-agent", rid, { action: MailRuleAction.ALLOW });
     expect(http.patch).toHaveBeenCalledWith(
       `/identities/my-agent/mail-contact-rules/${rid}`,
-      { status: "paused" },
+      { action: "allow" },
     );
 
     await resource.delete("my-agent", rid);
@@ -458,12 +457,12 @@ describe("AgentIdentity contact-rule delegation", () => {
       parseMailIdentityContactRule(MAIL_RULE_DICT),
     );
 
-    await identity.updateMailContactRule("rid", { status: ContactRuleStatus.PAUSED });
+    await identity.updateMailContactRule("rid", { action: MailRuleAction.ALLOW });
 
     expect(inkbox._mailIdentityContactRules.update).toHaveBeenCalledWith(
       identity.agentHandle,
       "rid",
-      { status: ContactRuleStatus.PAUSED },
+      { action: MailRuleAction.ALLOW },
     );
   });
 
@@ -506,7 +505,7 @@ describe("AgentIdentity contact-rule delegation", () => {
     ).rejects.toThrow(/no phone number/);
     await expect(identity.getPhoneContactRule("rid")).rejects.toThrow(InkboxError);
     await expect(
-      identity.updatePhoneContactRule("rid", { status: ContactRuleStatus.PAUSED }),
+      identity.updatePhoneContactRule("rid", { action: PhoneRuleAction.BLOCK }),
     ).rejects.toThrow(InkboxError);
     await expect(identity.deletePhoneContactRule("rid")).rejects.toThrow(InkboxError);
     expect(inkbox._phoneIdentityContactRules.create).not.toHaveBeenCalled();

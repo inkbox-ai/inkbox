@@ -83,7 +83,6 @@ identity = inkbox.get_identity("sales-agent")
 identities = inkbox.list_identities()  # → list[AgentIdentitySummary]
 
 identity.update(new_handle="new-name")   # rename
-identity.update(status="paused")         # or "active"
 identity.refresh()                       # re-fetch from API, updates cached channels
 identity.delete()                        # cascades: mailbox + tunnel + phone-number release
 ```
@@ -506,7 +505,7 @@ rule = inkbox.imessage_contact_rules.create(
     "my-agent", action=IMessageRuleAction.BLOCK, match_target="+15559999999",
 )
 rules = inkbox.imessage_contact_rules.list("my-agent")
-inkbox.imessage_contact_rules.update("my-agent", rule.id, status="paused")  # admin-only
+inkbox.imessage_contact_rules.update("my-agent", rule.id, action="allow")  # admin-only
 inkbox.imessage_contact_rules.delete("my-agent", rule.id)                   # admin-only
 all_rules = inkbox.imessage_contact_rules.list_all()                        # admin-only, org-wide
 ```
@@ -813,7 +812,7 @@ from inkbox import (
 identity = inkbox.get_identity("sales-agent")
 
 # Mail rules via the identity convenience methods. New rules always start
-# active; call `update(..., status="paused")` afterwards to pause one.
+# active.
 rule = identity.create_mail_contact_rule(
     action=MailRuleAction.ALLOW,         # or BLOCK
     match_type=MailRuleMatchType.DOMAIN, # or EXACT_EMAIL
@@ -821,7 +820,7 @@ rule = identity.create_mail_contact_rule(
 )
 identity.list_mail_contact_rules()
 identity.get_mail_contact_rule(rule.id)
-identity.update_mail_contact_rule(rule.id, status="paused")  # admin-only
+identity.update_mail_contact_rule(rule.id, action="allow")  # admin-only
 identity.delete_mail_contact_rule(rule.id)                   # admin-only
 
 # Phone rules — same shape, only match_type="exact_number" is supported.

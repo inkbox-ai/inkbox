@@ -21,9 +21,7 @@ use serde_json::{Map, Value};
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::phone::types::{
-    ContactRuleStatus, PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType,
-};
+use crate::phone::types::{PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType};
 
 const ORG_BASE: &str = "/phone/contact-rules";
 
@@ -121,26 +119,15 @@ impl PhoneIdentityContactRulesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Update `action` or `status` (admin-only). Omitted (`None`) fields are
-    /// left unchanged, matching the Python `_UNSET` sentinel.
+    /// Update `action` (admin-only).
     pub fn update(
         &self,
         agent_handle: &str,
         rule_id: &str,
-        action: Option<PhoneRuleAction>,
-        status: Option<ContactRuleStatus>,
+        action: PhoneRuleAction,
     ) -> Result<PhoneIdentityContactRule> {
         let mut body = Map::new();
-        if let Some(a) = action {
-            body.insert("action".into(), a.as_str().into());
-        }
-        if let Some(s) = status {
-            let s = match s {
-                ContactRuleStatus::Active => "active",
-                ContactRuleStatus::Paused => "paused",
-            };
-            body.insert("status".into(), s.into());
-        }
+        body.insert("action".into(), action.as_str().into());
         let data = self
             .http
             .patch(&rule_path(agent_handle, Some(rule_id)), &body)?;

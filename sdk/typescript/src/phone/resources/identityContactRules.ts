@@ -19,7 +19,6 @@
  */
 
 import { HttpTransport } from "../../_http.js";
-import { ContactRuleStatus } from "../../mail/types.js";
 import {
   PhoneIdentityContactRule,
   PhoneRuleAction,
@@ -49,8 +48,7 @@ export interface CreatePhoneIdentityContactRuleOptions {
 }
 
 export interface UpdatePhoneIdentityContactRuleOptions {
-  action?: PhoneRuleAction;
-  status?: ContactRuleStatus;
+  action: PhoneRuleAction;
 }
 
 export interface ListAllPhoneIdentityContactRulesOptions {
@@ -93,8 +91,8 @@ export class PhoneIdentityContactRulesResource {
   }
 
   /**
-   * Create a rule for an agent identity. New rules are always `active`;
-   * use {@link update} to pause one after creation. The identity must have
+   * Create a rule for an agent identity. New rules are always `active`.
+   * The identity must have
    * a phone number — otherwise the server returns 422.
    *
    * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
@@ -116,15 +114,13 @@ export class PhoneIdentityContactRulesResource {
     return parsePhoneIdentityContactRule(data);
   }
 
-  /** Update `action` or `status` (admin-only). */
+  /** Update `action` (admin-only). */
   async update(
     agentHandle: string,
     ruleId: string,
     options: UpdatePhoneIdentityContactRuleOptions,
   ): Promise<PhoneIdentityContactRule> {
-    const body: Record<string, unknown> = {};
-    if (options.action !== undefined) body.action = options.action;
-    if (options.status !== undefined) body.status = options.status;
+    const body = { action: options.action };
     const data = await this.http.patch<RawPhoneIdentityContactRule>(
       rulePath(agentHandle, ruleId),
       body,

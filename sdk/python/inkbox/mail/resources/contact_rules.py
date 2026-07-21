@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from inkbox.mail.types import (
-    ContactRuleStatus,
     MailContactRule,
     MailRuleAction,
     MailRuleMatchType,
@@ -21,7 +20,6 @@ if TYPE_CHECKING:
 
 _BASE = "/mailboxes"
 _ORG_BASE = "/contact-rules"
-_UNSET = object()
 
 
 def _rule_path(email_address: str, rule_id: UUID | str | None = None) -> str:
@@ -101,23 +99,16 @@ class MailContactRulesResource:
         email_address: str,
         rule_id: UUID | str,
         *,
-        action: MailRuleAction | str = _UNSET,  # type: ignore[assignment]
-        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+        action: MailRuleAction | str,
     ) -> MailContactRule:
-        """Update ``action`` or ``status`` (admin-only).
+        """Update ``action`` (admin-only).
 
         ``match_type`` and ``match_target`` are immutable — delete + re-create
         to change them.
         """
-        body: dict[str, Any] = {}
-        if action is not _UNSET:
-            body["action"] = (
-                action.value if isinstance(action, MailRuleAction) else action
-            )
-        if status is not _UNSET:
-            body["status"] = (
-                status.value if isinstance(status, ContactRuleStatus) else status
-            )
+        body = {
+            "action": action.value if isinstance(action, MailRuleAction) else action,
+        }
         data = self._http.patch(_rule_path(email_address, rule_id), json=body)
         return MailContactRule._from_dict(data)
 

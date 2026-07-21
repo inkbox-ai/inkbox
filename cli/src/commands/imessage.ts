@@ -168,31 +168,24 @@ function registerContactRuleCommands(parent: Command): void {
 
   rule
     .command("update <rule-id>")
-    .description("Update an iMessage contact rule's action or status (admin-only)")
+    .description("Update an iMessage contact rule's action (admin-only)")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
-    .option("--action <action>", "'allow' or 'block'")
-    .option("--status <status>", "'active' or 'paused'")
+    .requiredOption("--action <action>", "'allow' or 'block'")
     .action(
       withErrorHandler(async function (
         this: Command,
         ruleId: string,
-        cmdOpts: { identity: string; action?: string; status?: string },
+        cmdOpts: { identity: string; action: string },
       ) {
         if (cmdOpts.action !== undefined && cmdOpts.action !== "allow" && cmdOpts.action !== "block") {
           throw new Error("--action must be 'allow' or 'block'");
-        }
-        if (cmdOpts.status !== undefined && cmdOpts.status !== "active" && cmdOpts.status !== "paused") {
-          throw new Error("--status must be 'active' or 'paused'");
         }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const row = await inkbox.imessageContactRules.update(
           cmdOpts.identity,
           ruleId,
-          {
-            action: cmdOpts.action as never,
-            status: cmdOpts.status as never,
-          },
+          { action: cmdOpts.action as never },
         );
         output(row, { json: !!opts.json });
       }),

@@ -658,16 +658,16 @@ describe("IMessageContactRulesResource", () => {
     expect(rule.agentIdentityId).toBe(IDENTITY_ID);
   });
 
-  it("update patches action/status", async () => {
+  it("update patches action", async () => {
     vi.mocked(fetch).mockResolvedValue(ok(CONTACT_RULE_DICT));
     const resource = new IMessageContactRulesResource(new HttpTransport("k", BASE));
 
-    await resource.update(HANDLE, RULE_ID, { status: ContactRuleStatus.PAUSED });
+    await resource.update(HANDLE, RULE_ID, { action: IMessageRuleAction.ALLOW });
 
     const { url, init } = lastCall();
     expect(url).toBe(`${BASE}/identities/${HANDLE}/contact-rules/${RULE_ID}`);
     expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body as string)).toEqual({ status: "paused" });
+    expect(JSON.parse(init.body as string)).toEqual({ action: "allow" });
   });
 
   it("delete targets the rule path", async () => {

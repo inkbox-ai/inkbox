@@ -82,7 +82,6 @@ const identity = await inkbox.getIdentity("sales-agent");
 const identities = await inkbox.listIdentities();   // AgentIdentitySummary[]
 
 await identity.update({ newHandle: "new-name" });   // rename
-await identity.update({ status: "paused" });         // or "active"
 await identity.refresh();                            // re-fetch from API, updates cached channels
 await identity.delete();                             // cascades: mailbox + tunnel + phone-number release
 ```
@@ -488,7 +487,7 @@ const rule = await inkbox.imessageContactRules.create("my-agent", {
   matchTarget: "+15559999999",
 });
 const rules = await inkbox.imessageContactRules.list("my-agent");
-await inkbox.imessageContactRules.update("my-agent", rule.id, { status: "paused" }); // admin-only
+await inkbox.imessageContactRules.update("my-agent", rule.id, { action: "allow" }); // admin-only
 await inkbox.imessageContactRules.delete("my-agent", rule.id);                       // admin-only
 const allRules = await inkbox.imessageContactRules.listAll();                        // admin-only, org-wide
 ```
@@ -801,7 +800,7 @@ import {
 const identity = await inkbox.getIdentity("sales-agent");
 
 // Mail rules via the identity convenience methods. New rules always start
-// active; call `update(..., { status: "paused" })` afterwards to pause one.
+// active.
 const rule = await identity.createMailContactRule({
   action: MailRuleAction.ALLOW,          // or BLOCK
   matchType: MailRuleMatchType.DOMAIN,   // or EXACT_EMAIL
@@ -809,7 +808,7 @@ const rule = await identity.createMailContactRule({
 });
 await identity.listMailContactRules();
 await identity.getMailContactRule(rule.id);
-await identity.updateMailContactRule(rule.id, { status: "paused" });  // admin-only
+await identity.updateMailContactRule(rule.id, { action: "allow" });  // admin-only
 await identity.deleteMailContactRule(rule.id);                        // admin-only
 
 // Phone rules — same shape, only matchType: "exact_number" is supported.

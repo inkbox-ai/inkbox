@@ -9,7 +9,6 @@
  */
 
 import { HttpTransport } from "../../_http.js";
-import { ContactRuleStatus } from "../../mail/types.js";
 import {
   IMessageContactRule,
   IMessageRuleAction,
@@ -39,8 +38,7 @@ export interface CreateIMessageContactRuleOptions {
 }
 
 export interface UpdateIMessageContactRuleOptions {
-  action?: IMessageRuleAction;
-  status?: ContactRuleStatus;
+  action: IMessageRuleAction;
 }
 
 export interface ListAllIMessageContactRulesOptions {
@@ -78,8 +76,7 @@ export class IMessageContactRulesResource {
   }
 
   /**
-   * Create a rule. New rules are always `active`; use {@link update}
-   * to pause one after creation.
+   * Create a rule. New rules are always `active`.
    *
    * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
    *   the same `(matchType, matchTarget)` already exists.
@@ -100,15 +97,13 @@ export class IMessageContactRulesResource {
     return parseIMessageContactRule(data);
   }
 
-  /** Update `action` or `status` (admin-only). */
+  /** Update `action` (admin-only). */
   async update(
     agentHandle: string,
     ruleId: string,
     options: UpdateIMessageContactRuleOptions,
   ): Promise<IMessageContactRule> {
-    const body: Record<string, unknown> = {};
-    if (options.action !== undefined) body.action = options.action;
-    if (options.status !== undefined) body.status = options.status;
+    const body = { action: options.action };
     const data = await this.http.patch<RawIMessageContactRule>(
       rulePath(agentHandle, ruleId),
       body,

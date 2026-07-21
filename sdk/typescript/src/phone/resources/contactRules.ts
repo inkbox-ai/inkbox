@@ -10,7 +10,6 @@
  */
 
 import { HttpTransport } from "../../_http.js";
-import { ContactRuleStatus } from "../../mail/types.js";
 import {
   PhoneContactRule,
   PhoneRuleAction,
@@ -41,8 +40,7 @@ export interface CreatePhoneContactRuleOptions {
 }
 
 export interface UpdatePhoneContactRuleOptions {
-  action?: PhoneRuleAction;
-  status?: ContactRuleStatus;
+  action: PhoneRuleAction;
 }
 
 export interface ListAllPhoneContactRulesOptions {
@@ -100,9 +98,7 @@ export class PhoneContactRulesResource {
     ruleId: string,
     options: UpdatePhoneContactRuleOptions,
   ): Promise<PhoneContactRule> {
-    const body: Record<string, unknown> = {};
-    if (options.action !== undefined) body.action = options.action;
-    if (options.status !== undefined) body.status = options.status;
+    const body = { action: options.action };
     const data = await this.http.patch<RawPhoneContactRule>(
       rulePath(phoneNumberId, ruleId),
       body,

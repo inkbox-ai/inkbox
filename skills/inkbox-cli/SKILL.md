@@ -114,7 +114,6 @@ inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
                                  [--description <text> | --clear-description]
                                  [--mail-filter-mode whitelist|blacklist]
                                  [--phone-filter-mode whitelist|blacklist]
-                                 [--status active|paused]
 inkbox identity refresh <handle>
 ```
 
@@ -175,7 +174,7 @@ inkbox identity mail-rules list <handle> [--action allow|block] [--match-type ex
 inkbox identity mail-rules list-all [--agent-identity-id <id>] [--action …] [--match-type …]   # admin-only, org-wide
 inkbox identity mail-rules get <handle> <rule-id>
 inkbox identity mail-rules create <handle> --action allow|block --match-type exact_email|domain --match-target <value>
-inkbox identity mail-rules update <handle> <rule-id> [--action allow|block] [--status active|paused]   # admin-only
+inkbox identity mail-rules update <handle> <rule-id> --action allow|block   # admin-only
 inkbox identity mail-rules delete <handle> <rule-id>                                                    # admin-only
 
 # Phone rules — require the identity to have a phone number; only exact_number is supported.
@@ -183,11 +182,11 @@ inkbox identity phone-rules list <handle> [--action allow|block] [--match-type e
 inkbox identity phone-rules list-all [--agent-identity-id <id>] [--action …]   # admin-only, org-wide
 inkbox identity phone-rules get <handle> <rule-id>
 inkbox identity phone-rules create <handle> --action allow|block --match-target <e164> [--match-type exact_number]
-inkbox identity phone-rules update <handle> <rule-id> [--action allow|block] [--status active|paused]   # admin-only
+inkbox identity phone-rules update <handle> <rule-id> --action allow|block   # admin-only
 inkbox identity phone-rules delete <handle> <rule-id>                                                    # admin-only
 ```
 
-New rules always start active; use `update --status paused` to pause one. These replace the deprecated `inkbox mailbox rules` / `inkbox number rules` groups below.
+New rules always start active. These replace the deprecated `inkbox mailbox rules` / `inkbox number rules` groups below.
 
 ### Identity Signing Key
 
@@ -333,7 +332,7 @@ inkbox imessage upload-media ./photo.jpg -i <handle> --content-type image/jpeg
 # Contact rules are scoped to the identity (not a phone number):
 inkbox imessage contact-rule list -i <handle>
 inkbox imessage contact-rule create -i <handle> --action block --match-target +15559999999
-inkbox imessage contact-rule update <rule-id> -i <handle> --status paused   # admin-only
+inkbox imessage contact-rule update <rule-id> -i <handle> --action allow|block   # admin-only
 inkbox imessage contact-rule delete <rule-id> -i <handle>                   # admin-only
 inkbox imessage contact-rule list-all                                       # admin-only, org-wide
 ```
@@ -479,8 +478,8 @@ inkbox domain set-default <domain-name>
 inkbox mailbox rules list --mailbox <email> [--action allow|block] [--match-type exact_email|domain] [--limit <n>] [--offset <n>]
 inkbox mailbox rules list --all-mailboxes [--mailbox-id <id>] [--action …] [--match-type …]    # admin-only
 inkbox mailbox rules get <rule-id> --mailbox <email>
-inkbox mailbox rules create --mailbox <email> --action allow|block --match-type exact_email|domain --match-target <value> [--status active|paused]
-inkbox mailbox rules update <rule-id> --mailbox <email> [--action allow|block] [--status active|paused]   # admin-only
+inkbox mailbox rules create --mailbox <email> --action allow|block --match-type exact_email|domain --match-target <value>
+inkbox mailbox rules update <rule-id> --mailbox <email> --action allow|block   # admin-only
 inkbox mailbox rules delete <rule-id> --mailbox <email>                                                    # admin-only
 ```
 
@@ -504,8 +503,8 @@ Use `--state` only when provisioning a local number. Phone-number rows also carr
 inkbox number rules list --number <id> [--action allow|block] [--match-type exact_number] [--limit <n>] [--offset <n>]
 inkbox number rules list --all-numbers [--phone-number-id <id>] [--action …] [--match-type …]   # admin-only
 inkbox number rules get <rule-id> --number <id>
-inkbox number rules create --number <id> --action allow|block --match-target <e164> [--match-type exact_number] [--status active|paused]
-inkbox number rules update <rule-id> --number <id> [--action allow|block] [--status active|paused]   # admin-only
+inkbox number rules create --number <id> --action allow|block --match-target <e164> [--match-type exact_number]
+inkbox number rules update <rule-id> --number <id> --action allow|block   # admin-only
 inkbox number rules delete <rule-id> --number <id>                                                    # admin-only
 ```
 

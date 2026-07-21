@@ -19,9 +19,7 @@ use uuid::Uuid;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::mail::types::{
-    ContactRuleStatus, MailIdentityContactRule, MailRuleAction, MailRuleMatchType,
-};
+use crate::mail::types::{MailIdentityContactRule, MailRuleAction, MailRuleMatchType};
 
 const ORG_BASE: &str = "/mail/contact-rules";
 
@@ -123,29 +121,20 @@ impl MailIdentityContactRulesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Update `action` or `status` (admin-only).
+    /// Update `action` (admin-only).
     ///
     /// `match_type` and `match_target` are immutable — delete + re-create to
-    /// change them. `None` arguments are omitted from the body, mirroring the
-    /// Python `_UNSET` sentinel.
+    /// change them.
     pub fn update(
         &self,
         agent_handle: &str,
         rule_id: &str,
-        action: Option<MailRuleAction>,
-        status: Option<ContactRuleStatus>,
+        action: MailRuleAction,
     ) -> Result<MailIdentityContactRule> {
-        let mut body = serde_json::Map::new();
-        if let Some(a) = action {
-            body.insert("action".into(), Value::String(a.as_str().to_string()));
-        }
-        if let Some(s) = status {
-            body.insert("status".into(), Value::String(s.as_str().to_string()));
-        }
-        let data = self.http.patch(
-            &rule_path(agent_handle, Some(rule_id)),
-            &Value::Object(body),
-        )?;
+        let body = json!({"action": action.as_str()});
+        let data = self
+            .http
+            .patch(&rule_path(agent_handle, Some(rule_id)), &body)?;
         Ok(serde_json::from_value(data)?)
     }
 

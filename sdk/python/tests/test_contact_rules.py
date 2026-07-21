@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from inkbox.mail.resources.contact_rules import MailContactRulesResource
-from inkbox.mail.types import MailRuleAction, MailRuleMatchType
+from inkbox.mail.types import ContactRuleStatus, MailRuleAction, MailRuleMatchType
 from inkbox.phone.resources.contact_rules import PhoneContactRulesResource
 from inkbox.phone.types import PhoneRuleAction
 
@@ -88,17 +88,18 @@ class TestMailContactRules:
         )
         assert isinstance(rule.id, UUID)
 
-    def test_update_only_sends_supplied_fields(self, transport):
+    def test_update_sends_action_only(self, transport):
         transport.patch.return_value = {**MAIL_RULE_DICT, "status": "paused"}
         resource = MailContactRulesResource(transport)
 
         rid = "aaaa1111-0000-0000-0000-000000000011"
-        resource.update("box@inkbox.ai", rid, status="paused")
+        rule = resource.update("box@inkbox.ai", rid, action="block")
 
         transport.patch.assert_called_once_with(
             f"/mailboxes/box@inkbox.ai/contact-rules/{rid}",
-            json={"status": "paused"},
+            json={"action": "block"},
         )
+        assert rule.status is ContactRuleStatus.PAUSED
 
     def test_list_all_org_wide(self, transport):
         transport.get.return_value = [MAIL_RULE_DICT]

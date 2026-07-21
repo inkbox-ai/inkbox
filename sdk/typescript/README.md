@@ -157,8 +157,7 @@ await identity2.refresh();  // re-fetch channels from API
 // List all identities for your org
 const allIdentities = await inkbox.listIdentities();
 
-// Update status or handle
-await identity.update({ status: "paused" });
+// Update identity metadata or handle
 await identity.update({ newHandle: "sales-bot-v2" });
 
 // Release the phone number (carrier release + local delete). Mailbox and

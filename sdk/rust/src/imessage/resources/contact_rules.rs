@@ -11,9 +11,7 @@ use uuid::Uuid;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::imessage::types::{
-    ContactRuleStatus, IMessageContactRule, IMessageRuleAction, IMessageRuleMatchType,
-};
+use crate::imessage::types::{IMessageContactRule, IMessageRuleAction, IMessageRuleMatchType};
 
 const ORG_BASE: &str = "/contact-rules";
 
@@ -110,32 +108,19 @@ impl IMessageContactRulesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Update `action` or `status` (admin-only).
-    ///
-    /// `None` arguments are omitted from the request body, mirroring the
-    /// Python `_UNSET` sentinel.
+    /// Update `action` (admin-only).
     ///
     /// # Arguments
     /// * `agent_handle` - Handle of the agent identity owning the rule.
     /// * `rule_id` - Id of the rule to update.
-    /// * `action` - Optional new action.
-    /// * `status` - Optional new status.
+    /// * `action` - New action.
     pub fn update(
         &self,
         agent_handle: &str,
         rule_id: &str,
-        action: Option<IMessageRuleAction>,
-        status: Option<ContactRuleStatus>,
+        action: IMessageRuleAction,
     ) -> Result<IMessageContactRule> {
-        // Build the body inserting only the fields that were supplied.
-        let mut map = serde_json::Map::new();
-        if let Some(a) = action {
-            map.insert("action".to_string(), json!(a.as_str()));
-        }
-        if let Some(s) = status {
-            map.insert("status".to_string(), json!(s.as_str()));
-        }
-        let body = serde_json::Value::Object(map);
+        let body = json!({"action": action.as_str()});
         let data = self
             .http
             .patch(&rule_path(agent_handle, Some(rule_id)), &body)?;

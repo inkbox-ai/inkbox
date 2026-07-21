@@ -1,6 +1,5 @@
 import { Command } from "commander";
 import {
-  ContactRuleStatus,
   FilterMode,
   PhoneRuleAction,
   PhoneRuleMatchType,
@@ -139,21 +138,19 @@ function registerNumberRulesCommands(parent: Command): void {
 
   rules
     .command("update <rule-id>")
-    .description("Update action and/or status on a rule (admin-only)")
+    .description("Update the action on a rule (admin-only)")
     .requiredOption("--number <id>", "Phone number id")
-    .option("--action <action>", "allow or block")
-    .option("--status <status>", "active or paused")
+    .requiredOption("--action <action>", "allow or block")
     .action(
       withErrorHandler(async function (
         this: Command,
         ruleId: string,
-        cmdOpts: { number: string; action?: string; status?: string },
+        cmdOpts: { number: string; action: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.phoneContactRules.update(cmdOpts.number, ruleId, {
-          action: cmdOpts.action as PhoneRuleAction | undefined,
-          status: cmdOpts.status as ContactRuleStatus | undefined,
+          action: cmdOpts.action as PhoneRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
       }),

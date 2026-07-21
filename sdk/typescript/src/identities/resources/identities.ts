@@ -108,7 +108,7 @@ export class IdentitiesResource {
 
   /**
    * Update an identity's handle, display name, description, iMessage
-   * reachability, and/or status.
+   * reachability, and/or contact-rule filter modes.
    *
    * Only provided fields are applied; omitted fields are left unchanged.
    * For `displayName` and `description`, explicit `null` clears the value
@@ -131,8 +131,6 @@ export class IdentitiesResource {
    * @param options.phoneFilterMode - `"whitelist"` or `"blacklist"` for this
    *   identity's phone contact rules (admin-only). The server rejects this
    *   with 422 when the identity has no phone number.
-   * @param options.status - `"active"` or `"paused"`. Call `delete()` to
-   *   remove an identity; `"deleted"` is rejected here.
    */
   async update(
     agentHandle: string,
@@ -171,7 +169,6 @@ export class IdentitiesResource {
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
     if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;
-    if (options.status !== undefined) body["status"] = options.status;
     try {
       const data = options.idempotencyKey === undefined
         ? await this.http.patch<RawAgentIdentityData>(`/${agentHandle}`, body)
