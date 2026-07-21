@@ -215,6 +215,15 @@ pub struct ContactAccess {
     pub created_at: String,
 }
 
+/// The most recently updated active memory for a contact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactMemorySummary {
+    pub id: Uuid,
+    pub content: String,
+    /// ISO-8601 timestamp string.
+    pub updated_at: String,
+}
+
 /// A contact (address-book entry) owned by your organisation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contact {
@@ -278,6 +287,8 @@ pub struct Contact {
     pub is_confirmed: bool,
     #[serde(default)]
     pub memory_count: Option<u64>,
+    #[serde(default)]
+    pub latest_memory: Option<ContactMemorySummary>,
     #[serde(default)]
     pub status: Option<String>,
     /// ISO-8601 timestamp string.
@@ -343,6 +354,15 @@ pub struct ContactFactCitationDetail {
     pub source_url: Option<String>,
 }
 
+/// Result of deleting one contact fact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactFactDeleteResult {
+    pub deleted_fact_id: Uuid,
+    pub memory_count: u64,
+    #[serde(default)]
+    pub latest_memory: Option<ContactMemorySummary>,
+}
+
 /// Outcome for one card in a bulk vCard import.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -399,6 +419,32 @@ impl ContactImportResult {
     }
 }
 
+/// One row in a bulk contact deletion result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactBulkDeleteResultItem {
+    pub contact_id: Uuid,
+    pub status: String,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// Result of deleting multiple contacts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactBulkDeleteResult {
+    pub deleted_count: u64,
+    pub error_count: u64,
+    #[serde(default)]
+    pub results: Vec<ContactBulkDeleteResultItem>,
+}
+
+/// A bounded multi-contact vCard document.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactVCardExportResult {
+    pub content_type: String,
+    pub contact_count: u64,
+    pub vcard: String,
+}
+
 /// Deserialize a list field that the server may send as `null` into an empty
 /// `Vec` (mirrors Python's `d.get(...) or []`).
 fn null_as_default<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
@@ -437,6 +483,12 @@ mod tests {
             "addresses": [],
             "custom_fields": [],
             "access": [],
+            "memory_count": 1,
+            "latest_memory": {
+                "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "content": "Prefers email",
+                "updated_at": "2026-07-20T12:00:00Z"
+            },
             "created_at": "2026-07-20T12:00:00Z",
             "updated_at": "2026-07-20T12:00:00Z"
         }))
@@ -448,6 +500,8 @@ mod tests {
         );
         assert_eq!(contact.review_status, super::ContactReviewStatus::Confirmed);
         assert!(contact.is_confirmed);
+        assert_eq!(contact.memory_count, Some(1));
+        assert_eq!(contact.latest_memory.unwrap().content, "Prefers email");
     }
 
     #[test]

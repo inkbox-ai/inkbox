@@ -9,14 +9,16 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - **Contact memory in all three SDKs.** Contacts now expose lifecycle metadata and filtering, unified email/SMS/iMessage/call correspondence, generated facts with source citations, and explicit duplicate-contact merging.
-- **Contact memory counts.** Contact list and mutation responses expose the active `memory_count` (TS `memoryCount`).
-- **Contact memory in the CLI.** Use `inkbox contacts facts list|get|citation`, `inkbox contacts correspondence`, and `inkbox contacts merge`. Contact list/get/correspondence commands include the applicable lifecycle filters, and correspondence supports channel, time, pagination, content, transcript, and per-channel limit options.
+- **Contact memory summaries.** Contact list and mutation responses expose the active `memory_count` (TS `memoryCount`) and latest active memory summary when available.
+- **Contact memory in the CLI.** Use `inkbox contacts facts list|get|citation|citation-url|delete`, `inkbox contacts correspondence`, and `inkbox contacts merge`. Contact list/get/correspondence commands include the applicable lifecycle filters, and correspondence supports channel, time, pagination, content, transcript, and per-channel limit options.
 - **vCard conflict results.** Bulk imports now identify identifier conflicts and the existing contact involved.
+- **Contact mutation parity.** All SDKs and the CLI support fact deletion, contact bulk deletion, batch vCard export, direct citation URL resolution, and optional idempotency keys for contact create/update/delete and vCard import.
 
 ### Changed
 
 - Version bumped to 0.5.1 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.1`.
 - Contacts are organization-wide. The compatibility access-list API and `inkbox contacts access list` remain available as read-only metadata.
+- **Rust note (source-breaking).** `Contact` gains the public `latest_memory` field, so struct literals and exhaustive patterns must account for it. The field is optional on the wire and defaults to `None` when omitted.
 
 ### Removed
 

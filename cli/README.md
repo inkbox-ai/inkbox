@@ -416,16 +416,24 @@ are enforced.
 Organization-wide contacts, correspondence, and memory facts.
 
 ```bash
-inkbox contacts list [--review-status <status>]       # Repeat or comma-separate statuses
+inkbox contacts list [--review-status <status>] [--offset <n>]  # Offset max: 10000
 inkbox contacts get <contact-id>
 inkbox contacts facts list <contact-id>
 inkbox contacts facts get <contact-id> <fact-id>
 inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
+inkbox contacts facts citation-url <source-url>
+inkbox contacts facts delete <contact-id> <fact-id>
 inkbox contacts correspondence <contact-id> [-i <identity-id>]
   [--channels <channel>] [--after <datetime>] [--before <datetime>]
   [--limit-per-channel <n>] [--content <mode>] [--transcripts <mode>]
 inkbox contacts merge <survivor-id> --losing <contact-id...>
   [--field-sources '{"preferredName":"<contact-id>"}']
+inkbox contacts create --json <payload> [--idempotency-key <key>]
+inkbox contacts update <contact-id> --json <patch> [--idempotency-key <key>]
+inkbox contacts delete <contact-id> [--idempotency-key <key>]
+inkbox contacts bulk-delete <contact-id...>
+inkbox contacts import <file.vcf> [--idempotency-key <key>]
+inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts access list <contact-id>              # Compatibility read only
 ```
 

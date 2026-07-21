@@ -198,6 +198,23 @@ class ContactAccess:
 
 
 @dataclass
+class ContactMemorySummary:
+    """The most recently updated active memory for a contact."""
+
+    id: UUID
+    content: str
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> ContactMemorySummary:
+        return cls(
+            id=UUID(d["id"]),
+            content=d["content"],
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )
+
+
+@dataclass
 class Contact:
     """A contact (address-book entry) owned by your organisation."""
 
@@ -234,6 +251,7 @@ class Contact:
     status: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.fromtimestamp(0))
     updated_at: datetime = field(default_factory=lambda: datetime.fromtimestamp(0))
+    latest_memory: ContactMemorySummary | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Contact:
@@ -271,6 +289,11 @@ class Contact:
             is_auto_created=bool(d.get("is_auto_created", False)),
             is_confirmed=bool(d.get("is_confirmed", True)),
             memory_count=d.get("memory_count"),
+            latest_memory=(
+                ContactMemorySummary._from_dict(d["latest_memory"])
+                if d.get("latest_memory") is not None
+                else None
+            ),
             organization_id=d.get("organization_id"),
             status=d.get("status"),
             created_at=datetime.fromisoformat(d["created_at"]),
@@ -391,6 +414,25 @@ class ContactFactCitationDetail:
             source_id=UUID(d["source_id"]),
             source_locator=d["source_locator"],
             source_url=d.get("source_url"),
+        )
+
+
+@dataclass
+class ContactFactDeleteResult:
+    deleted_fact_id: UUID
+    memory_count: int
+    latest_memory: ContactMemorySummary | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> ContactFactDeleteResult:
+        return cls(
+            deleted_fact_id=UUID(d["deleted_fact_id"]),
+            memory_count=d["memory_count"],
+            latest_memory=(
+                ContactMemorySummary._from_dict(d["latest_memory"])
+                if d.get("latest_memory") is not None
+                else None
+            ),
         )
 
 
@@ -678,4 +720,52 @@ class ContactImportResult:
             results=[
                 ContactImportResultItem._from_dict(r) for r in d.get("results") or []
             ],
+        )
+
+
+@dataclass
+class ContactBulkDeleteResultItem:
+    contact_id: UUID
+    status: str
+    error: str | None = None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> ContactBulkDeleteResultItem:
+        return cls(
+            contact_id=UUID(d["contact_id"]),
+            status=d["status"],
+            error=d.get("error"),
+        )
+
+
+@dataclass
+class ContactBulkDeleteResult:
+    deleted_count: int
+    error_count: int
+    results: list[ContactBulkDeleteResultItem]
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> ContactBulkDeleteResult:
+        return cls(
+            deleted_count=d["deleted_count"],
+            error_count=d["error_count"],
+            results=[
+                ContactBulkDeleteResultItem._from_dict(item)
+                for item in d.get("results") or []
+            ],
+        )
+
+
+@dataclass
+class ContactVCardExportResult:
+    content_type: str
+    contact_count: int
+    vcard: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> ContactVCardExportResult:
+        return cls(
+            content_type=d["content_type"],
+            contact_count=d["contact_count"],
+            vcard=d["vcard"],
         )

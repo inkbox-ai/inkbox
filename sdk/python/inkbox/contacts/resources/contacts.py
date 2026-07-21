@@ -17,6 +17,7 @@ from inkbox.contacts.resources.vcards import VCardsResource
 from inkbox.contacts.types import (
     Contact,
     ContactAddress,
+    ContactBulkDeleteResult,
     ContactCustomField,
     ContactDate,
     ContactEmail,
@@ -24,6 +25,7 @@ from inkbox.contacts.types import (
     ContactReviewStatus,
     ContactWebsite,
 )
+from inkbox.imessage.types import _validate_idempotency_key
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -85,7 +87,8 @@ class ContactsResource:
                 ``company_name``, ``job_title``, and ``notes``. Max 100 chars.
             order: ``"name"`` or ``"recent"`` sort order (server default applies).
             limit: Max rows to return.
-            offset: Offset for paging.
+            offset: Offset for paging, from 0 through 10,000.
+            review_status: Review states to include.
         """
         params: dict[str, Any] = {}
         if q is not None:
@@ -157,6 +160,7 @@ class ContactsResource:
         dates: list[ContactDate] | None = None,
         addresses: list[ContactAddress] | None = None,
         custom_fields: list[ContactCustomField] | None = None,
+        idempotency_key: str | None = None,
     ) -> Contact:
         """Create a new contact.
 
@@ -192,7 +196,12 @@ class ContactsResource:
             wire = _items_to_wire(items)
             if wire is not None:
                 body[name] = wire
-        data = self._http.post(_BASE, json=body)
+        headers = (
+            {"Idempotency-Key": _validate_idempotency_key(idempotency_key)}
+            if idempotency_key is not None
+            else None
+        )
+        data = self._http.post(_BASE, json=body, headers=headers)
         return Contact._from_dict(data)
 
     def update(
@@ -216,6 +225,7 @@ class ContactsResource:
         addresses: list[ContactAddress] | None = _UNSET,  # type: ignore[assignment]
         custom_fields: list[ContactCustomField] | None = _UNSET,  # type: ignore[assignment]
         review_status: ContactReviewStatus | str = _UNSET,  # type: ignore[assignment]
+        idempotency_key: str | None = None,
     ) -> Contact:
         """JSON-merge-patch update.
 
@@ -255,7 +265,12 @@ class ContactsResource:
             if items is _UNSET:
                 continue
             body[name] = _items_to_wire(items) if items is not None else None
-        data = self._http.patch(f"{_BASE}/{contact_id}", json=body)
+        headers = (
+            {"Idempotency-Key": _validate_idempotency_key(idempotency_key)}
+            if idempotency_key is not None
+            else None
+        )
+        data = self._http.patch(f"{_BASE}/{contact_id}", json=body, headers=headers)
         return Contact._from_dict(data)
 
     def merge(
@@ -275,6 +290,27 @@ class ContactsResource:
         data = self._http.post(f"{_BASE}/{contact_id}/merge", json=body)
         return Contact._from_dict(data)
 
-    def delete(self, contact_id: UUID | str) -> None:
+    def delete(
+        self,
+        contact_id: UUID | str,
+        *,
+        idempotency_key: str | None = None,
+    ) -> None:
         """Delete a contact."""
-        self._http.delete(f"{_BASE}/{contact_id}")
+        headers = (
+            {"Idempotency-Key": _validate_idempotency_key(idempotency_key)}
+            if idempotency_key is not None
+            else None
+        )
+        self._http.delete(f"{_BASE}/{contact_id}", headers=headers)
+
+    def bulk_delete(
+        self,
+        contact_ids: list[UUID | str],
+    ) -> ContactBulkDeleteResult:
+        """Delete multiple contacts and return per-contact outcomes."""
+        data = self._http.post(
+            f"{_BASE}/bulk-delete",
+            json={"contact_ids": [str(contact_id) for contact_id in contact_ids]},
+        )
+        return ContactBulkDeleteResult._from_dict(data)

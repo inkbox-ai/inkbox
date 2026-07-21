@@ -56,6 +56,12 @@ export type ContactNameSource =
   | "mail_header"
   | "identifier_fallback";
 
+export interface ContactMemorySummary {
+  id: string;
+  content: string;
+  updatedAt: Date;
+}
+
 export interface Contact {
   id: string;
   organizationId: string | null;
@@ -88,6 +94,7 @@ export interface Contact {
   isAutoCreated: boolean;
   isConfirmed: boolean;
   memoryCount: number | null;
+  latestMemory?: ContactMemorySummary | null;
   status: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -117,6 +124,24 @@ export interface ContactImportResult {
   readonly createdIds: string[];
   /** Convenience: per-card entries where `status === "error"`. */
   readonly errors: ContactImportResultItem[];
+}
+
+export interface ContactBulkDeleteResultItem {
+  contactId: string;
+  status: "deleted" | "error";
+  error: string | null;
+}
+
+export interface ContactBulkDeleteResult {
+  deletedCount: number;
+  errorCount: number;
+  results: ContactBulkDeleteResultItem[];
+}
+
+export interface ContactVCardExportResult {
+  contentType: string;
+  contactCount: number;
+  vcard: string;
 }
 
 // ---- wire types ----
@@ -195,9 +220,32 @@ export interface RawContact {
   is_auto_created?: boolean;
   is_confirmed?: boolean;
   memory_count?: number | null;
+  latest_memory?: RawContactMemorySummary | null;
   status?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface RawContactMemorySummary {
+  id: string;
+  content: string;
+  updated_at: string;
+}
+
+export interface RawContactBulkDeleteResult {
+  deleted_count: number;
+  error_count: number;
+  results: Array<{
+    contact_id: string;
+    status: "deleted" | "error";
+    error?: string | null;
+  }>;
+}
+
+export interface RawContactVCardExportResult {
+  content_type: string;
+  contact_count: number;
+  vcard: string;
 }
 
 export interface RawContactImportResultItem {
@@ -300,9 +348,40 @@ export function parseContact(r: RawContact): Contact {
     isAutoCreated: r.is_auto_created ?? false,
     isConfirmed: r.is_confirmed ?? true,
     memoryCount: r.memory_count ?? null,
+    latestMemory: r.latest_memory
+      ? {
+          id: r.latest_memory.id,
+          content: r.latest_memory.content,
+          updatedAt: new Date(r.latest_memory.updated_at),
+        }
+      : null,
     status: r.status ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseContactBulkDeleteResult(
+  r: RawContactBulkDeleteResult,
+): ContactBulkDeleteResult {
+  return {
+    deletedCount: r.deleted_count,
+    errorCount: r.error_count,
+    results: r.results.map((item) => ({
+      contactId: item.contact_id,
+      status: item.status,
+      error: item.error ?? null,
+    })),
+  };
+}
+
+export function parseContactVCardExportResult(
+  r: RawContactVCardExportResult,
+): ContactVCardExportResult {
+  return {
+    contentType: r.content_type,
+    contactCount: r.contact_count,
+    vcard: r.vcard,
   };
 }
 

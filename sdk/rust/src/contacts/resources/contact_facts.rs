@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use crate::contacts::types::{ContactFact, ContactFactCitationDetail};
-use crate::error::Result;
+use crate::contacts::types::{ContactFact, ContactFactCitationDetail, ContactFactDeleteResult};
+use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
 const BASE: &str = "/contacts";
@@ -44,6 +44,36 @@ impl ContactFactsResource {
             &format!("{BASE}/{contact_id}/facts/{fact_id}/citations/{citation_id}"),
             NO_QUERY,
         )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Resolve the authorized URL returned on an available citation.
+    pub fn resolve_citation_url(&self, source_url: &str) -> Result<ContactFactCitationDetail> {
+        let path = if source_url.starts_with("http://") || source_url.starts_with("https://") {
+            let parsed = reqwest::Url::parse(source_url)
+                .map_err(|_| InkboxError::InvalidArgument("invalid citation source URL".into()))?;
+            match parsed.query() {
+                Some(query) => format!("{}?{query}", parsed.path()),
+                None => parsed.path().to_string(),
+            }
+        } else {
+            source_url.to_string()
+        };
+        let relative_path = path.strip_prefix("/api/v1").unwrap_or(&path);
+        if !relative_path.starts_with("/contacts/") {
+            return Err(InkboxError::InvalidArgument(
+                "source_url must be a contact citation URL".into(),
+            ));
+        }
+        let data = self.http.get(relative_path, NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Delete a fact using an organization-wide credential.
+    pub fn delete(&self, contact_id: &str, fact_id: &str) -> Result<ContactFactDeleteResult> {
+        let data = self
+            .http
+            .delete_with_response(&format!("{BASE}/{contact_id}/facts/{fact_id}"))?;
         Ok(serde_json::from_value(data)?)
     }
 }
@@ -94,5 +124,49 @@ mod tests {
             facts[0].citations[0].availability,
             ContactFactCitationAvailability::SourceUnavailableToCaller
         );
+    }
+
+    #[test]
+    fn resolves_citation_url_and_deletes_fact() {
+        let server = MockServer::start();
+        let citation = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/contacts/contact-1/facts/fact-1/citations/citation-1")
+                .query_param("view", "source");
+            then.status(200).json_body(json!({
+                "source_type": "email",
+                "source_id": "22222222-2222-2222-2222-222222222222",
+                "source_locator": {"part": "body"}
+            }));
+        });
+        let delete = server.mock(|when, then| {
+            when.method(DELETE)
+                .path("/api/v1/contacts/contact-1/facts/fact-1");
+            then.status(200).json_body(json!({
+                "deleted_fact_id": "22222222-2222-2222-2222-222222222222",
+                "memory_count": 0,
+                "latest_memory": null
+            }));
+        });
+        let sdk = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+
+        sdk.contacts()
+            .facts()
+            .resolve_citation_url(
+                "/api/v1/contacts/contact-1/facts/fact-1/citations/citation-1?view=source",
+            )
+            .unwrap();
+        let result = sdk
+            .contacts()
+            .facts()
+            .delete("contact-1", "fact-1")
+            .unwrap();
+
+        citation.assert();
+        delete.assert();
+        assert_eq!(result.memory_count, 0);
     }
 }

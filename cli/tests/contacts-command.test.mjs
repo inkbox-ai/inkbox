@@ -18,11 +18,13 @@ test("contacts exposes contact-memory commands", () => {
   assert.match(text, /merge/);
 });
 
-test("contact facts exposes list, get, and citation", () => {
+test("contact facts exposes read and deletion commands", () => {
   const text = help("contacts", "facts");
   assert.match(text, /list (?:\[options\] )?<contact-id>/);
   assert.match(text, /get <contact-id> <fact-id>/);
   assert.match(text, /citation <contact-id> <fact-id> <citation-id>/);
+  assert.match(text, /citation-url <source-url>/);
+  assert.match(text, /delete <contact-id> <fact-id>/);
 });
 
 test("contact lifecycle options are discoverable", () => {
@@ -30,6 +32,16 @@ test("contact lifecycle options are discoverable", () => {
   assert.doesNotMatch(help("contacts", "get"), /--include-dismissed/);
   assert.doesNotMatch(help("contacts", "correspondence"), /--include-dismissed/);
   assert.doesNotMatch(help("contacts", "facts", "list"), /--include-dismissed/);
+  assert.match(help("contacts", "create"), /--idempotency-key <key>/);
+  assert.match(help("contacts", "update", "contact-id"), /--idempotency-key <key>/);
+  assert.match(help("contacts", "delete", "contact-id"), /--idempotency-key <key>/);
+  assert.match(help("contacts", "import", "contacts.vcf"), /--idempotency-key <key>/);
+});
+
+test("contacts exposes bulk deletion and batch export", () => {
+  const text = help("contacts");
+  assert.match(text, /bulk-delete <contact-id\.\.\.>/);
+  assert.match(text, /export-many (?:\[options\] )?<contact-id\.\.\.>/);
 });
 
 test("contact access retains list and removes mutation commands", () => {

@@ -4,7 +4,7 @@
  * Contacts CRUD + search + lookup.
  */
 
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
@@ -12,6 +12,7 @@ import { VCardsResource } from "./vcards.js";
 import {
   Contact,
   ContactAddress,
+  ContactBulkDeleteResult,
   ContactCustomField,
   ContactDate,
   ContactEmail,
@@ -19,6 +20,7 @@ import {
   ContactReviewStatus,
   ContactWebsite,
   RawContact,
+  RawContactBulkDeleteResult,
   contactAddressToWire,
   contactCustomFieldToWire,
   contactDateToWire,
@@ -26,6 +28,7 @@ import {
   contactPhoneToWire,
   contactWebsiteToWire,
   parseContact,
+  parseContactBulkDeleteResult,
 } from "../types.js";
 
 const BASE = "/contacts";
@@ -34,6 +37,7 @@ export interface ListContactsOptions {
   q?: string;
   order?: "name" | "recent" | string;
   limit?: number;
+  /** Offset from 0 through 10,000. */
   offset?: number;
   reviewStatus?: ContactReviewStatus[];
 }
@@ -64,6 +68,7 @@ export interface CreateContactOptions {
   dates?: ContactDate[];
   addresses?: ContactAddress[];
   customFields?: ContactCustomField[];
+  idempotencyKey?: string;
 }
 
 export interface UpdateContactOptions {
@@ -85,6 +90,7 @@ export interface UpdateContactOptions {
   addresses?: ContactAddress[] | null;
   customFields?: ContactCustomField[] | null;
   reviewStatus?: ContactReviewStatus;
+  idempotencyKey?: string;
 }
 
 export type ContactMergeField =
@@ -178,7 +184,12 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    const data = await this.http.post<RawContact>(BASE, body);
+    if (options.idempotencyKey !== undefined) validateIdempotencyKey(options.idempotencyKey);
+    const data = await this.http.post<RawContact>(BASE, body, {
+      headers: options.idempotencyKey === undefined
+        ? undefined
+        : { "Idempotency-Key": options.idempotencyKey },
+    });
     return parseContact(data);
   }
 
@@ -218,7 +229,12 @@ export class ContactsResource {
       body.custom_fields =
         options.customFields === null ? null : options.customFields!.map(contactCustomFieldToWire);
     }
-    const data = await this.http.patch<RawContact>(`${BASE}/${contactId}`, body);
+    if (options.idempotencyKey !== undefined) validateIdempotencyKey(options.idempotencyKey);
+    const data = await this.http.patch<RawContact>(`${BASE}/${contactId}`, body, {
+      headers: options.idempotencyKey === undefined
+        ? undefined
+        : { "Idempotency-Key": options.idempotencyKey },
+    });
     return parseContact(data);
   }
 
@@ -247,7 +263,19 @@ export class ContactsResource {
     return parseContact(data);
   }
 
-  async delete(contactId: string): Promise<void> {
-    await this.http.delete(`${BASE}/${contactId}`);
+  async delete(contactId: string, options: { idempotencyKey?: string } = {}): Promise<void> {
+    if (options.idempotencyKey !== undefined) validateIdempotencyKey(options.idempotencyKey);
+    await this.http.delete(`${BASE}/${contactId}`, {
+      headers: options.idempotencyKey === undefined
+        ? undefined
+        : { "Idempotency-Key": options.idempotencyKey },
+    });
+  }
+
+  async bulkDelete(contactIds: string[]): Promise<ContactBulkDeleteResult> {
+    const data = await this.http.post<RawContactBulkDeleteResult>(`${BASE}/bulk-delete`, {
+      contact_ids: contactIds,
+    });
+    return parseContactBulkDeleteResult(data);
   }
 }

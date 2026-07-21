@@ -172,4 +172,76 @@ describe("contact memory", () => {
     expect(call.channel === "calls" && call.transcript?.[0].omittedTurns).toBe(3);
     expect(result.nextCursor).toBe("next-page");
   });
+
+  it("supports fact deletion, citation URLs, bulk deletion, and batch export", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeOkResponse({
+        source_type: "email_message",
+        source_id: "message-1",
+        source_locator: { paragraph: 2 },
+        source_url: null,
+      }))
+      .mockResolvedValueOnce(makeOkResponse({
+        deleted_fact_id: "fact-1",
+        memory_count: 0,
+        latest_memory: null,
+      }))
+      .mockResolvedValueOnce(makeOkResponse({
+        deleted_count: 1,
+        error_count: 0,
+        results: [{ contact_id: "contact-1", status: "deleted", error: null }],
+      }))
+      .mockResolvedValueOnce(makeOkResponse({
+        content_type: "text/vcard; charset=utf-8",
+        contact_count: 1,
+        vcard: "BEGIN:VCARD\r\nEND:VCARD\r\n",
+      }));
+    const resource = new ContactsResource(new HttpTransport("k", BASE));
+
+    await resource.facts.resolveCitationUrl(
+      `${BASE}/contacts/contact-1/facts/fact-1/citations/citation-1?view=source`,
+    );
+    const deletedFact = await resource.facts.delete("contact-1", "fact-1");
+    const deletedContacts = await resource.bulkDelete(["contact-1"]);
+    const exported = await resource.vcards.exportMany(["contact-1"]);
+
+    expect(deletedFact.memoryCount).toBe(0);
+    expect(deletedContacts.deletedCount).toBe(1);
+    expect(exported.contactCount).toBe(1);
+    expect(new URL(vi.mocked(fetch).mock.calls[0][0] as string).search).toBe("?view=source");
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => new URL(url as string).pathname)).toEqual([
+      "/api/v1/contacts/contact-1/facts/fact-1/citations/citation-1",
+      "/api/v1/contacts/contact-1/facts/fact-1",
+      "/api/v1/contacts/bulk-delete",
+      "/api/v1/contacts/vcard-export",
+    ]);
+  });
+
+  it("forwards idempotency keys on contact mutations and vCard import", async () => {
+    const contact = {
+      id: "contact-1",
+      preferred_name: "Alex",
+      given_name: "Alex",
+      family_name: null,
+      company_name: null,
+      job_title: null,
+      notes: null,
+      created_at: "2026-07-20T10:00:00Z",
+      updated_at: "2026-07-20T10:00:00Z",
+    };
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeOkResponse(contact))
+      .mockResolvedValueOnce(makeOkResponse(contact))
+      .mockResolvedValueOnce(makeOkResponse({}))
+      .mockResolvedValueOnce(makeOkResponse({ created_count: 0, error_count: 0, results: [] }));
+    const resource = new ContactsResource(new HttpTransport("k", BASE));
+
+    await resource.create({ givenName: "Alex", idempotencyKey: "create-contact-1" });
+    await resource.update("contact-1", { notes: "Updated", idempotencyKey: "update-contact-1" });
+    await resource.delete("contact-1", { idempotencyKey: "delete-contact-1" });
+    await resource.vcards.import("BEGIN:VCARD\r\nEND:VCARD\r\n", "text/vcard", "import-vcard-1");
+
+    expect(vi.mocked(fetch).mock.calls.map(([, init]) => new Headers(init?.headers).get("Idempotency-Key")))
+      .toEqual(["create-contact-1", "update-contact-1", "delete-contact-1", "import-vcard-1"]);
+  });
 });

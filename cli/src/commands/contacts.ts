@@ -99,6 +99,28 @@ function registerContactFactsCommands(parent: Command): void {
         output(citation as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
     );
+
+  facts
+    .command("citation-url <source-url>")
+    .description("Resolve an available fact citation URL")
+    .action(
+      withErrorHandler(async function (this: Command, sourceUrl: string) {
+        const opts = getGlobalOpts(this);
+        const citation = await createClient(opts).contacts.facts.resolveCitationUrl(sourceUrl);
+        output(citation as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  facts
+    .command("delete <contact-id> <fact-id>")
+    .description("Delete a contact fact")
+    .action(
+      withErrorHandler(async function (this: Command, contactId: string, factId: string) {
+        const opts = getGlobalOpts(this);
+        const result = await createClient(opts).contacts.facts.delete(contactId, factId);
+        output(result as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
 }
 
 export function registerContactsCommands(program: Command): void {
@@ -117,7 +139,7 @@ export function registerContactsCommands(program: Command): void {
       collectValues,
     )
     .option("--limit <n>", "Max rows", (v) => parseInt(v, 10))
-    .option("--offset <n>", "Offset", (v) => parseInt(v, 10))
+    .option("--offset <n>", "Offset (0-10000)", (v) => parseInt(v, 10))
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -243,13 +265,15 @@ export function registerContactsCommands(program: Command): void {
     .command("create")
     .description("Create a contact (pass the full payload as JSON)")
     .requiredOption("--json <payload>", "JSON payload matching CreateContactOptions")
+    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { json: string },
+        cmdOpts: { json: string; idempotencyKey?: string },
       ) {
         const opts = getGlobalOpts(this);
         const payload = parseJsonArg<CreateContactOptions>(cmdOpts.json, "--json payload");
+        if (cmdOpts.idempotencyKey !== undefined) payload.idempotencyKey = cmdOpts.idempotencyKey;
         const inkbox = createClient(opts);
         const contact = await inkbox.contacts.create(payload);
         output(contact as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -260,14 +284,16 @@ export function registerContactsCommands(program: Command): void {
     .command("update <contact-id>")
     .description("JSON-merge-patch update (pass the patch as JSON)")
     .requiredOption("--json <payload>", "JSON patch matching UpdateContactOptions")
+    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
       withErrorHandler(async function (
         this: Command,
         contactId: string,
-        cmdOpts: { json: string },
+        cmdOpts: { json: string; idempotencyKey?: string },
       ) {
         const opts = getGlobalOpts(this);
         const patch = parseJsonArg<Record<string, unknown>>(cmdOpts.json, "--json patch");
+        if (cmdOpts.idempotencyKey !== undefined) patch.idempotencyKey = cmdOpts.idempotencyKey;
         const inkbox = createClient(opts);
         const contact = await inkbox.contacts.update(contactId, patch);
         output(contact as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -277,12 +303,28 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("delete <contact-id>")
     .description("Delete a contact")
+    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
-      withErrorHandler(async function (this: Command, contactId: string) {
+      withErrorHandler(async function (
+        this: Command,
+        contactId: string,
+        cmdOpts: { idempotencyKey?: string },
+      ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        await inkbox.contacts.delete(contactId);
+        await inkbox.contacts.delete(contactId, { idempotencyKey: cmdOpts.idempotencyKey });
         console.log(`Deleted contact ${contactId}.`);
+      }),
+    );
+
+  contacts
+    .command("bulk-delete <contact-id...>")
+    .description("Delete multiple contacts")
+    .action(
+      withErrorHandler(async function (this: Command, contactIds: string[]) {
+        const opts = getGlobalOpts(this);
+        const result = await createClient(opts).contacts.bulkDelete(contactIds);
+        output(result as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
     );
 
@@ -318,13 +360,45 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("import <file>")
     .description("Bulk vCard import (text/vcard, ≤5 MiB, ≤1000 cards)")
+    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
-      withErrorHandler(async function (this: Command, file: string) {
+      withErrorHandler(async function (
+        this: Command,
+        file: string,
+        cmdOpts: { idempotencyKey?: string },
+      ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const body = readFileSync(file, "utf8");
-        const result = await inkbox.contacts.vcards.import(body);
+        const result = await inkbox.contacts.vcards.import(
+          body,
+          "text/vcard",
+          cmdOpts.idempotencyKey,
+        );
         output(result as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  contacts
+    .command("export-many <contact-id...>")
+    .description("Export up to 25 contacts as one vCard document")
+    .option("--out <file>", "Write to file instead of stdout")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        contactIds: string[],
+        cmdOpts: { out?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const result = await createClient(opts).contacts.vcards.exportMany(contactIds);
+        if (cmdOpts.out) {
+          writeFileSync(cmdOpts.out, result.vcard, "utf8");
+          if (!opts.json) console.log(`Wrote ${cmdOpts.out}`);
+        } else if (opts.json) {
+          output(result as unknown as Record<string, unknown>, { json: true });
+        } else {
+          process.stdout.write(result.vcard);
+        }
       }),
     );
 

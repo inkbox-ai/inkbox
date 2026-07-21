@@ -79,7 +79,7 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 - `identity signing-key rotate <handle>` (rotates that identity's webhook signing key)
 - `signing-key create` (DEPRECATED org-level path)
 
-`contacts delete`, `notes delete`, `identity mail-rules delete`, `identity phone-rules delete`, `mailbox rules delete` (deprecated), and `number rules delete` (deprecated) remove data or affect downstream filtering — confirm intent before running.
+`contacts delete`, `contacts bulk-delete`, `contacts facts delete`, `notes delete`, `identity mail-rules delete`, `identity phone-rules delete`, `mailbox rules delete` (deprecated), and `number rules delete` (deprecated) remove data or affect downstream filtering — confirm intent before running.
 
 Also confirm before creating or rotating secrets if the values were not explicitly provided by the user.
 
@@ -496,17 +496,21 @@ inkbox number rules delete <rule-id> --number <id>                              
 Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
 ```bash
-inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]
+inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]  # offset max 10000
 inkbox contacts get <contact-id>
-inkbox contacts create --json <payload>            # JSON matching CreateContactOptions
-inkbox contacts update <contact-id> --json <patch>  # JSON-merge-patch
-inkbox contacts delete <contact-id>
+inkbox contacts create --json <payload> [--idempotency-key <key>]
+inkbox contacts update <contact-id> --json <patch> [--idempotency-key <key>]
+inkbox contacts delete <contact-id> [--idempotency-key <key>]
+inkbox contacts bulk-delete <contact-id...>
 inkbox contacts lookup (--email <email> | --email-contains <s> | --email-domain <d> | --phone <e164> | --phone-contains <s>)
-inkbox contacts import <file.vcf>                  # bulk vCard import (≤5 MiB, ≤1000 cards)
+inkbox contacts import <file.vcf> [--idempotency-key <key>]
 inkbox contacts export <contact-id> [--out <file>] # vCard 4.0 to stdout or file
+inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts facts list <contact-id>
 inkbox contacts facts get <contact-id> <fact-id>
 inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
+inkbox contacts facts citation-url <source-url>
+inkbox contacts facts delete <contact-id> <fact-id>  # admin only
 inkbox contacts correspondence <contact-id> [--identity <uuid>] [--channels <channel>]
 inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <json>]
 inkbox contacts access list <contact-id>             # compatibility read only

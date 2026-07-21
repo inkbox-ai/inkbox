@@ -498,8 +498,14 @@ export class HttpTransport {
     });
   }
 
-  async delete(path: string, opts?: { timeoutMs?: number }): Promise<void> {
-    await this.request<void>("DELETE", path, { timeoutMs: opts?.timeoutMs });
+  async delete(
+    path: string,
+    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+  ): Promise<void> {
+    await this.request<void>("DELETE", path, {
+      timeoutMs: opts?.timeoutMs,
+      headers: opts?.headers,
+    });
   }
 
   /**
@@ -508,8 +514,14 @@ export class HttpTransport {
    * Used by endpoints (e.g. tunnels) that respond with a representation
    * of the deleted resource rather than 204 No Content.
    */
-  async deleteWithResponse<T>(path: string, opts?: { timeoutMs?: number }): Promise<T> {
-    return this.request<T>("DELETE", path, { timeoutMs: opts?.timeoutMs });
+  async deleteWithResponse<T>(
+    path: string,
+    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+  ): Promise<T> {
+    return this.request<T>("DELETE", path, {
+      timeoutMs: opts?.timeoutMs,
+      headers: opts?.headers,
+    });
   }
 
   /**
@@ -521,8 +533,13 @@ export class HttpTransport {
     path: string,
     body: string | Uint8Array,
     contentType: string,
+    opts?: { headers?: Record<string, string> },
   ): Promise<T> {
-    return this.request<T>("POST", path, { rawBody: body, contentType });
+    return this.request<T>("POST", path, {
+      rawBody: body,
+      contentType,
+      headers: opts?.headers,
+    });
   }
 
   /**

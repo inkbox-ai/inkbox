@@ -864,11 +864,13 @@ const contact = await inkbox.contacts.create({
   familyName: "Lovelace",
   emails: [{ label: "work", value: "ada@example.com" }],
   phones: [{ label: "mobile", value: "+15551234567" }],
+  idempotencyKey: "create-ada-1",
 });
 await inkbox.contacts.get(contact.id);
 await inkbox.contacts.list({ q: "ada", order: "recent", reviewStatus: ["confirmed"] });
-await inkbox.contacts.update(contact.id, { jobTitle: "Analyst" });   // JSON-merge-patch
-await inkbox.contacts.delete(contact.id);
+await inkbox.contacts.update(contact.id, { jobTitle: "Analyst", idempotencyKey: "update-ada-1" });
+await inkbox.contacts.delete(contact.id, { idempotencyKey: "delete-ada-1" });
+await inkbox.contacts.bulkDelete(["contact-uuid-1", "contact-uuid-2"]);
 
 // Reverse-lookup — exactly one filter required (else thrown before HTTP)
 await inkbox.contacts.lookup({ email: "ada@example.com" });
@@ -882,7 +884,9 @@ await inkbox.contacts.access.list(contact.id);
 
 // Facts, citations, correspondence, and duplicate merging
 const facts = await inkbox.contacts.facts.list(contact.id);
-console.log(facts[0]?.citations[0]?.sourceUrl);
+const sourceUrl = facts[0]?.citations[0]?.sourceUrl;
+if (sourceUrl) await inkbox.contacts.facts.resolveCitationUrl(sourceUrl);
+await inkbox.contacts.facts.delete(contact.id, facts[0].id);  // admin only
 const history = await inkbox.contacts.correspondence.get(contact.id, {
   identityId: "identity-uuid",
   channels: ["email", "sms"],
@@ -892,13 +896,17 @@ const survivor = await inkbox.contacts.merge(contact.id, {
 });
 
 // vCards
-const result = await inkbox.contacts.vcards.import(vcfText);  // bulk, ≤5 MiB, ≤1000 cards
+const result = await inkbox.contacts.vcards.import(
+  vcfText, "text/vcard", "import-contacts-1",
+);  // bulk, ≤5 MiB, ≤1000 cards
 console.log(result.createdIds);
 for (const item of result.errors) {
   console.log(item.index, item.error);
 }
 
 const vcf = await inkbox.contacts.vcards.export(contact.id);  // vCard 4.0 string
+const batch = await inkbox.contacts.vcards.exportMany(["contact-uuid-1", "contact-uuid-2"]);
+console.log(batch.vcard);
 ```
 
 ## Notes

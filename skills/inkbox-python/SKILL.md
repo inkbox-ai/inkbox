@@ -879,13 +879,15 @@ contact = inkbox.contacts.create(
     family_name="Lovelace",
     emails=[ContactEmail(label="work", value="ada@example.com")],
     phones=[ContactPhone(label="mobile", value="+15551234567")],
+    idempotency_key="create-ada-1",
 )
 inkbox.contacts.get(str(contact.id))
 inkbox.contacts.list(
     q="ada", order="recent", review_status=[ContactReviewStatus.CONFIRMED]
 )
-inkbox.contacts.update(str(contact.id), job_title="Analyst")
-inkbox.contacts.delete(str(contact.id))
+inkbox.contacts.update(str(contact.id), job_title="Analyst", idempotency_key="update-ada-1")
+inkbox.contacts.delete(str(contact.id), idempotency_key="delete-ada-1")
+inkbox.contacts.bulk_delete(["contact-uuid-1", "contact-uuid-2"])
 
 # Reverse-lookup — exactly one filter required (else ValueError before HTTP)
 inkbox.contacts.lookup(email="ada@example.com")
@@ -900,7 +902,8 @@ inkbox.contacts.access.list(str(contact.id))
 # Facts, citations, correspondence, and duplicate merging
 facts = inkbox.contacts.facts.list(str(contact.id))
 if facts and facts[0].citations and facts[0].citations[0].source_url:
-    print(facts[0].citations[0].source_url)
+    source = inkbox.contacts.facts.resolve_citation_url(facts[0].citations[0].source_url)
+inkbox.contacts.facts.delete(str(contact.id), str(facts[0].id))  # admin only
 history = inkbox.contacts.correspondence.get(
     str(contact.id),
     ContactCorrespondenceOptions(identity_id="identity-uuid", channels=["email", "sms"]),
@@ -910,12 +913,16 @@ survivor = inkbox.contacts.merge(
 )
 
 # vCards
-result = inkbox.contacts.vcards.import_vcards(vcf_text)   # bulk, ≤5 MiB, ≤1000 cards
+result = inkbox.contacts.vcards.import_vcards(
+    vcf_text, idempotency_key="import-contacts-1"
+)  # bulk, ≤5 MiB, ≤1000 cards
 print(result.created_ids)     # list[UUID]
 for item in result.errors:    # list[ContactImportResultItem]
     print(item.index, item.error)
 
 vcf = inkbox.contacts.vcards.export_vcard(str(contact.id))  # vCard 4.0 string
+batch = inkbox.contacts.vcards.export_vcards(["contact-uuid-1", "contact-uuid-2"])
+print(batch.vcard)
 ```
 
 ## Notes

@@ -120,19 +120,29 @@ class HttpTransport:
         _raise_for_status(resp)
         return resp.json()
 
-    def delete(self, path: str, *, timeout: float | None = None) -> None:
-        resp = self._send("DELETE", path, timeout=timeout)
+    def delete(
+        self,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        resp = self._send("DELETE", path, headers=headers, timeout=timeout)
         _raise_for_status(resp)
 
     def delete_with_response(
-        self, path: str, *, timeout: float | None = None,
+        self,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
     ) -> Any:
         """``DELETE`` that returns a parsed JSON body.
 
         Used by endpoints (e.g. tunnels) that respond with a representation
         of the deleted resource rather than 204 No Content.
         """
-        resp = self._send("DELETE", path, timeout=timeout)
+        resp = self._send("DELETE", path, headers=headers, timeout=timeout)
         _raise_for_status(resp)
         if resp.status_code == 204 or not resp.content:
             return None
@@ -165,14 +175,16 @@ class HttpTransport:
         content: bytes,
         content_type: str,
         accept: str = "application/json",
+        headers: dict[str, str] | None = None,
     ) -> Any:
         """POST arbitrary bytes with a caller-supplied Content-Type.
 
         Used for non-JSON payloads like vCard imports. The response is
         still decoded as JSON.
         """
-        headers = {"Content-Type": content_type, "Accept": accept}
-        resp = self._send("POST", path, content=content, headers=headers)
+        request_headers = {"Content-Type": content_type, "Accept": accept}
+        request_headers.update(headers or {})
+        resp = self._send("POST", path, content=content, headers=request_headers)
         _raise_for_status(resp)
         if resp.status_code == 204:
             return None

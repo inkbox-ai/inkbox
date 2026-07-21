@@ -51,6 +51,7 @@ def contact_payload():
         "is_auto_created": True,
         "is_confirmed": False,
         "memory_count": 3,
+        "latest_memory": {"id": SOURCE_ID, "content": "Prefers email", "updated_at": NOW},
         "status": "active",
         "created_at": NOW,
         "updated_at": NOW,
@@ -67,6 +68,7 @@ def test_contact_lifecycle_and_review_filtering():
     assert contacts[0].is_auto_created is True
     assert contacts[0].created_by_identity_id is not None
     assert contacts[0].memory_count == 3
+    assert contacts[0].latest_memory.content == "Prefers email"
     assert transport.get.call_args.kwargs["params"]["review_status"] == ["unreviewed"]
 
     transport.get.return_value = contact_payload()
@@ -206,3 +208,73 @@ def test_contact_type_is_publicly_importable():
     from inkbox import Contact as ExportedContact
 
     assert ExportedContact is Contact
+
+
+def test_contact_mutation_parity_and_idempotency():
+    transport = MagicMock()
+    transport.post.side_effect = [contact_payload(), {
+        "deleted_count": 1,
+        "error_count": 0,
+        "results": [{"contact_id": CONTACT_ID, "status": "deleted", "error": None}],
+    }]
+    transport.patch.return_value = contact_payload()
+    resource = ContactsResource(transport)
+
+    resource.create(given_name="Alex", idempotency_key="create-contact-1")
+    assert transport.post.call_args_list[0].kwargs["headers"] == {
+        "Idempotency-Key": "create-contact-1"
+    }
+    resource.update(CONTACT_ID, notes="Updated", idempotency_key="update-contact-1")
+    assert transport.patch.call_args.kwargs["headers"] == {
+        "Idempotency-Key": "update-contact-1"
+    }
+    resource.delete(CONTACT_ID, idempotency_key="delete-contact-1")
+    transport.delete.assert_called_once_with(
+        f"/contacts/{CONTACT_ID}", headers={"Idempotency-Key": "delete-contact-1"}
+    )
+    result = resource.bulk_delete([CONTACT_ID])
+    assert result.deleted_count == 1
+
+
+def test_fact_delete_citation_url_and_vcard_batch_operations():
+    transport = MagicMock()
+    transport.get.return_value = {
+        "source_type": "email",
+        "source_id": SOURCE_ID,
+        "source_locator": {"part": "body"},
+        "source_url": None,
+    }
+    transport.delete_with_response.return_value = {
+        "deleted_fact_id": SOURCE_ID,
+        "memory_count": 0,
+        "latest_memory": None,
+    }
+    transport.post.return_value = {
+        "content_type": "text/vcard; charset=utf-8",
+        "contact_count": 1,
+        "vcard": "BEGIN:VCARD\r\nEND:VCARD\r\n",
+    }
+    transport.post_bytes.return_value = {
+        "created_count": 0,
+        "error_count": 0,
+        "results": [],
+    }
+    resource = ContactsResource(transport)
+
+    resource.facts.resolve_citation_url(
+        f"https://inkbox.ai/api/v1/contacts/{CONTACT_ID}/facts/{SOURCE_ID}/citations/{SOURCE_ID}?view=source"
+    )
+    transport.get.assert_called_with(
+        f"/contacts/{CONTACT_ID}/facts/{SOURCE_ID}/citations/{SOURCE_ID}?view=source"
+    )
+    deleted = resource.facts.delete(CONTACT_ID, SOURCE_ID)
+    assert str(deleted.deleted_fact_id) == SOURCE_ID
+    assert deleted.latest_memory is None
+    exported = resource.vcards.export_vcards([CONTACT_ID])
+    assert exported.contact_count == 1
+    resource.vcards.import_vcards(
+        "BEGIN:VCARD\r\nEND:VCARD\r\n", idempotency_key="import-vcard-1"
+    )
+    assert transport.post_bytes.call_args.kwargs["headers"] == {
+        "Idempotency-Key": "import-vcard-1"
+    }

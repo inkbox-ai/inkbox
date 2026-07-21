@@ -30,6 +30,16 @@ export interface ContactFactCitationDetail {
   sourceUrl: string | null;
 }
 
+export interface ContactFactDeleteResult {
+  deletedFactId: string;
+  memoryCount: number;
+  latestMemory: {
+    id: string;
+    content: string;
+    updatedAt: Date;
+  } | null;
+}
+
 export interface RawContactFactCitation {
   source_type: string;
   availability: ContactFactCitationAvailability;
@@ -55,6 +65,16 @@ export interface RawContactFactCitationDetail {
   source_id: string;
   source_locator: Record<string, unknown>;
   source_url: string | null;
+}
+
+export interface RawContactFactDeleteResult {
+  deleted_fact_id: string;
+  memory_count: number;
+  latest_memory: {
+    id: string;
+    content: string;
+    updated_at: string;
+  } | null;
 }
 
 export function parseContactFactCitation(r: RawContactFactCitation): ContactFactCitation {
@@ -89,5 +109,21 @@ export function parseContactFactCitationDetail(
     sourceId: r.source_id,
     sourceLocator: r.source_locator,
     sourceUrl: r.source_url,
+  };
+}
+
+export function parseContactFactDeleteResult(
+  r: RawContactFactDeleteResult,
+): ContactFactDeleteResult {
+  return {
+    deletedFactId: r.deleted_fact_id,
+    memoryCount: r.memory_count,
+    latestMemory: r.latest_memory
+      ? {
+          id: r.latest_memory.id,
+          content: r.latest_memory.content,
+          updatedAt: new Date(r.latest_memory.updated_at),
+        }
+      : null,
   };
 }
