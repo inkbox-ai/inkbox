@@ -92,7 +92,9 @@ describe("MailWebhookPayload", () => {
     expect(first.address).toBe(received.data.message.from_address);
     expect(first.id).toBeTypeOf("string");
     expect(first.name).toBeTypeOf("string");
+    expect(first.memories).toStrictEqual(["Prefers email over phone calls."]);
     expect(second.bucket).toBe("cc");
+    expect(second.memories).toStrictEqual([]);
     expect(received.data.message.cc_addresses).not.toBeNull();
     expect(received.data.message.cc_addresses).toContain(second.address);
   });
@@ -121,6 +123,16 @@ describe("MailWebhookPayload", () => {
     const forwarded = loadFixture<MailWebhookPayload>("message_forwarded.json");
     expect(forwarded.data.contacts).toStrictEqual([]);
     expect(forwarded.data.agent_identities).toStrictEqual([]);
+  });
+
+  it("allows pre-memory replay contacts to omit memories", () => {
+    const contact: WebhookMailContact = {
+      bucket: "from",
+      address: "customer@example.com",
+      id: "contact_1",
+      name: "Jane Doe",
+    };
+    expect(contact.memories).toBeUndefined();
   });
 
   it("agent_identities allows display_name: null", () => {
@@ -320,12 +332,13 @@ describe("WebhookContext", () => {
           updated_at: "2026-07-04T00:04:00Z",
         },
         reaction: null,
-        contacts: [],
+        contacts: [{ id: "contact_1", name: "Jane Doe", memories: ["Prefers iMessage."] }],
         agent_identities: [],
         context: { texts: context.texts },
       },
     };
     expect(imessagePayload.data.context?.texts?.mode).toBe("window");
+    expect(imessagePayload.data.contacts[0].memories).toStrictEqual(["Prefers iMessage."]);
   });
 });
 
@@ -382,6 +395,9 @@ describe("TextWebhookPayload", () => {
     expect(payload.data.recipient_phone_number).toBeNull();
     expect(payload.data.contacts).toHaveLength(1);
     expect(payload.data.contacts[0].id).toBeTypeOf("string");
+    expect(payload.data.contacts[0].memories).toStrictEqual([
+      "Prefers text messages after 5pm.",
+    ]);
   });
 
   it("outbound 1:1 has a single-entry recipients[] and populated legacy lifecycle fields", () => {
@@ -454,6 +470,9 @@ describe("PhoneIncomingCallWebhookPayload", () => {
     expect(Array.isArray(payload.contacts)).toBe(true);
     expect(Array.isArray(payload.agent_identities)).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(payload, "contact")).toBe(false);
+    expect(payload.contacts[0].memories).toStrictEqual([
+      "Usually calls about scheduling.",
+    ]);
   });
 
   it("does not carry is_blocked on the wire", () => {
@@ -530,6 +549,9 @@ describe("CallEndedWebhookPayload", () => {
     const payload = loadFixture<CallEndedWebhookPayload>("call_ended.json");
     expect(Array.isArray(payload.data.contacts)).toBe(true);
     expect(Array.isArray(payload.data.agent_identities)).toBe(true);
+    expect(payload.data.contacts[0].memories).toStrictEqual([
+      "Prefers Thursday appointments.",
+    ]);
   });
 
   it("keeps parsing pre-Voice AI payloads that omit the new fields", () => {

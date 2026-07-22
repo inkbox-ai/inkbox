@@ -74,6 +74,8 @@ export type HangupReasonWire =
 export interface WebhookContact {
   id: string;
   name: string;
+  /** Active memories, newest first; optional only for older replays. */
+  memories?: string[];
 }
 
 /**
@@ -233,6 +235,8 @@ export interface WebhookMailContact {
   address: string;
   id: string;
   name: string;
+  /** Active memories, newest first; optional only for older replays. */
+  memories?: string[];
 }
 
 /**

@@ -112,6 +112,8 @@ class WebhookContact(TypedDict):
     """
     id: str
     name: str
+    # Active memories, newest first; optional only for older replays.
+    memories: NotRequired[list[str]]
 
 
 class WebhookAgentIdentity(TypedDict):
@@ -273,6 +275,8 @@ class WebhookMailContact(TypedDict):
     address: str
     id: str
     name: str
+    # Active memories, newest first; optional only for older replays.
+    memories: NotRequired[list[str]]
 
 
 class WebhookMailAgentIdentity(TypedDict):
