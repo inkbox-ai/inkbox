@@ -4,9 +4,10 @@ inkbox/imessage/resources/imessages.py
 iMessage operations: send, list, conversations, reactions, read
 receipts, typing indicators, media upload.
 
-iMessage messaging operations are identity/assignment-scoped, so they key off
+iMessage messaging operations are identity-scoped, so they key off
 ``conversation_id`` / ``agent_identity_id`` rather than a local number ID.
-This resource also lists and claims organization-owned dedicated numbers.
+One-to-one conversations may carry assignment state; groups require a dedicated
+outbound number. This resource also lists and claims dedicated numbers.
 """
 
 from __future__ import annotations
@@ -96,7 +97,7 @@ class IMessagesResource:
     def send(
         self,
         *,
-        to: str | None = None,
+        to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
         text: str | None = None,
         media_urls: list[str] | None = None,
@@ -110,8 +111,9 @@ class IMessagesResource:
         conversation, subject to server-side policy checks.
 
         Args:
-            to: E.164 recipient number. Mutually exclusive with
-                ``conversation_id``.
+            to: One E.164 recipient or 1–8 distinct recipients. Two or more
+                recipients select or create a dedicated-outbound group.
+                Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
             text: Message body.
             media_urls: Media URLs (at most one). Pass with ``text`` or
@@ -170,6 +172,7 @@ class IMessagesResource:
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -190,6 +193,9 @@ class IMessagesResource:
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            include_groups: Include group messages. Defaults to ``False`` for
+                backwards-compatible one-to-one listings. A specific
+                ``conversation_id`` is returned even when this is ``False``.
             start_datetime: Inclusive lower bound on ``created_at`` (str). Bare
                 dates resolve to the start of that day; naive datetimes are
                 interpreted in ``tz``; zoned datetimes are exact instants.
@@ -208,6 +214,8 @@ class IMessagesResource:
             params["is_read"] = is_read
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if include_groups:
+            params["include_groups"] = True
         if start_datetime is not None:
             params["start_datetime"] = start_datetime
         if end_datetime is not None:
@@ -248,6 +256,7 @@ class IMessagesResource:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -262,6 +271,7 @@ class IMessagesResource:
             is_blocked: Tri-state filter applied to the underlying
                 messages — ``True`` for only blocked, ``False`` for only
                 non-blocked, ``None`` for all.
+            include_groups: Include group conversations. Defaults to ``False``.
             start_datetime: Inclusive lower bound on ``created_at`` (str). Bare
                 dates resolve to the start of that day; naive datetimes are
                 interpreted in ``tz``; zoned datetimes are exact instants.
@@ -276,6 +286,8 @@ class IMessagesResource:
             params["agent_identity_id"] = str(agent_identity_id)
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if include_groups:
+            params["include_groups"] = True
         if start_datetime is not None:
             params["start_datetime"] = start_datetime
         if end_datetime is not None:

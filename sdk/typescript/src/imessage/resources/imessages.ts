@@ -107,8 +107,9 @@ export class IMessagesResource {
    * subscriptions (`inkbox.webhooks.subscriptions.create({
    * agentIdentityId, url, eventTypes: ["imessage.received", ...] })`).
    *
-   * @param options.to - E.164 recipient number. Mutually exclusive with
-   *   `conversationId`.
+   * @param options.to - One E.164 recipient or 1–8 distinct recipients. Two
+   *   or more recipients select or create a dedicated-outbound group.
+   *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
@@ -123,7 +124,7 @@ export class IMessagesResource {
    *   rule.
    */
   async send(options: {
-    to?: string | null;
+    to?: string | string[] | null;
     conversationId?: string | null;
     text?: string | null;
     mediaUrls?: string[] | null;
@@ -131,7 +132,7 @@ export class IMessagesResource {
     agentIdentityId?: string | null;
   }): Promise<IMessage> {
     const body: {
-      to?: string;
+      to?: string | string[];
       conversation_id?: string;
       text?: string;
       media_urls?: string[];
@@ -188,6 +189,7 @@ export class IMessagesResource {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
@@ -208,6 +210,9 @@ export class IMessagesResource {
     }
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
+    }
+    if (options?.includeGroups === true) {
+      params["include_groups"] = true;
     }
     if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
     if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
@@ -262,6 +267,7 @@ export class IMessagesResource {
       limit?: number;
       offset?: number;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
@@ -276,6 +282,9 @@ export class IMessagesResource {
     }
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
+    }
+    if (options?.includeGroups === true) {
+      params["include_groups"] = true;
     }
     if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
     if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;

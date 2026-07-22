@@ -512,17 +512,18 @@ class IMessageMessageReactionWire(TypedDict):
 
 class IMessageWebhookMessage(TypedDict):
     """
-    Stored iMessage. ``is_blocked`` is not part of the wire body --
-    blocked messages never reach the webhook. There is no local-number
-    field: shared pool lines are hidden from agents, so the message is
-    identified by ``conversation_id`` and the counterparty
-    ``remote_number`` only.
+    Stored iMessage. ``is_blocked`` is not part of the wire body -- blocked
+    messages never reach the webhook. Group messages have no assignment and
+    include sender/participant fields.
     """
     id: str
     conversation_id: str
-    assignment_id: str
+    assignment_id: str | None
     direction: IMessageDirectionWire
-    remote_number: str
+    remote_number: str | None
+    sender_number: NotRequired[str | None]
+    participants: NotRequired[list[str] | None]
+    is_group: NotRequired[bool]
     content: str | None
     message_type: IMessageTypeWire
     service: IMessageServiceWire

@@ -1,7 +1,9 @@
 //! Inkbox iMessage messaging and dedicated number management.
 //!
-//! Messages and conversations remain assignment-routed. Organization-owned
-//! dedicated numbers are listed and claimed through [`IMessagesResource`].
+//! Messages and conversations are identity-scoped. One-to-one conversations may
+//! carry assignment state; groups require a dedicated outbound number.
+//! Organization-owned dedicated numbers are listed and claimed through
+//! [`IMessagesResource`].
 
 pub mod resources;
 pub mod types;

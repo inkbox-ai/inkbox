@@ -1,8 +1,9 @@
 //! iMessage operations: send, list, conversations, reactions, read
 //! receipts, typing indicators, media upload.
 //!
-//! Messages and conversations remain assignment-scoped. Dedicated number
-//! ownership is managed through [`IMessagesResource::list_numbers`] and
+//! Messages and conversations are identity-scoped. One-to-one conversations may
+//! carry assignment state; groups require a dedicated outbound number. Dedicated
+//! number ownership is managed through [`IMessagesResource::list_numbers`] and
 //! [`IMessagesResource::claim_number`].
 
 use std::sync::Arc;
@@ -137,6 +138,45 @@ impl IMessagesResource {
         Ok(serde_json::from_value(message)?)
     }
 
+    /// Send to 2–8 distinct recipients from a dedicated-outbound number.
+    ///
+    /// The server selects or creates a group from the exact best-known
+    /// participant set. Use [`Self::send`] with `conversation_id` for later
+    /// replies so the canonical group remains unambiguous.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_group(
+        &self,
+        to: &[String],
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+        agent_identity_id: Option<&Uuid>,
+    ) -> Result<IMessage> {
+        let mut body = serde_json::Map::new();
+        body.insert("to".to_string(), json!(to));
+        if let Some(t) = text {
+            body.insert("text".to_string(), json!(t));
+        }
+        if let Some(urls) = media_urls {
+            body.insert("media_urls".to_string(), json!(urls));
+        }
+        if let Some(style) = send_style {
+            body.insert("send_style".to_string(), json!(style.as_str()));
+        }
+        let body = serde_json::Value::Object(body);
+
+        let mut params: Vec<(&str, String)> = Vec::new();
+        if let Some(id) = agent_identity_id {
+            params.push(("agent_identity_id", id.to_string()));
+        }
+        let data = self.http.post("/messages", Some(&body), &params)?;
+        let message = data
+            .get("message")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        Ok(serde_json::from_value(message)?)
+    }
+
     /// List iMessages visible to the caller, newest first.
     ///
     /// Identity-scoped API keys never see contact-rule-blocked rows regardless
@@ -162,7 +202,7 @@ impl IMessagesResource {
     ) -> Result<Vec<IMessage>> {
         // Delegate with an empty (default) date range — wire-identical to the
         // original list.
-        self.list_filtered(
+        self.list_filtered_with_groups(
             agent_identity_id,
             conversation_id,
             limit,
@@ -170,6 +210,31 @@ impl IMessagesResource {
             is_read,
             is_blocked,
             &DateRangeFilter::default(),
+            false,
+        )
+    }
+
+    /// List iMessages with an explicit group-visibility opt-in.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_with_groups(
+        &self,
+        agent_identity_id: Option<&Uuid>,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+    ) -> Result<Vec<IMessage>> {
+        self.list_filtered_with_groups(
+            agent_identity_id,
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+            include_groups,
         )
     }
 
@@ -194,6 +259,31 @@ impl IMessagesResource {
         is_blocked: Option<bool>,
         filter: &DateRangeFilter,
     ) -> Result<Vec<IMessage>> {
+        self.list_filtered_with_groups(
+            agent_identity_id,
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            filter,
+            false,
+        )
+    }
+
+    /// List date-filtered iMessages with an explicit group-visibility opt-in.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_filtered_with_groups(
+        &self,
+        agent_identity_id: Option<&Uuid>,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+        include_groups: bool,
+    ) -> Result<Vec<IMessage>> {
         // limit/offset always sent; httpx renders bools lowercase.
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
@@ -208,6 +298,9 @@ impl IMessagesResource {
         }
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
+        }
+        if include_groups {
+            params.push(("include_groups", "true".to_string()));
         }
         filter.apply(&mut params);
         let data = self.http.get("/messages", &params)?;
@@ -257,12 +350,32 @@ impl IMessagesResource {
     ) -> Result<Vec<IMessageConversationSummary>> {
         // Delegate with an empty (default) date range — wire-identical to the
         // original list_conversations.
-        self.list_conversations_filtered(
+        self.list_conversations_filtered_with_groups(
             agent_identity_id,
             limit,
             offset,
             is_blocked,
             &DateRangeFilter::default(),
+            false,
+        )
+    }
+
+    /// List iMessage conversations with an explicit group-visibility opt-in.
+    pub fn list_conversations_with_groups(
+        &self,
+        agent_identity_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+    ) -> Result<Vec<IMessageConversationSummary>> {
+        self.list_conversations_filtered_with_groups(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+            include_groups,
         )
     }
 
@@ -285,6 +398,26 @@ impl IMessagesResource {
         is_blocked: Option<bool>,
         filter: &DateRangeFilter,
     ) -> Result<Vec<IMessageConversationSummary>> {
+        self.list_conversations_filtered_with_groups(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            filter,
+            false,
+        )
+    }
+
+    /// List date-filtered conversations with an explicit group-visibility opt-in.
+    pub fn list_conversations_filtered_with_groups(
+        &self,
+        agent_identity_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+        include_groups: bool,
+    ) -> Result<Vec<IMessageConversationSummary>> {
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
         if let Some(id) = agent_identity_id {
@@ -292,6 +425,9 @@ impl IMessagesResource {
         }
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
+        }
+        if include_groups {
+            params.push(("include_groups", "true".to_string()));
         }
         filter.apply(&mut params);
         let data = self.http.get("/conversations", &params)?;
@@ -419,6 +555,29 @@ mod tests {
             "status": "active",
             "agent_identity_id": null,
             "agent_handle": null
+        })
+    }
+
+    fn group_message_json() -> serde_json::Value {
+        json!({
+            "id": "22222222-2222-2222-2222-222222222222",
+            "conversation_id": "33333333-3333-3333-3333-333333333333",
+            "assignment_id": null,
+            "direction": "outbound",
+            "remote_number": null,
+            "sender_number": null,
+            "participants": ["+15550001111", "+15550002222"],
+            "is_group": true,
+            "content": "Hello group",
+            "message_type": "message",
+            "service": "imessage",
+            "is_read": false,
+            "recipients": [
+                {"remote_number": "+15550001111", "delivery_status": "queued"},
+                {"remote_number": "+15550002222", "delivery_status": "queued"}
+            ],
+            "created_at": "2026-07-22T00:00:00Z",
+            "updated_at": "2026-07-22T00:00:00Z"
         })
     }
 
@@ -570,5 +729,87 @@ mod tests {
             .unwrap_err();
         mock.assert();
         assert!(matches!(error, InkboxError::IdempotencyKeyReused { .. }));
+    }
+
+    #[test]
+    fn send_group_serializes_recipient_list_and_parses_group_fields() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/imessage/messages")
+                .json_body(json!({
+                    "to": ["+15550001111", "+15550002222"],
+                    "text": "Hello group"
+                }));
+            then.status(200)
+                .json_body(json!({"message": group_message_json()}));
+        });
+
+        let recipients = vec!["+15550001111".to_string(), "+15550002222".to_string()];
+        let message = client(&server)
+            .imessages()
+            .send_group(&recipients, Some("Hello group"), None, None, None)
+            .unwrap();
+
+        mock.assert();
+        assert!(message.is_group);
+        assert_eq!(message.assignment_id, None);
+        assert_eq!(message.remote_number, None);
+        assert_eq!(message.participants, Some(recipients));
+        assert_eq!(message.recipients.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn list_with_groups_sends_explicit_opt_in() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/imessage/messages")
+                .query_param("limit", "50")
+                .query_param("offset", "0")
+                .query_param("include_groups", "true");
+            then.status(200).json_body(json!([group_message_json()]));
+        });
+
+        let messages = client(&server)
+            .imessages()
+            .list_with_groups(None, None, 50, 0, None, None, true)
+            .unwrap();
+
+        mock.assert();
+        assert!(messages[0].is_group);
+    }
+
+    #[test]
+    fn list_conversations_with_groups_parses_nullable_assignment() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/imessage/conversations")
+                .query_param("limit", "50")
+                .query_param("offset", "0")
+                .query_param("include_groups", "true");
+            then.status(200).json_body(json!([{
+                "id": "33333333-3333-3333-3333-333333333333",
+                "assignment_id": null,
+                "assignment_status": null,
+                "remote_number": null,
+                "participants": ["+15550001111", "+15550002222"],
+                "is_group": true,
+                "created_at": "2026-07-22T00:00:00Z",
+                "updated_at": "2026-07-22T00:00:00Z"
+            }]));
+        });
+
+        let conversations = client(&server)
+            .imessages()
+            .list_conversations_with_groups(None, 50, 0, None, true)
+            .unwrap();
+
+        mock.assert();
+        assert!(conversations[0].is_group);
+        assert_eq!(conversations[0].assignment_id, None);
+        assert_eq!(conversations[0].assignment_status, None);
+        assert_eq!(conversations[0].remote_number, None);
     }
 }

@@ -339,6 +339,24 @@ describe("WebhookContext", () => {
     };
     expect(imessagePayload.data.context?.texts?.mode).toBe("window");
     expect(imessagePayload.data.contacts[0].memories).toStrictEqual(["Prefers iMessage."]);
+
+    const groupPayload: IMessageWebhookPayload = {
+      ...imessagePayload,
+      id: "evt_context_imessage_group",
+      data: {
+        ...imessagePayload.data,
+        message: {
+          ...imessagePayload.data.message!,
+          assignment_id: null,
+          remote_number: "+15551234567",
+          sender_number: "+15551234567",
+          participants: ["+15551234567", "+15557654321"],
+          is_group: true,
+        },
+      },
+    };
+    expect(groupPayload.data.message?.assignment_id).toBeNull();
+    expect(groupPayload.data.message?.participants).toHaveLength(2);
   });
 });
 

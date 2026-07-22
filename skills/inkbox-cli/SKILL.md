@@ -306,15 +306,16 @@ inkbox text mark-conversation-read <conversation-key> -i <handle>
 
 ## iMessage
 
-All iMessage commands are identity-scoped and require `-i <handle>`. iMessage has no per-identity number: recipients connect to an agent identity through a shared pool of numbers via the triage line, which creates an assignment for that one recipient. There is **no cold outreach** — sends only work toward recipients who connected first, and the identity must be opted in (`inkbox identity update <handle> --imessage-enabled true`).
+All iMessage commands are identity-scoped and require `-i <handle>`. Shared service and dedicated inbound require the recipient to message first; dedicated outbound identities may initiate one-to-one and group conversations. The identity must be opted in (`inkbox identity update <handle> --imessage-enabled true`).
 
 ```bash
 inkbox imessage triage-number   # the router number + the connect command humans text to it
 inkbox imessage send -i <handle> --to +15551234567 --text "Hello over iMessage"
+inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello group" # dedicated outbound only
 inkbox imessage send -i <handle> --conversation-id <conversation-uuid> --text "Reply" --send-style slam
-inkbox imessage list -i <handle> --limit 20 --unread-only
+inkbox imessage list -i <handle> --limit 20 --unread-only --include-groups
 inkbox imessage assignments -i <handle> --limit 20   # active connections, newest first
-inkbox imessage conversations -i <handle> --limit 20
+inkbox imessage conversations -i <handle> --limit 20 --include-groups
 inkbox imessage conversation <conversation-id> -i <handle> --limit 50
 inkbox imessage react <message-id> -i <handle> --reaction like
 inkbox imessage mark-conversation-read <conversation-id> -i <handle>

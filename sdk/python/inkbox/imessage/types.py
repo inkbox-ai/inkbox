@@ -3,9 +3,10 @@ inkbox/imessage/types.py
 
 Dataclasses mirroring the Inkbox iMessage API response models.
 
-iMessage records route by assignment and are keyed by ``conversation_id`` /
-``remote_number``. Shared local numbers are never exposed; dedicated-number
-ownership and attachment are represented separately by ``IMessageNumber``.
+iMessage records are keyed by ``conversation_id``. One-to-one rows also expose
+assignment and remote-number state; dedicated-outbound groups instead expose
+participant snapshots. Dedicated-number ownership and attachment are represented
+separately by ``IMessageNumber``.
 """
 
 from __future__ import annotations
@@ -239,18 +240,17 @@ class IMessageMessageReaction:
 
 @dataclass
 class IMessage:
-    """An iMessage in an assignment-routed conversation.
+    """An iMessage in a one-to-one or group conversation.
 
-    Message rows do not expose their local service number, so messages are
-    identified by ``conversation_id`` and the counterparty
-    ``remote_number``.
+    Group rows have ``is_group=True``, no assignment, a best-known participant
+    snapshot, and per-recipient outbound delivery state.
     """
 
     id: UUID
     conversation_id: UUID
-    assignment_id: UUID
+    assignment_id: UUID | None
     direction: str  # "inbound" | "outbound"
-    remote_number: str
+    remote_number: str | None
     content: str | None
     message_type: str  # "message" | "carousel"
     service: IMessageService
@@ -269,6 +269,11 @@ class IMessage:
     recipients: list[IMessageRecipient] | None = None
     # Live (non-removed) tapbacks targeting this message, oldest first.
     reactions: list[IMessageMessageReaction] | None = None
+    # Additive group fields stay at the end to preserve positional dataclass
+    # construction for callers using the pre-group field order.
+    sender_number: str | None = None
+    participants: list[str] | None = None
+    is_group: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessage:
@@ -280,9 +285,12 @@ class IMessage:
         return cls(
             id=UUID(d["id"]),
             conversation_id=UUID(d["conversation_id"]),
-            assignment_id=UUID(d["assignment_id"]),
+            assignment_id=(UUID(d["assignment_id"]) if d.get("assignment_id") else None),
             direction=d["direction"],
-            remote_number=d["remote_number"],
+            remote_number=d.get("remote_number"),
+            sender_number=d.get("sender_number"),
+            participants=d.get("participants"),
+            is_group=d.get("is_group", False),
             content=d.get("content"),
             message_type=d["message_type"],
             service=IMessageService(d["service"]),
@@ -314,31 +322,36 @@ class IMessage:
 
 @dataclass
 class IMessageConversation:
-    """One assignment-scoped iMessage conversation.
+    """One iMessage conversation.
 
-    ``assignment_status`` reflects the current connection: non-active
-    means the recipient is disconnected and the agent cannot reply until
-    they reconnect through triage.
+    One-to-one rows expose assignment state. Group rows have no assignment and
+    expose a best-known participant snapshot instead.
     """
 
     id: UUID
-    assignment_id: UUID
-    remote_number: str
+    assignment_id: UUID | None
+    remote_number: str | None
     created_at: datetime
     updated_at: datetime
-    assignment_status: IMessageAssignmentStatus = IMessageAssignmentStatus.ACTIVE
+    assignment_status: IMessageAssignmentStatus | None = IMessageAssignmentStatus.ACTIVE
+    participants: list[str] | None = None
+    is_group: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageConversation:
         return cls(
             id=UUID(d["id"]),
-            assignment_id=UUID(d["assignment_id"]),
-            remote_number=d["remote_number"],
+            assignment_id=(UUID(d["assignment_id"]) if d.get("assignment_id") else None),
+            remote_number=d.get("remote_number"),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
-            assignment_status=IMessageAssignmentStatus(
-                d.get("assignment_status") or "active"
+            assignment_status=(
+                IMessageAssignmentStatus(d["assignment_status"])
+                if d.get("assignment_status")
+                else (IMessageAssignmentStatus.ACTIVE if d.get("assignment_id") else None)
             ),
+            participants=d.get("participants"),
+            is_group=d.get("is_group", False),
         )
 
 
@@ -347,31 +360,37 @@ class IMessageConversationSummary:
     """Conversation list row with latest-message preview."""
 
     id: UUID
-    assignment_id: UUID
-    remote_number: str
+    assignment_id: UUID | None
+    remote_number: str | None
     latest_text: str | None = None
     latest_message_at: datetime | None = None
     latest_direction: str | None = None
     latest_has_media: bool = False
     unread_count: int = 0
     total_count: int = 0
-    assignment_status: IMessageAssignmentStatus = IMessageAssignmentStatus.ACTIVE
+    assignment_status: IMessageAssignmentStatus | None = IMessageAssignmentStatus.ACTIVE
+    participants: list[str] | None = None
+    is_group: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageConversationSummary:
         return cls(
             id=UUID(d["id"]),
-            assignment_id=UUID(d["assignment_id"]),
-            remote_number=d["remote_number"],
+            assignment_id=(UUID(d["assignment_id"]) if d.get("assignment_id") else None),
+            remote_number=d.get("remote_number"),
             latest_text=d.get("latest_text"),
             latest_message_at=_dt(d.get("latest_message_at")),
             latest_direction=d.get("latest_direction"),
             latest_has_media=d.get("latest_has_media", False),
             unread_count=d.get("unread_count", 0),
             total_count=d.get("total_count", 0),
-            assignment_status=IMessageAssignmentStatus(
-                d.get("assignment_status") or "active"
+            assignment_status=(
+                IMessageAssignmentStatus(d["assignment_status"])
+                if d.get("assignment_status")
+                else (IMessageAssignmentStatus.ACTIVE if d.get("assignment_id") else None)
             ),
+            participants=d.get("participants"),
+            is_group=d.get("is_group", False),
         )
 
 

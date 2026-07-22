@@ -830,8 +830,9 @@ export class AgentIdentity {
    * (`inkbox.webhooks.subscriptions.create({ agentIdentityId, url,
    * eventTypes: ["imessage.received", ...] })`).
    *
-   * @param options.to - E.164 recipient number. Mutually exclusive with
-   *   `conversationId`.
+   * @param options.to - One E.164 recipient or 1–8 distinct recipients. Two
+   *   or more recipients select or create a dedicated-outbound group.
+   *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
@@ -843,7 +844,7 @@ export class AgentIdentity {
    *   contact rule; other send failures.
    */
   async sendIMessage(options: {
-    to?: string | null;
+    to?: string | string[] | null;
     conversationId?: string | null;
     text?: string | null;
     mediaUrls?: string[] | null;
@@ -876,6 +877,7 @@ export class AgentIdentity {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
@@ -918,6 +920,7 @@ export class AgentIdentity {
       limit?: number;
       offset?: number;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;

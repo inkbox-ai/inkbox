@@ -387,7 +387,7 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 ## iMessage
 
-iMessage works differently from SMS: there is no per-identity iMessage number. Recipients connect to an agent identity through a small shared pool of numbers — they ask the triage line to connect them to `@agent_handle`, and that creates an assignment between that one recipient and the identity. Everything agent-facing is keyed by `conversationId` / `remoteNumber`; the shared local number is never exposed, and there is **no cold outreach** — you can only message recipients who connected first.
+iMessage can use shared service or an organization-owned dedicated number. Shared service and dedicated inbound require the recipient to message first; dedicated outbound can initiate one-to-one and group conversations, subject to server-side policy checks.
 
 Discover the router (triage) line at runtime — it can change, so never hardcode it:
 
@@ -413,6 +413,14 @@ Messaging (identity convenience methods; `inkbox.imessages` is the org-level res
 ```typescript
 // Send to a connected recipient, or reply into a conversation by UUID.
 const sent = await identity.sendIMessage({ to: "+15551234567", text: "Hello over iMessage" });
+const outboundIdentity = await inkbox.createIdentity("outbound-agent", {
+  imessageEnabled: true,
+  imessageNumberType: "dedicated_outbound",
+});
+const group = await outboundIdentity.sendIMessage({
+  to: ["+15551234567", "+15557654321"],
+  text: "Hello group",
+}); // dedicated outbound only; 2–8 distinct recipients
 const reply = await identity.sendIMessage({
   conversationId: sent.conversationId,
   text: "With style",
@@ -421,13 +429,16 @@ const reply = await identity.sendIMessage({
 console.log(sent.service, sent.status);  // "imessage", "queued"
 
 // List messages / conversations
-const msgs = await identity.listIMessages({ limit: 20, isRead: false });
-const convos = await identity.listIMessageConversations({ limit: 20 });
+const msgs = await identity.listIMessages({ limit: 20, isRead: false, includeGroups: true });
+const convos = await identity.listIMessageConversations({ limit: 20, includeGroups: true });
 const convo = await identity.getIMessageConversation(sent.conversationId);
 // assignmentStatus tells you whether the recipient is still connected:
 // anything other than "active" means sends/reactions will be refused
 // until they reconnect through triage.
 console.log(convo.assignmentStatus);
+// Group rows have isGroup=true, nullable assignment/remote fields, a
+// best-known participants snapshot, and per-recipient delivery state.
+// Reply by conversationId; group reactions/read receipts/typing return 409.
 
 // Who is actively connected to this identity right now (paginated)?
 const connections = await identity.listIMessageAssignments({ limit: 20 });

@@ -438,6 +438,10 @@ Messaging (identity convenience methods; `inkbox.imessages` is the org-level res
 ```python
 # Send to a connected recipient, or reply into a conversation by UUID.
 sent = identity.send_imessage(to="+15551234567", text="Hello over iMessage")
+group = identity.send_imessage(
+    to=["+15551234567", "+15557654321"],
+    text="Hello group",
+)  # dedicated_outbound only; 2–8 distinct recipients
 reply = identity.send_imessage(
     conversation_id=sent.conversation_id,
     text="With style",
@@ -446,13 +450,16 @@ reply = identity.send_imessage(
 print(sent.service, sent.status)  # IMessageService.IMESSAGE, IMessageDeliveryStatus.QUEUED
 
 # List messages / conversations
-msgs = identity.list_imessages(limit=20, is_read=False)
-convos = identity.list_imessage_conversations(limit=20)
+msgs = identity.list_imessages(limit=20, is_read=False, include_groups=True)
+convos = identity.list_imessage_conversations(limit=20, include_groups=True)
 convo = identity.get_imessage_conversation(sent.conversation_id)
 # assignment_status tells you whether the recipient is still connected:
 # anything other than "active" means sends/reactions will be refused
 # until they reconnect through triage.
 print(convo.assignment_status)
+# Group rows have is_group=True, nullable assignment/remote fields, a
+# best-known participants snapshot, and per-recipient delivery state.
+# Reply by conversation_id; group reactions/read receipts/typing return 409.
 
 # Who is actively connected to this identity right now (paginated)?
 connections = identity.list_imessage_assignments(limit=20)

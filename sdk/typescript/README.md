@@ -531,6 +531,7 @@ const connections = await identity.listIMessageAssignments();
 
 // Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
 // a new tapback replaces your previous one on the same message part.
+// Reactions, read receipts, and typing indicators return 409 for groups.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 
 // Read receipts, typing indicator, media.
@@ -584,6 +585,21 @@ const outboundIdentity = await inkbox.createIdentity("outreach-agent", {
   imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
 });
 console.log(outboundIdentity.imessageNumber?.number);
+
+// Dedicated outbound only: create or reuse an exact-participant group. Keep
+// the returned conversationId for later replies. An ambiguous best-known match
+// returns 409 instead of choosing a conversation.
+const group = await outboundIdentity.sendIMessage({
+  to: ["+15551234567", "+15557654321"],
+  text: "Welcome to the group!",
+});
+await outboundIdentity.sendIMessage({
+  conversationId: group.conversationId,
+  text: "Following up in the same conversation.",
+});
+const groupConvos = await outboundIdentity.listIMessageConversations({ includeGroups: true });
+const groupMessages = await outboundIdentity.listIMessages({ includeGroups: true });
+console.log(group.isGroup, group.participants, group.recipients);
 
 // Claim and atomically attach/swap during update. To attach an already-owned
 // number, pass imessageNumberId instead. Pass imessageNumberId: null to move

@@ -157,6 +157,40 @@ or claim and attach a new number by type. Claims require a stable 1–255 charac
 idempotency key; reuse the same key after an ambiguous result. Dedicated outbound
 numbers are the only number type that can start a new conversation.
 
+Dedicated outbound identities can also start group conversations. Scalar sends
+remain on `send_imessage`; groups use `send_imessage_group`, and later replies
+use the returned conversation id with `send_imessage`:
+
+```rust
+let recipients = vec!["+15551234567".to_string(), "+15557654321".to_string()];
+let group = identity.send_imessage_group(
+    &recipients,
+    Some("Welcome to the group!"),
+    None,
+    None,
+)?;
+identity.send_imessage(
+    None,
+    Some(&group.conversation_id),
+    Some("Following up in the same conversation."),
+    None,
+    None,
+)?;
+
+let conversations = identity.list_imessage_conversations_with_groups(
+    50,
+    0,
+    None,
+    true,
+)?;
+```
+
+List methods exclude groups by default for backwards compatibility. Group
+messages expose `is_group`, a best-known `participants` snapshot, and
+per-recipient delivery state; assignment and one-to-one remote fields are
+optional. Group reactions, read receipts, and typing indicators are not
+supported.
+
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.

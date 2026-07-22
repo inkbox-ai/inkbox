@@ -864,6 +864,21 @@ impl AgentIdentity {
             .send(to, conversation_id, text, media_urls, send_style, Some(&id))
     }
 
+    /// Send to 2–8 distinct recipients as a dedicated-outbound iMessage group.
+    pub fn send_imessage_group(
+        &self,
+        to: &[String],
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+    ) -> Result<IMessage> {
+        self.require_imessage()?;
+        let id = self.id();
+        self.inkbox
+            .imessages()
+            .send_group(to, text, media_urls, send_style, Some(&id))
+    }
+
     /// List this identity's iMessages, newest first.
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
@@ -884,6 +899,30 @@ impl AgentIdentity {
             is_read,
             is_blocked,
             &DateRangeFilter::default(),
+        )
+    }
+
+    /// List this identity's iMessages with explicit group visibility.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_imessages_with_groups(
+        &self,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+    ) -> Result<Vec<IMessage>> {
+        self.require_imessage()?;
+        let id = self.id();
+        self.inkbox.imessages().list_with_groups(
+            Some(&id),
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            include_groups,
         )
     }
 
@@ -942,6 +981,25 @@ impl AgentIdentity {
             offset,
             is_blocked,
             &DateRangeFilter::default(),
+        )
+    }
+
+    /// List this identity's conversations with explicit group visibility.
+    pub fn list_imessage_conversations_with_groups(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+    ) -> Result<Vec<IMessageConversationSummary>> {
+        self.require_imessage()?;
+        let id = self.id();
+        self.inkbox.imessages().list_conversations_with_groups(
+            Some(&id),
+            limit,
+            offset,
+            is_blocked,
+            include_groups,
         )
     }
 

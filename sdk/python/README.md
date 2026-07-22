@@ -517,12 +517,29 @@ identity.send_imessage(
     text="On it — give me two minutes.",
 )
 
+# Dedicated outbound only: create or reuse an exact-participant group. Keep the
+# returned conversation_id and use it for later replies. A best-known set that
+# matches multiple conversations returns 409 instead of choosing one.
+group = outbound_identity.send_imessage(
+    to=["+15551234567", "+15557654321"],
+    text="Welcome to the group!",
+)
+outbound_identity.send_imessage(
+    conversation_id=group.conversation_id,
+    text="Following up in the same conversation.",
+)
+group_convos = outbound_identity.list_imessage_conversations(include_groups=True)
+group_msgs = outbound_identity.list_imessages(include_groups=True)
+print(group.is_group, group.participants, group.recipients)
+
 # Who is currently connected? (Disconnected conversations stay readable
 # with assignment_status == "released"; sends into them return 409.)
 connections = identity.list_imessage_assignments()
 
 # Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
 # a new tapback replaces your previous one on the same message part.
+# Reactions, read receipts, and typing indicators are not supported for groups
+# and return 409.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
 
 # Read receipts, typing indicator, media.

@@ -282,14 +282,15 @@ inkbox text mark-conversation-read <conversation-key> -i <handle>  # Mark conver
 
 ### imessage
 
-iMessage over the shared Inkbox router. Recipients connect first by texting
-`connect @<handle>` to the router number; there is no cold outreach.
+iMessage over shared or dedicated service. Shared and dedicated inbound
+recipients connect first; dedicated outbound identities may initiate one-to-one
+or group conversations.
 
 ```bash
 inkbox imessage triage-number                # Router number + the command humans text to connect
 
-inkbox imessage send -i <handle>             # Send a message to a connected recipient
-  --to <number>                              #   E.164 recipient (mutually exclusive with --conversation-id)
+inkbox imessage send -i <handle>             # Send or reply
+  --to <numbers>                             #   One E.164 recipient or a comma-separated group
   --conversation-id <id>                     #   Existing conversation UUID to reply into
   --text <text>                              #   Message body
   --media-url <url>                          #   Media URL (at most one)
@@ -300,12 +301,14 @@ inkbox imessage list -i <handle>             # List messages, newest first
   --limit <n>                                #   Max results (default: 50)
   --offset <n>                               #   Pagination offset (default: 0)
   --unread-only                              #   Show only unread messages
+  --include-groups                           #   Include group messages
 
 inkbox imessage assignments -i <handle>      # List recipients currently connected to the identity
   --limit <n>                                #   Max results (default: 50)
   --offset <n>                               #   Pagination offset (default: 0)
 
 inkbox imessage conversations -i <handle>    # Conversation summaries with previews + unread counts
+  --include-groups                           #   Include group conversations
 inkbox imessage conversation <conversation-id> -i <handle>  # Read one conversation's messages
 
 inkbox imessage react <message-id> -i <handle>  # Send a tapback (replaces your previous one)

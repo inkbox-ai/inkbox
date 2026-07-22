@@ -3,9 +3,10 @@
  *
  * Types mirroring the Inkbox iMessage API response models.
  *
- * Conversations are keyed by `conversationId` / `remoteNumber`. Shared
- * service numbers stay hidden, while dedicated numbers owned by the
- * organization are exposed through the numbers resource.
+ * Conversations are keyed by `conversationId`. One-to-one rows also expose
+ * assignment and remote-number state; dedicated-outbound groups instead expose
+ * participant snapshots. Dedicated numbers are exposed through the numbers
+ * resource.
  */
 
 import { ContactRuleStatus } from "../mail/types.js";
@@ -157,19 +158,23 @@ export interface IMessageMessageReaction {
 }
 
 /**
- * An iMessage in an assignment-routed conversation.
+ * An iMessage in a one-to-one or group conversation.
  *
- * There is no local-number field: shared pool lines are hidden from
- * agents, so messages are identified by `conversationId` and the
- * counterparty `remoteNumber` only.
+ * Group rows have no assignment, carry a best-known participant snapshot,
+ * and expose per-recipient outbound delivery state.
  */
 export interface IMessage {
   id: string;
   conversationId: string;
-  assignmentId: string;
+  assignmentId: string | null;
   /** "inbound" | "outbound" */
   direction: string;
-  remoteNumber: string;
+  remoteNumber: string | null;
+  /** Sender for inbound group messages; null for outbound and one-to-one rows. */
+  senderNumber: string | null;
+  /** Best-known participant snapshot for a group message. */
+  participants: string[] | null;
+  isGroup: boolean;
   content: string | null;
   /** "message" | "carousel" */
   messageType: string;
@@ -192,17 +197,18 @@ export interface IMessage {
 }
 
 /**
- * One assignment-scoped iMessage conversation.
+ * One iMessage conversation.
  *
- * `assignmentStatus` reflects the current connection: non-active means
- * the recipient is disconnected and the agent cannot reply until they
- * reconnect through triage.
+ * One-to-one rows expose assignment state. Group rows have no assignment and
+ * expose a best-known participant snapshot instead.
  */
 export interface IMessageConversation {
   id: string;
-  assignmentId: string;
-  assignmentStatus: IMessageAssignmentStatus;
-  remoteNumber: string;
+  assignmentId: string | null;
+  assignmentStatus: IMessageAssignmentStatus | null;
+  remoteNumber: string | null;
+  participants: string[] | null;
+  isGroup: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -210,9 +216,11 @@ export interface IMessageConversation {
 /** Conversation list row with latest-message preview. */
 export interface IMessageConversationSummary {
   id: string;
-  assignmentId: string;
-  assignmentStatus: IMessageAssignmentStatus;
-  remoteNumber: string;
+  assignmentId: string | null;
+  assignmentStatus: IMessageAssignmentStatus | null;
+  remoteNumber: string | null;
+  participants: string[] | null;
+  isGroup: boolean;
   latestText: string | null;
   latestMessageAt: Date | null;
   latestDirection: string | null;
@@ -315,9 +323,12 @@ export interface RawIMessageMessageReaction {
 export interface RawIMessage {
   id: string;
   conversation_id: string;
-  assignment_id: string;
+  assignment_id: string | null;
   direction: string;
-  remote_number: string;
+  remote_number: string | null;
+  sender_number?: string | null;
+  participants?: string[] | null;
+  is_group?: boolean;
   content?: string | null;
   message_type: string;
   service: string;
@@ -339,9 +350,11 @@ export interface RawIMessage {
 
 export interface RawIMessageConversation {
   id: string;
-  assignment_id: string;
+  assignment_id: string | null;
   assignment_status?: string | null;
-  remote_number: string;
+  remote_number: string | null;
+  participants?: string[] | null;
+  is_group?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -457,6 +470,9 @@ export function parseIMessage(r: RawIMessage): IMessage {
     assignmentId: r.assignment_id,
     direction: r.direction,
     remoteNumber: r.remote_number,
+    senderNumber: r.sender_number ?? null,
+    participants: r.participants ?? null,
+    isGroup: r.is_group ?? false,
     content: r.content ?? null,
     messageType: r.message_type,
     service: r.service as IMessageService,
@@ -483,9 +499,12 @@ export function parseIMessageConversation(
   return {
     id: r.id,
     assignmentId: r.assignment_id,
-    assignmentStatus:
-      (r.assignment_status as IMessageAssignmentStatus) ?? IMessageAssignmentStatus.ACTIVE,
+    assignmentStatus: r.assignment_status
+      ? r.assignment_status as IMessageAssignmentStatus
+      : (r.assignment_id ? IMessageAssignmentStatus.ACTIVE : null),
     remoteNumber: r.remote_number,
+    participants: r.participants ?? null,
+    isGroup: r.is_group ?? false,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -510,9 +529,12 @@ export function parseIMessageConversationSummary(
   return {
     id: r.id,
     assignmentId: r.assignment_id,
-    assignmentStatus:
-      (r.assignment_status as IMessageAssignmentStatus) ?? IMessageAssignmentStatus.ACTIVE,
+    assignmentStatus: r.assignment_status
+      ? r.assignment_status as IMessageAssignmentStatus
+      : (r.assignment_id ? IMessageAssignmentStatus.ACTIVE : null),
     remoteNumber: r.remote_number,
+    participants: r.participants ?? null,
+    isGroup: r.is_group ?? false,
     latestText: r.latest_text ?? null,
     latestMessageAt: r.latest_message_at ? new Date(r.latest_message_at) : null,
     latestDirection: r.latest_direction ?? null,

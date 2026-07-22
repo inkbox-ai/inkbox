@@ -26,6 +26,7 @@ MSG_ID = "dddd4444-0000-0000-0000-000000000001"
 IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001"
 RULE_ID = "ffff6666-0000-0000-0000-000000000001"
 REMOTE = "+15551234567"
+GROUP_REMOTE = "+15557654321"
 HANDLE = "support-bot"
 
 IMESSAGE_NUMBER_DICT = {
@@ -78,6 +79,19 @@ IMESSAGE_DICT = {
     "updated_at": "2026-06-01T00:00:00+00:00",
 }
 
+GROUP_IMESSAGE_DICT = {
+    **IMESSAGE_DICT,
+    "assignment_id": None,
+    "remote_number": None,
+    "sender_number": REMOTE,
+    "participants": [REMOTE, GROUP_REMOTE],
+    "is_group": True,
+    "recipients": [
+        {"remote_number": REMOTE, "delivery_status": "queued", "service": "imessage"},
+        {"remote_number": GROUP_REMOTE, "delivery_status": "queued", "service": "imessage"},
+    ],
+}
+
 IMESSAGE_CONVERSATION_DICT = {
     "id": CONVO_ID,
     "assignment_id": "bbbb2222-0000-0000-0000-000000000001",
@@ -94,6 +108,15 @@ IMESSAGE_CONVERSATION_SUMMARY_DICT = {
     "latest_has_media": False,
     "unread_count": 2,
     "total_count": 5,
+}
+
+GROUP_CONVERSATION_DICT = {
+    **IMESSAGE_CONVERSATION_DICT,
+    "assignment_id": None,
+    "assignment_status": None,
+    "remote_number": None,
+    "participants": [REMOTE, GROUP_REMOTE],
+    "is_group": True,
 }
 
 IMESSAGE_REACTION_DICT = {
@@ -152,6 +175,29 @@ class TestIMessagesSend:
             },
             params={"agent_identity_id": IDENTITY_ID},
         )
+
+    def test_serializes_group_recipients_without_changing_scalar_sends(
+        self, client, transport,
+    ):
+        transport.post.return_value = {"message": GROUP_IMESSAGE_DICT}
+
+        msg = client._imessages.send(
+            to=[REMOTE, GROUP_REMOTE],
+            text="Hello group",
+            agent_identity_id=IDENTITY_ID,
+        )
+
+        transport.post.assert_called_once_with(
+            "/messages",
+            json={"to": [REMOTE, GROUP_REMOTE], "text": "Hello group"},
+            params={"agent_identity_id": IDENTITY_ID},
+        )
+        assert msg.assignment_id is None
+        assert msg.remote_number is None
+        assert msg.sender_number == REMOTE
+        assert msg.participants == [REMOTE, GROUP_REMOTE]
+        assert msg.is_group is True
+        assert len(msg.recipients or []) == 2
 
     def test_returns_parsed_message(self, client, transport):
         transport.post.return_value = {"message": IMESSAGE_DICT}
@@ -298,6 +344,17 @@ class TestIMessagesList:
         assert len(msgs) == 1
         assert msgs[0].conversation_id == UUID(CONVO_ID)
 
+    def test_includes_groups_only_when_requested(self, client, transport):
+        transport.get.return_value = [GROUP_IMESSAGE_DICT]
+
+        msgs = client._imessages.list(include_groups=True)
+
+        transport.get.assert_called_once_with(
+            "/messages",
+            params={"limit": 50, "offset": 0, "include_groups": True},
+        )
+        assert msgs[0].is_group is True
+
 
 class TestIMessageConversations:
     def test_lists_summaries(self, client, transport):
@@ -312,6 +369,24 @@ class TestIMessageConversations:
         assert convos[0].unread_count == 2
         assert convos[0].remote_number == REMOTE
 
+    def test_lists_group_summaries_with_nullable_assignment(self, client, transport):
+        transport.get.return_value = [{
+            **IMESSAGE_CONVERSATION_SUMMARY_DICT,
+            **GROUP_CONVERSATION_DICT,
+        }]
+
+        convos = client._imessages.list_conversations(include_groups=True)
+
+        transport.get.assert_called_once_with(
+            "/conversations",
+            params={"limit": 50, "offset": 0, "include_groups": True},
+        )
+        assert convos[0].assignment_id is None
+        assert convos[0].assignment_status is None
+        assert convos[0].remote_number is None
+        assert convos[0].participants == [REMOTE, GROUP_REMOTE]
+        assert convos[0].is_group is True
+
     def test_gets_single_conversation(self, client, transport):
         transport.get.return_value = IMESSAGE_CONVERSATION_DICT
 
@@ -324,6 +399,17 @@ class TestIMessageConversations:
             params={"agent_identity_id": IDENTITY_ID},
         )
         assert convo.id == UUID(CONVO_ID)
+
+    def test_gets_group_conversation_without_list_opt_in(self, client, transport):
+        transport.get.return_value = GROUP_CONVERSATION_DICT
+
+        convo = client._imessages.get_conversation(CONVO_ID)
+
+        transport.get.assert_called_once_with(
+            f"/conversations/{CONVO_ID}", params={},
+        )
+        assert convo.is_group is True
+        assert convo.assignment_id is None
 
 
 class TestIMessageActions:

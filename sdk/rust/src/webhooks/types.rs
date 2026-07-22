@@ -686,16 +686,21 @@ pub struct IMessageMessageReactionWire {
 }
 
 /// Stored iMessage. `is_blocked` is not part of the wire body -- blocked
-/// messages never reach the webhook. There is no local-number field: shared
-/// pool lines are hidden from agents, so the message is identified by
-/// `conversation_id` and the counterparty `remote_number` only.
+/// messages never reach the webhook. Group messages have no assignment and
+/// include sender/participant fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IMessageWebhookMessage {
     pub id: String,
     pub conversation_id: String,
-    pub assignment_id: String,
+    pub assignment_id: Option<String>,
     pub direction: IMessageDirectionWire,
-    pub remote_number: String,
+    pub remote_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participants: Option<Vec<String>>,
+    #[serde(default)]
+    pub is_group: bool,
     pub content: Option<String>,
     pub message_type: IMessageTypeWire,
     pub service: IMessageServiceWire,
@@ -917,6 +922,41 @@ pub struct CallEndedWebhookPayload {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn imessage_group_webhook_parses_nullable_assignment_and_participants() {
+        let raw = r#"{
+            "id": "evt_group",
+            "event_type": "imessage.received",
+            "timestamp": "2026-07-22T00:00:00Z",
+            "data": {
+                "message": {
+                    "id": "imsg_1", "conversation_id": "conv_1",
+                    "assignment_id": null, "direction": "inbound",
+                    "remote_number": "+15551234567",
+                    "sender_number": "+15551234567",
+                    "participants": ["+15551234567", "+15557654321"],
+                    "is_group": true, "content": "Hello",
+                    "message_type": "message", "service": "imessage",
+                    "send_style": null, "media": null,
+                    "was_downgraded": null, "status": "received",
+                    "error_code": null, "error_message": null,
+                    "error_reason": null, "error_detail": null,
+                    "is_read": false, "recipients": null, "reactions": null,
+                    "created_at": "2026-07-22T00:00:00Z",
+                    "updated_at": "2026-07-22T00:00:00Z"
+                },
+                "reaction": null, "contacts": [], "agent_identities": []
+            }
+        }"#;
+
+        let payload: IMessageWebhookPayload = serde_json::from_str(raw).unwrap();
+        let message = payload.data.message.unwrap();
+        assert!(message.is_group);
+        assert_eq!(message.assignment_id, None);
+        assert_eq!(message.sender_number.as_deref(), Some("+15551234567"));
+        assert_eq!(message.participants.unwrap().len(), 2);
+    }
 
     fn message_json(extra: &str) -> String {
         format!(

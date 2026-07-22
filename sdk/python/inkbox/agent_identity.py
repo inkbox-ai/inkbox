@@ -1031,7 +1031,7 @@ class AgentIdentity:
     def send_imessage(
         self,
         *,
-        to: str | None = None,
+        to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
         text: str | None = None,
         media_urls: list[str] | None = None,
@@ -1044,8 +1044,9 @@ class AgentIdentity:
         server-side policy checks.
 
         Args:
-            to: E.164 recipient number. Mutually exclusive with
-                ``conversation_id``.
+            to: One E.164 recipient or 1–8 distinct recipients. Two or more
+                recipients select or create a dedicated-outbound group.
+                Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
             text: Message body.
             media_urls: Media URLs (at most one). Use
@@ -1076,6 +1077,7 @@ class AgentIdentity:
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -1092,6 +1094,7 @@ class AgentIdentity:
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            include_groups: Include group messages. Defaults to ``False``.
             start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
                 leaves the side open. UTC unless ``tz`` is set.
             end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
@@ -1106,6 +1109,7 @@ class AgentIdentity:
             offset=offset,
             is_read=is_read,
             is_blocked=is_blocked,
+            include_groups=include_groups,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,
@@ -1136,6 +1140,7 @@ class AgentIdentity:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -1148,6 +1153,7 @@ class AgentIdentity:
             is_blocked: Tri-state filter applied to the underlying
                 messages — ``True`` for only blocked, ``False`` for only
                 non-blocked, ``None`` for all.
+            include_groups: Include group conversations. Defaults to ``False``.
             start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
                 leaves the side open. UTC unless ``tz`` is set.
             end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
@@ -1160,6 +1166,7 @@ class AgentIdentity:
             limit=limit,
             offset=offset,
             is_blocked=is_blocked,
+            include_groups=include_groups,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,

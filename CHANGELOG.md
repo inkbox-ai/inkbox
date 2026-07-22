@@ -4,6 +4,26 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.3 — Dedicated outbound iMessage groups
+
+### Added
+
+- **iMessage group conversations in all three SDKs.** Python and TypeScript send methods accept either one E.164 recipient or a list of 1–8 recipients; two or more recipients select or create a dedicated-outbound group. Rust preserves its scalar method and adds `send_group` / `send_imessage_group` for group creation.
+- **Group-aware reads.** Message and conversation list methods expose an explicit group opt-in while remaining one-to-one by default. Message and conversation models expose group identity, best-known participants, inbound sender attribution, and per-recipient delivery state; direct conversation lookup works without the list opt-in.
+- **CLI group support.** `inkbox imessage send --to` accepts a comma-separated recipient list, and `imessage list` / `imessage conversations` accept `--include-groups`.
+- **Group-aware webhook types.** iMessage message payloads allow nullable assignment and one-to-one remote fields and expose group sender, participants, and group identity.
+### Changed
+
+- Version bumped to 0.5.3 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.3`.
+- Group creation requires a dedicated outbound number. Later sends should use the returned conversation id; exact-participant lookup returns `409` when more than one conversation matches. Reactions, read receipts, and typing indicators remain one-to-one operations and return `409` for groups.
+- **TypeScript note (source-breaking).** iMessage message and conversation assignment/remote fields are nullable, group properties are required on parsed models, and assignment status is nullable for groups. Hand-built object literals need the new fields.
+- **Rust note (source-breaking).** The corresponding public struct fields now use `Option`, and the structs gain group properties. Existing scalar methods keep their signatures; new suffixed list methods opt into groups.
+- **Python note.** The corresponding dataclass fields now accept `None`, and new group fields have backwards-compatible defaults.
+
+### Compatibility and rollout
+
+- Scalar sends and default lists keep their existing wire shapes. New clients parse responses from older API deployments, but group sends and group list opt-in require the matching backend rollout.
+
 ## 0.5.2 — Webhook contact memories
 
 ### Added
