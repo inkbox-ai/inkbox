@@ -211,12 +211,28 @@ def test_old_payload_without_body_fields_still_parses():
 
 
 def test_mail_contact_entries_have_required_keys():
-    required = {"bucket", "address", "id", "name"}
+    required = {"bucket", "address", "id", "name", "memories"}
     for fixture in MAIL_FIXTURES:
         payload = cast(MailWebhookPayload, _load(fixture))
         for entry in payload["data"]["contacts"]:
             assert set(entry.keys()) == required, (fixture, entry)
             assert entry["bucket"] in ("from", "to", "cc", "bcc")
+            assert isinstance(entry["memories"], list)
+
+
+def test_mail_contact_memories_and_old_replays():
+    payload = cast(MailWebhookPayload, _load("message_received.json"))
+    assert payload["data"]["contacts"][0]["memories"] == [
+        "Prefers email over phone calls."
+    ]
+    assert payload["data"]["contacts"][1]["memories"] == []
+    old_contact: WebhookMailContact = {
+        "bucket": "from",
+        "address": "customer@example.com",
+        "id": "contact_1",
+        "name": "Jane Doe",
+    }
+    assert old_contact["name"] == "Jane Doe"
 
 
 def test_mail_agent_identity_entries_have_required_keys():
@@ -273,6 +289,9 @@ def test_text_received_has_no_lifecycle_timestamps():
     assert payload["data"]["recipient_phone_number"] is None
     assert len(payload["data"]["contacts"]) == 1
     assert isinstance(payload["data"]["contacts"][0]["id"], str)
+    assert payload["data"]["contacts"][0]["memories"] == [
+        "Prefers text messages after 5pm."
+    ]
 
 
 def test_text_sent_1on1_has_single_entry_recipients():
@@ -361,6 +380,9 @@ def test_phone_incoming_call_payload_is_flat_and_plural():
     assert isinstance(payload["contacts"], list)
     assert isinstance(payload["agent_identities"], list)
     assert "contact" not in payload
+    assert payload["contacts"][0]["memories"] == [
+        "Usually calls about scheduling."
+    ]
 
 
 def test_phone_incoming_call_omits_is_blocked():
@@ -446,6 +468,7 @@ def test_call_ended_contacts_and_identities_are_lists():
     data = payload["data"]
     assert isinstance(data["contacts"], list)
     assert isinstance(data["agent_identities"], list)
+    assert data["contacts"][0]["memories"] == ["Prefers Thursday appointments."]
 
 
 def test_call_ended_pre_hosted_payload_omits_new_fields():

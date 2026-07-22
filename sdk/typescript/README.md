@@ -1146,6 +1146,10 @@ identities in the same org. On mail, each list entry carries a
 `bucket: "from" | "to" | "cc" | "bcc"` plus `address`; receivers
 should pair to the source field by `(bucket, address)`.
 `data.message.bcc_addresses` is populated only on outbound events.
+Every resolved contact carries active memory text, newest first, in
+`memories`; use `match.memories ?? []` for replayed payloads that
+predate contact memories. This is separate from the optional
+conversation `context`.
 
 Phone-text payloads carry several fields for group sends:
 

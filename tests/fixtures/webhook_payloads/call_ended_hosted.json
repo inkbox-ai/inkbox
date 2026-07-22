@@ -20,7 +20,7 @@
       "reason": "Call the dental office and book a cleaning next week, mornings preferred"
     },
     "contacts": [
-      {"id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe"}
+      {"id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe", "memories": ["Prefers morning appointments."]}
     ],
     "agent_identities": [],
     "transcript": {

@@ -25,8 +25,8 @@
       "created_at": "2026-04-10T18:13:42.104Z"
     },
     "contacts": [
-      {"bucket": "from", "address": "customer@example.com", "id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe"},
-      {"bucket": "cc", "address": "legal@example.com", "id": "550e8400-e29b-41d4-a716-446655440001", "name": "Legal Team"}
+      {"bucket": "from", "address": "customer@example.com", "id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe", "memories": ["Prefers email over phone calls."]},
+      {"bucket": "cc", "address": "legal@example.com", "id": "550e8400-e29b-41d4-a716-446655440001", "name": "Legal Team", "memories": []}
     ],
     "agent_identities": [
       {"bucket": "cc", "address": "billing@inkboxmail.com", "id": "550e8400-e29b-41d4-a716-446655440010", "agent_handle": "billing", "display_name": "Billing"}

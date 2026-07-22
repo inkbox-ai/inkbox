@@ -1130,7 +1130,10 @@ identities in the same org. On mail, each list entry carries a
 `bucket: "from" | "to" | "cc" | "bcc"` plus `address`; receivers
 should pair to the source field by `(bucket, address)`.
 `data["message"]["bcc_addresses"]` is populated only on outbound
-events.
+events. Every resolved contact carries active memory text, newest
+first, in `memories`; use `match.get("memories", [])` for replayed
+payloads that predate contact memories. This is separate from the
+optional conversation `context`.
 
 On inbound `message.received`, `data["message"]` carries the plain-text
 `body`: the whole message when it fits the size cap, otherwise a prefix

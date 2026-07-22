@@ -150,6 +150,9 @@ pub struct RateLimitInfoWire {
 pub struct WebhookContact {
     pub id: String,
     pub name: String,
+    /// Active contact memories, newest first. Defaults empty for older replays.
+    #[serde(default)]
+    pub memories: Vec<String>,
 }
 
 /// Identity match for a remote party on a phone or text webhook event.
@@ -373,6 +376,9 @@ pub struct WebhookMailContact {
     pub address: String,
     pub id: String,
     pub name: String,
+    /// Active contact memories, newest first. Defaults empty for older replays.
+    #[serde(default)]
+    pub memories: Vec<String>,
 }
 
 /// Per-recipient identity match on a mail webhook event. Same shape as
@@ -978,6 +984,30 @@ mod tests {
     }
 
     #[test]
+    fn contact_memories_parse_and_default_for_old_replays() {
+        let contact: WebhookContact =
+            serde_json::from_str(r#"{"id":"ct1","name":"Jane","memories":["Prefers email."]}"#)
+                .unwrap();
+        assert_eq!(contact.memories, ["Prefers email."]);
+
+        let old_contact: WebhookContact =
+            serde_json::from_str(r#"{"id":"ct1","name":"Jane"}"#).unwrap();
+        assert!(old_contact.memories.is_empty());
+
+        let mail_contact: WebhookMailContact = serde_json::from_str(
+            r#"{"bucket":"from","address":"jane@example.com","id":"ct1","name":"Jane","memories":["Prefers email."]}"#,
+        )
+        .unwrap();
+        assert_eq!(mail_contact.memories, ["Prefers email."]);
+
+        let old_mail_contact: WebhookMailContact = serde_json::from_str(
+            r#"{"bucket":"from","address":"jane@example.com","id":"ct1","name":"Jane"}"#,
+        )
+        .unwrap();
+        assert!(old_mail_contact.memories.is_empty());
+    }
+
+    #[test]
     fn deserializes_call_ended_with_inline_transcript() {
         let raw = r#"{
             "id": "evt_abc",
@@ -994,7 +1024,7 @@ mod tests {
                     "duration_seconds": 123,
                     "some_future_field": true
                 },
-                "contacts": [{"id": "ct1", "name": "Jane"}],
+                "contacts": [{"id": "ct1", "name": "Jane", "memories": ["Prefers Thursday appointments."]}],
                 "agent_identities": [],
                 "transcript": {
                     "entries": [
@@ -1011,6 +1041,10 @@ mod tests {
         assert_eq!(payload.event_type, CallLifecycleWebhookEventType::CallEnded);
         assert_eq!(payload.data.call.origin, CallOriginWire::DedicatedNumber);
         assert_eq!(payload.data.call.duration_seconds, Some(123));
+        assert_eq!(
+            payload.data.contacts[0].memories,
+            ["Prefers Thursday appointments."]
+        );
         let transcript = payload.data.transcript.expect("inline transcript present");
         assert!(transcript.abridged);
         assert_eq!(transcript.url, payload.data.transcript_url);

@@ -4,6 +4,18 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.2 — Webhook contact memories
+
+### Added
+
+- Resolved contacts in mail, SMS, iMessage, incoming-call, and `call.ended` webhook payloads expose active memory text in newest-first `memories` arrays. This is separate from configurable conversation `context`.
+
+### Changed
+
+- Version bumped to 0.5.2 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.2`.
+- Python and TypeScript permit `memories` to be absent on older replayed payloads. Rust defaults an absent field to an empty vector.
+- **Rust note (source-breaking).** `WebhookContact` and `WebhookMailContact` gain a public `memories` field. Struct literals and exhaustive patterns must account for it.
+
 ## 0.5.1 — Contact memory
 
 ### Added

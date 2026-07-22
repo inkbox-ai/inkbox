@@ -25,7 +25,7 @@
       "updated_at": "2026-04-10T18:24:16.912Z"
     },
     "contacts": [
-      {"id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe"}
+      {"id": "550e8400-e29b-41d4-a716-446655440000", "name": "Jane Doe", "memories": ["Prefers text messages after 5pm."]}
     ],
     "agent_identities": [],
     "recipient_phone_number": null
