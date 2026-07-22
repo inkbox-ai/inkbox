@@ -12,6 +12,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - **Group-aware reads.** Message and conversation list methods expose an explicit group opt-in while remaining one-to-one by default. Message and conversation models expose group identity, best-known participants, inbound sender attribution, and per-recipient delivery state; direct conversation lookup works without the list opt-in.
 - **Group creation lifecycle.** Conversation list and detail models expose `creating`, `not_created`, or `ready`. A rejected initial creation keeps the same local conversation, and the next send retries before binding the remote thread.
 - **Group tapbacks.** Existing message-ID reaction methods support inbound group messages. Reaction responses and webhooks allow a nullable assignment.
+- **Group expressive styles.** Group creation and conversation-id replies accept the same 13 `IMessageSendStyle` values as one-to-one sends, including sends with one media URL; the existing SDK parameters and CLI `--send-style` flag are unchanged.
 - **CLI group support.** `inkbox imessage send --to` accepts a comma-separated recipient list, and `imessage list` / `imessage conversations` accept `--include-groups`.
 - **Group-aware webhook types.** iMessage message payloads allow nullable assignment and one-to-one remote fields and expose group sender, participants, and group identity.
 

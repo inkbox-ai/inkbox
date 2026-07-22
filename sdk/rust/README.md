@@ -162,19 +162,23 @@ remain on `send_imessage`; groups use `send_imessage_group`, and later replies
 use the returned conversation id with `send_imessage`:
 
 ```rust
+use inkbox::imessage::IMessageSendStyle;
+
 let recipients = vec!["+15551234567".to_string(), "+15557654321".to_string()];
+let group_media = vec!["https://example.com/group-photo.jpg".to_string()];
 let group = identity.send_imessage_group(
     &recipients,
     Some("Welcome to the group!"),
-    None,
-    None,
+    Some(&group_media),
+    Some(IMessageSendStyle::Confetti),
 )?;
+let reply_media = vec!["https://example.com/follow-up.jpg".to_string()];
 identity.send_imessage(
     None,
     Some(&group.conversation_id),
     Some("Following up in the same conversation."),
-    None,
-    None,
+    Some(&reply_media),
+    Some(IMessageSendStyle::Lasers),
 )?;
 
 let conversations = identity.list_imessage_conversations_with_groups(
@@ -185,6 +189,9 @@ let conversations = identity.list_imessage_conversations_with_groups(
 )?;
 println!("{:?}", conversations[0].group_creation_status);
 ```
+
+Group creation and conversation-id replies accept the same 13
+`IMessageSendStyle` values as one-to-one sends, with or without the media URL.
 
 List methods exclude groups by default for backwards compatibility. Group
 messages expose `is_group`, a best-known `participants` snapshot, and

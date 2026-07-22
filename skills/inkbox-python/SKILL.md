@@ -436,16 +436,21 @@ idempotency key when retrying an ambiguous claim.
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agent_identity_id` / `is_blocked` filters):
 
 ```python
+from inkbox import IMessageSendStyle
+
 # Send to a connected recipient, or reply into a conversation by UUID.
 sent = identity.send_imessage(to="+15551234567", text="Hello over iMessage")
-group = identity.send_imessage(
+group = outbound_identity.send_imessage(
     to=["+15551234567", "+15557654321"],
     text="Hello group",
+    media_urls=["https://example.com/group-photo.jpg"],
+    send_style=IMessageSendStyle.CONFETTI,
 )  # dedicated_outbound only; 2–8 distinct recipients
-reply = identity.send_imessage(
-    conversation_id=sent.conversation_id,
-    text="With style",
-    send_style="slam",          # IMessageSendStyle: confetti, lasers, slam, ...
+group_reply = outbound_identity.send_imessage(
+    conversation_id=group.conversation_id,
+    text="Group follow-up",
+    media_urls=["https://example.com/follow-up.jpg"],
+    send_style=IMessageSendStyle.LASERS,
 )
 print(sent.service, sent.status)  # IMessageService.IMESSAGE, IMessageDeliveryStatus.QUEUED
 
@@ -461,6 +466,8 @@ print(convo.assignment_status)
 # snapshot. group_creation_status is creating, not_created, or ready. A rejected
 # initial creation keeps the same conversation; send again by conversation_id to
 # retry, and success changes it to ready.
+# Group creation and conversation_id replies accept the same 13
+# IMessageSendStyle values as one-to-one sends, with or without the media URL.
 
 # Who is actively connected to this identity right now (paginated)?
 connections = identity.list_imessage_assignments(limit=20)

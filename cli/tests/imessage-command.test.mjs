@@ -16,11 +16,13 @@ test("buildIMessageSendOptions builds a group send", () => {
     to: "+15551234567, +15557654321",
     text: "Hello group",
     mediaUrl: "https://example.com/photo.jpg",
+    sendStyle: "confetti",
   }), {
     sendOptions: {
       to: ["+15551234567", "+15557654321"],
       text: "Hello group",
       mediaUrls: ["https://example.com/photo.jpg"],
+      sendStyle: "confetti",
     },
   });
 });
@@ -30,10 +32,14 @@ test("buildIMessageSendOptions builds a conversation reply", () => {
     identity: "support-bot",
     conversationId: "eeee1111-0000-0000-0000-0000000000fa",
     text: "Reply",
+    mediaUrl: "https://example.com/reply.jpg",
+    sendStyle: "lasers",
   }), {
     sendOptions: {
       conversationId: "eeee1111-0000-0000-0000-0000000000fa",
       text: "Reply",
+      mediaUrls: ["https://example.com/reply.jpg"],
+      sendStyle: "lasers",
     },
   });
 });

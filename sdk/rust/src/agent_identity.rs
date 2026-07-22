@@ -848,7 +848,9 @@ impl AgentIdentity {
     /// * `conversation_id` - Existing conversation UUID to reply into.
     /// * `text` - Message body.
     /// * `media_urls` - Media URLs (at most one).
-    /// * `send_style` - Optional expressive send style.
+    /// * `send_style` - Optional expressive send style. The same
+    ///   [`IMessageSendStyle`] values work for one-to-one and group replies,
+    ///   including sends with one media URL.
     pub fn send_imessage(
         &self,
         to: Option<&str>,
@@ -865,6 +867,9 @@ impl AgentIdentity {
     }
 
     /// Send to 2–8 distinct recipients as a dedicated-outbound iMessage group.
+    ///
+    /// `send_style` accepts the same [`IMessageSendStyle`] values as one-to-one
+    /// sends and may be combined with the single supported media URL.
     pub fn send_imessage_group(
         &self,
         to: &[String],

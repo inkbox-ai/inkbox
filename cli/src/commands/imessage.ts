@@ -230,7 +230,10 @@ export function registerIMessageCommands(program: Command): void {
     .option("--conversation-id <id>", "Existing conversation UUID to reply into")
     .option("--text <text>", "Message body")
     .option("--media-url <url>", "Media URL (at most one)")
-    .option("--send-style <style>", "Expressive send style (e.g. slam, confetti)")
+    .option(
+      "--send-style <style>",
+      "Expressive style for one-to-one or group sends (e.g. slam, confetti)",
+    )
     .action(
       withErrorHandler(async function (
         this: Command,

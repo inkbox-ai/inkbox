@@ -119,8 +119,10 @@ class IMessagesResource:
             media_urls: Media URLs (at most one). Pass with ``text`` or
                 by themselves. Use :meth:`upload_media` to turn raw
                 bytes into a sendable URL first.
-            send_style: Optional expressive send style
-                (see ``IMessageSendStyle``).
+            send_style: Optional expressive send style (see
+                ``IMessageSendStyle``). The same styles work for one-to-one
+                sends, new groups, and replies by group ``conversation_id``;
+                they may be combined with the single supported media URL.
             agent_identity_id: Identity to send as. Required for
                 org-wide API keys when sending by ``to``; ignored for
                 identity-scoped keys (the key's identity wins).

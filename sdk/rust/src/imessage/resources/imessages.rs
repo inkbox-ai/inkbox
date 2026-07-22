@@ -88,7 +88,9 @@ impl IMessagesResource {
     /// * `media_urls` - Media URLs (at most one). Pass with `text` or by
     ///   themselves. Use [`Self::upload_media`] to turn raw bytes into a
     ///   sendable URL first.
-    /// * `send_style` - Optional expressive send style.
+    /// * `send_style` - Optional expressive send style. The same
+    ///   [`IMessageSendStyle`] values work for one-to-one and group replies,
+    ///   including sends with one media URL.
     /// * `agent_identity_id` - Identity to send as. Required for org-wide API
     ///   keys when sending by `to`; ignored for identity-scoped keys.
     ///
@@ -142,7 +144,9 @@ impl IMessagesResource {
     ///
     /// The server selects or creates a group from the exact best-known
     /// participant set. Use [`Self::send`] with `conversation_id` for later
-    /// replies so the canonical group remains unambiguous.
+    /// replies so the canonical group remains unambiguous. `send_style` accepts
+    /// the same [`IMessageSendStyle`] values as one-to-one sends and may be
+    /// combined with the single supported media URL.
     #[allow(clippy::too_many_arguments)]
     pub fn send_group(
         &self,
@@ -541,7 +545,9 @@ mod tests {
 
     use crate::client::Inkbox;
     use crate::error::InkboxError;
-    use crate::imessage::types::{IMessageNumberStatus, IMessageNumberType, IMessageReactionType};
+    use crate::imessage::types::{
+        IMessageNumberStatus, IMessageNumberType, IMessageReactionType, IMessageSendStyle,
+    };
 
     fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
         Inkbox::builder("test-key")
@@ -735,23 +741,32 @@ mod tests {
     }
 
     #[test]
-    fn send_group_serializes_recipient_list_and_parses_group_fields() {
+    fn send_group_serializes_style_and_media_with_recipients() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/v1/imessage/messages")
                 .json_body(json!({
                     "to": ["+15550001111", "+15550002222"],
-                    "text": "Hello group"
+                    "text": "Hello group",
+                    "media_urls": ["https://media.example/group.jpg"],
+                    "send_style": "confetti"
                 }));
             then.status(200)
                 .json_body(json!({"message": group_message_json()}));
         });
 
         let recipients = vec!["+15550001111".to_string(), "+15550002222".to_string()];
+        let media_urls = vec!["https://media.example/group.jpg".to_string()];
         let message = client(&server)
             .imessages()
-            .send_group(&recipients, Some("Hello group"), None, None, None)
+            .send_group(
+                &recipients,
+                Some("Hello group"),
+                Some(&media_urls),
+                Some(IMessageSendStyle::Confetti),
+                None,
+            )
             .unwrap();
 
         mock.assert();
@@ -760,6 +775,41 @@ mod tests {
         assert_eq!(message.remote_number, None);
         assert_eq!(message.participants, Some(recipients));
         assert_eq!(message.recipients.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn send_serializes_style_and_media_by_conversation_id() {
+        let server = MockServer::start();
+        let conversation_id = Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/imessage/messages")
+                .json_body(json!({
+                    "conversation_id": conversation_id.to_string(),
+                    "text": "Group follow-up",
+                    "media_urls": ["https://media.example/follow-up.jpg"],
+                    "send_style": "lasers"
+                }));
+            then.status(200)
+                .json_body(json!({"message": group_message_json()}));
+        });
+
+        let media_urls = vec!["https://media.example/follow-up.jpg".to_string()];
+        let message = client(&server)
+            .imessages()
+            .send(
+                None,
+                Some(&conversation_id),
+                Some("Group follow-up"),
+                Some(&media_urls),
+                Some(IMessageSendStyle::Lasers),
+                None,
+            )
+            .unwrap();
+
+        mock.assert();
+        assert!(message.is_group);
+        assert_eq!(message.conversation_id, conversation_id);
     }
 
     #[test]

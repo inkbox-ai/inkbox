@@ -163,12 +163,13 @@ class TestIMessagesSend:
             params=None,
         )
 
-    def test_passes_identity_and_send_style(self, client, transport):
+    def test_passes_media_and_send_style_by_conversation_id(self, client, transport):
         transport.post.return_value = {"message": IMESSAGE_DICT}
 
         client._imessages.send(
             conversation_id=CONVO_ID,
             text="Hi",
+            media_urls=["https://media.example/reply.jpg"],
             send_style=IMessageSendStyle.SLAM,
             agent_identity_id=IDENTITY_ID,
         )
@@ -178,25 +179,38 @@ class TestIMessagesSend:
             json={
                 "conversation_id": CONVO_ID,
                 "text": "Hi",
+                "media_urls": ["https://media.example/reply.jpg"],
                 "send_style": "slam",
             },
             params={"agent_identity_id": IDENTITY_ID},
         )
 
-    def test_serializes_group_recipients_without_changing_scalar_sends(
+    def test_serializes_group_recipients_with_style_and_media(
         self, client, transport,
     ):
-        transport.post.return_value = {"message": GROUP_IMESSAGE_DICT}
+        response = {
+            **GROUP_IMESSAGE_DICT,
+            "send_style": "confetti",
+            "media": [{"url": "https://media.example/group.jpg"}],
+        }
+        transport.post.return_value = {"message": response}
 
         msg = client._imessages.send(
             to=[REMOTE, GROUP_REMOTE],
             text="Hello group",
+            media_urls=["https://media.example/group.jpg"],
+            send_style=IMessageSendStyle.CONFETTI,
             agent_identity_id=IDENTITY_ID,
         )
 
         transport.post.assert_called_once_with(
             "/messages",
-            json={"to": [REMOTE, GROUP_REMOTE], "text": "Hello group"},
+            json={
+                "to": [REMOTE, GROUP_REMOTE],
+                "text": "Hello group",
+                "media_urls": ["https://media.example/group.jpg"],
+                "send_style": "confetti",
+            },
             params={"agent_identity_id": IDENTITY_ID},
         )
         assert msg.assignment_id is None
@@ -204,6 +218,9 @@ class TestIMessagesSend:
         assert msg.sender_number == REMOTE
         assert msg.participants == [REMOTE, GROUP_REMOTE]
         assert msg.is_group is True
+        assert msg.send_style is IMessageSendStyle.CONFETTI
+        assert msg.media is not None
+        assert msg.media[0].url == "https://media.example/group.jpg"
         assert len(msg.recipients or []) == 2
 
     def test_returns_parsed_message(self, client, transport):

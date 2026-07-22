@@ -837,7 +837,9 @@ export class AgentIdentity {
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadIMessageMedia} to create one from bytes.
-   * @param options.sendStyle - Optional expressive send style.
+   * @param options.sendStyle - Optional expressive send style. The same
+   *   `IMessageSendStyle` values work for one-to-one sends, new groups, and
+   *   replies by group `conversationId`, including sends with one media URL.
    *
    * @throws {InkboxError} when this identity is not iMessage-enabled.
    * @throws {InkboxAPIError} 403 when the recipient is blocked by a

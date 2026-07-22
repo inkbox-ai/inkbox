@@ -294,7 +294,7 @@ inkbox imessage send -i <handle>             # Send or reply
   --conversation-id <id>                     #   Existing conversation UUID to reply into
   --text <text>                              #   Message body
   --media-url <url>                          #   Media URL (at most one)
-  --send-style <style>                       #   Expressive send style (e.g. slam, confetti)
+  --send-style <style>                       #   Expressive style for 1:1 or group sends
 
 inkbox imessage list -i <handle>             # List messages, newest first
   --conversation-id <id>                     #   Narrow to one conversation
@@ -329,6 +329,14 @@ inkbox imessage contact-rule update <rule-id> -i <handle>  # Change action/statu
 inkbox imessage contact-rule delete <rule-id> -i <handle>  # Delete a rule (admin key)
 inkbox imessage contact-rule list-all        # Org-wide rule list (admin key)
   --agent-identity-id <id>                   #   Narrow to one identity
+```
+
+The same 13 expressive styles work on group creation and conversation-id
+replies, including sends with `--media-url`:
+
+```bash
+inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello group" --media-url https://example.com/group-photo.jpg --send-style confetti
+inkbox imessage send -i <handle> --conversation-id <group-conversation-id> --text "Follow-up" --media-url https://example.com/follow-up.jpg --send-style lasers
 ```
 
 Group conversation rows expose `groupCreationStatus` as `creating`,

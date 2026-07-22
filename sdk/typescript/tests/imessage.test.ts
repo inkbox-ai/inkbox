@@ -172,13 +172,14 @@ describe("IMessagesResource", () => {
     vi.restoreAllMocks();
   });
 
-  it("send posts the wire body and identity query param", async () => {
+  it("send posts style and media by conversation id", async () => {
     vi.mocked(fetch).mockResolvedValue(ok({ message: IMESSAGE_DICT }));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
 
     const msg = await resource.send({
       conversationId: CONVO_ID,
       text: "Hi",
+      mediaUrls: ["https://media.example/reply.jpg"],
       sendStyle: IMessageSendStyle.SLAM,
       agentIdentityId: IDENTITY_ID,
     });
@@ -188,6 +189,7 @@ describe("IMessagesResource", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       conversation_id: CONVO_ID,
       text: "Hi",
+      media_urls: ["https://media.example/reply.jpg"],
       send_style: "slam",
     });
     expect(msg.id).toBe(MSG_ID);
@@ -294,13 +296,17 @@ describe("IMessagesResource", () => {
     });
   });
 
-  it("send serializes a group recipient list", async () => {
-    vi.mocked(fetch).mockResolvedValue(ok({ message: GROUP_IMESSAGE_DICT }));
+  it("send serializes group recipients with style and media", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok({
+      message: { ...GROUP_IMESSAGE_DICT, send_style: "confetti" },
+    }));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
 
     const message = await resource.send({
       to: [REMOTE, GROUP_REMOTE],
       text: "Hello group",
+      mediaUrls: ["https://media.example/group.jpg"],
+      sendStyle: IMessageSendStyle.CONFETTI,
       agentIdentityId: IDENTITY_ID,
     });
 
@@ -309,12 +315,15 @@ describe("IMessagesResource", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       to: [REMOTE, GROUP_REMOTE],
       text: "Hello group",
+      media_urls: ["https://media.example/group.jpg"],
+      send_style: "confetti",
     });
     expect(message.assignmentId).toBeNull();
     expect(message.remoteNumber).toBeNull();
     expect(message.senderNumber).toBe(REMOTE);
     expect(message.participants).toEqual([REMOTE, GROUP_REMOTE]);
     expect(message.isGroup).toBe(true);
+    expect(message.sendStyle).toBe(IMessageSendStyle.CONFETTI);
     expect(message.recipients).toHaveLength(2);
   });
 

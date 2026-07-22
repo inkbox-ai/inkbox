@@ -508,6 +508,7 @@ import {
   DedicatedIMessageNumberQuotaExceededError,
   IdempotencyKeyReusedError,
   IMessageNumberType,
+  IMessageSendStyle,
 } from "@inkbox/sdk";
 
 // Shared service: opt an identity in at create time or later.
@@ -593,10 +594,14 @@ console.log(outboundIdentity.imessageNumber?.number);
 const group = await outboundIdentity.sendIMessage({
   to: ["+15551234567", "+15557654321"],
   text: "Welcome to the group!",
+  mediaUrls: ["https://example.com/group-photo.jpg"],
+  sendStyle: IMessageSendStyle.CONFETTI,
 });
 await outboundIdentity.sendIMessage({
   conversationId: group.conversationId,
   text: "Following up in the same conversation.",
+  mediaUrls: ["https://example.com/follow-up.jpg"],
+  sendStyle: IMessageSendStyle.LASERS,
 });
 const groupConvos = await outboundIdentity.listIMessageConversations({ includeGroups: true });
 const groupMessages = await outboundIdentity.listIMessages({ includeGroups: true });
@@ -606,6 +611,8 @@ console.log(group.isGroup, group.participants, group.recipients);
 // again with its conversationId to retry. Success binds the remote thread and
 // changes the status to "ready".
 console.log(groupConvos[0].groupCreationStatus);
+// Groups accept the same 13 IMessageSendStyle values as one-to-one sends on
+// both creation and conversationId replies, with or without the media URL.
 
 // Claim and atomically attach/swap during update. To attach an already-owned
 // number, pass imessageNumberId instead. Pass imessageNumberId: null to move

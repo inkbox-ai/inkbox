@@ -114,7 +114,9 @@ export class IMessagesResource {
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadMedia} to turn raw bytes into a sendable URL first.
-   * @param options.sendStyle - Optional expressive send style.
+   * @param options.sendStyle - Optional expressive send style. The same
+   *   `IMessageSendStyle` values work for one-to-one sends, new groups, and
+   *   replies by group `conversationId`, including sends with one media URL.
    * @param options.agentIdentityId - Identity to send as. Required for
    *   org-wide API keys when sending by `to`; ignored for
    *   identity-scoped keys (the key's identity wins).

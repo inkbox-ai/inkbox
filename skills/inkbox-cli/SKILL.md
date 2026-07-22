@@ -311,8 +311,8 @@ All iMessage commands are identity-scoped and require `-i <handle>`. Shared serv
 ```bash
 inkbox imessage triage-number   # the router number + the connect command humans text to it
 inkbox imessage send -i <handle> --to +15551234567 --text "Hello over iMessage"
-inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello group" # dedicated outbound only
-inkbox imessage send -i <handle> --conversation-id <conversation-uuid> --text "Reply" --send-style slam
+inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello group" --media-url https://example.com/group-photo.jpg --send-style confetti # dedicated outbound only
+inkbox imessage send -i <handle> --conversation-id <group-conversation-id> --text "Reply" --media-url https://example.com/follow-up.jpg --send-style lasers
 inkbox imessage list -i <handle> --limit 20 --unread-only --include-groups
 inkbox imessage assignments -i <handle> --limit 20   # active connections, newest first
 inkbox imessage conversations -i <handle> --limit 20 --include-groups
@@ -334,6 +334,8 @@ Group conversation output includes `groupCreationStatus` (`creating`,
 `not_created`, or `ready`). A rejected initial creation remains on the same
 conversation; send again by conversation id to retry. `react` supports inbound
 one-to-one and group messages. Read receipts and typing remain one-to-one only.
+Group creation and conversation-id replies accept the same 13 expressive styles
+as one-to-one sends, with or without `--media-url`.
 
 ## SMS Opt-Ins
 

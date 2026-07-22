@@ -1051,8 +1051,10 @@ class AgentIdentity:
             text: Message body.
             media_urls: Media URLs (at most one). Use
                 :meth:`upload_imessage_media` to create one from bytes.
-            send_style: Optional expressive send style
-                (see ``IMessageSendStyle``).
+            send_style: Optional expressive send style (see
+                ``IMessageSendStyle``). The same styles work for one-to-one
+                sends, new groups, and replies by group ``conversation_id``;
+                they may be combined with the single supported media URL.
 
         Raises:
             InkboxError: when this identity is not iMessage-enabled.

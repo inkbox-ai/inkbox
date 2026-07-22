@@ -472,6 +472,8 @@ number. iMessage is **opt-in per identity** (`imessage_enabled`). Shared and
 contact-rule, and rate-limit checks.
 
 ```python
+from inkbox import IMessageSendStyle
+
 # Shared service: opt an identity in at create time or later.
 identity = inkbox.create_identity("my-agent", imessage_enabled=True)
 
@@ -523,10 +525,14 @@ identity.send_imessage(
 group = outbound_identity.send_imessage(
     to=["+15551234567", "+15557654321"],
     text="Welcome to the group!",
+    media_urls=["https://example.com/group-photo.jpg"],
+    send_style=IMessageSendStyle.CONFETTI,
 )
 outbound_identity.send_imessage(
     conversation_id=group.conversation_id,
     text="Following up in the same conversation.",
+    media_urls=["https://example.com/follow-up.jpg"],
+    send_style=IMessageSendStyle.LASERS,
 )
 group_convos = outbound_identity.list_imessage_conversations(include_groups=True)
 group_msgs = outbound_identity.list_imessages(include_groups=True)
@@ -536,6 +542,8 @@ print(group.is_group, group.participants, group.recipients)
 # its conversation_id to retry. A successful retry binds the remote thread and
 # changes the status to ready.
 print(group_convos[0].group_creation_status)
+# Groups accept the same 13 IMessageSendStyle values as one-to-one sends on
+# both creation and conversation_id replies, with or without the media URL.
 
 # Who is currently connected? (Disconnected conversations stay readable
 # with assignment_status == "released"; sends into them return 409.)

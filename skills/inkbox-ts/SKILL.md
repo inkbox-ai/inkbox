@@ -411,6 +411,8 @@ console.log(identity.imessageEnabled, identity.imessageFilterMode);
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agentIdentityId` / `isBlocked` filters):
 
 ```typescript
+import { IMessageSendStyle } from "@inkbox/sdk";
+
 // Send to a connected recipient, or reply into a conversation by UUID.
 const sent = await identity.sendIMessage({ to: "+15551234567", text: "Hello over iMessage" });
 const outboundIdentity = await inkbox.createIdentity("outbound-agent", {
@@ -420,11 +422,14 @@ const outboundIdentity = await inkbox.createIdentity("outbound-agent", {
 const group = await outboundIdentity.sendIMessage({
   to: ["+15551234567", "+15557654321"],
   text: "Hello group",
+  mediaUrls: ["https://example.com/group-photo.jpg"],
+  sendStyle: IMessageSendStyle.CONFETTI,
 }); // dedicated outbound only; 2–8 distinct recipients
-const reply = await identity.sendIMessage({
-  conversationId: sent.conversationId,
-  text: "With style",
-  sendStyle: "slam",            // IMessageSendStyle: confetti, lasers, slam, ...
+const groupReply = await outboundIdentity.sendIMessage({
+  conversationId: group.conversationId,
+  text: "Group follow-up",
+  mediaUrls: ["https://example.com/follow-up.jpg"],
+  sendStyle: IMessageSendStyle.LASERS,
 });
 console.log(sent.service, sent.status);  // "imessage", "queued"
 
@@ -440,6 +445,8 @@ console.log(convo.assignmentStatus);
 // snapshot. groupCreationStatus is "creating", "not_created", or "ready". A
 // rejected initial creation keeps the same conversation; send again by
 // conversationId to retry, and success changes it to "ready".
+// Group creation and conversationId replies accept the same 13
+// IMessageSendStyle values as one-to-one sends, with or without the media URL.
 
 // Who is actively connected to this identity right now (paginated)?
 const connections = await identity.listIMessageAssignments({ limit: 20 });
