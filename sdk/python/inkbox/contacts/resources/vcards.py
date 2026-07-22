@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from inkbox.contacts.types import ContactImportResult
+from inkbox.contacts.types import ContactImportResult, ContactVCardExportResult
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -55,3 +55,14 @@ class VCardsResource:
             accept=_VCARD_CONTENT_TYPE,
         )
         return data.decode("utf-8")
+
+    def export_vcards(
+        self,
+        contact_ids: list[UUID | str],
+    ) -> ContactVCardExportResult:
+        """Export up to 25 contacts as one vCard document."""
+        data = self._http.post(
+            f"{_BASE}/vcard-export",
+            json={"contact_ids": [str(contact_id) for contact_id in contact_ids]},
+        )
+        return ContactVCardExportResult._from_dict(data)

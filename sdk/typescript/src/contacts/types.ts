@@ -39,12 +39,31 @@ export interface ContactCustomField {
   value: string;
 }
 
+/**
+ * Deprecated read-only compatibility metadata.
+ * These records do not restrict organization-wide contact visibility.
+ */
 export interface ContactAccess {
   id: string;
   contactId: string;
-  /** null = wildcard grant (every active identity sees the contact) */
+  /** null is the legacy wildcard sentinel. */
   identityId: string | null;
   createdAt: Date;
+}
+
+export type ContactCreationSource = "manual" | "vcard" | "communication" | "backfill";
+export type ContactReviewStatus = "unreviewed" | "confirmed";
+export type ContactNameSource =
+  | "manual"
+  | "vcard"
+  | "provider"
+  | "mail_header"
+  | "identifier_fallback";
+
+export interface ContactMemorySummary {
+  id: string;
+  content: string;
+  updatedAt: Date;
 }
 
 export interface Contact {
@@ -68,6 +87,18 @@ export interface Contact {
   addresses: ContactAddress[];
   customFields: ContactCustomField[];
   access: ContactAccess[];
+  creationSource: ContactCreationSource;
+  reviewStatus: ContactReviewStatus;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
+  preferredNameSource: ContactNameSource;
+  preferredNameLockedAt: Date | null;
+  createdByIdentityId: string | null;
+  mergedIntoContactId: string | null;
+  isAutoCreated: boolean;
+  isConfirmed: boolean;
+  memoryCount: number | null;
+  latestMemory: ContactMemorySummary | null;
   status: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -79,12 +110,15 @@ export interface Contact {
  * `contact` is populated when `status === "created"` (and `error` is null);
  * `error` is populated when `status === "error"` (and `contact` is null).
  */
+export type ContactImportStatus = "created" | "conflict" | "error";
+
 export interface ContactImportResultItem {
   /** 0-based position within the uploaded vCard stream. */
   index: number;
-  status: "created" | "error";
+  status: ContactImportStatus;
   contact: Contact | null;
   error: string | null;
+  conflictingContactId: string | null;
 }
 
 export interface ContactImportResult {
@@ -96,6 +130,28 @@ export interface ContactImportResult {
   readonly createdIds: string[];
   /** Convenience: per-card entries where `status === "error"`. */
   readonly errors: ContactImportResultItem[];
+  /** Convenience: per-card entries where `status === "conflict"`. */
+  readonly conflicts: ContactImportResultItem[];
+}
+
+export type ContactBulkDeleteStatus = "deleted" | "error";
+
+export interface ContactBulkDeleteResultItem {
+  contactId: string;
+  status: ContactBulkDeleteStatus;
+  error: string | null;
+}
+
+export interface ContactBulkDeleteResult {
+  deletedCount: number;
+  errorCount: number;
+  results: ContactBulkDeleteResultItem[];
+}
+
+export interface ContactVCardExportResult {
+  contentType: string;
+  contactCount: number;
+  vcard: string;
 }
 
 // ---- wire types ----
@@ -163,16 +219,51 @@ export interface RawContact {
   addresses: RawContactAddress[] | null;
   custom_fields: RawContactCustomField[] | null;
   access: RawContactAccess[] | null;
+  creation_source?: ContactCreationSource;
+  review_status?: ContactReviewStatus;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  preferred_name_source?: ContactNameSource;
+  preferred_name_locked_at?: string | null;
+  created_by_identity_id?: string | null;
+  merged_into_contact_id?: string | null;
+  is_auto_created?: boolean;
+  is_confirmed?: boolean;
+  memory_count?: number | null;
+  latest_memory?: RawContactMemorySummary | null;
   status?: string | null;
   created_at: string;
   updated_at: string;
 }
 
+export interface RawContactMemorySummary {
+  id: string;
+  content: string;
+  updated_at: string;
+}
+
+export interface RawContactBulkDeleteResult {
+  deleted_count: number;
+  error_count: number;
+  results: Array<{
+    contact_id: string;
+    status: "deleted" | "error";
+    error?: string | null;
+  }>;
+}
+
+export interface RawContactVCardExportResult {
+  content_type: string;
+  contact_count: number;
+  vcard: string;
+}
+
 export interface RawContactImportResultItem {
   index: number;
-  status: "created" | "error";
+  status: ContactImportStatus;
   contact?: RawContact | null;
   error?: string | null;
+  conflicting_contact_id?: string | null;
 }
 
 export interface RawContactImportResult {
@@ -254,9 +345,53 @@ export function parseContact(r: RawContact): Contact {
     addresses: (r.addresses ?? []).map(parseContactAddress),
     customFields: (r.custom_fields ?? []).map(parseContactCustomField),
     access: (r.access ?? []).map(parseContactAccess),
+    creationSource: r.creation_source ?? "backfill",
+    reviewStatus: r.review_status ?? "confirmed",
+    reviewedAt: r.reviewed_at ? new Date(r.reviewed_at) : null,
+    reviewedBy: r.reviewed_by ?? null,
+    preferredNameSource: r.preferred_name_source ?? "manual",
+    preferredNameLockedAt: r.preferred_name_locked_at
+      ? new Date(r.preferred_name_locked_at)
+      : null,
+    createdByIdentityId: r.created_by_identity_id ?? null,
+    mergedIntoContactId: r.merged_into_contact_id ?? null,
+    isAutoCreated: r.is_auto_created ?? false,
+    isConfirmed: r.is_confirmed ?? true,
+    memoryCount: r.memory_count ?? null,
+    latestMemory: r.latest_memory
+      ? {
+          id: r.latest_memory.id,
+          content: r.latest_memory.content,
+          updatedAt: new Date(r.latest_memory.updated_at),
+        }
+      : null,
     status: r.status ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseContactBulkDeleteResult(
+  r: RawContactBulkDeleteResult,
+): ContactBulkDeleteResult {
+  return {
+    deletedCount: r.deleted_count,
+    errorCount: r.error_count,
+    results: r.results.map((item) => ({
+      contactId: item.contact_id,
+      status: item.status,
+      error: item.error ?? null,
+    })),
+  };
+}
+
+export function parseContactVCardExportResult(
+  r: RawContactVCardExportResult,
+): ContactVCardExportResult {
+  return {
+    contentType: r.content_type,
+    contactCount: r.contact_count,
+    vcard: r.vcard,
   };
 }
 
@@ -268,6 +403,7 @@ export function parseContactImportResultItem(
     status: r.status,
     contact: r.contact ? parseContact(r.contact) : null,
     error: r.error ?? null,
+    conflictingContactId: r.conflicting_contact_id ?? null,
   };
 }
 
@@ -286,6 +422,9 @@ export function parseContactImportResult(
     },
     get errors() {
       return results.filter((i) => i.status === "error");
+    },
+    get conflicts() {
+      return results.filter((i) => i.status === "conflict");
     },
   };
 }

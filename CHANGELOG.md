@@ -4,6 +4,28 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.1 — Contact memory
+
+### Added
+
+- **Contact memory in all three SDKs.** Contacts now expose lifecycle metadata and filtering, unified email/SMS/iMessage/call correspondence, generated facts with source citations, and explicit duplicate-contact merging.
+- **Contact memory summaries.** Contact list and mutation responses expose the active `memory_count` (TS `memoryCount`) and latest active memory summary when available.
+- **Contact memory in the CLI.** Use `inkbox contacts facts list|get|citation|citation-url|delete`, `inkbox contacts correspondence`, and `inkbox contacts merge`. Contact list supports review-status filtering, and correspondence supports channel, time, pagination, content, transcript, and per-channel limit options.
+- **vCard conflict results.** Bulk imports now identify identifier conflicts and the existing contact involved.
+- **Contact mutation parity.** All SDKs and the CLI support fact deletion, contact bulk deletion, batch vCard export, and direct citation URL resolution.
+
+### Changed
+
+- Version bumped to 0.5.1 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.1`.
+- Contacts are organization-wide. The compatibility access-list API and `inkbox contacts access list` remain available as read-only metadata.
+- **Rust note (source-breaking).** `Contact` gains 12 public fields: `creation_source`, `review_status`, `reviewed_at`, `reviewed_by`, `preferred_name_source`, `preferred_name_locked_at`, `created_by_identity_id`, `merged_into_contact_id`, `is_auto_created`, `is_confirmed`, `memory_count`, and `latest_memory`. Struct literals and exhaustive patterns must account for them. All are optional on the wire and default when omitted, so parsing older responses is unaffected.
+- **TypeScript note (source-breaking).** `Contact` gains required properties: `creationSource`, `reviewStatus`, `reviewedAt`, `reviewedBy`, `preferredNameSource`, `preferredNameLockedAt`, `createdByIdentityId`, `mergedIntoContactId`, `isAutoCreated`, `isConfirmed`, `memoryCount`, and `latestMemory`. Hand-built object literals (fixtures, mocks) need all of these properties; `latestMemory` may be `null`, and parsing defaults them when the wire omits them.
+- **Python note (source-breaking).** The `Contact` dataclass inserts the new defaulted lifecycle fields before `organization_id`, `status`, `created_at`, and `updated_at`, so positional construction past `access` binds differently. Construct `Contact(...)` with keyword arguments.
+
+### Removed
+
+- **Source-breaking:** contact access grant/revoke methods were removed from the Python, TypeScript, and Rust SDKs, and `inkbox contacts access grant|revoke` were removed from the CLI. Create-contact access options were also removed: `access_identity_ids` (Python), `accessIdentityIds` (TypeScript), and the corresponding Rust create field are no longer accepted. Remove those calls/options before upgrading.
+
 ## 0.5.0 — Identity tunnel summaries + inlined vault access
 
 ### Added

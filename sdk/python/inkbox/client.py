@@ -357,7 +357,7 @@ class Inkbox:
 
     @property
     def contacts(self) -> ContactsResource:
-        """Org-wide contacts (list, get, create, update, delete, lookup, access, vCards)."""
+        """Organization-wide contacts, memory, correspondence, and vCards."""
         return self._contacts
 
     @property

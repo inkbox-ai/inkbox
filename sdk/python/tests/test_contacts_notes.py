@@ -164,24 +164,6 @@ class TestContactsCreate:
         ]
         assert "access_identity_ids" not in kwargs["json"]
 
-    def test_explicit_empty_list_sends_empty_grants(self, transport):
-        transport.post.return_value = CONTACT_DICT
-        resource = ContactsResource(transport)
-
-        resource.create(access_identity_ids=[])
-
-        _, kwargs = transport.post.call_args
-        assert kwargs["json"]["access_identity_ids"] == []
-
-    def test_none_explicit_forces_null(self, transport):
-        transport.post.return_value = CONTACT_DICT
-        resource = ContactsResource(transport)
-
-        resource.create(access_identity_ids=None)
-
-        _, kwargs = transport.post.call_args
-        assert kwargs["json"]["access_identity_ids"] is None
-
     def test_all_name_fields_and_birthday_serialize(self, transport):
         from datetime import date
 
@@ -236,47 +218,23 @@ class TestContactsUpdate:
 
 
 class TestContactAccess:
-    def test_grant_wildcard(self, transport):
-        transport.post.return_value = {
-            "id": "bbbb2222-0000-0000-0000-000000000010",
-            "contact_id": "aaaa1111-0000-0000-0000-000000000001",
-            "identity_id": None,
-            "created_at": "2026-04-20T00:00:00Z",
-        }
+    def test_list_remains_available(self, transport):
+        transport.get.return_value = [
+            {
+                "id": "bbbb2222-0000-0000-0000-000000000010",
+                "contact_id": "aaaa1111-0000-0000-0000-000000000001",
+                "identity_id": None,
+                "created_at": "2026-04-20T00:00:00Z",
+            }
+        ]
         access = ContactAccessResource(transport)
 
-        access.grant("aaaa1111-0000-0000-0000-000000000001", wildcard=True)
+        rows = access.list("aaaa1111-0000-0000-0000-000000000001")
 
-        _, kwargs = transport.post.call_args
-        assert kwargs["json"] == {"identity_id": None}
-
-    def test_grant_per_identity(self, transport):
-        transport.post.return_value = {
-            "id": "bbbb2222-0000-0000-0000-000000000011",
-            "contact_id": "aaaa1111-0000-0000-0000-000000000001",
-            "identity_id": "dddd4444-0000-0000-0000-000000000001",
-            "created_at": "2026-04-20T00:00:00Z",
-        }
-        access = ContactAccessResource(transport)
-
-        access.grant(
-            "aaaa1111-0000-0000-0000-000000000001",
-            identity_id="dddd4444-0000-0000-0000-000000000001",
-        )
-
-        _, kwargs = transport.post.call_args
-        assert kwargs["json"] == {
-            "identity_id": "dddd4444-0000-0000-0000-000000000001",
-        }
-
-    def test_wildcard_plus_identity_rejects(self, transport):
-        access = ContactAccessResource(transport)
-        with pytest.raises(ValueError):
-            access.grant(
-                "aaaa1111-0000-0000-0000-000000000001",
-                identity_id="dddd4444-0000-0000-0000-000000000001",
-                wildcard=True,
-            )
+        assert len(rows) == 1
+        assert rows[0].identity_id is None
+        assert not hasattr(access, "grant")
+        assert not hasattr(access, "revoke")
 
 
 class TestVCards:
@@ -285,7 +243,12 @@ class TestVCards:
             "created_count": 1,
             "error_count": 1,
             "results": [
-                {"index": 0, "status": "created", "contact": CONTACT_DICT, "error": None},
+                {
+                    "index": 0,
+                    "status": "created",
+                    "contact": CONTACT_DICT,
+                    "error": None,
+                },
                 {"index": 1, "status": "error", "contact": None, "error": "bad FN"},
             ],
         }
@@ -311,6 +274,25 @@ class TestVCards:
         assert len(result.errors) == 1
         assert result.errors[0].index == 1
 
+    def test_import_parses_identifier_conflict(self, transport):
+        conflict_id = "aaaa1111-0000-0000-0000-000000000009"
+        transport.post_bytes.return_value = {
+            "created_count": 0,
+            "error_count": 1,
+            "results": [{
+                "index": 0,
+                "status": "conflict",
+                "contact": None,
+                "error": "duplicate contact identifier",
+                "conflicting_contact_id": conflict_id,
+            }],
+        }
+
+        result = VCardsResource(transport).import_vcards("BEGIN:VCARD\r\nEND:VCARD\r\n")
+
+        assert result.results[0].status == "conflict"
+        assert str(result.results[0].conflicting_contact_id) == conflict_id
+
     def test_export_returns_text(self, transport):
         transport.get_bytes.return_value = b"BEGIN:VCARD\r\nEND:VCARD\r\n"
         resource = VCardsResource(transport)
@@ -331,7 +313,12 @@ class TestVCards:
             "created_count": 1,
             "error_count": 0,
             "results": [
-                {"index": 0, "status": "created", "contact": CONTACT_DICT, "error": None},
+                {
+                    "index": 0,
+                    "status": "created",
+                    "contact": CONTACT_DICT,
+                    "error": None,
+                },
             ],
         }
         transport.get_bytes.return_value = b"BEGIN:VCARD\r\nFN:Alex\r\nEND:VCARD\r\n"

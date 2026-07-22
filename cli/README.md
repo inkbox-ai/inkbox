@@ -411,6 +411,35 @@ delete-thread <thread-id> -i <handle>` (reclaim is immediate), or upgrade the
 plan. All three send paths (`email send`, `email reply-all`, `email forward`)
 are enforced.
 
+### contacts
+
+Organization-wide contacts, correspondence, and memory facts.
+
+```bash
+inkbox contacts list [--review-status <status>] [--offset <n>]  # Offset max: 10000
+inkbox contacts get <contact-id>
+inkbox contacts facts list <contact-id>
+inkbox contacts facts get <contact-id> <fact-id>
+inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
+inkbox contacts facts citation-url <source-url>
+inkbox contacts facts delete <contact-id> <fact-id>  # Admin-scoped API key required
+inkbox contacts correspondence <contact-id> [-i <identity-id>]
+  [--channels <channel>] [--after <datetime>] [--before <datetime>]
+  [--limit-per-channel <n>] [--content <mode>] [--transcripts <mode>]
+inkbox contacts merge <survivor-id> --losing <contact-id...>  # Admin-scoped API key required
+  [--field-sources '{"preferredName":"<contact-id>"}']
+inkbox contacts create --json <payload>
+inkbox contacts update <contact-id> --json <patch>
+inkbox contacts delete <contact-id>
+inkbox contacts bulk-delete <contact-id...>
+inkbox contacts import <file.vcf>
+inkbox contacts export-many <contact-id...> [--out <file>]
+inkbox contacts access list <contact-id>              # Compatibility read only
+```
+
+Merges are rejected atomically if the survivor would exceed 25 active memories.
+Delete unwanted facts, then retry the merge.
+
 ### tunnel
 
 Tunnel read + update + sign-csr. Tunnels are provisioned atomically by

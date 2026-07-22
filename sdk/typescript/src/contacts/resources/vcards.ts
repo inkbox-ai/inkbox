@@ -7,8 +7,11 @@
 import { HttpTransport } from "../../_http.js";
 import {
   ContactImportResult,
+  ContactVCardExportResult,
   RawContactImportResult,
+  RawContactVCardExportResult,
   parseContactImportResult,
+  parseContactVCardExportResult,
 } from "../types.js";
 
 const BASE = "/contacts";
@@ -40,5 +43,13 @@ export class VCardsResource {
   /** Export a single contact as vCard 4.0 text. */
   async export(contactId: string): Promise<string> {
     return this.http.getText(`${BASE}/${contactId}.vcf`, VCARD_CONTENT_TYPE);
+  }
+
+  /** Export up to 25 contacts as one vCard document. */
+  async exportMany(contactIds: string[]): Promise<ContactVCardExportResult> {
+    const data = await this.http.post<RawContactVCardExportResult>(`${BASE}/vcard-export`, {
+      contact_ids: contactIds,
+    });
+    return parseContactVCardExportResult(data);
   }
 }

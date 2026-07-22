@@ -173,7 +173,15 @@ impl HttpTransport {
     }
 
     pub fn delete(&self, path: &str) -> Result<()> {
+        self.delete_with_headers(path, NO_HEADERS)
+    }
+
+    /// `DELETE` with caller-supplied per-request headers.
+    pub fn delete_with_headers(&self, path: &str, headers: Headers) -> Result<()> {
         let rb = self.client.delete(self.url(path));
+        let rb = headers
+            .iter()
+            .fold(rb, |request, (name, value)| request.header(*name, *value));
         raise_for_status(self.send(rb, &self.url(path))?)?;
         Ok(())
     }
@@ -181,7 +189,15 @@ impl HttpTransport {
     /// `DELETE` that returns a parsed JSON body (e.g. tunnels respond with a
     /// representation of the deleted resource rather than 204).
     pub fn delete_with_response(&self, path: &str) -> Result<Value> {
+        self.delete_with_response_and_headers(path, NO_HEADERS)
+    }
+
+    /// `DELETE` with caller-supplied headers that returns a parsed JSON body.
+    pub fn delete_with_response_and_headers(&self, path: &str, headers: Headers) -> Result<Value> {
         let rb = self.client.delete(self.url(path));
+        let rb = headers
+            .iter()
+            .fold(rb, |request, (name, value)| request.header(*name, *value));
         raise_for_status(self.send(rb, &self.url(path))?)?.json_or_null()
     }
 
@@ -212,12 +228,27 @@ impl HttpTransport {
         content_type: &str,
         accept: &str,
     ) -> Result<Value> {
+        self.post_bytes_with_headers(path, content, content_type, accept, NO_HEADERS)
+    }
+
+    /// POST arbitrary bytes with caller-supplied per-request headers.
+    pub fn post_bytes_with_headers(
+        &self,
+        path: &str,
+        content: Vec<u8>,
+        content_type: &str,
+        accept: &str,
+        headers: Headers,
+    ) -> Result<Value> {
         let rb = self
             .client
             .post(self.url(path))
             .header(reqwest::header::CONTENT_TYPE, content_type)
             .header(reqwest::header::ACCEPT, accept)
             .body(content);
+        let rb = headers
+            .iter()
+            .fold(rb, |request, (name, value)| request.header(*name, *value));
         raise_for_status(self.send(rb, &self.url(path))?)?.json_or_null()
     }
 

@@ -42,7 +42,7 @@ Inkbox (admin-only client)
 ├── .mailContactRules         → MailContactRulesResource    (DEPRECATED — per-mailbox)
 ├── .phoneContactRules        → PhoneContactRulesResource   (DEPRECATED — per-number)
 ├── .smsOptIns                → SmsOptInsResource
-├── .contacts                 → ContactsResource   (.access, .vcards)
+├── .contacts                 → ContactsResource   (.facts, .correspondence, .access, .vcards)
 ├── .notes                    → NotesResource      (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → Promise<WhoamiResponse>
@@ -853,11 +853,13 @@ await inkbox.phoneContactRules.create(num.id, {
 
 ## Contacts
 
-Admin-only address book with per-identity access grants and vCard import/export.
+Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
+
+Merging requires an admin-scoped API key. The merge is rejected atomically if
+the survivor would exceed 25 active memories; delete unwanted facts and retry.
 
 ```typescript
 import type { CreateContactOptions, ContactEmail, ContactPhone } from "@inkbox/sdk";
-import { RedundantContactAccessGrantError } from "@inkbox/sdk";
 
 // CRUD
 const contact = await inkbox.contacts.create({
@@ -865,13 +867,12 @@ const contact = await inkbox.contacts.create({
   familyName: "Lovelace",
   emails: [{ label: "work", value: "ada@example.com" }],
   phones: [{ label: "mobile", value: "+15551234567" }],
-  // accessIdentityIds defaults to "wildcard"; pass [] for admin-only, or
-  // a list of identity UUIDs for explicit grants.
 });
 await inkbox.contacts.get(contact.id);
-await inkbox.contacts.list({ q: "ada", order: "recent", limit: 50, offset: 0 });
-await inkbox.contacts.update(contact.id, { jobTitle: "Analyst" });   // JSON-merge-patch
+await inkbox.contacts.list({ q: "ada", order: "recent", reviewStatus: ["confirmed"] });
+await inkbox.contacts.update(contact.id, { jobTitle: "Analyst" });
 await inkbox.contacts.delete(contact.id);
+await inkbox.contacts.bulkDelete(["contact-uuid-1", "contact-uuid-2"]);
 
 // Reverse-lookup — exactly one filter required (else thrown before HTTP)
 await inkbox.contacts.lookup({ email: "ada@example.com" });
@@ -880,19 +881,21 @@ await inkbox.contacts.lookup({ phone: "+15551234567" });
 await inkbox.contacts.lookup({ emailContains: "ada" });
 await inkbox.contacts.lookup({ phoneContains: "555" });
 
-// Access grants (admin + JWT only; agents can self-revoke)
+// Compatibility access information is read-only
 await inkbox.contacts.access.list(contact.id);
-await inkbox.contacts.access.grant(contact.id, { identityId: "agent-uuid" });
-await inkbox.contacts.access.grant(contact.id, { wildcard: true });   // every active identity
-await inkbox.contacts.access.revoke(contact.id, "agent-uuid");
 
-try {
-  await inkbox.contacts.access.grant(contact.id, { identityId: "agent-uuid" });
-} catch (e) {
-  if (e instanceof RedundantContactAccessGrantError) {
-    console.log(e.error, e.detailMessage);
-  }
-}
+// Facts, citations, correspondence, and duplicate merging
+const facts = await inkbox.contacts.facts.list(contact.id);
+const sourceUrl = facts[0]?.citations[0]?.sourceUrl;
+if (sourceUrl) await inkbox.contacts.facts.resolveCitationUrl(sourceUrl);
+if (facts[0]) await inkbox.contacts.facts.delete(contact.id, facts[0].id);  // admin only
+const history = await inkbox.contacts.correspondence.get(contact.id, {
+  identityId: "identity-uuid",
+  channels: ["email", "sms"],
+});
+const survivor = await inkbox.contacts.merge(contact.id, {
+  losingContactIds: ["duplicate-contact-uuid"],
+});
 
 // vCards
 const result = await inkbox.contacts.vcards.import(vcfText);  // bulk, ≤5 MiB, ≤1000 cards
@@ -900,8 +903,13 @@ console.log(result.createdIds);
 for (const item of result.errors) {
   console.log(item.index, item.error);
 }
+for (const item of result.conflicts) {
+  console.log(item.index, item.conflictingContactId);
+}
 
 const vcf = await inkbox.contacts.vcards.export(contact.id);  // vCard 4.0 string
+const batch = await inkbox.contacts.vcards.exportMany(["contact-uuid-1", "contact-uuid-2"]);
+console.log(batch.vcard);
 ```
 
 ## Notes
@@ -1108,7 +1116,7 @@ try {
 `InkboxAPIError.detail` is typed as `InkboxAPIErrorDetail` — either a string or a structured object. Catch the narrower subclasses when you need the parsed fields:
 
 - `DuplicateContactRuleError` — 409 when creating a contact rule with an already-taken `(matchType, matchTarget)` on the same resource. Exposes `.existingRuleId: string`.
-- `RedundantContactAccessGrantError` — 409 when a contact-access grant is redundant (e.g. per-identity grant on top of an active wildcard). Exposes `.error` and `.detailMessage`.
+- `RedundantContactAccessGrantError` — 409 when an identity-viewer grant is redundant (e.g. a specific viewer on top of an active wildcard). Exposes `.error` and `.detailMessage`.
 - `StorageLimitExceededError` — 402 when a send / reply-all / forward would push the mailbox past its plan storage cap. Exposes `.message` (also as `.detailMessage`), `.upgradeUrl`, and `.limitBytes`. Delete messages or threads to free space (immediate), or upgrade. A `402` whose `detail` is a plain string stays a plain `InkboxAPIError`.
 
 ## Key Conventions

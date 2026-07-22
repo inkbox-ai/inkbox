@@ -6,16 +6,21 @@
 
 import { HttpTransport } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
+import { ContactCorrespondenceResource } from "./correspondence.js";
+import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
 import {
   Contact,
   ContactAddress,
+  ContactBulkDeleteResult,
   ContactCustomField,
   ContactDate,
   ContactEmail,
   ContactPhone,
+  ContactReviewStatus,
   ContactWebsite,
   RawContact,
+  RawContactBulkDeleteResult,
   contactAddressToWire,
   contactCustomFieldToWire,
   contactDateToWire,
@@ -23,6 +28,7 @@ import {
   contactPhoneToWire,
   contactWebsiteToWire,
   parseContact,
+  parseContactBulkDeleteResult,
 } from "../types.js";
 
 const BASE = "/contacts";
@@ -31,7 +37,9 @@ export interface ListContactsOptions {
   q?: string;
   order?: "name" | "recent" | string;
   limit?: number;
+  /** Offset from 0 through 10,000. */
   offset?: number;
+  reviewStatus?: ContactReviewStatus[];
 }
 
 export interface LookupContactsOptions {
@@ -60,15 +68,6 @@ export interface CreateContactOptions {
   dates?: ContactDate[];
   addresses?: ContactAddress[];
   customFields?: ContactCustomField[];
-  /**
-   * Access control at create time.
-   *   - `undefined` (default) / `"wildcard"` — one wildcard row, every active
-   *     identity sees the contact.
-   *   - `[]` — zero grants (only admin + human callers see it).
-   *   - Explicit list of identity UUIDs — one per-identity grant each. Capped
-   *     at 500 entries server-side.
-   */
-  accessIdentityIds?: string[] | "wildcard" | null;
 }
 
 export interface UpdateContactOptions {
@@ -89,23 +88,46 @@ export interface UpdateContactOptions {
   dates?: ContactDate[] | null;
   addresses?: ContactAddress[] | null;
   customFields?: ContactCustomField[] | null;
+  reviewStatus?: ContactReviewStatus;
+}
+
+export type ContactMergeField =
+  | "preferredName"
+  | "namePrefix"
+  | "givenName"
+  | "middleName"
+  | "familyName"
+  | "nameSuffix"
+  | "companyName"
+  | "jobTitle"
+  | "birthday"
+  | "notes";
+
+export interface MergeContactsOptions {
+  losingContactIds: string[];
+  fieldSources?: Partial<Record<ContactMergeField, string>>;
 }
 
 export class ContactsResource {
   readonly access: ContactAccessResource;
+  readonly correspondence: ContactCorrespondenceResource;
+  readonly facts: ContactFactsResource;
   readonly vcards: VCardsResource;
 
   constructor(private readonly http: HttpTransport) {
     this.access = new ContactAccessResource(http);
+    this.correspondence = new ContactCorrespondenceResource(http);
+    this.facts = new ContactFactsResource(http);
     this.vcards = new VCardsResource(http);
   }
 
   async list(options: ListContactsOptions = {}): Promise<Contact[]> {
-    const params: Record<string, string | number | undefined> = {};
+    const params: Record<string, string | number | readonly string[] | undefined> = {};
     if (options.q !== undefined) params.q = options.q;
     if (options.order !== undefined) params.order = options.order;
     if (options.limit !== undefined) params.limit = options.limit;
     if (options.offset !== undefined) params.offset = options.offset;
+    if (options.reviewStatus !== undefined) params.review_status = options.reviewStatus;
     const data = await this.http.get<{ items: RawContact[] } | RawContact[]>(
       BASE,
       params,
@@ -160,13 +182,6 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    if (options.accessIdentityIds === undefined || options.accessIdentityIds === "wildcard") {
-      // omit — server wildcards by default
-    } else if (options.accessIdentityIds === null) {
-      body.access_identity_ids = null;
-    } else {
-      body.access_identity_ids = options.accessIdentityIds;
-    }
     const data = await this.http.post<RawContact>(BASE, body);
     return parseContact(data);
   }
@@ -184,6 +199,7 @@ export class ContactsResource {
       ["jobTitle", "job_title"],
       ["birthday", "birthday"],
       ["notes", "notes"],
+      ["reviewStatus", "review_status"],
     ] as const) {
       if (key in options) body[wire] = (options as Record<string, unknown>)[key];
     }
@@ -210,7 +226,45 @@ export class ContactsResource {
     return parseContact(data);
   }
 
+  /**
+   * Merge contacts using an admin-scoped API key.
+   *
+   * The server rejects the merge atomically if the result would exceed 25 active
+   * memories. Delete unwanted facts and retry.
+   */
+  async merge(contactId: string, options: MergeContactsOptions): Promise<Contact> {
+    const fieldSources = Object.fromEntries(
+      Object.entries(options.fieldSources ?? {}).map(([key, value]) => [
+        {
+          preferredName: "preferred_name",
+          namePrefix: "name_prefix",
+          givenName: "given_name",
+          middleName: "middle_name",
+          familyName: "family_name",
+          nameSuffix: "name_suffix",
+          companyName: "company_name",
+          jobTitle: "job_title",
+          birthday: "birthday",
+          notes: "notes",
+        }[key as ContactMergeField],
+        value,
+      ]),
+    );
+    const data = await this.http.post<RawContact>(`${BASE}/${contactId}/merge`, {
+      losing_contact_ids: options.losingContactIds,
+      field_sources: fieldSources,
+    });
+    return parseContact(data);
+  }
+
   async delete(contactId: string): Promise<void> {
     await this.http.delete(`${BASE}/${contactId}`);
+  }
+
+  async bulkDelete(contactIds: string[]): Promise<ContactBulkDeleteResult> {
+    const data = await this.http.post<RawContactBulkDeleteResult>(`${BASE}/bulk-delete`, {
+      contact_ids: contactIds,
+    });
+    return parseContactBulkDeleteResult(data);
   }
 }

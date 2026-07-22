@@ -289,7 +289,8 @@ async function readErrorDetail(resp: Response): Promise<InkboxAPIErrorDetail> {
   }
 }
 
-type Params = Record<string, string | number | boolean | undefined | null>;
+type ParamValue = string | number | boolean;
+type Params = Record<string, ParamValue | readonly ParamValue[] | undefined | null>;
 
 type StoredCookie = {
   name: string;
@@ -497,8 +498,14 @@ export class HttpTransport {
     });
   }
 
-  async delete(path: string, opts?: { timeoutMs?: number }): Promise<void> {
-    await this.request<void>("DELETE", path, { timeoutMs: opts?.timeoutMs });
+  async delete(
+    path: string,
+    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+  ): Promise<void> {
+    await this.request<void>("DELETE", path, {
+      timeoutMs: opts?.timeoutMs,
+      headers: opts?.headers,
+    });
   }
 
   /**
@@ -507,8 +514,14 @@ export class HttpTransport {
    * Used by endpoints (e.g. tunnels) that respond with a representation
    * of the deleted resource rather than 204 No Content.
    */
-  async deleteWithResponse<T>(path: string, opts?: { timeoutMs?: number }): Promise<T> {
-    return this.request<T>("DELETE", path, { timeoutMs: opts?.timeoutMs });
+  async deleteWithResponse<T>(
+    path: string,
+    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+  ): Promise<T> {
+    return this.request<T>("DELETE", path, {
+      timeoutMs: opts?.timeoutMs,
+      headers: opts?.headers,
+    });
   }
 
   /**
@@ -520,8 +533,13 @@ export class HttpTransport {
     path: string,
     body: string | Uint8Array,
     contentType: string,
+    opts?: { headers?: Record<string, string> },
   ): Promise<T> {
-    return this.request<T>("POST", path, { rawBody: body, contentType });
+    return this.request<T>("POST", path, {
+      rawBody: body,
+      contentType,
+      headers: opts?.headers,
+    });
   }
 
   /**
@@ -553,7 +571,9 @@ export class HttpTransport {
     if (opts.params) {
       const qs = new URLSearchParams();
       for (const [k, v] of Object.entries(opts.params)) {
-        if (v !== undefined && v !== null) {
+        if (Array.isArray(v)) {
+          for (const item of v) qs.append(k, String(item));
+        } else if (v !== undefined && v !== null) {
           qs.set(k, String(v));
         }
       }
