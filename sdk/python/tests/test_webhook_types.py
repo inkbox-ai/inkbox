@@ -226,8 +226,13 @@ def test_mail_contact_memories_and_old_replays():
         "Prefers email over phone calls."
     ]
     assert payload["data"]["contacts"][1]["memories"] == []
-    payload["data"]["contacts"][0].pop("memories")
-    assert "memories" not in payload["data"]["contacts"][0]
+    old_contact: WebhookMailContact = {
+        "bucket": "from",
+        "address": "customer@example.com",
+        "id": "contact_1",
+        "name": "Jane Doe",
+    }
+    assert old_contact["name"] == "Jane Doe"
 
 
 def test_mail_agent_identity_entries_have_required_keys():
