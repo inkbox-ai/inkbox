@@ -333,7 +333,7 @@ pub struct ContactFact {
     pub id: Uuid,
     pub contact_id: Uuid,
     pub content: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "f64_from_number_or_string")]
     pub confidence: Option<f64>,
     pub origin: ContactFactOrigin,
     #[serde(default)]
@@ -381,7 +381,7 @@ pub struct ContactImportResultItem {
     /// The resulting contact when `status == "created"`; None otherwise.
     #[serde(default)]
     pub contact: Option<Contact>,
-    /// The rejection reason when `status == "error"`; None otherwise.
+    /// The rejection reason when the card was not created.
     #[serde(default)]
     pub error: Option<String>,
     /// Existing contact that owns a conflicting identifier.
@@ -394,7 +394,7 @@ pub struct ContactImportResultItem {
 pub struct ContactImportResult {
     /// Number of cards that were stored.
     pub created_count: i64,
-    /// Number of cards that failed to parse / validate.
+    /// Number of cards that conflicted or failed validation.
     pub error_count: i64,
     /// Per-card outcome in submission order.
     #[serde(default, deserialize_with = "null_as_default")]
@@ -417,13 +417,29 @@ impl ContactImportResult {
             .filter(|item| item.status == ContactImportStatus::Error)
             .collect()
     }
+
+    /// Only the items whose `status == "conflict"`.
+    pub fn conflicts(&self) -> Vec<&ContactImportResultItem> {
+        self.results
+            .iter()
+            .filter(|item| item.status == ContactImportStatus::Conflict)
+            .collect()
+    }
+}
+
+/// Outcome for one contact in a bulk deletion request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactBulkDeleteStatus {
+    Deleted,
+    Error,
 }
 
 /// One row in a bulk contact deletion result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactBulkDeleteResultItem {
     pub contact_id: Uuid,
-    pub status: String,
+    pub status: ContactBulkDeleteStatus,
     #[serde(default)]
     pub error: Option<String>,
 }
@@ -460,11 +476,56 @@ const fn default_true() -> bool {
     true
 }
 
+/// Deserialize an optional float the server may encode as a JSON string
+/// (decimal fields arrive as e.g. `"0.90"` to preserve precision).
+fn f64_from_number_or_string<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value: Option<Value> = Option::deserialize(deserializer)?;
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Number(number)) => number
+            .as_f64()
+            .map(Some)
+            .ok_or_else(|| serde::de::Error::custom("number out of f64 range")),
+        Some(Value::String(text)) => text
+            .parse::<f64>()
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+        Some(other) => Err(serde::de::Error::custom(format!(
+            "expected number or string, got {other}"
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
-    use super::{Contact, ContactImportResult, ContactImportStatus};
+    use super::{Contact, ContactFact, ContactImportResult, ContactImportStatus};
+
+    #[test]
+    fn parses_confidence_from_string_or_number() {
+        let fact = |confidence: serde_json::Value| -> ContactFact {
+            serde_json::from_value(json!({
+                "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "contact_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "content": "Prefers email",
+                "confidence": confidence,
+                "origin": "generated",
+                "locked_at": null,
+                "created_at": "2026-07-20T12:00:00Z",
+                "updated_at": "2026-07-20T12:00:00Z",
+                "citations": []
+            }))
+            .unwrap()
+        };
+
+        assert_eq!(fact(json!("0.90")).confidence, Some(0.90));
+        assert_eq!(fact(json!(0.90)).confidence, Some(0.90));
+        assert_eq!(fact(json!(null)).confidence, None);
+    }
 
     #[test]
     fn defaults_contact_lifecycle_fields() {
@@ -521,5 +582,7 @@ mod tests {
 
         assert_eq!(result.results[0].status, ContactImportStatus::Conflict);
         assert!(result.results[0].conflicting_contact_id.is_some());
+        assert_eq!(result.conflicts().len(), 1);
+        assert!(result.errors().is_empty());
     }
 }

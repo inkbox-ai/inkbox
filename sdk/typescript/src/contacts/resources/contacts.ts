@@ -4,7 +4,7 @@
  * Contacts CRUD + search + lookup.
  */
 
-import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
+import { HttpTransport } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
@@ -68,7 +68,6 @@ export interface CreateContactOptions {
   dates?: ContactDate[];
   addresses?: ContactAddress[];
   customFields?: ContactCustomField[];
-  idempotencyKey?: string;
 }
 
 export interface UpdateContactOptions {
@@ -90,7 +89,6 @@ export interface UpdateContactOptions {
   addresses?: ContactAddress[] | null;
   customFields?: ContactCustomField[] | null;
   reviewStatus?: ContactReviewStatus;
-  idempotencyKey?: string;
 }
 
 export type ContactMergeField =
@@ -184,12 +182,7 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    if (options.idempotencyKey !== undefined) validateIdempotencyKey(options.idempotencyKey);
-    const data = await this.http.post<RawContact>(BASE, body, {
-      headers: options.idempotencyKey === undefined
-        ? undefined
-        : { "Idempotency-Key": options.idempotencyKey },
-    });
+    const data = await this.http.post<RawContact>(BASE, body);
     return parseContact(data);
   }
 
@@ -229,12 +222,7 @@ export class ContactsResource {
       body.custom_fields =
         options.customFields === null ? null : options.customFields!.map(contactCustomFieldToWire);
     }
-    if (options.idempotencyKey !== undefined) validateIdempotencyKey(options.idempotencyKey);
-    const data = await this.http.patch<RawContact>(`${BASE}/${contactId}`, body, {
-      headers: options.idempotencyKey === undefined
-        ? undefined
-        : { "Idempotency-Key": options.idempotencyKey },
-    });
+    const data = await this.http.patch<RawContact>(`${BASE}/${contactId}`, body);
     return parseContact(data);
   }
 
@@ -263,13 +251,8 @@ export class ContactsResource {
     return parseContact(data);
   }
 
-  async delete(contactId: string, options: { idempotencyKey?: string } = {}): Promise<void> {
-    if (options.idempotencyKey !== undefined) validateIdempotencyKey(options.idempotencyKey);
-    await this.http.delete(`${BASE}/${contactId}`, {
-      headers: options.idempotencyKey === undefined
-        ? undefined
-        : { "Idempotency-Key": options.idempotencyKey },
-    });
+  async delete(contactId: string): Promise<void> {
+    await this.http.delete(`${BASE}/${contactId}`);
   }
 
   async bulkDelete(contactIds: string[]): Promise<ContactBulkDeleteResult> {

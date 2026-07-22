@@ -17,6 +17,18 @@ function makeOkResponse(body: unknown) {
   } as Response;
 }
 
+function makeNoContentResponse() {
+  return {
+    ok: true,
+    status: 204,
+    statusText: "No Content",
+    headers: {
+      get() { return null; },
+      getSetCookie() { return []; },
+    } as unknown as Headers,
+  } as Response;
+}
+
 describe("contact memory", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
   afterEach(() => vi.restoreAllMocks());
@@ -217,7 +229,7 @@ describe("contact memory", () => {
     ]);
   });
 
-  it("forwards idempotency keys on contact mutations and vCard import", async () => {
+  it("sends contact mutations and vCard import to their endpoints", async () => {
     const contact = {
       id: "contact-1",
       preferred_name: "Alex",
@@ -232,16 +244,54 @@ describe("contact memory", () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(makeOkResponse(contact))
       .mockResolvedValueOnce(makeOkResponse(contact))
-      .mockResolvedValueOnce(makeOkResponse({}))
+      .mockResolvedValueOnce(makeNoContentResponse())
       .mockResolvedValueOnce(makeOkResponse({ created_count: 0, error_count: 0, results: [] }));
     const resource = new ContactsResource(new HttpTransport("k", BASE));
 
-    await resource.create({ givenName: "Alex", idempotencyKey: "create-contact-1" });
-    await resource.update("contact-1", { notes: "Updated", idempotencyKey: "update-contact-1" });
-    await resource.delete("contact-1", { idempotencyKey: "delete-contact-1" });
-    await resource.vcards.import("BEGIN:VCARD\r\nEND:VCARD\r\n", "text/vcard", "import-vcard-1");
+    await resource.create({ givenName: "Alex" });
+    await resource.update("contact-1", { notes: "Updated" });
+    await resource.delete("contact-1");
+    await resource.vcards.import("BEGIN:VCARD\r\nEND:VCARD\r\n", "text/vcard");
 
-    expect(vi.mocked(fetch).mock.calls.map(([, init]) => new Headers(init?.headers).get("Idempotency-Key")))
-      .toEqual(["create-contact-1", "update-contact-1", "delete-contact-1", "import-vcard-1"]);
+    expect(
+      vi.mocked(fetch).mock.calls.map(([url, init]) => [
+        init?.method,
+        new URL(url as string).pathname,
+      ]),
+    ).toEqual([
+      ["POST", "/api/v1/contacts"],
+      ["PATCH", "/api/v1/contacts/contact-1"],
+      ["DELETE", "/api/v1/contacts/contact-1"],
+      ["POST", "/api/v1/contacts/import"],
+    ]);
+  });
+
+  it("separates vCard conflicts from parse errors", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(makeOkResponse({
+      created_count: 0,
+      error_count: 2,
+      results: [
+        {
+          index: 0,
+          status: "conflict",
+          contact: null,
+          error: "identifier conflict",
+          conflicting_contact_id: "contact-1",
+        },
+        {
+          index: 1,
+          status: "error",
+          contact: null,
+          error: "invalid card",
+          conflicting_contact_id: null,
+        },
+      ],
+    }));
+    const resource = new ContactsResource(new HttpTransport("k", BASE));
+
+    const result = await resource.vcards.import("BEGIN:VCARD\r\nEND:VCARD\r\n");
+
+    expect(result.conflicts.map((item) => item.index)).toEqual([0]);
+    expect(result.errors.map((item) => item.index)).toEqual([1]);
   });
 });

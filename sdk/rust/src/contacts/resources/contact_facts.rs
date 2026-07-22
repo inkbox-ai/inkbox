@@ -96,7 +96,7 @@ mod tests {
                 "id": "22222222-2222-2222-2222-222222222222",
                 "contact_id": "11111111-1111-1111-1111-111111111111",
                 "content": "Prefers morning meetings",
-                "confidence": 0.9,
+                "confidence": "0.90",
                 "origin": "generated",
                 "locked_at": null,
                 "created_at": "2026-07-20T12:00:00Z",
@@ -120,6 +120,7 @@ mod tests {
 
         mock.assert();
         assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].confidence, Some(0.90));
         assert_eq!(
             facts[0].citations[0].availability,
             ContactFactCitationAvailability::SourceUnavailableToCaller

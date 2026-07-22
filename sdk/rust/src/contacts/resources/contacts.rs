@@ -16,7 +16,7 @@ use crate::contacts::types::{
     ContactEmail, ContactPhone, ContactReviewStatus, ContactWebsite,
 };
 use crate::error::{InkboxError, Result};
-use crate::http::{validate_idempotency_key, HttpTransport, NO_HEADERS, NO_QUERY};
+use crate::http::{HttpTransport, NO_QUERY};
 
 const BASE: &str = "/contacts";
 
@@ -202,15 +202,6 @@ impl ContactsResource {
 
     /// Create a new contact.
     pub fn create(&self, params: &CreateContactParams) -> Result<Contact> {
-        self.create_with_idempotency_key(params, None)
-    }
-
-    /// Create a contact with an optional retry-safe idempotency key.
-    pub fn create_with_idempotency_key(
-        &self,
-        params: &CreateContactParams,
-        idempotency_key: Option<&str>,
-    ) -> Result<Contact> {
         let mut body = Map::new();
         // Scalar fields: emit only when present.
         insert_opt_str(&mut body, "preferred_name", &params.preferred_name);
@@ -253,17 +244,7 @@ impl ContactsResource {
                 wire_list(custom_fields, ContactCustomField::to_wire),
             );
         }
-        let idempotency_header;
-        let headers = if let Some(key) = idempotency_key {
-            validate_idempotency_key(key)?;
-            idempotency_header = [("Idempotency-Key", key)];
-            idempotency_header.as_slice()
-        } else {
-            NO_HEADERS
-        };
-        let data =
-            self.http
-                .post_with_headers(BASE, Some(&Value::Object(body)), NO_QUERY, headers)?;
+        let data = self.http.post(BASE, Some(&Value::Object(body)), NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -272,16 +253,6 @@ impl ContactsResource {
     /// Only provided fields are sent; omit a field to leave it unchanged. Pass
     /// a scalar as `Some(None)` to clear it.
     pub fn update(&self, contact_id: &str, params: &UpdateContactParams) -> Result<Contact> {
-        self.update_with_idempotency_key(contact_id, params, None)
-    }
-
-    /// Update a contact with an optional retry-safe idempotency key.
-    pub fn update_with_idempotency_key(
-        &self,
-        contact_id: &str,
-        params: &UpdateContactParams,
-        idempotency_key: Option<&str>,
-    ) -> Result<Contact> {
         let mut body = Map::new();
         // Scalar fields: outer Some => emit (None scalar becomes JSON null).
         insert_patch_str(&mut body, "preferred_name", &params.preferred_name);
@@ -322,43 +293,15 @@ impl ContactsResource {
                 Value::String(review_status.as_str().to_string()),
             );
         }
-        let idempotency_header;
-        let headers = if let Some(key) = idempotency_key {
-            validate_idempotency_key(key)?;
-            idempotency_header = [("Idempotency-Key", key)];
-            idempotency_header.as_slice()
-        } else {
-            NO_HEADERS
-        };
-        let data = self.http.patch_with_headers(
-            &format!("{BASE}/{contact_id}"),
-            &Value::Object(body),
-            headers,
-        )?;
+        let data = self
+            .http
+            .patch(&format!("{BASE}/{contact_id}"), &Value::Object(body))?;
         Ok(serde_json::from_value(data)?)
     }
 
     /// Delete a contact.
     pub fn delete(&self, contact_id: &str) -> Result<()> {
-        self.delete_with_idempotency_key(contact_id, None)
-    }
-
-    /// Delete a contact with an optional retry-safe idempotency key.
-    pub fn delete_with_idempotency_key(
-        &self,
-        contact_id: &str,
-        idempotency_key: Option<&str>,
-    ) -> Result<()> {
-        let idempotency_header;
-        let headers = if let Some(key) = idempotency_key {
-            validate_idempotency_key(key)?;
-            idempotency_header = [("Idempotency-Key", key)];
-            idempotency_header.as_slice()
-        } else {
-            NO_HEADERS
-        };
-        self.http
-            .delete_with_headers(&format!("{BASE}/{contact_id}"), headers)
+        self.http.delete(&format!("{BASE}/{contact_id}"))
     }
 
     /// Delete multiple contacts and return per-contact outcomes.
@@ -495,6 +438,12 @@ mod tests {
             "merged_into_contact_id": null,
             "is_auto_created": true,
             "is_confirmed": false,
+            "memory_count": 2,
+            "latest_memory": {
+                "id": LOSING_ID,
+                "content": "Prefers email",
+                "updated_at": "2026-07-20T12:00:00Z"
+            },
             "status": "active",
             "created_at": "2026-07-20T12:00:00Z",
             "updated_at": "2026-07-20T12:00:00Z"
@@ -581,7 +530,8 @@ mod tests {
                 },
             )
             .unwrap();
-        sdk.contacts()
+        let survivor = sdk
+            .contacts()
             .merge(
                 CONTACT_ID,
                 &MergeContactsParams {
@@ -593,15 +543,23 @@ mod tests {
 
         update.assert();
         merge.assert();
+        assert_eq!(survivor.memory_count, Some(2));
+        assert_eq!(
+            survivor
+                .latest_memory
+                .as_ref()
+                .map(|memory| memory.content.as_str()),
+            Some("Prefers email")
+        );
     }
 
     #[test]
-    fn supports_idempotent_create_and_bulk_delete() {
+    fn supports_create_and_bulk_delete() {
         let server = MockServer::start();
         let create = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/v1/contacts")
-                .header("Idempotency-Key", "create-contact-1");
+                .json_body_partial(r#"{"preferred_name": "Ada"}"#);
             then.status(201).json_body(contact());
         });
         let bulk_delete = server.mock(|when, then| {
@@ -617,18 +575,19 @@ mod tests {
 
         let sdk = client(&server);
         sdk.contacts()
-            .create_with_idempotency_key(
-                &CreateContactParams {
-                    preferred_name: Some("Ada".into()),
-                    ..Default::default()
-                },
-                Some("create-contact-1"),
-            )
+            .create(&CreateContactParams {
+                preferred_name: Some("Ada".into()),
+                ..Default::default()
+            })
             .unwrap();
         let result = sdk.contacts().bulk_delete(&[CONTACT_ID.into()]).unwrap();
 
         create.assert();
         bulk_delete.assert();
         assert_eq!(result.deleted_count, 1);
+        assert_eq!(
+            result.results[0].status,
+            crate::contacts::ContactBulkDeleteStatus::Deleted
+        );
     }
 }

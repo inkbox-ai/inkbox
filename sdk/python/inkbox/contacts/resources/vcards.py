@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from inkbox.contacts.types import ContactImportResult, ContactVCardExportResult
-from inkbox.imessage.types import _validate_idempotency_key
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -29,7 +28,6 @@ class VCardsResource:
         content: str | bytes,
         *,
         content_type: str = _VCARD_CONTENT_TYPE,
-        idempotency_key: str | None = None,
     ) -> ContactImportResult:
         """Bulk-import vCards.
 
@@ -44,11 +42,6 @@ class VCardsResource:
             f"{_BASE}/import",
             content=body,
             content_type=content_type,
-            headers=(
-                {"Idempotency-Key": _validate_idempotency_key(idempotency_key)}
-                if idempotency_key is not None
-                else None
-            ),
         )
         return ContactImportResult._from_dict(data)
 

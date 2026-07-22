@@ -265,15 +265,13 @@ export function registerContactsCommands(program: Command): void {
     .command("create")
     .description("Create a contact (pass the full payload as JSON)")
     .requiredOption("--json <payload>", "JSON payload matching CreateContactOptions")
-    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { json: string; idempotencyKey?: string },
+        cmdOpts: { json: string },
       ) {
         const opts = getGlobalOpts(this);
         const payload = parseJsonArg<CreateContactOptions>(cmdOpts.json, "--json payload");
-        if (cmdOpts.idempotencyKey !== undefined) payload.idempotencyKey = cmdOpts.idempotencyKey;
         const inkbox = createClient(opts);
         const contact = await inkbox.contacts.create(payload);
         output(contact as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -284,16 +282,14 @@ export function registerContactsCommands(program: Command): void {
     .command("update <contact-id>")
     .description("JSON-merge-patch update (pass the patch as JSON)")
     .requiredOption("--json <payload>", "JSON patch matching UpdateContactOptions")
-    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
       withErrorHandler(async function (
         this: Command,
         contactId: string,
-        cmdOpts: { json: string; idempotencyKey?: string },
+        cmdOpts: { json: string },
       ) {
         const opts = getGlobalOpts(this);
         const patch = parseJsonArg<Record<string, unknown>>(cmdOpts.json, "--json patch");
-        if (cmdOpts.idempotencyKey !== undefined) patch.idempotencyKey = cmdOpts.idempotencyKey;
         const inkbox = createClient(opts);
         const contact = await inkbox.contacts.update(contactId, patch);
         output(contact as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -303,16 +299,11 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("delete <contact-id>")
     .description("Delete a contact")
-    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
-      withErrorHandler(async function (
-        this: Command,
-        contactId: string,
-        cmdOpts: { idempotencyKey?: string },
-      ) {
+      withErrorHandler(async function (this: Command, contactId: string) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        await inkbox.contacts.delete(contactId, { idempotencyKey: cmdOpts.idempotencyKey });
+        await inkbox.contacts.delete(contactId);
         console.log(`Deleted contact ${contactId}.`);
       }),
     );
@@ -360,21 +351,12 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("import <file>")
     .description("Bulk vCard import (text/vcard, ≤5 MiB, ≤1000 cards)")
-    .option("--idempotency-key <key>", "Retry-safe mutation key")
     .action(
-      withErrorHandler(async function (
-        this: Command,
-        file: string,
-        cmdOpts: { idempotencyKey?: string },
-      ) {
+      withErrorHandler(async function (this: Command, file: string) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const body = readFileSync(file, "utf8");
-        const result = await inkbox.contacts.vcards.import(
-          body,
-          "text/vcard",
-          cmdOpts.idempotencyKey,
-        );
+        const result = await inkbox.contacts.vcards.import(body, "text/vcard");
         output(result as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
     );

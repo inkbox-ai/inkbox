@@ -4,7 +4,7 @@
  * vCard import / export.
  */
 
-import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
+import { HttpTransport } from "../../_http.js";
 import {
   ContactImportResult,
   ContactVCardExportResult,
@@ -31,18 +31,11 @@ export class VCardsResource {
   async import(
     content: string | Uint8Array,
     contentType: string = VCARD_CONTENT_TYPE,
-    idempotencyKey?: string,
   ): Promise<ContactImportResult> {
-    if (idempotencyKey !== undefined) validateIdempotencyKey(idempotencyKey);
     const data = await this.http.postRaw<RawContactImportResult>(
       `${BASE}/import`,
       content,
       contentType,
-      {
-        headers: idempotencyKey === undefined
-          ? undefined
-          : { "Idempotency-Key": idempotencyKey },
-      },
     );
     return parseContactImportResult(data);
   }

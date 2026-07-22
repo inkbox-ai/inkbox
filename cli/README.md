@@ -428,11 +428,11 @@ inkbox contacts correspondence <contact-id> [-i <identity-id>]
   [--limit-per-channel <n>] [--content <mode>] [--transcripts <mode>]
 inkbox contacts merge <survivor-id> --losing <contact-id...>
   [--field-sources '{"preferredName":"<contact-id>"}']
-inkbox contacts create --json <payload> [--idempotency-key <key>]
-inkbox contacts update <contact-id> --json <patch> [--idempotency-key <key>]
-inkbox contacts delete <contact-id> [--idempotency-key <key>]
+inkbox contacts create --json <payload>
+inkbox contacts update <contact-id> --json <patch>
+inkbox contacts delete <contact-id>
 inkbox contacts bulk-delete <contact-id...>
-inkbox contacts import <file.vcf> [--idempotency-key <key>]
+inkbox contacts import <file.vcf>
 inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts access list <contact-id>              # Compatibility read only
 ```

@@ -498,12 +498,12 @@ Organization-wide address book with lifecycle review, memory, correspondence, an
 ```bash
 inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]  # offset max 10000
 inkbox contacts get <contact-id>
-inkbox contacts create --json <payload> [--idempotency-key <key>]
-inkbox contacts update <contact-id> --json <patch> [--idempotency-key <key>]
-inkbox contacts delete <contact-id> [--idempotency-key <key>]
+inkbox contacts create --json <payload>
+inkbox contacts update <contact-id> --json <patch>
+inkbox contacts delete <contact-id>
 inkbox contacts bulk-delete <contact-id...>
 inkbox contacts lookup (--email <email> | --email-contains <s> | --email-domain <d> | --phone <e164> | --phone-contains <s>)
-inkbox contacts import <file.vcf> [--idempotency-key <key>]
+inkbox contacts import <file.vcf>
 inkbox contacts export <contact-id> [--out <file>] # vCard 4.0 to stdout or file
 inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts facts list <contact-id>

@@ -6,6 +6,8 @@ from inkbox.contacts.resources.correspondence import ContactCorrespondenceOption
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
     Contact,
+    ContactBulkDeleteStatus,
+    ContactImportResult,
     ContactReviewStatus,
     CorrespondenceChannel,
     EmailCorrespondenceItem,
@@ -85,9 +87,11 @@ def test_update_review_status_and_merge():
     resource.update(CONTACT_ID, review_status=ContactReviewStatus.CONFIRMED)
     assert transport.patch.call_args.kwargs["json"] == {"review_status": "confirmed"}
 
-    resource.merge(
+    survivor = resource.merge(
         CONTACT_ID, losing_contact_ids=[SOURCE_ID], field_sources={"notes": SOURCE_ID}
     )
+    assert survivor.memory_count == 3
+    assert survivor.latest_memory.content == "Prefers email"
     assert transport.post.call_args.kwargs["json"] == {
         "losing_contact_ids": [SOURCE_ID],
         "field_sources": {"notes": SOURCE_ID},
@@ -210,7 +214,7 @@ def test_contact_type_is_publicly_importable():
     assert ExportedContact is Contact
 
 
-def test_contact_mutation_parity_and_idempotency():
+def test_contact_mutation_parity():
     transport = MagicMock()
     transport.post.side_effect = [contact_payload(), {
         "deleted_count": 1,
@@ -220,20 +224,15 @@ def test_contact_mutation_parity_and_idempotency():
     transport.patch.return_value = contact_payload()
     resource = ContactsResource(transport)
 
-    resource.create(given_name="Alex", idempotency_key="create-contact-1")
-    assert transport.post.call_args_list[0].kwargs["headers"] == {
-        "Idempotency-Key": "create-contact-1"
-    }
-    resource.update(CONTACT_ID, notes="Updated", idempotency_key="update-contact-1")
-    assert transport.patch.call_args.kwargs["headers"] == {
-        "Idempotency-Key": "update-contact-1"
-    }
-    resource.delete(CONTACT_ID, idempotency_key="delete-contact-1")
-    transport.delete.assert_called_once_with(
-        f"/contacts/{CONTACT_ID}", headers={"Idempotency-Key": "delete-contact-1"}
-    )
+    resource.create(given_name="Alex")
+    assert transport.post.call_args_list[0].kwargs["json"] == {"given_name": "Alex"}
+    resource.update(CONTACT_ID, notes="Updated")
+    assert transport.patch.call_args.kwargs["json"] == {"notes": "Updated"}
+    resource.delete(CONTACT_ID)
+    transport.delete.assert_called_once_with(f"/contacts/{CONTACT_ID}")
     result = resource.bulk_delete([CONTACT_ID])
     assert result.deleted_count == 1
+    assert result.results[0].status is ContactBulkDeleteStatus.DELETED
 
 
 def test_fact_delete_citation_url_and_vcard_batch_operations():
@@ -272,9 +271,32 @@ def test_fact_delete_citation_url_and_vcard_batch_operations():
     assert deleted.latest_memory is None
     exported = resource.vcards.export_vcards([CONTACT_ID])
     assert exported.contact_count == 1
-    resource.vcards.import_vcards(
-        "BEGIN:VCARD\r\nEND:VCARD\r\n", idempotency_key="import-vcard-1"
-    )
-    assert transport.post_bytes.call_args.kwargs["headers"] == {
-        "Idempotency-Key": "import-vcard-1"
-    }
+    resource.vcards.import_vcards("BEGIN:VCARD\r\nEND:VCARD\r\n")
+    assert transport.post_bytes.call_args.kwargs["content_type"] == "text/vcard"
+
+
+def test_vcard_import_separates_conflicts_from_errors():
+    result = ContactImportResult._from_dict({
+        "created_count": 0,
+        "error_count": 2,
+        "results": [
+            {
+                "index": 0,
+                "status": "conflict",
+                "error": "identifier conflict",
+                "conflicting_contact_id": CONTACT_ID,
+            },
+            {"index": 1, "status": "error", "error": "invalid card"},
+        ],
+    })
+
+    assert [item.index for item in result.conflicts] == [0]
+    assert [item.index for item in result.errors] == [1]
+
+
+def test_contact_result_types_are_publicly_importable():
+    from inkbox.contacts import ContactImportResultItem as ExportedImportResultItem
+    from inkbox.contacts import ContactImportResult as ExportedImportResult
+
+    assert ExportedImportResult is ContactImportResult
+    assert ExportedImportResultItem.__name__ == "ContactImportResultItem"
