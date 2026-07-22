@@ -94,7 +94,7 @@ export interface Contact {
   isAutoCreated: boolean;
   isConfirmed: boolean;
   memoryCount: number | null;
-  latestMemory?: ContactMemorySummary | null;
+  latestMemory: ContactMemorySummary | null;
   status: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -106,10 +106,12 @@ export interface Contact {
  * `contact` is populated when `status === "created"` (and `error` is null);
  * `error` is populated when `status === "error"` (and `contact` is null).
  */
+export type ContactImportStatus = "created" | "conflict" | "error";
+
 export interface ContactImportResultItem {
   /** 0-based position within the uploaded vCard stream. */
   index: number;
-  status: "created" | "conflict" | "error";
+  status: ContactImportStatus;
   contact: Contact | null;
   error: string | null;
   conflictingContactId: string | null;
@@ -124,11 +126,15 @@ export interface ContactImportResult {
   readonly createdIds: string[];
   /** Convenience: per-card entries where `status === "error"`. */
   readonly errors: ContactImportResultItem[];
+  /** Convenience: per-card entries where `status === "conflict"`. */
+  readonly conflicts: ContactImportResultItem[];
 }
+
+export type ContactBulkDeleteStatus = "deleted" | "error";
 
 export interface ContactBulkDeleteResultItem {
   contactId: string;
-  status: "deleted" | "error";
+  status: ContactBulkDeleteStatus;
   error: string | null;
 }
 
@@ -250,7 +256,7 @@ export interface RawContactVCardExportResult {
 
 export interface RawContactImportResultItem {
   index: number;
-  status: "created" | "conflict" | "error";
+  status: ContactImportStatus;
   contact?: RawContact | null;
   error?: string | null;
   conflicting_contact_id?: string | null;
@@ -412,6 +418,9 @@ export function parseContactImportResult(
     },
     get errors() {
       return results.filter((i) => i.status === "error");
+    },
+    get conflicts() {
+      return results.filter((i) => i.status === "conflict");
     },
   };
 }

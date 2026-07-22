@@ -43,6 +43,11 @@ const CONTACT_DICT = {
   is_auto_created: false,
   is_confirmed: true,
   memory_count: 3,
+  latest_memory: {
+    id: "cccc3333-0000-0000-0000-000000000001",
+    content: "Prefers email",
+    updated_at: "2026-04-21T00:00:00Z",
+  },
   status: "active",
   created_at: "2026-04-20T00:00:00Z",
   updated_at: "2026-04-20T00:00:00Z",
@@ -186,7 +191,7 @@ describe("ContactsResource", () => {
       "creation_source", "review_status", "reviewed_at", "reviewed_by",
       "preferred_name_source", "preferred_name_locked_at", "created_by_identity_id",
       "merged_into_contact_id", "is_auto_created", "is_confirmed",
-      "memory_count",
+      "memory_count", "latest_memory",
     ]) delete legacy[key];
     vi.mocked(fetch).mockResolvedValue(makeOkResponse(legacy));
 
@@ -222,7 +227,7 @@ describe("ContactsResource", () => {
     const resource = new ContactsResource(http);
 
     await resource.update(CONTACT_DICT.id, { reviewStatus: "confirmed" });
-    await resource.merge(CONTACT_DICT.id, {
+    const survivor = await resource.merge(CONTACT_DICT.id, {
       losingContactIds: ["contact-loser"],
       fieldSources: { preferredName: "contact-loser" },
     });
@@ -238,6 +243,8 @@ describe("ContactsResource", () => {
       losing_contact_ids: ["contact-loser"],
       field_sources: { preferred_name: "contact-loser" },
     });
+    expect(survivor.memoryCount).toBe(3);
+    expect(survivor.latestMemory?.content).toBe("Prefers email");
   });
 
   it("keeps contact access listing read-only", async () => {
@@ -310,6 +317,8 @@ describe("VCardsResource", () => {
 
     expect(result.results[0].status).toBe("conflict");
     expect(result.results[0].conflictingContactId).toBe(conflictId);
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.errors).toHaveLength(0);
   });
 
   it("import then export is a coherent round-trip", async () => {

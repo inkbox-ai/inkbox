@@ -22,8 +22,8 @@ pub use resources::correspondence::{ContactCorrespondenceResource, Correspondenc
 pub use resources::vcards::VCardsResource;
 pub use types::{
     Contact, ContactAccess, ContactAddress, ContactBulkDeleteResult, ContactBulkDeleteResultItem,
-    ContactCreationSource, ContactCustomField, ContactDate, ContactEmail, ContactFact,
-    ContactFactCitation, ContactFactCitationAvailability, ContactFactCitationDetail,
+    ContactBulkDeleteStatus, ContactCreationSource, ContactCustomField, ContactDate, ContactEmail,
+    ContactFact, ContactFactCitation, ContactFactCitationAvailability, ContactFactCitationDetail,
     ContactFactDeleteResult, ContactFactOrigin, ContactImportResult, ContactImportResultItem,
     ContactImportStatus, ContactMemorySummary, ContactNameSource, ContactPhone,
     ContactReviewStatus, ContactVCardExportResult, ContactWebsite,

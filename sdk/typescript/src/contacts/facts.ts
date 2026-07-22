@@ -3,6 +3,8 @@ export type ContactFactCitationAvailability =
   | "purged"
   | "source_unavailable_to_caller";
 
+export type ContactFactOrigin = "generated" | "user";
+
 export interface ContactFactCitation {
   sourceType: string;
   availability: ContactFactCitationAvailability;
@@ -16,7 +18,7 @@ export interface ContactFact {
   contactId: string;
   content: string;
   confidence: number | null;
-  origin: "generated" | "user";
+  origin: ContactFactOrigin;
   lockedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -53,7 +55,7 @@ export interface RawContactFact {
   contact_id: string;
   content: string;
   confidence: string | number | null;
-  origin: "generated" | "user";
+  origin: ContactFactOrigin;
   locked_at: string | null;
   created_at: string;
   updated_at: string;

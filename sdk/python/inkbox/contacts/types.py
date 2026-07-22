@@ -663,11 +663,10 @@ class ContactImportResultItem:
 
     Attributes:
         index: 0-based position within the uploaded vCard stream.
-        status: ``"created"`` if the card was stored, ``"error"`` otherwise.
+        status: ``"created"``, ``"conflict"``, or ``"error"``.
         contact: The resulting :class:`Contact` when ``status == "created"``;
             ``None`` otherwise.
-        error: The rejection reason when ``status == "error"``; ``None`` when
-            the card was created successfully.
+        error: The rejection reason when the card was not created.
     """
 
     index: int
@@ -694,7 +693,7 @@ class ContactImportResult:
 
     Attributes:
         created_count: Number of cards that were stored.
-        error_count: Number of cards that failed to parse / validate.
+        error_count: Number of cards that conflicted or failed validation.
         results: Per-card outcome in submission order.
     """
 
@@ -712,6 +711,11 @@ class ContactImportResult:
         """Only the items whose ``status == "error"``."""
         return [item for item in self.results if item.status is ContactImportStatus.ERROR]
 
+    @property
+    def conflicts(self) -> list[ContactImportResultItem]:
+        """Only the items whose ``status == "conflict"``."""
+        return [item for item in self.results if item.status is ContactImportStatus.CONFLICT]
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ContactImportResult:
         return cls(
@@ -723,17 +727,22 @@ class ContactImportResult:
         )
 
 
+class ContactBulkDeleteStatus(StrEnum):
+    DELETED = "deleted"
+    ERROR = "error"
+
+
 @dataclass
 class ContactBulkDeleteResultItem:
     contact_id: UUID
-    status: str
+    status: ContactBulkDeleteStatus
     error: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ContactBulkDeleteResultItem:
         return cls(
             contact_id=UUID(d["contact_id"]),
-            status=d["status"],
+            status=ContactBulkDeleteStatus(d["status"]),
             error=d.get("error"),
         )
 
