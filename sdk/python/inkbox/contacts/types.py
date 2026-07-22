@@ -176,10 +176,10 @@ class ContactCustomField:
 
 @dataclass
 class ContactAccess:
-    """A single access grant on a contact.
+    """Deprecated read-only compatibility metadata for a contact.
 
-    ``identity_id=None`` means the grant is a wildcard — every active
-    identity can see the contact.
+    These records do not restrict organization-wide contact visibility.
+    ``identity_id=None`` is the legacy wildcard sentinel.
     """
 
     id: UUID

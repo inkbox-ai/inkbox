@@ -1,4 +1,5 @@
-//! Read-only compatibility access rows for contacts.
+//! Deprecated read-only compatibility metadata that does not restrict
+//! organization-wide contact visibility.
 
 use std::sync::Arc;
 
@@ -19,9 +20,9 @@ impl ContactAccessResource {
         Self { http }
     }
 
-    /// List compatibility access rows for a single contact.
+    /// List deprecated read-only compatibility metadata for a contact.
     ///
-    /// Returns 404 from the server if the caller can't see the contact.
+    /// These records do not restrict organization-wide contact visibility.
     pub fn list(&self, contact_id: &str) -> Result<Vec<ContactAccess>> {
         let data = self
             .http

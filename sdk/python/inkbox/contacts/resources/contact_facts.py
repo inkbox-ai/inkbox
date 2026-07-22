@@ -55,7 +55,7 @@ class ContactFactsResource:
         contact_id: UUID | str,
         fact_id: UUID | str,
     ) -> ContactFactDeleteResult:
-        """Delete a fact using an organization-wide credential."""
+        """Delete a fact using an admin-scoped API key."""
         data = self._http.delete_with_response(
             f"/contacts/{contact_id}/facts/{fact_id}"
         )

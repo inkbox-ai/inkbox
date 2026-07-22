@@ -69,7 +69,7 @@ impl ContactFactsResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Delete a fact using an organization-wide credential.
+    /// Delete a fact using an admin-scoped API key.
     pub fn delete(&self, contact_id: &str, fact_id: &str) -> Result<ContactFactDeleteResult> {
         let data = self
             .http

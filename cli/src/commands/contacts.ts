@@ -113,7 +113,7 @@ function registerContactFactsCommands(parent: Command): void {
 
   facts
     .command("delete <contact-id> <fact-id>")
-    .description("Delete a contact fact")
+    .description("Delete a contact fact (admin-scoped API key required)")
     .action(
       withErrorHandler(async function (this: Command, contactId: string, factId: string) {
         const opts = getGlobalOpts(this);
@@ -237,7 +237,9 @@ export function registerContactsCommands(program: Command): void {
 
   contacts
     .command("merge <contact-id>")
-    .description("Merge contacts into the surviving contact")
+    .description(
+      "Merge contacts (admin-scoped key required; rejected atomically above 25 active memories; delete unwanted facts and retry)",
+    )
     .requiredOption("--losing <contact-id...>", "Contact IDs to merge into the survivor")
     .option("--field-sources <json>", "JSON object mapping profile fields to source contact IDs")
     .action(

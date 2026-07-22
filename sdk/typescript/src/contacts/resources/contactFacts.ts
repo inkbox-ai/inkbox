@@ -54,6 +54,7 @@ export class ContactFactsResource {
     return parseContactFactCitationDetail(data);
   }
 
+  /** Delete a fact using an admin-scoped API key. */
   async delete(contactId: string, factId: string): Promise<ContactFactDeleteResult> {
     const data = await this.http.deleteWithResponse<RawContactFactDeleteResult>(
       `${BASE}/${contactId}/facts/${factId}`,

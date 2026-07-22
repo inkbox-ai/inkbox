@@ -201,14 +201,14 @@ impl ContactCustomField {
     }
 }
 
-/// A single access grant on a contact.
+/// Deprecated read-only compatibility metadata for a contact.
 ///
-/// `identity_id == None` means the grant is a wildcard — every active identity
-/// can see the contact.
+/// These records do not restrict organization-wide contact visibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactAccess {
     pub id: Uuid,
     pub contact_id: Uuid,
+    /// `None` is the legacy wildcard sentinel.
     #[serde(default)]
     pub identity_id: Option<Uuid>,
     /// ISO-8601 timestamp string.

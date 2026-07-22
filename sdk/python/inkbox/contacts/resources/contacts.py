@@ -51,7 +51,7 @@ class ContactsResource:
 
     @property
     def access(self) -> ContactAccessResource:
-        """Compatibility access records (read-only)."""
+        """Deprecated read-only metadata that does not restrict contact visibility."""
         return self._access
 
     @property
@@ -267,7 +267,11 @@ class ContactsResource:
         losing_contact_ids: list[UUID | str],
         field_sources: dict[str, UUID | str] | None = None,
     ) -> Contact:
-        """Merge contacts into the contact identified by ``contact_id``."""
+        """Merge contacts into the contact identified by ``contact_id``.
+
+        Requires an admin-scoped API key. The server rejects the merge atomically
+        if the result would exceed 25 active memories; delete unwanted facts and retry.
+        """
         body = {
             "losing_contact_ids": [str(value) for value in losing_contact_ids],
             "field_sources": {

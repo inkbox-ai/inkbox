@@ -39,10 +39,14 @@ export interface ContactCustomField {
   value: string;
 }
 
+/**
+ * Deprecated read-only compatibility metadata.
+ * These records do not restrict organization-wide contact visibility.
+ */
 export interface ContactAccess {
   id: string;
   contactId: string;
-  /** null = wildcard grant (every active identity sees the contact) */
+  /** null is the legacy wildcard sentinel. */
   identityId: string | null;
   createdAt: Date;
 }

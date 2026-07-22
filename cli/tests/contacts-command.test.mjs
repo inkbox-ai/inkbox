@@ -52,6 +52,7 @@ test("contact facts exposes read and deletion commands", () => {
   assert.match(text, /citation <contact-id> <fact-id> <citation-id>/);
   assert.match(text, /citation-url <source-url>/);
   assert.match(text, /delete <contact-id> <fact-id>/);
+  assert.match(help("contacts", "facts", "delete"), /admin-scoped API key required/);
 });
 
 test("contact lifecycle options are discoverable", () => {
@@ -87,6 +88,9 @@ test("contact correspondence and merge expose their request options", () => {
   const merge = help("contacts", "merge");
   assert.match(merge, /--losing <contact-id\.\.\.>/);
   assert.match(merge, /--field-sources <json>/);
+  assert.match(merge, /admin-scoped key required/);
+  assert.match(merge, /rejected atomically above 25 active\s+memories/);
+  assert.match(merge, /delete unwanted facts and retry/);
 });
 
 test("contact fact deletion calls the API and prints remaining memory", async () => {

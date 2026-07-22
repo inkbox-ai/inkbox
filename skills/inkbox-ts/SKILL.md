@@ -855,6 +855,9 @@ await inkbox.phoneContactRules.create(num.id, {
 
 Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
+Merging requires an admin-scoped API key. The merge is rejected atomically if
+the survivor would exceed 25 active memories; delete unwanted facts and retry.
+
 ```typescript
 import type { CreateContactOptions, ContactEmail, ContactPhone } from "@inkbox/sdk";
 

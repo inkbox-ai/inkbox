@@ -226,6 +226,12 @@ export class ContactsResource {
     return parseContact(data);
   }
 
+  /**
+   * Merge contacts using an admin-scoped API key.
+   *
+   * The server rejects the merge atomically if the result would exceed 25 active
+   * memories. Delete unwanted facts and retry.
+   */
   async merge(contactId: string, options: MergeContactsOptions): Promise<Contact> {
     const fieldSources = Object.fromEntries(
       Object.entries(options.fieldSources ?? {}).map(([key, value]) => [

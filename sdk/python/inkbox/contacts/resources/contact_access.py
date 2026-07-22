@@ -1,7 +1,8 @@
 """
 inkbox/contacts/resources/contact_access.py
 
-Read-only compatibility access information.
+Deprecated read-only compatibility metadata that does not restrict
+organization-wide contact visibility.
 """
 
 from __future__ import annotations
@@ -22,9 +23,9 @@ class ContactAccessResource:
         self._http = http
 
     def list(self, contact_id: UUID | str) -> list[ContactAccess]:
-        """List compatibility access rows for a single contact.
+        """List deprecated read-only compatibility metadata for a contact.
 
-        Returns 404 from the server if the caller can't see the contact.
+        These records do not restrict organization-wide contact visibility.
         """
         data = self._http.get(f"{_BASE}/{contact_id}/access")
         items = data["items"] if isinstance(data, dict) and "items" in data else data

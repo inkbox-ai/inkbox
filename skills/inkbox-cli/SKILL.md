@@ -495,6 +495,9 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
+Merging requires an admin-scoped API key. The merge is rejected atomically if
+the survivor would exceed 25 active memories; delete unwanted facts and retry.
+
 ```bash
 inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]  # offset max 10000
 inkbox contacts get <contact-id>
@@ -512,7 +515,7 @@ inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
 inkbox contacts facts citation-url <source-url>
 inkbox contacts facts delete <contact-id> <fact-id>  # admin only
 inkbox contacts correspondence <contact-id> [--identity <uuid>] [--channels <channel>]
-inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <json>]
+inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <json>]  # admin-scoped API key required
 inkbox contacts access list <contact-id>             # compatibility read only
 ```
 
