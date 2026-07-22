@@ -183,13 +183,19 @@ let conversations = identity.list_imessage_conversations_with_groups(
     None,
     true,
 )?;
+println!("{:?}", conversations[0].group_creation_status);
 ```
 
 List methods exclude groups by default for backwards compatibility. Group
 messages expose `is_group`, a best-known `participants` snapshot, and
 per-recipient delivery state; assignment and one-to-one remote fields are
-optional. Group reactions, read receipts, and typing indicators are not
-supported.
+optional. `group_creation_status` is `Creating`, `NotCreated`, or `Ready`. A
+rejected initial creation keeps the same local conversation at `NotCreated`;
+send again with that conversation id to retry. Success binds the remote thread
+and changes the status to `Ready`.
+
+`send_imessage_reaction` supports inbound one-to-one and group messages by
+message id. Group read receipts and typing indicators remain unsupported.
 
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,

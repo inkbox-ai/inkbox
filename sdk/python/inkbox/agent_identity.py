@@ -1193,8 +1193,7 @@ class AgentIdentity:
         reaction: IMessageReactionType | str,
         part_index: int = 0,
     ) -> IMessageReaction:
-        """Send a tapback reaction to a message in one of this
-        identity's conversations.
+        """React to an inbound one-to-one or group message owned by this identity.
 
         Args:
             message_id: UUID of the message being reacted to.
@@ -1211,8 +1210,9 @@ class AgentIdentity:
     def mark_imessage_conversation_read(
         self, conversation_id: UUID | str
     ) -> IMessageMarkReadResult:
-        """Send a read receipt and mark a conversation's inbound
-        messages read.
+        """Send a one-to-one read receipt and mark inbound messages read.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.
@@ -1221,7 +1221,9 @@ class AgentIdentity:
         return self._inkbox._imessages.mark_conversation_read(conversation_id)
 
     def send_imessage_typing(self, conversation_id: UUID | str) -> None:
-        """Show a typing indicator to a conversation's recipient.
+        """Show a typing indicator to a one-to-one recipient.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.

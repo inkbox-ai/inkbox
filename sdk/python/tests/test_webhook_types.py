@@ -12,18 +12,23 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import cast
+from typing import cast, get_type_hints
 
 import pytest
 
 from inkbox import (
     CallEndedWebhookPayload,
+    IMessageWebhookReaction,
     MailWebhookPayload,
     PhoneIncomingCallWebhookPayload,
     TextWebhookPayload,
     WebhookMailAgentIdentity,
     WebhookMailContact,
 )
+
+
+def test_imessage_group_reaction_assignment_is_nullable():
+    assert get_type_hints(IMessageWebhookReaction)["assignment_id"] == str | None
 
 # Repo layout: sdk/python/tests/test_webhook_types.py -> sdk/python/tests
 #                                                    -> sdk/python

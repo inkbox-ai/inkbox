@@ -152,6 +152,18 @@ pub enum IMessageAssignmentStatus {
     Released,
 }
 
+/// Lifecycle of a local group conversation's initial creation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IMessageGroupCreationStatus {
+    /// The initial remote group thread is still being created.
+    Creating,
+    /// No remote group thread is bound; the next send retries creation.
+    NotCreated,
+    /// The remote group thread is bound and ready for sends.
+    Ready,
+}
+
 /// Whether a matching remote number is allowed through or blocked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -326,7 +338,7 @@ pub struct IMessage {
 /// One iMessage conversation.
 ///
 /// One-to-one rows expose assignment state. Group rows have no assignment and
-/// expose a best-known participant snapshot instead.
+/// expose a best-known participant snapshot and creation lifecycle instead.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageConversation {
     pub id: Uuid,
@@ -341,6 +353,9 @@ pub struct IMessageConversation {
     pub participants: Option<Vec<String>>,
     #[serde(default)]
     pub is_group: bool,
+    /// Group lifecycle; `None` for one-to-one conversations and older responses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_creation_status: Option<IMessageGroupCreationStatus>,
 }
 
 /// Conversation list row with latest-message preview.
@@ -367,6 +382,9 @@ pub struct IMessageConversationSummary {
     pub participants: Option<Vec<String>>,
     #[serde(default)]
     pub is_group: bool,
+    /// Group lifecycle; `None` for one-to-one conversations and older responses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_creation_status: Option<IMessageGroupCreationStatus>,
 }
 
 /// A tapback reaction on an iMessage.
@@ -374,7 +392,7 @@ pub struct IMessageConversationSummary {
 pub struct IMessageReaction {
     pub id: Uuid,
     pub conversation_id: Uuid,
-    pub assignment_id: Uuid,
+    pub assignment_id: Option<Uuid>,
     pub target_message_id: Uuid,
     /// "inbound" | "outbound"
     pub direction: String,
@@ -547,11 +565,16 @@ mod tests {
             "remote_number": null,
             "participants": ["+15550001111", "+15550002222"],
             "is_group": true,
+            "group_creation_status": "not_created",
             "created_at": "2026-07-22T00:00:00Z",
             "updated_at": "2026-07-22T00:00:00Z"
         }))
         .unwrap();
         assert_eq!(group.assignment_status, None);
         assert!(group.is_group);
+        assert_eq!(
+            group.group_creation_status,
+            Some(IMessageGroupCreationStatus::NotCreated)
+        );
     }
 }

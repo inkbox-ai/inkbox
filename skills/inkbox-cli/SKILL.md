@@ -330,6 +330,11 @@ inkbox imessage contact-rule delete <rule-id> -i <handle>                   # ad
 inkbox imessage contact-rule list-all                                       # admin-only, org-wide
 ```
 
+Group conversation output includes `groupCreationStatus` (`creating`,
+`not_created`, or `ready`). A rejected initial creation remains on the same
+conversation; send again by conversation id to retry. `react` supports inbound
+one-to-one and group messages. Read receipts and typing remain one-to-one only.
+
 ## SMS Opt-Ins
 
 Per-recipient SMS consent state, keyed by `(your org, recipient number)`. The registry is updated automatically when recipients text `START` / `STOP` to any of your numbers (`source=sms`). Reads work for any admin caller; writes require your org to be on its own active, customer-managed 10DLC campaign — default-campaign orgs share consent state and get `409 customer_campaign_required` on writes (audit event recorded with `source=api`).

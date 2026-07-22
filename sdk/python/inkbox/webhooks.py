@@ -550,7 +550,7 @@ class IMessageWebhookReaction(TypedDict):
     """
     id: str
     conversation_id: str
-    assignment_id: str
+    assignment_id: str | None
     target_message_id: str
     direction: IMessageDirectionWire
     reaction: IMessageReactionTypeWire
@@ -569,7 +569,7 @@ class IMessageWebhookData(TypedDict):
     lifecycle events ``imessage.sent`` / ``imessage.delivered`` /
     ``imessage.delivery_failed``) or ``reaction``
     (``imessage.reaction_received``) is populated. ``contacts`` and
-    ``agent_identities`` resolve the remote number against the assigned
+    ``agent_identities`` resolve the remote number against the conversation
     identity's visible contact book and identity graph; both are always
     present, possibly empty.
     """

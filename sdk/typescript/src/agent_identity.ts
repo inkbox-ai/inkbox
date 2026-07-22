@@ -948,8 +948,7 @@ export class AgentIdentity {
   }
 
   /**
-   * Send a tapback reaction to a message in one of this identity's
-   * conversations.
+   * React to an inbound one-to-one or group message owned by this identity.
    *
    * @param options.messageId - UUID of the message being reacted to.
    * @param options.reaction - Tapback kind (see {@link IMessageReactionType}).
@@ -966,7 +965,8 @@ export class AgentIdentity {
   }
 
   /**
-   * Send a read receipt and mark a conversation's inbound messages read.
+   * Send a one-to-one read receipt and mark inbound messages read.
+   * Group conversations return 409.
    *
    * @param conversationId - UUID of the conversation.
    * @returns Object with `conversationId` and `updatedCount`.
@@ -979,7 +979,8 @@ export class AgentIdentity {
   }
 
   /**
-   * Show a typing indicator to a conversation's recipient.
+   * Show a typing indicator to a one-to-one recipient.
+   * Group conversations return 409.
    *
    * @param conversationId - UUID of the conversation.
    */

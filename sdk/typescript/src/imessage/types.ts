@@ -70,6 +70,16 @@ export enum IMessageAssignmentStatus {
   RELEASED = "released",
 }
 
+/** Lifecycle of a local group conversation's initial creation. */
+export enum IMessageGroupCreationStatus {
+  /** The initial remote group thread is still being created. */
+  CREATING = "creating",
+  /** No remote group thread is bound; the next send retries creation. */
+  NOT_CREATED = "not_created",
+  /** The remote group thread is bound and ready for sends. */
+  READY = "ready",
+}
+
 /** Role of an iMessage number. */
 export enum IMessageNumberType {
   DEDICATED_INBOUND = "dedicated_inbound",
@@ -200,7 +210,7 @@ export interface IMessage {
  * One iMessage conversation.
  *
  * One-to-one rows expose assignment state. Group rows have no assignment and
- * expose a best-known participant snapshot instead.
+ * expose a best-known participant snapshot and creation lifecycle instead.
  */
 export interface IMessageConversation {
   id: string;
@@ -209,6 +219,8 @@ export interface IMessageConversation {
   remoteNumber: string | null;
   participants: string[] | null;
   isGroup: boolean;
+  /** Group lifecycle; null for one-to-one conversations and older responses. */
+  groupCreationStatus: IMessageGroupCreationStatus | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -221,6 +233,8 @@ export interface IMessageConversationSummary {
   remoteNumber: string | null;
   participants: string[] | null;
   isGroup: boolean;
+  /** Group lifecycle; null for one-to-one conversations and older responses. */
+  groupCreationStatus: IMessageGroupCreationStatus | null;
   latestText: string | null;
   latestMessageAt: Date | null;
   latestDirection: string | null;
@@ -233,7 +247,7 @@ export interface IMessageConversationSummary {
 export interface IMessageReaction {
   id: string;
   conversationId: string;
-  assignmentId: string;
+  assignmentId: string | null;
   targetMessageId: string;
   /** "inbound" | "outbound" */
   direction: string;
@@ -355,6 +369,7 @@ export interface RawIMessageConversation {
   remote_number: string | null;
   participants?: string[] | null;
   is_group?: boolean;
+  group_creation_status?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -382,7 +397,7 @@ export interface RawIMessageConversationSummary extends RawIMessageConversation 
 export interface RawIMessageReaction {
   id: string;
   conversation_id: string;
-  assignment_id: string;
+  assignment_id: string | null;
   target_message_id: string;
   direction: string;
   reaction: string;
@@ -505,6 +520,8 @@ export function parseIMessageConversation(
     remoteNumber: r.remote_number,
     participants: r.participants ?? null,
     isGroup: r.is_group ?? false,
+    groupCreationStatus:
+      (r.group_creation_status as IMessageGroupCreationStatus | null | undefined) ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -535,6 +552,8 @@ export function parseIMessageConversationSummary(
     remoteNumber: r.remote_number,
     participants: r.participants ?? null,
     isGroup: r.is_group ?? false,
+    groupCreationStatus:
+      (r.group_creation_status as IMessageGroupCreationStatus | null | undefined) ?? null,
     latestText: r.latest_text ?? null,
     latestMessageAt: r.latest_message_at ? new Date(r.latest_message_at) : null,
     latestDirection: r.latest_direction ?? null,

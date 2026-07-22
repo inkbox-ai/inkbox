@@ -382,6 +382,7 @@ export function registerIMessageCommands(program: Command): void {
             "remoteNumber",
             "participants",
             "isGroup",
+            "groupCreationStatus",
             "latestText",
             "latestDirection",
             "latestHasMedia",
@@ -419,7 +420,7 @@ export function registerIMessageCommands(program: Command): void {
 
   imessage
     .command("react <message-id>")
-    .description("Send a tapback reaction to a message")
+    .description("React to an inbound one-to-one or group message")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .requiredOption(
       "--reaction <kind>",
@@ -443,6 +444,7 @@ export function registerIMessageCommands(program: Command): void {
         output(
           {
             id: reaction.id,
+            assignmentId: reaction.assignmentId,
             reaction: reaction.reaction,
             targetMessageId: reaction.targetMessageId,
             conversationId: reaction.conversationId,
@@ -455,7 +457,7 @@ export function registerIMessageCommands(program: Command): void {
 
   imessage
     .command("mark-conversation-read <conversation-id>")
-    .description("Send a read receipt and mark a conversation's inbound messages read")
+    .description("Send a one-to-one read receipt and mark inbound messages read")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (
@@ -475,7 +477,7 @@ export function registerIMessageCommands(program: Command): void {
 
   imessage
     .command("typing <conversation-id>")
-    .description("Show a typing indicator to a conversation's recipient")
+    .description("Show a typing indicator to a one-to-one recipient")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (

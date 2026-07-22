@@ -12,6 +12,7 @@ from inkbox.imessage.types import (
     IMessageNumberStatus,
     IMessageNumberType,
     IMessageDeliveryStatus,
+    IMessageGroupCreationStatus,
     IMessageReactionType,
     IMessageRuleAction,
     IMessageRuleMatchType,
@@ -117,6 +118,7 @@ GROUP_CONVERSATION_DICT = {
     "remote_number": None,
     "participants": [REMOTE, GROUP_REMOTE],
     "is_group": True,
+    "group_creation_status": "creating",
 }
 
 IMESSAGE_REACTION_DICT = {
@@ -130,6 +132,11 @@ IMESSAGE_REACTION_DICT = {
     "part_index": 0,
     "created_at": "2026-06-01T00:00:00+00:00",
     "updated_at": "2026-06-01T00:00:00+00:00",
+}
+
+GROUP_IMESSAGE_REACTION_DICT = {
+    **IMESSAGE_REACTION_DICT,
+    "assignment_id": None,
 }
 
 IMESSAGE_CONTACT_RULE_DICT = {
@@ -368,6 +375,7 @@ class TestIMessageConversations:
         )
         assert convos[0].unread_count == 2
         assert convos[0].remote_number == REMOTE
+        assert convos[0].group_creation_status is None
 
     def test_lists_group_summaries_with_nullable_assignment(self, client, transport):
         transport.get.return_value = [{
@@ -386,6 +394,7 @@ class TestIMessageConversations:
         assert convos[0].remote_number is None
         assert convos[0].participants == [REMOTE, GROUP_REMOTE]
         assert convos[0].is_group is True
+        assert convos[0].group_creation_status is IMessageGroupCreationStatus.CREATING
 
     def test_gets_single_conversation(self, client, transport):
         transport.get.return_value = IMESSAGE_CONVERSATION_DICT
@@ -410,6 +419,7 @@ class TestIMessageConversations:
         )
         assert convo.is_group is True
         assert convo.assignment_id is None
+        assert convo.group_creation_status is IMessageGroupCreationStatus.CREATING
 
 
 class TestIMessageActions:
@@ -427,6 +437,23 @@ class TestIMessageActions:
         )
         assert reaction.reaction is IMessageReactionType.LIKE
         assert reaction.target_message_id == UUID(MSG_ID)
+
+    def test_send_group_reaction_preserves_request_and_parses_null_assignment(
+        self, client, transport,
+    ):
+        transport.post.return_value = GROUP_IMESSAGE_REACTION_DICT
+
+        reaction = client._imessages.send_reaction(
+            message_id=MSG_ID,
+            reaction=IMessageReactionType.EMPHASIZE,
+            part_index=1,
+        )
+
+        transport.post.assert_called_once_with(
+            "/reactions",
+            json={"message_id": MSG_ID, "reaction": "emphasize", "part_index": 1},
+        )
+        assert reaction.assignment_id is None
 
     def test_mark_conversation_read(self, client, transport):
         transport.post.return_value = {

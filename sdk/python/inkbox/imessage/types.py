@@ -83,6 +83,14 @@ class IMessageAssignmentStatus(StrEnum):
     RELEASED = "released"
 
 
+class IMessageGroupCreationStatus(StrEnum):
+    """Lifecycle of a local group conversation's initial creation."""
+
+    CREATING = "creating"
+    NOT_CREATED = "not_created"
+    READY = "ready"
+
+
 class IMessageNumberType(StrEnum):
     """Type of an organization-owned dedicated iMessage number."""
 
@@ -325,7 +333,7 @@ class IMessageConversation:
     """One iMessage conversation.
 
     One-to-one rows expose assignment state. Group rows have no assignment and
-    expose a best-known participant snapshot instead.
+    expose a best-known participant snapshot and creation lifecycle instead.
     """
 
     id: UUID
@@ -336,6 +344,8 @@ class IMessageConversation:
     assignment_status: IMessageAssignmentStatus | None = IMessageAssignmentStatus.ACTIVE
     participants: list[str] | None = None
     is_group: bool = False
+    # None for one-to-one conversations and responses from older deployments.
+    group_creation_status: IMessageGroupCreationStatus | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageConversation:
@@ -352,12 +362,17 @@ class IMessageConversation:
             ),
             participants=d.get("participants"),
             is_group=d.get("is_group", False),
+            group_creation_status=(
+                IMessageGroupCreationStatus(d["group_creation_status"])
+                if d.get("group_creation_status")
+                else None
+            ),
         )
 
 
 @dataclass
 class IMessageConversationSummary:
-    """Conversation list row with latest-message preview."""
+    """Conversation list row with latest-message preview and group lifecycle."""
 
     id: UUID
     assignment_id: UUID | None
@@ -371,6 +386,8 @@ class IMessageConversationSummary:
     assignment_status: IMessageAssignmentStatus | None = IMessageAssignmentStatus.ACTIVE
     participants: list[str] | None = None
     is_group: bool = False
+    # None for one-to-one conversations and responses from older deployments.
+    group_creation_status: IMessageGroupCreationStatus | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageConversationSummary:
@@ -391,6 +408,11 @@ class IMessageConversationSummary:
             ),
             participants=d.get("participants"),
             is_group=d.get("is_group", False),
+            group_creation_status=(
+                IMessageGroupCreationStatus(d["group_creation_status"])
+                if d.get("group_creation_status")
+                else None
+            ),
         )
 
 
@@ -400,7 +422,7 @@ class IMessageReaction:
 
     id: UUID
     conversation_id: UUID
-    assignment_id: UUID
+    assignment_id: UUID | None
     target_message_id: UUID
     direction: str  # "inbound" | "outbound"
     reaction: IMessageReactionType
@@ -416,7 +438,7 @@ class IMessageReaction:
         return cls(
             id=UUID(d["id"]),
             conversation_id=UUID(d["conversation_id"]),
-            assignment_id=UUID(d["assignment_id"]),
+            assignment_id=(UUID(d["assignment_id"]) if d.get("assignment_id") else None),
             target_message_id=UUID(d["target_message_id"]),
             direction=d["direction"],
             reaction=IMessageReactionType(d["reaction"]),

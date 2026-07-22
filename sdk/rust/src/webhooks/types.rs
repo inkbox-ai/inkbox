@@ -727,7 +727,7 @@ pub struct IMessageWebhookMessage {
 pub struct IMessageWebhookReaction {
     pub id: String,
     pub conversation_id: String,
-    pub assignment_id: String,
+    pub assignment_id: Option<String>,
     pub target_message_id: String,
     pub direction: IMessageDirectionWire,
     pub reaction: IMessageReactionTypeWire,
@@ -743,7 +743,7 @@ pub struct IMessageWebhookReaction {
 /// Exactly one of `message` (`imessage.received` and the delivery lifecycle
 /// events `imessage.sent` / `imessage.delivered` / `imessage.delivery_failed`)
 /// or `reaction` (`imessage.reaction_received`) is populated. `contacts` and
-/// `agent_identities` resolve the remote number against the assigned identity's
+/// `agent_identities` resolve the remote number against the conversation identity's
 /// visible contact book and identity graph; both are always present, possibly
 /// empty.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -956,6 +956,31 @@ mod tests {
         assert_eq!(message.assignment_id, None);
         assert_eq!(message.sender_number.as_deref(), Some("+15551234567"));
         assert_eq!(message.participants.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn imessage_group_reaction_webhook_parses_nullable_assignment() {
+        let raw = r#"{
+            "id": "evt_group_reaction",
+            "event_type": "imessage.reaction_received",
+            "timestamp": "2026-07-22T00:01:00Z",
+            "data": {
+                "message": null,
+                "reaction": {
+                    "id": "reaction_1", "conversation_id": "conv_1",
+                    "assignment_id": null, "target_message_id": "imsg_1",
+                    "direction": "inbound", "reaction": "emphasize",
+                    "custom_emoji": null, "remote_number": "+15551234567",
+                    "part_index": 0,
+                    "created_at": "2026-07-22T00:01:00Z",
+                    "updated_at": "2026-07-22T00:01:00Z"
+                },
+                "contacts": [], "agent_identities": []
+            }
+        }"#;
+
+        let payload: IMessageWebhookPayload = serde_json::from_str(raw).unwrap();
+        assert_eq!(payload.data.reaction.unwrap().assignment_id, None);
     }
 
     fn message_json(extra: &str) -> String {

@@ -311,12 +311,12 @@ inkbox imessage conversations -i <handle>    # Conversation summaries with previ
   --include-groups                           #   Include group conversations
 inkbox imessage conversation <conversation-id> -i <handle>  # Read one conversation's messages
 
-inkbox imessage react <message-id> -i <handle>  # Send a tapback (replaces your previous one)
+inkbox imessage react <message-id> -i <handle>  # React to an inbound 1:1 or group message
   --reaction <kind>                          #   love, like, dislike, laugh, emphasize, question
   --part-index <n>                           #   Part of a multi-part message (default: 0)
 
-inkbox imessage mark-conversation-read <conversation-id> -i <handle>  # Send a read receipt
-inkbox imessage typing <conversation-id> -i <handle>                  # Show the typing bubble
+inkbox imessage mark-conversation-read <conversation-id> -i <handle>  # One-to-one only
+inkbox imessage typing <conversation-id> -i <handle>                  # One-to-one only
 
 inkbox imessage upload-media <file> -i <handle>  # Upload a file, get a sendable media URL
   --content-type <type>                      #   MIME type of the file
@@ -330,6 +330,11 @@ inkbox imessage contact-rule delete <rule-id> -i <handle>  # Delete a rule (admi
 inkbox imessage contact-rule list-all        # Org-wide rule list (admin key)
   --agent-identity-id <id>                   #   Narrow to one identity
 ```
+
+Group conversation rows expose `groupCreationStatus` as `creating`,
+`not_created`, or `ready`. A rejected initial creation stays on the same local
+conversation; send again with its conversation id to retry. Successful retry
+changes the status to `ready`.
 
 ### vault
 

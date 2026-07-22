@@ -12,8 +12,9 @@ pub use resources::{IMessageContactRulesResource, IMessagesResource};
 pub use types::{
     ContactRuleStatus, IMessage, IMessageAssignment, IMessageAssignmentStatus, IMessageContactRule,
     IMessageConversation, IMessageConversationSummary, IMessageDeliveryStatus,
-    IMessageMarkReadResult, IMessageMediaItem, IMessageMediaUpload, IMessageMessageReaction,
-    IMessageNumber, IMessageNumberStatus, IMessageNumberType, IMessageReaction,
-    IMessageReactionType, IMessageRecipient, IMessageRuleAction, IMessageRuleMatchType,
-    IMessageSendStyle, IMessageService, IMessageTriageNumber, IdentityIMessageNumber,
+    IMessageGroupCreationStatus, IMessageMarkReadResult, IMessageMediaItem, IMessageMediaUpload,
+    IMessageMessageReaction, IMessageNumber, IMessageNumberStatus, IMessageNumberType,
+    IMessageReaction, IMessageReactionType, IMessageRecipient, IMessageRuleAction,
+    IMessageRuleMatchType, IMessageSendStyle, IMessageService, IMessageTriageNumber,
+    IdentityIMessageNumber,
 };

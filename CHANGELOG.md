@@ -10,15 +10,18 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - **iMessage group conversations in all three SDKs.** Python and TypeScript send methods accept either one E.164 recipient or a list of 1–8 recipients; two or more recipients select or create a dedicated-outbound group. Rust preserves its scalar method and adds `send_group` / `send_imessage_group` for group creation.
 - **Group-aware reads.** Message and conversation list methods expose an explicit group opt-in while remaining one-to-one by default. Message and conversation models expose group identity, best-known participants, inbound sender attribution, and per-recipient delivery state; direct conversation lookup works without the list opt-in.
+- **Group creation lifecycle.** Conversation list and detail models expose `creating`, `not_created`, or `ready`. A rejected initial creation keeps the same local conversation, and the next send retries before binding the remote thread.
+- **Group tapbacks.** Existing message-ID reaction methods support inbound group messages. Reaction responses and webhooks allow a nullable assignment.
 - **CLI group support.** `inkbox imessage send --to` accepts a comma-separated recipient list, and `imessage list` / `imessage conversations` accept `--include-groups`.
 - **Group-aware webhook types.** iMessage message payloads allow nullable assignment and one-to-one remote fields and expose group sender, participants, and group identity.
+
 ### Changed
 
 - Version bumped to 0.5.3 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.3`.
-- Group creation requires a dedicated outbound number. Later sends should use the returned conversation id; exact-participant lookup returns `409` when more than one conversation matches. Reactions, read receipts, and typing indicators remain one-to-one operations and return `409` for groups.
-- **TypeScript note (source-breaking).** iMessage message and conversation assignment/remote fields are nullable, group properties are required on parsed models, and assignment status is nullable for groups. Hand-built object literals need the new fields.
-- **Rust note (source-breaking).** The corresponding public struct fields now use `Option`, and the structs gain group properties. Existing scalar methods keep their signatures; new suffixed list methods opt into groups.
-- **Python note.** The corresponding dataclass fields now accept `None`, and new group fields have backwards-compatible defaults.
+- Group creation requires a dedicated outbound number. Later sends should use the returned conversation id; exact-participant lookup returns `409` when more than one conversation matches. Group read receipts and typing indicators remain unsupported.
+- **TypeScript note (source-breaking).** iMessage message and conversation assignment/remote fields are nullable, group properties and creation status are required on parsed models, reaction assignment is nullable, and assignment status is nullable for groups. Hand-built object literals need the new fields.
+- **Rust note (source-breaking).** The corresponding public struct fields now use `Option`, conversation structs gain group properties and creation status, and reaction assignment becomes optional. Existing scalar methods keep their signatures; new suffixed list methods opt into groups.
+- **Python note.** The corresponding dataclass fields now accept `None`, and new group fields and creation status have backwards-compatible defaults. Reaction assignment may be `None` for groups.
 
 ### Compatibility and rollout
 

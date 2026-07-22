@@ -1039,8 +1039,7 @@ impl AgentIdentity {
             .get_conversation(conversation_id, Some(&id))
     }
 
-    /// Send a tapback reaction to a message in one of this identity's
-    /// conversations.
+    /// React to an inbound one-to-one or group message owned by this identity.
     ///
     /// # Arguments
     /// * `message_id` - UUID of the message being reacted to.
@@ -1058,7 +1057,8 @@ impl AgentIdentity {
             .send_reaction(message_id, reaction, part_index)
     }
 
-    /// Send a read receipt and mark a conversation's inbound messages read.
+    /// Send a one-to-one read receipt and mark inbound messages read.
+    /// Group conversations return 409.
     pub fn mark_imessage_conversation_read(
         &self,
         conversation_id: &Uuid,
@@ -1069,7 +1069,8 @@ impl AgentIdentity {
             .mark_conversation_read(conversation_id)
     }
 
-    /// Show a typing indicator to a conversation's recipient.
+    /// Show a typing indicator to a one-to-one recipient.
+    /// Group conversations return 409.
     pub fn send_imessage_typing(&self, conversation_id: &Uuid) -> Result<()> {
         self.require_imessage()?;
         self.inkbox.imessages().send_typing(conversation_id)

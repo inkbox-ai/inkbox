@@ -6,6 +6,7 @@ import { IMessageContactRulesResource } from "../src/imessage/resources/contactR
 import {
   IMessageAssignmentStatus,
   IMessageDeliveryStatus,
+  IMessageGroupCreationStatus,
   IMessageNumberStatus,
   IMessageNumberType,
   IMessageReactionType,
@@ -102,6 +103,7 @@ const GROUP_CONVERSATION_DICT = {
   remote_number: null,
   participants: [REMOTE, GROUP_REMOTE],
   is_group: true,
+  group_creation_status: "creating",
 };
 
 const REACTION_DICT = {
@@ -115,6 +117,11 @@ const REACTION_DICT = {
   part_index: 0,
   created_at: "2026-06-01T00:00:00Z",
   updated_at: "2026-06-01T00:00:00Z",
+};
+
+const GROUP_REACTION_DICT = {
+  ...REACTION_DICT,
+  assignment_id: null,
 };
 
 const CONTACT_RULE_DICT = {
@@ -357,6 +364,7 @@ describe("IMessagesResource", () => {
     expect(convos[0].unreadCount).toBe(2);
     expect(convos[0].totalCount).toBe(5);
     expect(convos[0].latestMessageAt).toBeInstanceOf(Date);
+    expect(convos[0].groupCreationStatus).toBeNull();
   });
 
   it("listConversations parses group summaries with nullable assignments", async () => {
@@ -375,6 +383,7 @@ describe("IMessagesResource", () => {
     expect(conversations[0].remoteNumber).toBeNull();
     expect(conversations[0].participants).toEqual([REMOTE, GROUP_REMOTE]);
     expect(conversations[0].isGroup).toBe(true);
+    expect(conversations[0].groupCreationStatus).toBe(IMessageGroupCreationStatus.CREATING);
   });
 
   it("getConversation passes the identity assertion", async () => {
@@ -402,6 +411,7 @@ describe("IMessagesResource", () => {
     expect(lastCall().url).toBe(`${BASE}/conversations/${CONVO_ID}`);
     expect(conversation.isGroup).toBe(true);
     expect(conversation.assignmentId).toBeNull();
+    expect(conversation.groupCreationStatus).toBe(IMessageGroupCreationStatus.CREATING);
   });
 
   it("sendReaction posts the tapback body", async () => {
@@ -422,6 +432,26 @@ describe("IMessagesResource", () => {
     });
     expect(reaction.reaction).toBe(IMessageReactionType.LIKE);
     expect(reaction.targetMessageId).toBe(MSG_ID);
+  });
+
+  it("sendReaction supports an inbound group target without changing the request", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok(GROUP_REACTION_DICT));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const reaction = await resource.sendReaction({
+      messageId: MSG_ID,
+      reaction: IMessageReactionType.EMPHASIZE,
+      partIndex: 1,
+    });
+
+    const { url, init } = lastCall();
+    expect(url).toBe(`${BASE}/reactions`);
+    expect(JSON.parse(init.body as string)).toEqual({
+      message_id: MSG_ID,
+      reaction: "emphasize",
+      part_index: 1,
+    });
+    expect(reaction.assignmentId).toBeNull();
   });
 
   it("markConversationRead returns the updated count", async () => {

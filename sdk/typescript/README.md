@@ -529,9 +529,10 @@ await identity.sendIMessage({
 // with assignmentStatus === "released"; sends into them return 409.)
 const connections = await identity.listIMessageAssignments();
 
-// Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
-// a new tapback replaces your previous one on the same message part.
-// Reactions, read receipts, and typing indicators return 409 for groups.
+// Tapbacks target inbound one-to-one or group messages by messageId. The
+// classic six are sendable ("custom" is inbound-only, 422 on send), and a new
+// tapback replaces your previous one on the same message part. Group read
+// receipts and typing indicators remain unsupported and return 409.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 
 // Read receipts, typing indicator, media.
@@ -600,6 +601,11 @@ await outboundIdentity.sendIMessage({
 const groupConvos = await outboundIdentity.listIMessageConversations({ includeGroups: true });
 const groupMessages = await outboundIdentity.listIMessages({ includeGroups: true });
 console.log(group.isGroup, group.participants, group.recipients);
+// groupCreationStatus is "creating", "not_created", or "ready". A rejected
+// initial creation leaves this same local conversation at "not_created"; send
+// again with its conversationId to retry. Success binds the remote thread and
+// changes the status to "ready".
+console.log(groupConvos[0].groupCreationStatus);
 
 // Claim and atomically attach/swap during update. To attach an already-owned
 // number, pass imessageNumberId instead. Pass imessageNumberId: null to move

@@ -323,7 +323,7 @@ class IMessagesResource:
         reaction: IMessageReactionType | str,
         part_index: int = 0,
     ) -> IMessageReaction:
-        """Send a tapback reaction to a message.
+        """Send a tapback reaction to an inbound one-to-one or group message.
 
         Args:
             message_id: UUID of the message being reacted to.
@@ -345,7 +345,9 @@ class IMessagesResource:
         self,
         conversation_id: UUID | str,
     ) -> IMessageMarkReadResult:
-        """Send a read receipt and mark inbound messages read locally.
+        """Send a one-to-one read receipt and mark inbound messages read locally.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.
@@ -360,7 +362,9 @@ class IMessagesResource:
         return IMessageMarkReadResult._from_dict(data)
 
     def send_typing(self, conversation_id: UUID | str) -> None:
-        """Show a typing indicator to the conversation's recipient.
+        """Show a typing indicator to a one-to-one recipient.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.

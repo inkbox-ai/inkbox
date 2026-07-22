@@ -436,9 +436,10 @@ const convo = await identity.getIMessageConversation(sent.conversationId);
 // anything other than "active" means sends/reactions will be refused
 // until they reconnect through triage.
 console.log(convo.assignmentStatus);
-// Group rows have isGroup=true, nullable assignment/remote fields, a
-// best-known participants snapshot, and per-recipient delivery state.
-// Reply by conversationId; group reactions/read receipts/typing return 409.
+// Group rows have nullable assignment/remote fields and a best-known participant
+// snapshot. groupCreationStatus is "creating", "not_created", or "ready". A
+// rejected initial creation keeps the same conversation; send again by
+// conversationId to retry, and success changes it to "ready".
 
 // Who is actively connected to this identity right now (paginated)?
 const connections = await identity.listIMessageAssignments({ limit: 20 });
@@ -446,9 +447,9 @@ for (const a of connections) {
   console.log(a.remoteNumber, a.status, a.createdAt);
 }
 
-// Tapback reactions. Sends accept the classic six (love, like, dislike,
-// laugh, emphasize, question); inbound can also be "custom" with the
-// literal emoji in customEmoji.
+// Tapbacks target inbound one-to-one or group messages by messageId. Sends
+// accept the classic six (love, like, dislike, laugh, emphasize, question);
+// inbound can also be "custom" with the literal emoji in customEmoji.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 
 // Live tapbacks come back on message reads, oldest first.
@@ -456,7 +457,7 @@ for (const r of msgs[0].reactions ?? []) {
   console.log(r.direction, r.reaction, r.customEmoji);
 }
 
-// Read receipts + typing indicator
+// Read receipts + typing indicator are one-to-one only; groups return 409.
 await identity.markIMessageConversationRead(sent.conversationId);
 await identity.sendIMessageTyping(sent.conversationId);
 

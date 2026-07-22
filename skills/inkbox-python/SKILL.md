@@ -457,25 +457,26 @@ convo = identity.get_imessage_conversation(sent.conversation_id)
 # anything other than "active" means sends/reactions will be refused
 # until they reconnect through triage.
 print(convo.assignment_status)
-# Group rows have is_group=True, nullable assignment/remote fields, a
-# best-known participants snapshot, and per-recipient delivery state.
-# Reply by conversation_id; group reactions/read receipts/typing return 409.
+# Group rows have nullable assignment/remote fields and a best-known participant
+# snapshot. group_creation_status is creating, not_created, or ready. A rejected
+# initial creation keeps the same conversation; send again by conversation_id to
+# retry, and success changes it to ready.
 
 # Who is actively connected to this identity right now (paginated)?
 connections = identity.list_imessage_assignments(limit=20)
 for a in connections:
     print(a.remote_number, a.status, a.created_at)
 
-# Tapback reactions. Sends accept the classic six (love, like, dislike,
-# laugh, emphasize, question); inbound can also be "custom" with the
-# literal emoji in custom_emoji.
+# Tapbacks target inbound one-to-one or group messages by message_id. Sends
+# accept the classic six (love, like, dislike, laugh, emphasize, question);
+# inbound can also be "custom" with the literal emoji in custom_emoji.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
 
 # Live tapbacks come back on message reads, oldest first.
 for r in msgs[0].reactions or []:
     print(r.direction, r.reaction, r.custom_emoji)
 
-# Read receipts + typing indicator
+# Read receipts + typing indicator are one-to-one only; groups return 409.
 identity.mark_imessage_conversation_read(sent.conversation_id)
 identity.send_imessage_typing(sent.conversation_id)
 

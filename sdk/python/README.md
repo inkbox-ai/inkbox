@@ -531,15 +531,20 @@ outbound_identity.send_imessage(
 group_convos = outbound_identity.list_imessage_conversations(include_groups=True)
 group_msgs = outbound_identity.list_imessages(include_groups=True)
 print(group.is_group, group.participants, group.recipients)
+# group_creation_status is creating, not_created, or ready. A rejected initial
+# creation leaves this same local conversation at not_created; send again with
+# its conversation_id to retry. A successful retry binds the remote thread and
+# changes the status to ready.
+print(group_convos[0].group_creation_status)
 
 # Who is currently connected? (Disconnected conversations stay readable
 # with assignment_status == "released"; sends into them return 409.)
 connections = identity.list_imessage_assignments()
 
-# Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
-# a new tapback replaces your previous one on the same message part.
-# Reactions, read receipts, and typing indicators are not supported for groups
-# and return 409.
+# Tapbacks target inbound one-to-one or group messages by message_id. The
+# classic six are sendable ("custom" is inbound-only, 422 on send), and a new
+# tapback replaces your previous one on the same message part. Group read
+# receipts and typing indicators remain unsupported and return 409.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
 
 # Read receipts, typing indicator, media.

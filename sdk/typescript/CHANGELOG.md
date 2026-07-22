@@ -1,16 +1,18 @@
 # Changelog
 
-## 0.5.2 — Dedicated outbound iMessage groups
+## 0.5.3 — Dedicated outbound iMessage groups
 
 ### Added
 
 - `sendIMessage` and `imessages.send` accept one recipient or a recipient array; two or more recipients select or create a dedicated-outbound group. Reply with the returned `conversationId`.
 - Message and conversation lists accept `includeGroups: false`; group models expose nullable assignment/remote fields, sender attribution, participants, group identity, and per-recipient status.
-- iMessage webhook message types expose the additive group fields.
+- Conversation list/detail models expose `groupCreationStatus`; failed creation stays on the same conversation and the next send retries.
+- Existing reaction methods support inbound group messages by `messageId`; REST and webhook reaction assignment fields are nullable.
+- iMessage webhook message types expose the additive group fields. Group read receipts and typing indicators remain unsupported.
 
 ### Compatibility
 
-- Scalar sends and default one-to-one listings are unchanged. Group sends require the matching API rollout; group reactions, read receipts, and typing indicators return `409`.
+- Scalar sends, reaction method signatures, and default one-to-one listings are unchanged. Group sends and tapbacks require the matching API rollout.
 
 ## 0.5.0 — Identity tunnel summaries and inlined access
 

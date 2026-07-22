@@ -454,7 +454,7 @@ impl IMessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Send a tapback reaction to a message.
+    /// Send a tapback reaction to an inbound one-to-one or group message.
     ///
     /// # Arguments
     /// * `message_id` - UUID of the message being reacted to.
@@ -478,7 +478,8 @@ impl IMessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Send a read receipt and mark inbound messages read locally.
+    /// Send a one-to-one read receipt and mark inbound messages read locally.
+    /// Group conversations return 409.
     ///
     /// # Arguments
     /// * `conversation_id` - UUID of the conversation.
@@ -493,7 +494,8 @@ impl IMessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Show a typing indicator to the conversation's recipient.
+    /// Show a typing indicator to a one-to-one recipient.
+    /// Group conversations return 409.
     ///
     /// # Arguments
     /// * `conversation_id` - UUID of the conversation.
@@ -535,10 +537,11 @@ impl IMessagesResource {
 mod tests {
     use httpmock::prelude::*;
     use serde_json::json;
+    use uuid::Uuid;
 
     use crate::client::Inkbox;
     use crate::error::InkboxError;
-    use crate::imessage::types::{IMessageNumberStatus, IMessageNumberType};
+    use crate::imessage::types::{IMessageNumberStatus, IMessageNumberType, IMessageReactionType};
 
     fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
         Inkbox::builder("test-key")
@@ -796,6 +799,7 @@ mod tests {
                 "remote_number": null,
                 "participants": ["+15550001111", "+15550002222"],
                 "is_group": true,
+                "group_creation_status": "ready",
                 "created_at": "2026-07-22T00:00:00Z",
                 "updated_at": "2026-07-22T00:00:00Z"
             }]));
@@ -811,5 +815,44 @@ mod tests {
         assert_eq!(conversations[0].assignment_id, None);
         assert_eq!(conversations[0].assignment_status, None);
         assert_eq!(conversations[0].remote_number, None);
+        assert!(matches!(
+            conversations[0].group_creation_status,
+            Some(crate::imessage::types::IMessageGroupCreationStatus::Ready)
+        ));
+    }
+
+    #[test]
+    fn send_reaction_supports_group_response_without_changing_the_request() {
+        let server = MockServer::start();
+        let message_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/imessage/reactions")
+                .json_body(json!({
+                    "message_id": message_id.to_string(),
+                    "reaction": "emphasize",
+                    "part_index": 1
+                }));
+            then.status(200).json_body(json!({
+                "id": "11111111-1111-1111-1111-111111111111",
+                "conversation_id": "33333333-3333-3333-3333-333333333333",
+                "assignment_id": null,
+                "target_message_id": message_id,
+                "direction": "outbound",
+                "reaction": "emphasize",
+                "remote_number": "+15550001111",
+                "part_index": 1,
+                "created_at": "2026-07-22T00:00:00Z",
+                "updated_at": "2026-07-22T00:00:00Z"
+            }));
+        });
+
+        let reaction = client(&server)
+            .imessages()
+            .send_reaction(&message_id, IMessageReactionType::Emphasize, 1)
+            .unwrap();
+
+        mock.assert();
+        assert_eq!(reaction.assignment_id, None);
     }
 }

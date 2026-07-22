@@ -534,7 +534,7 @@ export interface IMessageWebhookMessage {
 export interface IMessageWebhookReaction {
   id: string;
   conversation_id: string;
-  assignment_id: string;
+  assignment_id: string | null;
   target_message_id: string;
   direction: IMessageDirectionWire;
   reaction: IMessageReactionTypeWire;
