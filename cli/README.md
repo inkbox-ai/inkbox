@@ -312,7 +312,7 @@ inkbox imessage conversations -i <handle>    # Conversation summaries with previ
 inkbox imessage conversation <conversation-id> -i <handle>  # Read one conversation's messages
 
 inkbox imessage react <message-id> -i <handle>  # React to an inbound 1:1 or group message
-  --reaction <kind>                          #   love, like, dislike, laugh, emphasize, question
+  --reaction <kind>                          #   love, like, dislike, laugh, emphasize, question, eyes
   --part-index <n>                           #   Part of a multi-part message (default: 0)
 
 inkbox imessage mark-conversation-read <conversation-id> -i <handle>  # One-to-one only

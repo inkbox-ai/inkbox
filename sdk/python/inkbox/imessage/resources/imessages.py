@@ -329,8 +329,9 @@ class IMessagesResource:
 
         Args:
             message_id: UUID of the message being reacted to.
-            reaction: Tapback kind. Sends accept the classic six;
-                ``custom`` is inbound-only and rejected with 422.
+            reaction: Tapback kind. Sends accept ``love``, ``like``,
+                ``dislike``, ``laugh``, ``emphasize``, ``question``, and
+                ``eyes``. ``custom`` is inbound-only and rejected with 422.
             part_index: Part of a multi-part message to react to.
         """
         body: dict[str, Any] = {

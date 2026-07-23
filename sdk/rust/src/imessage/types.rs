@@ -112,7 +112,7 @@ pub enum IMessageDeliveryStatus {
 /// Tapback reaction kinds.
 ///
 /// `Custom` is inbound-only: recipients can react with any emoji
-/// (carried in `custom_emoji`), but sends accept the classic six.
+/// (carried in `custom_emoji`). Sends accept the seven named reactions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IMessageReactionType {
@@ -122,6 +122,7 @@ pub enum IMessageReactionType {
     Laugh,
     Emphasize,
     Question,
+    Eyes,
     Custom,
 }
 
@@ -229,6 +230,7 @@ impl IMessageReactionType {
             IMessageReactionType::Laugh => "laugh",
             IMessageReactionType::Emphasize => "emphasize",
             IMessageReactionType::Question => "question",
+            IMessageReactionType::Eyes => "eyes",
             IMessageReactionType::Custom => "custom",
         }
     }
@@ -400,7 +402,7 @@ pub struct IMessageReaction {
     pub remote_number: String,
     pub created_at: String,
     pub updated_at: String,
-    /// Literal emoji when reaction is "custom"; None for the classic six.
+    /// Literal emoji when reaction is "custom"; None for named reactions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_emoji: Option<String>,
     #[serde(default)]
@@ -472,6 +474,15 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn reaction_types_keep_named_eyes_distinct_from_inbound_custom() {
+        assert_eq!(IMessageReactionType::Eyes.as_str(), "eyes");
+        assert_eq!(
+            serde_json::from_value::<IMessageReactionType>(json!("custom")).unwrap(),
+            IMessageReactionType::Custom
+        );
+    }
 
     #[test]
     fn number_type_serializes_to_wire_value() {

@@ -475,8 +475,9 @@ for a in connections:
     print(a.remote_number, a.status, a.created_at)
 
 # Tapbacks target inbound one-to-one or group messages by message_id. Sends
-# accept the classic six (love, like, dislike, laugh, emphasize, question);
-# inbound can also be "custom" with the literal emoji in custom_emoji.
+# accept seven named reactions (love, like, dislike, laugh, emphasize,
+# question, eyes); inbound can also be "custom" with the literal emoji in
+# custom_emoji. Arbitrary custom emoji are not sendable.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
 
 # Live tapbacks come back on message reads, oldest first.

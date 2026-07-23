@@ -333,7 +333,9 @@ inkbox imessage contact-rule list-all                                       # ad
 Group conversation output includes `groupCreationStatus` (`creating`,
 `not_created`, or `ready`). A rejected initial creation remains on the same
 conversation; send again by conversation id to retry. `react` supports inbound
-one-to-one and group messages. Read receipts and typing remain one-to-one only.
+one-to-one and group messages. Its named choices are `love`, `like`, `dislike`,
+`laugh`, `emphasize`, `question`, and `eyes`; arbitrary custom emoji are
+inbound-only. Read receipts and typing remain one-to-one only.
 Group creation and conversation-id replies accept the same 13 expressive styles
 as one-to-one sends, with or without `--media-url`.
 

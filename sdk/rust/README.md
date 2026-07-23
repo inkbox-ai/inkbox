@@ -202,7 +202,9 @@ send again with that conversation id to retry. Success binds the remote thread
 and changes the status to `Ready`.
 
 `send_imessage_reaction` supports inbound one-to-one and group messages by
-message id. Group read receipts and typing indicators remain unsupported.
+message id. The sendable named reactions are `love`, `like`, `dislike`,
+`laugh`, `emphasize`, `question`, and `eyes`; arbitrary custom emoji remain
+inbound-only. Group read receipts and typing indicators remain unsupported.
 
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,

@@ -370,7 +370,7 @@ describe("WebhookContext", () => {
           assignment_id: null,
           target_message_id: "imsg_1",
           direction: "inbound",
-          reaction: "emphasize",
+          reaction: "eyes",
           custom_emoji: null,
           remote_number: "+15551234567",
           part_index: 0,
@@ -382,6 +382,7 @@ describe("WebhookContext", () => {
       },
     };
     expect(groupReactionPayload.data.reaction?.assignment_id).toBeNull();
+    expect(groupReactionPayload.data.reaction?.reaction).toBe("eyes");
   });
 });
 

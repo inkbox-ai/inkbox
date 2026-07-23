@@ -46,7 +46,7 @@ class IMessageReactionType(StrEnum):
     """Tapback reaction kinds.
 
     ``CUSTOM`` is inbound-only: recipients can react with any emoji
-    (carried in ``custom_emoji``), but sends accept the classic six.
+    (carried in ``custom_emoji``). Sends accept the seven named reactions.
     """
 
     LOVE = "love"
@@ -55,6 +55,7 @@ class IMessageReactionType(StrEnum):
     LAUGH = "laugh"
     EMPHASIZE = "emphasize"
     QUESTION = "question"
+    EYES = "eyes"
     CUSTOM = "custom"
 
 
@@ -429,7 +430,7 @@ class IMessageReaction:
     remote_number: str
     created_at: datetime
     updated_at: datetime
-    # Literal emoji when reaction is "custom"; None for the classic six.
+    # Literal emoji when reaction is "custom"; None for named reactions.
     custom_emoji: str | None = None
     part_index: int = 0
 

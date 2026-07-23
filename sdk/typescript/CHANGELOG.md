@@ -8,6 +8,7 @@
 - Message and conversation lists accept `includeGroups: false`; group models expose nullable assignment/remote fields, sender attribution, participants, group identity, and per-recipient status.
 - Conversation list/detail models expose `groupCreationStatus`; failed creation stays on the same conversation and the next send retries.
 - Existing reaction methods support inbound group messages by `messageId`; REST and webhook reaction assignment fields are nullable.
+- Reaction types and webhook payloads include the named, sendable `eyes` tapback. Arbitrary custom emoji remain inbound-only through `customEmoji`.
 - Group creation and `conversationId` replies accept the same 13 `IMessageSendStyle` values as one-to-one sends, including sends with one media URL.
 - iMessage webhook message types expose the additive group fields. Group read receipts and typing indicators remain unsupported.
 

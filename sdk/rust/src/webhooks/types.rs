@@ -628,6 +628,7 @@ pub enum IMessageReactionTypeWire {
     Laugh,
     Emphasize,
     Question,
+    Eyes,
     Custom,
 }
 
@@ -722,7 +723,7 @@ pub struct IMessageWebhookMessage {
 /// A tapback reaction on an iMessage (snake_case wire shape).
 ///
 /// `custom_emoji` carries the literal emoji when `reaction` is `"custom"`;
-/// `None` for the classic six.
+/// `None` for named reactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IMessageWebhookReaction {
     pub id: String,
@@ -969,7 +970,7 @@ mod tests {
                 "reaction": {
                     "id": "reaction_1", "conversation_id": "conv_1",
                     "assignment_id": null, "target_message_id": "imsg_1",
-                    "direction": "inbound", "reaction": "emphasize",
+                    "direction": "inbound", "reaction": "eyes",
                     "custom_emoji": null, "remote_number": "+15551234567",
                     "part_index": 0,
                     "created_at": "2026-07-22T00:01:00Z",
@@ -980,7 +981,9 @@ mod tests {
         }"#;
 
         let payload: IMessageWebhookPayload = serde_json::from_str(raw).unwrap();
-        assert_eq!(payload.data.reaction.unwrap().assignment_id, None);
+        let reaction = payload.data.reaction.unwrap();
+        assert_eq!(reaction.assignment_id, None);
+        assert_eq!(reaction.reaction, IMessageReactionTypeWire::Eyes);
     }
 
     fn message_json(extra: &str) -> String {

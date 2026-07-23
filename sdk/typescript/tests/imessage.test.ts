@@ -122,6 +122,7 @@ const REACTION_DICT = {
 const GROUP_REACTION_DICT = {
   ...REACTION_DICT,
   assignment_id: null,
+  reaction: "eyes",
 };
 
 const CONTACT_RULE_DICT = {
@@ -449,7 +450,7 @@ describe("IMessagesResource", () => {
 
     const reaction = await resource.sendReaction({
       messageId: MSG_ID,
-      reaction: IMessageReactionType.EMPHASIZE,
+      reaction: IMessageReactionType.EYES,
       partIndex: 1,
     });
 
@@ -457,10 +458,11 @@ describe("IMessagesResource", () => {
     expect(url).toBe(`${BASE}/reactions`);
     expect(JSON.parse(init.body as string)).toEqual({
       message_id: MSG_ID,
-      reaction: "emphasize",
+      reaction: "eyes",
       part_index: 1,
     });
     expect(reaction.assignmentId).toBeNull();
+    expect(reaction.reaction).toBe(IMessageReactionType.EYES);
   });
 
   it("markConversationRead returns the updated count", async () => {

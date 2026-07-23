@@ -462,8 +462,9 @@ impl IMessagesResource {
     ///
     /// # Arguments
     /// * `message_id` - UUID of the message being reacted to.
-    /// * `reaction` - Tapback kind. Sends accept the classic six; `custom` is
-    ///   inbound-only and rejected with 422.
+    /// * `reaction` - Tapback kind. Sends accept `love`, `like`, `dislike`,
+    ///   `laugh`, `emphasize`, `question`, and `eyes`; `custom` is inbound-only
+    ///   and rejected with 422.
     /// * `part_index` - Part of a multi-part message to react to.
     pub fn send_reaction(
         &self,
@@ -880,7 +881,7 @@ mod tests {
                 .path("/api/v1/imessage/reactions")
                 .json_body(json!({
                     "message_id": message_id.to_string(),
-                    "reaction": "emphasize",
+                    "reaction": "eyes",
                     "part_index": 1
                 }));
             then.status(200).json_body(json!({
@@ -889,7 +890,7 @@ mod tests {
                 "assignment_id": null,
                 "target_message_id": message_id,
                 "direction": "outbound",
-                "reaction": "emphasize",
+                "reaction": "eyes",
                 "remote_number": "+15550001111",
                 "part_index": 1,
                 "created_at": "2026-07-22T00:00:00Z",
@@ -899,10 +900,11 @@ mod tests {
 
         let reaction = client(&server)
             .imessages()
-            .send_reaction(&message_id, IMessageReactionType::Emphasize, 1)
+            .send_reaction(&message_id, IMessageReactionType::Eyes, 1)
             .unwrap();
 
         mock.assert();
         assert_eq!(reaction.assignment_id, None);
+        assert_eq!(reaction.reaction, IMessageReactionType::Eyes);
     }
 }

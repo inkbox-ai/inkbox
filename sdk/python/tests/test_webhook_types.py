@@ -12,12 +12,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import cast, get_type_hints
+from typing import cast, get_args, get_type_hints
 
 import pytest
 
 from inkbox import (
     CallEndedWebhookPayload,
+    IMessageReactionTypeWire,
     IMessageWebhookReaction,
     MailWebhookPayload,
     PhoneIncomingCallWebhookPayload,
@@ -29,6 +30,11 @@ from inkbox import (
 
 def test_imessage_group_reaction_assignment_is_nullable():
     assert get_type_hints(IMessageWebhookReaction)["assignment_id"] == str | None
+
+
+def test_imessage_reaction_wire_keeps_eyes_and_inbound_custom_distinct():
+    values = set(get_args(IMessageReactionTypeWire))
+    assert {"eyes", "custom"} <= values
 
 # Repo layout: sdk/python/tests/test_webhook_types.py -> sdk/python/tests
 #                                                    -> sdk/python

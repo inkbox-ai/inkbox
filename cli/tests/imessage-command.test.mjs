@@ -1,6 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildIMessageSendOptions } from "../dist/commands/imessage.js";
+import { Command } from "commander";
+import {
+  buildIMessageSendOptions,
+  IMESSAGE_SENDABLE_REACTIONS,
+  registerIMessageCommands,
+} from "../dist/commands/imessage.js";
+
+test("iMessage reaction choices match the named outbound allowlist", () => {
+  assert.deepEqual(IMESSAGE_SENDABLE_REACTIONS, [
+    "love",
+    "like",
+    "dislike",
+    "laugh",
+    "emphasize",
+    "question",
+    "eyes",
+  ]);
+  assert.equal(IMESSAGE_SENDABLE_REACTIONS.includes("custom"), false);
+  assert.equal(IMESSAGE_SENDABLE_REACTIONS.includes("🔥"), false);
+
+  const program = new Command();
+  registerIMessageCommands(program);
+  const imessage = program.commands.find((command) => command.name() === "imessage");
+  const react = imessage?.commands.find((command) => command.name() === "react");
+  const reactionOption = react?.options.find((option) => option.long === "--reaction");
+  assert.deepEqual(reactionOption?.argChoices, IMESSAGE_SENDABLE_REACTIONS);
+  assert.equal(reactionOption?.mandatory, true);
+});
 
 test("buildIMessageSendOptions preserves a scalar recipient", () => {
   assert.deepEqual(buildIMessageSendOptions({

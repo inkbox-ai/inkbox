@@ -549,9 +549,9 @@ print(group_convos[0].group_creation_status)
 # with assignment_status == "released"; sends into them return 409.)
 connections = identity.list_imessage_assignments()
 
-# Tapbacks target inbound one-to-one or group messages by message_id. The
-# classic six are sendable ("custom" is inbound-only, 422 on send), and a new
-# tapback replaces your previous one on the same message part. Group read
+# Tapbacks target inbound one-to-one or group messages by message_id. The seven
+# named reactions include "eyes" ("custom" is inbound-only, 422 on send), and a
+# new tapback replaces your previous one on the same message part. Group read
 # receipts and typing indicators remain unsupported and return 409.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
 

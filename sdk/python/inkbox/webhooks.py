@@ -458,6 +458,7 @@ IMessageReactionTypeWire = Literal[
     "laugh",
     "emphasize",
     "question",
+    "eyes",
     "custom",
 ]
 
@@ -546,7 +547,7 @@ class IMessageWebhookReaction(TypedDict):
     """A tapback reaction on an iMessage (snake_case wire shape).
 
     ``custom_emoji`` carries the literal emoji when ``reaction`` is
-    ``"custom"``; ``None`` for the classic six.
+    ``"custom"``; ``None`` for named reactions.
     """
     id: str
     conversation_id: str

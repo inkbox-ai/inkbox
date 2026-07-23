@@ -137,6 +137,7 @@ IMESSAGE_REACTION_DICT = {
 GROUP_IMESSAGE_REACTION_DICT = {
     **IMESSAGE_REACTION_DICT,
     "assignment_id": None,
+    "reaction": "eyes",
 }
 
 IMESSAGE_CONTACT_RULE_DICT = {
@@ -462,15 +463,16 @@ class TestIMessageActions:
 
         reaction = client._imessages.send_reaction(
             message_id=MSG_ID,
-            reaction=IMessageReactionType.EMPHASIZE,
+            reaction=IMessageReactionType.EYES,
             part_index=1,
         )
 
         transport.post.assert_called_once_with(
             "/reactions",
-            json={"message_id": MSG_ID, "reaction": "emphasize", "part_index": 1},
+            json={"message_id": MSG_ID, "reaction": "eyes", "part_index": 1},
         )
         assert reaction.assignment_id is None
+        assert reaction.reaction is IMessageReactionType.EYES
 
     def test_mark_conversation_read(self, client, transport):
         transport.post.return_value = {

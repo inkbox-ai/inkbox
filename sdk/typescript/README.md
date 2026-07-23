@@ -530,9 +530,9 @@ await identity.sendIMessage({
 // with assignmentStatus === "released"; sends into them return 409.)
 const connections = await identity.listIMessageAssignments();
 
-// Tapbacks target inbound one-to-one or group messages by messageId. The
-// classic six are sendable ("custom" is inbound-only, 422 on send), and a new
-// tapback replaces your previous one on the same message part. Group read
+// Tapbacks target inbound one-to-one or group messages by messageId. The seven
+// named reactions include "eyes" ("custom" is inbound-only, 422 on send), and a
+// new tapback replaces your previous one on the same message part. Group read
 // receipts and typing indicators remain unsupported and return 409.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 

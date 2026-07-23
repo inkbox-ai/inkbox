@@ -1,10 +1,20 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import type { AgentIdentity } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
+
+export const IMESSAGE_SENDABLE_REACTIONS = [
+  "love",
+  "like",
+  "dislike",
+  "laugh",
+  "emphasize",
+  "question",
+  "eyes",
+] as const;
 
 const IMESSAGE_LIST_COLUMNS = [
   "id",
@@ -461,9 +471,13 @@ export function registerIMessageCommands(program: Command): void {
     .command("react <message-id>")
     .description("React to an inbound one-to-one or group message")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
-    .requiredOption(
-      "--reaction <kind>",
-      "Tapback kind: love, like, dislike, laugh, emphasize, question",
+    .addOption(
+      new Option(
+        "--reaction <kind>",
+        `Tapback kind: ${IMESSAGE_SENDABLE_REACTIONS.join(", ")}`,
+      )
+        .choices([...IMESSAGE_SENDABLE_REACTIONS])
+        .makeOptionMandatory(),
     )
     .option("--part-index <n>", "Part of a multi-part message to react to", "0")
     .action(

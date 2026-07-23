@@ -455,8 +455,9 @@ for (const a of connections) {
 }
 
 // Tapbacks target inbound one-to-one or group messages by messageId. Sends
-// accept the classic six (love, like, dislike, laugh, emphasize, question);
-// inbound can also be "custom" with the literal emoji in customEmoji.
+// accept seven named reactions (love, like, dislike, laugh, emphasize,
+// question, eyes); inbound can also be "custom" with the literal emoji in
+// customEmoji. Arbitrary custom emoji are not sendable.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 
 // Live tapbacks come back on message reads, oldest first.

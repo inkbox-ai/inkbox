@@ -324,8 +324,9 @@ export class IMessagesResource {
    * Send a tapback reaction to an inbound one-to-one or group message.
    *
    * @param options.messageId - UUID of the message being reacted to.
-   * @param options.reaction - Tapback kind. Sends accept the classic
-   *   six; `custom` is inbound-only and rejected with 422.
+   * @param options.reaction - Tapback kind. Sends accept `love`, `like`,
+   *   `dislike`, `laugh`, `emphasize`, `question`, and `eyes`; `custom` is
+   *   inbound-only and rejected with 422.
    * @param options.partIndex - Part of a multi-part message to react to.
    *   Defaults to 0.
    */

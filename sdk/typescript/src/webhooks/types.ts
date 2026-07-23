@@ -445,6 +445,7 @@ export type IMessageReactionTypeWire =
   | "laugh"
   | "emphasize"
   | "question"
+  | "eyes"
   | "custom";
 
 export type IMessageSendStyleWire =
@@ -529,7 +530,7 @@ export interface IMessageWebhookMessage {
 /**
  * A tapback reaction on an iMessage (snake_case wire shape).
  * `custom_emoji` carries the literal emoji when `reaction` is
- * `"custom"`; `null` for the classic six.
+ * `"custom"`; `null` for named reactions.
  */
 export interface IMessageWebhookReaction {
   id: string;

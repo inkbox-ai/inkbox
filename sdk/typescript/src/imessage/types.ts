@@ -35,7 +35,7 @@ export enum IMessageDeliveryStatus {
  * Tapback reaction kinds.
  *
  * `CUSTOM` is inbound-only: recipients can react with any emoji
- * (carried in `customEmoji`), but sends accept the classic six.
+ * (carried in `customEmoji`). Sends accept the seven named reactions.
  */
 export enum IMessageReactionType {
   LOVE = "love",
@@ -44,6 +44,7 @@ export enum IMessageReactionType {
   LAUGH = "laugh",
   EMPHASIZE = "emphasize",
   QUESTION = "question",
+  EYES = "eyes",
   CUSTOM = "custom",
 }
 
@@ -160,7 +161,7 @@ export interface IMessageMessageReaction {
   /** "inbound" | "outbound" */
   direction: string;
   reaction: IMessageReactionType;
-  /** Literal emoji when `reaction` is "custom"; null for the classic six. */
+  /** Literal emoji when `reaction` is "custom"; null for named reactions. */
   customEmoji: string | null;
   remoteNumber: string;
   partIndex: number;
@@ -252,7 +253,7 @@ export interface IMessageReaction {
   /** "inbound" | "outbound" */
   direction: string;
   reaction: IMessageReactionType;
-  /** Literal emoji when `reaction` is "custom"; null for the classic six. */
+  /** Literal emoji when `reaction` is "custom"; null for named reactions. */
   customEmoji: string | null;
   remoteNumber: string;
   partIndex: number;
