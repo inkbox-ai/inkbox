@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { CallMode, IncomingCallAction } from "@inkbox/sdk";
+import { CallMode, CallOrigin, IncomingCallAction } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -10,6 +10,7 @@ interface PlaceCallCommandOptions {
   wsUrl?: string;
   hosted?: boolean;
   reason?: string;
+  origination?: CallOrigin;
 }
 
 interface PlaceCallOptions {
@@ -17,6 +18,7 @@ interface PlaceCallOptions {
   clientWebsocketUrl?: string;
   mode?: CallMode;
   reason?: string;
+  origination?: CallOrigin;
 }
 
 export function buildPlaceCallOptions(
@@ -42,6 +44,9 @@ export function buildPlaceCallOptions(
     callOptions.mode = CallMode.HOSTED_AGENT;
     callOptions.reason = cmdOpts.reason;
   }
+  if (cmdOpts.origination) {
+    callOptions.origination = cmdOpts.origination;
+  }
   return { callOptions };
 }
 
@@ -58,6 +63,10 @@ export function registerPhoneCommands(program: Command): void {
     .option("--ws-url <url>", "WebSocket URL (wss://) for audio bridging")
     .option("--hosted", "Let Inkbox Voice AI drive the call (requires --reason)")
     .option("--reason <text>", "Voice AI's task brief — what to accomplish")
+    .option(
+      "--origination <origin>",
+      "Call origin: dedicated_number or shared_imessage_number",
+    )
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -78,6 +87,7 @@ export function registerPhoneCommands(program: Command): void {
             id: call.id,
             from: call.localPhoneNumber,
             to: call.remotePhoneNumber,
+            origin: call.origin,
             status: call.status,
             mode: call.mode,
             reason: call.reason,

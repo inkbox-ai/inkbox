@@ -114,6 +114,10 @@ inkbox email list -i my-agent --limit 10
 # Place a phone call
 inkbox phone call -i my-agent --to +15551234567
 
+# Or call over an existing shared iMessage connection (no dedicated number)
+inkbox phone call -i my-agent --to +15551234567 \
+  --origination shared_imessage_number
+
 # Send a text message (SMS/MMS; comma-separate --to for groups)
 inkbox text send -i my-agent --to +15551234567 --text "Hi from my agent!"
 

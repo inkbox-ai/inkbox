@@ -242,6 +242,7 @@ All phone commands are identity-scoped and require `-i <handle>`.
 ```bash
 inkbox phone call -i <handle> --to +15551234567 --ws-url wss://example.com/ws
 inkbox phone call -i <handle> --to +15551234567 --hosted --reason "Confirm tomorrow's 3pm appointment"
+inkbox phone call -i <handle> --to +15551234567 --origination shared_imessage_number
 inkbox phone calls -i <handle> --limit 10 --offset 0
 inkbox phone hangup <call-id> -i <handle>
 inkbox phone transcripts <call-id> -i <handle>
@@ -252,7 +253,14 @@ inkbox phone hosted-agent get -i <handle>
 inkbox phone hosted-agent set -i <handle> --voice <voice> --model <model> --instructions <text>
 ```
 
-Before placing a call, confirm the destination number and the websocket URL (or the `--reason` task brief for Voice AI calls) with the user.
+Before placing a call, confirm the destination number, origination, and the
+websocket URL (or the `--reason` task brief for Voice AI calls) with the user.
+
+`--origination` selects `dedicated_number` (the default) or
+`shared_imessage_number`. Shared-line calls use the identity's iMessage-line
+assignment and do not require a dedicated phone number. The recipient must
+already have a shared iMessage connection to the identity; otherwise the call
+fails with `409 no_shared_connection`.
 
 `--hosted` places a call Inkbox Voice AI drives end to end
 — no WebSocket, no code. It requires `--reason` (the agent's task brief)
