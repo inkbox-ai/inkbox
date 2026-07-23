@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.4 — Dedicated outbound iMessage groups
+
+### Added
+
+- `send_imessage` and `imessages.send` accept one recipient or a list of 1–8; two or more recipients select or create a dedicated-outbound group. Reply with the returned `conversation_id`.
+- Message and conversation lists accept `include_groups=False`; group models expose nullable assignment/remote fields, `sender_number`, `participants`, `is_group`, and per-recipient status.
+- Conversation list/detail models expose `group_creation_status`; failed creation stays on the same conversation and the next send retries.
+- Existing reaction methods support inbound group messages by `message_id`; REST and webhook reaction assignment fields are nullable.
+- Reaction types and webhook payloads include the named, sendable `eyes` tapback. Reaction sends reject `custom` and arbitrary emoji before making a request; inbound custom emoji remain available through `custom_emoji`.
+- Group creation and `conversation_id` replies accept the same 13 `IMessageSendStyle` values as one-to-one sends, including sends with one media URL.
+- iMessage webhook message types expose the additive group fields. Group read receipts and typing indicators remain unsupported.
+
+### Compatibility
+
+- Scalar sends, reaction method signatures, and default one-to-one listings are unchanged. Group sends and tapbacks require the matching API rollout.
+
 ## 0.5.0 — Identity tunnel summaries and inlined access
 
 ### Added

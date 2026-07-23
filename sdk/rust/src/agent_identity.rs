@@ -848,7 +848,9 @@ impl AgentIdentity {
     /// * `conversation_id` - Existing conversation UUID to reply into.
     /// * `text` - Message body.
     /// * `media_urls` - Media URLs (at most one).
-    /// * `send_style` - Optional expressive send style.
+    /// * `send_style` - Optional expressive send style. The same
+    ///   [`IMessageSendStyle`] values work for one-to-one and group replies,
+    ///   including sends with one media URL.
     pub fn send_imessage(
         &self,
         to: Option<&str>,
@@ -862,6 +864,24 @@ impl AgentIdentity {
         self.inkbox
             .imessages()
             .send(to, conversation_id, text, media_urls, send_style, Some(&id))
+    }
+
+    /// Send to 2–8 distinct recipients as a dedicated-outbound iMessage group.
+    ///
+    /// `send_style` accepts the same [`IMessageSendStyle`] values as one-to-one
+    /// sends and may be combined with the single supported media URL.
+    pub fn send_imessage_group(
+        &self,
+        to: &[String],
+        text: Option<&str>,
+        media_urls: Option<&[String]>,
+        send_style: Option<IMessageSendStyle>,
+    ) -> Result<IMessage> {
+        self.require_imessage()?;
+        let id = self.id();
+        self.inkbox
+            .imessages()
+            .send_group(to, text, media_urls, send_style, Some(&id))
     }
 
     /// List this identity's iMessages, newest first.
@@ -884,6 +904,54 @@ impl AgentIdentity {
             is_read,
             is_blocked,
             &DateRangeFilter::default(),
+        )
+    }
+
+    /// List this identity's iMessages with explicit group visibility.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_imessages_with_groups(
+        &self,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+    ) -> Result<Vec<IMessage>> {
+        self.list_imessages_filtered_with_groups(
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            &DateRangeFilter::default(),
+            include_groups,
+        )
+    }
+
+    /// List this identity's date-filtered iMessages with explicit group visibility.
+    #[allow(clippy::too_many_arguments)]
+    pub fn list_imessages_filtered_with_groups(
+        &self,
+        conversation_id: Option<&Uuid>,
+        limit: i64,
+        offset: i64,
+        is_read: Option<bool>,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+        include_groups: bool,
+    ) -> Result<Vec<IMessage>> {
+        self.require_imessage()?;
+        let id = self.id();
+        self.inkbox.imessages().list_filtered_with_groups(
+            Some(&id),
+            conversation_id,
+            limit,
+            offset,
+            is_read,
+            is_blocked,
+            filter,
+            include_groups,
         )
     }
 
@@ -945,6 +1013,46 @@ impl AgentIdentity {
         )
     }
 
+    /// List this identity's conversations with explicit group visibility.
+    pub fn list_imessage_conversations_with_groups(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        include_groups: bool,
+    ) -> Result<Vec<IMessageConversationSummary>> {
+        self.list_imessage_conversations_filtered_with_groups(
+            limit,
+            offset,
+            is_blocked,
+            &DateRangeFilter::default(),
+            include_groups,
+        )
+    }
+
+    /// List this identity's date-filtered conversations with explicit group visibility.
+    pub fn list_imessage_conversations_filtered_with_groups(
+        &self,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        filter: &DateRangeFilter,
+        include_groups: bool,
+    ) -> Result<Vec<IMessageConversationSummary>> {
+        self.require_imessage()?;
+        let id = self.id();
+        self.inkbox
+            .imessages()
+            .list_conversations_filtered_with_groups(
+                Some(&id),
+                limit,
+                offset,
+                is_blocked,
+                filter,
+                include_groups,
+            )
+    }
+
     /// List this identity's iMessage conversations, additionally narrowed by a
     /// `created_at` [`DateRangeFilter`].
     ///
@@ -981,8 +1089,7 @@ impl AgentIdentity {
             .get_conversation(conversation_id, Some(&id))
     }
 
-    /// Send a tapback reaction to a message in one of this identity's
-    /// conversations.
+    /// React to an inbound one-to-one or group message owned by this identity.
     ///
     /// # Arguments
     /// * `message_id` - UUID of the message being reacted to.
@@ -1000,7 +1107,8 @@ impl AgentIdentity {
             .send_reaction(message_id, reaction, part_index)
     }
 
-    /// Send a read receipt and mark a conversation's inbound messages read.
+    /// Send a one-to-one read receipt and mark inbound messages read.
+    /// Group conversations return 409.
     pub fn mark_imessage_conversation_read(
         &self,
         conversation_id: &Uuid,
@@ -1011,7 +1119,8 @@ impl AgentIdentity {
             .mark_conversation_read(conversation_id)
     }
 
-    /// Show a typing indicator to a conversation's recipient.
+    /// Show a typing indicator to a one-to-one recipient.
+    /// Group conversations return 409.
     pub fn send_imessage_typing(&self, conversation_id: &Uuid) -> Result<()> {
         self.require_imessage()?;
         self.inkbox.imessages().send_typing(conversation_id)
@@ -1509,6 +1618,12 @@ mod tests {
         AgentIdentity::new(data, inkbox)
     }
 
+    fn imessage_identity_at(base_url: &str) -> AgentIdentity {
+        let identity = identity_at(base_url, false);
+        identity.data.borrow_mut().summary.imessage_enabled = true;
+        identity
+    }
+
     /// Build a phoneless identity backed by a client pointed at an unreachable
     /// localhost port, so any real request fails fast instead of hanging.
     fn phoneless_identity() -> AgentIdentity {
@@ -1774,6 +1889,62 @@ mod tests {
         let calls = identity.list_calls(10, 2, Some(false)).unwrap();
         mock.assert();
         assert_eq!(calls.len(), 1);
+    }
+
+    #[test]
+    fn filtered_group_imessage_lists_scope_by_identity_and_preserve_date_filters() {
+        let server = MockServer::start();
+        let message_list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/imessage/messages")
+                .query_param("agent_identity_id", IDENTITY_ID)
+                .query_param("limit", "25")
+                .query_param("offset", "5")
+                .query_param("is_read", "false")
+                .query_param("is_blocked", "false")
+                .query_param("include_groups", "true")
+                .query_param("start_datetime", "2026-07-01")
+                .query_param("end_datetime", "2026-07-02")
+                .query_param("tz", "America/New_York");
+            then.status(200).json_body(json!([]));
+        });
+        let conversation_list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/imessage/conversations")
+                .query_param("agent_identity_id", IDENTITY_ID)
+                .query_param("limit", "25")
+                .query_param("offset", "5")
+                .query_param("is_blocked", "false")
+                .query_param("include_groups", "true")
+                .query_param("start_datetime", "2026-07-01")
+                .query_param("end_datetime", "2026-07-02")
+                .query_param("tz", "America/New_York");
+            then.status(200).json_body(json!([]));
+        });
+        let identity = imessage_identity_at(&server.base_url());
+        let filter = DateRangeFilter {
+            start_datetime: Some("2026-07-01".into()),
+            end_datetime: Some("2026-07-02".into()),
+            tz: Some("America/New_York".into()),
+        };
+
+        identity
+            .list_imessages_filtered_with_groups(
+                None,
+                25,
+                5,
+                Some(false),
+                Some(false),
+                &filter,
+                true,
+            )
+            .unwrap();
+        identity
+            .list_imessage_conversations_filtered_with_groups(25, 5, Some(false), &filter, true)
+            .unwrap();
+
+        message_list.assert();
+        conversation_list.assert();
     }
 
     #[test]

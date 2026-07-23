@@ -508,6 +508,7 @@ import {
   DedicatedIMessageNumberQuotaExceededError,
   IdempotencyKeyReusedError,
   IMessageNumberType,
+  IMessageSendStyle,
 } from "@inkbox/sdk";
 
 // Shared service: opt an identity in at create time or later.
@@ -529,8 +530,10 @@ await identity.sendIMessage({
 // with assignmentStatus === "released"; sends into them return 409.)
 const connections = await identity.listIMessageAssignments();
 
-// Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
-// a new tapback replaces your previous one on the same message part.
+// Tapbacks target inbound one-to-one or group messages by messageId. The seven
+// named reactions include "eyes" ("custom" is rejected locally on send), and a
+// new tapback replaces your previous one on the same message part. Group read
+// receipts and typing indicators remain unsupported and return 409.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 
 // Read receipts, typing indicator, media.
@@ -584,6 +587,32 @@ const outboundIdentity = await inkbox.createIdentity("outreach-agent", {
   imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
 });
 console.log(outboundIdentity.imessageNumber?.number);
+
+// Dedicated outbound only: create or reuse an exact-participant group. Keep
+// the returned conversationId for later replies. An ambiguous best-known match
+// returns 409 instead of choosing a conversation.
+const group = await outboundIdentity.sendIMessage({
+  to: ["+15551234567", "+15557654321"],
+  text: "Welcome to the group!",
+  mediaUrls: ["https://example.com/group-photo.jpg"],
+  sendStyle: IMessageSendStyle.CONFETTI,
+});
+await outboundIdentity.sendIMessage({
+  conversationId: group.conversationId,
+  text: "Following up in the same conversation.",
+  mediaUrls: ["https://example.com/follow-up.jpg"],
+  sendStyle: IMessageSendStyle.LASERS,
+});
+const groupConvos = await outboundIdentity.listIMessageConversations({ includeGroups: true });
+const groupMessages = await outboundIdentity.listIMessages({ includeGroups: true });
+console.log(group.isGroup, group.participants, group.recipients);
+// groupCreationStatus is "creating", "not_created", or "ready". A rejected
+// initial creation leaves this same local conversation at "not_created"; send
+// again with its conversationId to retry. Success binds the remote thread and
+// changes the status to "ready".
+console.log(groupConvos[0].groupCreationStatus);
+// Groups accept the same 13 IMessageSendStyle values as one-to-one sends on
+// both creation and conversationId replies, with or without the media URL.
 
 // Claim and atomically attach/swap during update. To attach an already-owned
 // number, pass imessageNumberId instead. Pass imessageNumberId: null to move

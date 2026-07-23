@@ -472,6 +472,8 @@ number. iMessage is **opt-in per identity** (`imessage_enabled`). Shared and
 contact-rule, and rate-limit checks.
 
 ```python
+from inkbox import IMessageSendStyle
+
 # Shared service: opt an identity in at create time or later.
 identity = inkbox.create_identity("my-agent", imessage_enabled=True)
 
@@ -517,12 +519,40 @@ identity.send_imessage(
     text="On it — give me two minutes.",
 )
 
+# Dedicated outbound only: create or reuse an exact-participant group. Keep the
+# returned conversation_id and use it for later replies. A best-known set that
+# matches multiple conversations returns 409 instead of choosing one.
+group = outbound_identity.send_imessage(
+    to=["+15551234567", "+15557654321"],
+    text="Welcome to the group!",
+    media_urls=["https://example.com/group-photo.jpg"],
+    send_style=IMessageSendStyle.CONFETTI,
+)
+outbound_identity.send_imessage(
+    conversation_id=group.conversation_id,
+    text="Following up in the same conversation.",
+    media_urls=["https://example.com/follow-up.jpg"],
+    send_style=IMessageSendStyle.LASERS,
+)
+group_convos = outbound_identity.list_imessage_conversations(include_groups=True)
+group_msgs = outbound_identity.list_imessages(include_groups=True)
+print(group.is_group, group.participants, group.recipients)
+# group_creation_status is creating, not_created, or ready. A rejected initial
+# creation leaves this same local conversation at not_created; send again with
+# its conversation_id to retry. A successful retry binds the remote thread and
+# changes the status to ready.
+print(group_convos[0].group_creation_status)
+# Groups accept the same 13 IMessageSendStyle values as one-to-one sends on
+# both creation and conversation_id replies, with or without the media URL.
+
 # Who is currently connected? (Disconnected conversations stay readable
 # with assignment_status == "released"; sends into them return 409.)
 connections = identity.list_imessage_assignments()
 
-# Tapbacks: classic six on send ("custom" is inbound-only, 422 on send);
-# a new tapback replaces your previous one on the same message part.
+# Tapbacks target inbound one-to-one or group messages by message_id. The seven
+# named reactions include "eyes" ("custom" is rejected locally on send), and a
+# new tapback replaces your previous one on the same message part. Group read
+# receipts and typing indicators remain unsupported and return 409.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
 
 # Read receipts, typing indicator, media.

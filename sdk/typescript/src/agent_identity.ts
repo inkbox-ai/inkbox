@@ -830,20 +830,23 @@ export class AgentIdentity {
    * (`inkbox.webhooks.subscriptions.create({ agentIdentityId, url,
    * eventTypes: ["imessage.received", ...] })`).
    *
-   * @param options.to - E.164 recipient number. Mutually exclusive with
-   *   `conversationId`.
+   * @param options.to - One E.164 recipient or 1–8 distinct recipients. Two
+   *   or more recipients select or create a dedicated-outbound group.
+   *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadIMessageMedia} to create one from bytes.
-   * @param options.sendStyle - Optional expressive send style.
+   * @param options.sendStyle - Optional expressive send style. The same
+   *   `IMessageSendStyle` values work for one-to-one sends, new groups, and
+   *   replies by group `conversationId`, including sends with one media URL.
    *
    * @throws {InkboxError} when this identity is not iMessage-enabled.
    * @throws {InkboxAPIError} 403 when the recipient is blocked by a
    *   contact rule; other send failures.
    */
   async sendIMessage(options: {
-    to?: string | null;
+    to?: string | string[] | null;
     conversationId?: string | null;
     text?: string | null;
     mediaUrls?: string[] | null;
@@ -876,6 +879,7 @@ export class AgentIdentity {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
@@ -918,6 +922,7 @@ export class AgentIdentity {
       limit?: number;
       offset?: number;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
@@ -945,8 +950,7 @@ export class AgentIdentity {
   }
 
   /**
-   * Send a tapback reaction to a message in one of this identity's
-   * conversations.
+   * React to an inbound one-to-one or group message owned by this identity.
    *
    * @param options.messageId - UUID of the message being reacted to.
    * @param options.reaction - Tapback kind (see {@link IMessageReactionType}).
@@ -963,7 +967,8 @@ export class AgentIdentity {
   }
 
   /**
-   * Send a read receipt and mark a conversation's inbound messages read.
+   * Send a one-to-one read receipt and mark inbound messages read.
+   * Group conversations return 409.
    *
    * @param conversationId - UUID of the conversation.
    * @returns Object with `conversationId` and `updatedCount`.
@@ -976,7 +981,8 @@ export class AgentIdentity {
   }
 
   /**
-   * Show a typing indicator to a conversation's recipient.
+   * Show a typing indicator to a one-to-one recipient.
+   * Group conversations return 409.
    *
    * @param conversationId - UUID of the conversation.
    */

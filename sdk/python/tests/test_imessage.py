@@ -12,6 +12,7 @@ from inkbox.imessage.types import (
     IMessageNumberStatus,
     IMessageNumberType,
     IMessageDeliveryStatus,
+    IMessageGroupCreationStatus,
     IMessageReactionType,
     IMessageRuleAction,
     IMessageRuleMatchType,
@@ -26,6 +27,7 @@ MSG_ID = "dddd4444-0000-0000-0000-000000000001"
 IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001"
 RULE_ID = "ffff6666-0000-0000-0000-000000000001"
 REMOTE = "+15551234567"
+GROUP_REMOTE = "+15557654321"
 HANDLE = "support-bot"
 
 IMESSAGE_NUMBER_DICT = {
@@ -78,6 +80,19 @@ IMESSAGE_DICT = {
     "updated_at": "2026-06-01T00:00:00+00:00",
 }
 
+GROUP_IMESSAGE_DICT = {
+    **IMESSAGE_DICT,
+    "assignment_id": None,
+    "remote_number": None,
+    "sender_number": REMOTE,
+    "participants": [REMOTE, GROUP_REMOTE],
+    "is_group": True,
+    "recipients": [
+        {"remote_number": REMOTE, "delivery_status": "queued", "service": "imessage"},
+        {"remote_number": GROUP_REMOTE, "delivery_status": "queued", "service": "imessage"},
+    ],
+}
+
 IMESSAGE_CONVERSATION_DICT = {
     "id": CONVO_ID,
     "assignment_id": "bbbb2222-0000-0000-0000-000000000001",
@@ -96,6 +111,16 @@ IMESSAGE_CONVERSATION_SUMMARY_DICT = {
     "total_count": 5,
 }
 
+GROUP_CONVERSATION_DICT = {
+    **IMESSAGE_CONVERSATION_DICT,
+    "assignment_id": None,
+    "assignment_status": None,
+    "remote_number": None,
+    "participants": [REMOTE, GROUP_REMOTE],
+    "is_group": True,
+    "group_creation_status": "creating",
+}
+
 IMESSAGE_REACTION_DICT = {
     "id": "aaaa7777-0000-0000-0000-000000000001",
     "conversation_id": CONVO_ID,
@@ -107,6 +132,12 @@ IMESSAGE_REACTION_DICT = {
     "part_index": 0,
     "created_at": "2026-06-01T00:00:00+00:00",
     "updated_at": "2026-06-01T00:00:00+00:00",
+}
+
+GROUP_IMESSAGE_REACTION_DICT = {
+    **IMESSAGE_REACTION_DICT,
+    "assignment_id": None,
+    "reaction": "eyes",
 }
 
 IMESSAGE_CONTACT_RULE_DICT = {
@@ -133,12 +164,13 @@ class TestIMessagesSend:
             params=None,
         )
 
-    def test_passes_identity_and_send_style(self, client, transport):
+    def test_passes_media_and_send_style_by_conversation_id(self, client, transport):
         transport.post.return_value = {"message": IMESSAGE_DICT}
 
         client._imessages.send(
             conversation_id=CONVO_ID,
             text="Hi",
+            media_urls=["https://media.example/reply.jpg"],
             send_style=IMessageSendStyle.SLAM,
             agent_identity_id=IDENTITY_ID,
         )
@@ -148,10 +180,49 @@ class TestIMessagesSend:
             json={
                 "conversation_id": CONVO_ID,
                 "text": "Hi",
+                "media_urls": ["https://media.example/reply.jpg"],
                 "send_style": "slam",
             },
             params={"agent_identity_id": IDENTITY_ID},
         )
+
+    def test_serializes_group_recipients_with_style_and_media(
+        self, client, transport,
+    ):
+        response = {
+            **GROUP_IMESSAGE_DICT,
+            "send_style": "confetti",
+            "media": [{"url": "https://media.example/group.jpg"}],
+        }
+        transport.post.return_value = {"message": response}
+
+        msg = client._imessages.send(
+            to=[REMOTE, GROUP_REMOTE],
+            text="Hello group",
+            media_urls=["https://media.example/group.jpg"],
+            send_style=IMessageSendStyle.CONFETTI,
+            agent_identity_id=IDENTITY_ID,
+        )
+
+        transport.post.assert_called_once_with(
+            "/messages",
+            json={
+                "to": [REMOTE, GROUP_REMOTE],
+                "text": "Hello group",
+                "media_urls": ["https://media.example/group.jpg"],
+                "send_style": "confetti",
+            },
+            params={"agent_identity_id": IDENTITY_ID},
+        )
+        assert msg.assignment_id is None
+        assert msg.remote_number is None
+        assert msg.sender_number == REMOTE
+        assert msg.participants == [REMOTE, GROUP_REMOTE]
+        assert msg.is_group is True
+        assert msg.send_style is IMessageSendStyle.CONFETTI
+        assert msg.media is not None
+        assert msg.media[0].url == "https://media.example/group.jpg"
+        assert len(msg.recipients or []) == 2
 
     def test_returns_parsed_message(self, client, transport):
         transport.post.return_value = {"message": IMESSAGE_DICT}
@@ -298,6 +369,17 @@ class TestIMessagesList:
         assert len(msgs) == 1
         assert msgs[0].conversation_id == UUID(CONVO_ID)
 
+    def test_includes_groups_only_when_requested(self, client, transport):
+        transport.get.return_value = [GROUP_IMESSAGE_DICT]
+
+        msgs = client._imessages.list(include_groups=True)
+
+        transport.get.assert_called_once_with(
+            "/messages",
+            params={"limit": 50, "offset": 0, "include_groups": True},
+        )
+        assert msgs[0].is_group is True
+
 
 class TestIMessageConversations:
     def test_lists_summaries(self, client, transport):
@@ -311,6 +393,26 @@ class TestIMessageConversations:
         )
         assert convos[0].unread_count == 2
         assert convos[0].remote_number == REMOTE
+        assert convos[0].group_creation_status is None
+
+    def test_lists_group_summaries_with_nullable_assignment(self, client, transport):
+        transport.get.return_value = [{
+            **IMESSAGE_CONVERSATION_SUMMARY_DICT,
+            **GROUP_CONVERSATION_DICT,
+        }]
+
+        convos = client._imessages.list_conversations(include_groups=True)
+
+        transport.get.assert_called_once_with(
+            "/conversations",
+            params={"limit": 50, "offset": 0, "include_groups": True},
+        )
+        assert convos[0].assignment_id is None
+        assert convos[0].assignment_status is None
+        assert convos[0].remote_number is None
+        assert convos[0].participants == [REMOTE, GROUP_REMOTE]
+        assert convos[0].is_group is True
+        assert convos[0].group_creation_status is IMessageGroupCreationStatus.CREATING
 
     def test_gets_single_conversation(self, client, transport):
         transport.get.return_value = IMESSAGE_CONVERSATION_DICT
@@ -324,6 +426,18 @@ class TestIMessageConversations:
             params={"agent_identity_id": IDENTITY_ID},
         )
         assert convo.id == UUID(CONVO_ID)
+
+    def test_gets_group_conversation_without_list_opt_in(self, client, transport):
+        transport.get.return_value = GROUP_CONVERSATION_DICT
+
+        convo = client._imessages.get_conversation(CONVO_ID)
+
+        transport.get.assert_called_once_with(
+            f"/conversations/{CONVO_ID}", params={},
+        )
+        assert convo.is_group is True
+        assert convo.assignment_id is None
+        assert convo.group_creation_status is IMessageGroupCreationStatus.CREATING
 
 
 class TestIMessageActions:
@@ -341,6 +455,33 @@ class TestIMessageActions:
         )
         assert reaction.reaction is IMessageReactionType.LIKE
         assert reaction.target_message_id == UUID(MSG_ID)
+
+    def test_send_group_reaction_preserves_request_and_parses_null_assignment(
+        self, client, transport,
+    ):
+        transport.post.return_value = GROUP_IMESSAGE_REACTION_DICT
+
+        reaction = client._imessages.send_reaction(
+            message_id=MSG_ID,
+            reaction=IMessageReactionType.EYES,
+            part_index=1,
+        )
+
+        transport.post.assert_called_once_with(
+            "/reactions",
+            json={"message_id": MSG_ID, "reaction": "eyes", "part_index": 1},
+        )
+        assert reaction.assignment_id is None
+        assert reaction.reaction is IMessageReactionType.EYES
+
+    @pytest.mark.parametrize("reaction", [IMessageReactionType.CUSTOM, "\U0001f440"])
+    def test_send_reaction_rejects_inbound_only_or_arbitrary_values(
+        self, client, transport, reaction,
+    ):
+        with pytest.raises(ValueError, match="reaction must be one of"):
+            client._imessages.send_reaction(message_id=MSG_ID, reaction=reaction)
+
+        transport.post.assert_not_called()
 
     def test_mark_conversation_read(self, client, transport):
         transport.post.return_value = {

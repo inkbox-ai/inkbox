@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.4 — Dedicated outbound iMessage groups
+
+### Added
+
+- `inkbox imessage send --to` accepts one E.164 recipient or a comma-separated group.
+- `inkbox imessage list` and `inkbox imessage conversations` accept `--include-groups`; default listings remain one-to-one only.
+- Group conversation output exposes `groupCreationStatus`, and `imessage react` supports inbound group messages by message id.
+- `imessage react --reaction` accepts the seven named reactions, including `eyes`, and rejects arbitrary/custom emoji values before sending.
+- Existing `--send-style` works on group creation and conversation-id replies, including sends with `--media-url`.
+
+### Changed
+
+- CLI version moved in lockstep with `@inkbox/sdk` 0.5.4 and depends on `^0.5.4`.
+
 ## 0.4.26 — Dedicated iMessage number SDK support
 
 ### Changed

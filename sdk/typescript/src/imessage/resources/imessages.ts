@@ -39,6 +39,25 @@ import {
   parseIMessageTriageNumber,
 } from "../types.js";
 
+const SENDABLE_REACTIONS = new Set<string>([
+  "love",
+  "like",
+  "dislike",
+  "laugh",
+  "emphasize",
+  "question",
+  "eyes",
+]);
+
+function validateSendableReaction(reaction: IMessageReactionType | string): string {
+  if (!SENDABLE_REACTIONS.has(reaction)) {
+    throw new Error(
+      `reaction must be one of: ${[...SENDABLE_REACTIONS].join(", ")}`,
+    );
+  }
+  return reaction;
+}
+
 export class IMessagesResource {
   constructor(private readonly http: HttpTransport) {}
 
@@ -107,13 +126,16 @@ export class IMessagesResource {
    * subscriptions (`inkbox.webhooks.subscriptions.create({
    * agentIdentityId, url, eventTypes: ["imessage.received", ...] })`).
    *
-   * @param options.to - E.164 recipient number. Mutually exclusive with
-   *   `conversationId`.
+   * @param options.to - One E.164 recipient or 1–8 distinct recipients. Two
+   *   or more recipients select or create a dedicated-outbound group.
+   *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
    * @param options.text - Message body.
    * @param options.mediaUrls - Media URLs (at most one). Use
    *   {@link uploadMedia} to turn raw bytes into a sendable URL first.
-   * @param options.sendStyle - Optional expressive send style.
+   * @param options.sendStyle - Optional expressive send style. The same
+   *   `IMessageSendStyle` values work for one-to-one sends, new groups, and
+   *   replies by group `conversationId`, including sends with one media URL.
    * @param options.agentIdentityId - Identity to send as. Required for
    *   org-wide API keys when sending by `to`; ignored for
    *   identity-scoped keys (the key's identity wins).
@@ -123,7 +145,7 @@ export class IMessagesResource {
    *   rule.
    */
   async send(options: {
-    to?: string | null;
+    to?: string | string[] | null;
     conversationId?: string | null;
     text?: string | null;
     mediaUrls?: string[] | null;
@@ -131,7 +153,7 @@ export class IMessagesResource {
     agentIdentityId?: string | null;
   }): Promise<IMessage> {
     const body: {
-      to?: string;
+      to?: string | string[];
       conversation_id?: string;
       text?: string;
       media_urls?: string[];
@@ -188,6 +210,7 @@ export class IMessagesResource {
       offset?: number;
       isRead?: boolean;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
@@ -208,6 +231,9 @@ export class IMessagesResource {
     }
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
+    }
+    if (options?.includeGroups === true) {
+      params["include_groups"] = true;
     }
     if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
     if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
@@ -262,6 +288,7 @@ export class IMessagesResource {
       limit?: number;
       offset?: number;
       isBlocked?: boolean;
+      includeGroups?: boolean;
       startDatetime?: string;
       endDatetime?: string;
       tz?: string;
@@ -276,6 +303,9 @@ export class IMessagesResource {
     }
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
+    }
+    if (options?.includeGroups === true) {
+      params["include_groups"] = true;
     }
     if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
     if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;
@@ -310,29 +340,34 @@ export class IMessagesResource {
   }
 
   /**
-   * Send a tapback reaction to a message.
+   * Send a tapback reaction to an inbound one-to-one or group message.
    *
    * @param options.messageId - UUID of the message being reacted to.
-   * @param options.reaction - Tapback kind. Sends accept the classic
-   *   six; `custom` is inbound-only and rejected with 422.
+   * @param options.reaction - Tapback kind. Sends accept `love`, `like`,
+   *   `dislike`, `laugh`, `emphasize`, `question`, and `eyes`; `custom` is
+   *   inbound-only and rejected locally.
    * @param options.partIndex - Part of a multi-part message to react to.
    *   Defaults to 0.
+   * @throws {Error} when `reaction` is custom or not one of the seven
+   *   provider-supported named tapbacks.
    */
   async sendReaction(options: {
     messageId: string;
     reaction: IMessageReactionType | string;
     partIndex?: number;
   }): Promise<IMessageReaction> {
+    const reaction = validateSendableReaction(options.reaction);
     const data = await this.http.post<RawIMessageReaction>("/reactions", {
       message_id: options.messageId,
-      reaction: options.reaction,
+      reaction,
       part_index: options.partIndex ?? 0,
     });
     return parseIMessageReaction(data);
   }
 
   /**
-   * Send a read receipt and mark inbound messages read locally.
+   * Send a one-to-one read receipt and mark inbound messages read locally.
+   * Group conversations return 409.
    *
    * @param conversationId - UUID of the conversation.
    * @returns Object with `conversationId` and `updatedCount`.
@@ -351,7 +386,8 @@ export class IMessagesResource {
   }
 
   /**
-   * Show a typing indicator to the conversation's recipient.
+   * Show a typing indicator to a one-to-one recipient.
+   * Group conversations return 409.
    *
    * @param conversationId - UUID of the conversation.
    */

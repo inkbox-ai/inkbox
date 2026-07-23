@@ -458,6 +458,7 @@ IMessageReactionTypeWire = Literal[
     "laugh",
     "emphasize",
     "question",
+    "eyes",
     "custom",
 ]
 
@@ -512,17 +513,18 @@ class IMessageMessageReactionWire(TypedDict):
 
 class IMessageWebhookMessage(TypedDict):
     """
-    Stored iMessage. ``is_blocked`` is not part of the wire body --
-    blocked messages never reach the webhook. There is no local-number
-    field: shared pool lines are hidden from agents, so the message is
-    identified by ``conversation_id`` and the counterparty
-    ``remote_number`` only.
+    Stored iMessage. ``is_blocked`` is not part of the wire body -- blocked
+    messages never reach the webhook. Group messages have no assignment and
+    include sender/participant fields.
     """
     id: str
     conversation_id: str
-    assignment_id: str
+    assignment_id: str | None
     direction: IMessageDirectionWire
-    remote_number: str
+    remote_number: str | None
+    sender_number: NotRequired[str | None]
+    participants: NotRequired[list[str] | None]
+    is_group: NotRequired[bool]
     content: str | None
     message_type: IMessageTypeWire
     service: IMessageServiceWire
@@ -545,11 +547,11 @@ class IMessageWebhookReaction(TypedDict):
     """A tapback reaction on an iMessage (snake_case wire shape).
 
     ``custom_emoji`` carries the literal emoji when ``reaction`` is
-    ``"custom"``; ``None`` for the classic six.
+    ``"custom"``; ``None`` for named reactions.
     """
     id: str
     conversation_id: str
-    assignment_id: str
+    assignment_id: str | None
     target_message_id: str
     direction: IMessageDirectionWire
     reaction: IMessageReactionTypeWire
@@ -568,7 +570,7 @@ class IMessageWebhookData(TypedDict):
     lifecycle events ``imessage.sent`` / ``imessage.delivered`` /
     ``imessage.delivery_failed``) or ``reaction``
     (``imessage.reaction_received``) is populated. ``contacts`` and
-    ``agent_identities`` resolve the remote number against the assigned
+    ``agent_identities`` resolve the remote number against the conversation
     identity's visible contact book and identity graph; both are always
     present, possibly empty.
     """

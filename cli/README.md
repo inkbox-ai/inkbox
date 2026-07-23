@@ -282,38 +282,41 @@ inkbox text mark-conversation-read <conversation-key> -i <handle>  # Mark conver
 
 ### imessage
 
-iMessage over the shared Inkbox router. Recipients connect first by texting
-`connect @<handle>` to the router number; there is no cold outreach.
+iMessage over shared or dedicated service. Shared and dedicated inbound
+recipients connect first; dedicated outbound identities may initiate one-to-one
+or group conversations.
 
 ```bash
 inkbox imessage triage-number                # Router number + the command humans text to connect
 
-inkbox imessage send -i <handle>             # Send a message to a connected recipient
-  --to <number>                              #   E.164 recipient (mutually exclusive with --conversation-id)
+inkbox imessage send -i <handle>             # Send or reply
+  --to <numbers>                             #   One E.164 recipient or a comma-separated group
   --conversation-id <id>                     #   Existing conversation UUID to reply into
   --text <text>                              #   Message body
   --media-url <url>                          #   Media URL (at most one)
-  --send-style <style>                       #   Expressive send style (e.g. slam, confetti)
+  --send-style <style>                       #   Expressive style for 1:1 or group sends
 
 inkbox imessage list -i <handle>             # List messages, newest first
   --conversation-id <id>                     #   Narrow to one conversation
   --limit <n>                                #   Max results (default: 50)
   --offset <n>                               #   Pagination offset (default: 0)
   --unread-only                              #   Show only unread messages
+  --include-groups                           #   Include group messages
 
 inkbox imessage assignments -i <handle>      # List recipients currently connected to the identity
   --limit <n>                                #   Max results (default: 50)
   --offset <n>                               #   Pagination offset (default: 0)
 
 inkbox imessage conversations -i <handle>    # Conversation summaries with previews + unread counts
+  --include-groups                           #   Include group conversations
 inkbox imessage conversation <conversation-id> -i <handle>  # Read one conversation's messages
 
-inkbox imessage react <message-id> -i <handle>  # Send a tapback (replaces your previous one)
-  --reaction <kind>                          #   love, like, dislike, laugh, emphasize, question
+inkbox imessage react <message-id> -i <handle>  # React to an inbound 1:1 or group message
+  --reaction <kind>                          #   love, like, dislike, laugh, emphasize, question, eyes
   --part-index <n>                           #   Part of a multi-part message (default: 0)
 
-inkbox imessage mark-conversation-read <conversation-id> -i <handle>  # Send a read receipt
-inkbox imessage typing <conversation-id> -i <handle>                  # Show the typing bubble
+inkbox imessage mark-conversation-read <conversation-id> -i <handle>  # One-to-one only
+inkbox imessage typing <conversation-id> -i <handle>                  # One-to-one only
 
 inkbox imessage upload-media <file> -i <handle>  # Upload a file, get a sendable media URL
   --content-type <type>                      #   MIME type of the file
@@ -327,6 +330,19 @@ inkbox imessage contact-rule delete <rule-id> -i <handle>  # Delete a rule (admi
 inkbox imessage contact-rule list-all        # Org-wide rule list (admin key)
   --agent-identity-id <id>                   #   Narrow to one identity
 ```
+
+The same 13 expressive styles work on group creation and conversation-id
+replies, including sends with `--media-url`:
+
+```bash
+inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello group" --media-url https://example.com/group-photo.jpg --send-style confetti
+inkbox imessage send -i <handle> --conversation-id <group-conversation-id> --text "Follow-up" --media-url https://example.com/follow-up.jpg --send-style lasers
+```
+
+Group conversation rows expose `groupCreationStatus` as `creating`,
+`not_created`, or `ready`. A rejected initial creation stays on the same local
+conversation; send again with its conversation id to retry. Successful retry
+changes the status to `ready`.
 
 ### vault
 

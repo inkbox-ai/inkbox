@@ -445,6 +445,7 @@ export type IMessageReactionTypeWire =
   | "laugh"
   | "emphasize"
   | "question"
+  | "eyes"
   | "custom";
 
 export type IMessageSendStyleWire =
@@ -496,17 +497,18 @@ export interface IMessageMessageReactionWire {
 
 /**
  * Stored iMessage. `is_blocked` is not part of the wire body — blocked
- * messages never reach the webhook. There is no local-number field:
- * shared pool lines are hidden from agents, so the message is
- * identified by `conversation_id` and the counterparty `remote_number`
- * only.
+ * messages never reach the webhook. Group messages have no assignment and
+ * include sender/participant fields.
  */
 export interface IMessageWebhookMessage {
   id: string;
   conversation_id: string;
-  assignment_id: string;
+  assignment_id: string | null;
   direction: IMessageDirectionWire;
-  remote_number: string;
+  remote_number: string | null;
+  sender_number?: string | null;
+  participants?: string[] | null;
+  is_group?: boolean;
   content: string | null;
   message_type: IMessageTypeWire;
   service: IMessageServiceWire;
@@ -528,12 +530,12 @@ export interface IMessageWebhookMessage {
 /**
  * A tapback reaction on an iMessage (snake_case wire shape).
  * `custom_emoji` carries the literal emoji when `reaction` is
- * `"custom"`; `null` for the classic six.
+ * `"custom"`; `null` for named reactions.
  */
 export interface IMessageWebhookReaction {
   id: string;
   conversation_id: string;
-  assignment_id: string;
+  assignment_id: string | null;
   target_message_id: string;
   direction: IMessageDirectionWire;
   reaction: IMessageReactionTypeWire;

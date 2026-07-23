@@ -387,7 +387,7 @@ await inkbox.texts.update(phone.id, "text-uuid", { status: "deleted" });
 
 ## iMessage
 
-iMessage works differently from SMS: there is no per-identity iMessage number. Recipients connect to an agent identity through a small shared pool of numbers — they ask the triage line to connect them to `@agent_handle`, and that creates an assignment between that one recipient and the identity. Everything agent-facing is keyed by `conversationId` / `remoteNumber`; the shared local number is never exposed, and there is **no cold outreach** — you can only message recipients who connected first.
+iMessage can use shared service or an organization-owned dedicated number. Shared service and dedicated inbound require the recipient to message first; dedicated outbound can initiate one-to-one and group conversations, subject to server-side policy checks.
 
 Discover the router (triage) line at runtime — it can change, so never hardcode it:
 
@@ -411,23 +411,42 @@ console.log(identity.imessageEnabled, identity.imessageFilterMode);
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agentIdentityId` / `isBlocked` filters):
 
 ```typescript
+import { IMessageSendStyle } from "@inkbox/sdk";
+
 // Send to a connected recipient, or reply into a conversation by UUID.
 const sent = await identity.sendIMessage({ to: "+15551234567", text: "Hello over iMessage" });
-const reply = await identity.sendIMessage({
-  conversationId: sent.conversationId,
-  text: "With style",
-  sendStyle: "slam",            // IMessageSendStyle: confetti, lasers, slam, ...
+const outboundIdentity = await inkbox.createIdentity("outbound-agent", {
+  imessageEnabled: true,
+  imessageNumberType: "dedicated_outbound",
+});
+const group = await outboundIdentity.sendIMessage({
+  to: ["+15551234567", "+15557654321"],
+  text: "Hello group",
+  mediaUrls: ["https://example.com/group-photo.jpg"],
+  sendStyle: IMessageSendStyle.CONFETTI,
+}); // dedicated outbound only; 2–8 distinct recipients
+const groupReply = await outboundIdentity.sendIMessage({
+  conversationId: group.conversationId,
+  text: "Group follow-up",
+  mediaUrls: ["https://example.com/follow-up.jpg"],
+  sendStyle: IMessageSendStyle.LASERS,
 });
 console.log(sent.service, sent.status);  // "imessage", "queued"
 
 // List messages / conversations
-const msgs = await identity.listIMessages({ limit: 20, isRead: false });
-const convos = await identity.listIMessageConversations({ limit: 20 });
+const msgs = await identity.listIMessages({ limit: 20, isRead: false, includeGroups: true });
+const convos = await identity.listIMessageConversations({ limit: 20, includeGroups: true });
 const convo = await identity.getIMessageConversation(sent.conversationId);
 // assignmentStatus tells you whether the recipient is still connected:
 // anything other than "active" means sends/reactions will be refused
 // until they reconnect through triage.
 console.log(convo.assignmentStatus);
+// Group rows have nullable assignment/remote fields and a best-known participant
+// snapshot. groupCreationStatus is "creating", "not_created", or "ready". A
+// rejected initial creation keeps the same conversation; send again by
+// conversationId to retry, and success changes it to "ready".
+// Group creation and conversationId replies accept the same 13
+// IMessageSendStyle values as one-to-one sends, with or without the media URL.
 
 // Who is actively connected to this identity right now (paginated)?
 const connections = await identity.listIMessageAssignments({ limit: 20 });
@@ -435,9 +454,10 @@ for (const a of connections) {
   console.log(a.remoteNumber, a.status, a.createdAt);
 }
 
-// Tapback reactions. Sends accept the classic six (love, like, dislike,
-// laugh, emphasize, question); inbound can also be "custom" with the
-// literal emoji in customEmoji.
+// Tapbacks target inbound one-to-one or group messages by messageId. Sends
+// accept seven named reactions (love, like, dislike, laugh, emphasize,
+// question, eyes); inbound can also be "custom" with the literal emoji in
+// customEmoji. Arbitrary custom emoji are not sendable.
 await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 
 // Live tapbacks come back on message reads, oldest first.
@@ -445,7 +465,7 @@ for (const r of msgs[0].reactions ?? []) {
   console.log(r.direction, r.reaction, r.customEmoji);
 }
 
-// Read receipts + typing indicator
+// Read receipts + typing indicator are one-to-one only; groups return 409.
 await identity.markIMessageConversationRead(sent.conversationId);
 await identity.sendIMessageTyping(sent.conversationId);
 

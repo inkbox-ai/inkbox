@@ -6,6 +6,7 @@ import { IMessageContactRulesResource } from "../src/imessage/resources/contactR
 import {
   IMessageAssignmentStatus,
   IMessageDeliveryStatus,
+  IMessageGroupCreationStatus,
   IMessageNumberStatus,
   IMessageNumberType,
   IMessageReactionType,
@@ -23,6 +24,7 @@ const MSG_ID = "dddd4444-0000-0000-0000-000000000001";
 const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
 const RULE_ID = "ffff6666-0000-0000-0000-000000000001";
 const REMOTE = "+15551234567";
+const GROUP_REMOTE = "+15557654321";
 const HANDLE = "support-bot";
 const NUMBER_ID = "99999999-0000-0000-0000-000000000001";
 
@@ -63,6 +65,19 @@ const IMESSAGE_DICT = {
   updated_at: "2026-06-01T00:00:00Z",
 };
 
+const GROUP_IMESSAGE_DICT = {
+  ...IMESSAGE_DICT,
+  assignment_id: null,
+  remote_number: null,
+  sender_number: REMOTE,
+  participants: [REMOTE, GROUP_REMOTE],
+  is_group: true,
+  recipients: [
+    { remote_number: REMOTE, delivery_status: "queued", service: "imessage" },
+    { remote_number: GROUP_REMOTE, delivery_status: "queued", service: "imessage" },
+  ],
+};
+
 const CONVERSATION_DICT = {
   id: CONVO_ID,
   assignment_id: "bbbb2222-0000-0000-0000-000000000001",
@@ -81,6 +96,16 @@ const CONVERSATION_SUMMARY_DICT = {
   total_count: 5,
 };
 
+const GROUP_CONVERSATION_DICT = {
+  ...CONVERSATION_DICT,
+  assignment_id: null,
+  assignment_status: null,
+  remote_number: null,
+  participants: [REMOTE, GROUP_REMOTE],
+  is_group: true,
+  group_creation_status: "creating",
+};
+
 const REACTION_DICT = {
   id: "aaaa7777-0000-0000-0000-000000000001",
   conversation_id: CONVO_ID,
@@ -92,6 +117,12 @@ const REACTION_DICT = {
   part_index: 0,
   created_at: "2026-06-01T00:00:00Z",
   updated_at: "2026-06-01T00:00:00Z",
+};
+
+const GROUP_REACTION_DICT = {
+  ...REACTION_DICT,
+  assignment_id: null,
+  reaction: "eyes",
 };
 
 const CONTACT_RULE_DICT = {
@@ -142,13 +173,14 @@ describe("IMessagesResource", () => {
     vi.restoreAllMocks();
   });
 
-  it("send posts the wire body and identity query param", async () => {
+  it("send posts style and media by conversation id", async () => {
     vi.mocked(fetch).mockResolvedValue(ok({ message: IMESSAGE_DICT }));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
 
     const msg = await resource.send({
       conversationId: CONVO_ID,
       text: "Hi",
+      mediaUrls: ["https://media.example/reply.jpg"],
       sendStyle: IMessageSendStyle.SLAM,
       agentIdentityId: IDENTITY_ID,
     });
@@ -158,6 +190,7 @@ describe("IMessagesResource", () => {
     expect(JSON.parse(init.body as string)).toEqual({
       conversation_id: CONVO_ID,
       text: "Hi",
+      media_urls: ["https://media.example/reply.jpg"],
       send_style: "slam",
     });
     expect(msg.id).toBe(MSG_ID);
@@ -264,6 +297,37 @@ describe("IMessagesResource", () => {
     });
   });
 
+  it("send serializes group recipients with style and media", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok({
+      message: { ...GROUP_IMESSAGE_DICT, send_style: "confetti" },
+    }));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const message = await resource.send({
+      to: [REMOTE, GROUP_REMOTE],
+      text: "Hello group",
+      mediaUrls: ["https://media.example/group.jpg"],
+      sendStyle: IMessageSendStyle.CONFETTI,
+      agentIdentityId: IDENTITY_ID,
+    });
+
+    const { url, init } = lastCall();
+    expect(url).toBe(`${BASE}/messages?agent_identity_id=${IDENTITY_ID}`);
+    expect(JSON.parse(init.body as string)).toEqual({
+      to: [REMOTE, GROUP_REMOTE],
+      text: "Hello group",
+      media_urls: ["https://media.example/group.jpg"],
+      send_style: "confetti",
+    });
+    expect(message.assignmentId).toBeNull();
+    expect(message.remoteNumber).toBeNull();
+    expect(message.senderNumber).toBe(REMOTE);
+    expect(message.participants).toEqual([REMOTE, GROUP_REMOTE]);
+    expect(message.isGroup).toBe(true);
+    expect(message.sendStyle).toBe(IMessageSendStyle.CONFETTI);
+    expect(message.recipients).toHaveLength(2);
+  });
+
   it("list passes filters as snake_case query params", async () => {
     vi.mocked(fetch).mockResolvedValue(ok([IMESSAGE_DICT]));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
@@ -287,6 +351,17 @@ describe("IMessagesResource", () => {
     expect(msgs[0].conversationId).toBe(CONVO_ID);
   });
 
+  it("list opts into groups explicitly", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok([GROUP_IMESSAGE_DICT]));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const messages = await resource.list({ includeGroups: true });
+
+    const params = new URL(lastCall().url).searchParams;
+    expect(params.get("include_groups")).toBe("true");
+    expect(messages[0].isGroup).toBe(true);
+  });
+
   it("listConversations parses summaries", async () => {
     vi.mocked(fetch).mockResolvedValue(ok([CONVERSATION_SUMMARY_DICT]));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
@@ -299,6 +374,26 @@ describe("IMessagesResource", () => {
     expect(convos[0].unreadCount).toBe(2);
     expect(convos[0].totalCount).toBe(5);
     expect(convos[0].latestMessageAt).toBeInstanceOf(Date);
+    expect(convos[0].groupCreationStatus).toBeNull();
+  });
+
+  it("listConversations parses group summaries with nullable assignments", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok([{
+      ...CONVERSATION_SUMMARY_DICT,
+      ...GROUP_CONVERSATION_DICT,
+    }]));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const conversations = await resource.listConversations({ includeGroups: true });
+
+    const params = new URL(lastCall().url).searchParams;
+    expect(params.get("include_groups")).toBe("true");
+    expect(conversations[0].assignmentId).toBeNull();
+    expect(conversations[0].assignmentStatus).toBeNull();
+    expect(conversations[0].remoteNumber).toBeNull();
+    expect(conversations[0].participants).toEqual([REMOTE, GROUP_REMOTE]);
+    expect(conversations[0].isGroup).toBe(true);
+    expect(conversations[0].groupCreationStatus).toBe(IMessageGroupCreationStatus.CREATING);
   });
 
   it("getConversation passes the identity assertion", async () => {
@@ -315,6 +410,18 @@ describe("IMessagesResource", () => {
     );
     expect(convo.id).toBe(CONVO_ID);
     expect(convo.assignmentId).toBe(CONVERSATION_DICT.assignment_id);
+  });
+
+  it("getConversation returns a group without list opt-in", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok(GROUP_CONVERSATION_DICT));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const conversation = await resource.getConversation(CONVO_ID);
+
+    expect(lastCall().url).toBe(`${BASE}/conversations/${CONVO_ID}`);
+    expect(conversation.isGroup).toBe(true);
+    expect(conversation.assignmentId).toBeNull();
+    expect(conversation.groupCreationStatus).toBe(IMessageGroupCreationStatus.CREATING);
   });
 
   it("sendReaction posts the tapback body", async () => {
@@ -336,6 +443,38 @@ describe("IMessagesResource", () => {
     expect(reaction.reaction).toBe(IMessageReactionType.LIKE);
     expect(reaction.targetMessageId).toBe(MSG_ID);
   });
+
+  it("sendReaction supports an inbound group target without changing the request", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok(GROUP_REACTION_DICT));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    const reaction = await resource.sendReaction({
+      messageId: MSG_ID,
+      reaction: IMessageReactionType.EYES,
+      partIndex: 1,
+    });
+
+    const { url, init } = lastCall();
+    expect(url).toBe(`${BASE}/reactions`);
+    expect(JSON.parse(init.body as string)).toEqual({
+      message_id: MSG_ID,
+      reaction: "eyes",
+      part_index: 1,
+    });
+    expect(reaction.assignmentId).toBeNull();
+    expect(reaction.reaction).toBe(IMessageReactionType.EYES);
+  });
+
+  it.each([IMessageReactionType.CUSTOM, "\u{1F440}"])(
+    "sendReaction rejects inbound-only or arbitrary reaction %s before sending",
+    async (reaction) => {
+      const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+      await expect(resource.sendReaction({ messageId: MSG_ID, reaction }))
+        .rejects.toThrow("reaction must be one of");
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
 
   it("markConversationRead returns the updated count", async () => {
     vi.mocked(fetch).mockResolvedValue(
@@ -392,6 +531,9 @@ describe("parseIMessage", () => {
     const msg = parseIMessage(IMESSAGE_DICT);
 
     expect(msg.remoteNumber).toBe(REMOTE);
+    expect(msg.senderNumber).toBeNull();
+    expect(msg.participants).toBeNull();
+    expect(msg.isGroup).toBe(false);
     expect(msg.messageType).toBe("message");
     expect(msg.sendStyle).toBe(IMessageSendStyle.SLAM);
     expect(msg.wasDowngraded).toBe(false);

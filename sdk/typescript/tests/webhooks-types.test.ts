@@ -339,6 +339,50 @@ describe("WebhookContext", () => {
     };
     expect(imessagePayload.data.context?.texts?.mode).toBe("window");
     expect(imessagePayload.data.contacts[0].memories).toStrictEqual(["Prefers iMessage."]);
+
+    const groupPayload: IMessageWebhookPayload = {
+      ...imessagePayload,
+      id: "evt_context_imessage_group",
+      data: {
+        ...imessagePayload.data,
+        message: {
+          ...imessagePayload.data.message!,
+          assignment_id: null,
+          remote_number: "+15551234567",
+          sender_number: "+15551234567",
+          participants: ["+15551234567", "+15557654321"],
+          is_group: true,
+        },
+      },
+    };
+    expect(groupPayload.data.message?.assignment_id).toBeNull();
+    expect(groupPayload.data.message?.participants).toHaveLength(2);
+
+    const groupReactionPayload: IMessageWebhookPayload = {
+      id: "evt_context_imessage_group_reaction",
+      event_type: "imessage.reaction_received",
+      timestamp: "2026-07-04T00:05:00Z",
+      data: {
+        message: null,
+        reaction: {
+          id: "reaction_1",
+          conversation_id: "conv_1",
+          assignment_id: null,
+          target_message_id: "imsg_1",
+          direction: "inbound",
+          reaction: "eyes",
+          custom_emoji: null,
+          remote_number: "+15551234567",
+          part_index: 0,
+          created_at: "2026-07-04T00:05:00Z",
+          updated_at: "2026-07-04T00:05:00Z",
+        },
+        contacts: [],
+        agent_identities: [],
+      },
+    };
+    expect(groupReactionPayload.data.reaction?.assignment_id).toBeNull();
+    expect(groupReactionPayload.data.reaction?.reaction).toBe("eyes");
   });
 });
 

@@ -4,9 +4,10 @@ inkbox/imessage/resources/imessages.py
 iMessage operations: send, list, conversations, reactions, read
 receipts, typing indicators, media upload.
 
-iMessage messaging operations are identity/assignment-scoped, so they key off
+iMessage messaging operations are identity-scoped, so they key off
 ``conversation_id`` / ``agent_identity_id`` rather than a local number ID.
-This resource also lists and claims organization-owned dedicated numbers.
+One-to-one conversations may carry assignment state; groups require a dedicated
+outbound number. This resource also lists and claims dedicated numbers.
 """
 
 from __future__ import annotations
@@ -33,6 +34,25 @@ from inkbox.imessage.types import (
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
+
+
+_SENDABLE_REACTIONS = (
+    "love",
+    "like",
+    "dislike",
+    "laugh",
+    "emphasize",
+    "question",
+    "eyes",
+)
+
+
+def _sendable_reaction_value(reaction: IMessageReactionType | str) -> str:
+    value = reaction.value if isinstance(reaction, IMessageReactionType) else reaction
+    if value not in _SENDABLE_REACTIONS:
+        allowed = ", ".join(_SENDABLE_REACTIONS)
+        raise ValueError(f"reaction must be one of: {allowed}")
+    return value
 
 
 class IMessagesResource:
@@ -96,7 +116,7 @@ class IMessagesResource:
     def send(
         self,
         *,
-        to: str | None = None,
+        to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
         text: str | None = None,
         media_urls: list[str] | None = None,
@@ -110,15 +130,18 @@ class IMessagesResource:
         conversation, subject to server-side policy checks.
 
         Args:
-            to: E.164 recipient number. Mutually exclusive with
-                ``conversation_id``.
+            to: One E.164 recipient or 1–8 distinct recipients. Two or more
+                recipients select or create a dedicated-outbound group.
+                Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
             text: Message body.
             media_urls: Media URLs (at most one). Pass with ``text`` or
                 by themselves. Use :meth:`upload_media` to turn raw
                 bytes into a sendable URL first.
-            send_style: Optional expressive send style
-                (see ``IMessageSendStyle``).
+            send_style: Optional expressive send style (see
+                ``IMessageSendStyle``). The same styles work for one-to-one
+                sends, new groups, and replies by group ``conversation_id``;
+                they may be combined with the single supported media URL.
             agent_identity_id: Identity to send as. Required for
                 org-wide API keys when sending by ``to``; ignored for
                 identity-scoped keys (the key's identity wins).
@@ -170,6 +193,7 @@ class IMessagesResource:
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -190,6 +214,9 @@ class IMessagesResource:
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            include_groups: Include group messages. Defaults to ``False`` for
+                backwards-compatible one-to-one listings. A specific
+                ``conversation_id`` is returned even when this is ``False``.
             start_datetime: Inclusive lower bound on ``created_at`` (str). Bare
                 dates resolve to the start of that day; naive datetimes are
                 interpreted in ``tz``; zoned datetimes are exact instants.
@@ -208,6 +235,8 @@ class IMessagesResource:
             params["is_read"] = is_read
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if include_groups:
+            params["include_groups"] = True
         if start_datetime is not None:
             params["start_datetime"] = start_datetime
         if end_datetime is not None:
@@ -248,6 +277,7 @@ class IMessagesResource:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -262,6 +292,7 @@ class IMessagesResource:
             is_blocked: Tri-state filter applied to the underlying
                 messages — ``True`` for only blocked, ``False`` for only
                 non-blocked, ``None`` for all.
+            include_groups: Include group conversations. Defaults to ``False``.
             start_datetime: Inclusive lower bound on ``created_at`` (str). Bare
                 dates resolve to the start of that day; naive datetimes are
                 interpreted in ``tz``; zoned datetimes are exact instants.
@@ -276,6 +307,8 @@ class IMessagesResource:
             params["agent_identity_id"] = str(agent_identity_id)
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if include_groups:
+            params["include_groups"] = True
         if start_datetime is not None:
             params["start_datetime"] = start_datetime
         if end_datetime is not None:
@@ -311,19 +344,22 @@ class IMessagesResource:
         reaction: IMessageReactionType | str,
         part_index: int = 0,
     ) -> IMessageReaction:
-        """Send a tapback reaction to a message.
+        """Send a tapback reaction to an inbound one-to-one or group message.
 
         Args:
             message_id: UUID of the message being reacted to.
-            reaction: Tapback kind. Sends accept the classic six;
-                ``custom`` is inbound-only and rejected with 422.
+            reaction: Tapback kind. Sends accept ``love``, ``like``,
+                ``dislike``, ``laugh``, ``emphasize``, ``question``, and
+                ``eyes``. ``custom`` is inbound-only and rejected locally.
             part_index: Part of a multi-part message to react to.
+
+        Raises:
+            ValueError: If ``reaction`` is custom or not one of the seven
+                provider-supported named tapbacks.
         """
         body: dict[str, Any] = {
             "message_id": str(message_id),
-            "reaction": (
-                reaction.value if isinstance(reaction, IMessageReactionType) else reaction
-            ),
+            "reaction": _sendable_reaction_value(reaction),
             "part_index": part_index,
         }
         data = self._http.post("/reactions", json=body)
@@ -333,7 +369,9 @@ class IMessagesResource:
         self,
         conversation_id: UUID | str,
     ) -> IMessageMarkReadResult:
-        """Send a read receipt and mark inbound messages read locally.
+        """Send a one-to-one read receipt and mark inbound messages read locally.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.
@@ -348,7 +386,9 @@ class IMessagesResource:
         return IMessageMarkReadResult._from_dict(data)
 
     def send_typing(self, conversation_id: UUID | str) -> None:
-        """Show a typing indicator to the conversation's recipient.
+        """Show a typing indicator to a one-to-one recipient.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.

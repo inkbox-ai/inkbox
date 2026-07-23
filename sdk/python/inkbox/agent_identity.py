@@ -1031,7 +1031,7 @@ class AgentIdentity:
     def send_imessage(
         self,
         *,
-        to: str | None = None,
+        to: str | list[str] | None = None,
         conversation_id: UUID | str | None = None,
         text: str | None = None,
         media_urls: list[str] | None = None,
@@ -1044,14 +1044,17 @@ class AgentIdentity:
         server-side policy checks.
 
         Args:
-            to: E.164 recipient number. Mutually exclusive with
-                ``conversation_id``.
+            to: One E.164 recipient or 1–8 distinct recipients. Two or more
+                recipients select or create a dedicated-outbound group.
+                Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
             text: Message body.
             media_urls: Media URLs (at most one). Use
                 :meth:`upload_imessage_media` to create one from bytes.
-            send_style: Optional expressive send style
-                (see ``IMessageSendStyle``).
+            send_style: Optional expressive send style (see
+                ``IMessageSendStyle``). The same styles work for one-to-one
+                sends, new groups, and replies by group ``conversation_id``;
+                they may be combined with the single supported media URL.
 
         Raises:
             InkboxError: when this identity is not iMessage-enabled.
@@ -1076,6 +1079,7 @@ class AgentIdentity:
         offset: int = 0,
         is_read: bool | None = None,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -1092,6 +1096,7 @@ class AgentIdentity:
             is_read: Filter by read state (``True``, ``False``, or ``None`` for all).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            include_groups: Include group messages. Defaults to ``False``.
             start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
                 leaves the side open. UTC unless ``tz`` is set.
             end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
@@ -1106,6 +1111,7 @@ class AgentIdentity:
             offset=offset,
             is_read=is_read,
             is_blocked=is_blocked,
+            include_groups=include_groups,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,
@@ -1136,6 +1142,7 @@ class AgentIdentity:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        include_groups: bool = False,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -1148,6 +1155,7 @@ class AgentIdentity:
             is_blocked: Tri-state filter applied to the underlying
                 messages — ``True`` for only blocked, ``False`` for only
                 non-blocked, ``None`` for all.
+            include_groups: Include group conversations. Defaults to ``False``.
             start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
                 leaves the side open. UTC unless ``tz`` is set.
             end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
@@ -1160,6 +1168,7 @@ class AgentIdentity:
             limit=limit,
             offset=offset,
             is_blocked=is_blocked,
+            include_groups=include_groups,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,
@@ -1186,8 +1195,7 @@ class AgentIdentity:
         reaction: IMessageReactionType | str,
         part_index: int = 0,
     ) -> IMessageReaction:
-        """Send a tapback reaction to a message in one of this
-        identity's conversations.
+        """React to an inbound one-to-one or group message owned by this identity.
 
         Args:
             message_id: UUID of the message being reacted to.
@@ -1204,8 +1212,9 @@ class AgentIdentity:
     def mark_imessage_conversation_read(
         self, conversation_id: UUID | str
     ) -> IMessageMarkReadResult:
-        """Send a read receipt and mark a conversation's inbound
-        messages read.
+        """Send a one-to-one read receipt and mark inbound messages read.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.
@@ -1214,7 +1223,9 @@ class AgentIdentity:
         return self._inkbox._imessages.mark_conversation_read(conversation_id)
 
     def send_imessage_typing(self, conversation_id: UUID | str) -> None:
-        """Show a typing indicator to a conversation's recipient.
+        """Show a typing indicator to a one-to-one recipient.
+
+        Group conversations are unsupported and return 409.
 
         Args:
             conversation_id: UUID of the conversation.

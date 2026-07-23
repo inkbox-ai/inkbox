@@ -1,9 +1,20 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { Command } from "commander";
+import { Command, Option } from "commander";
+import type { AgentIdentity } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
+
+export const IMESSAGE_SENDABLE_REACTIONS = [
+  "love",
+  "like",
+  "dislike",
+  "laugh",
+  "emphasize",
+  "question",
+  "eyes",
+] as const;
 
 const IMESSAGE_LIST_COLUMNS = [
   "id",
@@ -16,6 +27,45 @@ const IMESSAGE_LIST_COLUMNS = [
   "createdAt",
 ];
 
+const IMESSAGE_GROUP_LIST_COLUMNS = [
+  "id",
+  "direction",
+  "conversationId",
+  "remoteNumber",
+  "senderNumber",
+  "participants",
+  "isGroup",
+  "service",
+  "content",
+  "isRead",
+  "createdAt",
+];
+
+const IMESSAGE_CONVERSATION_COLUMNS = [
+  "id",
+  "remoteNumber",
+  "latestText",
+  "latestDirection",
+  "latestHasMedia",
+  "unreadCount",
+  "totalCount",
+  "latestMessageAt",
+];
+
+const IMESSAGE_GROUP_CONVERSATION_COLUMNS = [
+  "id",
+  "remoteNumber",
+  "participants",
+  "isGroup",
+  "groupCreationStatus",
+  "latestText",
+  "latestDirection",
+  "latestHasMedia",
+  "unreadCount",
+  "totalCount",
+  "latestMessageAt",
+];
+
 const CONTACT_RULE_COLUMNS = [
   "id",
   "agentIdentityId",
@@ -25,6 +75,44 @@ const CONTACT_RULE_COLUMNS = [
   "status",
   "createdAt",
 ];
+
+type SendIMessageOptions = Parameters<AgentIdentity["sendIMessage"]>[0];
+
+export interface IMessageSendCommandOptions {
+  identity: string;
+  to?: string;
+  conversationId?: string;
+  text?: string;
+  mediaUrl?: string;
+  sendStyle?: string;
+}
+
+export function buildIMessageSendOptions(
+  cmdOpts: IMessageSendCommandOptions,
+): { sendOptions: SendIMessageOptions } | { error: string } {
+  const recipients = (cmdOpts.to ?? "")
+    .split(",")
+    .map((recipient) => recipient.trim())
+    .filter(Boolean);
+  if (recipients.length > 0 && cmdOpts.conversationId) {
+    return { error: "Pass either --to or --conversation-id, not both." };
+  }
+  if (recipients.length === 0 && !cmdOpts.conversationId) {
+    return { error: "Pass --to or --conversation-id." };
+  }
+  if (!cmdOpts.text && !cmdOpts.mediaUrl) {
+    return { error: "Pass --text, --media-url, or both." };
+  }
+  const sendOptions: SendIMessageOptions = {};
+  if (recipients.length > 0) {
+    sendOptions.to = recipients.length === 1 ? recipients[0] : recipients;
+  }
+  if (cmdOpts.conversationId) sendOptions.conversationId = cmdOpts.conversationId;
+  if (cmdOpts.text) sendOptions.text = cmdOpts.text;
+  if (cmdOpts.mediaUrl) sendOptions.mediaUrls = [cmdOpts.mediaUrl];
+  if (cmdOpts.sendStyle) sendOptions.sendStyle = cmdOpts.sendStyle;
+  return { sendOptions };
+}
 
 function registerContactRuleCommands(parent: Command): void {
   const rule = parent
@@ -160,7 +248,7 @@ function registerContactRuleCommands(parent: Command): void {
 export function registerIMessageCommands(program: Command): void {
   const imessage = program
     .command("imessage")
-    .description("iMessage operations over shared pool numbers (identity-scoped)");
+    .description("iMessage operations (identity-scoped)");
 
   imessage
     .command("triage-number")
@@ -182,16 +270,16 @@ export function registerIMessageCommands(program: Command): void {
 
   imessage
     .command("send")
-    .description(
-      "Send an iMessage through an existing triage assignment. " +
-        "The identity must be iMessage-enabled and already connected to the recipient.",
-    )
+    .description("Send an iMessage or reply to an existing conversation")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
-    .option("--to <number>", "E.164 recipient number")
+    .option("--to <numbers>", "One E.164 recipient or a comma-separated group")
     .option("--conversation-id <id>", "Existing conversation UUID to reply into")
     .option("--text <text>", "Message body")
     .option("--media-url <url>", "Media URL (at most one)")
-    .option("--send-style <style>", "Expressive send style (e.g. slam, confetti)")
+    .option(
+      "--send-style <style>",
+      "Expressive style for one-to-one or group sends (e.g. slam, confetti)",
+    )
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -204,34 +292,24 @@ export function registerIMessageCommands(program: Command): void {
           sendStyle?: string;
         },
       ) {
-        if (cmdOpts.to && cmdOpts.conversationId) {
-          console.error("Pass either --to or --conversation-id, not both.");
-          process.exit(1);
-        }
-        if (!cmdOpts.to && !cmdOpts.conversationId) {
-          console.error("Pass --to or --conversation-id.");
-          process.exit(1);
-        }
-        if (!cmdOpts.text && !cmdOpts.mediaUrl) {
-          console.error("Pass --text, --media-url, or both.");
+        const sendResult = buildIMessageSendOptions(cmdOpts);
+        if ("error" in sendResult) {
+          console.error(sendResult.error);
           process.exit(1);
         }
 
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
-        const msg = await identity.sendIMessage({
-          to: cmdOpts.to,
-          conversationId: cmdOpts.conversationId,
-          text: cmdOpts.text,
-          mediaUrls: cmdOpts.mediaUrl ? [cmdOpts.mediaUrl] : undefined,
-          sendStyle: cmdOpts.sendStyle,
-        });
+        const msg = await identity.sendIMessage(sendResult.sendOptions);
         output(
           {
             id: msg.id,
             direction: msg.direction,
             remote: msg.remoteNumber,
+            sender: msg.senderNumber,
+            participants: msg.participants,
+            isGroup: msg.isGroup,
             conversationId: msg.conversationId,
             service: msg.service,
             content: msg.content,
@@ -251,6 +329,7 @@ export function registerIMessageCommands(program: Command): void {
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .option("--unread-only", "Show only unread messages")
+    .option("--include-groups", "Include group messages")
     .option("--start-datetime <date>", "Only messages with created_at >= this date/instant")
     .option("--end-datetime <date>", "Only messages with created_at <= this date (bare date is whole-day inclusive)")
     .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
@@ -263,6 +342,7 @@ export function registerIMessageCommands(program: Command): void {
           limit: string;
           offset: string;
           unreadOnly?: boolean;
+          includeGroups?: boolean;
           startDatetime?: string;
           endDatetime?: string;
           tz?: string;
@@ -276,11 +356,17 @@ export function registerIMessageCommands(program: Command): void {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
           isRead: cmdOpts.unreadOnly ? false : undefined,
+          includeGroups: cmdOpts.includeGroups,
           startDatetime: cmdOpts.startDatetime,
           endDatetime: cmdOpts.endDatetime,
           tz: cmdOpts.tz,
         });
-        output(msgs, { json: !!opts.json, columns: IMESSAGE_LIST_COLUMNS });
+        output(msgs, {
+          json: !!opts.json,
+          columns: cmdOpts.includeGroups || msgs.some((message) => message.isGroup)
+            ? IMESSAGE_GROUP_LIST_COLUMNS
+            : IMESSAGE_LIST_COLUMNS,
+        });
       }),
     );
 
@@ -315,6 +401,7 @@ export function registerIMessageCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--include-groups", "Include group conversations")
     .option("--start-datetime <date>", "Only conversations with created_at >= this date/instant")
     .option("--end-datetime <date>", "Only conversations with created_at <= this date (bare date is whole-day inclusive)")
     .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
@@ -325,6 +412,7 @@ export function registerIMessageCommands(program: Command): void {
           identity: string;
           limit: string;
           offset: string;
+          includeGroups?: boolean;
           startDatetime?: string;
           endDatetime?: string;
           tz?: string;
@@ -336,22 +424,16 @@ export function registerIMessageCommands(program: Command): void {
         const convos = await identity.listIMessageConversations({
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
+          includeGroups: cmdOpts.includeGroups,
           startDatetime: cmdOpts.startDatetime,
           endDatetime: cmdOpts.endDatetime,
           tz: cmdOpts.tz,
         });
         output(convos, {
           json: !!opts.json,
-          columns: [
-            "id",
-            "remoteNumber",
-            "latestText",
-            "latestDirection",
-            "latestHasMedia",
-            "unreadCount",
-            "totalCount",
-            "latestMessageAt",
-          ],
+          columns: cmdOpts.includeGroups || convos.some((conversation) => conversation.isGroup)
+            ? IMESSAGE_GROUP_CONVERSATION_COLUMNS
+            : IMESSAGE_CONVERSATION_COLUMNS,
         });
       }),
     );
@@ -376,17 +458,26 @@ export function registerIMessageCommands(program: Command): void {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
-        output(msgs, { json: !!opts.json, columns: IMESSAGE_LIST_COLUMNS });
+        output(msgs, {
+          json: !!opts.json,
+          columns: msgs.some((message) => message.isGroup)
+            ? IMESSAGE_GROUP_LIST_COLUMNS
+            : IMESSAGE_LIST_COLUMNS,
+        });
       }),
     );
 
   imessage
     .command("react <message-id>")
-    .description("Send a tapback reaction to a message")
+    .description("React to an inbound one-to-one or group message")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
-    .requiredOption(
-      "--reaction <kind>",
-      "Tapback kind: love, like, dislike, laugh, emphasize, question",
+    .addOption(
+      new Option(
+        "--reaction <kind>",
+        `Tapback kind: ${IMESSAGE_SENDABLE_REACTIONS.join(", ")}`,
+      )
+        .choices([...IMESSAGE_SENDABLE_REACTIONS])
+        .makeOptionMandatory(),
     )
     .option("--part-index <n>", "Part of a multi-part message to react to", "0")
     .action(
@@ -406,6 +497,7 @@ export function registerIMessageCommands(program: Command): void {
         output(
           {
             id: reaction.id,
+            assignmentId: reaction.assignmentId,
             reaction: reaction.reaction,
             targetMessageId: reaction.targetMessageId,
             conversationId: reaction.conversationId,
@@ -418,7 +510,7 @@ export function registerIMessageCommands(program: Command): void {
 
   imessage
     .command("mark-conversation-read <conversation-id>")
-    .description("Send a read receipt and mark a conversation's inbound messages read")
+    .description("Send a one-to-one read receipt and mark inbound messages read")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (
@@ -438,7 +530,7 @@ export function registerIMessageCommands(program: Command): void {
 
   imessage
     .command("typing <conversation-id>")
-    .description("Show a typing indicator to a conversation's recipient")
+    .description("Show a typing indicator to a one-to-one recipient")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (

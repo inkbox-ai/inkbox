@@ -157,6 +157,55 @@ or claim and attach a new number by type. Claims require a stable 1–255 charac
 idempotency key; reuse the same key after an ambiguous result. Dedicated outbound
 numbers are the only number type that can start a new conversation.
 
+Dedicated outbound identities can also start group conversations. Scalar sends
+remain on `send_imessage`; groups use `send_imessage_group`, and later replies
+use the returned conversation id with `send_imessage`:
+
+```rust
+use inkbox::imessage::IMessageSendStyle;
+
+let recipients = vec!["+15551234567".to_string(), "+15557654321".to_string()];
+let group_media = vec!["https://example.com/group-photo.jpg".to_string()];
+let group = identity.send_imessage_group(
+    &recipients,
+    Some("Welcome to the group!"),
+    Some(&group_media),
+    Some(IMessageSendStyle::Confetti),
+)?;
+let reply_media = vec!["https://example.com/follow-up.jpg".to_string()];
+identity.send_imessage(
+    None,
+    Some(&group.conversation_id),
+    Some("Following up in the same conversation."),
+    Some(&reply_media),
+    Some(IMessageSendStyle::Lasers),
+)?;
+
+let conversations = identity.list_imessage_conversations_with_groups(
+    50,
+    0,
+    None,
+    true,
+)?;
+println!("{:?}", conversations[0].group_creation_status);
+```
+
+Group creation and conversation-id replies accept the same 13
+`IMessageSendStyle` values as one-to-one sends, with or without the media URL.
+
+List methods exclude groups by default for backwards compatibility. Group
+messages expose `is_group`, a best-known `participants` snapshot, and
+per-recipient delivery state; assignment and one-to-one remote fields are
+optional. `group_creation_status` is `Creating`, `NotCreated`, or `Ready`. A
+rejected initial creation keeps the same local conversation at `NotCreated`;
+send again with that conversation id to retry. Success binds the remote thread
+and changes the status to `Ready`.
+
+`send_imessage_reaction` supports inbound one-to-one and group messages by
+message id. The sendable named reactions are `love`, `like`, `dislike`,
+`laugh`, `emphasize`, `question`, and `eyes`; arbitrary custom emoji remain
+inbound-only. Group read receipts and typing indicators remain unsupported.
+
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.

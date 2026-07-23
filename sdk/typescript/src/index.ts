@@ -191,6 +191,7 @@ export {
   IMessageNumberStatus,
   IMessageNumberType,
   IMessageDeliveryStatus,
+  IMessageGroupCreationStatus,
   IMessageReactionType,
   IMessageRuleAction,
   IMessageRuleMatchType,

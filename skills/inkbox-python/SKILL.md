@@ -436,39 +436,55 @@ idempotency key when retrying an ambiguous claim.
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agent_identity_id` / `is_blocked` filters):
 
 ```python
+from inkbox import IMessageSendStyle
+
 # Send to a connected recipient, or reply into a conversation by UUID.
 sent = identity.send_imessage(to="+15551234567", text="Hello over iMessage")
-reply = identity.send_imessage(
-    conversation_id=sent.conversation_id,
-    text="With style",
-    send_style="slam",          # IMessageSendStyle: confetti, lasers, slam, ...
+group = outbound_identity.send_imessage(
+    to=["+15551234567", "+15557654321"],
+    text="Hello group",
+    media_urls=["https://example.com/group-photo.jpg"],
+    send_style=IMessageSendStyle.CONFETTI,
+)  # dedicated_outbound only; 2–8 distinct recipients
+group_reply = outbound_identity.send_imessage(
+    conversation_id=group.conversation_id,
+    text="Group follow-up",
+    media_urls=["https://example.com/follow-up.jpg"],
+    send_style=IMessageSendStyle.LASERS,
 )
 print(sent.service, sent.status)  # IMessageService.IMESSAGE, IMessageDeliveryStatus.QUEUED
 
 # List messages / conversations
-msgs = identity.list_imessages(limit=20, is_read=False)
-convos = identity.list_imessage_conversations(limit=20)
+msgs = identity.list_imessages(limit=20, is_read=False, include_groups=True)
+convos = identity.list_imessage_conversations(limit=20, include_groups=True)
 convo = identity.get_imessage_conversation(sent.conversation_id)
 # assignment_status tells you whether the recipient is still connected:
 # anything other than "active" means sends/reactions will be refused
 # until they reconnect through triage.
 print(convo.assignment_status)
+# Group rows have nullable assignment/remote fields and a best-known participant
+# snapshot. group_creation_status is creating, not_created, or ready. A rejected
+# initial creation keeps the same conversation; send again by conversation_id to
+# retry, and success changes it to ready.
+# Group creation and conversation_id replies accept the same 13
+# IMessageSendStyle values as one-to-one sends, with or without the media URL.
 
 # Who is actively connected to this identity right now (paginated)?
 connections = identity.list_imessage_assignments(limit=20)
 for a in connections:
     print(a.remote_number, a.status, a.created_at)
 
-# Tapback reactions. Sends accept the classic six (love, like, dislike,
-# laugh, emphasize, question); inbound can also be "custom" with the
-# literal emoji in custom_emoji.
+# Tapbacks target inbound one-to-one or group messages by message_id. Sends
+# accept seven named reactions (love, like, dislike, laugh, emphasize,
+# question, eyes); inbound can also be "custom" with the literal emoji in
+# custom_emoji. Arbitrary custom emoji are not sendable.
 identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
 
 # Live tapbacks come back on message reads, oldest first.
 for r in msgs[0].reactions or []:
     print(r.direction, r.reaction, r.custom_emoji)
 
-# Read receipts + typing indicator
+# Read receipts + typing indicator are one-to-one only; groups return 409.
 identity.mark_imessage_conversation_read(sent.conversation_id)
 identity.send_imessage_typing(sent.conversation_id)
 

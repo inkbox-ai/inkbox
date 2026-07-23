@@ -1,8 +1,9 @@
 //! Types mirroring the Inkbox iMessage API response models.
 //!
-//! iMessage messages and conversations route by assignment and remain keyed by
-//! `conversation_id` / `remote_number`. Dedicated number ownership is exposed
-//! separately through [`IMessageNumber`].
+//! iMessage messages and conversations are keyed by `conversation_id`.
+//! One-to-one rows also expose assignment and remote-number state; dedicated-
+//! outbound groups instead expose participant snapshots. Dedicated number
+//! ownership is exposed separately through [`IMessageNumber`].
 
 use uuid::Uuid;
 
@@ -111,7 +112,7 @@ pub enum IMessageDeliveryStatus {
 /// Tapback reaction kinds.
 ///
 /// `Custom` is inbound-only: recipients can react with any emoji
-/// (carried in `custom_emoji`), but sends accept the classic six.
+/// (carried in `custom_emoji`). Sends accept the seven named reactions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IMessageReactionType {
@@ -121,6 +122,7 @@ pub enum IMessageReactionType {
     Laugh,
     Emphasize,
     Question,
+    Eyes,
     Custom,
 }
 
@@ -149,6 +151,18 @@ pub enum IMessageSendStyle {
 pub enum IMessageAssignmentStatus {
     Active,
     Released,
+}
+
+/// Lifecycle of a local group conversation's initial creation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IMessageGroupCreationStatus {
+    /// The initial remote group thread is still being created.
+    Creating,
+    /// No remote group thread is bound; the next send retries creation.
+    NotCreated,
+    /// The remote group thread is bound and ready for sends.
+    Ready,
 }
 
 /// Whether a matching remote number is allowed through or blocked.
@@ -216,6 +230,7 @@ impl IMessageReactionType {
             IMessageReactionType::Laugh => "laugh",
             IMessageReactionType::Emphasize => "emphasize",
             IMessageReactionType::Question => "question",
+            IMessageReactionType::Eyes => "eyes",
             IMessageReactionType::Custom => "custom",
         }
     }
@@ -271,18 +286,24 @@ pub struct IMessageMessageReaction {
     pub part_index: i64,
 }
 
-/// An iMessage in an assignment-routed conversation.
+/// An iMessage in a one-to-one or group conversation.
 ///
-/// Message rows do not expose their local service number, so messages are
-/// identified by `conversation_id` and the counterparty `remote_number`.
+/// Group rows have no assignment, carry a best-known participant snapshot,
+/// and expose per-recipient outbound delivery state.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessage {
     pub id: Uuid,
     pub conversation_id: Uuid,
-    pub assignment_id: Uuid,
+    pub assignment_id: Option<Uuid>,
     /// "inbound" | "outbound"
     pub direction: String,
-    pub remote_number: String,
+    pub remote_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participants: Option<Vec<String>>,
+    #[serde(default)]
+    pub is_group: bool,
     #[serde(default)]
     pub content: Option<String>,
     /// "message" | "carousel"
@@ -316,29 +337,35 @@ pub struct IMessage {
     pub reactions: Option<Vec<IMessageMessageReaction>>,
 }
 
-/// One assignment-scoped iMessage conversation.
+/// One iMessage conversation.
 ///
-/// `assignment_status` reflects the current connection: non-active
-/// means the recipient is disconnected and the agent cannot reply until
-/// they reconnect through triage.
+/// One-to-one rows expose assignment state. Group rows have no assignment and
+/// expose a best-known participant snapshot and creation lifecycle instead.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageConversation {
     pub id: Uuid,
-    pub assignment_id: Uuid,
-    pub remote_number: String,
+    pub assignment_id: Option<Uuid>,
+    pub remote_number: Option<String>,
     pub created_at: String,
     pub updated_at: String,
-    // Python defaults a missing/null `assignment_status` to "active".
-    #[serde(default = "default_assignment_status")]
-    pub assignment_status: IMessageAssignmentStatus,
+    // Missing legacy status defaults to active; explicit group null stays None.
+    #[serde(default = "default_optional_assignment_status")]
+    pub assignment_status: Option<IMessageAssignmentStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participants: Option<Vec<String>>,
+    #[serde(default)]
+    pub is_group: bool,
+    /// Group lifecycle; `None` for one-to-one conversations and older responses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_creation_status: Option<IMessageGroupCreationStatus>,
 }
 
 /// Conversation list row with latest-message preview.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageConversationSummary {
     pub id: Uuid,
-    pub assignment_id: Uuid,
-    pub remote_number: String,
+    pub assignment_id: Option<Uuid>,
+    pub remote_number: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_text: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -351,8 +378,15 @@ pub struct IMessageConversationSummary {
     pub unread_count: i64,
     #[serde(default)]
     pub total_count: i64,
-    #[serde(default = "default_assignment_status")]
-    pub assignment_status: IMessageAssignmentStatus,
+    #[serde(default = "default_optional_assignment_status")]
+    pub assignment_status: Option<IMessageAssignmentStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participants: Option<Vec<String>>,
+    #[serde(default)]
+    pub is_group: bool,
+    /// Group lifecycle; `None` for one-to-one conversations and older responses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_creation_status: Option<IMessageGroupCreationStatus>,
 }
 
 /// A tapback reaction on an iMessage.
@@ -360,7 +394,7 @@ pub struct IMessageConversationSummary {
 pub struct IMessageReaction {
     pub id: Uuid,
     pub conversation_id: Uuid,
-    pub assignment_id: Uuid,
+    pub assignment_id: Option<Uuid>,
     pub target_message_id: Uuid,
     /// "inbound" | "outbound"
     pub direction: String,
@@ -368,7 +402,7 @@ pub struct IMessageReaction {
     pub remote_number: String,
     pub created_at: String,
     pub updated_at: String,
-    /// Literal emoji when reaction is "custom"; None for the classic six.
+    /// Literal emoji when reaction is "custom"; None for named reactions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_emoji: Option<String>,
     #[serde(default)]
@@ -426,10 +460,13 @@ pub struct IMessageContactRule {
     pub updated_at: String,
 }
 
-/// Default for `assignment_status` when the server omits it (Python coalesces
-/// a missing/null value to `"active"`).
+/// Default for `assignment_status` when an older response omits it.
 fn default_assignment_status() -> IMessageAssignmentStatus {
     IMessageAssignmentStatus::Active
+}
+
+fn default_optional_assignment_status() -> Option<IMessageAssignmentStatus> {
+    Some(default_assignment_status())
 }
 
 #[cfg(test)]
@@ -437,6 +474,15 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn reaction_types_keep_named_eyes_distinct_from_inbound_custom() {
+        assert_eq!(IMessageReactionType::Eyes.as_str(), "eyes");
+        assert_eq!(
+            serde_json::from_value::<IMessageReactionType>(json!("custom")).unwrap(),
+            IMessageReactionType::Custom
+        );
+    }
 
     #[test]
     fn number_type_serializes_to_wire_value() {
@@ -480,5 +526,66 @@ mod tests {
             "status": "active"
         }));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn group_message_fields_deserialize_without_an_assignment() {
+        let message: IMessage = serde_json::from_value(json!({
+            "id": "22222222-2222-2222-2222-222222222222",
+            "conversation_id": "33333333-3333-3333-3333-333333333333",
+            "assignment_id": null,
+            "direction": "inbound",
+            "remote_number": "+15550001111",
+            "sender_number": "+15550001111",
+            "participants": ["+15550001111", "+15550002222"],
+            "is_group": true,
+            "message_type": "message",
+            "service": "imessage",
+            "is_read": false,
+            "created_at": "2026-07-22T00:00:00Z",
+            "updated_at": "2026-07-22T00:00:00Z"
+        }))
+        .unwrap();
+
+        assert!(message.is_group);
+        assert_eq!(message.assignment_id, None);
+        assert_eq!(message.remote_number.as_deref(), Some("+15550001111"));
+        assert_eq!(message.sender_number.as_deref(), Some("+15550001111"));
+        assert_eq!(message.participants.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn missing_legacy_assignment_status_stays_active_but_group_null_stays_null() {
+        let legacy: IMessageConversation = serde_json::from_value(json!({
+            "id": "33333333-3333-3333-3333-333333333333",
+            "assignment_id": "44444444-4444-4444-4444-444444444444",
+            "remote_number": "+15550001111",
+            "created_at": "2026-07-22T00:00:00Z",
+            "updated_at": "2026-07-22T00:00:00Z"
+        }))
+        .unwrap();
+        assert_eq!(
+            legacy.assignment_status,
+            Some(IMessageAssignmentStatus::Active)
+        );
+
+        let group: IMessageConversation = serde_json::from_value(json!({
+            "id": "33333333-3333-3333-3333-333333333333",
+            "assignment_id": null,
+            "assignment_status": null,
+            "remote_number": null,
+            "participants": ["+15550001111", "+15550002222"],
+            "is_group": true,
+            "group_creation_status": "not_created",
+            "created_at": "2026-07-22T00:00:00Z",
+            "updated_at": "2026-07-22T00:00:00Z"
+        }))
+        .unwrap();
+        assert_eq!(group.assignment_status, None);
+        assert!(group.is_group);
+        assert_eq!(
+            group.group_creation_status,
+            Some(IMessageGroupCreationStatus::NotCreated)
+        );
     }
 }
