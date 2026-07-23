@@ -15,6 +15,7 @@ import httpx
 from inkbox._http import HttpTransport, sdk_user_agent
 from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
+from inkbox.a2a.resource import A2AResource
 from inkbox.agent_identity import AgentIdentity
 from inkbox.api_keys.resources.api_keys import ApiKeysResource
 from inkbox.contacts.resources.contacts import ContactsResource
@@ -160,6 +161,7 @@ class Inkbox:
                 )
         _api_base = f"{base_url.rstrip('/')}/api"
         _api_root = f"{base_url.rstrip('/')}/api/v1"
+        self._base_url = base_url.rstrip("/")
         _cookie_jar = CookieJar()
         _ua = sdk_user_agent(user_agent_prefix)
 
@@ -269,6 +271,7 @@ class Inkbox:
         )
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
+        self._a2a = A2AResource(self._api_http)
 
         self._contacts = ContactsResource(self._contacts_http)
         self._notes = NotesResource(self._contacts_http)

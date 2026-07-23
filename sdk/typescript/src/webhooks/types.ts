@@ -715,3 +715,34 @@ export interface CallEndedWebhookPayload {
   timestamp: string;
   data: CallEndedWebhookData;
 }
+
+// ---- A2A task lifecycle ----------------------------------------------
+
+export type A2AWebhookEventType =
+  | "a2a.task.created"
+  | "a2a.task.message"
+  | "a2a.task.canceled"
+  | "a2a.sent_task.updated";
+
+export interface A2AWebhookCaller {
+  identity_id: string;
+  organization_id: string;
+  handle: string | null;
+  trust_tier: string;
+}
+
+export interface A2AWebhookData {
+  task_id: string;
+  context_id: string;
+  state: string;
+  caller: A2AWebhookCaller;
+  message_id: string | null;
+  parts: Record<string, unknown>[] | null;
+}
+
+export interface A2AWebhookPayload {
+  id: string;
+  event_type: A2AWebhookEventType;
+  timestamp: string;
+  data: A2AWebhookData;
+}

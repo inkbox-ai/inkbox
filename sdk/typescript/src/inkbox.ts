@@ -36,6 +36,7 @@ import { NotesResource } from "./notes/resources/notes.js";
 import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
+import { A2AResource } from "./a2a/resource.js";
 import type {
   AgentIdentitySummary,
   CreateIdentityOptions,
@@ -171,8 +172,11 @@ export class Inkbox {
   readonly _tunnels: TunnelsResource;
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
+  readonly _a2a: A2AResource;
   /** @internal — used by the tunnel-agent runtime for data-plane auth. */
   readonly _apiKey: string;
+  /** @internal — canonical platform origin used for A2A credential pinning. */
+  readonly _baseUrl: string;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
 
@@ -192,6 +196,7 @@ export class Inkbox {
     const vaultKey = resolved.vaultKey;
     this._apiKey = apiKey;
     const baseUrl = resolved.baseUrl ?? DEFAULT_BASE_URL;
+    this._baseUrl = baseUrl.replace(/\/$/, "");
     if (!baseUrl.startsWith("https://")) {
       const parsed = new URL(baseUrl);
       if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
@@ -251,6 +256,7 @@ export class Inkbox {
     this._notes = new NotesResource(apiHttp);
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
+    this._a2a = new A2AResource(apiHttp);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);

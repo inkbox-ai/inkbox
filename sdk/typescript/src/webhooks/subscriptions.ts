@@ -181,13 +181,14 @@ const EVENT_PREFIX_TO_OWNER: Array<[string, string]> = [
   ["text.", "phone_number"],
   ["imessage.", "agent_identity"],
   ["call.", "agent_identity"],
+  ["a2a.", "agent_identity"],
 ];
 
 // Owner resource → the event-type prefixes it may subscribe to.
 const OWNER_EVENT_PREFIXES: Record<string, string[]> = {
   mailbox: ["message."],
   phone_number: ["text."],
-  agent_identity: ["imessage.", "call."],
+  agent_identity: ["imessage.", "call.", "a2a."],
 };
 
 function assertChannelCoherence(
