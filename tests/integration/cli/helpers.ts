@@ -34,7 +34,7 @@ export function loadConfig(): CliIntegrationConfig {
     interserviceSecret,
     environment,
     verbose: process.env.SDK_INTEGRATION_VERBOSE === "1",
-    pollTimeoutMs: 240_000,
+    pollTimeoutMs: 600_000,
     pollIntervalMs: 5_000,
   };
 }
