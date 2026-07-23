@@ -11,6 +11,17 @@ const IMESSAGE_LIST_COLUMNS = [
   "direction",
   "conversationId",
   "remoteNumber",
+  "service",
+  "content",
+  "isRead",
+  "createdAt",
+];
+
+const IMESSAGE_GROUP_LIST_COLUMNS = [
+  "id",
+  "direction",
+  "conversationId",
+  "remoteNumber",
   "senderNumber",
   "participants",
   "isGroup",
@@ -18,6 +29,31 @@ const IMESSAGE_LIST_COLUMNS = [
   "content",
   "isRead",
   "createdAt",
+];
+
+const IMESSAGE_CONVERSATION_COLUMNS = [
+  "id",
+  "remoteNumber",
+  "latestText",
+  "latestDirection",
+  "latestHasMedia",
+  "unreadCount",
+  "totalCount",
+  "latestMessageAt",
+];
+
+const IMESSAGE_GROUP_CONVERSATION_COLUMNS = [
+  "id",
+  "remoteNumber",
+  "participants",
+  "isGroup",
+  "groupCreationStatus",
+  "latestText",
+  "latestDirection",
+  "latestHasMedia",
+  "unreadCount",
+  "totalCount",
+  "latestMessageAt",
 ];
 
 const CONTACT_RULE_COLUMNS = [
@@ -262,7 +298,7 @@ export function registerIMessageCommands(program: Command): void {
             direction: msg.direction,
             remote: msg.remoteNumber,
             sender: msg.senderNumber,
-            participants: msg.participants?.join(", "),
+            participants: msg.participants,
             isGroup: msg.isGroup,
             conversationId: msg.conversationId,
             service: msg.service,
@@ -315,7 +351,12 @@ export function registerIMessageCommands(program: Command): void {
           endDatetime: cmdOpts.endDatetime,
           tz: cmdOpts.tz,
         });
-        output(msgs, { json: !!opts.json, columns: IMESSAGE_LIST_COLUMNS });
+        output(msgs, {
+          json: !!opts.json,
+          columns: cmdOpts.includeGroups || msgs.some((message) => message.isGroup)
+            ? IMESSAGE_GROUP_LIST_COLUMNS
+            : IMESSAGE_LIST_COLUMNS,
+        });
       }),
     );
 
@@ -380,19 +421,9 @@ export function registerIMessageCommands(program: Command): void {
         });
         output(convos, {
           json: !!opts.json,
-          columns: [
-            "id",
-            "remoteNumber",
-            "participants",
-            "isGroup",
-            "groupCreationStatus",
-            "latestText",
-            "latestDirection",
-            "latestHasMedia",
-            "unreadCount",
-            "totalCount",
-            "latestMessageAt",
-          ],
+          columns: cmdOpts.includeGroups || convos.some((conversation) => conversation.isGroup)
+            ? IMESSAGE_GROUP_CONVERSATION_COLUMNS
+            : IMESSAGE_CONVERSATION_COLUMNS,
         });
       }),
     );
@@ -417,7 +448,12 @@ export function registerIMessageCommands(program: Command): void {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
-        output(msgs, { json: !!opts.json, columns: IMESSAGE_LIST_COLUMNS });
+        output(msgs, {
+          json: !!opts.json,
+          columns: msgs.some((message) => message.isGroup)
+            ? IMESSAGE_GROUP_LIST_COLUMNS
+            : IMESSAGE_LIST_COLUMNS,
+        });
       }),
     );
 
