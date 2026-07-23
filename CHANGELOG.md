@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
-## 0.5.3 — Dedicated outbound iMessage groups
+## 0.5.4 — Dedicated outbound iMessage groups
 
 ### Added
 
@@ -12,14 +12,14 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - **Group-aware reads.** Message and conversation list methods expose an explicit group opt-in while remaining one-to-one by default. Message and conversation models expose group identity, best-known participants, inbound sender attribution, and per-recipient delivery state; direct conversation lookup works without the list opt-in.
 - **Group creation lifecycle.** Conversation list and detail models expose `creating`, `not_created`, or `ready`. A rejected initial creation keeps the same local conversation, and the next send retries before binding the remote thread.
 - **Group tapbacks.** Existing message-ID reaction methods support inbound group messages. Reaction responses and webhooks allow a nullable assignment.
-- **Eyes tapback.** Outbound reactions accept the seven named values `love`, `like`, `dislike`, `laugh`, `emphasize`, `question`, and `eyes`. Arbitrary custom emoji remain inbound-only and are exposed through `custom_emoji` / `customEmoji`.
+- **Eyes tapback.** Outbound reactions accept the seven named values `love`, `like`, `dislike`, `laugh`, `emphasize`, `question`, and `eyes`. SDK methods reject `custom` and arbitrary emoji before sending; inbound custom emoji remain available through `custom_emoji` / `customEmoji`.
 - **Group expressive styles.** Group creation and conversation-id replies accept the same 13 `IMessageSendStyle` values as one-to-one sends, including sends with one media URL; the existing SDK parameters and CLI `--send-style` flag are unchanged.
 - **CLI group support.** `inkbox imessage send --to` accepts a comma-separated recipient list, and `imessage list` / `imessage conversations` accept `--include-groups`.
 - **Group-aware webhook types.** iMessage message payloads allow nullable assignment and one-to-one remote fields and expose group sender, participants, and group identity.
 
 ### Changed
 
-- Version bumped to 0.5.3 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.3`.
+- Version bumped to 0.5.4 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.4`.
 - Group creation requires a dedicated outbound number. Later sends should use the returned conversation id; exact-participant lookup returns `409` when more than one conversation matches. Group read receipts and typing indicators remain unsupported.
 - **TypeScript note (source-breaking).** iMessage message and conversation assignment/remote fields are nullable, group properties and creation status are required on parsed models, reaction assignment is nullable, and assignment status is nullable for groups. Hand-built object literals need the new fields.
 - **Rust note (source-breaking).** The corresponding public struct fields now use `Option`, conversation structs gain group properties and creation status, and reaction assignment becomes optional. Existing scalar methods keep their signatures; new suffixed list methods opt into groups.

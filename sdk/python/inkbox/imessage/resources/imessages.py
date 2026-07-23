@@ -36,6 +36,25 @@ if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 
+_SENDABLE_REACTIONS = (
+    "love",
+    "like",
+    "dislike",
+    "laugh",
+    "emphasize",
+    "question",
+    "eyes",
+)
+
+
+def _sendable_reaction_value(reaction: IMessageReactionType | str) -> str:
+    value = reaction.value if isinstance(reaction, IMessageReactionType) else reaction
+    if value not in _SENDABLE_REACTIONS:
+        allowed = ", ".join(_SENDABLE_REACTIONS)
+        raise ValueError(f"reaction must be one of: {allowed}")
+    return value
+
+
 class IMessagesResource:
 
     def __init__(self, http: HttpTransport) -> None:
@@ -331,14 +350,16 @@ class IMessagesResource:
             message_id: UUID of the message being reacted to.
             reaction: Tapback kind. Sends accept ``love``, ``like``,
                 ``dislike``, ``laugh``, ``emphasize``, ``question``, and
-                ``eyes``. ``custom`` is inbound-only and rejected with 422.
+                ``eyes``. ``custom`` is inbound-only and rejected locally.
             part_index: Part of a multi-part message to react to.
+
+        Raises:
+            ValueError: If ``reaction`` is custom or not one of the seven
+                provider-supported named tapbacks.
         """
         body: dict[str, Any] = {
             "message_id": str(message_id),
-            "reaction": (
-                reaction.value if isinstance(reaction, IMessageReactionType) else reaction
-            ),
+            "reaction": _sendable_reaction_value(reaction),
             "part_index": part_index,
         }
         data = self._http.post("/reactions", json=body)

@@ -39,6 +39,25 @@ import {
   parseIMessageTriageNumber,
 } from "../types.js";
 
+const SENDABLE_REACTIONS = new Set<string>([
+  "love",
+  "like",
+  "dislike",
+  "laugh",
+  "emphasize",
+  "question",
+  "eyes",
+]);
+
+function validateSendableReaction(reaction: IMessageReactionType | string): string {
+  if (!SENDABLE_REACTIONS.has(reaction)) {
+    throw new Error(
+      `reaction must be one of: ${[...SENDABLE_REACTIONS].join(", ")}`,
+    );
+  }
+  return reaction;
+}
+
 export class IMessagesResource {
   constructor(private readonly http: HttpTransport) {}
 
@@ -326,18 +345,21 @@ export class IMessagesResource {
    * @param options.messageId - UUID of the message being reacted to.
    * @param options.reaction - Tapback kind. Sends accept `love`, `like`,
    *   `dislike`, `laugh`, `emphasize`, `question`, and `eyes`; `custom` is
-   *   inbound-only and rejected with 422.
+   *   inbound-only and rejected locally.
    * @param options.partIndex - Part of a multi-part message to react to.
    *   Defaults to 0.
+   * @throws {Error} when `reaction` is custom or not one of the seven
+   *   provider-supported named tapbacks.
    */
   async sendReaction(options: {
     messageId: string;
     reaction: IMessageReactionType | string;
     partIndex?: number;
   }): Promise<IMessageReaction> {
+    const reaction = validateSendableReaction(options.reaction);
     const data = await this.http.post<RawIMessageReaction>("/reactions", {
       message_id: options.messageId,
-      reaction: options.reaction,
+      reaction,
       part_index: options.partIndex ?? 0,
     });
     return parseIMessageReaction(data);

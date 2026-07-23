@@ -11,7 +11,7 @@ use std::sync::Arc;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::error::Result;
+use crate::error::{InkboxError, Result};
 use crate::filters::DateRangeFilter;
 use crate::http::{validate_idempotency_key, HttpTransport};
 use crate::imessage::types::{
@@ -464,7 +464,7 @@ impl IMessagesResource {
     /// * `message_id` - UUID of the message being reacted to.
     /// * `reaction` - Tapback kind. Sends accept `love`, `like`, `dislike`,
     ///   `laugh`, `emphasize`, `question`, and `eyes`; `custom` is inbound-only
-    ///   and rejected with 422.
+    ///   and rejected locally before a request is sent.
     /// * `part_index` - Part of a multi-part message to react to.
     pub fn send_reaction(
         &self,
@@ -472,6 +472,12 @@ impl IMessagesResource {
         reaction: IMessageReactionType,
         part_index: i64,
     ) -> Result<IMessageReaction> {
+        if reaction == IMessageReactionType::Custom {
+            return Err(InkboxError::InvalidArgument(
+                "reaction must be one of: love, like, dislike, laugh, emphasize, question, eyes"
+                    .into(),
+            ));
+        }
         let body = json!({
             "message_id": message_id.to_string(),
             "reaction": reaction.as_str(),
@@ -906,5 +912,26 @@ mod tests {
         mock.assert();
         assert_eq!(reaction.assignment_id, None);
         assert_eq!(reaction.reaction, IMessageReactionType::Eyes);
+    }
+
+    #[test]
+    fn send_reaction_rejects_inbound_only_custom_before_sending() {
+        let server = MockServer::start();
+        let message_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let mock = server.mock(|when, then| {
+            when.method(POST).path("/api/v1/imessage/reactions");
+            then.status(500);
+        });
+
+        let error = client(&server)
+            .imessages()
+            .send_reaction(&message_id, IMessageReactionType::Custom, 0)
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            InkboxError::InvalidArgument(message) if message.contains("reaction must be one of")
+        ));
+        mock.assert_hits(0);
     }
 }

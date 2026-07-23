@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.3 — Dedicated outbound iMessage groups
+## 0.5.4 — Dedicated outbound iMessage groups
 
 ### Added
 
@@ -12,7 +12,7 @@
 
 ### Changed
 
-- CLI version moved in lockstep with `@inkbox/sdk` 0.5.3 and depends on `^0.5.3`.
+- CLI version moved in lockstep with `@inkbox/sdk` 0.5.4 and depends on `^0.5.4`.
 
 ## 0.4.26 — Dedicated iMessage number SDK support
 

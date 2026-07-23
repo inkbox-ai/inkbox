@@ -474,6 +474,15 @@ class TestIMessageActions:
         assert reaction.assignment_id is None
         assert reaction.reaction is IMessageReactionType.EYES
 
+    @pytest.mark.parametrize("reaction", [IMessageReactionType.CUSTOM, "\U0001f440"])
+    def test_send_reaction_rejects_inbound_only_or_arbitrary_values(
+        self, client, transport, reaction,
+    ):
+        with pytest.raises(ValueError, match="reaction must be one of"):
+            client._imessages.send_reaction(message_id=MSG_ID, reaction=reaction)
+
+        transport.post.assert_not_called()
+
     def test_mark_conversation_read(self, client, transport):
         transport.post.return_value = {
             "conversation_id": CONVO_ID,

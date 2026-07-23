@@ -465,6 +465,17 @@ describe("IMessagesResource", () => {
     expect(reaction.reaction).toBe(IMessageReactionType.EYES);
   });
 
+  it.each([IMessageReactionType.CUSTOM, "\u{1F440}"])(
+    "sendReaction rejects inbound-only or arbitrary reaction %s before sending",
+    async (reaction) => {
+      const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+      await expect(resource.sendReaction({ messageId: MSG_ID, reaction }))
+        .rejects.toThrow("reaction must be one of");
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
   it("markConversationRead returns the updated count", async () => {
     vi.mocked(fetch).mockResolvedValue(
       ok({ conversation_id: CONVO_ID, updated_count: 3 }),
