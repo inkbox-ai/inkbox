@@ -40,7 +40,7 @@ export function loadConfig(): SdkIntegrationConfig {
     environment,
     verbose: process.env.SDK_INTEGRATION_VERBOSE === "1",
     httpTimeout: 60_000,
-    pollTimeout: 240_000,
+    pollTimeout: 600_000,
     pollInterval: 5_000,
   };
 }

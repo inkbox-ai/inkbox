@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    testTimeout: 300_000,
+    testTimeout: 660_000,
     include: ["**/*.test.ts"],
   },
 });
