@@ -717,3 +717,36 @@ class CallEndedWebhookPayload(TypedDict):
     event_type: CallLifecycleWebhookEventType
     timestamp: str
     data: CallEndedWebhookData
+
+
+# ---- A2A task lifecycle ---------------------------------------------------
+
+A2AWebhookEventType = Literal[
+    "a2a.task.created",
+    "a2a.task.message",
+    "a2a.task.canceled",
+    "a2a.sent_task.updated",
+]
+
+
+class A2AWebhookCaller(TypedDict):
+    identity_id: str
+    organization_id: str
+    handle: str | None
+    trust_tier: str
+
+
+class A2AWebhookData(TypedDict):
+    task_id: str
+    context_id: str
+    state: str
+    caller: A2AWebhookCaller
+    message_id: str | None
+    parts: list[dict] | None
+
+
+class A2AWebhookPayload(TypedDict):
+    id: str
+    event_type: A2AWebhookEventType
+    timestamp: str
+    data: A2AWebhookData

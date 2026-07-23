@@ -67,6 +67,20 @@ import type {
 } from "./identities/types.js";
 import type { TunnelSummary } from "./tunnels/types.js";
 import type { Inkbox } from "./inkbox.js";
+import { A2AClient } from "./a2a/client.js";
+import type {
+  A2AContactRule,
+  A2AContext,
+  A2AContextPage,
+  A2AReplyIntent,
+  A2ARuleAction,
+  A2ARuleDirection,
+  A2ASettings,
+  A2ASkill,
+  A2ATask,
+  A2ATaskPage,
+  A2ATaskState,
+} from "./a2a/types.js";
 
 export class AgentIdentity {
   private _data: _AgentIdentityData;
@@ -1181,6 +1195,115 @@ export class AgentIdentity {
    */
   async delete(): Promise<void> {
     await this._inkbox._idsResource.delete(this.agentHandle);
+  }
+
+  // ------------------------------------------------------------------
+  // A2A
+  // ------------------------------------------------------------------
+
+  /** Enable this identity's A2A receiver. */
+  a2aEnable(): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { enabled: true });
+  }
+
+  /** Disable this identity's A2A receiver. */
+  a2aDisable(): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { enabled: false });
+  }
+
+  /** Return this identity's A2A channel settings. */
+  a2aSettings(): Promise<A2ASettings> {
+    return this._inkbox._a2a.settings(this.agentHandle);
+  }
+
+  /** Replace the skills advertised on this identity's Agent Card. */
+  a2aSetSkills(skills: A2ASkill[]): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { skills });
+  }
+
+  /** Return this identity's Agent Card preview. */
+  a2aCard(): Promise<Record<string, unknown>> {
+    return this._inkbox._a2a.card(this.agentHandle);
+  }
+
+  /** List the receiver-side A2A task inbox. */
+  a2aTasks(options: {
+    state?: A2ATaskState;
+    contextId?: string;
+    cursor?: string;
+    limit?: number;
+  } = {}): Promise<A2ATaskPage> {
+    return this._inkbox._a2a.tasks(this.agentHandle, options);
+  }
+
+  /** Drain every page in the receiver-side A2A inbox. */
+  iterA2ATasks(options: {
+    state?: A2ATaskState;
+    contextId?: string;
+    limit?: number;
+  } = {}): AsyncGenerator<A2ATask> {
+    return this._inkbox._a2a.iterTasks(this.agentHandle, options);
+  }
+
+  /** Get a full A2A task with messages and transitions. */
+  a2aTask(taskId: string): Promise<A2ATask> {
+    return this._inkbox._a2a.task(this.agentHandle, taskId);
+  }
+
+  /** Reply to an inbound A2A task and choose its next state. */
+  a2aReply(
+    taskId: string,
+    options: {
+      intent: A2AReplyIntent;
+      text?: string;
+      parts?: Record<string, unknown>[];
+    },
+  ): Promise<A2ATask> {
+    return this._inkbox._a2a.reply(this.agentHandle, taskId, options);
+  }
+
+  /** List receiver-side A2A contexts. */
+  a2aContexts(options: {
+    cursor?: string;
+    limit?: number;
+  } = {}): Promise<A2AContextPage> {
+    return this._inkbox._a2a.contexts(this.agentHandle, options);
+  }
+
+  /** Get a receiver-side A2A context and its tasks. */
+  a2aContext(contextId: string): Promise<A2AContext> {
+    return this._inkbox._a2a.context(this.agentHandle, contextId);
+  }
+
+  /** List this identity's A2A inbound contact rules. */
+  a2aContactRules(): Promise<A2AContactRule[]> {
+    return this._inkbox._a2a.contactRules(this.agentHandle);
+  }
+
+  /** Add an owner-authorized A2A inbound contact rule. */
+  a2aAddContactRule(options: {
+    handle: string;
+    action: A2ARuleAction;
+    direction?: A2ARuleDirection;
+  }): Promise<A2AContactRule> {
+    return this._inkbox._a2a.addContactRule(this.agentHandle, options);
+  }
+
+  /**
+   * Create an A2A client bound to this claimed identity's agent-scoped key.
+   */
+  async a2aClient(): Promise<A2AClient> {
+    const principal = await this._inkbox.whoami();
+    if (
+      principal.authType !== "api_key"
+      || principal.authSubtype !== "api_key.agent_scoped.claimed"
+      || principal.scope !== `agent_identity:${this.id}`
+    ) {
+      throw new InkboxError(
+        "A2A calls require this claimed identity's agent-scoped API key",
+      );
+    }
+    return new A2AClient(this._inkbox._apiKey, this._inkbox._baseUrl);
   }
 
   // ------------------------------------------------------------------

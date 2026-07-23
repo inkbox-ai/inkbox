@@ -1,0 +1,25 @@
+export { A2AClient, A2AProtocolError } from "./client.js";
+export { A2AResource } from "./resource.js";
+export type {
+  A2ACard,
+  A2ACaller,
+  A2AContactRule,
+  A2AContext,
+  A2AContextPage,
+  A2AMessage,
+  A2AReplyIntent,
+  A2AResolvedTarget,
+  A2ARuleAction,
+  A2ARuleDirection,
+  A2ASendResult,
+  A2ASettings,
+  A2ASkill,
+  A2ATask,
+  A2ATaskPage,
+  A2ATaskState,
+  A2ATransition,
+  A2AWireMessage,
+  A2AWireTask,
+  A2AWireTaskPage,
+  A2AWireTaskState,
+} from "./types.js";

@@ -5,6 +5,31 @@ inkbox — Python SDK for the Inkbox APIs.
 from inkbox.client import Inkbox
 from inkbox.agent_identity import AgentIdentity
 from inkbox.credentials import Credentials
+from inkbox.a2a import (
+    A2ACard,
+    A2ACaller,
+    A2AClient,
+    A2AContactRule,
+    A2AContext,
+    A2AContextPage,
+    A2AMessage,
+    A2AProtocolError,
+    A2AReplyIntent,
+    A2AResolvedTarget,
+    A2ARuleAction,
+    A2ARuleDirection,
+    A2ASendResult,
+    A2ASettings,
+    A2ASkill,
+    A2ATask,
+    A2ATaskPage,
+    A2ATaskState,
+    A2ATransition,
+    A2AWireMessage,
+    A2AWireTask,
+    A2AWireTaskPage,
+    A2AWireTaskState,
+)
 
 # Exceptions (canonical source)
 from inkbox.exceptions import (
@@ -244,6 +269,10 @@ from inkbox.signing_keys import SigningKey, SigningKeyStatus, verify_webhook
 
 # Receiver-side webhook payload types
 from inkbox.webhooks import (
+    A2AWebhookCaller,
+    A2AWebhookData,
+    A2AWebhookEventType,
+    A2AWebhookPayload,
     CallDirectionWire,
     CallEndedWebhookData,
     CallEndedWebhookPayload,
@@ -327,6 +356,30 @@ from inkbox.webhook_deliveries import (
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
 __all__ = [
+    # A2A
+    "A2ACard",
+    "A2ACaller",
+    "A2AClient",
+    "A2AContactRule",
+    "A2AContext",
+    "A2AContextPage",
+    "A2AMessage",
+    "A2AProtocolError",
+    "A2AReplyIntent",
+    "A2AResolvedTarget",
+    "A2ARuleAction",
+    "A2ARuleDirection",
+    "A2ASendResult",
+    "A2ASettings",
+    "A2ASkill",
+    "A2ATask",
+    "A2ATaskPage",
+    "A2ATaskState",
+    "A2ATransition",
+    "A2AWireMessage",
+    "A2AWireTask",
+    "A2AWireTaskPage",
+    "A2AWireTaskState",
     # Entry points
     "Inkbox",
     "AgentIdentity",
@@ -531,6 +584,10 @@ __all__ = [
     "SigningKeyStatus",
     "verify_webhook",
     # Receiver-side webhook payload types
+    "A2AWebhookCaller",
+    "A2AWebhookData",
+    "A2AWebhookEventType",
+    "A2AWebhookPayload",
     "CallDirectionWire",
     "CallEndedWebhookData",
     "CallEndedWebhookPayload",

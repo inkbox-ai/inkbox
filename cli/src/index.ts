@@ -21,6 +21,7 @@ import { registerWebhookCommands } from "./commands/webhook.js";
 import { registerContactsCommands } from "./commands/contacts.js";
 import { registerNotesCommands } from "./commands/notes.js";
 import { registerDomainCommands } from "./commands/domain.js";
+import { registerA2ACommands } from "./commands/a2a.js";
 
 // Node's fetch ignores HTTP(S)_PROXY/NO_PROXY unless NODE_USE_ENV_PROXY is
 // enabled — a flag that only exists on Node 22.21+/24+ — which strands the
@@ -64,5 +65,6 @@ registerWebhookCommands(program);
 registerContactsCommands(program);
 registerNotesCommands(program);
 registerDomainCommands(program);
+registerA2ACommands(program);
 
 program.parse();

@@ -15,6 +15,21 @@ from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
 from inkbox.credentials import Credentials
+from inkbox.a2a.client import A2AClient
+from inkbox.a2a.resource import skills_wire
+from inkbox.a2a.types import (
+    A2AContactRule,
+    A2AContext,
+    A2AContextPage,
+    A2AReplyIntent,
+    A2ARuleAction,
+    A2ARuleDirection,
+    A2ASettings,
+    A2ASkill,
+    A2ATask,
+    A2ATaskPage,
+    A2ATaskState,
+)
 from inkbox.vault.totp import TOTPCode, TOTPConfig
 from inkbox.vault.types import DecryptedVaultSecret, SecretPayload, VaultSecret
 from inkbox.identities.types import (
@@ -1369,6 +1384,137 @@ class AgentIdentity:
         """Delete one of this identity's phone contact rules (admin-only)."""
         self._require_phone()
         self._inkbox._phone_identity_contact_rules.delete(self.agent_handle, rule_id)
+
+    ## A2A
+
+    def a2a_enable(self) -> A2ASettings:
+        """Enable this identity's A2A receiver."""
+        return self._inkbox._a2a.update_settings(self.agent_handle, enabled=True)
+
+    def a2a_disable(self) -> A2ASettings:
+        """Disable this identity's A2A receiver."""
+        return self._inkbox._a2a.update_settings(self.agent_handle, enabled=False)
+
+    def a2a_settings(self) -> A2ASettings:
+        """Return this identity's A2A channel settings."""
+        return self._inkbox._a2a.settings(self.agent_handle)
+
+    def a2a_set_skills(self, skills: list[A2ASkill]) -> A2ASettings:
+        """Replace the skills advertised on this identity's Agent Card."""
+        return self._inkbox._a2a.update_settings(
+            self.agent_handle,
+            skills=skills_wire(skills),
+        )
+
+    def a2a_card(self) -> dict[str, Any]:
+        """Return this identity's Agent Card preview."""
+        return self._inkbox._a2a.card(self.agent_handle)
+
+    def a2a_tasks(
+        self,
+        *,
+        state: A2ATaskState | str | None = None,
+        context_id: UUID | str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2ATaskPage:
+        """List the receiver-side A2A task inbox."""
+        return self._inkbox._a2a.tasks(
+            self.agent_handle,
+            state=state,
+            context_id=str(context_id) if context_id is not None else None,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    def iter_a2a_tasks(
+        self,
+        *,
+        state: A2ATaskState | str | None = None,
+        context_id: UUID | str | None = None,
+        limit: int = 50,
+    ) -> Iterator[A2ATask]:
+        """Drain every page in the receiver-side A2A inbox."""
+        return self._inkbox._a2a.iter_tasks(
+            self.agent_handle,
+            state=state,
+            context_id=str(context_id) if context_id is not None else None,
+            limit=limit,
+        )
+
+    def a2a_task(self, task_id: UUID | str) -> A2ATask:
+        """Get a full A2A task with messages and transitions."""
+        return self._inkbox._a2a.task(self.agent_handle, str(task_id))
+
+    def a2a_reply(
+        self,
+        task_id: UUID | str,
+        *,
+        intent: A2AReplyIntent | str,
+        text: str | None = None,
+        parts: list[dict[str, Any]] | None = None,
+    ) -> A2ATask:
+        """Reply to an inbound A2A task and choose its next state."""
+        return self._inkbox._a2a.reply(
+            self.agent_handle,
+            str(task_id),
+            intent=intent,
+            text=text,
+            parts=parts,
+        )
+
+    def a2a_contexts(
+        self,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2AContextPage:
+        """List receiver-side A2A contexts."""
+        return self._inkbox._a2a.contexts(
+            self.agent_handle,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    def a2a_context(self, context_id: UUID | str) -> A2AContext:
+        """Get a receiver-side A2A context and its tasks."""
+        return self._inkbox._a2a.context(self.agent_handle, str(context_id))
+
+    def a2a_contact_rules(self) -> list[A2AContactRule]:
+        """List this identity's A2A inbound contact rules."""
+        return self._inkbox._a2a.contact_rules(self.agent_handle)
+
+    def a2a_add_contact_rule(
+        self,
+        *,
+        handle: str,
+        action: A2ARuleAction | str,
+        direction: A2ARuleDirection | str = A2ARuleDirection.INBOUND,
+    ) -> A2AContactRule:
+        """Add an owner-authorized A2A inbound contact rule."""
+        return self._inkbox._a2a.add_contact_rule(
+            self.agent_handle,
+            peer_handle=handle,
+            action=action,
+            direction=direction,
+        )
+
+    def a2a_client(self) -> A2AClient:
+        """Create an A2A client bound to this claimed identity's API key."""
+        principal = self._inkbox.whoami()
+        expected_scope = f"agent_identity:{self.id}"
+        if (
+            principal.auth_type != "api_key"
+            or principal.auth_subtype != "api_key.agent_scoped.claimed"
+            or getattr(principal, "scope", None) != expected_scope
+        ):
+            raise InkboxError(
+                "A2A calls require this claimed identity's agent-scoped API key"
+            )
+        return A2AClient(
+            api_key=self._inkbox._api_key,
+            platform_base_url=self._inkbox._base_url,
+        )
 
     ## Signing key
 
