@@ -41,6 +41,20 @@ export class InkboxConnectionError extends InkboxError {
   }
 }
 
+/** Thrown when a direct mailbox import upload returns an error response. */
+export class MailImportUploadError extends InkboxError {
+  readonly statusCode: number | null;
+  readonly detail: string;
+
+  constructor(statusCode: number | null, detail: string) {
+    const prefix = statusCode === null ? "transport error" : `HTTP ${statusCode}`;
+    super(`Import upload failed (${prefix}): ${detail}`);
+    this.name = "MailImportUploadError";
+    this.statusCode = statusCode;
+    this.detail = detail;
+  }
+}
+
 export type InkboxAPIErrorDetail = string | Record<string, unknown>;
 
 export class InkboxAPIError extends InkboxError {

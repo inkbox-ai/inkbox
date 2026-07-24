@@ -10,17 +10,27 @@ use serde_json::Value;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
+use crate::mail::resources::imports::MailboxImportsResource;
 use crate::mail::types::{FilterMode, Mailbox, Message};
 
 const BASE: &str = "/mailboxes";
 
 pub struct MailboxesResource {
     http: Arc<HttpTransport>,
+    imports: MailboxImportsResource,
 }
 
 impl MailboxesResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
-        Self { http }
+        Self {
+            imports: MailboxImportsResource::new(http.clone()),
+            http,
+        }
+    }
+
+    /// Import MBOX, EML, or ZIP-of-EML files into a mailbox.
+    pub fn imports(&self) -> &MailboxImportsResource {
+        &self.imports
     }
 
     /// List all mailboxes for your organisation.

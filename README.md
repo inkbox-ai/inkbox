@@ -147,6 +147,23 @@ print(listener.public_url)
 listener.wait()
 ```
 
+### Mailbox Imports
+
+Import MBOX, EML, or ZIP-of-EML archives through `mailboxes.imports`. Create a
+job, upload directly with the returned target, start it, then wait for any
+terminal state (`completed`, `failed`, or `cancelled`). Imported content that is
+unsafe may be rejected and counted separately.
+
+```bash
+inkbox mailbox imports run agent@inkboxmail.com ./archive.mbox \
+  --original-address old-address@example.com
+```
+
+Use `--no-wait` to return after queueing, or `inkbox mailbox imports wait
+<email> <job-id>` to resume watching later. Processing counters are checkpointed
+and may pause or reset during recovery, so do not calculate a percentage from
+them.
+
 ### Tunnels (TypeScript)
 
 ```typescript

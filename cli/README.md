@@ -406,6 +406,29 @@ Secret type flags:
 
 ### mailbox
 
+Import historical mail from MBOX, EML, or ZIP-of-EML files:
+
+```bash
+inkbox mailbox imports run <email> <file>
+  --source-format <auto|mbox|eml|zip>       # Default: auto
+  --original-address <email>                # Repeatable; identifies sent mail
+  --mark-unread                             # Default imports as read
+  --no-wait                                 # Return after queueing
+  --timeout <seconds>                       # Local wait timeout; does not cancel
+  --poll-interval <seconds>                 # Default: 5
+
+inkbox mailbox imports get <email> <job-id>
+inkbox mailbox imports list <email> [--cursor <cursor>] [--limit <n>]
+inkbox mailbox imports wait <email> <job-id> [--timeout <seconds>] [--poll-interval <seconds>]
+inkbox mailbox imports cancel <email> <job-id>
+```
+
+`run` uploads from disk without loading the full file into memory. Upload and
+processing progress goes to stderr; `--json` keeps stdout to one job object.
+`run` and `wait` exit nonzero when the terminal job is failed or cancelled.
+Unsafe imported content may be rejected and counted separately. Processing
+counters may pause or reset during recovery and are not a percentage.
+
 Org-level mailbox read + update. Mailboxes are provisioned atomically
 by `inkbox identity create` and removed by `inkbox identity delete`
 (cascade) — there is no standalone create / delete here. `display_name`

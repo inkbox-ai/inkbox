@@ -17,11 +17,16 @@ import {
   parseMailbox,
   parseMessage,
 } from "../types.js";
+import { MailboxImportsResource } from "./imports.js";
 
 const BASE = "/mailboxes";
 
 export class MailboxesResource {
-  constructor(private readonly http: HttpTransport) {}
+  readonly imports: MailboxImportsResource;
+
+  constructor(private readonly http: HttpTransport) {
+    this.imports = new MailboxImportsResource(http);
+  }
 
   /** List all mailboxes for your organisation. */
   async list(): Promise<Mailbox[]> {

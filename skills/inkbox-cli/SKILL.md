@@ -1,6 +1,6 @@
 ---
 name: inkbox-cli
-description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, mailbox, mailbox storage, mail clients (IMAP/SMTP), phone number, webhook, or signup workflows.
+description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, mailbox imports, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, mailbox storage, mail clients (IMAP/SMTP), phone number, webhook, or signup workflows.
 user-invocable: false
 ---
 
@@ -405,6 +405,24 @@ Secret type flags:
 ```
 
 ## Mailboxes
+
+### Import historical mail
+
+```bash
+inkbox mailbox imports run <email> <archive.mbox> \
+  --original-address old@example.com
+inkbox mailbox imports get <email> <job-id>
+inkbox mailbox imports list <email>
+inkbox mailbox imports wait <email> <job-id> --poll-interval 5
+inkbox mailbox imports cancel <email> <job-id>
+```
+
+`run` supports `--source-format auto|mbox|eml|zip`, repeatable
+`--original-address`, `--mark-unread`, `--no-wait`, `--timeout`, and
+`--poll-interval`. Progress is stderr-only; `--json` stdout contains one job
+object. Failed or cancelled `run`/`wait` jobs exit nonzero. A local timeout or
+Ctrl-C does not cancel the job. Counters may pause or reset and are not a
+percentage. Unsafe imported content may be rejected.
 
 Mailboxes are provisioned atomically by `inkbox identity create` and removed by `inkbox identity delete` (cascade); there is no standalone create / delete here. The human-readable name lives on the identity now — `inkbox identity update --display-name`; the mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 

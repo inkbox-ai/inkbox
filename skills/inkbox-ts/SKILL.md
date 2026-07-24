@@ -1,6 +1,6 @@
 ---
 name: inkbox-ts
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox TypeScript SDK.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, mailbox imports, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: false
 ---
 
@@ -120,6 +120,27 @@ await identity.revokeAccess(viewer.id);       // revoke one viewer (keyed by vie
 Granting a viewer against an already-wildcard target raises `RedundantContactAccessGrantError` (409); revoking a non-existent grant raises `InkboxAPIError` (404).
 
 ## Mail
+
+### Import historical mail
+
+```typescript
+import { MailImportFormat } from "@inkbox/sdk";
+
+const created = await inkbox.mailboxes.imports.create(email, {
+  sourceFormat: MailImportFormat.AUTO,
+  originalAddresses: ["old@example.com"],
+});
+await inkbox.mailboxes.imports.upload(created.upload, file);
+await inkbox.mailboxes.imports.start(email, created.job.id);
+const job = await inkbox.mailboxes.imports.wait(email, created.job.id, {
+  pollIntervalMs: 5_000,
+});
+```
+
+Formats: `auto`, `mbox`, `eml`, `zip` (ZIP-of-EML). `wait` returns all terminal
+states; failure/cancellation are job results, not transport errors. A timeout
+does not cancel. Counters may pause or reset and must not be treated as a
+percentage. Unsafe imported content may be rejected.
 
 ### Send
 
