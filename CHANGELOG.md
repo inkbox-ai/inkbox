@@ -9,14 +9,16 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - **A2A receiver inboxes in Python and TypeScript.** `AgentIdentity` can enable the channel, configure Agent Card skills, manage inbound contact rules, list contexts and tasks, and reply with an explicit `ask_caller`, `complete`, or `fail` lifecycle decision.
+- **Two-sided A2A history in Python, TypeScript, and Rust.** Identity-scoped task history supports inbound, outbound, or combined views with requester, worker, state, context, time, and keyword filters. Message history adds task and participant provenance with opaque cursor pagination.
 - **A standard A2A 1.0 client.** Identity-bound clients fetch Agent Cards without credentials, refuse redirects, validate canonical HTTPS origins, send with `returnImmediately`, poll/list/cancel tasks, and preserve exact wire task/message types.
 - **Credential pinning.** The Inkbox API key is attached only when both the Inkbox-hosted card and selected RPC interface match the configured Inkbox origin. External agents receive no Inkbox credential unless the caller explicitly supplies their credential.
-- **CLI A2A workflow.** `inkbox a2a` covers receiver enablement, cards, skills, rules, tasks, replies, remote calls, checks/waits, and cancellation.
+- **CLI A2A workflow.** `inkbox a2a` covers receiver enablement, cards, skills, rules, filterable task/message history, replies, remote calls, checks/waits, and cancellation.
 - **A2A webhook types.** All four task lifecycle events are available in Python and TypeScript webhook envelopes and subscription validation.
 
 ### Changed
 
-- Python, TypeScript, CLI, and Rust package metadata move to 0.5.6; the CLI depends on `@inkbox/sdk` `^0.5.6`. Rust exposes no A2A surface in this release; that implementation remains deliberately deferred.
+- Python, TypeScript, CLI, and Rust package metadata move to 0.5.6; the CLI depends on `@inkbox/sdk` `^0.5.6`. Rust exposes the A2A task, context, and message-history surface; receiver configuration and the standard protocol client remain Python/TypeScript-only.
+- Task detail exposes current state and message history.
 - Python and TypeScript A2A clients unwrap the standard task/message result envelope while retaining compatibility with direct task payloads.
 
 ### Compatibility and rollout

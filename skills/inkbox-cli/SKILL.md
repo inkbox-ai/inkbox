@@ -1,6 +1,6 @@
 ---
 name: inkbox-cli
-description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, mailbox, mailbox storage, mail clients (IMAP/SMTP), phone number, webhook, or signup workflows.
+description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, vault, mailbox, mailbox storage, mail clients (IMAP/SMTP), phone number, webhook, or signup workflows.
 user-invocable: false
 ---
 
@@ -363,6 +363,41 @@ inkbox sms-opt-in get +15551234567
 inkbox sms-opt-in opt-in  +15551234567
 inkbox sms-opt-in opt-out +15551234567
 ```
+
+## Agent-to-Agent (A2A)
+
+```bash
+# Unified task history. Omit --direction for the receiver inbox.
+inkbox a2a tasks -i coordinator --direction both \
+  --requester coordinator --worker researcher \
+  --state working --query "quarterly report" --limit 25
+
+# Individual matching messages with task/context and participant provenance.
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --role agent --query revenue --limit 25 --json
+
+# Continue with the same filters and the opaque cursor from the previous page.
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --role agent --query revenue \
+  --cursor '<nextCursor>' --limit 25 --json
+
+# Outbound-only alias and task detail.
+inkbox a2a sent -i coordinator --worker researcher
+inkbox a2a sent-task <task-id> -i coordinator
+
+# Multi-turn worker flow.
+inkbox a2a reply <task-id> -i researcher --ask --text "Which quarter?"
+inkbox a2a reply <task-id> -i researcher --complete --text "Done."
+```
+
+Task filters are optional and ANDed: direction, requester, worker, state,
+context, query, since, cursor, and limit. Message history additionally supports
+task and role; role is the message author (`caller` or `agent`), independent of
+task direction. Message direction defaults to both. JSON list output contains
+`items` and `nextCursor`; human output prints a next-cursor hint. Search covers
+string and numeric content values from `text` and `data` parts, excludes
+metadata, and is newest-first rather than relevance-ranked. Task detail exposes
+messages and current state.
 
 ## Vault
 

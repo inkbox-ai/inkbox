@@ -21,6 +21,10 @@ from inkbox.a2a.types import (
     A2AContactRule,
     A2AContext,
     A2AContextPage,
+    A2AHistoryDirection,
+    A2AHistoryMessage,
+    A2AHistoryMessagePage,
+    A2AMessageRole,
     A2AReplyIntent,
     A2ARuleAction,
     A2ARuleDirection,
@@ -1413,16 +1417,26 @@ class AgentIdentity:
     def a2a_tasks(
         self,
         *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: UUID | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         cursor: str | None = None,
         limit: int = 50,
     ) -> A2ATaskPage:
         """List the receiver-side A2A task inbox."""
         return self._inkbox._a2a.tasks(
             self.agent_handle,
+            direction=direction,
+            requester_handle=requester_handle,
+            worker_handle=worker_handle,
             state=state,
             context_id=str(context_id) if context_id is not None else None,
+            q=q,
+            since=since,
             cursor=cursor,
             limit=limit,
         )
@@ -1430,35 +1444,53 @@ class AgentIdentity:
     def iter_a2a_tasks(
         self,
         *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: UUID | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         limit: int = 50,
     ) -> Iterator[A2ATask]:
         """Drain every page in the receiver-side A2A inbox."""
         return self._inkbox._a2a.iter_tasks(
             self.agent_handle,
+            direction=direction,
+            requester_handle=requester_handle,
+            worker_handle=worker_handle,
             state=state,
             context_id=str(context_id) if context_id is not None else None,
+            q=q,
+            since=since,
             limit=limit,
         )
 
     def a2a_task(self, task_id: UUID | str) -> A2ATask:
-        """Get a full A2A task with messages and transitions."""
+        """Get an A2A task with its message history."""
         return self._inkbox._a2a.task(self.agent_handle, str(task_id))
 
     def a2a_sent_tasks(
         self,
         *,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: UUID | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         cursor: str | None = None,
         limit: int = 50,
     ) -> A2ATaskPage:
         """List A2A tasks sent by this identity."""
         return self._inkbox._a2a.sent_tasks(
             self.agent_handle,
+            requester_handle=requester_handle,
+            worker_handle=worker_handle,
             state=state,
             context_id=str(context_id) if context_id is not None else None,
+            q=q,
+            since=since,
             cursor=cursor,
             limit=limit,
         )
@@ -1466,15 +1498,23 @@ class AgentIdentity:
     def iter_a2a_sent_tasks(
         self,
         *,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: UUID | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         limit: int = 50,
     ) -> Iterator[A2ATask]:
         """Drain every page of A2A tasks sent by this identity."""
         return self._inkbox._a2a.iter_sent_tasks(
             self.agent_handle,
+            requester_handle=requester_handle,
+            worker_handle=worker_handle,
             state=state,
             context_id=str(context_id) if context_id is not None else None,
+            q=q,
+            since=since,
             limit=limit,
         )
 
@@ -1483,6 +1523,62 @@ class AgentIdentity:
         return self._inkbox._a2a.sent_task(
             self.agent_handle,
             str(task_id),
+        )
+
+    def a2a_messages(
+        self,
+        *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
+        task_id: UUID | str | None = None,
+        context_id: UUID | str | None = None,
+        role: A2AMessageRole | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2AHistoryMessagePage:
+        """List this identity's inbound and outbound A2A messages."""
+        return self._inkbox._a2a.messages(
+            self.agent_handle,
+            direction=direction,
+            requester_handle=requester_handle,
+            worker_handle=worker_handle,
+            task_id=str(task_id) if task_id is not None else None,
+            context_id=str(context_id) if context_id is not None else None,
+            role=role,
+            q=q,
+            since=since,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    def iter_a2a_messages(
+        self,
+        *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
+        task_id: UUID | str | None = None,
+        context_id: UUID | str | None = None,
+        role: A2AMessageRole | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
+        limit: int = 50,
+    ) -> Iterator[A2AHistoryMessage]:
+        """Drain every page of this identity's A2A message history."""
+        return self._inkbox._a2a.iter_messages(
+            self.agent_handle,
+            direction=direction,
+            requester_handle=requester_handle,
+            worker_handle=worker_handle,
+            task_id=str(task_id) if task_id is not None else None,
+            context_id=str(context_id) if context_id is not None else None,
+            role=role,
+            q=q,
+            since=since,
+            limit=limit,
         )
 
     def a2a_reply(

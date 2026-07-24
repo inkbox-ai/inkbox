@@ -5,16 +5,24 @@ import type {
   A2AContactRule,
   A2AContext,
   A2AContextPage,
+  A2AHistoryMessage,
+  A2AHistoryMessagePage,
+  A2AMessageListOptions,
   A2AReplyIntent,
   A2ARuleAction,
   A2ARuleDirection,
   A2ASettings,
   A2ASkill,
   A2ATask,
+  A2ATaskListOptions,
   A2ATaskPage,
-  A2ATaskState,
+  A2ASentTaskListOptions,
 } from "./types.js";
-import { parseA2AContext, parseA2ATask } from "./types.js";
+import {
+  parseA2AContext,
+  parseA2AHistoryMessage,
+  parseA2ATask,
+} from "./types.js";
 
 type Raw = Record<string, any>;
 
@@ -67,16 +75,16 @@ export class A2AResource {
 
   async tasks(
     handle: string,
-    options: {
-      state?: A2ATaskState;
-      contextId?: string;
-      cursor?: string;
-      limit?: number;
-    } = {},
+    options: A2ATaskListOptions = {},
   ): Promise<A2ATaskPage> {
     const raw = await this.http.get<Raw>(`${base(handle)}/tasks`, {
+      direction: options.direction,
+      requester_handle: options.requesterHandle,
+      worker_handle: options.workerHandle,
       state: options.state,
       context_id: options.contextId,
+      q: options.q,
+      since: options.since,
       cursor: options.cursor,
       limit: options.limit ?? 50,
     });
@@ -88,11 +96,7 @@ export class A2AResource {
 
   async *iterTasks(
     handle: string,
-    options: {
-      state?: A2ATaskState;
-      contextId?: string;
-      limit?: number;
-    } = {},
+    options: Omit<A2ATaskListOptions, "cursor"> = {},
   ): AsyncGenerator<A2ATask> {
     let cursor: string | undefined;
     do {
@@ -110,16 +114,15 @@ export class A2AResource {
 
   async sentTasks(
     handle: string,
-    options: {
-      state?: A2ATaskState;
-      contextId?: string;
-      cursor?: string;
-      limit?: number;
-    } = {},
+    options: A2ASentTaskListOptions = {},
   ): Promise<A2ATaskPage> {
     const raw = await this.http.get<Raw>(`${base(handle)}/sent/tasks`, {
+      requester_handle: options.requesterHandle,
+      worker_handle: options.workerHandle,
       state: options.state,
       context_id: options.contextId,
+      q: options.q,
+      since: options.since,
       cursor: options.cursor,
       limit: options.limit ?? 50,
     });
@@ -131,11 +134,7 @@ export class A2AResource {
 
   async *iterSentTasks(
     handle: string,
-    options: {
-      state?: A2ATaskState;
-      contextId?: string;
-      limit?: number;
-    } = {},
+    options: Omit<A2ASentTaskListOptions, "cursor"> = {},
   ): AsyncGenerator<A2ATask> {
     let cursor: string | undefined;
     do {
@@ -149,6 +148,40 @@ export class A2AResource {
     return parseA2ATask(
       await this.http.get<Raw>(`${base(handle)}/sent/tasks/${taskId}`),
     );
+  }
+
+  async messages(
+    handle: string,
+    options: A2AMessageListOptions = {},
+  ): Promise<A2AHistoryMessagePage> {
+    const raw = await this.http.get<Raw>(`${base(handle)}/messages`, {
+      direction: options.direction,
+      requester_handle: options.requesterHandle,
+      worker_handle: options.workerHandle,
+      task_id: options.taskId,
+      context_id: options.contextId,
+      role: options.role,
+      q: options.q,
+      since: options.since,
+      cursor: options.cursor,
+      limit: options.limit ?? 50,
+    });
+    return {
+      items: (raw.items ?? []).map(parseA2AHistoryMessage),
+      nextCursor: raw.next_cursor ?? null,
+    };
+  }
+
+  async *iterMessages(
+    handle: string,
+    options: Omit<A2AMessageListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2AHistoryMessage> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.messages(handle, { ...options, cursor });
+      yield* page.items;
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
   }
 
   async reply(

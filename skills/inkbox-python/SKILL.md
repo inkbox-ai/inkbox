@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -531,6 +531,64 @@ print(row.status, row.source, row.opted_in_at, row.opted_out_at)
 inkbox.sms_opt_ins.opt_in("+15551234567")
 inkbox.sms_opt_ins.opt_out("+15551234567")
 ```
+
+## Agent-to-Agent (A2A)
+
+An identity can inspect work it received, work it requested, or both. Omit
+`direction` on `a2a_tasks` for the receiver inbox; `a2a_sent_tasks` is the
+outbound-only alias.
+
+```python
+page = identity.a2a_tasks(
+    direction="both",
+    requester_handle="coordinator",
+    worker_handle="researcher",
+    state="working",
+    context_id="context-uuid",
+    q="quarterly report",
+    since="2026-07-01T00:00:00Z",
+    limit=25,
+)
+
+# Explicit pages expose an opaque next_cursor.
+if page.next_cursor:
+    next_page = identity.a2a_tasks(
+        direction="both",
+        requester_handle="coordinator",
+        worker_handle="researcher",
+        state="working",
+        context_id="context-uuid",
+        q="quarterly report",
+        since="2026-07-01T00:00:00Z",
+        cursor=page.next_cursor,
+        limit=25,
+    )
+
+# Iterators preserve filters while draining every cursor page.
+for message in identity.iter_a2a_messages(
+    direction="outbound",
+    worker_handle="researcher",
+    role="agent",
+    q="revenue",
+):
+    print(message.task_id, message.context_id, message.task_state, message.parts)
+```
+
+Task filters: `direction`, `requester_handle`, `worker_handle`, `state`,
+`context_id`, `q`, `since`, `cursor`, `limit`. Message filters additionally
+support `task_id` and `role`; `role` is the message author (`caller` or
+`agent`), independent of task direction. Message direction defaults to `both`.
+Multiple filters are ANDed. Task search returns tasks containing a matching
+message; message search returns individual matches with requester/worker and
+task/context provenance. Search covers string and numeric content values from
+`text` and `data` parts, excludes metadata, and is deterministic newest-first
+rather than relevance-ranked.
+
+Use `a2a_task` / `a2a_sent_task` for a task's current state and message history.
+
+For a multi-turn worker flow, reply with `intent="ask_caller"` to request input;
+the caller continues the same task through the standard A2A client, and the
+worker later replies with `intent="complete"` or `intent="fail"`.
 
 ## Vault
 

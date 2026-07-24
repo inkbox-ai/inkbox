@@ -25,6 +25,8 @@ export type A2AWireTaskState =
 
 export type A2ARuleAction = "allow" | "block" | (string & {});
 export type A2ARuleDirection = "inbound" | "outbound" | "both" | (string & {});
+export type A2AHistoryDirection = "inbound" | "outbound" | "both" | (string & {});
+export type A2AMessageRole = "caller" | "agent" | (string & {});
 export type A2AReplyIntent = "ask_caller" | "complete" | "fail";
 
 export interface A2ASkill {
@@ -80,15 +82,6 @@ export interface A2AMessage {
   createdAt: string;
 }
 
-export interface A2ATransition {
-  id: string;
-  fromState: A2ATaskState | null;
-  toState: A2ATaskState;
-  actor: string;
-  reason: string | null;
-  createdAt: string;
-}
-
 export interface A2ATask {
   id: string;
   contextId: string;
@@ -96,7 +89,7 @@ export interface A2ATask {
   caller: A2ACaller;
   target: A2ATarget | null;
   messages: A2AMessage[];
-  transitions: A2ATransition[];
+  historyTruncated: boolean;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -107,11 +100,26 @@ export interface A2ATaskPage {
   nextCursor: string | null;
 }
 
+export interface A2ATaskListOptions {
+  direction?: A2AHistoryDirection;
+  requesterHandle?: string;
+  workerHandle?: string;
+  state?: A2ATaskState;
+  contextId?: string;
+  q?: string;
+  since?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export type A2ASentTaskListOptions = Omit<A2ATaskListOptions, "direction">;
+
 export interface A2AContext {
   id: string;
   caller: A2ACaller;
   target: A2ATarget | null;
   tasks: A2ATask[];
+  tasksTruncated: boolean;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -119,6 +127,40 @@ export interface A2AContext {
 export interface A2AContextPage {
   items: A2AContext[];
   nextCursor: string | null;
+}
+
+export interface A2AHistoryMessage {
+  id: string;
+  messageId: string;
+  taskId: string;
+  contextId: string;
+  taskState: A2ATaskState;
+  caller: A2ACaller;
+  target: A2ATarget | null;
+  role: A2AMessageRole;
+  parts: Record<string, unknown>[];
+  metadata: Record<string, unknown> | null;
+  extensions: string[] | null;
+  referenceTaskIds: string[] | null;
+  createdAt: string;
+}
+
+export interface A2AHistoryMessagePage {
+  items: A2AHistoryMessage[];
+  nextCursor: string | null;
+}
+
+export interface A2AMessageListOptions {
+  direction?: A2AHistoryDirection;
+  requesterHandle?: string;
+  workerHandle?: string;
+  taskId?: string;
+  contextId?: string;
+  role?: A2AMessageRole;
+  q?: string;
+  since?: string;
+  cursor?: string;
+  limit?: number;
 }
 
 export interface A2ACard {
@@ -196,14 +238,7 @@ export function parseA2ATask(raw: Record<string, any>): A2ATask {
       referenceTaskIds: item.reference_task_ids ?? null,
       createdAt: item.created_at,
     })),
-    transitions: (raw.transitions ?? []).map((item: Record<string, any>) => ({
-      id: item.id,
-      fromState: item.from_state ?? null,
-      toState: item.to_state,
-      actor: item.actor,
-      reason: item.reason ?? null,
-      createdAt: item.created_at,
-    })),
+    historyTruncated: raw.history_truncated ?? false,
     completedAt: raw.completed_at ?? null,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
@@ -225,7 +260,37 @@ export function parseA2AContext(raw: Record<string, any>): A2AContext {
       handle: raw.target.handle ?? null,
     } : null,
     tasks: (raw.tasks ?? []).map(parseA2ATask),
+    tasksTruncated: raw.tasks_truncated ?? false,
     createdAt: raw.created_at,
     lastActivityAt: raw.last_activity_at,
+  };
+}
+
+export function parseA2AHistoryMessage(
+  raw: Record<string, any>,
+): A2AHistoryMessage {
+  return {
+    id: raw.id,
+    messageId: raw.message_id,
+    taskId: raw.task_id,
+    contextId: raw.context_id,
+    taskState: raw.task_state,
+    caller: {
+      identityId: raw.caller.identity_id,
+      organizationId: raw.caller.organization_id,
+      handle: raw.caller.handle ?? null,
+      trustTier: raw.caller.trust_tier ?? "inkbox_verified",
+    },
+    target: raw.target ? {
+      identityId: raw.target.identity_id,
+      organizationId: raw.target.organization_id,
+      handle: raw.target.handle ?? null,
+    } : null,
+    role: raw.role,
+    parts: raw.parts ?? [],
+    metadata: raw.metadata ?? null,
+    extensions: raw.extensions ?? null,
+    referenceTaskIds: raw.reference_task_ids ?? null,
+    createdAt: raw.created_at,
   };
 }

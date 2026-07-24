@@ -4,11 +4,12 @@
 
 ### Added
 
-- `inkbox a2a enable|disable|card`, skills and rule management, task inbox/list/reply commands, and remote `call|check|cancel` commands.
+- `inkbox a2a enable|disable|card`, skills and rule management, filterable task/message history, task replies, and remote `call|check|cancel` commands.
 
 ### Changed
 
 - CLI version moved with Python and TypeScript to 0.5.6 and now depends on `@inkbox/sdk` `^0.5.6`.
+- Task and message list commands preserve opaque pagination cursors in JSON and human-readable output.
 
 ## 0.5.5 — Action-only contact-rule updates
 

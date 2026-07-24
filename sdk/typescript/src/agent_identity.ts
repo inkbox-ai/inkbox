@@ -72,14 +72,18 @@ import type {
   A2AContactRule,
   A2AContext,
   A2AContextPage,
+  A2AHistoryMessage,
+  A2AHistoryMessagePage,
+  A2AMessageListOptions,
   A2AReplyIntent,
   A2ARuleAction,
   A2ARuleDirection,
   A2ASettings,
   A2ASkill,
   A2ATask,
+  A2ATaskListOptions,
   A2ATaskPage,
-  A2ATaskState,
+  A2ASentTaskListOptions,
 } from "./a2a/types.js";
 
 export class AgentIdentity {
@@ -1227,51 +1231,51 @@ export class AgentIdentity {
   }
 
   /** List the receiver-side A2A task inbox. */
-  a2aTasks(options: {
-    state?: A2ATaskState;
-    contextId?: string;
-    cursor?: string;
-    limit?: number;
-  } = {}): Promise<A2ATaskPage> {
+  a2aTasks(options: A2ATaskListOptions = {}): Promise<A2ATaskPage> {
     return this._inkbox._a2a.tasks(this.agentHandle, options);
   }
 
   /** Drain every page in the receiver-side A2A inbox. */
-  iterA2ATasks(options: {
-    state?: A2ATaskState;
-    contextId?: string;
-    limit?: number;
-  } = {}): AsyncGenerator<A2ATask> {
+  iterA2ATasks(
+    options: Omit<A2ATaskListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2ATask> {
     return this._inkbox._a2a.iterTasks(this.agentHandle, options);
   }
 
-  /** Get a full A2A task with messages and transitions. */
+  /** Get an A2A task with its message history. */
   a2aTask(taskId: string): Promise<A2ATask> {
     return this._inkbox._a2a.task(this.agentHandle, taskId);
   }
 
   /** List A2A tasks sent by this identity. */
-  a2aSentTasks(options: {
-    state?: A2ATaskState;
-    contextId?: string;
-    cursor?: string;
-    limit?: number;
-  } = {}): Promise<A2ATaskPage> {
+  a2aSentTasks(options: A2ASentTaskListOptions = {}): Promise<A2ATaskPage> {
     return this._inkbox._a2a.sentTasks(this.agentHandle, options);
   }
 
   /** Drain every page of A2A tasks sent by this identity. */
-  iterA2ASentTasks(options: {
-    state?: A2ATaskState;
-    contextId?: string;
-    limit?: number;
-  } = {}): AsyncGenerator<A2ATask> {
+  iterA2ASentTasks(
+    options: Omit<A2ASentTaskListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2ATask> {
     return this._inkbox._a2a.iterSentTasks(this.agentHandle, options);
   }
 
   /** Get a full A2A task sent by this identity. */
   a2aSentTask(taskId: string): Promise<A2ATask> {
     return this._inkbox._a2a.sentTask(this.agentHandle, taskId);
+  }
+
+  /** List this identity's inbound and outbound A2A messages. */
+  a2aMessages(
+    options: A2AMessageListOptions = {},
+  ): Promise<A2AHistoryMessagePage> {
+    return this._inkbox._a2a.messages(this.agentHandle, options);
+  }
+
+  /** Drain every page of this identity's A2A message history. */
+  iterA2AMessages(
+    options: Omit<A2AMessageListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2AHistoryMessage> {
+    return this._inkbox._a2a.iterMessages(this.agentHandle, options);
   }
 
   /** Reply to an inbound A2A task and choose its next state. */

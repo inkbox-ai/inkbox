@@ -9,6 +9,10 @@ from inkbox.a2a.types import (
     A2AContactRule,
     A2AContext,
     A2AContextPage,
+    A2AHistoryDirection,
+    A2AHistoryMessage,
+    A2AHistoryMessagePage,
+    A2AMessageRole,
     A2AReplyIntent,
     A2ARuleAction,
     A2ARuleDirection,
@@ -19,6 +23,7 @@ from inkbox.a2a.types import (
     A2ATaskState,
     parse_context,
     parse_datetime,
+    parse_history_message,
     parse_skill,
     parse_task,
 )
@@ -69,16 +74,30 @@ class A2AResource:
         self,
         handle: str,
         *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         cursor: str | None = None,
         limit: int = 50,
     ) -> A2ATaskPage:
         data = self._http.get(
             f"{self._base(handle)}/tasks",
             params={
+                "direction": (
+                    direction.value
+                    if isinstance(direction, A2AHistoryDirection)
+                    else direction
+                ),
+                "requester_handle": requester_handle,
+                "worker_handle": worker_handle,
                 "state": state.value if isinstance(state, A2ATaskState) else state,
                 "context_id": context_id,
+                "q": q,
+                "since": since,
                 "cursor": cursor,
                 "limit": limit,
             },
@@ -92,16 +111,26 @@ class A2AResource:
         self,
         handle: str,
         *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         limit: int = 50,
     ) -> Iterator[A2ATask]:
         cursor = None
         while True:
             page = self.tasks(
                 handle,
+                direction=direction,
+                requester_handle=requester_handle,
+                worker_handle=worker_handle,
                 state=state,
                 context_id=context_id,
+                q=q,
+                since=since,
                 cursor=cursor,
                 limit=limit,
             )
@@ -117,16 +146,24 @@ class A2AResource:
         self,
         handle: str,
         *,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         cursor: str | None = None,
         limit: int = 50,
     ) -> A2ATaskPage:
         data = self._http.get(
             f"{self._base(handle)}/sent/tasks",
             params={
+                "requester_handle": requester_handle,
+                "worker_handle": worker_handle,
                 "state": state.value if isinstance(state, A2ATaskState) else state,
                 "context_id": context_id,
+                "q": q,
+                "since": since,
                 "cursor": cursor,
                 "limit": limit,
             },
@@ -140,16 +177,24 @@ class A2AResource:
         self,
         handle: str,
         *,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
         state: A2ATaskState | str | None = None,
         context_id: str | None = None,
+        q: str | None = None,
+        since: str | None = None,
         limit: int = 50,
     ) -> Iterator[A2ATask]:
         cursor = None
         while True:
             page = self.sent_tasks(
                 handle,
+                requester_handle=requester_handle,
+                worker_handle=worker_handle,
                 state=state,
                 context_id=context_id,
+                q=q,
+                since=since,
                 cursor=cursor,
                 limit=limit,
             )
@@ -162,6 +207,79 @@ class A2AResource:
         return parse_task(
             self._http.get(f"{self._base(handle)}/sent/tasks/{task_id}")
         )
+
+    def messages(
+        self,
+        handle: str,
+        *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
+        task_id: str | None = None,
+        context_id: str | None = None,
+        role: A2AMessageRole | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2AHistoryMessagePage:
+        data = self._http.get(
+            f"{self._base(handle)}/messages",
+            params={
+                "direction": (
+                    direction.value
+                    if isinstance(direction, A2AHistoryDirection)
+                    else direction
+                ),
+                "requester_handle": requester_handle,
+                "worker_handle": worker_handle,
+                "task_id": task_id,
+                "context_id": context_id,
+                "role": role.value if isinstance(role, A2AMessageRole) else role,
+                "q": q,
+                "since": since,
+                "cursor": cursor,
+                "limit": limit,
+            },
+        )
+        return A2AHistoryMessagePage(
+            items=[parse_history_message(item) for item in data["items"]],
+            next_cursor=data.get("next_cursor"),
+        )
+
+    def iter_messages(
+        self,
+        handle: str,
+        *,
+        direction: A2AHistoryDirection | str | None = None,
+        requester_handle: str | None = None,
+        worker_handle: str | None = None,
+        task_id: str | None = None,
+        context_id: str | None = None,
+        role: A2AMessageRole | str | None = None,
+        q: str | None = None,
+        since: str | None = None,
+        limit: int = 50,
+    ) -> Iterator[A2AHistoryMessage]:
+        cursor = None
+        while True:
+            page = self.messages(
+                handle,
+                direction=direction,
+                requester_handle=requester_handle,
+                worker_handle=worker_handle,
+                task_id=task_id,
+                context_id=context_id,
+                role=role,
+                q=q,
+                since=since,
+                cursor=cursor,
+                limit=limit,
+            )
+            yield from page.items
+            if not page.next_cursor:
+                return
+            cursor = page.next_cursor
 
     def reply(
         self,

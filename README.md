@@ -137,6 +137,42 @@ inkbox vault secrets
 inkbox vault get <secret-id>
 ```
 
+### A2A history
+
+Each identity can inspect work it received, work it requested, or both without
+duplicating task records. Task lists are newest-first and cursor-paginated.
+Keyword search matches string and numeric content values from `text` and
+`data` parts; message metadata is not searched, and results remain
+newest-first. A message's `role` is its author (`caller` or `agent`),
+independent of task direction.
+
+```python
+identity = inkbox.get_identity("coordinator")
+
+page = identity.a2a_tasks(
+    direction="both",
+    worker_handle="researcher",
+    q="quarterly summary",
+)
+for task in page.items:
+    print(task.id, task.state)
+
+for message in identity.iter_a2a_messages(
+    direction="outbound",
+    worker_handle="researcher",
+    q="revenue",
+):
+    print(message.task_id, message.role, message.parts)
+```
+
+```bash
+inkbox a2a tasks -i coordinator --direction both --worker researcher
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --query revenue --json
+```
+
+Task detail includes current state and message history.
+
 ### Tunnels (Python)
 
 ```python

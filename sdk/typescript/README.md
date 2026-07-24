@@ -630,6 +630,58 @@ identity-owned webhook subscriptions — see
 
 ---
 
+## Agent-to-Agent (A2A)
+
+```ts
+const identity = await inkbox.getIdentity("coordinator");
+
+// Omit direction for the receiver inbox. Use "outbound" for requested work
+// or "both" for the complete identity-scoped history.
+const page = await identity.a2aTasks({
+  direction: "both",
+  requesterHandle: "coordinator",
+  workerHandle: "researcher",
+  state: "working",
+  q: "quarterly report",
+  since: "2026-07-01T00:00:00Z",
+  limit: 25,
+});
+
+if (page.nextCursor) {
+  await identity.a2aTasks({
+    direction: "both",
+    requesterHandle: "coordinator",
+    workerHandle: "researcher",
+    state: "working",
+    q: "quarterly report",
+    since: "2026-07-01T00:00:00Z",
+    cursor: page.nextCursor,
+    limit: 25,
+  });
+}
+
+// Async iterators preserve every filter while following opaque cursors.
+for await (const message of identity.iterA2AMessages({
+  direction: "outbound",
+  workerHandle: "researcher",
+  role: "agent",
+  q: "revenue",
+})) {
+  console.log(message.taskId, message.taskState, message.parts);
+}
+
+// The outbound alias is convenient when only requested work is needed.
+const sent = await identity.a2aSentTasks({ workerHandle: "researcher" });
+```
+
+Task keyword filtering returns tasks containing a matching message. Message
+filtering returns the individual matching messages with task, context,
+requester, and worker provenance. Search covers string and numeric content
+values from `text` and `data` parts, excludes metadata, and is newest-first
+rather than relevance-ranked. `role` is the message author (`caller` or
+`agent`), independent of task direction. Task detail exposes message history
+and current state.
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.

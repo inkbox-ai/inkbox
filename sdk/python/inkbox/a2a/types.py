@@ -55,6 +55,17 @@ class A2ARuleDirection(ForwardCompatibleStrEnum):
     BOTH = "both"
 
 
+class A2AHistoryDirection(ForwardCompatibleStrEnum):
+    INBOUND = "inbound"
+    OUTBOUND = "outbound"
+    BOTH = "both"
+
+
+class A2AMessageRole(ForwardCompatibleStrEnum):
+    CALLER = "caller"
+    AGENT = "agent"
+
+
 class A2AReplyIntent(StrEnum):
     ASK_CALLER = "ask_caller"
     COMPLETE = "complete"
@@ -132,16 +143,6 @@ class A2AMessage:
 
 
 @dataclass(frozen=True)
-class A2ATransition:
-    id: str
-    from_state: A2ATaskState | None
-    to_state: A2ATaskState
-    actor: str
-    reason: str | None
-    created_at: datetime
-
-
-@dataclass(frozen=True)
 class A2ATask:
     id: str
     context_id: str
@@ -149,10 +150,10 @@ class A2ATask:
     caller: A2ACaller
     target: A2ATarget | None
     messages: list[A2AMessage]
-    transitions: list[A2ATransition]
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    history_truncated: bool = False
 
 
 @dataclass(frozen=True)
@@ -169,11 +170,35 @@ class A2AContext:
     tasks: list[A2ATask]
     created_at: datetime
     last_activity_at: datetime
+    tasks_truncated: bool = False
 
 
 @dataclass(frozen=True)
 class A2AContextPage:
     items: list[A2AContext]
+    next_cursor: str | None
+
+
+@dataclass(frozen=True)
+class A2AHistoryMessage:
+    id: str
+    message_id: str
+    task_id: str
+    context_id: str
+    task_state: A2ATaskState
+    caller: A2ACaller
+    target: A2ATarget | None
+    role: A2AMessageRole
+    parts: list[dict[str, Any]]
+    metadata: dict[str, Any] | None
+    extensions: list[str] | None
+    reference_task_ids: list[str] | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class A2AHistoryMessagePage:
+    items: list[A2AHistoryMessage]
     next_cursor: str | None
 
 
@@ -292,24 +317,10 @@ def parse_task(data: dict[str, Any]) -> A2ATask:
         caller=parse_caller(data["caller"]),
         target=parse_target(data.get("target")),
         messages=[parse_message(item) for item in data.get("messages", [])],
-        transitions=[
-            A2ATransition(
-                id=item["id"],
-                from_state=(
-                    A2ATaskState(item["from_state"])
-                    if item.get("from_state")
-                    else None
-                ),
-                to_state=A2ATaskState(item["to_state"]),
-                actor=item["actor"],
-                reason=item.get("reason"),
-                created_at=parse_datetime(item["created_at"]),  # type: ignore[arg-type]
-            )
-            for item in data.get("transitions", [])
-        ],
         completed_at=parse_datetime(data.get("completed_at")),
         created_at=parse_datetime(data["created_at"]),  # type: ignore[arg-type]
         updated_at=parse_datetime(data["updated_at"]),  # type: ignore[arg-type]
+        history_truncated=bool(data.get("history_truncated", False)),
     )
 
 
@@ -321,4 +332,23 @@ def parse_context(data: dict[str, Any]) -> A2AContext:
         tasks=[parse_task(item) for item in data.get("tasks", [])],
         created_at=parse_datetime(data["created_at"]),  # type: ignore[arg-type]
         last_activity_at=parse_datetime(data["last_activity_at"]),  # type: ignore[arg-type]
+        tasks_truncated=bool(data.get("tasks_truncated", False)),
+    )
+
+
+def parse_history_message(data: dict[str, Any]) -> A2AHistoryMessage:
+    return A2AHistoryMessage(
+        id=data["id"],
+        message_id=data["message_id"],
+        task_id=data["task_id"],
+        context_id=data["context_id"],
+        task_state=A2ATaskState(data["task_state"]),
+        caller=parse_caller(data["caller"]),
+        target=parse_target(data.get("target")),
+        role=A2AMessageRole(data["role"]),
+        parts=list(data.get("parts", [])),
+        metadata=data.get("metadata"),
+        extensions=data.get("extensions"),
+        reference_task_ids=data.get("reference_task_ids"),
+        created_at=parse_datetime(data["created_at"]),  # type: ignore[arg-type]
     )

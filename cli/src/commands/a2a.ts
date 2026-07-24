@@ -1,6 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
 import type {
+  A2AHistoryDirection,
+  A2AHistoryMessage,
+  A2AMessageRole,
   A2AReplyIntent,
   A2ARuleAction,
   A2ASkill,
@@ -10,19 +13,71 @@ import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output } from "../output.js";
 
-const TASK_COLUMNS = ["id", "contextId", "state", "createdAt", "updatedAt"];
-const SENT_TASK_COLUMNS = [
+const TASK_COLUMNS = [
   "id",
-  "targetHandle",
+  "requesterHandle",
+  "workerHandle",
   "contextId",
   "state",
   "createdAt",
   "updatedAt",
 ];
+const SENT_TASK_COLUMNS = [
+  "id",
+  "requesterHandle",
+  "workerHandle",
+  "contextId",
+  "state",
+  "createdAt",
+  "updatedAt",
+];
+const MESSAGE_COLUMNS = [
+  "id",
+  "taskId",
+  "contextId",
+  "taskState",
+  "role",
+  "requesterHandle",
+  "workerHandle",
+  "text",
+  "createdAt",
+];
 const RULE_COLUMNS = ["id", "action", "matchTarget", "direction", "status"];
 
 async function identityFor(command: Command, handle: string) {
   return createClient(getGlobalOpts(command)).getIdentity(handle);
+}
+
+function positiveInt(value: string, name: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new TypeError(`${name} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function outputCursorPage(
+  page: { items: unknown[]; nextCursor: string | null },
+  command: Command,
+  columns: string[],
+  tableItems: Record<string, unknown>[],
+): void {
+  const json = !!getGlobalOpts(command).json;
+  if (json) {
+    output(page, { json: true });
+    return;
+  }
+  output(tableItems, { json: false, columns });
+  if (page.nextCursor) {
+    console.error(`Next cursor: ${page.nextCursor}`);
+  }
+}
+
+function messageText(message: A2AHistoryMessage): string {
+  return message.parts
+    .map((part) => ("text" in part ? String(part.text) : ""))
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function registerA2ACommands(program: Command): void {
@@ -105,17 +160,54 @@ export function registerA2ACommands(program: Command): void {
     }));
 
   a2a.command("tasks")
-    .description("List an identity's inbound A2A tasks")
+    .description("List an identity's A2A task history")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--direction <direction>", "Filter: inbound, outbound, or both")
+    .option("--requester <handle>", "Filter by requester identity")
+    .option("--worker <handle>", "Filter by worker identity")
     .option("--state <state>", "Filter by task state")
+    .option("--context <id>", "Filter by context ID")
+    .option("-q, --query <query>", "Search task message content")
+    .option("--since <datetime>", "Only tasks created at or after this time")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Results per page (1-100)", "50")
     .action(withErrorHandler(async function (
       this: Command,
-      options: { identity: string; state?: string },
+      options: {
+        identity: string;
+        direction?: string;
+        requester?: string;
+        worker?: string;
+        state?: string;
+        context?: string;
+        query?: string;
+        since?: string;
+        cursor?: string;
+        limit: string;
+      },
     ) {
       const result = await (await identityFor(this, options.identity)).a2aTasks({
+        direction: options.direction as A2AHistoryDirection | undefined,
+        requesterHandle: options.requester,
+        workerHandle: options.worker,
         state: options.state as A2ATaskState | undefined,
+        contextId: options.context,
+        q: options.query,
+        since: options.since,
+        cursor: options.cursor,
+        limit: positiveInt(options.limit, "--limit"),
       });
-      output(result.items, { json: !!getGlobalOpts(this).json, columns: TASK_COLUMNS });
+      const items = result.items.map((task) => ({
+        ...task,
+        requesterHandle: task.caller.handle,
+        workerHandle: task.target?.handle ?? null,
+      }));
+      outputCursorPage(
+        result,
+        this,
+        TASK_COLUMNS,
+        items,
+      );
     }));
 
   a2a.command("task <task-id>")
@@ -133,22 +225,44 @@ export function registerA2ACommands(program: Command): void {
   a2a.command("sent")
     .description("List A2A tasks sent by an identity")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--requester <handle>", "Filter by requester identity")
+    .option("--worker <handle>", "Filter by worker identity")
     .option("--state <state>", "Filter by task state")
+    .option("--context <id>", "Filter by context ID")
+    .option("-q, --query <query>", "Search task message content")
+    .option("--since <datetime>", "Only tasks created at or after this time")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Results per page (1-100)", "50")
     .action(withErrorHandler(async function (
       this: Command,
-      options: { identity: string; state?: string },
+      options: {
+        identity: string;
+        requester?: string;
+        worker?: string;
+        state?: string;
+        context?: string;
+        query?: string;
+        since?: string;
+        cursor?: string;
+        limit: string;
+      },
     ) {
       const result = await (await identityFor(this, options.identity)).a2aSentTasks({
+        requesterHandle: options.requester,
+        workerHandle: options.worker,
         state: options.state as A2ATaskState | undefined,
+        contextId: options.context,
+        q: options.query,
+        since: options.since,
+        cursor: options.cursor,
+        limit: positiveInt(options.limit, "--limit"),
       });
       const items = result.items.map((task) => ({
         ...task,
-        targetHandle: task.target?.handle ?? null,
+        requesterHandle: task.caller.handle,
+        workerHandle: task.target?.handle ?? null,
       }));
-      output(items, {
-        json: !!getGlobalOpts(this).json,
-        columns: SENT_TASK_COLUMNS,
-      });
+      outputCursorPage(result, this, SENT_TASK_COLUMNS, items);
     }));
 
   a2a.command("sent-task <task-id>")
@@ -161,6 +275,56 @@ export function registerA2ACommands(program: Command): void {
     ) {
       const result = await (await identityFor(this, options.identity)).a2aSentTask(taskId);
       output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("messages")
+    .description("List and search an identity's A2A message history")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--direction <direction>", "Filter: inbound, outbound, or both")
+    .option("--requester <handle>", "Filter by requester identity")
+    .option("--worker <handle>", "Filter by worker identity")
+    .option("--task <id>", "Filter by task ID")
+    .option("--context <id>", "Filter by context ID")
+    .option("--role <role>", "Filter: caller or agent")
+    .option("-q, --query <query>", "Search message content")
+    .option("--since <datetime>", "Only messages created at or after this time")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Results per page (1-100)", "50")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: {
+        identity: string;
+        direction?: string;
+        requester?: string;
+        worker?: string;
+        task?: string;
+        context?: string;
+        role?: string;
+        query?: string;
+        since?: string;
+        cursor?: string;
+        limit: string;
+      },
+    ) {
+      const result = await (await identityFor(this, options.identity)).a2aMessages({
+        direction: options.direction as A2AHistoryDirection | undefined,
+        requesterHandle: options.requester,
+        workerHandle: options.worker,
+        taskId: options.task,
+        contextId: options.context,
+        role: options.role as A2AMessageRole | undefined,
+        q: options.query,
+        since: options.since,
+        cursor: options.cursor,
+        limit: positiveInt(options.limit, "--limit"),
+      });
+      const items = result.items.map((message) => ({
+        ...message,
+        requesterHandle: message.caller.handle,
+        workerHandle: message.target?.handle ?? null,
+        text: messageText(message),
+      }));
+      outputCursorPage(result, this, MESSAGE_COLUMNS, items);
     }));
 
   a2a.command("reply <task-id>")

@@ -1,6 +1,6 @@
 ---
 name: inkbox-ts
-description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox TypeScript SDK.
+description: Use when writing TypeScript or JavaScript code that imports from `@inkbox/sdk`, uses `npm install @inkbox/sdk`, or when adding email, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox TypeScript SDK.
 user-invocable: false
 ---
 
@@ -515,6 +515,56 @@ console.log(row.status, row.source, row.optedInAt, row.optedOutAt);
 await inkbox.smsOptIns.optIn("+15551234567");
 await inkbox.smsOptIns.optOut("+15551234567");
 ```
+
+## Agent-to-Agent (A2A)
+
+An identity can inspect work it received, work it requested, or both. Omit
+`direction` on `a2aTasks` for the receiver inbox; `a2aSentTasks` is the
+outbound-only alias.
+
+```ts
+const page = await identity.a2aTasks({
+  direction: "both",
+  requesterHandle: "coordinator",
+  workerHandle: "researcher",
+  state: "working",
+  contextId: "context-uuid",
+  q: "quarterly report",
+  since: "2026-07-01T00:00:00Z",
+  limit: 25,
+});
+
+// Async iterators preserve filters while draining every cursor page.
+for await (const message of identity.iterA2AMessages({
+  direction: "outbound",
+  workerHandle: "researcher",
+  role: "agent",
+  q: "revenue",
+})) {
+  console.log(
+    message.taskId,
+    message.contextId,
+    message.taskState,
+    message.parts,
+  );
+}
+```
+
+Task filters: `direction`, `requesterHandle`, `workerHandle`, `state`,
+`contextId`, `q`, `since`, `cursor`, `limit`. Message filters additionally
+support `taskId` and `role`; `role` is the message author (`caller` or
+`agent`), independent of task direction. Message direction defaults to `both`.
+Multiple filters are ANDed. Task search returns tasks containing a matching
+message; message search returns individual matches with requester/worker and
+task/context provenance. Search covers string and numeric content values from
+`text` and `data` parts, excludes metadata, and is deterministic newest-first
+rather than relevance-ranked.
+
+Use `a2aTask` / `a2aSentTask` for a task's current state and message history.
+
+For a multi-turn worker flow, reply with `intent: "ask_caller"` to request
+input; the caller continues the same task through the standard A2A client, and
+the worker later replies with `intent: "complete"` or `intent: "fail"`.
 
 ## Vault
 

@@ -582,6 +582,55 @@ the five `imessage.*` event types.
 
 ---
 
+## Agent-to-Agent (A2A)
+
+```python
+identity = inkbox.get_identity("coordinator")
+
+# Omit direction for the receiver inbox. Use "outbound" for requested work
+# or "both" for the complete identity-scoped history.
+page = identity.a2a_tasks(
+    direction="both",
+    requester_handle="coordinator",
+    worker_handle="researcher",
+    state="working",
+    q="quarterly report",
+    since="2026-07-01T00:00:00Z",
+    limit=25,
+)
+if page.next_cursor:
+    next_page = identity.a2a_tasks(
+        direction="both",
+        requester_handle="coordinator",
+        worker_handle="researcher",
+        state="working",
+        q="quarterly report",
+        since="2026-07-01T00:00:00Z",
+        cursor=page.next_cursor,
+        limit=25,
+    )
+
+# Iterators preserve every filter while following opaque cursors.
+for message in identity.iter_a2a_messages(
+    direction="outbound",
+    worker_handle="researcher",
+    role="agent",
+    q="revenue",
+):
+    print(message.task_id, message.task_state, message.parts)
+
+# The outbound alias is convenient when only requested work is needed.
+sent = identity.a2a_sent_tasks(worker_handle="researcher")
+```
+
+Task keyword filtering returns tasks containing a matching message. Message
+filtering returns the individual matching messages with task, context,
+requester, and worker provenance. Search covers string and numeric content
+values from `text` and `data` parts, excludes metadata, and is newest-first
+rather than relevance-ranked. `role` is the message author (`caller` or
+`agent`), independent of task direction. Task detail exposes message history
+and current state.
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
