@@ -196,6 +196,32 @@ await identity.revokeAccess(viewer.id);
 
 ## Mail
 
+### Mailbox imports
+
+```ts
+import { openAsBlob } from "node:fs";
+import { MailImportFormat } from "@inkbox/sdk";
+
+const file = await openAsBlob("./archive.zip");
+const created = await inkbox.mailboxes.imports.create("agent@inkboxmail.com", {
+  sourceFormat: MailImportFormat.ZIP,
+  originalAddresses: ["old-address@example.com"],
+});
+await inkbox.mailboxes.imports.upload(created.upload, file);
+await inkbox.mailboxes.imports.start("agent@inkboxmail.com", created.job.id);
+const job = await inkbox.mailboxes.imports.wait("agent@inkboxmail.com", created.job.id, {
+  timeoutMs: 3_600_000,
+  pollIntervalMs: 5_000,
+});
+```
+
+Supported formats are `auto`, `mbox`, `eml`, and `zip` (ZIP-of-EML). `wait`
+fetches immediately, polls every five seconds by default, and returns every
+terminal state, including `failed` and `cancelled`. A local timeout does not
+cancel the job. Counters may pause or reset during recovery; processing has no
+reliable percentage. Unsafe imported content may be rejected and reported in
+`messagesRejectedUnsafe`. Use `refreshUploadTarget` if the upload target expires.
+
 ```ts
 // Send an email (plain text and/or HTML)
 const sent = await identity.sendEmail({

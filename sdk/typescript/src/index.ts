@@ -21,6 +21,7 @@ export {
   InkboxConnectionError,
   InkboxError,
   InkboxVaultKeyError,
+  MailImportUploadError,
   RecipientBlockedError,
   RedundantContactAccessGrantError,
   StorageLimitExceededError,
@@ -125,6 +126,8 @@ export {
   MailRuleAction,
   MailRuleMatchType,
   MessageDirection,
+  MailImportFormat,
+  MailImportJobStatus,
   SendingDomainStatus,
   ThreadFolder,
 } from "./mail/types.js";
@@ -132,6 +135,10 @@ export type {
   Domain,
   FilterModeChangeNotice,
   Mailbox,
+  MailImportCreateResult,
+  MailImportJob,
+  MailImportJobPage,
+  MailImportUploadTarget,
   MailContactRule,
   MailIdentityContactRule,
   Message,
@@ -140,6 +147,13 @@ export type {
   Thread,
   ThreadDetail,
 } from "./mail/types.js";
+export type {
+  MailboxImportsResource,
+  CreateMailImportOptions,
+  ListMailImportsOptions,
+  UploadMailImportOptions,
+  WaitForMailImportOptions,
+} from "./mail/resources/imports.js";
 export type {
   MailIdentityContactRulesResource,
   CreateMailIdentityContactRuleOptions,

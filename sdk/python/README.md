@@ -187,6 +187,34 @@ identity.revoke_access(viewer.id)
 
 ## Mail
 
+### Mailbox imports
+
+```python
+from inkbox import MailImportFormat
+
+created = inkbox.mailboxes.imports.create(
+    "agent@inkboxmail.com",
+    source_format=MailImportFormat.AUTO,
+    original_addresses=["old-address@example.com"],
+)
+inkbox.mailboxes.imports.upload(created.upload, "./archive.mbox")
+inkbox.mailboxes.imports.start("agent@inkboxmail.com", str(created.job.id))
+job = inkbox.mailboxes.imports.wait(
+    "agent@inkboxmail.com",
+    str(created.job.id),
+    timeout=3600,
+    poll_interval=5,
+)
+```
+
+Supported formats are `auto`, `mbox`, `eml`, and `zip` (ZIP-of-EML). `wait`
+fetches immediately, polls every five seconds by default, and returns every
+terminal state, including `failed` and `cancelled`. A local timeout does not
+cancel the job. Counters may pause or reset during recovery; processing has no
+reliable percentage. Unsafe imported content may be rejected and reported in
+`messages_rejected_unsafe`. Use `refresh_upload_target` if the upload target
+expires before upload.
+
 ```python
 # Send an email (plain text and/or HTML)
 sent = identity.send_email(

@@ -141,6 +141,14 @@ pub enum InkboxError {
     #[error("transport error: {0}")]
     Transport(#[from] reqwest::Error),
 
+    /// A direct mailbox import upload returned an HTTP error.
+    #[error("import upload failed with HTTP {status_code}: {detail}")]
+    MailImportUpload { status_code: u16, detail: String },
+
+    /// A direct mailbox import upload failed before receiving an HTTP response.
+    #[error("import upload failed: {detail}")]
+    MailImportUploadTransport { detail: String },
+
     /// Response body could not be decoded as the expected JSON shape.
     #[error("decode error: {0}")]
     Decode(#[from] serde_json::Error),

@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, mailbox imports, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -121,6 +121,26 @@ identity.revoke_access(viewer.id) # revoke one viewer (keyed by viewer UUID)
 Granting a viewer against an already-wildcard target raises `RedundantContactAccessGrantError` (409); revoking a non-existent grant raises `InkboxAPIError` (404).
 
 ## Mail
+
+### Import historical mail
+
+```python
+from inkbox import MailImportFormat
+
+created = inkbox.mailboxes.imports.create(
+    email,
+    source_format=MailImportFormat.AUTO,
+    original_addresses=["old@example.com"],
+)
+inkbox.mailboxes.imports.upload(created.upload, "archive.mbox")
+inkbox.mailboxes.imports.start(email, str(created.job.id))
+job = inkbox.mailboxes.imports.wait(email, str(created.job.id), poll_interval=5)
+```
+
+Formats: `auto`, `mbox`, `eml`, `zip` (ZIP-of-EML). `wait` returns all terminal
+states; failure/cancellation are job results, not transport errors. A timeout
+does not cancel. Counters may pause or reset and must not be treated as a
+percentage. Unsafe imported content may be rejected.
 
 ### Send
 

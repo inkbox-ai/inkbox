@@ -5,7 +5,7 @@ import { Inkbox } from "@inkbox/sdk";
 import type { Command } from "commander";
 
 // Keep in sync with package.json "version".
-export const CLI_VERSION = "0.5.5";
+export const CLI_VERSION = "0.5.6";
 
 export interface GlobalOpts {
   apiKey?: string;
@@ -51,7 +51,7 @@ export function resolveBaseUrl(opts: GlobalOpts): string | undefined {
   );
 }
 
-export function createClient(opts: GlobalOpts): Inkbox {
+export function createClient(opts: GlobalOpts, timeoutMs?: number): Inkbox {
   const fileCfg = readConfigFile();
   const apiKey = opts.apiKey ?? process.env.INKBOX_API_KEY ?? fileCfg.api_key;
   if (!apiKey) {
@@ -68,6 +68,7 @@ export function createClient(opts: GlobalOpts): Inkbox {
     apiKey,
     vaultKey: vaultKey || undefined,
     baseUrl,
+    timeoutMs,
     userAgentPrefix: `inkbox-cli/${CLI_VERSION}`,
   });
 }

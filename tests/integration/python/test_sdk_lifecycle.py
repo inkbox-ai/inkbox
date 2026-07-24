@@ -7,9 +7,10 @@ End-to-end lifecycle test for the Python SDK against a live environment.
 from __future__ import annotations
 
 from uuid import uuid4
+from tempfile import NamedTemporaryFile
 
 import pytest
-from inkbox import Inkbox
+from inkbox import Inkbox, MailImportFormat, MailImportJobStatus
 from conftest import SdkIntegrationContext, log_step, poll_until
 
 
@@ -56,6 +57,31 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         assert bravo.agent_handle == bravo_handle
         assert bravo.mailbox is not None
         assert bravo.tunnel is not None
+
+        log_step(ctx, "import one EML through the Python SDK")
+        imported_subject = f"python-import-{run_suffix}"
+        with NamedTemporaryFile(suffix=".eml") as upload:
+            upload.write(
+                (
+                    f"From: sender@example.com\r\nTo: {alpha.email_address}\r\n"
+                    f"Subject: {imported_subject}\r\nMessage-ID: <{run_suffix}@example.com>\r\n"
+                    "Date: Wed, 1 Jul 2026 12:00:00 +0000\r\n\r\nImported body.\r\n"
+                ).encode()
+            )
+            upload.flush()
+            created = inkbox.mailboxes.imports.create(
+                alpha.email_address, source_format=MailImportFormat.EML
+            )
+            inkbox.mailboxes.imports.upload(created.upload, upload.name)
+        inkbox.mailboxes.imports.start(alpha.email_address, str(created.job.id))
+        imported = inkbox.mailboxes.imports.wait(
+            alpha.email_address,
+            str(created.job.id),
+            timeout=cfg.poll_timeout,
+            poll_interval=cfg.poll_interval,
+        )
+        assert imported.status is MailImportJobStatus.COMPLETED
+        assert imported.messages_imported == 1
 
         log_step(ctx, "list identities shows 2")
         identities = inkbox.list_identities()

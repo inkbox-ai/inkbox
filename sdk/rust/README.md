@@ -113,6 +113,34 @@ exposes channel-scoped convenience methods: `send_email`, `forward_email`,
 (`list_mail_contact_rules`, `create_phone_contact_rule`, ...), `create_signing_key`,
 and more.
 
+### Mailbox imports
+
+```rust
+use std::time::Duration;
+use inkbox::mail::MailImportFormat;
+
+let imports = inkbox.mailboxes().imports();
+let created = imports.create(
+    "agent@inkboxmail.com",
+    MailImportFormat::Auto,
+    Some(&["old-address@example.com".to_string()]),
+    true,
+)?;
+imports.upload(&created.upload, "./archive.mbox")?;
+imports.start("agent@inkboxmail.com", &created.job.id.to_string())?;
+let job = imports.wait(
+    "agent@inkboxmail.com",
+    &created.job.id.to_string(),
+    Some(Duration::from_secs(3600)),
+    Some(Duration::from_secs(5)),
+)?;
+```
+
+Imports support MBOX, EML, and ZIP-of-EML files. `wait` returns completed,
+failed, and cancelled jobs; timing out locally does not cancel the job. Counters
+may pause or reset during recovery and do not represent a percentage. Unsafe
+imported content may be rejected in `messages_rejected_unsafe`.
+
 ### Dedicated iMessage numbers
 
 List or claim organization-owned dedicated numbers through the iMessage resource:

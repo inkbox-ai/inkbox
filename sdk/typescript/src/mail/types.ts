@@ -80,6 +80,22 @@ export enum SendingDomainStatus {
   PENDING_DELETION = "pending_deletion",
 }
 
+export enum MailImportFormat {
+  AUTO = "auto",
+  MBOX = "mbox",
+  EML = "eml",
+  ZIP = "zip",
+}
+
+export enum MailImportJobStatus {
+  PENDING_UPLOAD = "pending_upload",
+  QUEUED = "queued",
+  RUNNING = "running",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  CANCELLED = "cancelled",
+}
+
 /**
  * A custom sending domain registered to your organisation.
  *
@@ -178,6 +194,45 @@ export interface Message {
   firstOpenedAt: Date | null;
   /** Observed opens; approximate (proxy prefetch inflates, the per-window debounce collapses repeats) — prefer `firstOpenedAt`. */
   openCount: number;
+  /** Import job that created this historical message, or `null`. */
+  importJobId: string | null;
+}
+
+export interface MailImportUploadTarget {
+  url: string;
+  fields: Record<string, string>;
+  expiresInSeconds: number;
+}
+
+export interface MailImportJob {
+  id: string;
+  mailboxId: string;
+  status: MailImportJobStatus;
+  sourceFormat: MailImportFormat;
+  originalAddresses: string[] | null;
+  markAsRead: boolean;
+  uploadSizeBytes: number | null;
+  messagesProcessed: number;
+  messagesImported: number;
+  messagesSkippedDuplicate: number;
+  messagesFailed: number;
+  messagesRejectedUnsafe: number;
+  errorDetail: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+}
+
+export interface MailImportCreateResult {
+  job: MailImportJob;
+  upload: MailImportUploadTarget;
+}
+
+export interface MailImportJobPage {
+  items: MailImportJob[];
+  nextCursor: string | null;
+  hasMore: boolean;
 }
 
 /** Server-suggested To/Cc for a reply-all (sending mailbox and BCC excluded). */
@@ -304,6 +359,7 @@ export interface RawMessage {
   created_at: string;
   first_opened_at?: string | null;
   open_count?: number;
+  import_job_id?: string | null;
   // detail-only fields
   body_text?: string | null;
   body_html?: string | null;
@@ -314,6 +370,37 @@ export interface RawMessage {
   ses_message_id?: string | null;
   updated_at?: string;
   reply_all_recipients?: { to: string[]; cc: string[] } | null;
+}
+
+export interface RawMailImportUploadTarget {
+  url: string;
+  fields: Record<string, string>;
+  expires_in_seconds: number;
+}
+
+export interface RawMailImportJob {
+  id: string;
+  mailbox_id: string;
+  status: string;
+  source_format: string;
+  original_addresses: string[] | null;
+  mark_as_read: boolean;
+  upload_size_bytes: number | null;
+  messages_processed: number;
+  messages_imported: number;
+  messages_skipped_duplicate: number;
+  messages_failed: number;
+  messages_rejected_unsafe?: number;
+  error_detail: string | null;
+  created_at: string;
+  updated_at?: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface RawMailImportCreateResult {
+  job: RawMailImportJob;
+  upload: RawMailImportUploadTarget;
 }
 
 export interface RawThread {
@@ -414,6 +501,39 @@ export function parseMessage(r: RawMessage): Message {
     createdAt: new Date(r.created_at),
     firstOpenedAt: r.first_opened_at ? new Date(r.first_opened_at) : null,
     openCount: r.open_count ?? 0,
+    importJobId: r.import_job_id ?? null,
+  };
+}
+
+export function parseMailImportUploadTarget(
+  r: RawMailImportUploadTarget,
+): MailImportUploadTarget {
+  return {
+    url: r.url,
+    fields: r.fields,
+    expiresInSeconds: r.expires_in_seconds,
+  };
+}
+
+export function parseMailImportJob(r: RawMailImportJob): MailImportJob {
+  return {
+    id: r.id,
+    mailboxId: r.mailbox_id,
+    status: r.status as MailImportJobStatus,
+    sourceFormat: r.source_format as MailImportFormat,
+    originalAddresses: r.original_addresses ?? null,
+    markAsRead: r.mark_as_read,
+    uploadSizeBytes: r.upload_size_bytes ?? null,
+    messagesProcessed: r.messages_processed ?? 0,
+    messagesImported: r.messages_imported ?? 0,
+    messagesSkippedDuplicate: r.messages_skipped_duplicate ?? 0,
+    messagesFailed: r.messages_failed ?? 0,
+    messagesRejectedUnsafe: r.messages_rejected_unsafe ?? 0,
+    errorDetail: r.error_detail ?? null,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at ?? r.created_at),
+    startedAt: r.started_at ? new Date(r.started_at) : null,
+    finishedAt: r.finished_at ? new Date(r.finished_at) : null,
   };
 }
 

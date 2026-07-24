@@ -1,6 +1,9 @@
 // tests/integration/cli/cli_lifecycle.test.ts
 
 import { randomUUID } from "node:crypto";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   loadConfig,
@@ -76,6 +79,24 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     );
     expect(bravoCreate.mailbox).toBeTruthy();
     const bravoMb = { emailAddress: bravoCreate.mailbox };
+
+    logStep(config, "import one EML through the CLI");
+    const importDir = mkdtempSync(join(tmpdir(), "inkbox-cli-import-"));
+    const importPath = join(importDir, "message.eml");
+    writeFileSync(
+      importPath,
+      `From: sender@example.com\r\nTo: ${alphaMb.emailAddress}\r\n` +
+        `Subject: cli-import-${runSuffix}\r\nMessage-ID: <${runSuffix}@example.com>\r\n` +
+        "Date: Wed, 1 Jul 2026 12:00:00 +0000\r\n\r\nImported body.\r\n",
+    );
+    const imported = inkboxJson<{ status: string; messagesImported: number }>(
+      `mailbox imports run "${alphaMb.emailAddress}" "${importPath}" --source-format eml ` +
+        `--timeout ${Math.ceil(config.pollTimeoutMs / 1000)} ` +
+        `--poll-interval ${Math.max(1, Math.ceil(config.pollIntervalMs / 1000))}`,
+      cliOpts,
+    );
+    expect(imported.status).toBe("completed");
+    expect(imported.messagesImported).toBe(1);
 
     logStep(config, "list identities shows 2");
     const identities = inkboxJson<unknown[]>("identity list", cliOpts);

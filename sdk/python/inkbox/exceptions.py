@@ -22,6 +22,16 @@ class InkboxVaultKeyError(InkboxError):
     """
 
 
+class MailImportUploadError(InkboxError):
+    """Raised when a direct mailbox import upload fails."""
+
+    def __init__(self, status_code: int | None, detail: str) -> None:
+        prefix = f"HTTP {status_code}" if status_code is not None else "transport error"
+        super().__init__(f"Import upload failed ({prefix}): {detail}")
+        self.status_code = status_code
+        self.detail = detail
+
+
 class InkboxAPIError(InkboxError):
     """
     Raised when the API returns a 4xx or 5xx response.
@@ -34,9 +44,7 @@ class InkboxAPIError(InkboxError):
     """
 
     def __init__(self, status_code: int, detail: str | dict[str, Any]) -> None:
-        super().__init__(
-            f"HTTP {status_code}: {detail}"
-        )
+        super().__init__(f"HTTP {status_code}: {detail}")
         self.status_code = status_code
         self.detail: str | dict[str, Any] = detail
 

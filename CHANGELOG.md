@@ -4,6 +4,21 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.6 — Mailbox imports
+
+### Added
+
+- Python, TypeScript, and Rust SDK resources for creating, uploading, starting, listing, inspecting, cancelling, and waiting for MBOX, EML, and ZIP-of-EML mailbox imports. Direct uploads stream without API credentials, and polling returns completed, failed, or cancelled jobs.
+- `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits.
+- Import provenance on message models through nullable `import_job_id` (TypeScript `importJobId`), plus unsafe-content rejection counters on import jobs.
+
+### Changed
+
+- Version bumped to 0.5.6 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.6`.
+- Import waits poll every five seconds by default. Local timeouts stop waiting without cancelling the job; processing counters are checkpoints and are not a percentage.
+- **TypeScript note (source-breaking).** `Message` gains required `importJobId: string | null`; hand-built message object literals must add it. Parsing defaults an omitted wire field to `null`.
+- **Rust note (source-breaking).** `Message` gains public `import_job_id: Option<Uuid>`, and `InkboxError` gains `MailImportUpload` and `MailImportUploadTransport` variants. Struct literals and exhaustive error matches must account for them; omitted message fields still deserialize as `None`.
+
 ## 0.5.5 — Action-only contact-rule updates
 
 ### Changed
