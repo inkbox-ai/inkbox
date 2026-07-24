@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.6 — A2A 1.0
+
+### Added
+
+- `inkbox a2a enable|disable|card`, skills and rule management, task inbox/list/reply commands, and remote `call|check|cancel` commands.
+
+### Changed
+
+- CLI version moved with Python and TypeScript to 0.5.6 and now depends on `@inkbox/sdk` `^0.5.6`.
+
 ## 0.5.5 — Action-only contact-rule updates
 
 ### Changed

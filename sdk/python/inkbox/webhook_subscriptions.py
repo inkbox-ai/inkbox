@@ -177,20 +177,21 @@ def _assert_no_incoming_call(event_types: list[str]) -> None:
 
 
 # Wire event-type prefix -> the owning resource whose channel it belongs to.
-# An agent identity owns two channels (iMessage + post-call lifecycle), so two
-# prefixes map to it; a single subscription may still only carry one channel.
+# An agent identity owns iMessage, post-call, and A2A channels; a single
+# subscription may still only carry one channel.
 _EVENT_PREFIX_TO_OWNER = {
     "message.": "mailbox",
     "text.": "phone_number",
     "imessage.": "agent_identity",
     "call.": "agent_identity",
+    "a2a.": "agent_identity",
 }
 
 # Owner resource -> the event-type prefixes it may subscribe to.
 _OWNER_EVENT_PREFIXES = {
     "mailbox": ("message.",),
     "phone_number": ("text.",),
-    "agent_identity": ("imessage.", "call."),
+    "agent_identity": ("imessage.", "call.", "a2a."),
 }
 
 
