@@ -278,13 +278,15 @@ Load the Inkbox skills into your coding agent so it automatically knows how to u
 /reload-plugins
 ```
 
+The plugin loads the Inkbox skills and connects the remote MCP server. Sign in when prompted to authorize an identity.
+
 ### Codex (plugin)
 
 ```bash
 codex plugin marketplace add inkbox-ai/inkbox
 ```
 
-Then install `inkbox` from the Codex plugin UI. Codex has no `codex plugin install` subcommand yet, and the official plugin directory is not open for submissions — see the [Codex plugin docs](https://developers.openai.com/codex/plugins/build).
+Then install `inkbox` from the Codex plugin UI. See the [Codex plugin docs](https://developers.openai.com/codex/plugins/build) for current installation options.
 
 ### Any Agent (individual skills)
 

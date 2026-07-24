@@ -1,5 +1,34 @@
 {
   "name": "inkbox",
-  "description": "Inkbox email and phone SDK skills.",
-  "skills": "./skills/"
+  "version": "0.1.0",
+  "description": "Inkbox communication tools and SDK skills.",
+  "author": {
+    "name": "Inkbox AI",
+    "email": "hello@inkbox.ai",
+    "url": "https://inkbox.ai"
+  },
+  "skills": "./skills/",
+  "mcpServers": {
+    "inkbox": {
+      "type": "http",
+      "url": "https://inkbox.ai/mcp"
+    }
+  },
+  "interface": {
+    "displayName": "Inkbox",
+    "shortDescription": "Email, messaging, and calls for AI agents.",
+    "longDescription": "Give agents an Inkbox identity and use its communications through live tools or SDK guidance.",
+    "developerName": "Inkbox AI",
+    "category": "Productivity",
+    "capabilities": ["Email", "Messaging", "Calls"],
+    "websiteURL": "https://inkbox.ai",
+    "privacyPolicyURL": "https://inkbox.ai/privacy-policy",
+    "termsOfServiceURL": "https://inkbox.ai/terms-of-service",
+    "brandColor": "#141442",
+    "defaultPrompt": [
+      "Summarize my unread communications.",
+      "Draft a reply to my latest email.",
+      "Show my recent conversation with a contact."
+    ]
+  }
 }
