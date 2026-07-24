@@ -75,8 +75,7 @@ class IMessageContactRulesResource:
         match_target: str,
         match_type: IMessageRuleMatchType | str = IMessageRuleMatchType.EXACT_NUMBER,
     ) -> IMessageContactRule:
-        """Create a rule. New rules are always ``active``; use
-        :meth:`update` to pause one after creation.
+        """Create a rule. Use :meth:`update` to change its allow/block action.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.

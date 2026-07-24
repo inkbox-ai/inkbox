@@ -221,7 +221,7 @@ function registerMailboxRulesCommands(parent: Command): void {
 
   rules
     .command("create")
-    .description("Create a rule (always starts active; use `update` to pause)")
+    .description("Create an allow or block rule")
     .requiredOption("--mailbox <email>", "Mailbox email address")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-type <type>", "exact_email or domain")

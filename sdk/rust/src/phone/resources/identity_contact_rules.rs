@@ -93,8 +93,8 @@ impl PhoneIdentityContactRulesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Create a rule for an agent identity. New rules are always `active`; use
-    /// [`Self::update`] to pause one after creation.
+    /// Create a rule for an agent identity. Use [`Self::update`] to change its
+    /// allow/block action.
     ///
     /// The identity must have a phone number — otherwise the server returns 422.
     ///

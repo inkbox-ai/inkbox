@@ -79,8 +79,7 @@ class MailIdentityContactRulesResource:
         match_type: MailRuleMatchType | str,
         match_target: str,
     ) -> MailIdentityContactRule:
-        """Create a rule for an agent identity. New rules are always
-        ``active``.
+        """Create a rule for an agent identity.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.

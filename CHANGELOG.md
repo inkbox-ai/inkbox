@@ -4,6 +4,21 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.5 — Action-only contact-rule updates
+
+### Changed
+
+- Version bumped to 0.5.5 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.5`.
+- Contact-rule updates now require an allow/block `action`.
+
+### Removed
+
+- **Source-breaking:** identity updates and contact-rule updates no longer accept lifecycle status. The CLI likewise removes identity/contact-rule `--status` flags. Remove those arguments and flags before upgrading.
+
+### Compatibility
+
+- Response models continue to parse existing `paused` rows for backward compatibility.
+
 ## 0.5.4 — Dedicated outbound iMessage groups
 
 ### Added
@@ -62,7 +77,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Removed
 
 - **Source-breaking:** contact access grant/revoke methods were removed from the Python, TypeScript, and Rust SDKs, and `inkbox contacts access grant|revoke` were removed from the CLI. Create-contact access options were also removed: `access_identity_ids` (Python), `accessIdentityIds` (TypeScript), and the corresponding Rust create field are no longer accepted. Remove those calls/options before upgrading.
-- **Source-breaking:** identity updates and contact-rule updates no longer accept lifecycle status. Contact-rule updates now require an `action`; the CLI likewise removes identity/contact-rule `--status` flags. Response models continue to parse existing `paused` rows for backward compatibility.
 
 ## 0.5.0 — Identity tunnel summaries + inlined vault access
 

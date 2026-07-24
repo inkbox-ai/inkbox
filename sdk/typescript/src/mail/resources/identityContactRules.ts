@@ -84,7 +84,7 @@ export class MailIdentityContactRulesResource {
   }
 
   /**
-   * Create a rule for an agent identity. New rules are always `active`.
+   * Create a rule for an agent identity.
    *
    * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
    *   the same `(matchType, matchTarget)` already exists.

@@ -91,7 +91,7 @@ export class PhoneIdentityContactRulesResource {
   }
 
   /**
-   * Create a rule for an agent identity. New rules are always `active`.
+   * Create a rule for an agent identity.
    * The identity must have
    * a phone number — otherwise the server returns 422.
    *

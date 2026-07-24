@@ -78,8 +78,8 @@ impl PhoneContactRulesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Create a rule. New rules are always `active`; use [`update`](Self::update)
-    /// to pause one after creation.
+    /// Create a rule. Use [`update`](Self::update) to change its allow/block
+    /// action.
     ///
     /// Returns [`InkboxError::DuplicateContactRule`](crate::error::InkboxError)
     /// on 409 when a non-deleted rule with the same `(match_type, match_target)`

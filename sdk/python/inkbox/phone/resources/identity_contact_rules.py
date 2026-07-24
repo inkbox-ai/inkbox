@@ -85,8 +85,7 @@ class PhoneIdentityContactRulesResource:
         match_target: str,
         match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
     ) -> PhoneIdentityContactRule:
-        """Create a rule for an agent identity. New rules are always
-        ``active``.
+        """Create a rule for an agent identity.
 
         The identity must have a phone number — otherwise the server
         returns 422.

@@ -110,7 +110,7 @@ function registerNumberRulesCommands(parent: Command): void {
 
   rules
     .command("create")
-    .description("Create a rule (always starts active; use `update` to pause)")
+    .description("Create an allow or block rule")
     .requiredOption("--number <id>", "Phone number id")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-target <value>", "Phone number to match (E.164)")

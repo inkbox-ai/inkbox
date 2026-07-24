@@ -76,7 +76,7 @@ export class IMessageContactRulesResource {
   }
 
   /**
-   * Create a rule. New rules are always `active`.
+   * Create a rule with an allow/block action.
    *
    * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
    *   the same `(matchType, matchTarget)` already exists.

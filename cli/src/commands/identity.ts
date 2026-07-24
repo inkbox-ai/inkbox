@@ -192,7 +192,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
 
   rules
     .command("create <handle>")
-    .description("Create a mail contact rule (always starts active)")
+    .description("Create a mail allow or block contact rule")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-type <type>", "exact_email or domain")
     .requiredOption("--match-target <value>", "Address or domain to match")
