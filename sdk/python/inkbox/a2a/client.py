@@ -149,6 +149,13 @@ class A2AClient:
                 "configuration": {"returnImmediately": True},
             },
         )
+        task = result.get("task")
+        if isinstance(task, dict):
+            return A2ASendResult(kind="task", task=A2AWireTask(task))
+        message = result.get("message")
+        if isinstance(message, dict):
+            return A2ASendResult(kind="message", message=A2AWireMessage(message))
+        # Accept direct payloads from older A2A implementations.
         if "status" in result and "id" in result:
             return A2ASendResult(kind="task", task=A2AWireTask(result))
         return A2ASendResult(kind="message", message=A2AWireMessage(result))
@@ -163,7 +170,9 @@ class A2AClient:
         params: dict[str, Any] = {"id": task_id}
         if history_length is not None:
             params["historyLength"] = history_length
-        return A2AWireTask(self._rpc(target, "GetTask", params))
+        result = self._rpc(target, "GetTask", params)
+        task = result.get("task")
+        return A2AWireTask(task if isinstance(task, dict) else result)
 
     def list_tasks(
         self,
@@ -193,7 +202,9 @@ class A2AClient:
         )
 
     def cancel(self, target: A2AResolvedTarget, task_id: str) -> A2AWireTask:
-        return A2AWireTask(self._rpc(target, "CancelTask", {"id": task_id}))
+        result = self._rpc(target, "CancelTask", {"id": task_id})
+        task = result.get("task")
+        return A2AWireTask(task if isinstance(task, dict) else result)
 
     def wait(
         self,

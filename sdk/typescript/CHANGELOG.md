@@ -8,6 +8,10 @@
 - `identity.a2aClient()` provides a stateless standard A2A 1.0 client with credential-less card discovery, canonical-origin credential pinning, exact wire tasks/messages, idempotent message IDs, polling, listing, and cancellation.
 - A2A webhook payload types and subscription channel validation.
 
+### Changed
+
+- The A2A client unwraps the standard task/message result envelope while retaining compatibility with direct task payloads.
+
 ### Compatibility
 
 - Existing methods are unchanged. A2A requires the matching server rollout and a claimed identity-scoped key for remote calls.

@@ -17,6 +17,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Changed
 
 - Python, TypeScript, CLI, and Rust package metadata move to 0.5.6; the CLI depends on `@inkbox/sdk` `^0.5.6`. Rust exposes no A2A surface in this release; that implementation remains deliberately deferred.
+- Python and TypeScript A2A clients unwrap the standard task/message result envelope while retaining compatibility with direct task payloads.
 
 ### Compatibility and rollout
 
