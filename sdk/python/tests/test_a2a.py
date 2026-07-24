@@ -96,9 +96,11 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
                 "jsonrpc": "2.0",
                 "id": 1,
                 "result": {
-                    "id": "task-1",
-                    "contextId": "context-1",
-                    "status": {"state": "TASK_STATE_SUBMITTED"},
+                    "task": {
+                        "id": "task-1",
+                        "contextId": "context-1",
+                        "status": {"state": "TASK_STATE_SUBMITTED"},
+                    },
                 },
             },
         )
@@ -112,6 +114,8 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
 
     target = client.fetch_card("https://inkbox.ai/a2a/helper/card")
     result = client.send(target, text="Investigate", message_id="msg-1")
+    fetched = client.get_task(target, "task-1")
+    canceled = client.cancel(target, "task-1")
 
     assert "X-API-Key" not in requests[0].headers
     assert requests[1].headers["X-API-Key"] == "ApiKey_secret"
@@ -133,6 +137,8 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
     assert result.kind == "task"
     assert result.task is not None
     assert result.task.id == "task-1"
+    assert fetched.id == "task-1"
+    assert canceled.id == "task-1"
     client.close()
 
 

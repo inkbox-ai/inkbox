@@ -130,22 +130,32 @@ export class A2AClient {
       message,
       configuration: { returnImmediately: true },
     });
+    if (result.task && typeof result.task === "object") {
+      return { kind: "task", task: result.task as A2AWireTask };
+    }
+    if (result.message && typeof result.message === "object") {
+      return { kind: "message", message: result.message as any };
+    }
+    // Accept direct payloads from older A2A implementations.
     return "status" in result && "id" in result
       ? { kind: "task", task: result as A2AWireTask }
       : { kind: "message", message: result as any };
   }
 
-  getTask(
+  async getTask(
     target: A2AResolvedTarget,
     taskId: string,
     options: { historyLength?: number } = {},
   ): Promise<A2AWireTask> {
-    return this.rpc(target, "GetTask", {
+    const result = await this.rpc<Record<string, any>>(target, "GetTask", {
       id: taskId,
       ...(options.historyLength === undefined
         ? {}
         : { historyLength: options.historyLength }),
     });
+    return result.task && typeof result.task === "object"
+      ? result.task as A2AWireTask
+      : result as A2AWireTask;
   }
 
   async listTasks(
@@ -175,8 +185,15 @@ export class A2AClient {
     };
   }
 
-  cancel(target: A2AResolvedTarget, taskId: string): Promise<A2AWireTask> {
-    return this.rpc(target, "CancelTask", { id: taskId });
+  async cancel(target: A2AResolvedTarget, taskId: string): Promise<A2AWireTask> {
+    const result = await this.rpc<Record<string, any>>(
+      target,
+      "CancelTask",
+      { id: taskId },
+    );
+    return result.task && typeof result.task === "object"
+      ? result.task as A2AWireTask
+      : result as A2AWireTask;
   }
 
   async wait(

@@ -66,16 +66,46 @@ describe("A2AClient", () => {
         jsonrpc: "2.0",
         id: 1,
         result: {
-          id: "task-1",
-          contextId: "context-1",
-          status: { state: "TASK_STATE_SUBMITTED" },
+          task: {
+            id: "task-1",
+            contextId: "context-1",
+            status: { state: "TASK_STATE_SUBMITTED" },
+          },
+        },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        result: {
+          task: {
+            id: "task-1",
+            contextId: "context-1",
+            status: { state: "TASK_STATE_SUBMITTED" },
+          },
+        },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: 3,
+        result: {
+          task: {
+            id: "task-1",
+            contextId: "context-1",
+            status: { state: "TASK_STATE_CANCELED" },
+          },
         },
       }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const client = new A2AClient("ApiKey_secret", "https://inkbox.ai");
 
     const target = await client.fetchCard("https://inkbox.ai/a2a/helper/card");
-    await client.send(target, { text: "Investigate", messageId: "msg-1" });
+    const sent = await client.send(target, { text: "Investigate", messageId: "msg-1" });
+    const fetched = await client.getTask(target, "task-1");
+    const canceled = await client.cancel(target, "task-1");
+
+    expect(sent.kind).toBe("task");
+    expect(fetched.id).toBe("task-1");
+    expect(canceled.status.state).toBe("TASK_STATE_CANCELED");
 
     expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty("X-API-Key");
     const rpc = fetchMock.mock.calls[1][1];
