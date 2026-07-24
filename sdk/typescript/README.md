@@ -507,6 +507,7 @@ import {
   DedicatedIMessageNumberQuotaExceededError,
   IdempotencyKeyReusedError,
   IMessageNumberType,
+  IMessageRuleAction,
   IMessageSendStyle,
 } from "@inkbox/sdk";
 
@@ -547,7 +548,7 @@ await identity.sendIMessage({ conversationId: convos[0].id, mediaUrls: [upload.m
 
 // Per-identity allow/block rules, interpreted via imessageFilterMode.
 await inkbox.imessageContactRules.create("my-agent", {
-  action: "block",
+  action: IMessageRuleAction.BLOCK,
   matchTarget: "+15555550999",
 });
 
