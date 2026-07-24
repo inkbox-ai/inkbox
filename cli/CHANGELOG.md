@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.5 — Action-only contact-rule updates
+
+### Changed
+
+- Contact-rule update commands now require `--action`.
+- CLI version moved in lockstep with `@inkbox/sdk` 0.5.5 and depends on `^0.5.5`.
+
+### Removed
+
+- Identity and contact-rule update commands no longer accept lifecycle `--status`.
+
 ## 0.5.4 — Dedicated outbound iMessage groups
 
 ### Added

@@ -104,9 +104,9 @@ class TestMailIdentityContactRulesResource:
         rid = MAIL_RULE_DICT["id"]
         res.get("my-agent", rid)
         http.get.assert_called_with(f"/identities/my-agent/mail-contact-rules/{rid}")
-        res.update("my-agent", rid, status="paused")
+        res.update("my-agent", rid, action="allow")
         http.patch.assert_called_once_with(
-            f"/identities/my-agent/mail-contact-rules/{rid}", json={"status": "paused"}
+            f"/identities/my-agent/mail-contact-rules/{rid}", json={"action": "allow"}
         )
         res.delete("my-agent", rid)
         http.delete.assert_called_once_with(
@@ -312,11 +312,11 @@ class TestAgentIdentityContactRuleDelegation:
             match_target="spam@example.com",
         )
 
-    def test_update_mail_contact_rule_only_forwards_set_kwargs(self):
+    def test_update_mail_contact_rule_forwards_action(self):
         identity, inkbox = _identity()
-        identity.update_mail_contact_rule("rid", status="paused")
+        identity.update_mail_contact_rule("rid", action="allow")
         inkbox._mail_identity_contact_rules.update.assert_called_once_with(
-            identity.agent_handle, "rid", status="paused",
+            identity.agent_handle, "rid", action="allow",
         )
 
     def test_list_phone_contact_rules_without_phone_returns_empty(self):
@@ -334,7 +334,7 @@ class TestAgentIdentityContactRuleDelegation:
         with pytest.raises(InkboxError, match="no phone number"):
             identity.create_phone_contact_rule(action="block", match_target="+14155550199")
         with pytest.raises(InkboxError, match="no phone number"):
-            identity.update_phone_contact_rule("rid", status="paused")
+            identity.update_phone_contact_rule("rid", action="block")
         with pytest.raises(InkboxError, match="no phone number"):
             identity.delete_phone_contact_rule("rid")
 

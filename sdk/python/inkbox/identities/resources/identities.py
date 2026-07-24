@@ -130,10 +130,9 @@ class IdentitiesResource:
         imessage_filter_mode: str | None = None,
         mail_filter_mode: str | None = None,
         phone_filter_mode: str | None = None,
-        status: str | None = None,
     ) -> _AgentIdentityData:
         """Update an identity's handle, display name, description,
-        iMessage reachability, contact-rule filter modes, and/or status.
+        iMessage reachability, and contact-rule filter modes.
 
         Only provided fields are applied; omitted fields are left
         unchanged. For ``display_name`` and ``description``, explicit
@@ -161,8 +160,6 @@ class IdentitiesResource:
             phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
                 identity's phone contact rules (admin-only). The server
                 rejects this with 422 when the identity has no phone number.
-            status: ``"active"`` or ``"paused"``. Call :meth:`delete`
-                to remove an identity; ``"deleted"`` is rejected here.
         """
         body: dict[str, Any] = {}
         if new_handle is not None:
@@ -205,8 +202,6 @@ class IdentitiesResource:
             body["mail_filter_mode"] = mail_filter_mode
         if phone_filter_mode is not None:
             body["phone_filter_mode"] = phone_filter_mode
-        if status is not None:
-            body["status"] = status
         headers = None
         if idempotency_key is not None:
             headers = {

@@ -11,7 +11,6 @@
 
 import { HttpTransport } from "../../_http.js";
 import {
-  ContactRuleStatus,
   MailContactRule,
   MailRuleAction,
   MailRuleMatchType,
@@ -41,8 +40,7 @@ export interface CreateMailContactRuleOptions {
 }
 
 export interface UpdateMailContactRuleOptions {
-  action?: MailRuleAction;
-  status?: ContactRuleStatus;
+  action: MailRuleAction;
 }
 
 export interface ListAllMailContactRulesOptions {
@@ -100,9 +98,7 @@ export class MailContactRulesResource {
     ruleId: string,
     options: UpdateMailContactRuleOptions,
   ): Promise<MailContactRule> {
-    const body: Record<string, unknown> = {};
-    if (options.action !== undefined) body.action = options.action;
-    if (options.status !== undefined) body.status = options.status;
+    const body = { action: options.action };
     const data = await this.http.patch<RawMailContactRule>(
       rulePath(emailAddress, ruleId),
       body,

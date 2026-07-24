@@ -97,7 +97,6 @@ export interface UpdateIdentityOptions {
   imessageFilterMode?: "whitelist" | "blacklist";
   mailFilterMode?: "whitelist" | "blacklist";
   phoneFilterMode?: "whitelist" | "blacklist";
-  status?: "active" | "paused";
 }
 
 export interface IdentityMailbox {

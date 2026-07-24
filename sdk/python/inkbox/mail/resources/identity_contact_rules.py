@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from inkbox.mail.types import (
-    ContactRuleStatus,
     MailIdentityContactRule,
     MailRuleAction,
     MailRuleMatchType,
@@ -31,7 +30,6 @@ if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 _ORG_BASE = "/mail/contact-rules"
-_UNSET = object()
 
 
 def _rule_path(agent_handle: str, rule_id: UUID | str | None = None) -> str:
@@ -81,8 +79,7 @@ class MailIdentityContactRulesResource:
         match_type: MailRuleMatchType | str,
         match_target: str,
     ) -> MailIdentityContactRule:
-        """Create a rule for an agent identity. New rules are always
-        ``active``; use :meth:`update` to pause one after creation.
+        """Create a rule for an agent identity.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.
@@ -102,23 +99,16 @@ class MailIdentityContactRulesResource:
         agent_handle: str,
         rule_id: UUID | str,
         *,
-        action: MailRuleAction | str = _UNSET,  # type: ignore[assignment]
-        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+        action: MailRuleAction | str,
     ) -> MailIdentityContactRule:
-        """Update ``action`` or ``status`` (admin-only).
+        """Update ``action`` (admin-only).
 
         ``match_type`` and ``match_target`` are immutable — delete + re-create
         to change them.
         """
-        body: dict[str, Any] = {}
-        if action is not _UNSET:
-            body["action"] = (
-                action.value if isinstance(action, MailRuleAction) else action
-            )
-        if status is not _UNSET:
-            body["status"] = (
-                status.value if isinstance(status, ContactRuleStatus) else status
-            )
+        body = {
+            "action": action.value if isinstance(action, MailRuleAction) else action,
+        }
         data = self._http.patch(_rule_path(agent_handle, rule_id), json=body)
         return MailIdentityContactRule._from_dict(data)
 

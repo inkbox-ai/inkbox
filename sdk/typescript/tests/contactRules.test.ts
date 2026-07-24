@@ -79,18 +79,19 @@ describe("MailContactRulesResource", () => {
     });
   });
 
-  it("update only sends supplied fields", async () => {
+  it("update sends action and still parses a paused response", async () => {
     vi.mocked(fetch).mockResolvedValue(ok({ ...MAIL_RULE_DICT, status: "paused" }));
     const http = new HttpTransport("k", BASE);
     const resource = new MailContactRulesResource(http);
 
-    await resource.update("box@inkbox.ai", "aaaa1111-0000-0000-0000-000000000011", {
-      status: ContactRuleStatus.PAUSED,
+    const rule = await resource.update("box@inkbox.ai", "aaaa1111-0000-0000-0000-000000000011", {
+      action: MailRuleAction.BLOCK,
     });
 
     const call = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
     const body = JSON.parse(call.body as string);
-    expect(body).toEqual({ status: "paused" });
+    expect(body).toEqual({ action: "block" });
+    expect(rule.status).toBe(ContactRuleStatus.PAUSED);
   });
 
   it("listAll hits /contact-rules with mailboxId param", async () => {

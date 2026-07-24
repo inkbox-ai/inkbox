@@ -40,7 +40,6 @@ from inkbox.imessage.types import (
     IMessageNumberType,
 )
 from inkbox.mail.types import (
-    ContactRuleStatus,
     FilterMode,
     ForwardMode,
     MailIdentityContactRule,
@@ -1296,17 +1295,11 @@ class AgentIdentity:
         self,
         rule_id: UUID | str,
         *,
-        action: MailRuleAction | str = _UNSET,  # type: ignore[assignment]
-        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+        action: MailRuleAction | str,
     ) -> MailIdentityContactRule:
-        """Update a mail rule's ``action`` or ``status`` (admin-only)."""
-        kwargs: dict[str, Any] = {}
-        if action is not _UNSET:
-            kwargs["action"] = action
-        if status is not _UNSET:
-            kwargs["status"] = status
+        """Update a mail rule's ``action`` (admin-only)."""
         return self._inkbox._mail_identity_contact_rules.update(
-            self.agent_handle, rule_id, **kwargs,
+            self.agent_handle, rule_id, action=action,
         )
 
     def delete_mail_contact_rule(self, rule_id: UUID | str) -> None:
@@ -1364,18 +1357,12 @@ class AgentIdentity:
         self,
         rule_id: UUID | str,
         *,
-        action: PhoneRuleAction | str = _UNSET,  # type: ignore[assignment]
-        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+        action: PhoneRuleAction | str,
     ) -> PhoneIdentityContactRule:
-        """Update a phone rule's ``action`` or ``status`` (admin-only)."""
+        """Update a phone rule's ``action`` (admin-only)."""
         self._require_phone()
-        kwargs: dict[str, Any] = {}
-        if action is not _UNSET:
-            kwargs["action"] = action
-        if status is not _UNSET:
-            kwargs["status"] = status
         return self._inkbox._phone_identity_contact_rules.update(
-            self.agent_handle, rule_id, **kwargs,
+            self.agent_handle, rule_id, action=action,
         )
 
     def delete_phone_contact_rule(self, rule_id: UUID | str) -> None:
@@ -1412,10 +1399,9 @@ class AgentIdentity:
         imessage_filter_mode: FilterMode | str | None = None,
         mail_filter_mode: FilterMode | str | None = None,
         phone_filter_mode: FilterMode | str | None = None,
-        status: str | None = None,
     ) -> None:
         """Update this identity's handle, display name, description,
-        iMessage reachability, contact-rule filter modes, and/or status.
+        iMessage reachability, and contact-rule filter modes.
 
         Only provided fields are applied; omitted fields are left
         unchanged. For ``display_name`` and ``description``, explicit
@@ -1444,8 +1430,6 @@ class AgentIdentity:
             phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
                 identity's phone contact rules (admin-only). Rejected with a
                 422 when the identity has no phone number.
-            status: ``"active"`` or ``"paused"``. Call :meth:`delete`
-                to remove the identity; ``"deleted"`` is rejected here.
         """
         update_kwargs: dict[str, Any] = {}
         if new_handle is not None:
@@ -1480,8 +1464,6 @@ class AgentIdentity:
                 if isinstance(phone_filter_mode, FilterMode)
                 else phone_filter_mode
             )
-        if status is not None:
-            update_kwargs["status"] = status
         result = self._inkbox._ids_resource.update(
             self.agent_handle, **update_kwargs,
         )

@@ -8,7 +8,6 @@ import type {
   MailRuleMatchType,
   PhoneRuleAction,
   PhoneRuleMatchType,
-  ContactRuleStatus,
 } from "@inkbox/sdk";
 import { parseTotpUri } from "@inkbox/sdk";
 
@@ -193,7 +192,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
 
   rules
     .command("create <handle>")
-    .description("Create a mail contact rule (always starts active; use `update` to pause)")
+    .description("Create a mail allow or block contact rule")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-type <type>", "exact_email or domain")
     .requiredOption("--match-target <value>", "Address or domain to match")
@@ -216,21 +215,19 @@ function registerIdentityMailRuleCommands(parent: Command): void {
 
   rules
     .command("update <handle> <rule-id>")
-    .description("Update action and/or status on a mail rule (admin-only)")
-    .option("--action <action>", "allow or block")
-    .option("--status <status>", "active or paused")
+    .description("Update the action on a mail rule (admin-only)")
+    .requiredOption("--action <action>", "allow or block")
     .action(
       withErrorHandler(async function (
         this: Command,
         handle: string,
         ruleId: string,
-        cmdOpts: { action?: string; status?: string },
+        cmdOpts: { action: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.mailIdentityContactRules.update(handle, ruleId, {
-          action: cmdOpts.action as MailRuleAction | undefined,
-          status: cmdOpts.status as ContactRuleStatus | undefined,
+          action: cmdOpts.action as MailRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
@@ -348,21 +345,19 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
 
   rules
     .command("update <handle> <rule-id>")
-    .description("Update action and/or status on a phone rule (admin-only)")
-    .option("--action <action>", "allow or block")
-    .option("--status <status>", "active or paused")
+    .description("Update the action on a phone rule (admin-only)")
+    .requiredOption("--action <action>", "allow or block")
     .action(
       withErrorHandler(async function (
         this: Command,
         handle: string,
         ruleId: string,
-        cmdOpts: { action?: string; status?: string },
+        cmdOpts: { action: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.phoneIdentityContactRules.update(handle, ruleId, {
-          action: cmdOpts.action as PhoneRuleAction | undefined,
-          status: cmdOpts.status as ContactRuleStatus | undefined,
+          action: cmdOpts.action as PhoneRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
@@ -609,7 +604,6 @@ export function registerIdentityCommands(program: Command): void {
     .option("--imessage-filter-mode <mode>", "iMessage contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--phone-filter-mode <mode>", "Phone contact-rule mode: whitelist or blacklist (admin-only; identity must have a phone number)")
-    .option("--status <status>", "active or paused")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -623,7 +617,6 @@ export function registerIdentityCommands(program: Command): void {
           imessageFilterMode?: string;
           mailFilterMode?: string;
           phoneFilterMode?: string;
-          status?: string;
         },
       ) {
         if (cmdOpts.description !== undefined && cmdOpts.clearDescription) {
@@ -641,9 +634,6 @@ export function registerIdentityCommands(program: Command): void {
             throw new Error(`${flag} must be 'whitelist' or 'blacklist'`);
           }
         }
-        if (cmdOpts.status !== undefined && cmdOpts.status !== "active" && cmdOpts.status !== "paused") {
-          throw new Error("--status must be 'active' or 'paused'");
-        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
@@ -655,7 +645,6 @@ export function registerIdentityCommands(program: Command): void {
           imessageFilterMode?: "whitelist" | "blacklist";
           mailFilterMode?: "whitelist" | "blacklist";
           phoneFilterMode?: "whitelist" | "blacklist";
-          status?: "active" | "paused";
         } = {};
         if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
         if (cmdOpts.displayName !== undefined) {
@@ -677,9 +666,6 @@ export function registerIdentityCommands(program: Command): void {
         }
         if (cmdOpts.phoneFilterMode !== undefined) {
           updateOpts.phoneFilterMode = cmdOpts.phoneFilterMode as "whitelist" | "blacklist";
-        }
-        if (cmdOpts.status !== undefined) {
-          updateOpts.status = cmdOpts.status as "active" | "paused";
         }
         await id.update(updateOpts);
         console.log(`Updated identity '${handle}'.`);

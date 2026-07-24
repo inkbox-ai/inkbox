@@ -157,8 +157,7 @@ await identity2.refresh();  // re-fetch channels from API
 // List all identities for your org
 const allIdentities = await inkbox.listIdentities();
 
-// Update status or handle
-await identity.update({ status: "paused" });
+// Update identity metadata or handle
 await identity.update({ newHandle: "sales-bot-v2" });
 
 // Release the phone number (carrier release + local delete). Mailbox and
@@ -508,6 +507,7 @@ import {
   DedicatedIMessageNumberQuotaExceededError,
   IdempotencyKeyReusedError,
   IMessageNumberType,
+  IMessageRuleAction,
   IMessageSendStyle,
 } from "@inkbox/sdk";
 
@@ -548,7 +548,7 @@ await identity.sendIMessage({ conversationId: convos[0].id, mediaUrls: [upload.m
 
 // Per-identity allow/block rules, interpreted via imessageFilterMode.
 await inkbox.imessageContactRules.create("my-agent", {
-  action: "block",
+  action: IMessageRuleAction.BLOCK,
   matchTarget: "+15555550999",
 });
 

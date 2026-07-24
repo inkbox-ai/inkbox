@@ -582,12 +582,12 @@ class TestIMessageContactRules:
         transport.patch.return_value = IMESSAGE_CONTACT_RULE_DICT
 
         client._imessage_contact_rules.update(
-            HANDLE, RULE_ID, status=ContactRuleStatus.PAUSED,
+            HANDLE, RULE_ID, action=IMessageRuleAction.ALLOW,
         )
 
         transport.patch.assert_called_once_with(
             f"/identities/{HANDLE}/contact-rules/{RULE_ID}",
-            json={"status": "paused"},
+            json={"action": "allow"},
         )
 
     def test_deletes_rule(self, client, transport):

@@ -146,9 +146,8 @@ identity.refresh()  # re-fetch channels from API
 # List all identities for your org
 all_identities = inkbox.list_identities()
 
-# Update handle, display name, description, status. For description,
+# Update handle, display name, and description. For description,
 # pass None to clear and omit the kwarg to leave untouched.
-identity.update(status="paused")
 identity.update(new_handle="sales-bot-v2")
 identity.update(display_name="New Name", description="New blurb")
 identity.update(description=None)  # clear

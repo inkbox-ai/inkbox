@@ -82,7 +82,6 @@ const identity = await inkbox.getIdentity("sales-agent");
 const identities = await inkbox.listIdentities();   // AgentIdentitySummary[]
 
 await identity.update({ newHandle: "new-name" });   // rename
-await identity.update({ status: "paused" });         // or "active"
 await identity.refresh();                            // re-fetch from API, updates cached channels
 await identity.delete();                             // cascades: mailbox + tunnel + phone-number release
 ```
@@ -488,7 +487,9 @@ const rule = await inkbox.imessageContactRules.create("my-agent", {
   matchTarget: "+15559999999",
 });
 const rules = await inkbox.imessageContactRules.list("my-agent");
-await inkbox.imessageContactRules.update("my-agent", rule.id, { status: "paused" }); // admin-only
+await inkbox.imessageContactRules.update("my-agent", rule.id, {
+  action: IMessageRuleAction.ALLOW,
+}); // admin-only
 await inkbox.imessageContactRules.delete("my-agent", rule.id);                       // admin-only
 const allRules = await inkbox.imessageContactRules.listAll();                        // admin-only, org-wide
 ```
@@ -800,8 +801,7 @@ import {
 
 const identity = await inkbox.getIdentity("sales-agent");
 
-// Mail rules via the identity convenience methods. New rules always start
-// active; call `update(..., { status: "paused" })` afterwards to pause one.
+// Mail rules via the identity convenience methods.
 const rule = await identity.createMailContactRule({
   action: MailRuleAction.ALLOW,          // or BLOCK
   matchType: MailRuleMatchType.DOMAIN,   // or EXACT_EMAIL
@@ -809,7 +809,9 @@ const rule = await identity.createMailContactRule({
 });
 await identity.listMailContactRules();
 await identity.getMailContactRule(rule.id);
-await identity.updateMailContactRule(rule.id, { status: "paused" });  // admin-only
+await identity.updateMailContactRule(rule.id, {
+  action: MailRuleAction.ALLOW,
+}); // admin-only
 await identity.deleteMailContactRule(rule.id);                        // admin-only
 
 // Phone rules — same shape, only matchType: "exact_number" is supported.
@@ -823,7 +825,9 @@ await identity.listPhoneContactRules();
 
 // Equivalent org-level resources, keyed by agentHandle, with an org-wide listAll:
 await inkbox.mailIdentityContactRules.create("sales-agent", {
-  action: "allow", matchType: "domain", matchTarget: "example.com",
+  action: MailRuleAction.ALLOW,
+  matchType: MailRuleMatchType.DOMAIN,
+  matchTarget: "example.com",
 });
 await inkbox.mailIdentityContactRules.list("sales-agent");
 await inkbox.mailIdentityContactRules.listAll({ agentIdentityId: identity.id });  // admin-only, org-wide
@@ -832,7 +836,9 @@ await inkbox.phoneIdentityContactRules.listAll();                               
 // Duplicate (matchType, matchTarget) on the same identity throws 409:
 try {
   await identity.createMailContactRule({
-    action: "allow", matchType: "domain", matchTarget: "example.com",
+    action: MailRuleAction.ALLOW,
+    matchType: MailRuleMatchType.DOMAIN,
+    matchTarget: "example.com",
   });
 } catch (e) {
   if (e instanceof DuplicateContactRuleError) {
@@ -860,14 +866,25 @@ The legacy per-mailbox `inkbox.mailContactRules` and per-number
 (Sunset 2026-08-31). Prefer the identity-keyed surface above.
 
 ```typescript
+import {
+  MailRuleAction,
+  MailRuleMatchType,
+  PhoneRuleAction,
+  PhoneRuleMatchType,
+} from "@inkbox/sdk";
+
 // Deprecated — per-mailbox mail rule:
 await inkbox.mailContactRules.create(mailbox.emailAddress, {
-  action: "allow", matchType: "domain", matchTarget: "example.com",
+  action: MailRuleAction.ALLOW,
+  matchType: MailRuleMatchType.DOMAIN,
+  matchTarget: "example.com",
 });
 await inkbox.mailContactRules.listAll({ mailboxId: mailbox.id });
 // Deprecated — per-number phone rule:
 await inkbox.phoneContactRules.create(num.id, {
-  action: "block", matchType: "exact_number", matchTarget: "+15551234567",
+  action: PhoneRuleAction.BLOCK,
+  matchType: PhoneRuleMatchType.EXACT_NUMBER,
+  matchTarget: "+15551234567",
 });
 ```
 

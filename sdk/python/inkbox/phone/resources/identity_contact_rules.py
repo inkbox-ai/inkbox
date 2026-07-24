@@ -24,7 +24,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.mail.types import ContactRuleStatus
 from inkbox.phone.types import (
     PhoneIdentityContactRule,
     PhoneRuleAction,
@@ -35,7 +34,6 @@ if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 _ORG_BASE = "/phone/contact-rules"
-_UNSET = object()
 
 
 def _rule_path(agent_handle: str, rule_id: UUID | str | None = None) -> str:
@@ -87,8 +85,7 @@ class PhoneIdentityContactRulesResource:
         match_target: str,
         match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
     ) -> PhoneIdentityContactRule:
-        """Create a rule for an agent identity. New rules are always
-        ``active``; use :meth:`update` to pause one after creation.
+        """Create a rule for an agent identity.
 
         The identity must have a phone number — otherwise the server
         returns 422.
@@ -111,19 +108,12 @@ class PhoneIdentityContactRulesResource:
         agent_handle: str,
         rule_id: UUID | str,
         *,
-        action: PhoneRuleAction | str = _UNSET,  # type: ignore[assignment]
-        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+        action: PhoneRuleAction | str,
     ) -> PhoneIdentityContactRule:
-        """Update ``action`` or ``status`` (admin-only)."""
-        body: dict[str, Any] = {}
-        if action is not _UNSET:
-            body["action"] = (
-                action.value if isinstance(action, PhoneRuleAction) else action
-            )
-        if status is not _UNSET:
-            body["status"] = (
-                status.value if isinstance(status, ContactRuleStatus) else status
-            )
+        """Update ``action`` (admin-only)."""
+        body = {
+            "action": action.value if isinstance(action, PhoneRuleAction) else action,
+        }
         data = self._http.patch(_rule_path(agent_handle, rule_id), json=body)
         return PhoneIdentityContactRule._from_dict(data)
 

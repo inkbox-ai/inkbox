@@ -90,7 +90,6 @@ inkbox identity update <handle>              # Update an identity
   --display-name <name>                      #   New display name ("" to clear)
   --description <text>                       #   New description ("" to clear)
   --clear-description                        #   Explicit null (mutually exclusive with --description)
-  --status <status>                          #   active or paused
   --imessage-enabled <bool>                  #   Toggle iMessage reachability (true/false)
   --imessage-filter-mode <mode>              #   whitelist or blacklist (admin API key required)
 inkbox identity refresh <handle>             # Re-fetch identity from API
@@ -332,7 +331,7 @@ inkbox imessage contact-rule list -i <handle>    # Allow/block rules for the ide
 inkbox imessage contact-rule create -i <handle>  # Add a rule
   --action <action>                          #   'allow' or 'block'
   --match-target <number>                    #   Phone number to match (E.164)
-inkbox imessage contact-rule update <rule-id> -i <handle>  # Change action/status (admin key)
+inkbox imessage contact-rule update <rule-id> -i <handle> --action allow|block
 inkbox imessage contact-rule delete <rule-id> -i <handle>  # Delete a rule (admin key)
 inkbox imessage contact-rule list-all        # Org-wide rule list (admin key)
   --agent-identity-id <id>                   #   Narrow to one identity

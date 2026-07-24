@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::mail::types::{ContactRuleStatus, MailContactRule, MailRuleAction, MailRuleMatchType};
+use crate::mail::types::{MailContactRule, MailRuleAction, MailRuleMatchType};
 
 const BASE: &str = "/mailboxes";
 const ORG_BASE: &str = "/contact-rules";
@@ -73,8 +73,8 @@ impl MailContactRulesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Create a rule. New rules are always `active`; use
-    /// [`update`](Self::update) to pause one after creation.
+    /// Create a rule. Use [`update`](Self::update) to change its allow/block
+    /// action.
     ///
     /// Returns [`crate::error::InkboxError::DuplicateContactRule`] on 409 when
     /// a non-deleted rule with the same `(match_type, match_target)` already
@@ -99,29 +99,20 @@ impl MailContactRulesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Update `action` or `status` (admin-only).
+    /// Update `action` (admin-only).
     ///
     /// `match_type` and `match_target` are immutable — delete + re-create to
-    /// change them. Pass `None` for a field to leave it untouched (mirrors the
-    /// Python `_UNSET` sentinel: omitted keys are never sent).
+    /// change them.
     pub fn update(
         &self,
         email_address: &str,
         rule_id: &str,
-        action: Option<MailRuleAction>,
-        status: Option<ContactRuleStatus>,
+        action: MailRuleAction,
     ) -> Result<MailContactRule> {
-        let mut body = serde_json::Map::new();
-        if let Some(a) = action {
-            body.insert("action".into(), Value::String(a.as_str().to_string()));
-        }
-        if let Some(s) = status {
-            body.insert("status".into(), Value::String(s.as_str().to_string()));
-        }
-        let data = self.http.patch(
-            &rule_path(email_address, Some(rule_id)),
-            &Value::Object(body),
-        )?;
+        let body = json!({"action": action.as_str()});
+        let data = self
+            .http
+            .patch(&rule_path(email_address, Some(rule_id)), &body)?;
         Ok(serde_json::from_value(data)?)
     }
 

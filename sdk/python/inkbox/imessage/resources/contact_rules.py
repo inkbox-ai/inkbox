@@ -18,13 +18,11 @@ from inkbox.imessage.types import (
     IMessageRuleAction,
     IMessageRuleMatchType,
 )
-from inkbox.mail.types import ContactRuleStatus
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 _ORG_BASE = "/contact-rules"
-_UNSET = object()
 
 
 def _rule_path(agent_handle: str, rule_id: UUID | str | None = None) -> str:
@@ -77,8 +75,7 @@ class IMessageContactRulesResource:
         match_target: str,
         match_type: IMessageRuleMatchType | str = IMessageRuleMatchType.EXACT_NUMBER,
     ) -> IMessageContactRule:
-        """Create a rule. New rules are always ``active``; use
-        :meth:`update` to pause one after creation.
+        """Create a rule. Use :meth:`update` to change its allow/block action.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.
@@ -100,19 +97,12 @@ class IMessageContactRulesResource:
         agent_handle: str,
         rule_id: UUID | str,
         *,
-        action: IMessageRuleAction | str = _UNSET,  # type: ignore[assignment]
-        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+        action: IMessageRuleAction | str,
     ) -> IMessageContactRule:
-        """Update ``action`` or ``status`` (admin-only)."""
-        body: dict[str, Any] = {}
-        if action is not _UNSET:
-            body["action"] = (
-                action.value if isinstance(action, IMessageRuleAction) else action
-            )
-        if status is not _UNSET:
-            body["status"] = (
-                status.value if isinstance(status, ContactRuleStatus) else status
-            )
+        """Update ``action`` (admin-only)."""
+        body = {
+            "action": action.value if isinstance(action, IMessageRuleAction) else action,
+        }
         data = self._http.patch(_rule_path(agent_handle, rule_id), json=body)
         return IMessageContactRule._from_dict(data)
 

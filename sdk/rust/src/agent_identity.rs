@@ -48,15 +48,14 @@ use crate::imessage::types::{
     IMessageReactionType, IMessageSendStyle, IdentityIMessageNumber,
 };
 use crate::mail::types::{
-    ContactRuleStatus as MailContactRuleStatus, FilterMode, ForwardMode, MailIdentityContactRule,
-    MailRuleAction, MailRuleMatchType, Message, MessageDetail, MessageDirection, ThreadDetail,
+    FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction, MailRuleMatchType, Message,
+    MessageDetail, MessageDirection, ThreadDetail,
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    CallOrigin, ContactRuleStatus as PhoneContactRuleStatus, HostedAgentConfig, IncomingCallAction,
-    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
-    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
-    TextConversationUpdateResult, TextMessage,
+    CallOrigin, HostedAgentConfig, IncomingCallAction, IncomingCallActionConfig, PhoneCall,
+    PhoneCallWithRateLimit, PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType,
+    PhoneTranscript, TextConversationSummary, TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::TunnelSummary;
@@ -1187,20 +1186,15 @@ impl AgentIdentity {
         )
     }
 
-    /// Update a mail rule's `action` or `status` (admin-only). `None` arguments
-    /// are left unchanged.
+    /// Update a mail rule's `action` (admin-only).
     pub fn update_mail_contact_rule(
         &self,
         rule_id: &str,
-        action: Option<MailRuleAction>,
-        status: Option<MailContactRuleStatus>,
+        action: MailRuleAction,
     ) -> Result<MailIdentityContactRule> {
-        self.inkbox.mail_identity_contact_rules().update(
-            &self.agent_handle(),
-            rule_id,
-            action,
-            status,
-        )
+        self.inkbox
+            .mail_identity_contact_rules()
+            .update(&self.agent_handle(), rule_id, action)
     }
 
     /// Delete one of this identity's mail contact rules (admin-only).
@@ -1262,21 +1256,17 @@ impl AgentIdentity {
         )
     }
 
-    /// Update a phone rule's `action` or `status` (admin-only). `None`
-    /// arguments are left unchanged. Errors if this identity has no phone number.
+    /// Update a phone rule's `action` (admin-only). Errors if this identity has
+    /// no phone number.
     pub fn update_phone_contact_rule(
         &self,
         rule_id: &str,
-        action: Option<PhoneRuleAction>,
-        status: Option<PhoneContactRuleStatus>,
+        action: PhoneRuleAction,
     ) -> Result<PhoneIdentityContactRule> {
         self.require_phone()?;
-        self.inkbox.phone_identity_contact_rules().update(
-            &self.agent_handle(),
-            rule_id,
-            action,
-            status,
-        )
+        self.inkbox
+            .phone_identity_contact_rules()
+            .update(&self.agent_handle(), rule_id, action)
     }
 
     /// Delete one of this identity's phone contact rules (admin-only).
@@ -1313,7 +1303,7 @@ impl AgentIdentity {
     // -----------------------------------------------------------------------
 
     /// Update this identity's handle, display name, description, iMessage
-    /// reachability, contact-rule filter modes, and/or status.
+    /// reachability and contact-rule filter modes.
     ///
     /// Only provided fields are applied; omitted fields are left unchanged. For
     /// `display_name` and `description`, `Unset::Value(None)` clears the column;
@@ -1330,8 +1320,6 @@ impl AgentIdentity {
     /// * `phone_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
     ///   phone contact rules (admin-only). Rejected with 422 when the identity
     ///   has no phone number.
-    /// * `status` - `"active"` or `"paused"`. Call [`Self::delete`] to remove the
-    ///   identity; `"deleted"` is rejected here.
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
@@ -1342,7 +1330,6 @@ impl AgentIdentity {
         imessage_filter_mode: Option<&str>,
         mail_filter_mode: Option<&str>,
         phone_filter_mode: Option<&str>,
-        status: Option<&str>,
     ) -> Result<()> {
         self.update_with_imessage_number(
             new_handle,
@@ -1352,7 +1339,6 @@ impl AgentIdentity {
             imessage_filter_mode,
             mail_filter_mode,
             phone_filter_mode,
-            status,
             Unset::Omit,
             None,
             None,
@@ -1374,7 +1360,6 @@ impl AgentIdentity {
         imessage_filter_mode: Option<&str>,
         mail_filter_mode: Option<&str>,
         phone_filter_mode: Option<&str>,
-        status: Option<&str>,
         imessage_number_id: Unset<Uuid>,
         imessage_number_type: Option<IMessageNumberType>,
         idempotency_key: Option<&str>,
@@ -1388,7 +1373,6 @@ impl AgentIdentity {
             imessage_filter_mode,
             mail_filter_mode,
             phone_filter_mode,
-            status,
             imessage_number_id,
             imessage_number_type,
             idempotency_key,
@@ -1670,7 +1654,7 @@ mod tests {
                 )
                 .err(),
             identity
-                .update_phone_contact_rule("rid", Some(PhoneRuleAction::Block), None)
+                .update_phone_contact_rule("rid", PhoneRuleAction::Block)
                 .err(),
             identity.delete_phone_contact_rule("rid").err(),
         ];
@@ -2090,7 +2074,6 @@ mod tests {
                 None,
                 None,
                 None,
-                None,
                 Unset::Omit,
                 Some(IMessageNumberType::DedicatedOutbound),
                 Some("identity-claim-123"),
@@ -2132,7 +2115,6 @@ mod tests {
                 Unset::Omit,
                 Unset::Omit,
                 Some(false),
-                None,
                 None,
                 None,
                 None,

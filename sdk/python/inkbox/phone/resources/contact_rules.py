@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.mail.types import ContactRuleStatus
 from inkbox.phone.types import (
     PhoneContactRule,
     PhoneRuleAction,
@@ -21,7 +20,6 @@ if TYPE_CHECKING:
 
 _BASE = "/numbers"
 _ORG_BASE = "/contact-rules"
-_UNSET = object()
 
 
 def _rule_path(phone_number_id: UUID | str, rule_id: UUID | str | None = None) -> str:
@@ -80,8 +78,7 @@ class PhoneContactRulesResource:
         match_target: str,
         match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
     ) -> PhoneContactRule:
-        """Create a rule. New rules are always ``active``; use
-        :meth:`update` to pause one after creation.
+        """Create a rule. Use :meth:`update` to change its allow/block action.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.
@@ -101,19 +98,12 @@ class PhoneContactRulesResource:
         phone_number_id: UUID | str,
         rule_id: UUID | str,
         *,
-        action: PhoneRuleAction | str = _UNSET,  # type: ignore[assignment]
-        status: ContactRuleStatus | str = _UNSET,  # type: ignore[assignment]
+        action: PhoneRuleAction | str,
     ) -> PhoneContactRule:
-        """Update ``action`` or ``status`` (admin-only)."""
-        body: dict[str, Any] = {}
-        if action is not _UNSET:
-            body["action"] = (
-                action.value if isinstance(action, PhoneRuleAction) else action
-            )
-        if status is not _UNSET:
-            body["status"] = (
-                status.value if isinstance(status, ContactRuleStatus) else status
-            )
+        """Update ``action`` (admin-only)."""
+        body = {
+            "action": action.value if isinstance(action, PhoneRuleAction) else action,
+        }
         data = self._http.patch(_rule_path(phone_number_id, rule_id), json=body)
         return PhoneContactRule._from_dict(data)
 

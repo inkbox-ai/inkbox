@@ -167,7 +167,7 @@ impl IdentitiesResource {
     }
 
     /// Update an identity's handle, display name, description, iMessage
-    /// reachability, and/or status.
+    /// reachability and contact-rule filter modes.
     ///
     /// Only provided fields are applied; omitted fields are left unchanged. For
     /// `display_name` and `description`, `Unset::Value(None)` clears the column;
@@ -185,8 +185,6 @@ impl IdentitiesResource {
     /// * `phone_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
     ///   phone contact rules (admin-only). The server rejects this with 422 when
     ///   the identity has no phone number.
-    /// * `status` - `"active"` or `"paused"`. Call [`Self::delete`] to remove an
-    ///   identity; `"deleted"` is rejected here.
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
@@ -198,7 +196,6 @@ impl IdentitiesResource {
         imessage_filter_mode: Option<&str>,
         mail_filter_mode: Option<&str>,
         phone_filter_mode: Option<&str>,
-        status: Option<&str>,
     ) -> Result<AgentIdentitySummary> {
         self.update_with_imessage_number(
             agent_handle,
@@ -209,7 +206,6 @@ impl IdentitiesResource {
             imessage_filter_mode,
             mail_filter_mode,
             phone_filter_mode,
-            status,
             Unset::Omit,
             None,
             None,
@@ -235,7 +231,6 @@ impl IdentitiesResource {
         imessage_filter_mode: Option<&str>,
         mail_filter_mode: Option<&str>,
         phone_filter_mode: Option<&str>,
-        status: Option<&str>,
         imessage_number_id: Unset<Uuid>,
         imessage_number_type: Option<IMessageNumberType>,
         idempotency_key: Option<&str>,
@@ -313,10 +308,6 @@ impl IdentitiesResource {
         if let Some(mode) = phone_filter_mode {
             body.insert("phone_filter_mode".into(), Value::String(mode.to_string()));
         }
-        if let Some(s) = status {
-            body.insert("status".into(), Value::String(s.to_string()));
-        }
-
         let body = Value::Object(body);
         let path = format!("/{agent_handle}");
         let response = match idempotency_key {
@@ -567,7 +558,6 @@ mod tests {
                 None,
                 None,
                 None,
-                None,
                 Unset::Value(Some(number_id)),
                 None,
                 None,
@@ -599,7 +589,6 @@ mod tests {
                 None,
                 None,
                 None,
-                None,
                 Unset::Omit,
                 Some(IMessageNumberType::DedicatedOutbound),
                 Some("identity-claim-123"),
@@ -627,7 +616,6 @@ mod tests {
                 None,
                 None,
                 None,
-                None,
                 Unset::Value(None),
                 None,
                 None,
@@ -646,7 +634,6 @@ mod tests {
                 None,
                 Unset::Omit,
                 Unset::Omit,
-                None,
                 None,
                 None,
                 None,

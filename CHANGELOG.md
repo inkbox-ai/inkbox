@@ -4,6 +4,21 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.5 — Action-only contact-rule updates
+
+### Changed
+
+- Version bumped to 0.5.5 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.5`.
+- Contact-rule updates now require an allow/block `action`.
+
+### Removed
+
+- **Source-breaking:** identity updates and contact-rule updates no longer accept lifecycle status. The CLI likewise removes identity/contact-rule `--status` flags. Remove those arguments and flags before upgrading.
+
+### Compatibility
+
+- Response models continue to parse existing `paused` rows for backward compatibility.
+
 ## 0.5.4 — Dedicated outbound iMessage groups
 
 ### Added

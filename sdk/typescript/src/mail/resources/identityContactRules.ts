@@ -17,7 +17,6 @@
 
 import { HttpTransport } from "../../_http.js";
 import {
-  ContactRuleStatus,
   MailIdentityContactRule,
   MailRuleAction,
   MailRuleMatchType,
@@ -46,8 +45,7 @@ export interface CreateMailIdentityContactRuleOptions {
 }
 
 export interface UpdateMailIdentityContactRuleOptions {
-  action?: MailRuleAction;
-  status?: ContactRuleStatus;
+  action: MailRuleAction;
 }
 
 export interface ListAllMailIdentityContactRulesOptions {
@@ -86,8 +84,7 @@ export class MailIdentityContactRulesResource {
   }
 
   /**
-   * Create a rule for an agent identity. New rules are always `active`;
-   * use {@link update} to pause one after creation.
+   * Create a rule for an agent identity.
    *
    * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
    *   the same `(matchType, matchTarget)` already exists.
@@ -109,7 +106,7 @@ export class MailIdentityContactRulesResource {
   }
 
   /**
-   * Update `action` or `status` (admin-only).
+   * Update `action` (admin-only).
    *
    * `matchType` and `matchTarget` are immutable — delete + re-create to
    * change them.
@@ -119,9 +116,7 @@ export class MailIdentityContactRulesResource {
     ruleId: string,
     options: UpdateMailIdentityContactRuleOptions,
   ): Promise<MailIdentityContactRule> {
-    const body: Record<string, unknown> = {};
-    if (options.action !== undefined) body.action = options.action;
-    if (options.status !== undefined) body.status = options.status;
+    const body = { action: options.action };
     const data = await this.http.patch<RawMailIdentityContactRule>(
       rulePath(agentHandle, ruleId),
       body,

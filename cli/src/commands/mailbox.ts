@@ -3,7 +3,6 @@ import {
   FilterMode,
   MailRuleAction,
   MailRuleMatchType,
-  ContactRuleStatus,
 } from "@inkbox/sdk";
 import type { Mailbox } from "@inkbox/sdk";
 import { createClient, getGlobalOpts, resolveBaseUrl } from "../client.js";
@@ -222,7 +221,7 @@ function registerMailboxRulesCommands(parent: Command): void {
 
   rules
     .command("create")
-    .description("Create a rule (always starts active; use `update` to pause)")
+    .description("Create an allow or block rule")
     .requiredOption("--mailbox <email>", "Mailbox email address")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-type <type>", "exact_email or domain")
@@ -250,21 +249,19 @@ function registerMailboxRulesCommands(parent: Command): void {
 
   rules
     .command("update <rule-id>")
-    .description("Update action and/or status on a rule (admin-only)")
+    .description("Update the action on a rule (admin-only)")
     .requiredOption("--mailbox <email>", "Mailbox email address")
-    .option("--action <action>", "allow or block")
-    .option("--status <status>", "active or paused")
+    .requiredOption("--action <action>", "allow or block")
     .action(
       withErrorHandler(async function (
         this: Command,
         ruleId: string,
-        cmdOpts: { mailbox: string; action?: string; status?: string },
+        cmdOpts: { mailbox: string; action: string },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.mailContactRules.update(cmdOpts.mailbox, ruleId, {
-          action: cmdOpts.action as MailRuleAction | undefined,
-          status: cmdOpts.status as ContactRuleStatus | undefined,
+          action: cmdOpts.action as MailRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
       }),

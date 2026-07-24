@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.5 — Action-only contact-rule updates
+
+### Changed
+
+- Contact-rule update methods now require `action`.
+
+### Removed
+
+- **Source-breaking:** identity update options and contact-rule update options no longer accept lifecycle `status`. Remove those properties before upgrading.
+
+### Compatibility
+
+- Response models continue to parse existing `paused` rows.
+
 ## 0.5.4 — Dedicated outbound iMessage groups
 
 ### Added
