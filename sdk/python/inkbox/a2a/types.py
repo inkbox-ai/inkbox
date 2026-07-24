@@ -113,6 +113,13 @@ class A2ACaller:
 
 
 @dataclass(frozen=True)
+class A2ATarget:
+    identity_id: str
+    organization_id: str
+    handle: str | None
+
+
+@dataclass(frozen=True)
 class A2AMessage:
     id: str
     message_id: str
@@ -140,6 +147,7 @@ class A2ATask:
     context_id: str
     state: A2ATaskState
     caller: A2ACaller
+    target: A2ATarget | None
     messages: list[A2AMessage]
     transitions: list[A2ATransition]
     completed_at: datetime | None
@@ -157,6 +165,7 @@ class A2ATaskPage:
 class A2AContext:
     id: str
     caller: A2ACaller
+    target: A2ATarget | None
     tasks: list[A2ATask]
     created_at: datetime
     last_activity_at: datetime
@@ -252,6 +261,16 @@ def parse_caller(data: dict[str, Any]) -> A2ACaller:
     )
 
 
+def parse_target(data: dict[str, Any] | None) -> A2ATarget | None:
+    if data is None:
+        return None
+    return A2ATarget(
+        identity_id=data["identity_id"],
+        organization_id=data["organization_id"],
+        handle=data.get("handle"),
+    )
+
+
 def parse_message(data: dict[str, Any]) -> A2AMessage:
     return A2AMessage(
         id=data["id"],
@@ -271,6 +290,7 @@ def parse_task(data: dict[str, Any]) -> A2ATask:
         context_id=data["context_id"],
         state=A2ATaskState(data["state"]),
         caller=parse_caller(data["caller"]),
+        target=parse_target(data.get("target")),
         messages=[parse_message(item) for item in data.get("messages", [])],
         transitions=[
             A2ATransition(
@@ -297,6 +317,7 @@ def parse_context(data: dict[str, Any]) -> A2AContext:
     return A2AContext(
         id=data["id"],
         caller=parse_caller(data["caller"]),
+        target=parse_target(data.get("target")),
         tasks=[parse_task(item) for item in data.get("tasks", [])],
         created_at=parse_datetime(data["created_at"]),  # type: ignore[arg-type]
         last_activity_at=parse_datetime(data["last_activity_at"]),  # type: ignore[arg-type]

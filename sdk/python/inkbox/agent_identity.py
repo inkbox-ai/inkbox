@@ -1446,6 +1446,45 @@ class AgentIdentity:
         """Get a full A2A task with messages and transitions."""
         return self._inkbox._a2a.task(self.agent_handle, str(task_id))
 
+    def a2a_sent_tasks(
+        self,
+        *,
+        state: A2ATaskState | str | None = None,
+        context_id: UUID | str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2ATaskPage:
+        """List A2A tasks sent by this identity."""
+        return self._inkbox._a2a.sent_tasks(
+            self.agent_handle,
+            state=state,
+            context_id=str(context_id) if context_id is not None else None,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    def iter_a2a_sent_tasks(
+        self,
+        *,
+        state: A2ATaskState | str | None = None,
+        context_id: UUID | str | None = None,
+        limit: int = 50,
+    ) -> Iterator[A2ATask]:
+        """Drain every page of A2A tasks sent by this identity."""
+        return self._inkbox._a2a.iter_sent_tasks(
+            self.agent_handle,
+            state=state,
+            context_id=str(context_id) if context_id is not None else None,
+            limit=limit,
+        )
+
+    def a2a_sent_task(self, task_id: UUID | str) -> A2ATask:
+        """Get a full A2A task sent by this identity."""
+        return self._inkbox._a2a.sent_task(
+            self.agent_handle,
+            str(task_id),
+        )
+
     def a2a_reply(
         self,
         task_id: UUID | str,
@@ -1479,6 +1518,26 @@ class AgentIdentity:
     def a2a_context(self, context_id: UUID | str) -> A2AContext:
         """Get a receiver-side A2A context and its tasks."""
         return self._inkbox._a2a.context(self.agent_handle, str(context_id))
+
+    def a2a_sent_contexts(
+        self,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2AContextPage:
+        """List A2A contexts started by this identity."""
+        return self._inkbox._a2a.sent_contexts(
+            self.agent_handle,
+            cursor=cursor,
+            limit=limit,
+        )
+
+    def a2a_sent_context(self, context_id: UUID | str) -> A2AContext:
+        """Get an A2A context started by this identity."""
+        return self._inkbox._a2a.sent_context(
+            self.agent_handle,
+            str(context_id),
+        )
 
     def a2a_contact_rules(self) -> list[A2AContactRule]:
         """List this identity's A2A inbound contact rules."""

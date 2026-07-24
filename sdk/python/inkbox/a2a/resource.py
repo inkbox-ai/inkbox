@@ -113,6 +113,56 @@ class A2AResource:
     def task(self, handle: str, task_id: str) -> A2ATask:
         return parse_task(self._http.get(f"{self._base(handle)}/tasks/{task_id}"))
 
+    def sent_tasks(
+        self,
+        handle: str,
+        *,
+        state: A2ATaskState | str | None = None,
+        context_id: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2ATaskPage:
+        data = self._http.get(
+            f"{self._base(handle)}/sent/tasks",
+            params={
+                "state": state.value if isinstance(state, A2ATaskState) else state,
+                "context_id": context_id,
+                "cursor": cursor,
+                "limit": limit,
+            },
+        )
+        return A2ATaskPage(
+            items=[parse_task(item) for item in data["items"]],
+            next_cursor=data.get("next_cursor"),
+        )
+
+    def iter_sent_tasks(
+        self,
+        handle: str,
+        *,
+        state: A2ATaskState | str | None = None,
+        context_id: str | None = None,
+        limit: int = 50,
+    ) -> Iterator[A2ATask]:
+        cursor = None
+        while True:
+            page = self.sent_tasks(
+                handle,
+                state=state,
+                context_id=context_id,
+                cursor=cursor,
+                limit=limit,
+            )
+            yield from page.items
+            if not page.next_cursor:
+                return
+            cursor = page.next_cursor
+
+    def sent_task(self, handle: str, task_id: str) -> A2ATask:
+        return parse_task(
+            self._http.get(f"{self._base(handle)}/sent/tasks/{task_id}")
+        )
+
     def reply(
         self,
         handle: str,
@@ -153,6 +203,29 @@ class A2AResource:
     def context(self, handle: str, context_id: str) -> A2AContext:
         return parse_context(
             self._http.get(f"{self._base(handle)}/contexts/{context_id}")
+        )
+
+    def sent_contexts(
+        self,
+        handle: str,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2AContextPage:
+        data = self._http.get(
+            f"{self._base(handle)}/sent/contexts",
+            params={"cursor": cursor, "limit": limit},
+        )
+        return A2AContextPage(
+            items=[parse_context(item) for item in data["items"]],
+            next_cursor=data.get("next_cursor"),
+        )
+
+    def sent_context(self, handle: str, context_id: str) -> A2AContext:
+        return parse_context(
+            self._http.get(
+                f"{self._base(handle)}/sent/contexts/{context_id}"
+            )
         )
 
     def contact_rules(self, handle: str) -> list[A2AContactRule]:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import httpx
 import pytest
@@ -36,6 +36,99 @@ def test_inbox_tasks_use_exact_path_and_query() -> None:
             "limit": 25,
         },
     )
+
+
+def test_sent_tasks_use_exact_path_and_parse_target() -> None:
+    http = MagicMock()
+    http.get.return_value = {
+        "items": [
+            {
+                "id": "task-1",
+                "context_id": "context-1",
+                "state": "completed",
+                "caller": {
+                    "identity_id": "caller-1",
+                    "organization_id": "org-caller",
+                    "handle": "caller",
+                },
+                "target": {
+                    "identity_id": "target-1",
+                    "organization_id": "org-target",
+                    "handle": "helper",
+                },
+                "messages": [],
+                "transitions": [],
+                "completed_at": "2026-07-24T00:00:00Z",
+                "created_at": "2026-07-24T00:00:00Z",
+                "updated_at": "2026-07-24T00:00:00Z",
+            }
+        ],
+        "next_cursor": None,
+    }
+    resource = A2AResource(http)
+
+    page = resource.sent_tasks(
+        "caller",
+        state=A2ATaskState.COMPLETED,
+        cursor="next",
+        limit=25,
+    )
+
+    assert page.items[0].target is not None
+    assert page.items[0].target.handle == "helper"
+    http.get.assert_called_once_with(
+        "/identities/caller/a2a/sent/tasks",
+        params={
+            "state": "completed",
+            "context_id": None,
+            "cursor": "next",
+            "limit": 25,
+        },
+    )
+
+
+def test_sent_task_and_context_use_exact_paths() -> None:
+    http = MagicMock()
+    http.get.side_effect = [
+        {
+            "id": "task-1",
+            "context_id": "context-1",
+            "state": "submitted",
+            "caller": {
+                "identity_id": "caller-1",
+                "organization_id": "org-caller",
+                "handle": "caller",
+            },
+            "messages": [],
+            "transitions": [],
+            "completed_at": None,
+            "created_at": "2026-07-24T00:00:00Z",
+            "updated_at": "2026-07-24T00:00:00Z",
+        },
+        {
+            "id": "context-1",
+            "caller": {
+                "identity_id": "caller-1",
+                "organization_id": "org-caller",
+                "handle": "caller",
+            },
+            "tasks": [],
+            "created_at": "2026-07-24T00:00:00Z",
+            "last_activity_at": "2026-07-24T00:00:00Z",
+        },
+    ]
+    resource = A2AResource(http)
+
+    assert resource.sent_task("caller", "task-1").id == "task-1"
+    assert resource.sent_context("caller", "context-1").id == "context-1"
+    assert http.get.call_args_list == [
+        call(
+            "/identities/caller/a2a/sent/tasks/task-1"
+        ),
+        call(
+            "/identities/caller/a2a/sent/contexts/context-1"
+        ),
+    ]
 
 
 def test_inbox_reply_uses_exact_wire_body() -> None:

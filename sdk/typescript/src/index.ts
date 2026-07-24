@@ -19,6 +19,7 @@ export type {
   A2ATask,
   A2ATaskPage,
   A2ATaskState,
+  A2ATarget,
   A2ATransition,
   A2AWireMessage,
   A2AWireTask,

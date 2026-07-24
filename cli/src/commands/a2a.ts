@@ -11,6 +11,14 @@ import { withErrorHandler } from "../errors.js";
 import { output } from "../output.js";
 
 const TASK_COLUMNS = ["id", "contextId", "state", "createdAt", "updatedAt"];
+const SENT_TASK_COLUMNS = [
+  "id",
+  "targetHandle",
+  "contextId",
+  "state",
+  "createdAt",
+  "updatedAt",
+];
 const RULE_COLUMNS = ["id", "action", "matchTarget", "direction", "status"];
 
 async function identityFor(command: Command, handle: string) {
@@ -119,6 +127,39 @@ export function registerA2ACommands(program: Command): void {
       options: { identity: string },
     ) {
       const result = await (await identityFor(this, options.identity)).a2aTask(taskId);
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("sent")
+    .description("List A2A tasks sent by an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--state <state>", "Filter by task state")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { identity: string; state?: string },
+    ) {
+      const result = await (await identityFor(this, options.identity)).a2aSentTasks({
+        state: options.state as A2ATaskState | undefined,
+      });
+      const items = result.items.map((task) => ({
+        ...task,
+        targetHandle: task.target?.handle ?? null,
+      }));
+      output(items, {
+        json: !!getGlobalOpts(this).json,
+        columns: SENT_TASK_COLUMNS,
+      });
+    }));
+
+  a2a.command("sent-task <task-id>")
+    .description("Show a full A2A task sent by an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      taskId: string,
+      options: { identity: string },
+    ) {
+      const result = await (await identityFor(this, options.identity)).a2aSentTask(taskId);
       output(result, { json: !!getGlobalOpts(this).json });
     }));
 

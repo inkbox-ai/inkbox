@@ -39,6 +39,7 @@ pub mod credentials;
 pub mod signing_keys;
 
 // API domains (mirror the Python package layout).
+pub mod a2a;
 pub mod agent_signup;
 pub mod api_keys;
 pub mod contacts;

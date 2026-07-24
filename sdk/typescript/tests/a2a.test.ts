@@ -22,6 +22,97 @@ describe("A2AResource", () => {
     });
   });
 
+  it("uses the sent-task path and parses the target", async () => {
+    const http = {
+      get: vi.fn().mockResolvedValue({
+        items: [{
+          id: "task-1",
+          context_id: "context-1",
+          state: "completed",
+          caller: {
+            identity_id: "caller-1",
+            organization_id: "org-caller",
+            handle: "caller",
+          },
+          target: {
+            identity_id: "target-1",
+            organization_id: "org-target",
+            handle: "helper",
+          },
+          messages: [],
+          transitions: [],
+          completed_at: "2026-07-24T00:00:00Z",
+          created_at: "2026-07-24T00:00:00Z",
+          updated_at: "2026-07-24T00:00:00Z",
+        }],
+        next_cursor: null,
+      }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const page = await resource.sentTasks("caller", {
+      state: "completed",
+      cursor: "next",
+      limit: 25,
+    });
+
+    expect(page.items[0].target?.handle).toBe("helper");
+    expect(http.get).toHaveBeenCalledWith(
+      "/identities/caller/a2a/sent/tasks",
+      {
+        state: "completed",
+        context_id: undefined,
+        cursor: "next",
+        limit: 25,
+      },
+    );
+  });
+
+  it("uses exact sent-task and sent-context detail paths", async () => {
+    const http = {
+      get: vi.fn()
+        .mockResolvedValueOnce({
+          id: "task-1",
+          context_id: "context-1",
+          state: "submitted",
+          caller: {
+            identity_id: "caller-1",
+            organization_id: "org-caller",
+            handle: "caller",
+          },
+          messages: [],
+          transitions: [],
+          completed_at: null,
+          created_at: "2026-07-24T00:00:00Z",
+          updated_at: "2026-07-24T00:00:00Z",
+        })
+        .mockResolvedValueOnce({
+          id: "context-1",
+          caller: {
+            identity_id: "caller-1",
+            organization_id: "org-caller",
+            handle: "caller",
+          },
+          tasks: [],
+          created_at: "2026-07-24T00:00:00Z",
+          last_activity_at: "2026-07-24T00:00:00Z",
+        }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    await resource.sentTask("caller", "task-1");
+    await resource.sentContext("caller", "context-1");
+
+    expect(http.get).toHaveBeenNthCalledWith(
+      1,
+      "/identities/caller/a2a/sent/tasks/task-1",
+    );
+    expect(http.get).toHaveBeenNthCalledWith(
+      2,
+      "/identities/caller/a2a/sent/contexts/context-1",
+    );
+  });
+
   it("uses the exact reply body", async () => {
     const http = {
       post: vi.fn().mockResolvedValue({

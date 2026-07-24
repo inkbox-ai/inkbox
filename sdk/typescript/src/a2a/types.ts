@@ -63,6 +63,12 @@ export interface A2ACaller {
   trustTier: string;
 }
 
+export interface A2ATarget {
+  identityId: string;
+  organizationId: string;
+  handle: string | null;
+}
+
 export interface A2AMessage {
   id: string;
   messageId: string;
@@ -88,6 +94,7 @@ export interface A2ATask {
   contextId: string;
   state: A2ATaskState;
   caller: A2ACaller;
+  target: A2ATarget | null;
   messages: A2AMessage[];
   transitions: A2ATransition[];
   completedAt: string | null;
@@ -103,6 +110,7 @@ export interface A2ATaskPage {
 export interface A2AContext {
   id: string;
   caller: A2ACaller;
+  target: A2ATarget | null;
   tasks: A2ATask[];
   createdAt: string;
   lastActivityAt: string;
@@ -173,6 +181,11 @@ export function parseA2ATask(raw: Record<string, any>): A2ATask {
       handle: raw.caller.handle ?? null,
       trustTier: raw.caller.trust_tier ?? "inkbox_verified",
     },
+    target: raw.target ? {
+      identityId: raw.target.identity_id,
+      organizationId: raw.target.organization_id,
+      handle: raw.target.handle ?? null,
+    } : null,
     messages: (raw.messages ?? []).map((item: Record<string, any>) => ({
       id: item.id,
       messageId: item.message_id,
@@ -206,6 +219,11 @@ export function parseA2AContext(raw: Record<string, any>): A2AContext {
       handle: raw.caller.handle ?? null,
       trustTier: raw.caller.trust_tier ?? "inkbox_verified",
     },
+    target: raw.target ? {
+      identityId: raw.target.identity_id,
+      organizationId: raw.target.organization_id,
+      handle: raw.target.handle ?? null,
+    } : null,
     tasks: (raw.tasks ?? []).map(parseA2ATask),
     createdAt: raw.created_at,
     lastActivityAt: raw.last_activity_at,

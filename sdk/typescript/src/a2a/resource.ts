@@ -108,6 +108,49 @@ export class A2AResource {
     );
   }
 
+  async sentTasks(
+    handle: string,
+    options: {
+      state?: A2ATaskState;
+      contextId?: string;
+      cursor?: string;
+      limit?: number;
+    } = {},
+  ): Promise<A2ATaskPage> {
+    const raw = await this.http.get<Raw>(`${base(handle)}/sent/tasks`, {
+      state: options.state,
+      context_id: options.contextId,
+      cursor: options.cursor,
+      limit: options.limit ?? 50,
+    });
+    return {
+      items: (raw.items ?? []).map(parseA2ATask),
+      nextCursor: raw.next_cursor ?? null,
+    };
+  }
+
+  async *iterSentTasks(
+    handle: string,
+    options: {
+      state?: A2ATaskState;
+      contextId?: string;
+      limit?: number;
+    } = {},
+  ): AsyncGenerator<A2ATask> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.sentTasks(handle, { ...options, cursor });
+      yield* page.items;
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+  }
+
+  async sentTask(handle: string, taskId: string): Promise<A2ATask> {
+    return parseA2ATask(
+      await this.http.get<Raw>(`${base(handle)}/sent/tasks/${taskId}`),
+    );
+  }
+
   async reply(
     handle: string,
     taskId: string,
@@ -145,6 +188,28 @@ export class A2AResource {
   async context(handle: string, contextId: string): Promise<A2AContext> {
     return parseA2AContext(
       await this.http.get<Raw>(`${base(handle)}/contexts/${contextId}`),
+    );
+  }
+
+  async sentContexts(
+    handle: string,
+    options: { cursor?: string; limit?: number } = {},
+  ): Promise<A2AContextPage> {
+    const raw = await this.http.get<Raw>(`${base(handle)}/sent/contexts`, {
+      cursor: options.cursor,
+      limit: options.limit ?? 50,
+    });
+    return {
+      items: (raw.items ?? []).map(parseA2AContext),
+      nextCursor: raw.next_cursor ?? null,
+    };
+  }
+
+  async sentContext(handle: string, contextId: string): Promise<A2AContext> {
+    return parseA2AContext(
+      await this.http.get<Raw>(
+        `${base(handle)}/sent/contexts/${contextId}`,
+      ),
     );
   }
 
