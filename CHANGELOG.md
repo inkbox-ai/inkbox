@@ -20,6 +20,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Python, TypeScript, CLI, and Rust package metadata move to 0.5.6; the CLI depends on `@inkbox/sdk` `^0.5.6`. Rust exposes the A2A task, context, and message-history surface; receiver configuration and the standard protocol client remain Python/TypeScript-only.
 - Task detail exposes current state and message history.
 - Python and TypeScript A2A clients unwrap the standard task/message result envelope while retaining compatibility with direct task payloads.
+- Identity-owned iMessage, call-lifecycle, and A2A webhook events use separate subscription rows. Disjoint rows may share the same destination URL.
 
 ### Compatibility and rollout
 

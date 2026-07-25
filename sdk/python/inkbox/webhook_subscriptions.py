@@ -5,13 +5,11 @@ Webhook subscriptions -- fan-out per ``(owner, url, event_types)``.
 
 Replaces the legacy per-resource ``webhook_url`` columns on mailboxes
 and phone numbers. Use this resource to attach HTTPS receivers to mail
-(``message.*``), phone-text (``text.*``), iMessage (``imessage.*``), or
-post-call lifecycle (``call.ended``) events. Mail and text subscriptions
-are owned by the mailbox / phone number; iMessage and call-lifecycle
-subscriptions are owned by the agent identity, since shared iMessage pool
-numbers are not org resources and a call is only ever owned by its
-identity. One identity-owned subscription may combine iMessage,
-call-lifecycle, and A2A event types. Incoming-call
+(``message.*``), phone-text (``text.*``), iMessage (``imessage.*``),
+post-call lifecycle (``call.ended``), or A2A (``a2a.*``) events. Mail and
+text subscriptions are owned by the mailbox / phone number; the other
+channels are owned by the agent identity. Each subscription contains events
+from one channel. Incoming-call
 webhooks (``phone.incoming_call``) are still set on the phone-number
 resource itself -- that channel is a synchronous control-plane
 callback whose response body drives call routing, so fan-out is not
@@ -200,6 +198,7 @@ def _assert_channel_coherence(
     event_types: list[str],
 ) -> None:
     allowed = _OWNER_EVENT_PREFIXES[owner]
+    selected_prefixes: set[str] = set()
     for e in event_types:
         prefix = next((p for p in _EVENT_PREFIX_TO_OWNER if e.startswith(p)), None)
         if prefix is None:
@@ -211,6 +210,12 @@ def _assert_channel_coherence(
                 f"event_type {e!r} does not belong to the {owner!r} channel "
                 f"(it belongs to {_EVENT_PREFIX_TO_OWNER[prefix]!r})",
             )
+        selected_prefixes.add(prefix)
+    if len(selected_prefixes) > 1:
+        raise ValueError(
+            "event_types must all belong to one channel; got "
+            f"{sorted(selected_prefixes)!r}",
+        )
 
 
 def _assert_valid_context_config(cfg: Any) -> None:

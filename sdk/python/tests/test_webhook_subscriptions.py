@@ -379,26 +379,36 @@ class TestAgentIdentityOwner:
         assert kwargs["json"]["agent_identity_id"] == _IDENTITY_ID
         assert sub.agent_identity_id == UUID(_IDENTITY_ID)
 
-    def test_accepts_mixed_identity_owned_events_on_one_sub(self):
+    def test_accepts_a2a_events_on_agent_identity_owner(self):
+        res, http = _resource()
+        http.post.return_value = {
+            **RAW_IDENTITY_SUBSCRIPTION,
+            "event_types": ["a2a.task.created", "a2a.task.message"],
+        }
+
+        sub = res.create(
+            agent_identity_id=_IDENTITY_ID,
+            url="https://x.example.com/hook",
+            event_types=["a2a.task.created", "a2a.task.message"],
+        )
+
+        assert sub.event_types == ["a2a.task.created", "a2a.task.message"]
+
+    def test_rejects_mixed_identity_owned_events_on_one_sub(self):
         res, http = _resource()
         event_types = [
             "imessage.received",
             "call.ended",
             "a2a.sent_task.updated",
         ]
-        http.post.return_value = {
-            **RAW_IDENTITY_SUBSCRIPTION,
-            "event_types": event_types,
-        }
 
-        sub = res.create(
-            agent_identity_id=_IDENTITY_ID,
-            url="https://x.example.com/hook",
-            event_types=event_types,
-        )
-
-        assert http.post.call_args.kwargs["json"]["event_types"] == event_types
-        assert sub.event_types == event_types
+        with pytest.raises(ValueError, match="one channel"):
+            res.create(
+                agent_identity_id=_IDENTITY_ID,
+                url="https://x.example.com/hook",
+                event_types=event_types,
+            )
+        http.post.assert_not_called()
 
     def test_rejects_call_ended_on_mailbox_owner(self):
         res, _http = _resource()
