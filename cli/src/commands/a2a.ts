@@ -418,25 +418,38 @@ export function registerA2ACommands(program: Command): void {
     .description("Reply to an inbound A2A task")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .requiredOption("--text <text>", "Reply text")
-    .addOption(new Option("--complete", "Complete the task").conflicts(["ask", "fail"]))
-    .addOption(new Option("--ask", "Ask the caller for input").conflicts(["complete", "fail"]))
-    .addOption(new Option("--fail", "Fail the task").conflicts(["complete", "ask"]))
+    .addOption(new Option("--progress", "Post progress and keep working").conflicts(["complete", "ask", "fail"]))
+    .addOption(new Option("--complete", "Complete the task").conflicts(["progress", "ask", "fail"]))
+    .addOption(new Option("--ask", "Ask the caller for input").conflicts(["progress", "complete", "fail"]))
+    .addOption(new Option("--fail", "Fail the task").conflicts(["progress", "complete", "ask"]))
     .action(withErrorHandler(async function (
       this: Command,
       taskId: string,
       options: {
         identity: string;
         text: string;
+        progress?: boolean;
         complete?: boolean;
         ask?: boolean;
         fail?: boolean;
       },
     ) {
-      const selected = [options.complete, options.ask, options.fail].filter(Boolean);
-      if (selected.length !== 1) throw new TypeError("Pass exactly one of --complete, --ask, or --fail");
-      const intent: A2AReplyIntent = options.complete
-        ? "complete"
-        : options.ask ? "ask_caller" : "fail";
+      const selected = [
+        options.progress,
+        options.complete,
+        options.ask,
+        options.fail,
+      ].filter(Boolean);
+      if (selected.length !== 1) {
+        throw new TypeError(
+          "Pass exactly one of --progress, --complete, --ask, or --fail",
+        );
+      }
+      const intent: A2AReplyIntent = options.progress
+        ? "progress"
+        : options.complete
+          ? "complete"
+          : options.ask ? "ask_caller" : "fail";
       const result = await (await identityFor(this, options.identity)).a2aReply(taskId, {
         intent,
         text: options.text,

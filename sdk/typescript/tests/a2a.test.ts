@@ -362,6 +362,36 @@ describe("A2AResource", () => {
       { intent: "complete", parts: [{ text: "Done" }] },
     );
   });
+
+  it("supports progress replies", async () => {
+    const http = {
+      post: vi.fn().mockResolvedValue({
+        id: "task-1",
+        context_id: "context-1",
+        state: "working",
+        caller: {
+          identity_id: "caller-1",
+          organization_id: "org-caller",
+          handle: "caller",
+        },
+        messages: [],
+        completed_at: null,
+        created_at: "2026-07-23T00:00:00Z",
+        updated_at: "2026-07-23T00:00:01Z",
+      }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    await resource.reply("helper", "task-1", {
+      intent: "progress",
+      text: "Still working",
+    });
+
+    expect(http.post).toHaveBeenCalledWith(
+      "/identities/helper/a2a/tasks/task-1/reply",
+      { intent: "progress", parts: [{ text: "Still working" }] },
+    );
+  });
 });
 
 describe("A2AClient", () => {

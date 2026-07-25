@@ -25,11 +25,9 @@ class A2ATaskState(ForwardCompatibleStrEnum):
     SUBMITTED = "submitted"
     WORKING = "working"
     INPUT_REQUIRED = "input_required"
-    AUTH_REQUIRED = "auth_required"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELED = "canceled"
-    REJECTED = "rejected"
 
 
 class A2AWireTaskState(ForwardCompatibleStrEnum):
@@ -66,6 +64,7 @@ class A2AMessageRole(ForwardCompatibleStrEnum):
 
 
 class A2AReplyIntent(StrEnum):
+    PROGRESS = "progress"
     ASK_CALLER = "ask_caller"
     COMPLETE = "complete"
     FAIL = "fail"

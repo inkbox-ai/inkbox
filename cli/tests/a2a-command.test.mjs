@@ -40,6 +40,10 @@ test("A2A unified task history exposes direction", () => {
   assert.match(help("a2a", "tasks"), /--direction <direction>/);
 });
 
+test("A2A worker replies expose progress updates", () => {
+  assert.match(help("a2a", "reply"), /--progress/);
+});
+
 test("A2A message history exposes provenance, search, and pagination filters", () => {
   const text = help("a2a", "messages");
   for (const pattern of [

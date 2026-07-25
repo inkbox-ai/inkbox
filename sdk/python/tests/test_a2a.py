@@ -393,6 +393,41 @@ def test_inbox_reply_uses_exact_wire_body() -> None:
     )
 
 
+def test_inbox_reply_supports_progress_updates() -> None:
+    http = MagicMock()
+    http.post.return_value = {
+        "id": "task-1",
+        "context_id": "context-1",
+        "state": "working",
+        "caller": {
+            "identity_id": "caller-1",
+            "organization_id": "org-1",
+            "handle": "caller",
+        },
+        "messages": [],
+        "completed_at": None,
+        "created_at": "2026-07-23T00:00:00Z",
+        "updated_at": "2026-07-23T00:00:01Z",
+    }
+    resource = A2AResource(http)
+
+    task = resource.reply(
+        "helper",
+        "task-1",
+        intent=A2AReplyIntent.PROGRESS,
+        text="Still working",
+    )
+
+    assert task.state is A2ATaskState.WORKING
+    http.post.assert_called_once_with(
+        "/identities/helper/a2a/tasks/task-1/reply",
+        json={
+            "intent": "progress",
+            "parts": [{"text": "Still working"}],
+        },
+    )
+
+
 def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
     requests: list[httpx.Request] = []
 
