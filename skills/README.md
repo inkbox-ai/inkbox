@@ -12,7 +12,7 @@ Official AI agent skills from [Inkbox](https://inkbox.ai) — load them into you
 /reload-plugins
 ```
 
-Installs all six skills for automatic use, exposes self-signup as `/inkbox:inkbox-agent-self-signup`, and connects the Inkbox MCP server. Sign in when prompted to authorize an identity.
+Installs six skills for automatic use. Self-signup is also available as `/inkbox:inkbox-agent-self-signup`. The plugin connects the Inkbox MCP server; sign in when prompted to authorize an identity.
 
 ### Codex (plugin)
 
