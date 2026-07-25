@@ -1,10 +1,17 @@
 {
   "name": "inkbox",
-  "description": "Inkbox email and phone SDK skills for Claude Code.",
+  "description": "Inkbox communication tools and SDK skills for Claude Code.",
+  "version": "0.1.0",
   "author": {
     "name": "Inkbox AI",
     "email": "hello@inkbox.ai"
   },
   "homepage": "https://inkbox.ai",
-  "repository": "https://github.com/inkbox-ai/inkbox"
+  "repository": "https://github.com/inkbox-ai/inkbox",
+  "mcpServers": {
+    "inkbox": {
+      "type": "http",
+      "url": "https://inkbox.ai/mcp/anthropic"
+    }
+  }
 }
