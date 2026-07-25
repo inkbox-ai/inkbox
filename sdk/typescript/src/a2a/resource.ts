@@ -44,6 +44,8 @@ function parseSettings(raw: Raw): A2ASettings {
     filterMode: raw.filter_mode,
     skills: raw.skills ?? null,
     cardUrl: raw.card_url,
+    inboundTaskCount: raw.inbound_task_count ?? 0,
+    outboundTaskCount: raw.outbound_task_count ?? 0,
     updatedAt: raw.updated_at ?? null,
   };
 }

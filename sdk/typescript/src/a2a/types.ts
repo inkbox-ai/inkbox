@@ -42,6 +42,8 @@ export interface A2ASettings {
   filterMode: string;
   skills: A2ASkill[] | null;
   cardUrl: string;
+  inboundTaskCount: number;
+  outboundTaskCount: number;
   updatedAt: string | null;
 }
 

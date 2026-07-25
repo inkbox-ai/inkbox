@@ -6,6 +6,29 @@ import type { HttpTransport } from "../src/_http.js";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("A2AResource", () => {
+  it("parses participant task counts from settings", async () => {
+    const http = {
+      get: vi.fn().mockResolvedValue({
+        enabled: true,
+        filter_mode: "whitelist",
+        skills: null,
+        card_url: "https://example.test/a2a/helper/card",
+        inbound_task_count: 3,
+        outbound_task_count: 5,
+        updated_at: null,
+      }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const settings = await resource.settings("helper");
+
+    expect(settings.inboundTaskCount).toBe(3);
+    expect(settings.outboundTaskCount).toBe(5);
+    expect(http.get).toHaveBeenCalledWith(
+      "/identities/helper/a2a/settings",
+    );
+  });
+
   it("uses the exact task inbox path and query", async () => {
     const http = {
       get: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),

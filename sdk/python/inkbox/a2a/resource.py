@@ -63,6 +63,8 @@ class A2AResource:
                 else None
             ),
             card_url=data["card_url"],
+            inbound_task_count=data.get("inbound_task_count", 0),
+            outbound_task_count=data.get("outbound_task_count", 0),
             updated_at=parse_datetime(data.get("updated_at")),
         )
 
@@ -77,6 +79,8 @@ class A2AResource:
                 else None
             ),
             card_url=data["card_url"],
+            inbound_task_count=data.get("inbound_task_count", 0),
+            outbound_task_count=data.get("outbound_task_count", 0),
             updated_at=parse_datetime(data.get("updated_at")),
         )
 

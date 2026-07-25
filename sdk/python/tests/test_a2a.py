@@ -19,6 +19,26 @@ from inkbox.a2a.types import (
 from inkbox.exceptions import InkboxError
 
 
+def test_settings_parse_participant_task_counts() -> None:
+    http = MagicMock()
+    http.get.return_value = {
+        "enabled": True,
+        "filter_mode": "whitelist",
+        "skills": None,
+        "card_url": "https://example.test/a2a/helper/card",
+        "inbound_task_count": 3,
+        "outbound_task_count": 5,
+        "updated_at": None,
+    }
+    resource = A2AResource(http)
+
+    settings = resource.settings("helper")
+
+    assert settings.inbound_task_count == 3
+    assert settings.outbound_task_count == 5
+    http.get.assert_called_once_with("/identities/helper/a2a/settings")
+
+
 def test_inbox_tasks_use_exact_path_and_query() -> None:
     http = MagicMock()
     http.get.return_value = {"items": [], "next_cursor": None}

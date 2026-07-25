@@ -98,6 +98,8 @@ class A2ASettings:
     filter_mode: str
     skills: list[A2ASkill] | None
     card_url: str
+    inbound_task_count: int
+    outbound_task_count: int
     updated_at: datetime | None
 
 
