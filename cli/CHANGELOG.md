@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.7 — Hosted-agent authority
+
+### Added
+
+- `inkbox phone call --authority-mode <contact_scoped|yolo>` selects authority
+  for an outbound hosted-agent call; `yolo` requires an admin API key.
+- `inkbox phone hosted-agent authority-mode <contact_scoped|yolo>` updates an
+  identity's mode for future incoming calls with an admin API key and
+  idempotency key. Outbound calls use `phone call --authority-mode`.
+- Call and hosted-agent config output includes the resolved authority mode.
+
+### Changed
+
+- CLI version moved in lockstep to 0.5.7 and now depends on `@inkbox/sdk`
+  `^0.5.7`.
+
 ## 0.5.6 — A2A 1.0
 
 ### Added

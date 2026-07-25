@@ -88,6 +88,17 @@ class CallMode(StrEnum):
     HOSTED_AGENT = "hosted_agent"
 
 
+class HostedAgentAuthorityMode(StrEnum):
+    """How broadly a hosted voice agent may act.
+
+    ``contact_scoped`` confines activity to the current caller. ``yolo``
+    allows the hosted agent to work across the identity's available channels.
+    """
+
+    CONTACT_SCOPED = "contact_scoped"
+    YOLO = "yolo"
+
+
 class IncomingCallAction(StrEnum):
     """What to do when an inbound call arrives for an identity.
 
@@ -224,6 +235,11 @@ class PhoneCall:
     mode: str = "client_websocket"
     # Outbound Voice AI task brief; None on inbound and client_websocket calls.
     reason: str | None = None
+    # Hosted-agent authority. Missing/null values from older responses retain
+    # the safe contact-scoped behavior.
+    hosted_agent_authority_mode: HostedAgentAuthorityMode = (
+        HostedAgentAuthorityMode.CONTACT_SCOPED
+    )
     # Voice AI's recorded action items, surfaced inline (open items only,
     # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
@@ -251,6 +267,9 @@ class PhoneCall:
             # Coerce a null/missing mode to client_websocket for back-compat.
             mode=d.get("mode") or "client_websocket",
             reason=d.get("reason"),
+            hosted_agent_authority_mode=HostedAgentAuthorityMode(
+                d.get("hosted_agent_authority_mode") or "contact_scoped"
+            ),
             # Open items only, seq-ascending; empty for client_websocket calls.
             post_call_action_items=[
                 PostCallActionItem._from_dict(a) for a in d.get("post_call_action_items", [])
@@ -543,6 +562,7 @@ class HostedAgentConfig:
     voice: str | None
     model: str | None
     instructions: str | None
+    authority_mode: HostedAgentAuthorityMode = HostedAgentAuthorityMode.CONTACT_SCOPED
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> HostedAgentConfig:
@@ -551,6 +571,9 @@ class HostedAgentConfig:
             voice=d.get("voice"),
             model=d.get("model"),
             instructions=d.get("instructions"),
+            authority_mode=HostedAgentAuthorityMode(
+                d.get("authority_mode") or "contact_scoped"
+            ),
         )
 
 

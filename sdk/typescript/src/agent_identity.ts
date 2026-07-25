@@ -26,7 +26,12 @@ import type {
   IncomingCallActionConfig,
   HostedAgentConfig,
 } from "./phone/types.js";
-import { CallMode, CallOrigin, IncomingCallAction } from "./phone/types.js";
+import {
+  CallMode,
+  CallOrigin,
+  HostedAgentAuthorityMode,
+  IncomingCallAction,
+} from "./phone/types.js";
 import type {
   CreateMailIdentityContactRuleOptions,
   ListMailIdentityContactRulesOptions,
@@ -564,6 +569,8 @@ export class AgentIdentity {
    *   `dedicated_number`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
+   * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults
+   *   to `contact_scoped`.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise (server 422).
    */
@@ -572,6 +579,7 @@ export class AgentIdentity {
     origination?: CallOrigin;
     clientWebsocketUrl?: string;
     mode?: CallMode;
+    hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const origination = options.origination ?? CallOrigin.DEDICATED_NUMBER;
@@ -584,6 +592,7 @@ export class AgentIdentity {
         fromNumber:          this._phoneNumber!.number,
         clientWebsocketUrl:  options.clientWebsocketUrl,
         mode:                options.mode,
+        hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
         reason:              options.reason,
       });
     }
@@ -594,6 +603,7 @@ export class AgentIdentity {
       agentIdentityId:     this.id,
       clientWebsocketUrl:  options.clientWebsocketUrl,
       mode:                options.mode,
+      hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
       reason:              options.reason,
     });
   }
@@ -659,6 +669,21 @@ export class AgentIdentity {
       model: options?.model,
       instructions: options?.instructions,
       agentIdentityId: this.id,
+    });
+  }
+
+  /**
+   * Set authority for future incoming hosted calls with an admin API key.
+   * Outbound calls select authority independently with `hostedAgentAuthorityMode`.
+   */
+  async setHostedAgentAuthorityMode(options: {
+    authorityMode: HostedAgentAuthorityMode;
+    idempotencyKey: string;
+  }): Promise<HostedAgentConfig> {
+    return this._inkbox._hostedAgent.setAuthorityMode({
+      agentIdentityId: this.id,
+      authorityMode: options.authorityMode,
+      idempotencyKey: options.idempotencyKey,
     });
   }
 

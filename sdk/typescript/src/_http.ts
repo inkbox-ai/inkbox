@@ -530,8 +530,16 @@ export class HttpTransport {
     return this.request<T>("POST", path, { formBody: form });
   }
 
-  async put<T>(path: string, body: unknown, opts?: { timeoutMs?: number }): Promise<T> {
-    return this.request<T>("PUT", path, { body, timeoutMs: opts?.timeoutMs });
+  async put<T>(
+    path: string,
+    body: unknown,
+    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+  ): Promise<T> {
+    return this.request<T>("PUT", path, {
+      body,
+      timeoutMs: opts?.timeoutMs,
+      headers: opts?.headers,
+    });
   }
 
   async patch<T>(

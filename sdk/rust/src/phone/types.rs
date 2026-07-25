@@ -154,6 +154,27 @@ impl CallOrigin {
     }
 }
 
+/// How broadly a hosted voice agent may act.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedAgentAuthorityMode {
+    /// Confine activity to the current caller.
+    #[default]
+    ContactScoped,
+    /// Allow activity across the identity's available channels.
+    Yolo,
+}
+
+impl HostedAgentAuthorityMode {
+    /// The wire string value (`"contact_scoped"` / `"yolo"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HostedAgentAuthorityMode::ContactScoped => "contact_scoped",
+            HostedAgentAuthorityMode::Yolo => "yolo",
+        }
+    }
+}
+
 /// Routing decision applied to inbound calls for an agent identity.
 ///
 /// `hosted_agent` answers with Inkbox Voice AI and is the
@@ -250,6 +271,15 @@ where
         .unwrap_or_else(default_call_mode_client_websocket))
 }
 
+fn deserialize_authority_mode_null_default<'de, D>(
+    deserializer: D,
+) -> Result<HostedAgentAuthorityMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<HostedAgentAuthorityMode>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 // ---------------------------------------------------------------------------
 // Phone structs.
 // ---------------------------------------------------------------------------
@@ -342,6 +372,10 @@ pub struct PhoneCall {
     /// Outbound Voice AI task brief; `None` on inbound and client-driven calls.
     #[serde(default)]
     pub reason: Option<String>,
+    /// Hosted-agent authority. Missing/null values retain contact-scoped
+    /// behavior for compatibility with older responses.
+    #[serde(default, deserialize_with = "deserialize_authority_mode_null_default")]
+    pub hosted_agent_authority_mode: HostedAgentAuthorityMode,
     /// Open action items Voice AI recorded, `seq`-ascending. Empty for
     /// client-driven calls and Voice AI calls with no open items.
     #[serde(default)]
@@ -400,6 +434,8 @@ pub struct HostedAgentConfig {
     pub model: Option<String>,
     #[serde(default)]
     pub instructions: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_authority_mode_null_default")]
+    pub authority_mode: HostedAgentAuthorityMode,
 }
 
 /// An action item Inkbox Voice AI recorded during a call.
@@ -746,6 +782,10 @@ mod tests {
         let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
         assert_eq!(call.mode, "client_websocket");
         assert_eq!(call.reason, None);
+        assert_eq!(
+            call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::ContactScoped
+        );
     }
 
     #[test]
@@ -778,6 +818,26 @@ mod tests {
         assert_eq!(cfg.voice.as_deref(), Some("warm-voice"));
         assert_eq!(cfg.model, None);
         assert_eq!(cfg.instructions.as_deref(), Some("Be brief."));
+        assert_eq!(cfg.authority_mode, HostedAgentAuthorityMode::ContactScoped);
+    }
+
+    #[test]
+    fn hosted_agent_authority_mode_parses_yolo_and_null_defaults() {
+        let mut v = call_json();
+        v["hosted_agent_authority_mode"] = json!("yolo");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(
+            call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::Yolo
+        );
+
+        let mut v = call_json();
+        v["hosted_agent_authority_mode"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(
+            call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::ContactScoped
+        );
     }
 
     #[test]

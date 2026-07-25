@@ -13,7 +13,12 @@ import pytest
 from inkbox._http import HttpTransport
 from inkbox.exceptions import InkboxAPIError
 from inkbox.phone.resources.calls import CallsResource
-from inkbox.phone.types import CallMode, CallOrigin, PhoneCall
+from inkbox.phone.types import (
+    CallMode,
+    CallOrigin,
+    HostedAgentAuthorityMode,
+    PhoneCall,
+)
 from sample_data import (
     PHONE_CALL_BLOCKED_DICT,
     PHONE_CALL_DICT,
@@ -111,6 +116,26 @@ class TestCallsList:
         transport.get.assert_called_once_with(
             "/calls",
             params={"limit": 50, "offset": 0, "agent_identity_id": IDENTITY_ID},
+        )
+
+    def test_date_filters_pass_through(self, client, transport):
+        transport.get.return_value = []
+
+        client._calls.list(
+            start_datetime="2026-07-01",
+            end_datetime="2026-07-25",
+            tz="America/New_York",
+        )
+
+        transport.get.assert_called_once_with(
+            "/calls",
+            params={
+                "limit": 50,
+                "offset": 0,
+                "start_datetime": "2026-07-01",
+                "end_datetime": "2026-07-25",
+                "tz": "America/New_York",
+            },
         )
 
     def test_is_blocked_default_when_field_missing(self, client, transport):
@@ -343,6 +368,24 @@ class TestCallsPlaceHosted:
         assert call.mode == "hosted_agent"
         assert call.reason == "Book a cleaning next week, mornings preferred"
 
+    def test_yolo_authority_forwarded_and_parsed(self, client, transport):
+        transport.post.return_value = {
+            **PHONE_CALL_DICT,
+            "mode": "hosted_agent",
+            "hosted_agent_authority_mode": "yolo",
+        }
+
+        call = client._calls.place(
+            to_number="+15551234567",
+            mode=CallMode.HOSTED_AGENT,
+            hosted_agent_authority_mode=HostedAgentAuthorityMode.YOLO,
+            reason="Coordinate the appointment",
+        )
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["hosted_agent_authority_mode"] == "yolo"
+        assert call.hosted_agent_authority_mode is HostedAgentAuthorityMode.YOLO
+
     def test_string_mode_passed_verbatim(self, client, transport):
         """A raw string mode is forwarded as-is (no enum coercion)."""
         transport.post.return_value = PHONE_CALL_DICT
@@ -390,6 +433,7 @@ class TestCallsPlaceHosted:
 
         assert call.mode == "client_websocket"
         assert call.reason is None
+        assert call.hosted_agent_authority_mode is HostedAgentAuthorityMode.CONTACT_SCOPED
 
 
 class TestPostCallActionItems:

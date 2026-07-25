@@ -1,7 +1,12 @@
 // sdk/typescript/tests/agent_identity.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AgentIdentity } from "../src/agent_identity.js";
-import { CallMode, CallOrigin, IncomingCallAction } from "../src/phone/types.js";
+import {
+  CallMode,
+  CallOrigin,
+  HostedAgentAuthorityMode,
+  IncomingCallAction,
+} from "../src/phone/types.js";
 import { InkboxError } from "../src/_http.js";
 import type { Inkbox } from "../src/inkbox.js";
 import type { _AgentIdentityData } from "../src/identities/types.js";
@@ -80,7 +85,11 @@ function mockInkbox() {
       transcripts: vi.fn(),
     },
     _incomingCallAction: { get: vi.fn(), set: vi.fn() },
-    _hostedAgent: { getConfig: vi.fn(), setConfig: vi.fn() },
+    _hostedAgent: {
+      getConfig: vi.fn(),
+      setConfig: vi.fn(),
+      setAuthorityMode: vi.fn(),
+    },
     _texts: { send: vi.fn(), update: vi.fn(), updateConversation: vi.fn() },
     _idsResource: {
       get: vi.fn(),
@@ -400,6 +409,7 @@ describe("AgentIdentity phone helpers", () => {
       fromNumber: PARSED_PHONE.number,
       clientWebsocketUrl: undefined,
       mode: CallMode.HOSTED_AGENT,
+      hostedAgentAuthorityMode: undefined,
       reason: "Book a table for two",
     });
   });
@@ -422,6 +432,7 @@ describe("AgentIdentity phone helpers", () => {
       agentIdentityId: identity.id,
       clientWebsocketUrl: undefined,
       mode: CallMode.HOSTED_AGENT,
+      hostedAgentAuthorityMode: undefined,
       reason: "Confirm the appointment",
     });
   });
@@ -433,6 +444,7 @@ describe("AgentIdentity phone helpers", () => {
       voice: null,
       model: null,
       instructions: null,
+      authorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
     });
     const identity = new AgentIdentity(makeData(), ink);
 
@@ -450,6 +462,7 @@ describe("AgentIdentity phone helpers", () => {
       voice: "warm-voice",
       model: null,
       instructions: "Be brief.",
+      authorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
     });
     const identity = new AgentIdentity(makeData(), ink);
 
@@ -463,6 +476,29 @@ describe("AgentIdentity phone helpers", () => {
       model: undefined,
       instructions: "Be brief.",
       agentIdentityId: identity.id,
+    });
+  });
+
+  it("setHostedAgentAuthorityMode delegates with identity id", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._hostedAgent.setAuthorityMode).mockResolvedValue({
+      agentIdentityId: "id-1",
+      voice: null,
+      model: null,
+      instructions: null,
+      authorityMode: HostedAgentAuthorityMode.YOLO,
+    });
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.setHostedAgentAuthorityMode({
+      authorityMode: HostedAgentAuthorityMode.YOLO,
+      idempotencyKey: "authority-update-1",
+    });
+
+    expect(ink._hostedAgent.setAuthorityMode).toHaveBeenCalledWith({
+      agentIdentityId: identity.id,
+      authorityMode: HostedAgentAuthorityMode.YOLO,
+      idempotencyKey: "authority-update-1",
     });
   });
 

@@ -1,7 +1,11 @@
 // sdk/typescript/tests/phone/calls.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CallsResource } from "../../src/phone/resources/calls.js";
-import { CallMode, CallOrigin } from "../../src/phone/types.js";
+import {
+  CallMode,
+  CallOrigin,
+  HostedAgentAuthorityMode,
+} from "../../src/phone/types.js";
 import { HttpTransport, InkboxAPIError } from "../../src/_http.js";
 import {
   RAW_PHONE_CALL,
@@ -270,6 +274,7 @@ describe("CallsResource.place", () => {
     // reason only rides hosted placements; mode is always on the wire.
     expect(body["reason"]).toBeUndefined();
     expect(body["mode"]).toBe("client_websocket");
+    expect(body["hosted_agent_authority_mode"]).toBeUndefined();
   });
 
   it("parses the response including origin and rateLimit", async () => {
@@ -328,6 +333,31 @@ describe("CallsResource.place hosted_agent mode", () => {
     expect(call.reason).toBe("Book a cleaning next week, mornings preferred");
   });
 
+  it("forwards yolo authority on a hosted-agent call", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
+      mode: "hosted_agent",
+      hosted_agent_authority_mode: "yolo",
+    });
+    const res = new CallsResource(http);
+
+    const call = await res.place({
+      toNumber: "+15551234567",
+      fromNumber: "+18335794607",
+      mode: CallMode.HOSTED_AGENT,
+      hostedAgentAuthorityMode: HostedAgentAuthorityMode.YOLO,
+      reason: "Coordinate the appointment",
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["hosted_agent_authority_mode"]).toBe("yolo");
+    expect(call.hostedAgentAuthorityMode).toBe(HostedAgentAuthorityMode.YOLO);
+  });
+
   it("forwards a hosted_agent call with ws-url instead of client-gating (server 422s)", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
@@ -356,6 +386,9 @@ describe("CallsResource.place hosted_agent mode", () => {
 
     expect(call.mode).toBe(CallMode.CLIENT_WEBSOCKET);
     expect(call.reason).toBeNull();
+    expect(call.hostedAgentAuthorityMode).toBe(
+      HostedAgentAuthorityMode.CONTACT_SCOPED,
+    );
   });
 });
 

@@ -12,6 +12,7 @@ from uuid import UUID
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
+    HostedAgentAuthorityMode,
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneTranscript,
@@ -124,6 +125,7 @@ class CallsResource:
         agent_identity_id: UUID | str | None = None,
         client_websocket_url: str | None = None,
         mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
+        hosted_agent_authority_mode: HostedAgentAuthorityMode | str | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call.
@@ -146,6 +148,10 @@ class CallsResource:
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.
                 See :class:`CallMode`.
+            hosted_agent_authority_mode: Hosted-agent authority for this call.
+                Omit for the server's ``contact_scoped`` default. ``yolo`` is
+                valid only with ``mode=hosted_agent``; invalid combinations
+                surface the server's 422 response.
             reason: Voice AI's task brief for the call — what to
                 accomplish. Required with ``mode=hosted_agent``, invalid
                 otherwise.
@@ -162,6 +168,12 @@ class CallsResource:
             "origination": origination_value,
             "mode": mode_value,
         }
+        if hosted_agent_authority_mode is not None:
+            body["hosted_agent_authority_mode"] = (
+                hosted_agent_authority_mode.value
+                if isinstance(hosted_agent_authority_mode, HostedAgentAuthorityMode)
+                else hosted_agent_authority_mode
+            )
         if from_number is not None:
             body["from_number"] = from_number
         if agent_identity_id is not None:

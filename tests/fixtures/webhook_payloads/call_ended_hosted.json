@@ -17,6 +17,7 @@
       "updated_at": "2026-07-09T15:04:12Z",
       "duration_seconds": 189,
       "mode": "hosted_agent",
+      "hosted_agent_authority_mode": "yolo",
       "reason": "Call the dental office and book a cleaning next week, mornings preferred"
     },
     "contacts": [

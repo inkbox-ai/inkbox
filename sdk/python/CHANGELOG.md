@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.7 — Hosted-agent authority
+
+### Added
+
+- `HostedAgentAuthorityMode` with `contact_scoped` and `yolo` values.
+- Authority mode fields on hosted-agent config, calls, and `call.ended`
+  webhook types.
+- `HostedAgentConfigResource.set_authority_mode()` and
+  `AgentIdentity.set_hosted_agent_authority_mode()` for setting future incoming
+  call authority with admin API keys. Outbound calls select authority per call.
+- Per-call `hosted_agent_authority_mode` selection on outbound placement;
+  `yolo` requires an admin API key.
+
+### Compatibility
+
+- Existing methods default to `contact_scoped`; absent or null response fields
+  also parse as `contact_scoped`.
+
 ## 0.5.6 — A2A 1.0
 
 ### Added

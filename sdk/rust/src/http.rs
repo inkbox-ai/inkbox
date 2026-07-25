@@ -160,7 +160,20 @@ impl HttpTransport {
     }
 
     pub fn put<B: Serialize>(&self, path: &str, body: &B) -> Result<Value> {
-        let rb = self.client.put(self.url(path)).json(body);
+        self.put_with_headers(path, body, NO_HEADERS)
+    }
+
+    /// `PUT` with caller-supplied per-request headers.
+    pub fn put_with_headers<B: Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+        headers: Headers,
+    ) -> Result<Value> {
+        let mut rb = self.client.put(self.url(path)).json(body);
+        for (name, value) in headers {
+            rb = rb.header(*name, *value);
+        }
         raise_for_status(self.send(rb, &self.url(path))?)?.json_value()
     }
 

@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { buildPlaceCallOptions } from "../dist/commands/phone.js";
+
+const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+function help(...args) {
+  return execFileSync(process.execPath, [cli, ...args, "--help"], {
+    encoding: "utf8",
+  });
+}
+
+test("phone help exposes authority controls", () => {
+  assert.match(help("phone", "call"), /--authority-mode <mode>/);
+  const authorityHelp = help("phone", "hosted-agent", "authority-mode");
+  assert.match(authorityHelp, /--idempotency-key <key>/);
+  assert.match(authorityHelp, /admin API key/);
+});
 
 test("buildPlaceCallOptions builds a plain client-driven call", () => {
   const result = buildPlaceCallOptions({
@@ -77,6 +94,49 @@ test("buildPlaceCallOptions builds a shared hosted call with mode and reason", (
       reason: "Book a cleaning next week, mornings preferred",
       origination: "shared_imessage_number",
     },
+  });
+});
+
+test("buildPlaceCallOptions forwards yolo authority on a hosted call", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    hosted: true,
+    reason: "Coordinate the appointment",
+    authorityMode: "yolo",
+  });
+
+  assert.deepEqual(result, {
+    callOptions: {
+      toNumber: "+15551234567",
+      mode: "hosted_agent",
+      reason: "Coordinate the appointment",
+      hostedAgentAuthorityMode: "yolo",
+    },
+  });
+});
+
+test("buildPlaceCallOptions rejects yolo authority without --hosted", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    authorityMode: "yolo",
+  });
+
+  assert.deepEqual(result, {
+    error: "--authority-mode yolo requires --hosted.",
+  });
+});
+
+test("buildPlaceCallOptions rejects an unknown authority mode", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    authorityMode: "global",
+  });
+
+  assert.deepEqual(result, {
+    error: "--authority-mode must be contact_scoped or yolo.",
   });
 });
 

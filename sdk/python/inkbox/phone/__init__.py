@@ -6,6 +6,7 @@ from inkbox.phone.exceptions import InkboxAPIError, InkboxError
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
+    HostedAgentAuthorityMode,
     HostedAgentConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
@@ -31,6 +32,7 @@ __all__ = [
     "InkboxAPIError",
     "CallMode",
     "CallOrigin",
+    "HostedAgentAuthorityMode",
     "HostedAgentConfig",
     "IncomingCallAction",
     "IncomingCallActionConfig",

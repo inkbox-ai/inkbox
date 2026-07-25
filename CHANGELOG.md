@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
-## 0.5.7 — Mailbox imports
+## 0.5.7 — Mailbox imports and hosted-agent authority
 
 ### Added
 
@@ -12,6 +12,18 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits. `run` re-issues the upload target and retries once after a transport failure or rejected target, then cancels the job it created rather than leaving the mailbox blocked.
 - `MailImportQuotaExceededError` (Rust `InkboxError::MailImportQuotaExceeded`) on the 429 import-job quota rejection, carrying the server's `Retry-After` value.
 - Import provenance on message models through nullable `import_job_id` (TypeScript `importJobId`), plus unsafe-content rejection counters on import jobs.
+- **Hosted-agent authority modes.** Python, TypeScript, and Rust expose
+  `contact_scoped` and `yolo` as typed authority modes on hosted-agent config,
+  call responses, and `call.ended` webhook payloads.
+- **Privileged authority updates.** Hosted-agent config resources and
+  identity helpers can change the mode for future incoming calls with an admin
+  API key and a caller-generated idempotency key. Outbound calls select
+  authority per call.
+- **Per-call authority selection.** Outbound call placement accepts an
+  authority mode. The default is `contact_scoped`; `yolo` is available only
+  for hosted-agent calls made with an admin API key.
+- **CLI controls.** `inkbox phone call` accepts `--authority-mode`, and
+  `inkbox phone hosted-agent authority-mode` updates the saved mode.
 
 ### Changed
 
@@ -20,6 +32,14 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - The CLI prints the server's sentence for structured error details instead of the raw JSON object, and points at `imports list` / `imports cancel` when a mailbox already has an import in flight.
 - **TypeScript note (source-breaking).** `Message` gains required `importJobId: string | null`; hand-built message object literals must add it. Parsing defaults an omitted wire field to `null`.
 - **Rust note (source-breaking).** `Message` gains public `import_job_id: Option<Uuid>`, and `InkboxError` gains `MailImportUpload`, `MailImportUploadTransport`, `MailImportQuotaExceeded`, and `Timeout` variants. Struct literals and exhaustive error matches must account for them; omitted message fields still deserialize as `None`. Import `wait` now returns `Timeout` rather than `InvalidArgument` when the local wall-clock budget runs out.
+- PUT transports accept optional per-request headers.
+
+### Compatibility
+
+- Missing or null authority fields on older call and config responses parse as
+  `contact_scoped`. Older `call.ended` replays may omit the optional field.
+- Existing call-placement and hosted-agent config methods retain
+  `contact_scoped` behavior by default.
 
 ## 0.5.6 — A2A 1.0
 

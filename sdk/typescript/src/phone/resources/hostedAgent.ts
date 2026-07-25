@@ -4,8 +4,9 @@
  * Identity-scoped Inkbox Voice AI config (getConfig / setConfig).
  */
 
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
 import {
+  HostedAgentAuthorityMode,
   HostedAgentConfig,
   RawHostedAgentConfig,
   parseHostedAgentConfig,
@@ -70,6 +71,30 @@ export class HostedAgentConfigResource {
     const data = await this.http.put<RawHostedAgentConfig>(
       "/hosted-agent-config",
       body,
+    );
+    return parseHostedAgentConfig(data);
+  }
+
+  /**
+   * Set authority for an identity's future incoming hosted calls.
+   *
+   * This privileged operation requires an admin API key and a stable
+   * caller-generated idempotency key. Reuse the same key when retrying an
+   * ambiguous result. Outbound calls select authority independently.
+   */
+  async setAuthorityMode(options: {
+    agentIdentityId: string;
+    authorityMode: HostedAgentAuthorityMode;
+    idempotencyKey: string;
+  }): Promise<HostedAgentConfig> {
+    validateIdempotencyKey(options.idempotencyKey);
+    const data = await this.http.put<RawHostedAgentConfig>(
+      "/hosted-agent-config/authority-mode",
+      {
+        agent_identity_id: options.agentIdentityId,
+        authority_mode: options.authorityMode,
+      },
+      { headers: { "Idempotency-Key": options.idempotencyKey } },
     );
     return parseHostedAgentConfig(data);
   }

@@ -1,5 +1,10 @@
 import { Command } from "commander";
-import { CallMode, CallOrigin, IncomingCallAction } from "@inkbox/sdk";
+import {
+  CallMode,
+  CallOrigin,
+  HostedAgentAuthorityMode,
+  IncomingCallAction,
+} from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -11,6 +16,7 @@ interface PlaceCallCommandOptions {
   hosted?: boolean;
   reason?: string;
   origination?: CallOrigin;
+  authorityMode?: string;
 }
 
 interface PlaceCallOptions {
@@ -19,6 +25,7 @@ interface PlaceCallOptions {
   mode?: CallMode;
   reason?: string;
   origination?: CallOrigin;
+  hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
 }
 
 export function buildPlaceCallOptions(
@@ -35,6 +42,17 @@ export function buildPlaceCallOptions(
   if (!cmdOpts.hosted && cmdOpts.reason) {
     return { error: "--reason is only valid with --hosted." };
   }
+  if (
+    cmdOpts.authorityMode !== undefined
+    && !Object.values(HostedAgentAuthorityMode).includes(
+      cmdOpts.authorityMode as HostedAgentAuthorityMode,
+    )
+  ) {
+    return { error: "--authority-mode must be contact_scoped or yolo." };
+  }
+  if (!cmdOpts.hosted && cmdOpts.authorityMode === HostedAgentAuthorityMode.YOLO) {
+    return { error: "--authority-mode yolo requires --hosted." };
+  }
 
   const callOptions: PlaceCallOptions = { toNumber: cmdOpts.to };
   if (cmdOpts.wsUrl) {
@@ -46,6 +64,10 @@ export function buildPlaceCallOptions(
   }
   if (cmdOpts.origination) {
     callOptions.origination = cmdOpts.origination;
+  }
+  if (cmdOpts.authorityMode !== undefined) {
+    callOptions.hostedAgentAuthorityMode =
+      cmdOpts.authorityMode as HostedAgentAuthorityMode;
   }
   return { callOptions };
 }
@@ -63,6 +85,10 @@ export function registerPhoneCommands(program: Command): void {
     .option("--ws-url <url>", "WebSocket URL (wss://) for audio bridging")
     .option("--hosted", "Let Inkbox Voice AI drive the call (requires --reason)")
     .option("--reason <text>", "Voice AI's task brief — what to accomplish")
+    .option(
+      "--authority-mode <mode>",
+      "Hosted-agent authority: contact_scoped or yolo; yolo requires an admin API key",
+    )
     .option(
       "--origination <origin>",
       "Call origin: dedicated_number or shared_imessage_number",
@@ -91,6 +117,7 @@ export function registerPhoneCommands(program: Command): void {
             status: call.status,
             mode: call.mode,
             reason: call.reason,
+            authorityMode: call.hostedAgentAuthorityMode,
             callsRemaining: call.rateLimit.callsRemaining,
           },
           { json: !!opts.json },
@@ -296,6 +323,7 @@ export function registerPhoneCommands(program: Command): void {
             voice: config.voice,
             model: config.model,
             instructions: config.instructions,
+            authorityMode: config.authorityMode,
           },
           { json: !!opts.json },
         );
@@ -336,6 +364,44 @@ export function registerPhoneCommands(program: Command): void {
             voice: config.voice,
             model: config.model,
             instructions: config.instructions,
+            authorityMode: config.authorityMode,
+          },
+          { json: !!opts.json },
+        );
+      }),
+    );
+
+  hostedAgent
+    .command("authority-mode <mode>")
+    .description("Set authority for future incoming hosted calls (admin API key)")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .requiredOption(
+      "--idempotency-key <key>",
+      "Stable key to reuse when retrying the same update",
+    )
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        mode: string,
+        cmdOpts: { identity: string; idempotencyKey: string },
+      ) {
+        if (!Object.values(HostedAgentAuthorityMode).includes(
+          mode as HostedAgentAuthorityMode,
+        )) {
+          console.error("mode must be contact_scoped or yolo.");
+          process.exit(1);
+        }
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const config = await identity.setHostedAgentAuthorityMode({
+          authorityMode: mode as HostedAgentAuthorityMode,
+          idempotencyKey: cmdOpts.idempotencyKey,
+        });
+        output(
+          {
+            agentIdentityId: config.agentIdentityId,
+            authorityMode: config.authorityMode,
           },
           { json: !!opts.json },
         );

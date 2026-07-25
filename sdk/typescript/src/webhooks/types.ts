@@ -54,6 +54,7 @@ export type CallStatusWire =
   | "canceled";
 
 export type CallModeWire = "client_websocket" | "hosted_agent";
+export type HostedAgentAuthorityModeWire = "contact_scoped" | "yolo";
 
 export type CallOutcomeWire = "completed" | "no_answer" | "declined" | "failed";
 
@@ -639,6 +640,8 @@ export interface WebhookPhoneCall {
   duration_seconds: number | null;
   mode?: CallModeWire;
   reason?: string | null;
+  /** Optional/nullable on older replays; treat either as `contact_scoped`. */
+  hosted_agent_authority_mode?: HostedAgentAuthorityModeWire | null;
 }
 
 /**

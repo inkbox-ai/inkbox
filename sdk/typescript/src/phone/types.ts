@@ -85,6 +85,12 @@ export enum CallMode {
   HOSTED_AGENT = "hosted_agent",
 }
 
+/** How broadly a hosted voice agent may act. */
+export enum HostedAgentAuthorityMode {
+  CONTACT_SCOPED = "contact_scoped",
+  YOLO = "yolo",
+}
+
 /**
  * What happens when a call comes in for an agent identity.
  *
@@ -251,6 +257,8 @@ export interface PhoneCall {
   mode: string;
   /** Outbound Voice AI task brief; `null` on inbound and client-driven calls. */
   reason: string | null;
+  /** Hosted-agent authority. Defaults to `contact_scoped`. */
+  hostedAgentAuthorityMode: HostedAgentAuthorityMode;
   /**
    * Open action items Inkbox Voice AI recorded, `seq`-ascending.
    * Empty for client_websocket calls and Voice AI calls with no open items.
@@ -309,6 +317,7 @@ export interface HostedAgentConfig {
   voice: string | null;
   model: string | null;
   instructions: string | null;
+  authorityMode: HostedAgentAuthorityMode;
 }
 
 /**
@@ -478,6 +487,8 @@ export interface RawPhoneCall {
   // client_websocket.
   mode?: string | null;
   reason?: string | null;
+  // Optional/nullable for compatibility; parser defaults to contact_scoped.
+  hosted_agent_authority_mode?: HostedAgentAuthorityMode | string | null;
   // Absent/empty for client_websocket calls and Voice AI calls with no open items.
   post_call_action_items?: RawPostCallActionItem[];
   created_at: string;
@@ -577,6 +588,7 @@ export interface RawHostedAgentConfig {
   voice?: string | null;
   model?: string | null;
   instructions?: string | null;
+  authority_mode?: HostedAgentAuthorityMode | string | null;
 }
 
 export interface RawPostCallActionItem {
@@ -675,6 +687,9 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     // Coerce a null/missing mode to client_websocket for back-compat.
     mode: r.mode ?? CallMode.CLIENT_WEBSOCKET,
     reason: r.reason ?? null,
+    hostedAgentAuthorityMode:
+      (r.hosted_agent_authority_mode as HostedAgentAuthorityMode | null | undefined)
+      ?? HostedAgentAuthorityMode.CONTACT_SCOPED,
     postCallActionItems: (r.post_call_action_items ?? []).map(parsePostCallActionItem),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
@@ -730,6 +745,9 @@ export function parseHostedAgentConfig(r: RawHostedAgentConfig): HostedAgentConf
     voice: r.voice ?? null,
     model: r.model ?? null,
     instructions: r.instructions ?? null,
+    authorityMode:
+      (r.authority_mode as HostedAgentAuthorityMode | null | undefined)
+      ?? HostedAgentAuthorityMode.CONTACT_SCOPED,
   };
 }
 

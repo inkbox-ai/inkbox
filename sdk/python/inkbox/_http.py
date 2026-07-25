@@ -103,9 +103,10 @@ class HttpTransport:
         path: str,
         *,
         json: dict[str, Any],
+        headers: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> Any:
-        resp = self._send("PUT", path, json=json, timeout=timeout)
+        resp = self._send("PUT", path, json=json, headers=headers, timeout=timeout)
         _raise_for_status(resp)
         return resp.json()
 

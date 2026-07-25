@@ -1,7 +1,10 @@
 // sdk/typescript/tests/phone/hostedAgent.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { HostedAgentConfigResource } from "../../src/phone/resources/hostedAgent.js";
-import { CallMode } from "../../src/phone/types.js";
+import {
+  CallMode,
+  HostedAgentAuthorityMode,
+} from "../../src/phone/types.js";
 import type { HttpTransport } from "../../src/_http.js";
 import { RAW_HOSTED_AGENT_CONFIG } from "../sampleData.js";
 
@@ -32,6 +35,7 @@ describe("HostedAgentConfigResource.getConfig", () => {
     expect(config.instructions).toBe(
       "Always offer to text a summary after the call.",
     );
+    expect(config.authorityMode).toBe(HostedAgentAuthorityMode.CONTACT_SCOPED);
   });
 
   it("scopes by agentIdentityId when provided", async () => {
@@ -136,9 +140,55 @@ describe("HostedAgentConfigResource.setConfig", () => {
   });
 });
 
+describe("HostedAgentConfigResource.setAuthorityMode", () => {
+  it("sends the exact body and idempotency header", async () => {
+    const http = mockHttp();
+    vi.mocked(http.put).mockResolvedValue({
+      ...RAW_HOSTED_AGENT_CONFIG,
+      authority_mode: "yolo",
+    });
+    const res = new HostedAgentConfigResource(http);
+
+    const config = await res.setAuthorityMode({
+      agentIdentityId: IDENTITY_ID,
+      authorityMode: HostedAgentAuthorityMode.YOLO,
+      idempotencyKey: "authority-update-1",
+    });
+
+    expect(http.put).toHaveBeenCalledWith(
+      "/hosted-agent-config/authority-mode",
+      {
+        agent_identity_id: IDENTITY_ID,
+        authority_mode: "yolo",
+      },
+      { headers: { "Idempotency-Key": "authority-update-1" } },
+    );
+    expect(config.authorityMode).toBe(HostedAgentAuthorityMode.YOLO);
+  });
+
+  it("rejects invalid idempotency keys before transport", async () => {
+    const http = mockHttp();
+    const res = new HostedAgentConfigResource(http);
+
+    await expect(res.setAuthorityMode({
+      agentIdentityId: IDENTITY_ID,
+      authorityMode: HostedAgentAuthorityMode.YOLO,
+      idempotencyKey: "",
+    })).rejects.toThrow("idempotencyKey");
+    expect(http.put).not.toHaveBeenCalled();
+  });
+});
+
 describe("CallMode enum", () => {
   it("carries the exact wire strings", () => {
     expect(CallMode.CLIENT_WEBSOCKET).toBe("client_websocket");
     expect(CallMode.HOSTED_AGENT).toBe("hosted_agent");
+  });
+});
+
+describe("HostedAgentAuthorityMode enum", () => {
+  it("carries the exact wire strings", () => {
+    expect(HostedAgentAuthorityMode.CONTACT_SCOPED).toBe("contact_scoped");
+    expect(HostedAgentAuthorityMode.YOLO).toBe("yolo");
   });
 });

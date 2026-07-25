@@ -66,6 +66,7 @@ HangupReasonWire = Literal[
 ]
 
 CallModeWire = Literal["client_websocket", "hosted_agent"]
+HostedAgentAuthorityModeWire = Literal["contact_scoped", "yolo"]
 
 CallOutcomeWire = Literal["completed", "no_answer", "declined", "failed"]
 
@@ -654,6 +655,8 @@ class WebhookPhoneCall(TypedDict):
     duration_seconds: int | None
     mode: NotRequired[CallModeWire]
     reason: NotRequired[str | None]
+    # Optional/nullable for replay compatibility; treat either as contact_scoped.
+    hosted_agent_authority_mode: NotRequired[HostedAgentAuthorityModeWire | None]
 
 
 class WebhookCallTranscript(TypedDict):

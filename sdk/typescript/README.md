@@ -375,12 +375,30 @@ by 1024 and label the result GiB/MiB.
 ## Phone
 
 ```ts
+import { CallMode, HostedAgentAuthorityMode } from "@inkbox/sdk";
+
 // Place an outbound call — stream audio over WebSocket
 const call = await identity.placeCall({
   toNumber: "+15551234567",
   clientWebsocketUrl: "wss://your-agent.example.com/ws",
 });
 console.log(call.status, call.rateLimit.callsRemaining);
+
+// Let the hosted agent work beyond the current caller for this call.
+// Requesting yolo authority requires an admin API key.
+const hostedCall = await identity.placeCall({
+  toNumber: "+15551234567",
+  mode: CallMode.HOSTED_AGENT,
+  reason: "Coordinate the appointment and send confirmations.",
+  hostedAgentAuthorityMode: HostedAgentAuthorityMode.YOLO,
+});
+
+// Set the mode for future incoming calls with an admin API key. Outbound calls
+// select authority per call. Reuse this key when retrying an ambiguous result.
+await identity.setHostedAgentAuthorityMode({
+  authorityMode: HostedAgentAuthorityMode.YOLO,
+  idempotencyKey: "hosted-authority-update-1",
+});
 
 // List calls (paginated)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });

@@ -83,6 +83,7 @@ from inkbox.mail.types import (
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
+    HostedAgentAuthorityMode,
     HostedAgentConfig,
     IncomingCallAction,
     IncomingCallActionConfig,
@@ -441,6 +442,7 @@ __all__ = [
     # Phone types
     "CallMode",
     "CallOrigin",
+    "HostedAgentAuthorityMode",
     "HostedAgentConfig",
     "IncomingCallAction",
     "IncomingCallActionConfig",

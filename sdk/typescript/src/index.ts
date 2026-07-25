@@ -113,6 +113,7 @@ export type {
   CallOriginWire,
   CallLifecycleWebhookEventType,
   CallModeWire,
+  HostedAgentAuthorityModeWire,
   CallOutcomeWire,
   WebhookPhoneCall,
   WebhookCallTranscript,
@@ -200,6 +201,7 @@ export type {
 export {
   CallMode,
   CallOrigin,
+  HostedAgentAuthorityMode,
   IncomingCallAction,
   PhoneRuleAction,
   PhoneRuleMatchType,

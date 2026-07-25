@@ -7,7 +7,9 @@ use serde_json::Map;
 use crate::error::Result;
 use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
-use crate::phone::types::{CallOrigin, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript};
+use crate::phone::types::{
+    CallOrigin, HostedAgentAuthorityMode, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript,
+};
 
 pub struct CallsResource {
     http: Arc<HttpTransport>,
@@ -197,12 +199,43 @@ impl CallsResource {
         agent_identity_id: Option<&str>,
         reason: &str,
     ) -> Result<PhoneCallWithRateLimit> {
+        let mut body = Map::new();
+        body.insert("to_number".into(), to_number.into());
+        body.insert("origination".into(), origination.as_str().into());
+        body.insert("mode".into(), "hosted_agent".into());
+        body.insert("reason".into(), reason.into());
+        if let Some(n) = from_number {
+            body.insert("from_number".into(), n.into());
+        }
+        if let Some(id) = agent_identity_id {
+            body.insert("agent_identity_id".into(), id.into());
+        }
+        let data = self
+            .http
+            .post("/place-call", Some(&body), crate::http::NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Place an outbound hosted-agent call with an explicit authority mode.
+    pub fn place_hosted_with_authority(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        from_number: Option<&str>,
+        agent_identity_id: Option<&str>,
+        reason: &str,
+        authority_mode: HostedAgentAuthorityMode,
+    ) -> Result<PhoneCallWithRateLimit> {
         // Always send origination + mode + reason; scope keys only when set.
         let mut body = Map::new();
         body.insert("to_number".into(), to_number.into());
         body.insert("origination".into(), origination.as_str().into());
         body.insert("mode".into(), "hosted_agent".into());
         body.insert("reason".into(), reason.into());
+        body.insert(
+            "hosted_agent_authority_mode".into(),
+            authority_mode.as_str().into(),
+        );
         if let Some(n) = from_number {
             body.insert("from_number".into(), n.into());
         }
@@ -223,7 +256,7 @@ mod tests {
 
     use crate::client::Inkbox;
     use crate::error::{ApiErrorDetail, InkboxError};
-    use crate::phone::types::CallOrigin;
+    use crate::phone::types::{CallOrigin, HostedAgentAuthorityMode};
 
     /// Client whose phone transport points at the mock server (phone resources
     /// ride the `/api/v1/phone` sub-base).
@@ -570,12 +603,13 @@ mod tests {
 
     #[test]
     fn place_body_never_carries_mode_key() {
-        // The classic `place` stays byte-identical: the server defaults the
-        // mode, so the key must not appear on the wire.
+        // The classic `place` preserves its established wire body.
         fn body_has_no_mode(req: &HttpMockRequest) -> bool {
             let body = req.body.clone().unwrap_or_default();
             let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
-            v.get("mode").is_none() && v.get("reason").is_none()
+            v.get("mode").is_none()
+                && v.get("reason").is_none()
+                && v.get("hosted_agent_authority_mode").is_none()
         }
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
@@ -634,6 +668,47 @@ mod tests {
         assert_eq!(
             placed.call.reason.as_deref(),
             Some("Book a cleaning next week, mornings preferred")
+        );
+    }
+
+    #[test]
+    fn place_hosted_with_authority_sends_yolo() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "mode": "hosted_agent",
+                    "reason": "Coordinate the appointment",
+                    "hosted_agent_authority_mode": "yolo",
+                    "from_number": "+15550001111"
+                }));
+            then.status(200).json_body({
+                let mut v = placed_json("dedicated_number", json!("+15550001111"));
+                v["mode"] = json!("hosted_agent");
+                v["hosted_agent_authority_mode"] = json!("yolo");
+                v
+            });
+        });
+
+        let placed = client(&server)
+            .calls()
+            .place_hosted_with_authority(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                "Coordinate the appointment",
+                HostedAgentAuthorityMode::Yolo,
+            )
+            .unwrap();
+
+        mock.assert();
+        assert_eq!(
+            placed.call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::Yolo
         );
     }
 

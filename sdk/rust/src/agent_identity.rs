@@ -57,9 +57,10 @@ use crate::mail::types::{
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    CallOrigin, HostedAgentConfig, IncomingCallAction, IncomingCallActionConfig, PhoneCall,
-    PhoneCallWithRateLimit, PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType,
-    PhoneTranscript, TextConversationSummary, TextConversationUpdateResult, TextMessage,
+    CallOrigin, HostedAgentAuthorityMode, HostedAgentConfig, IncomingCallAction,
+    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
+    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
+    TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::TunnelSummary;
@@ -633,7 +634,6 @@ impl AgentIdentity {
     ) -> Result<PhoneCallWithRateLimit> {
         match origination {
             CallOrigin::DedicatedNumber => {
-                // Dedicated origination needs this identity's own number.
                 let number = self.require_phone()?;
                 self.inkbox.calls().place_hosted(
                     to_number,
@@ -644,11 +644,46 @@ impl AgentIdentity {
                 )
             }
             CallOrigin::SharedImessageNumber => {
-                // Shared-line origination scopes by identity id, no from_number.
                 let id = self.id().to_string();
                 self.inkbox
                     .calls()
                     .place_hosted(to_number, origination, None, Some(&id), reason)
+            }
+        }
+    }
+
+    /// Place a hosted-agent call with an explicit authority mode.
+    pub fn place_hosted_call_with_authority(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        reason: &str,
+        authority_mode: HostedAgentAuthorityMode,
+    ) -> Result<PhoneCallWithRateLimit> {
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                // Dedicated origination needs this identity's own number.
+                let number = self.require_phone()?;
+                self.inkbox.calls().place_hosted_with_authority(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    reason,
+                    authority_mode,
+                )
+            }
+            CallOrigin::SharedImessageNumber => {
+                // Shared-line origination scopes by identity id, no from_number.
+                let id = self.id().to_string();
+                self.inkbox.calls().place_hosted_with_authority(
+                    to_number,
+                    origination,
+                    None,
+                    Some(&id),
+                    reason,
+                    authority_mode,
+                )
             }
         }
     }
@@ -679,6 +714,21 @@ impl AgentIdentity {
             voice,
             model,
             instructions,
+        )
+    }
+
+    /// Set authority for future incoming hosted calls with an admin API key.
+    ///
+    /// Outbound calls select authority independently.
+    pub fn set_hosted_agent_authority_mode(
+        &self,
+        authority_mode: HostedAgentAuthorityMode,
+        idempotency_key: &str,
+    ) -> Result<HostedAgentConfig> {
+        self.inkbox.hosted_agent().set_authority_mode(
+            &self.id().to_string(),
+            authority_mode,
+            idempotency_key,
         )
     }
 

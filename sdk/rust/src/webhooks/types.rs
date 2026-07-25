@@ -5,6 +5,7 @@
 //! string enums whose `#[serde(rename = ...)]` values match the Python
 //! `Literal[...]` unions in `inkbox/webhooks.py` exactly.
 
+use crate::phone::types::HostedAgentAuthorityMode;
 use serde::{Deserialize, Serialize};
 
 // ---- Wire union types ----------------------------------------------------
@@ -842,12 +843,26 @@ pub struct WebhookPhoneCall {
     pub mode: String,
     #[serde(default)]
     pub reason: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_webhook_authority_null_default"
+    )]
+    pub hosted_agent_authority_mode: HostedAgentAuthorityMode,
 }
 
 fn default_webhook_call_mode() -> String {
     // Payloads predating Voice AI omit the field; they were always
     // client-driven.
     "client_websocket".to_string()
+}
+
+fn deserialize_webhook_authority_null_default<'de, D>(
+    deserializer: D,
+) -> Result<HostedAgentAuthorityMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<HostedAgentAuthorityMode>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 /// One open action item Inkbox Voice AI recorded during the call.
@@ -1249,6 +1264,10 @@ mod tests {
         let payload: CallEndedWebhookPayload = serde_json::from_str(raw).unwrap();
         assert_eq!(payload.data.call.mode, "client_websocket");
         assert_eq!(payload.data.call.reason, None);
+        assert_eq!(
+            payload.data.call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::ContactScoped
+        );
         assert_eq!(payload.data.outcome, None);
         assert!(payload.data.post_call_action_items.is_empty());
     }
@@ -1269,6 +1288,7 @@ mod tests {
                     "created_at": "t0", "updated_at": "t1",
                     "duration_seconds": 189,
                     "mode": "hosted_agent",
+                    "hosted_agent_authority_mode": "yolo",
                     "reason": "Book a cleaning next week"
                 },
                 "contacts": [],
@@ -1290,6 +1310,10 @@ mod tests {
         assert_eq!(
             payload.data.call.reason.as_deref(),
             Some("Book a cleaning next week")
+        );
+        assert_eq!(
+            payload.data.call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::Yolo
         );
         assert_eq!(payload.data.outcome.as_deref(), Some("completed"));
         let actions = &payload.data.post_call_action_items;

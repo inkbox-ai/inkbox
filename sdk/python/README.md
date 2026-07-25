@@ -365,6 +365,24 @@ call = identity.place_call(
 )
 print(call.status, call.rate_limit.calls_remaining)
 
+# Let the hosted agent work beyond the current caller for this call.
+# Requesting yolo authority requires an admin API key.
+from inkbox import CallMode, HostedAgentAuthorityMode
+
+hosted_call = identity.place_call(
+    to_number="+15551234567",
+    mode=CallMode.HOSTED_AGENT,
+    reason="Coordinate the appointment and send confirmations.",
+    hosted_agent_authority_mode=HostedAgentAuthorityMode.YOLO,
+)
+
+# Set the mode for future incoming calls with an admin API key. Outbound calls
+# select authority per call. Reuse this key when retrying an ambiguous result.
+identity.set_hosted_agent_authority_mode(
+    HostedAgentAuthorityMode.YOLO,
+    idempotency_key="hosted-authority-update-1",
+)
+
 # List calls (paginated)
 calls = identity.list_calls(limit=10, offset=0)
 for call in calls:
