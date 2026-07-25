@@ -1,6 +1,7 @@
 /** Inkbox serve-side A2A inbox resource. */
 
 import type { HttpTransport } from "../_http.js";
+import type { FilterMode } from "../mail/types.js";
 import type {
   A2AContactRule,
   A2AContext,
@@ -28,6 +29,13 @@ type Raw = Record<string, any>;
 
 function base(handle: string): string {
   return `/identities/${encodeURIComponent(handle)}/a2a`;
+}
+
+function ruleDirection(direction: A2ARuleDirection): "inbound" | "both" {
+  if (direction !== "inbound" && direction !== "both") {
+    throw new TypeError("A2A rule direction must be 'inbound' or 'both'");
+  }
+  return direction === "inbound" ? "inbound" : "both";
 }
 
 function parseSettings(raw: Raw): A2ASettings {
@@ -62,7 +70,7 @@ export class A2AResource {
 
   async updateSettings(
     handle: string,
-    changes: { enabled?: boolean; filter_mode?: string; skills?: A2ASkill[] | null },
+    changes: { enabled?: boolean; filter_mode?: FilterMode; skills?: A2ASkill[] | null },
   ): Promise<A2ASettings> {
     return parseSettings(
       await this.http.put<Raw>(`${base(handle)}/settings`, changes),
@@ -206,9 +214,14 @@ export class A2AResource {
 
   async contexts(
     handle: string,
-    options: { cursor?: string; limit?: number } = {},
+    options: {
+      direction?: "inbound" | "outbound" | "both";
+      cursor?: string;
+      limit?: number;
+    } = {},
   ): Promise<A2AContextPage> {
     const raw = await this.http.get<Raw>(`${base(handle)}/contexts`, {
+      direction: options.direction,
       cursor: options.cursor,
       limit: options.limit ?? 50,
     });
@@ -265,8 +278,37 @@ export class A2AResource {
         action: options.action,
         match_type: "handle",
         match_target: options.handle,
-        direction: options.direction ?? "inbound",
+        direction: ruleDirection(options.direction ?? "inbound"),
       }),
     );
+  }
+
+  async updateContactRule(
+    handle: string,
+    ruleId: string,
+    options: {
+      action?: A2ARuleAction;
+      direction?: A2ARuleDirection;
+    },
+  ): Promise<A2AContactRule> {
+    if (options.action === undefined && options.direction === undefined) {
+      throw new TypeError("Pass at least one of action or direction");
+    }
+    const body = {
+      action: options.action,
+      direction: options.direction === undefined
+        ? undefined
+        : ruleDirection(options.direction),
+    };
+    return parseRule(
+      await this.http.patch<Raw>(
+        `${base(handle)}/contact-rules/${ruleId}`,
+        body,
+      ),
+    );
+  }
+
+  async deleteContactRule(handle: string, ruleId: string): Promise<void> {
+    await this.http.delete(`${base(handle)}/contact-rules/${ruleId}`);
   }
 }

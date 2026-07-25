@@ -1410,6 +1410,27 @@ class AgentIdentity:
             skills=skills_wire(skills),
         )
 
+    def a2a_reset_skills(self) -> A2ASettings:
+        """Restore the receiver's default advertised skills."""
+        return self._inkbox._a2a.update_settings(
+            self.agent_handle,
+            skills=None,
+        )
+
+    def a2a_set_filter_mode(
+        self,
+        filter_mode: FilterMode | str,
+    ) -> A2ASettings:
+        """Set A2A admission to whitelist or blacklist mode (admin-only)."""
+        return self._inkbox._a2a.update_settings(
+            self.agent_handle,
+            filter_mode=(
+                filter_mode.value
+                if isinstance(filter_mode, FilterMode)
+                else filter_mode
+            ),
+        )
+
     def a2a_card(self) -> dict[str, Any]:
         """Return this identity's Agent Card preview."""
         return self._inkbox._a2a.card(self.agent_handle)
@@ -1601,12 +1622,14 @@ class AgentIdentity:
     def a2a_contexts(
         self,
         *,
+        direction: A2AHistoryDirection | str | None = None,
         cursor: str | None = None,
         limit: int = 50,
     ) -> A2AContextPage:
-        """List receiver-side A2A contexts."""
+        """List A2A contexts by direction; defaults to inbound."""
         return self._inkbox._a2a.contexts(
             self.agent_handle,
+            direction=direction,
             cursor=cursor,
             limit=limit,
         )
@@ -1646,12 +1669,34 @@ class AgentIdentity:
         action: A2ARuleAction | str,
         direction: A2ARuleDirection | str = A2ARuleDirection.INBOUND,
     ) -> A2AContactRule:
-        """Add an owner-authorized A2A inbound contact rule."""
+        """Add an A2A inbound contact rule (admin-only)."""
         return self._inkbox._a2a.add_contact_rule(
             self.agent_handle,
             peer_handle=handle,
             action=action,
             direction=direction,
+        )
+
+    def a2a_update_contact_rule(
+        self,
+        rule_id: UUID | str,
+        *,
+        action: A2ARuleAction | str | None = None,
+        direction: A2ARuleDirection | str | None = None,
+    ) -> A2AContactRule:
+        """Update an A2A inbound contact rule (admin-only)."""
+        return self._inkbox._a2a.update_contact_rule(
+            self.agent_handle,
+            str(rule_id),
+            action=action,
+            direction=direction,
+        )
+
+    def a2a_delete_contact_rule(self, rule_id: UUID | str) -> None:
+        """Delete an A2A inbound contact rule (admin-only)."""
+        self._inkbox._a2a.delete_contact_rule(
+            self.agent_handle,
+            str(rule_id),
         )
 
     def a2a_client(self) -> A2AClient:

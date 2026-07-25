@@ -6,8 +6,10 @@ import type {
   A2AMessageRole,
   A2AReplyIntent,
   A2ARuleAction,
+  A2ARuleDirection,
   A2ASkill,
   A2ATaskState,
+  FilterMode,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
@@ -130,6 +132,34 @@ export function registerA2ACommands(program: Command): void {
       output(result, { json: !!getGlobalOpts(this).json });
     }));
 
+  skills.command("reset")
+    .description("Restore the receiver's default advertised skills")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { identity: string },
+    ) {
+      const result = await (await identityFor(this, options.identity)).a2aResetSkills();
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("filter-mode")
+    .description("Set A2A admission mode (admin API key required)")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .requiredOption("--mode <mode>", "'whitelist' or 'blacklist'")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { identity: string; mode: string },
+    ) {
+      if (!["whitelist", "blacklist"].includes(options.mode)) {
+        throw new TypeError("--mode must be 'whitelist' or 'blacklist'");
+      }
+      const result = await (await identityFor(this, options.identity)).a2aSetFilterMode(
+        options.mode as FilterMode,
+      );
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
   const rules = a2a.command("rules").description("Manage inbound A2A contact rules");
   rules.command("list")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
@@ -145,18 +175,75 @@ export function registerA2ACommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .requiredOption("--handle <peer>", "Caller handle to match")
     .requiredOption("--action <action>", "'allow' or 'block'")
+    .option("--direction <direction>", "'inbound' or 'both'", "inbound")
     .action(withErrorHandler(async function (
       this: Command,
-      options: { identity: string; handle: string; action: string },
+      options: {
+        identity: string;
+        handle: string;
+        action: string;
+        direction: string;
+      },
     ) {
       if (!["allow", "block"].includes(options.action)) {
         throw new TypeError("--action must be 'allow' or 'block'");
       }
+      if (!["inbound", "both"].includes(options.direction)) {
+        throw new TypeError("--direction must be 'inbound' or 'both'");
+      }
       const result = await (await identityFor(this, options.identity)).a2aAddContactRule({
         handle: options.handle,
         action: options.action as A2ARuleAction,
+        direction: options.direction as A2ARuleDirection,
       });
       output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  rules.command("update <rule-id>")
+    .description("Update an A2A contact rule (admin API key required)")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--action <action>", "'allow' or 'block'")
+    .option("--direction <direction>", "'inbound' or 'both'")
+    .action(withErrorHandler(async function (
+      this: Command,
+      ruleId: string,
+      options: {
+        identity: string;
+        action?: string;
+        direction?: string;
+      },
+    ) {
+      if (options.action !== undefined && !["allow", "block"].includes(options.action)) {
+        throw new TypeError("--action must be 'allow' or 'block'");
+      }
+      if (
+        options.direction !== undefined
+        && !["inbound", "both"].includes(options.direction)
+      ) {
+        throw new TypeError("--direction must be 'inbound' or 'both'");
+      }
+      if (options.action === undefined && options.direction === undefined) {
+        throw new TypeError("Pass at least one of --action or --direction");
+      }
+      const result = await (
+        await identityFor(this, options.identity)
+      ).a2aUpdateContactRule(ruleId, {
+        action: options.action as A2ARuleAction | undefined,
+        direction: options.direction as A2ARuleDirection | undefined,
+      });
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  rules.command("delete <rule-id>")
+    .description("Delete an A2A contact rule (admin API key required)")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      ruleId: string,
+      options: { identity: string },
+    ) {
+      await (await identityFor(this, options.identity)).a2aDeleteContactRule(ruleId);
+      output({ deleted: true, id: ruleId }, { json: !!getGlobalOpts(this).json });
     }));
 
   a2a.command("tasks")

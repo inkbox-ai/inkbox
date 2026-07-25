@@ -24,7 +24,7 @@ export type A2AWireTaskState =
   | (string & {});
 
 export type A2ARuleAction = "allow" | "block" | (string & {});
-export type A2ARuleDirection = "inbound" | "outbound" | "both" | (string & {});
+export type A2ARuleDirection = "inbound" | "both" | (string & {});
 export type A2AHistoryDirection = "inbound" | "outbound" | "both" | (string & {});
 export type A2AMessageRole = "caller" | "agent" | (string & {});
 export type A2AReplyIntent = "ask_caller" | "complete" | "fail";

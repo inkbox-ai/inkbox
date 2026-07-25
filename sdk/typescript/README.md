@@ -682,6 +682,11 @@ rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
 
+Receiver enablement and advertised skills accept the identity's agent-scoped
+key. Filter-mode and contact-rule create/update/delete operations require an
+admin API key. Use `a2aResetSkills()` to restore default skills; rule
+directions are `inbound` or `both`.
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.

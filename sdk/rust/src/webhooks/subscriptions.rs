@@ -6,9 +6,9 @@
 //! lifecycle (`call.ended`) events. Mail and text subscriptions are owned by
 //! the mailbox / phone number; iMessage and call-lifecycle subscriptions are
 //! owned by the agent identity, since shared iMessage pool numbers are not org
-//! resources and a call is only ever owned by its identity. An identity may
-//! hold an iMessage sub and a call-lifecycle sub, but a single subscription
-//! carries only one channel. Incoming-call webhooks (`phone.incoming_call`) are
+//! resources and a call is only ever owned by its identity. One identity-owned
+//! subscription may combine iMessage, call-lifecycle, and A2A event types.
+//! Incoming-call webhooks (`phone.incoming_call`) are
 //! still set on the phone-number resource itself -- that channel is a
 //! synchronous control-plane callback whose response body drives call routing,
 //! so fan-out is not meaningful.
@@ -154,20 +154,20 @@ struct ListResponse {
 
 /// Wire event-type prefix -> the owning resource whose channel it belongs to.
 ///
-/// An agent identity owns two channels (iMessage + post-call lifecycle), so two
-/// prefixes map to it; a single subscription may still only carry one channel.
+/// An agent identity owns iMessage, post-call lifecycle, and A2A channels.
 const EVENT_PREFIX_TO_OWNER: &[(&str, &str)] = &[
     ("message.", "mailbox"),
     ("text.", "phone_number"),
     ("imessage.", "agent_identity"),
     ("call.", "agent_identity"),
+    ("a2a.", "agent_identity"),
 ];
 
 /// Owner resource -> the event-type prefixes it may subscribe to.
 const OWNER_EVENT_PREFIXES: &[(&str, &[&str])] = &[
     ("mailbox", &["message."]),
     ("phone_number", &["text."]),
-    ("agent_identity", &["imessage.", "call."]),
+    ("agent_identity", &["imessage.", "call.", "a2a."]),
 ];
 
 /// Reject an empty list or one carrying duplicate values.
@@ -200,17 +200,13 @@ fn assert_no_incoming_call(event_types: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// Every event type must share one channel that the owner may subscribe to.
-///
-/// The first event's prefix fixes the channel; every event must share it so one
-/// subscription never straddles two channels (e.g. `imessage.*` + `call.ended`).
+/// Every event type must belong to a channel that the owner may subscribe to.
 fn assert_channel_coherence(owner: &str, event_types: &[String]) -> Result<()> {
     let allowed = OWNER_EVENT_PREFIXES
         .iter()
         .find(|(name, _)| *name == owner)
         .map(|(_, prefixes)| *prefixes)
         .expect("owner must be one of the known channels");
-    let mut channel_prefix: Option<&str> = None;
     for e in event_types {
         let matched = EVENT_PREFIX_TO_OWNER
             .iter()
@@ -228,16 +224,6 @@ fn assert_channel_coherence(owner: &str, event_types: &[String]) -> Result<()> {
                 "event_type '{e}' does not belong to the {owner} channel \
                  (it belongs to {target_owner})"
             )));
-        }
-        match channel_prefix {
-            None => channel_prefix = Some(prefix),
-            Some(fixed) if fixed != prefix => {
-                return Err(InkboxError::InvalidArgument(format!(
-                    "event_type '{e}' does not belong to the same channel as the \
-                     other event types in this subscription"
-                )));
-            }
-            Some(_) => {}
         }
     }
     Ok(())
@@ -465,11 +451,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_mixing_imessage_and_call_ended() {
-        let err =
-            assert_channel_coherence("agent_identity", &ev(&["imessage.received", "call.ended"]))
-                .unwrap_err();
-        assert!(matches!(err, InkboxError::InvalidArgument(m) if m.contains("same channel")));
+    fn accepts_mixed_identity_owned_events() {
+        assert!(assert_channel_coherence(
+            "agent_identity",
+            &ev(&["imessage.received", "call.ended", "a2a.sent_task.updated",]),
+        )
+        .is_ok());
     }
 
     #[test]

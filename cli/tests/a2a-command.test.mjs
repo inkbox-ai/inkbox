@@ -18,6 +18,7 @@ test("A2A exposes receiver inbox and caller sent-history commands", () => {
   assert.match(text, /sent/);
   assert.match(text, /sent-task (?:\[options\] )?<task-id>/);
   assert.match(text, /messages/);
+  assert.match(text, /filter-mode/);
 });
 
 for (const command of ["tasks", "sent"]) {
@@ -56,4 +57,13 @@ test("A2A message history exposes provenance, search, and pagination filters", (
   ]) {
     assert.match(text, pattern);
   }
+});
+
+test("A2A admission controls expose complete admin operations", () => {
+  assert.match(help("a2a", "filter-mode"), /--mode <mode>/);
+  assert.match(help("a2a", "skills", "reset"), /--identity <handle>/);
+  assert.match(help("a2a", "rules", "add"), /--direction <direction>/);
+  assert.match(help("a2a", "rules", "update"), /--action <action>/);
+  assert.match(help("a2a", "rules", "update"), /--direction <direction>/);
+  assert.match(help("a2a", "rules", "delete"), /--identity <handle>/);
 });

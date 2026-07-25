@@ -1225,6 +1225,19 @@ export class AgentIdentity {
     return this._inkbox._a2a.updateSettings(this.agentHandle, { skills });
   }
 
+  /** Restore the receiver's default advertised skills. */
+  a2aResetSkills(): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { skills: null });
+  }
+
+  /** Set A2A admission to whitelist or blacklist mode (admin-only). */
+  a2aSetFilterMode(filterMode: FilterMode): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(
+      this.agentHandle,
+      { filter_mode: filterMode },
+    );
+  }
+
   /** Return this identity's Agent Card preview. */
   a2aCard(): Promise<Record<string, unknown>> {
     return this._inkbox._a2a.card(this.agentHandle);
@@ -1292,6 +1305,7 @@ export class AgentIdentity {
 
   /** List receiver-side A2A contexts. */
   a2aContexts(options: {
+    direction?: "inbound" | "outbound" | "both";
     cursor?: string;
     limit?: number;
   } = {}): Promise<A2AContextPage> {
@@ -1321,13 +1335,33 @@ export class AgentIdentity {
     return this._inkbox._a2a.contactRules(this.agentHandle);
   }
 
-  /** Add an owner-authorized A2A inbound contact rule. */
+  /** Add an A2A inbound contact rule (admin-only). */
   a2aAddContactRule(options: {
     handle: string;
     action: A2ARuleAction;
     direction?: A2ARuleDirection;
   }): Promise<A2AContactRule> {
     return this._inkbox._a2a.addContactRule(this.agentHandle, options);
+  }
+
+  /** Update an A2A inbound contact rule (admin-only). */
+  a2aUpdateContactRule(
+    ruleId: string,
+    options: {
+      action?: A2ARuleAction;
+      direction?: A2ARuleDirection;
+    },
+  ): Promise<A2AContactRule> {
+    return this._inkbox._a2a.updateContactRule(
+      this.agentHandle,
+      ruleId,
+      options,
+    );
+  }
+
+  /** Delete an A2A inbound contact rule (admin-only). */
+  a2aDeleteContactRule(ruleId: string): Promise<void> {
+    return this._inkbox._a2a.deleteContactRule(this.agentHandle, ruleId);
   }
 
   /**

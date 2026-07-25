@@ -733,7 +733,6 @@ class A2AWebhookCaller(TypedDict):
     identity_id: str
     organization_id: str
     handle: str | None
-    trust_tier: str
 
 
 class A2AWebhookData(TypedDict):
@@ -741,8 +740,8 @@ class A2AWebhookData(TypedDict):
     context_id: str
     state: str
     caller: A2AWebhookCaller
-    message_id: str | None
-    parts: list[dict] | None
+    message_id: NotRequired[str]
+    parts: NotRequired[list[dict]]
 
 
 class A2AWebhookPayload(TypedDict):

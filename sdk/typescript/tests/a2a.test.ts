@@ -266,6 +266,76 @@ describe("A2AResource", () => {
     );
   });
 
+  it("forwards context direction", async () => {
+    const http = {
+      get: vi.fn().mockResolvedValue({ items: [], next_cursor: "next-page" }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const page = await resource.contexts("coordinator", {
+      direction: "both",
+      cursor: "opaque",
+      limit: 20,
+    });
+
+    expect(page.nextCursor).toBe("next-page");
+    expect(http.get).toHaveBeenCalledWith(
+      "/identities/coordinator/a2a/contexts",
+      { direction: "both", cursor: "opaque", limit: 20 },
+    );
+  });
+
+  it("updates and deletes contact rules through the admin routes", async () => {
+    const http = {
+      patch: vi.fn().mockResolvedValue({
+        id: "rule-1",
+        action: "block",
+        match_type: "handle",
+        match_target: "peer",
+        direction: "both",
+        status: "active",
+        created_at: "2026-07-24T00:00:00Z",
+        updated_at: "2026-07-25T00:00:00Z",
+      }),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const updated = await resource.updateContactRule(
+      "coordinator",
+      "rule-1",
+      { action: "block", direction: "both" },
+    );
+    await resource.deleteContactRule("coordinator", "rule-1");
+
+    expect(updated.action).toBe("block");
+    expect(http.patch).toHaveBeenCalledWith(
+      "/identities/coordinator/a2a/contact-rules/rule-1",
+      { action: "block", direction: "both" },
+    );
+    expect(http.delete).toHaveBeenCalledWith(
+      "/identities/coordinator/a2a/contact-rules/rule-1",
+    );
+  });
+
+  it("requires a contact-rule update field", async () => {
+    const resource = new A2AResource({} as HttpTransport);
+    await expect(
+      resource.updateContactRule("coordinator", "rule-1", {}),
+    ).rejects.toThrow(/at least one/);
+  });
+
+  it("rejects outbound-only contact-rule direction", async () => {
+    const resource = new A2AResource({} as HttpTransport);
+    await expect(
+      resource.addContactRule("coordinator", {
+        handle: "peer",
+        action: "allow",
+        direction: "outbound",
+      }),
+    ).rejects.toThrow(/inbound.*both/);
+  });
+
   it("uses the exact reply body", async () => {
     const http = {
       post: vi.fn().mockResolvedValue({

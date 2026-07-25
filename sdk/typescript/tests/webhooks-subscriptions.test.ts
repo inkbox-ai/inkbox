@@ -546,15 +546,30 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
     expect(sub.agentIdentityId).toBe(IDENTITY_ID);
   });
 
-  it("rejects mixing imessage.* with call.ended on one subscription", async () => {
-    const { resource } = makeResource();
-    await expect(
-      resource.create({
-        agentIdentityId: IDENTITY_ID,
-        url: "https://x.example.com/hook",
-        eventTypes: ["imessage.received", "call.ended"],
-      }),
-    ).rejects.toThrow(/same channel/);
+  it("accepts mixed identity-owned events on one subscription", async () => {
+    const { resource, http } = makeResource();
+    const eventTypes = [
+      "imessage.received",
+      "call.ended",
+      "a2a.sent_task.updated",
+    ];
+    http.post.mockResolvedValue({
+      ...RAW_IDENTITY_SUBSCRIPTION,
+      event_types: eventTypes,
+    });
+
+    const sub = await resource.create({
+      agentIdentityId: IDENTITY_ID,
+      url: "https://x.example.com/hook",
+      eventTypes,
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      url: "https://x.example.com/hook",
+      event_types: eventTypes,
+      agent_identity_id: IDENTITY_ID,
+    });
+    expect(sub.eventTypes).toEqual(eventTypes);
   });
 
   it("rejects call.ended on a mailbox owner", async () => {

@@ -728,7 +728,6 @@ export interface A2AWebhookCaller {
   identity_id: string;
   organization_id: string;
   handle: string | null;
-  trust_tier: string;
 }
 
 export interface A2AWebhookData {
@@ -736,8 +735,8 @@ export interface A2AWebhookData {
   context_id: string;
   state: string;
   caller: A2AWebhookCaller;
-  message_id: string | null;
-  parts: Record<string, unknown>[] | null;
+  message_id?: string;
+  parts?: Record<string, unknown>[];
 }
 
 export interface A2AWebhookPayload {

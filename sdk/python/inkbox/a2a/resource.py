@@ -39,6 +39,19 @@ class A2AResource:
     def _base(handle: str) -> str:
         return f"/identities/{handle}/a2a"
 
+    @staticmethod
+    def _rule_direction(
+        direction: A2ARuleDirection | str,
+    ) -> str:
+        value = (
+            direction.value
+            if isinstance(direction, A2ARuleDirection)
+            else direction
+        )
+        if value not in {"inbound", "both"}:
+            raise ValueError("A2A rule direction must be 'inbound' or 'both'")
+        return value
+
     def settings(self, handle: str) -> A2ASettings:
         data = self._http.get(f"{self._base(handle)}/settings")
         return A2ASettings(
@@ -306,12 +319,21 @@ class A2AResource:
         self,
         handle: str,
         *,
+        direction: A2AHistoryDirection | str | None = None,
         cursor: str | None = None,
         limit: int = 50,
     ) -> A2AContextPage:
         data = self._http.get(
             f"{self._base(handle)}/contexts",
-            params={"cursor": cursor, "limit": limit},
+            params={
+                "direction": (
+                    direction.value
+                    if isinstance(direction, A2AHistoryDirection)
+                    else direction
+                ),
+                "cursor": cursor,
+                "limit": limit,
+            },
         )
         return A2AContextPage(
             items=[parse_context(item) for item in data["items"]],
@@ -366,14 +388,36 @@ class A2AResource:
                 "action": action.value if isinstance(action, A2ARuleAction) else action,
                 "match_type": "handle",
                 "match_target": peer_handle,
-                "direction": (
-                    direction.value
-                    if isinstance(direction, A2ARuleDirection)
-                    else direction
-                ),
+                "direction": self._rule_direction(direction),
             },
         )
         return self._parse_rule(data)
+
+    def update_contact_rule(
+        self,
+        handle: str,
+        rule_id: str,
+        *,
+        action: A2ARuleAction | str | None = None,
+        direction: A2ARuleDirection | str | None = None,
+    ) -> A2AContactRule:
+        body: dict[str, str] = {}
+        if action is not None:
+            body["action"] = (
+                action.value if isinstance(action, A2ARuleAction) else action
+            )
+        if direction is not None:
+            body["direction"] = self._rule_direction(direction)
+        if not body:
+            raise ValueError("Pass at least one of action or direction")
+        data = self._http.patch(
+            f"{self._base(handle)}/contact-rules/{rule_id}",
+            json=body,
+        )
+        return self._parse_rule(data)
+
+    def delete_contact_rule(self, handle: str, rule_id: str) -> None:
+        self._http.delete(f"{self._base(handle)}/contact-rules/{rule_id}")
 
     @staticmethod
     def _parse_rule(data: dict[str, Any]) -> A2AContactRule:

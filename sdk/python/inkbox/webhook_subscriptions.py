@@ -10,8 +10,8 @@ post-call lifecycle (``call.ended``) events. Mail and text subscriptions
 are owned by the mailbox / phone number; iMessage and call-lifecycle
 subscriptions are owned by the agent identity, since shared iMessage pool
 numbers are not org resources and a call is only ever owned by its
-identity. An identity may hold an iMessage sub and a call-lifecycle sub,
-but a single subscription carries only one channel. Incoming-call
+identity. One identity-owned subscription may combine iMessage,
+call-lifecycle, and A2A event types. Incoming-call
 webhooks (``phone.incoming_call``) are still set on the phone-number
 resource itself -- that channel is a synchronous control-plane
 callback whose response body drives call routing, so fan-out is not
@@ -177,8 +177,7 @@ def _assert_no_incoming_call(event_types: list[str]) -> None:
 
 
 # Wire event-type prefix -> the owning resource whose channel it belongs to.
-# An agent identity owns iMessage, post-call, and A2A channels; a single
-# subscription may still only carry one channel.
+# An agent identity owns iMessage, post-call, and A2A channels.
 _EVENT_PREFIX_TO_OWNER = {
     "message.": "mailbox",
     "text.": "phone_number",
@@ -201,9 +200,6 @@ def _assert_channel_coherence(
     event_types: list[str],
 ) -> None:
     allowed = _OWNER_EVENT_PREFIXES[owner]
-    # The first event's prefix fixes the channel; every event must share it so
-    # one subscription never straddles two channels (e.g. imessage.* + call.ended).
-    channel_prefix: str | None = None
     for e in event_types:
         prefix = next((p for p in _EVENT_PREFIX_TO_OWNER if e.startswith(p)), None)
         if prefix is None:
@@ -214,13 +210,6 @@ def _assert_channel_coherence(
             raise ValueError(
                 f"event_type {e!r} does not belong to the {owner!r} channel "
                 f"(it belongs to {_EVENT_PREFIX_TO_OWNER[prefix]!r})",
-            )
-        if channel_prefix is None:
-            channel_prefix = prefix
-        elif prefix != channel_prefix:
-            raise ValueError(
-                f"event_type {e!r} does not belong to the same channel as the "
-                f"other event types in this subscription",
             )
 
 

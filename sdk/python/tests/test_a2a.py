@@ -292,6 +292,75 @@ def test_sent_task_and_context_use_exact_paths() -> None:
     ]
 
 
+def test_context_history_forwards_direction() -> None:
+    http = MagicMock()
+    http.get.return_value = {"items": [], "next_cursor": "next-page"}
+    resource = A2AResource(http)
+
+    page = resource.contexts(
+        "coordinator",
+        direction=A2AHistoryDirection.BOTH,
+        cursor="opaque",
+        limit=20,
+    )
+
+    assert page.next_cursor == "next-page"
+    http.get.assert_called_once_with(
+        "/identities/coordinator/a2a/contexts",
+        params={"direction": "both", "cursor": "opaque", "limit": 20},
+    )
+
+
+def test_contact_rule_update_and_delete_use_admin_routes() -> None:
+    http = MagicMock()
+    http.patch.return_value = {
+        "id": "rule-1",
+        "action": "block",
+        "match_type": "handle",
+        "match_target": "peer",
+        "direction": "both",
+        "status": "active",
+        "created_at": "2026-07-24T00:00:00Z",
+        "updated_at": "2026-07-25T00:00:00Z",
+    }
+    resource = A2AResource(http)
+
+    updated = resource.update_contact_rule(
+        "coordinator",
+        "rule-1",
+        action="block",
+        direction="both",
+    )
+    resource.delete_contact_rule("coordinator", "rule-1")
+
+    assert updated.action.value == "block"
+    assert updated.direction.value == "both"
+    http.patch.assert_called_once_with(
+        "/identities/coordinator/a2a/contact-rules/rule-1",
+        json={"action": "block", "direction": "both"},
+    )
+    http.delete.assert_called_once_with(
+        "/identities/coordinator/a2a/contact-rules/rule-1"
+    )
+
+
+def test_contact_rule_update_requires_a_change() -> None:
+    resource = A2AResource(MagicMock())
+    with pytest.raises(ValueError, match="at least one"):
+        resource.update_contact_rule("coordinator", "rule-1")
+
+
+def test_contact_rules_reject_outbound_only_direction() -> None:
+    resource = A2AResource(MagicMock())
+    with pytest.raises(ValueError, match="inbound.*both"):
+        resource.add_contact_rule(
+            "coordinator",
+            peer_handle="peer",
+            action="allow",
+            direction="outbound",
+        )
+
+
 def test_inbox_reply_uses_exact_wire_body() -> None:
     http = MagicMock()
     http.post.return_value = {

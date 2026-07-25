@@ -8,8 +8,8 @@
  * are owned by the mailbox / phone number; iMessage and call-lifecycle
  * subscriptions are owned by the agent identity, since shared iMessage
  * pool numbers are not org resources and a call is only ever owned by its
- * identity. An identity may hold an iMessage sub and a call-lifecycle sub,
- * but a single subscription carries only one channel. Incoming-call
+ * identity. One identity-owned subscription may combine iMessage,
+ * call-lifecycle, and A2A event types. Incoming-call
  * webhooks (`phone.incoming_call`) are still set on the phone-number
  * resource itself — that channel is a synchronous control-plane
  * callback whose response body drives call routing, so fan-out is not
@@ -174,8 +174,7 @@ function assertNoIncomingCall(eventTypes: string[]): void {
 }
 
 // Wire event-type prefix → the owning resource whose channel it belongs to.
-// An agent identity owns two channels (iMessage + post-call lifecycle), so two
-// prefixes map to it; a single subscription may still only carry one channel.
+// An agent identity owns iMessage, post-call lifecycle, and A2A channels.
 const EVENT_PREFIX_TO_OWNER: Array<[string, string]> = [
   ["message.", "mailbox"],
   ["text.", "phone_number"],
@@ -196,9 +195,6 @@ function assertChannelCoherence(
   eventTypes: string[],
 ): void {
   const allowed = OWNER_EVENT_PREFIXES[owner];
-  // The first event's prefix fixes the channel; every event must share it so
-  // one subscription never straddles two channels (e.g. imessage.* + call.ended).
-  let channelPrefix: string | null = null;
   for (const e of eventTypes) {
     const match = EVENT_PREFIX_TO_OWNER.find(([prefix]) => e.startsWith(prefix));
     if (match === undefined) {
@@ -209,14 +205,6 @@ function assertChannelCoherence(
       throw new Error(
         `event_type '${e}' does not belong to the ${owner} ` +
         `channel (it belongs to ${targetOwner})`,
-      );
-    }
-    if (channelPrefix === null) {
-      channelPrefix = prefix;
-    } else if (prefix !== channelPrefix) {
-      throw new Error(
-        `event_type '${e}' does not belong to the same channel as the ` +
-        `other event types in this subscription`,
       );
     }
   }
