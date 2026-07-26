@@ -21,6 +21,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Task detail exposes current state and message history.
 - Python and TypeScript A2A clients unwrap the standard task/message result envelope while retaining compatibility with direct task payloads.
 - Identity-owned iMessage, call-lifecycle, and A2A webhook events use separate subscription rows. Disjoint rows may share the same destination URL.
+- Python, TypeScript, Rust, and the CLI reject mixed-family webhook updates and non-null conversation context on A2A subscriptions before sending the request.
 
 ### Compatibility and rollout
 

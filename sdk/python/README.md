@@ -1133,9 +1133,9 @@ prefix check, so most shape mistakes surface as `ValueError` before
 the request leaves the client. The server remains authoritative for the exact event-name
 enum, so a typo with a valid prefix (e.g. `message.received_typo`)
 passes the SDK's check and is rejected as 422 by the server. On
-`update` the SDK mirrors the non-empty / distinct /
-no-`phone.incoming_call` checks; channel coherence is deferred to the
-server because the SDK doesn't know the owner FK from a sub_id alone.
+`update` the SDK also rejects mixed event families. Owner compatibility
+remains server-validated because the SDK doesn't know the owner FK from a
+subscription ID alone.
 
 ### Conversation context
 
@@ -1143,7 +1143,8 @@ Opt a subscription into per-class conversation history on **received**
 events (`message.received`, `text.received`, `imessage.received`) by
 passing `context_config`. Each class (`email`, `texts`, `calls`) takes a
 `count` mode (last N items, 1..50) or a `window` mode (last H hours,
-1..168); omit a class to leave it unconfigured.
+1..168); omit a class to leave it unconfigured. Conversation context is
+not supported for A2A subscriptions.
 
 ```python
 inkbox.webhooks.subscriptions.create(

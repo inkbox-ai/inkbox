@@ -121,6 +121,19 @@ describe("WebhookSubscriptionsResource.create", () => {
     }));
   });
 
+  it("rejects contextConfig for A2A subscriptions", async () => {
+    const { resource, http } = makeResource();
+    await expect(
+      resource.create({
+        agentIdentityId: "identity",
+        url: "https://x/y",
+        eventTypes: ["a2a.task.created"],
+        contextConfig: { email: { mode: "count", count: 1 } },
+      }),
+    ).rejects.toThrow(/contextConfig is not supported for A2A subscriptions/);
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
   it("rejects when both FKs are provided", async () => {
     const { resource } = makeResource();
     await expect(
@@ -397,13 +410,23 @@ describe("WebhookSubscriptionsResource.update", () => {
     ).rejects.toThrow(/integer in 1\.\.168/);
   });
 
-  it("does not run channel coherence on update", async () => {
+  it("rejects mixed event channels on update", async () => {
     const { resource, http } = makeResource();
-    http.patch.mockResolvedValue(RAW_SUBSCRIPTION);
-
     await expect(
       resource.update("subid", { eventTypes: ["message.received", "text.received"] }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow(/one channel/);
+    expect(http.patch).not.toHaveBeenCalled();
+  });
+
+  it("rejects contextConfig with A2A events on update", async () => {
+    const { resource, http } = makeResource();
+    await expect(
+      resource.update("subid", {
+        eventTypes: ["a2a.task.message"],
+        contextConfig: { texts: { mode: "count", count: 1 } },
+      }),
+    ).rejects.toThrow(/contextConfig is not supported for A2A subscriptions/);
+    expect(http.patch).not.toHaveBeenCalled();
   });
 });
 

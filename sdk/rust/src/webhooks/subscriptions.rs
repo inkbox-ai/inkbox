@@ -100,8 +100,9 @@ pub enum WebhookSubscriptionStatus {
 /// raw owner FK) is populated. `owner_identity_id` is the **resolved** owning
 /// agent identity for every subscription regardless of channel — mail/phone
 /// subs resolve it server-side through the mailbox / phone number, while
-/// iMessage subs carry it directly. (Optional for forward-compatibility: `None`
-/// on servers that predate the field.) `organization_id` is an `"org_..."`
+/// identity-owned subscriptions carry it directly. (Optional for
+/// forward-compatibility: `None` on servers that predate the field.)
+/// `organization_id` is an `"org_..."`
 /// token string, not a UUID. `status` is always `"active"` for subscriptions
 /// callers can observe; deleted subscriptions are not returned by `list` /
 /// `get`.
@@ -200,39 +201,68 @@ fn assert_no_incoming_call(event_types: &[String]) -> Result<()> {
 }
 
 /// Every event type must belong to a channel that the owner may subscribe to.
-fn assert_channel_coherence(owner: &str, event_types: &[String]) -> Result<()> {
-    let allowed = OWNER_EVENT_PREFIXES
-        .iter()
-        .find(|(name, _)| *name == owner)
-        .map(|(_, prefixes)| *prefixes)
-        .expect("owner must be one of the known channels");
+fn selected_event_prefixes(event_types: &[String]) -> Result<HashSet<&'static str>> {
     let mut selected_prefixes: HashSet<&str> = HashSet::new();
     for e in event_types {
         let matched = EVENT_PREFIX_TO_OWNER
             .iter()
             .find(|(prefix, _)| e.starts_with(prefix));
-        let (prefix, target_owner) = match matched {
-            Some((prefix, target_owner)) => (*prefix, *target_owner),
+        let prefix = match matched {
+            Some((prefix, _)) => *prefix,
             None => {
                 return Err(InkboxError::InvalidArgument(format!(
                     "event_type '{e}' does not belong to any known channel"
                 )));
             }
         };
-        if !allowed.contains(&prefix) {
+        selected_prefixes.insert(prefix);
+    }
+    if selected_prefixes.len() > 1 {
+        let mut prefixes: Vec<&str> = selected_prefixes.iter().copied().collect();
+        prefixes.sort_unstable();
+        return Err(InkboxError::InvalidArgument(format!(
+            "event_types must all belong to one channel; got {prefixes:?}"
+        )));
+    }
+    Ok(selected_prefixes)
+}
+
+/// Every event type must belong to a channel that the owner may subscribe to.
+fn assert_channel_coherence(owner: &str, event_types: &[String]) -> Result<()> {
+    let allowed = OWNER_EVENT_PREFIXES
+        .iter()
+        .find(|(name, _)| *name == owner)
+        .map(|(_, prefixes)| *prefixes)
+        .expect("owner must be one of the known channels");
+    let selected_prefixes = selected_event_prefixes(event_types)?;
+    for e in event_types {
+        let (prefix, target_owner) = EVENT_PREFIX_TO_OWNER
+            .iter()
+            .find(|(prefix, _)| e.starts_with(prefix))
+            .expect("selected_event_prefixes already validated event types");
+        if !allowed.contains(prefix) {
             return Err(InkboxError::InvalidArgument(format!(
                 "event_type '{e}' does not belong to the {owner} channel \
                  (it belongs to {target_owner})"
             )));
         }
-        selected_prefixes.insert(prefix);
     }
-    if selected_prefixes.len() > 1 {
-        let mut prefixes: Vec<&str> = selected_prefixes.into_iter().collect();
-        prefixes.sort_unstable();
-        return Err(InkboxError::InvalidArgument(format!(
-            "event_types must all belong to one channel; got {prefixes:?}"
-        )));
+    if selected_prefixes.is_empty() {
+        return Err(InkboxError::InvalidArgument(
+            "event_types must be a non-empty list".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn assert_a2a_context_absent(
+    event_types: &[String],
+    context_config: Option<&WebhookContextConfig>,
+) -> Result<()> {
+    if context_config.is_some() && event_types.iter().any(|event| event.starts_with("a2a.")) {
+        return Err(InkboxError::InvalidArgument(
+            "context_config is not supported for A2A subscriptions".into(),
+        ));
     }
     Ok(())
 }
@@ -309,9 +339,10 @@ impl WebhookSubscriptionsResource {
     /// -> `text.*`, agent identity -> `imessage.*`, `call.ended`, or `a2a.*`).
     /// One subscription carries a single channel.
     ///
-    /// `context_config` opts the subscription into per-class conversation
-    /// context (email/texts/calls) delivered on received events; pass `None`
-    /// for none. See [`WebhookContextConfig`].
+    /// `context_config` opts mail, text, or iMessage subscriptions into
+    /// per-class conversation context (email/texts/calls) delivered on received
+    /// events. It is not supported for A2A subscriptions. See
+    /// [`WebhookContextConfig`].
     ///
     /// # Arguments
     /// * `url` - HTTPS receiver endpoint.
@@ -366,6 +397,7 @@ impl WebhookSubscriptionsResource {
         body.insert(format!("{owner}_id"), json!(owner_id.to_string()));
         if let Some(cfg) = context_config {
             assert_valid_context_config(cfg)?;
+            assert_a2a_context_absent(event_types, Some(cfg))?;
             body.insert("context_config".into(), json!(cfg));
         }
         let body = serde_json::Value::Object(body);
@@ -382,7 +414,8 @@ impl WebhookSubscriptionsResource {
     ///
     /// `context_config` is tri-state — the one field where `null` is meaningful
     /// on the wire: `None` omits the key (unchanged), `Some(None)` sends JSON
-    /// `null` (clear), `Some(Some(cfg))` validates and replaces.
+    /// `null` (clear), `Some(Some(cfg))` validates and replaces. A2A
+    /// subscriptions do not support a context object.
     ///
     /// # Arguments
     /// * `sub_id` - subscription UUID.
@@ -407,12 +440,16 @@ impl WebhookSubscriptionsResource {
         if let Some(events) = event_types {
             assert_event_types_non_empty_distinct(events)?;
             assert_no_incoming_call(events)?;
+            selected_event_prefixes(events)?;
             body.insert("event_types".into(), json!(events));
         }
         if let Some(cfg) = context_config {
             match cfg {
                 Some(cfg) => {
                     assert_valid_context_config(cfg)?;
+                    if let Some(events) = event_types {
+                        assert_a2a_context_absent(events, Some(cfg))?;
+                    }
                     body.insert("context_config".into(), json!(cfg));
                 }
                 None => {
@@ -470,6 +507,30 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(err, InkboxError::InvalidArgument(m) if m.contains("one channel")));
+    }
+
+    #[test]
+    fn rejects_a2a_context_config() {
+        let config = WebhookContextConfig {
+            email: Some(WebhookContextClassConfig::Count { count: 1 }),
+            ..Default::default()
+        };
+        let err = assert_a2a_context_absent(&ev(&["a2a.task.created"]), Some(&config)).unwrap_err();
+        assert!(matches!(
+            err,
+            InkboxError::InvalidArgument(m)
+                if m.contains("context_config is not supported for A2A subscriptions")
+        ));
+    }
+
+    #[test]
+    fn update_family_validation_rejects_mixed_events() {
+        let err =
+            selected_event_prefixes(&ev(&["imessage.received", "a2a.task.created"])).unwrap_err();
+        assert!(matches!(
+            err,
+            InkboxError::InvalidArgument(m) if m.contains("one channel")
+        ));
     }
 
     #[test]

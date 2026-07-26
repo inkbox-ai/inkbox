@@ -51,8 +51,8 @@ export interface WebhookSubscription {
   /**
    * Resolved owning agent identity for every subscription regardless of
    * channel — mail/phone subs resolve it server-side through the mailbox /
-   * phone number, while iMessage subs carry it directly. `null` on servers
-   * that predate the field.
+   * phone number, while identity-owned subscriptions carry it directly.
+   * `null` on servers that predate the field.
    */
   ownerIdentityId: string | null;
   url: string;
@@ -188,32 +188,62 @@ const OWNER_EVENT_PREFIXES: Record<string, string[]> = {
   agent_identity: ["imessage.", "call.", "a2a."],
 };
 
-function assertChannelCoherence(
-  owner: string,
-  eventTypes: string[],
-): void {
-  const allowed = OWNER_EVENT_PREFIXES[owner];
+function selectedEventPrefixes(eventTypes: string[]): Set<string> {
   const selectedPrefixes = new Set<string>();
-  for (const e of eventTypes) {
-    const match = EVENT_PREFIX_TO_OWNER.find(([prefix]) => e.startsWith(prefix));
+  for (const eventType of eventTypes) {
+    const match = EVENT_PREFIX_TO_OWNER.find(
+      ([prefix]) => eventType.startsWith(prefix),
+    );
     if (match === undefined) {
-      throw new Error(`event_type '${e}' does not belong to any known channel`);
-    }
-    const [prefix, targetOwner] = match;
-    if (!allowed.includes(prefix)) {
       throw new Error(
-        `event_type '${e}' does not belong to the ${owner} ` +
-        `channel (it belongs to ${targetOwner})`,
+        `event_type '${eventType}' does not belong to any known channel`,
       );
     }
-    selectedPrefixes.add(prefix);
+    selectedPrefixes.add(match[0]);
   }
   if (selectedPrefixes.size > 1) {
     throw new Error(
       `eventTypes must all belong to one channel; got ${[...selectedPrefixes].sort().join(", ")}`,
     );
   }
+  return selectedPrefixes;
+}
+
+function assertChannelCoherence(
+  owner: string,
+  eventTypes: string[],
+): void {
+  const allowed = OWNER_EVENT_PREFIXES[owner];
+  const selectedPrefixes = selectedEventPrefixes(eventTypes);
+  for (const e of eventTypes) {
+    const [prefix, targetOwner] = EVENT_PREFIX_TO_OWNER.find(
+      ([candidate]) => e.startsWith(candidate),
+    )!;
+    if (!allowed.includes(prefix)) {
+      throw new Error(
+        `event_type '${e}' does not belong to the ${owner} ` +
+        `channel (it belongs to ${targetOwner})`,
+      );
+    }
+  }
+  if (selectedPrefixes.size === 0) {
+    throw new Error("eventTypes must be a non-empty list");
+  }
   // INCOMING_CALL is rejected by assertNoIncomingCall earlier.
+}
+
+function assertA2AContextAbsent(
+  eventTypes: string[],
+  contextConfig: WebhookContextConfig | null,
+): void {
+  if (
+    contextConfig !== null
+    && eventTypes.some((eventType) => eventType.startsWith("a2a."))
+  ) {
+    throw new Error(
+      "contextConfig is not supported for A2A subscriptions",
+    );
+  }
 }
 
 const CONTEXT_CLASSES = ["email", "texts", "calls"] as const;
@@ -274,14 +304,14 @@ export interface CreateWebhookSubscriptionOptions {
   agentIdentityId?: string;
   url: string;
   eventTypes: string[];
-  /** Opt into per-class conversation context (email/texts/calls) on received events. */
+  /** Opt into context on received mail, text, or iMessage events; unsupported for A2A. */
   contextConfig?: WebhookContextConfig;
 }
 
 export interface UpdateWebhookSubscriptionOptions {
   url?: string;
   eventTypes?: string[];
-  /** Tri-state: omit = unchanged, `null` = clear, object = validate and replace. */
+  /** Tri-state: omit = unchanged, `null` = clear, object = replace; unsupported for A2A. */
   contextConfig?: WebhookContextConfig | null;
 }
 
@@ -327,7 +357,8 @@ export class WebhookSubscriptionsResource {
    * be a non-empty list of distinct values belonging to the owner's
    * channel (mailbox → `message.*`, phone number → `text.*`, agent
    * identity → `imessage.*`, `call.ended`, or `a2a.*`). One subscription
-   * carries a single channel.
+   * carries a single channel. A2A subscriptions do not support
+   * `contextConfig`.
    *
    * Returns a {@link WebhookSubscriptionCreateResponse}. Its `signingKey`
    * is populated **once** when this is the first subscription for an
@@ -364,6 +395,7 @@ export class WebhookSubscriptionsResource {
     };
     if (options.contextConfig !== undefined) {
       assertValidContextConfig(options.contextConfig);
+      assertA2AContextAbsent(options.eventTypes, options.contextConfig);
       body["context_config"] = options.contextConfig;
     }
     const data = await this.http.post<RawWebhookSubscriptionCreateResponse>(PATH, body);
@@ -389,6 +421,7 @@ export class WebhookSubscriptionsResource {
       assertEventTypesNotNull(options.eventTypes);
       assertEventTypesNonEmptyDistinct(options.eventTypes);
       assertNoIncomingCall(options.eventTypes);
+      selectedEventPrefixes(options.eventTypes);
       body["event_types"] = options.eventTypes;
     }
     if (options.contextConfig !== undefined) {
@@ -396,6 +429,12 @@ export class WebhookSubscriptionsResource {
         body["context_config"] = null;
       } else {
         assertValidContextConfig(options.contextConfig);
+        if (options.eventTypes !== undefined) {
+          assertA2AContextAbsent(
+            options.eventTypes,
+            options.contextConfig,
+          );
+        }
         body["context_config"] = options.contextConfig;
       }
     }

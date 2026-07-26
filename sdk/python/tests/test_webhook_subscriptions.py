@@ -233,12 +233,12 @@ class TestUpdate:
         with pytest.raises(ValueError, match="incoming_call_webhook_url"):
             res.update(_SUB_ID, event_types=["phone.incoming_call"])
 
-    def test_does_not_run_channel_coherence(self):
+    def test_defers_owner_compatibility_to_server(self):
         res, http = _resource()
         http.patch.return_value = RAW_SUBSCRIPTION
-        # Mixed channels would fail create, but update does not check
-        # because the owner FK is not available client-side.
-        res.update(_SUB_ID, event_types=["message.received", "text.received"])
+        # The SDK can validate that a replacement contains one event family,
+        # but it does not know the existing subscription's owner.
+        res.update(_SUB_ID, event_types=["text.received"])
         assert http.patch.called
 
     def test_rejects_none_url_on_update(self):
@@ -479,6 +479,20 @@ class TestContextConfig:
         _, kwargs = http.post.call_args
         assert "context_config" not in kwargs["json"]
 
+    def test_create_rejects_context_config_for_a2a(self):
+        res, http = _resource()
+        with pytest.raises(
+            ValueError,
+            match="context_config is not supported for A2A subscriptions",
+        ):
+            res.create(
+                agent_identity_id=_IDENTITY_ID,
+                url="https://x/y",
+                event_types=["a2a.task.created"],
+                context_config={"email": {"mode": "count", "count": 1}},
+            )
+        http.post.assert_not_called()
+
     def test_parse_tolerates_missing_context_config(self):
         sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
         assert sub.context_config is None
@@ -513,6 +527,28 @@ class TestContextConfig:
             f"/webhooks/subscriptions/{_SUB_ID}",
             json={"context_config": cfg},
         )
+
+    def test_update_rejects_context_config_with_a2a_events(self):
+        res, http = _resource()
+        with pytest.raises(
+            ValueError,
+            match="context_config is not supported for A2A subscriptions",
+        ):
+            res.update(
+                _SUB_ID,
+                event_types=["a2a.task.message"],
+                context_config={"texts": {"mode": "count", "count": 1}},
+            )
+        http.patch.assert_not_called()
+
+    def test_update_rejects_mixed_event_channels(self):
+        res, http = _resource()
+        with pytest.raises(ValueError, match="one channel"):
+            res.update(
+                _SUB_ID,
+                event_types=["imessage.received", "a2a.task.created"],
+            )
+        http.patch.assert_not_called()
 
     @pytest.mark.parametrize(
         "bad",
