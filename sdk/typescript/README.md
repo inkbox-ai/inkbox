@@ -656,6 +656,65 @@ identity-owned webhook subscriptions — see
 
 ---
 
+## Agent-to-Agent (A2A)
+
+```ts
+const identity = await inkbox.getIdentity("coordinator");
+
+// Omit direction for the receiver inbox. Use "outbound" for requested work
+// or "both" for the complete identity-scoped history.
+const page = await identity.a2aTasks({
+  direction: "both",
+  requesterHandle: "coordinator",
+  workerHandle: "researcher",
+  state: "working",
+  q: "quarterly report",
+  since: "2026-07-01T00:00:00Z",
+  limit: 25,
+});
+
+if (page.nextCursor) {
+  await identity.a2aTasks({
+    direction: "both",
+    requesterHandle: "coordinator",
+    workerHandle: "researcher",
+    state: "working",
+    q: "quarterly report",
+    since: "2026-07-01T00:00:00Z",
+    cursor: page.nextCursor,
+    limit: 25,
+  });
+}
+
+// Async iterators preserve every filter while following opaque cursors.
+for await (const message of identity.iterA2AMessages({
+  direction: "outbound",
+  workerHandle: "researcher",
+  role: "agent",
+  q: "revenue",
+})) {
+  console.log(message.taskId, message.taskState, message.parts);
+}
+
+// The outbound alias is convenient when only requested work is needed.
+const sent = await identity.a2aSentTasks({ workerHandle: "researcher" });
+```
+
+Task keyword filtering returns tasks containing a matching message. Message
+filtering returns the individual matching messages with task, context,
+requester, and worker provenance. Search covers string and numeric content
+values from `text` and `data` parts, excludes metadata, and is newest-first
+rather than relevance-ranked. `role` is the message author (`caller` or
+`agent`), independent of task direction. Task detail exposes message history
+and current state.
+
+Receiver enablement and advertised skills accept the identity's agent-scoped
+key. Filter-mode and contact-rule create/update/delete operations require an
+admin API key. Use `a2aResetSkills()` to restore default skills; rule
+directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
+requester's outbound policy and the worker's inbound policy; `both` applies in
+either role.
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
@@ -1116,10 +1175,9 @@ non-empty, distinct, no `phone.incoming_call`) plus the `message.` /
 `Error` before the request leaves the client. The server remains
 authoritative for the exact event-name enum, so a typo with a valid
 prefix (e.g. `message.received_typo`) passes the SDK's check and is
-rejected as 422 by the server. On `update` the SDK mirrors the
-non-empty / distinct / no-`phone.incoming_call` checks; channel
-coherence is deferred to the server because the SDK doesn't know the
-owner FK from a sub_id alone.
+rejected as 422 by the server. On `update` the SDK also rejects mixed
+event families. Owner compatibility remains server-validated because the
+SDK doesn't know the owner FK from a subscription ID alone.
 
 ### Conversation context
 
@@ -1127,7 +1185,8 @@ Opt a subscription into per-class conversation history on **received**
 events (`message.received`, `text.received`, `imessage.received`) by
 passing `contextConfig`. Each class (`email`, `texts`, `calls`) takes a
 `count` mode (last N items, 1..50) or a `window` mode (last H hours,
-1..168); omit a class to leave it unconfigured.
+1..168); omit a class to leave it unconfigured. Conversation context is
+not supported for A2A subscriptions.
 
 ```ts
 await inkbox.webhooks.subscriptions.create({

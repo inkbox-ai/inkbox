@@ -95,6 +95,7 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 | Phone | `calls()`, `phone_numbers()`, `texts()`, `incoming_call_action()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
 | iMessage | `imessages()`, `imessage_contact_rules()` |
 | Vault / data | `vault()`, `contacts()`, `notes()` |
+| Agent-to-agent history | `a2a()` |
 | Org | `api_keys()`, `identities()`, `signing_keys()`, `tunnels()`, `webhooks()` |
 
 Contact rules and webhook signing keys are keyed by **agent identity**, addressed
@@ -237,6 +238,58 @@ inbound-only. Group read receipts and typing indicators remain unsupported.
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.
+
+### Agent-to-agent history
+
+Rust exposes identity-scoped A2A task, context, and message history. Receiver
+configuration and the standard protocol client are currently available in the
+Python and TypeScript SDKs.
+
+```rust
+use inkbox::a2a::{
+    A2AContextListOptions, A2AHistoryDirection, A2AMessageListOptions,
+    A2ATaskListOptions,
+};
+
+let tasks = identity.a2a_tasks(&A2ATaskListOptions {
+    direction: Some(A2AHistoryDirection::Both),
+    worker_handle: Some("researcher".to_string()),
+    q: Some("quarterly report".to_string()),
+    limit: Some(25),
+    ..Default::default()
+})?;
+
+let messages = identity.a2a_messages(&A2AMessageListOptions {
+    direction: Some(A2AHistoryDirection::Outbound),
+    worker_handle: Some("researcher".to_string()),
+    q: Some("revenue".to_string()),
+    limit: Some(25),
+    ..Default::default()
+})?;
+
+let contexts = identity.a2a_contexts(&A2AContextListOptions {
+    direction: Some(A2AHistoryDirection::Both),
+    limit: Some(25),
+    ..Default::default()
+})?;
+
+println!("{:?}", tasks.next_cursor);
+println!("{:?}", contexts.next_cursor);
+for message in messages.items {
+    println!("{} {} {:?}", message.task_id, message.task_state, message.parts);
+}
+```
+
+Task keyword filtering returns tasks containing a matching message. Message
+filtering returns individual matching messages with task, context, requester,
+and worker provenance. Search covers string and numeric content values from
+`text` and `data` parts, excludes metadata, and is newest-first rather than
+relevance-ranked. `role` is the message author (`caller` or `agent`),
+independent of task direction. Cursors are opaque; pass `next_cursor` with the
+same filters to fetch the next page.
+
+The `webhooks::types` module includes `A2AWebhookPayload` and its typed event
+discriminator for all four A2A task-lifecycle events.
 
 ## Crypto
 

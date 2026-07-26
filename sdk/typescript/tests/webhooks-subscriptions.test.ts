@@ -121,6 +121,19 @@ describe("WebhookSubscriptionsResource.create", () => {
     }));
   });
 
+  it("rejects contextConfig for A2A subscriptions", async () => {
+    const { resource, http } = makeResource();
+    await expect(
+      resource.create({
+        agentIdentityId: "identity",
+        url: "https://x/y",
+        eventTypes: ["a2a.task.created"],
+        contextConfig: { email: { mode: "count", count: 1 } },
+      }),
+    ).rejects.toThrow(/contextConfig is not supported for A2A subscriptions/);
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
   it("rejects when both FKs are provided", async () => {
     const { resource } = makeResource();
     await expect(
@@ -397,13 +410,23 @@ describe("WebhookSubscriptionsResource.update", () => {
     ).rejects.toThrow(/integer in 1\.\.168/);
   });
 
-  it("does not run channel coherence on update", async () => {
+  it("rejects mixed event channels on update", async () => {
     const { resource, http } = makeResource();
-    http.patch.mockResolvedValue(RAW_SUBSCRIPTION);
-
     await expect(
       resource.update("subid", { eventTypes: ["message.received", "text.received"] }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow(/one channel/);
+    expect(http.patch).not.toHaveBeenCalled();
+  });
+
+  it("rejects contextConfig with A2A events on update", async () => {
+    const { resource, http } = makeResource();
+    await expect(
+      resource.update("subid", {
+        eventTypes: ["a2a.task.message"],
+        contextConfig: { texts: { mode: "count", count: 1 } },
+      }),
+    ).rejects.toThrow(/contextConfig is not supported for A2A subscriptions/);
+    expect(http.patch).not.toHaveBeenCalled();
   });
 });
 
@@ -546,15 +569,36 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
     expect(sub.agentIdentityId).toBe(IDENTITY_ID);
   });
 
-  it("rejects mixing imessage.* with call.ended on one subscription", async () => {
-    const { resource } = makeResource();
-    await expect(
-      resource.create({
-        agentIdentityId: IDENTITY_ID,
-        url: "https://x.example.com/hook",
-        eventTypes: ["imessage.received", "call.ended"],
-      }),
-    ).rejects.toThrow(/same channel/);
+  it("rejects mixed identity-owned events on one subscription", async () => {
+    const { resource, http } = makeResource();
+    const eventTypes = [
+      "imessage.received",
+      "call.ended",
+      "a2a.sent_task.updated",
+    ];
+    await expect(resource.create({
+      agentIdentityId: IDENTITY_ID,
+      url: "https://x.example.com/hook",
+      eventTypes,
+    })).rejects.toThrow(/one channel/);
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it("accepts A2A events on an identity subscription", async () => {
+    const { resource, http } = makeResource();
+    const eventTypes = ["a2a.task.created", "a2a.task.message"];
+    http.post.mockResolvedValue({
+      ...RAW_IDENTITY_SUBSCRIPTION,
+      event_types: eventTypes,
+    });
+
+    const sub = await resource.create({
+      agentIdentityId: IDENTITY_ID,
+      url: "https://x.example.com/hook",
+      eventTypes,
+    });
+
+    expect(sub.eventTypes).toEqual(eventTypes);
   });
 
   it("rejects call.ended on a mailbox owner", async () => {

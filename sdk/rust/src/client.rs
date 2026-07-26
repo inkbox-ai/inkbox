@@ -12,6 +12,7 @@ use std::sync::{Arc, Weak};
 use serde_json::Value;
 use url::Url;
 
+use crate::a2a::A2AResource;
 use crate::agent_identity::AgentIdentity;
 use crate::agent_signup::types::{
     AgentSignupResendResponse, AgentSignupResponse, AgentSignupStatusResponse,
@@ -167,6 +168,7 @@ pub struct Inkbox {
     api_keys: ApiKeysResource,
     identities: IdentitiesResource,
     tunnels: TunnelsResource,
+    a2a: A2AResource,
 
     // Transport used for the bare `/api` root (whoami, signup parity).
     root_api_http: Arc<HttpTransport>,
@@ -292,6 +294,7 @@ impl Inkbox {
             api_keys: ApiKeysResource::new(api_http.clone()),
             identities: IdentitiesResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
+            a2a: A2AResource::new(api_http.clone()),
 
             root_api_http: root_api_http.clone(),
             api_key: api_key.clone(),
@@ -408,6 +411,9 @@ impl Inkbox {
     }
     pub fn tunnels(&self) -> &TunnelsResource {
         &self.tunnels
+    }
+    pub fn a2a(&self) -> &A2AResource {
+        &self.a2a
     }
 
     /// Webhook subscription management and delivery log

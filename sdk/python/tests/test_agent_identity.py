@@ -5,7 +5,8 @@ Tests for AgentIdentity convenience methods.
 """
 
 import pytest
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 from sample_data_identities import IDENTITY_DETAIL_DICT
@@ -49,6 +50,27 @@ def _identity_without_phone():
     data = _AgentIdentityData._from_dict(detail)
     inkbox = MagicMock()
     return AgentIdentity(data, inkbox), inkbox
+
+
+def test_a2a_client_inherits_parent_request_timeout():
+    identity, inkbox = _identity_with_mailbox()
+    inkbox._api_key = "ApiKey_secret"
+    inkbox._base_url = "https://inkbox.ai"
+    inkbox._timeout = 7.25
+    inkbox.whoami.return_value = SimpleNamespace(
+        auth_type="api_key",
+        auth_subtype="api_key.agent_scoped.claimed",
+        scope=f"agent_identity:{identity.id}",
+    )
+
+    with patch("inkbox.agent_identity.A2AClient") as client_class:
+        identity.a2a_client()
+
+    client_class.assert_called_once_with(
+        api_key="ApiKey_secret",
+        platform_base_url="https://inkbox.ai",
+        timeout=7.25,
+    )
 
 
 class TestAgentIdentityGetMessage:

@@ -35,6 +35,10 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
+use crate::a2a::{
+    A2AContext, A2AContextListOptions, A2AContextPage, A2AHistoryMessagePage,
+    A2AMessageListOptions, A2ASentTaskListOptions, A2ATask, A2ATaskListOptions, A2ATaskPage,
+};
 use crate::client::Inkbox;
 use crate::credentials::Credentials;
 use crate::error::{InkboxError, Result};
@@ -110,6 +114,50 @@ impl AgentIdentity {
     /// This identity's agent handle.
     pub fn agent_handle(&self) -> String {
         self.data.borrow().summary.agent_handle.clone()
+    }
+
+    pub fn a2a_tasks(&self, options: &A2ATaskListOptions) -> Result<A2ATaskPage> {
+        self.inkbox.a2a().tasks(&self.agent_handle(), options)
+    }
+
+    pub fn a2a_sent_tasks(&self, options: &A2ASentTaskListOptions) -> Result<A2ATaskPage> {
+        self.inkbox.a2a().sent_tasks(&self.agent_handle(), options)
+    }
+
+    pub fn a2a_task(&self, task_id: Uuid) -> Result<A2ATask> {
+        self.inkbox.a2a().task(&self.agent_handle(), task_id)
+    }
+
+    pub fn a2a_sent_task(&self, task_id: Uuid) -> Result<A2ATask> {
+        self.inkbox.a2a().sent_task(&self.agent_handle(), task_id)
+    }
+
+    pub fn a2a_messages(&self, options: &A2AMessageListOptions) -> Result<A2AHistoryMessagePage> {
+        self.inkbox.a2a().messages(&self.agent_handle(), options)
+    }
+
+    pub fn a2a_contexts(&self, options: &A2AContextListOptions) -> Result<A2AContextPage> {
+        self.inkbox.a2a().contexts(&self.agent_handle(), options)
+    }
+
+    pub fn a2a_sent_contexts(
+        &self,
+        cursor: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<A2AContextPage> {
+        self.inkbox
+            .a2a()
+            .sent_contexts(&self.agent_handle(), cursor, limit)
+    }
+
+    pub fn a2a_context(&self, context_id: Uuid) -> Result<A2AContext> {
+        self.inkbox.a2a().context(&self.agent_handle(), context_id)
+    }
+
+    pub fn a2a_sent_context(&self, context_id: Uuid) -> Result<A2AContext> {
+        self.inkbox
+            .a2a()
+            .sent_context(&self.agent_handle(), context_id)
     }
 
     /// This identity's UUID.

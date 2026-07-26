@@ -137,6 +137,47 @@ inkbox vault secrets
 inkbox vault get <secret-id>
 ```
 
+### A2A history
+
+Each identity can inspect work it received, work it requested, or both without
+duplicating task records. Task lists are newest-first and cursor-paginated.
+Keyword search matches string and numeric content values from `text` and
+`data` parts; message metadata is not searched, and results remain
+newest-first. A message's `role` is its author (`caller` or `agent`),
+independent of task direction.
+
+Calls between Inkbox identities use bilateral contact rules. The requester must
+allow the worker in its `outbound` direction, and the worker must allow the
+requester in its `inbound` direction. Use `both` when the same peer rule should
+apply in either role.
+
+```python
+identity = inkbox.get_identity("coordinator")
+
+page = identity.a2a_tasks(
+    direction="both",
+    worker_handle="researcher",
+    q="quarterly summary",
+)
+for task in page.items:
+    print(task.id, task.state)
+
+for message in identity.iter_a2a_messages(
+    direction="outbound",
+    worker_handle="researcher",
+    q="revenue",
+):
+    print(message.task_id, message.role, message.parts)
+```
+
+```bash
+inkbox a2a tasks -i coordinator --direction both --worker researcher
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --query revenue --json
+```
+
+Task detail includes current state and message history.
+
 ### Tunnels (Python)
 
 ```python
@@ -295,13 +336,15 @@ Load the Inkbox skills into your coding agent so it automatically knows how to u
 /reload-plugins
 ```
 
+The plugin loads the Inkbox skills and connects the remote MCP server. Sign in when prompted to authorize an identity.
+
 ### Codex (plugin)
 
 ```bash
 codex plugin marketplace add inkbox-ai/inkbox
 ```
 
-Then install `inkbox` from the Codex plugin UI. Codex has no `codex plugin install` subcommand yet, and the official plugin directory is not open for submissions — see the [Codex plugin docs](https://developers.openai.com/codex/plugins/build).
+Then install `inkbox` from the Codex plugin UI. See the [Codex plugin docs](https://developers.openai.com/codex/plugins/build) for current installation options.
 
 ### Any Agent (individual skills)
 

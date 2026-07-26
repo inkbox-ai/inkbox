@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, mailbox imports, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -552,6 +552,72 @@ inkbox.sms_opt_ins.opt_in("+15551234567")
 inkbox.sms_opt_ins.opt_out("+15551234567")
 ```
 
+## Agent-to-Agent (A2A)
+
+An identity can inspect work it received, work it requested, or both. Omit
+`direction` on `a2a_tasks` for the receiver inbox; `a2a_sent_tasks` is the
+outbound-only alias.
+
+```python
+page = identity.a2a_tasks(
+    direction="both",
+    requester_handle="coordinator",
+    worker_handle="researcher",
+    state="working",
+    context_id="context-uuid",
+    q="quarterly report",
+    since="2026-07-01T00:00:00Z",
+    limit=25,
+)
+
+# Explicit pages expose an opaque next_cursor.
+if page.next_cursor:
+    next_page = identity.a2a_tasks(
+        direction="both",
+        requester_handle="coordinator",
+        worker_handle="researcher",
+        state="working",
+        context_id="context-uuid",
+        q="quarterly report",
+        since="2026-07-01T00:00:00Z",
+        cursor=page.next_cursor,
+        limit=25,
+    )
+
+# Iterators preserve filters while draining every cursor page.
+for message in identity.iter_a2a_messages(
+    direction="outbound",
+    worker_handle="researcher",
+    role="agent",
+    q="revenue",
+):
+    print(message.task_id, message.context_id, message.task_state, message.parts)
+```
+
+Task filters: `direction`, `requester_handle`, `worker_handle`, `state`,
+`context_id`, `q`, `since`, `cursor`, `limit`. Message filters additionally
+support `task_id` and `role`; `role` is the message author (`caller` or
+`agent`), independent of task direction. Message direction defaults to `both`.
+Multiple filters are ANDed. Task search returns tasks containing a matching
+message; message search returns individual matches with requester/worker and
+task/context provenance. Search covers string and numeric content values from
+`text` and `data` parts, excludes metadata, and is deterministic newest-first
+rather than relevance-ranked.
+
+Use `a2a_task` / `a2a_sent_task` for a task's current state and message history.
+
+For a multi-turn worker flow, reply with `intent="ask_caller"` to request input;
+the caller continues the same task through the standard A2A client, and the
+worker later replies with `intent="complete"` or `intent="fail"`.
+
+Receiver enablement and advertised skills may be changed with the identity's
+agent-scoped key. Admission-policy mutations require an admin API key:
+`a2a_set_filter_mode`, `a2a_add_contact_rule`, `a2a_update_contact_rule`, and
+`a2a_delete_contact_rule`. Use `a2a_reset_skills()` to restore the default
+Agent Card skills. Contact-rule directions are `inbound`, `outbound`, or
+`both`. The requester must allow the worker through its outbound policy, and
+the worker must allow the requester through its inbound policy.
+
 ## Vault
 
 Encrypted credential vault with client-side Argon2id key derivation and AES-256-GCM encryption. The server never sees plaintext secrets. Requires `argon2-cffi` and `cryptography` (included as dependencies).
@@ -1102,9 +1168,9 @@ Algorithm: HMAC-SHA256 over `"{request_id}.{timestamp}.{body}"`.
 - **Call lifecycle** (envelope, fire-and-forget + replayable) — `call.ended`, owned by the **agent identity** (like iMessage). Subscribe via `inkbox.webhooks.subscriptions.create(agent_identity_id=..., url=..., event_types=["call.ended"])`. `CallEndedWebhookPayload.data` carries the `call` (`WebhookPhoneCall`, with derived `duration_seconds`), resolved `contacts` / `agent_identities`, an always-present `transcript_url` (authoritative verbatim, fetch with an admin API key), and an inline `transcript` block (`WebhookCallTranscript`, middle-cut/abridged) present when the platform captured a transcript for the call, otherwise `None` — discriminate a turn from the abridgment marker on `"marker" in entry`. Voice AI call fields (all optional so pre-Voice AI payloads parse): `data["call"]` carries `mode` / `reason`; `data` carries `outcome` (`"completed" | "no_answer" | "declined" | "failed"`, `None` iff `mode` is `client_websocket`) and `post_call_action_items` (open items only, seq-ascending, mirroring `PhoneCall.post_call_action_items`). Voice AI calls fire `call.ended` on **every** terminal state (including never-connected ones like `no_answer`), not just connected calls. An identity may hold a `call.ended` sub and an `imessage.*` sub independently, but one subscription carries a single channel.
 - **Inbound call** (flat, synchronous) — `PhoneIncomingCallWebhookPayload` on a phone number's `incoming_call_webhook_url`. Not subscribable; the URL stays on the phone-number resource because the response (`action: "answer" | "reject"` + optional `client_websocket_url`) decides the call's fate. Non-200, invalid bodies, and timeouts are treated as "decline routing" by Inkbox. (Contrast `call.ended` above, which is the replayable post-call fan-out.)
 
-**Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox, phone number, **or** agent identity), one HTTPS destination URL, and a non-empty subset of the catalog's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, and one channel per subscription — `message.` / `text.` / `imessage.` / `call.` prefix matching the owner's channel, where an agent identity owns both `imessage.*` and `call.ended`) so most shape mistakes surface as `ValueError` before the request leaves the client. The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
+**Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox, phone number, **or** agent identity), one HTTPS destination URL, and a non-empty subset of one channel's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). Identity-owned iMessage, call-lifecycle, and A2A subscriptions use separate rows; disjoint rows may share a destination URL. The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, one channel per row, and event prefixes compatible with the owner). The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
 
-`create(...)` returns a `WebhookSubscriptionCreateResponse`. The **first** subscription created for an identity that has no signing key yet carries that identity's `signing_key` **once** (otherwise `None`) — capture it then, it cannot be retrieved again. Every subscription (read or created) also carries `owner_identity_id`, the resolved owning agent identity (mail/phone/iMessage).
+`create(...)` returns a `WebhookSubscriptionCreateResponse`. The **first** subscription created for an identity that has no signing key yet carries that identity's `signing_key` **once** (otherwise `None`) — capture it then, it cannot be retrieved again. Every subscription (read or created) also carries `owner_identity_id`, the resolved owning agent identity.
 
 ```python
 created = inkbox.webhooks.subscriptions.create(
@@ -1115,7 +1181,7 @@ if created.signing_key:                # populated once if the identity had no k
     save_secret(created.signing_key)
 ```
 
-**Conversation context:** opt a subscription into per-class history on **received** events (`message.received`, `text.received`, `imessage.received`) with `context_config` — `email` / `texts` / `calls`, each `{"mode": "count", "count": N}` (1..50) or `{"mode": "window", "hours": H}` (1..168). On `update` it is tri-state: omit = unchanged, `None` = clear, dict = replace. Received-event payloads then carry an optional `data["context"]` keyed by class; optional fields are absent, not `null`, so read with `.get(...)`. A skipped class ships `items: []` plus a `skipped` reason; call transcript entries are turns or an abridgment marker, discriminated on `"marker" in entry`. Config types `WebhookContextConfig` / `WebhookContextClassConfig` and receiver wire shapes `WebhookContextWire` / `WebhookContextBlockWire` / `WebhookTranscriptEntryWire` (and the item wire types) are exported from `inkbox`.
+**Conversation context:** opt a mail, text, or iMessage subscription into per-class history on **received** events (`message.received`, `text.received`, `imessage.received`) with `context_config` — `email` / `texts` / `calls`, each `{"mode": "count", "count": N}` (1..50) or `{"mode": "window", "hours": H}` (1..168). A2A subscriptions do not support conversation context. On `update` it is tri-state: omit = unchanged, `None` = clear, dict = replace. Received-event payloads then carry an optional `data["context"]` keyed by class; optional fields are absent, not `null`, so read with `.get(...)`. A skipped class ships `items: []` plus a `skipped` reason; call transcript entries are turns or an abridgment marker, discriminated on `"marker" in entry`. Config types `WebhookContextConfig` / `WebhookContextClassConfig` and receiver wire shapes `WebhookContextWire` / `WebhookContextBlockWire` / `WebhookTranscriptEntryWire` (and the item wire types) are exported from `inkbox`.
 
 ```python
 inkbox.webhooks.subscriptions.create(

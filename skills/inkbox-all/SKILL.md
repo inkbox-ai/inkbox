@@ -24,15 +24,19 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 - `inkbox-cli`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-cli/SKILL.md
-  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, mailbox imports, phone, text, iMessage, vault, mailbox storage and mail-client settings, number, signing key, and webhook operations.
+  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, mailbox imports, phone, text, iMessage, A2A task/message history, vault, mailbox storage and mail-client settings, number, signing key, and webhook operations.
 
 - `inkbox-python`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
-  Python SDK reference for `inkbox`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
+  Python SDK reference for `inkbox`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
 - `inkbox-ts`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-ts/SKILL.md
-  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
+  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
+
+For A2A history, search covers string and numeric content values from `text`
+and `data` parts, not metadata, with newest-first results. Message `role` is
+the author (`caller` or `agent`), independent of task direction.
 
 - `inkbox-tunnels`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-tunnels/SKILL.md
