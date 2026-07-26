@@ -51,7 +51,7 @@ RAW_STATUS = {
     "human_state": "pending",
     "human_email": "human@example.com",
     "restrictions": {
-        "max_sends_per_day": 10,
+        "max_sends_per_day": 5,
         "allowed_recipients": ["human@example.com"],
         "can_receive": True,
         "can_create_mailboxes": False,
@@ -235,7 +235,7 @@ class TestGetSignupStatus:
         assert result.human_email == "human@example.com"
 
         assert isinstance(result.restrictions, SignupRestrictions)
-        assert result.restrictions.max_sends_per_day == 10
+        assert result.restrictions.max_sends_per_day == 5
         assert result.restrictions.allowed_recipients == ["human@example.com"]
         assert result.restrictions.can_receive is True
         assert result.restrictions.can_create_mailboxes is False

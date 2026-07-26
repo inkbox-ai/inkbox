@@ -107,7 +107,7 @@ await Inkbox.resendSignupVerification(apiKey);
 // Check status and restrictions
 const status = await Inkbox.getSignupStatus(apiKey);
 console.log(status.claimStatus);                    // "agent_unclaimed" or "agent_claimed"
-console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (claimed)
+console.log(status.restrictions.maxSendsPerDay);    // Effective 24-hour recipient-send limit
 ```
 
 | Method | Auth | Returns |

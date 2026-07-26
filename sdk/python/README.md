@@ -95,7 +95,7 @@ Inkbox.resend_signup_verification(api_key)
 # Check status and restrictions
 status = Inkbox.get_signup_status(api_key)
 print(status.claim_status)                    # "agent_unclaimed" or "agent_claimed"
-print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
+print(status.restrictions.max_sends_per_day)  # Effective 24-hour recipient-send limit
 ```
 
 | Method | Auth | Returns |
