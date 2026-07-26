@@ -3,13 +3,11 @@
  *
  * Replaces the legacy per-resource `webhook_url` columns on mailboxes
  * and phone numbers. Use this resource to attach HTTPS receivers to
- * mail (`message.*`), phone-text (`text.*`), iMessage (`imessage.*`), or
- * post-call lifecycle (`call.ended`) events. Mail and text subscriptions
- * are owned by the mailbox / phone number; iMessage and call-lifecycle
- * subscriptions are owned by the agent identity, since shared iMessage
- * pool numbers are not org resources and a call is only ever owned by its
- * identity. An identity may hold an iMessage sub and a call-lifecycle sub,
- * but a single subscription carries only one channel. Incoming-call
+ * mail (`message.*`), phone-text (`text.*`), iMessage (`imessage.*`),
+ * post-call lifecycle (`call.ended`), or A2A (`a2a.*`) events. Mail and
+ * text subscriptions are owned by the mailbox / phone number; the other
+ * channels are owned by the agent identity. Each subscription contains
+ * events from one channel. Incoming-call
  * webhooks (`phone.incoming_call`) are still set on the phone-number
  * resource itself — that channel is a synchronous control-plane
  * callback whose response body drives call routing, so fan-out is not
@@ -53,8 +51,8 @@ export interface WebhookSubscription {
   /**
    * Resolved owning agent identity for every subscription regardless of
    * channel — mail/phone subs resolve it server-side through the mailbox /
-   * phone number, while iMessage subs carry it directly. `null` on servers
-   * that predate the field.
+   * phone number, while identity-owned subscriptions carry it directly.
+   * `null` on servers that predate the field.
    */
   ownerIdentityId: string | null;
   url: string;
@@ -174,52 +172,78 @@ function assertNoIncomingCall(eventTypes: string[]): void {
 }
 
 // Wire event-type prefix → the owning resource whose channel it belongs to.
-// An agent identity owns two channels (iMessage + post-call lifecycle), so two
-// prefixes map to it; a single subscription may still only carry one channel.
+// An agent identity owns iMessage, post-call lifecycle, and A2A channels.
 const EVENT_PREFIX_TO_OWNER: Array<[string, string]> = [
   ["message.", "mailbox"],
   ["text.", "phone_number"],
   ["imessage.", "agent_identity"],
   ["call.", "agent_identity"],
+  ["a2a.", "agent_identity"],
 ];
 
 // Owner resource → the event-type prefixes it may subscribe to.
 const OWNER_EVENT_PREFIXES: Record<string, string[]> = {
   mailbox: ["message."],
   phone_number: ["text."],
-  agent_identity: ["imessage.", "call."],
+  agent_identity: ["imessage.", "call.", "a2a."],
 };
+
+function selectedEventPrefixes(eventTypes: string[]): Set<string> {
+  const selectedPrefixes = new Set<string>();
+  for (const eventType of eventTypes) {
+    const match = EVENT_PREFIX_TO_OWNER.find(
+      ([prefix]) => eventType.startsWith(prefix),
+    );
+    if (match === undefined) {
+      throw new Error(
+        `event_type '${eventType}' does not belong to any known channel`,
+      );
+    }
+    selectedPrefixes.add(match[0]);
+  }
+  if (selectedPrefixes.size > 1) {
+    throw new Error(
+      `eventTypes must all belong to one channel; got ${[...selectedPrefixes].sort().join(", ")}`,
+    );
+  }
+  return selectedPrefixes;
+}
 
 function assertChannelCoherence(
   owner: string,
   eventTypes: string[],
 ): void {
   const allowed = OWNER_EVENT_PREFIXES[owner];
-  // The first event's prefix fixes the channel; every event must share it so
-  // one subscription never straddles two channels (e.g. imessage.* + call.ended).
-  let channelPrefix: string | null = null;
+  const selectedPrefixes = selectedEventPrefixes(eventTypes);
   for (const e of eventTypes) {
-    const match = EVENT_PREFIX_TO_OWNER.find(([prefix]) => e.startsWith(prefix));
-    if (match === undefined) {
-      throw new Error(`event_type '${e}' does not belong to any known channel`);
-    }
-    const [prefix, targetOwner] = match;
+    const [prefix, targetOwner] = EVENT_PREFIX_TO_OWNER.find(
+      ([candidate]) => e.startsWith(candidate),
+    )!;
     if (!allowed.includes(prefix)) {
       throw new Error(
         `event_type '${e}' does not belong to the ${owner} ` +
         `channel (it belongs to ${targetOwner})`,
       );
     }
-    if (channelPrefix === null) {
-      channelPrefix = prefix;
-    } else if (prefix !== channelPrefix) {
-      throw new Error(
-        `event_type '${e}' does not belong to the same channel as the ` +
-        `other event types in this subscription`,
-      );
-    }
+  }
+  if (selectedPrefixes.size === 0) {
+    throw new Error("eventTypes must be a non-empty list");
   }
   // INCOMING_CALL is rejected by assertNoIncomingCall earlier.
+}
+
+function assertA2AContextAbsent(
+  eventTypes: string[],
+  contextConfig: WebhookContextConfig | null,
+): void {
+  if (
+    contextConfig !== null
+    && eventTypes.some((eventType) => eventType.startsWith("a2a."))
+  ) {
+    throw new Error(
+      "contextConfig is not supported for A2A subscriptions",
+    );
+  }
 }
 
 const CONTEXT_CLASSES = ["email", "texts", "calls"] as const;
@@ -280,14 +304,14 @@ export interface CreateWebhookSubscriptionOptions {
   agentIdentityId?: string;
   url: string;
   eventTypes: string[];
-  /** Opt into per-class conversation context (email/texts/calls) on received events. */
+  /** Opt into context on received mail, text, or iMessage events; unsupported for A2A. */
   contextConfig?: WebhookContextConfig;
 }
 
 export interface UpdateWebhookSubscriptionOptions {
   url?: string;
   eventTypes?: string[];
-  /** Tri-state: omit = unchanged, `null` = clear, object = validate and replace. */
+  /** Tri-state: omit = unchanged, `null` = clear, object = replace; unsupported for A2A. */
   contextConfig?: WebhookContextConfig | null;
 }
 
@@ -332,9 +356,9 @@ export class WebhookSubscriptionsResource {
    * `phoneNumberId` / `agentIdentityId` is required; `eventTypes` must
    * be a non-empty list of distinct values belonging to the owner's
    * channel (mailbox → `message.*`, phone number → `text.*`, agent
-   * identity → `imessage.*` or `call.ended`). One subscription carries a
-   * single channel, so an identity sub may not mix `imessage.*` with
-   * `call.ended`.
+   * identity → `imessage.*`, `call.ended`, or `a2a.*`). One subscription
+   * carries a single channel. A2A subscriptions do not support
+   * `contextConfig`.
    *
    * Returns a {@link WebhookSubscriptionCreateResponse}. Its `signingKey`
    * is populated **once** when this is the first subscription for an
@@ -371,6 +395,7 @@ export class WebhookSubscriptionsResource {
     };
     if (options.contextConfig !== undefined) {
       assertValidContextConfig(options.contextConfig);
+      assertA2AContextAbsent(options.eventTypes, options.contextConfig);
       body["context_config"] = options.contextConfig;
     }
     const data = await this.http.post<RawWebhookSubscriptionCreateResponse>(PATH, body);
@@ -396,6 +421,7 @@ export class WebhookSubscriptionsResource {
       assertEventTypesNotNull(options.eventTypes);
       assertEventTypesNonEmptyDistinct(options.eventTypes);
       assertNoIncomingCall(options.eventTypes);
+      selectedEventPrefixes(options.eventTypes);
       body["event_types"] = options.eventTypes;
     }
     if (options.contextConfig !== undefined) {
@@ -403,6 +429,12 @@ export class WebhookSubscriptionsResource {
         body["context_config"] = null;
       } else {
         assertValidContextConfig(options.contextConfig);
+        if (options.eventTypes !== undefined) {
+          assertA2AContextAbsent(
+            options.eventTypes,
+            options.contextConfig,
+          );
+        }
         body["context_config"] = options.contextConfig;
       }
     }
