@@ -160,7 +160,7 @@ export function registerA2ACommands(program: Command): void {
       output(result, { json: !!getGlobalOpts(this).json });
     }));
 
-  const rules = a2a.command("rules").description("Manage inbound A2A contact rules");
+  const rules = a2a.command("rules").description("Manage directional A2A contact rules");
   rules.command("list")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(withErrorHandler(async function (
@@ -175,7 +175,7 @@ export function registerA2ACommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .requiredOption("--handle <peer>", "Caller handle to match")
     .requiredOption("--action <action>", "'allow' or 'block'")
-    .option("--direction <direction>", "'inbound' or 'both'", "inbound")
+    .option("--direction <direction>", "'inbound', 'outbound', or 'both'", "inbound")
     .action(withErrorHandler(async function (
       this: Command,
       options: {
@@ -188,8 +188,10 @@ export function registerA2ACommands(program: Command): void {
       if (!["allow", "block"].includes(options.action)) {
         throw new TypeError("--action must be 'allow' or 'block'");
       }
-      if (!["inbound", "both"].includes(options.direction)) {
-        throw new TypeError("--direction must be 'inbound' or 'both'");
+      if (!["inbound", "outbound", "both"].includes(options.direction)) {
+        throw new TypeError(
+          "--direction must be 'inbound', 'outbound', or 'both'",
+        );
       }
       const result = await (await identityFor(this, options.identity)).a2aAddContactRule({
         handle: options.handle,
@@ -203,7 +205,7 @@ export function registerA2ACommands(program: Command): void {
     .description("Update an A2A contact rule (admin API key required)")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--action <action>", "'allow' or 'block'")
-    .option("--direction <direction>", "'inbound' or 'both'")
+    .option("--direction <direction>", "'inbound', 'outbound', or 'both'")
     .action(withErrorHandler(async function (
       this: Command,
       ruleId: string,
@@ -218,9 +220,11 @@ export function registerA2ACommands(program: Command): void {
       }
       if (
         options.direction !== undefined
-        && !["inbound", "both"].includes(options.direction)
+        && !["inbound", "outbound", "both"].includes(options.direction)
       ) {
-        throw new TypeError("--direction must be 'inbound' or 'both'");
+        throw new TypeError(
+          "--direction must be 'inbound', 'outbound', or 'both'",
+        );
       }
       if (options.action === undefined && options.direction === undefined) {
         throw new TypeError("Pass at least one of --action or --direction");

@@ -685,7 +685,9 @@ and current state.
 Receiver enablement and advertised skills accept the identity's agent-scoped
 key. Filter-mode and contact-rule create/update/delete operations require an
 admin API key. Use `a2aResetSkills()` to restore default skills; rule
-directions are `inbound` or `both`.
+directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
+requester's outbound policy and the worker's inbound policy; `both` applies in
+either role.
 
 ## Credentials
 

@@ -1659,7 +1659,7 @@ class AgentIdentity:
         )
 
     def a2a_contact_rules(self) -> list[A2AContactRule]:
-        """List this identity's A2A inbound contact rules."""
+        """List this identity's directional A2A contact rules."""
         return self._inkbox._a2a.contact_rules(self.agent_handle)
 
     def a2a_add_contact_rule(
@@ -1669,7 +1669,7 @@ class AgentIdentity:
         action: A2ARuleAction | str,
         direction: A2ARuleDirection | str = A2ARuleDirection.INBOUND,
     ) -> A2AContactRule:
-        """Add an A2A inbound contact rule (admin-only)."""
+        """Add a directional A2A contact rule (admin-only)."""
         return self._inkbox._a2a.add_contact_rule(
             self.agent_handle,
             peer_handle=handle,
@@ -1684,7 +1684,7 @@ class AgentIdentity:
         action: A2ARuleAction | str | None = None,
         direction: A2ARuleDirection | str | None = None,
     ) -> A2AContactRule:
-        """Update an A2A inbound contact rule (admin-only)."""
+        """Update a directional A2A contact rule (admin-only)."""
         return self._inkbox._a2a.update_contact_rule(
             self.agent_handle,
             str(rule_id),
@@ -1693,7 +1693,7 @@ class AgentIdentity:
         )
 
     def a2a_delete_contact_rule(self, rule_id: UUID | str) -> None:
-        """Delete an A2A inbound contact rule (admin-only)."""
+        """Delete a directional A2A contact rule (admin-only)."""
         self._inkbox._a2a.delete_contact_rule(
             self.agent_handle,
             str(rule_id),
@@ -1714,6 +1714,7 @@ class AgentIdentity:
         return A2AClient(
             api_key=self._inkbox._api_key,
             platform_base_url=self._inkbox._base_url,
+            timeout=self._inkbox._timeout,
         )
 
     ## Signing key

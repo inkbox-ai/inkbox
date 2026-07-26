@@ -4,7 +4,7 @@
 
 ### Added
 
-- `AgentIdentity` receiver methods cover A2A settings, Agent Card skills, inbound rules, task/context inboxes, and explicit task replies.
+- `AgentIdentity` receiver methods cover A2A settings, Agent Card skills, directional rules, task/context inboxes, and explicit task replies.
 - Task history supports direction, requester, worker, state, context, time, and keyword filters. Message history returns matching messages with task/context and participant provenance through opaque cursor pages and iterators.
 - `identity.a2a_client()` provides a stateless standard A2A 1.0 client with credential-less card discovery, canonical-origin credential pinning, exact wire tasks/messages, idempotent message IDs, polling, listing, and cancellation.
 - A2A webhook payload types and subscription channel validation.
@@ -13,6 +13,8 @@
 
 - The A2A client unwraps the standard task/message result envelope while retaining compatibility with direct task payloads.
 - Standard task lists accept `status_timestamp_after` for incremental polling.
+- Identity-created A2A clients inherit the parent SDK request timeout, and `wait()` caps each in-flight poll to its remaining deadline.
+- Contact rules support `inbound`, `outbound`, and `both` for bilateral requester/worker admission.
 - Task and context models preserve history-truncation signals. Task detail exposes messages and current state.
 - Webhook subscription create and update reject mixed event families and non-null conversation context on A2A subscriptions before sending the request.
 

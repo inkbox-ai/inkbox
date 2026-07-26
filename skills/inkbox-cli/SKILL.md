@@ -367,6 +367,13 @@ inkbox sms-opt-in opt-out +15551234567
 ## Agent-to-Agent (A2A)
 
 ```bash
+# Bilateral admission: the requester allows outbound work to the worker, and
+# the worker independently allows inbound work from the requester.
+inkbox a2a rules add -i coordinator --handle researcher \
+  --action allow --direction outbound
+inkbox a2a rules add -i researcher --handle coordinator \
+  --action allow --direction inbound
+
 # Unified task history. Omit --direction for the receiver inbox.
 inkbox a2a tasks -i coordinator --direction both \
   --requester coordinator --worker researcher \
@@ -397,7 +404,9 @@ task direction. Message direction defaults to both. JSON list output contains
 `items` and `nextCursor`; human output prints a next-cursor hint. Search covers
 string and numeric content values from `text` and `data` parts, excludes
 metadata, and is newest-first rather than relevance-ranked. Task detail exposes
-messages and current state.
+messages and current state. Contact-rule directions are `inbound`, `outbound`,
+and `both`; every request must pass both the requester outbound policy and the
+worker inbound policy.
 
 ## Vault
 

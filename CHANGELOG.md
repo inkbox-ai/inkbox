@@ -8,7 +8,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- **A2A receiver inboxes in Python and TypeScript.** `AgentIdentity` can enable the channel, configure Agent Card skills, manage inbound contact rules, list contexts and tasks, and reply with an explicit `ask_caller`, `complete`, or `fail` lifecycle decision.
+- **A2A receiver inboxes in Python and TypeScript.** `AgentIdentity` can enable the channel, configure Agent Card skills, manage directional contact rules, list contexts and tasks, and reply with an explicit `ask_caller`, `complete`, or `fail` lifecycle decision.
 - **Two-sided A2A history in Python, TypeScript, and Rust.** Identity-scoped task history supports inbound, outbound, or combined views with requester, worker, state, context, time, and keyword filters. Message history adds task and participant provenance with opaque cursor pagination.
 - **A standard A2A 1.0 client.** Identity-bound clients fetch Agent Cards without credentials, refuse redirects, validate canonical HTTPS origins, send with `returnImmediately`, poll/list/cancel tasks, and preserve exact wire task/message types.
 - **Credential pinning.** The Inkbox API key is attached only when both the Inkbox-hosted card and selected RPC interface match the configured Inkbox origin. External agents receive no Inkbox credential unless the caller explicitly supplies their credential.
@@ -21,7 +21,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Task detail exposes current state and message history.
 - Python and TypeScript A2A clients unwrap the standard task/message result envelope while retaining compatibility with direct task payloads.
 - Python and TypeScript standard task lists accept `statusTimestampAfter` for incremental polling.
+- Python and TypeScript identity-bound A2A clients inherit their parent SDK request timeout; Python `wait()` caps in-flight polling requests to its remaining deadline.
 - TypeScript keeps resolved credentials out of returned target objects, freezes resolved endpoints after validation, and applies bounded timeouts to Agent Card and JSON-RPC requests.
+- A2A contact rules support `inbound`, `outbound`, and `both`; protocol calls require both the requester outbound policy and worker inbound policy to allow the peer.
 - **Rust note (source-breaking).** Combined context history now takes `A2AContextListOptions`, including an explicit `direction`; update positional `a2a_contexts(cursor, limit)` calls to pass the options struct.
 - Identity-owned iMessage, call-lifecycle, and A2A webhook events use separate subscription rows. Disjoint rows may share the same destination URL.
 - Python, TypeScript, Rust, and the CLI reject mixed-family webhook updates and non-null conversation context on A2A subscriptions before sending the request.

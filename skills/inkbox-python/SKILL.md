@@ -594,8 +594,9 @@ Receiver enablement and advertised skills may be changed with the identity's
 agent-scoped key. Admission-policy mutations require an admin API key:
 `a2a_set_filter_mode`, `a2a_add_contact_rule`, `a2a_update_contact_rule`, and
 `a2a_delete_contact_rule`. Use `a2a_reset_skills()` to restore the default
-Agent Card skills. Contact-rule directions are `inbound` or `both`;
-outbound-only rules are not supported.
+Agent Card skills. Contact-rule directions are `inbound`, `outbound`, or
+`both`. The requester must allow the worker through its outbound policy, and
+the worker must allow the requester through its inbound policy.
 
 ## Vault
 

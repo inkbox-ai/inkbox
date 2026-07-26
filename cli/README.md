@@ -358,6 +358,12 @@ inkbox a2a enable -i researcher
 inkbox a2a card -i researcher
 inkbox a2a skills set -i researcher --file skills.json
 
+# Bilateral admission for coordinator -> researcher calls
+inkbox a2a rules add -i coordinator --handle researcher \
+  --action allow --direction outbound
+inkbox a2a rules add -i researcher --handle coordinator \
+  --action allow --direction inbound
+
 # Unified task history. Omit --direction for the receiver inbox.
 inkbox a2a tasks -i coordinator --direction both \
   --requester coordinator --worker researcher \
@@ -386,7 +392,9 @@ prints a next-cursor hint when another page exists. Keyword search covers
 string and numeric content values from `text` and `data` parts, excludes
 metadata, and returns newest-first results rather than relevance ranking.
 `--role` selects the message author (`caller` or `agent`), independent of task
-direction. Task detail exposes messages and current state.
+direction. Task detail exposes messages and current state. A protocol call must
+pass both the requester identity's outbound policy and the worker identity's
+inbound policy. Contact-rule directions are `inbound`, `outbound`, and `both`.
 
 ### vault
 

@@ -167,10 +167,30 @@ class A2AClient:
         *,
         history_length: int | None = None,
     ) -> A2AWireTask:
+        return self._get_task(
+            target,
+            task_id,
+            history_length=history_length,
+            request_timeout=None,
+        )
+
+    def _get_task(
+        self,
+        target: A2AResolvedTarget,
+        task_id: str,
+        *,
+        history_length: int | None,
+        request_timeout: float | None,
+    ) -> A2AWireTask:
         params: dict[str, Any] = {"id": task_id}
         if history_length is not None:
             params["historyLength"] = history_length
-        result = self._rpc(target, "GetTask", params)
+        result = self._rpc(
+            target,
+            "GetTask",
+            params,
+            request_timeout=request_timeout,
+        )
         task = result.get("task")
         return A2AWireTask(task if isinstance(task, dict) else result)
 
@@ -219,7 +239,22 @@ class A2AClient:
     ) -> A2AWireTask:
         deadline = time.monotonic() + timeout
         while True:
-            task = self.get_task(target, task_id)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"A2A task {task_id} did not stop before timeout"
+                )
+            try:
+                task = self._get_task(
+                    target,
+                    task_id,
+                    history_length=None,
+                    request_timeout=remaining,
+                )
+            except httpx.TimeoutException as exc:
+                raise TimeoutError(
+                    f"A2A task {task_id} did not stop before timeout"
+                ) from exc
             if task.state in {
                 A2AWireTaskState.COMPLETED,
                 A2AWireTaskState.FAILED,
@@ -239,6 +274,8 @@ class A2AClient:
         target: A2AResolvedTarget,
         method: str,
         params: dict[str, Any],
+        *,
+        request_timeout: float | None = None,
     ) -> dict[str, Any]:
         if _canonical_url(target.rpc_url) != target.rpc_url:
             raise ValueError("A2A target RPC URL is not canonical")
@@ -250,16 +287,18 @@ class A2AClient:
         }
         if target.credential:
             headers["X-API-Key"] = target.credential
-        response = self._client.post(
-            target.rpc_url,
-            headers=headers,
-            json={
+        request_kwargs: dict[str, Any] = {
+            "headers": headers,
+            "json": {
                 "jsonrpc": "2.0",
                 "id": self._next_id,
                 "method": method,
                 "params": params,
             },
-        )
+        }
+        if request_timeout is not None:
+            request_kwargs["timeout"] = request_timeout
+        response = self._client.post(target.rpc_url, **request_kwargs)
         if 300 <= response.status_code < 400:
             raise InkboxError("A2A RPC redirects are refused")
         response.raise_for_status()

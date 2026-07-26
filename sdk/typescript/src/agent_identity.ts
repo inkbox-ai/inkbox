@@ -1330,12 +1330,12 @@ export class AgentIdentity {
     return this._inkbox._a2a.sentContext(this.agentHandle, contextId);
   }
 
-  /** List this identity's A2A inbound contact rules. */
+  /** List this identity's directional A2A contact rules. */
   a2aContactRules(): Promise<A2AContactRule[]> {
     return this._inkbox._a2a.contactRules(this.agentHandle);
   }
 
-  /** Add an A2A inbound contact rule (admin-only). */
+  /** Add a directional A2A contact rule (admin-only). */
   a2aAddContactRule(options: {
     handle: string;
     action: A2ARuleAction;
@@ -1344,7 +1344,7 @@ export class AgentIdentity {
     return this._inkbox._a2a.addContactRule(this.agentHandle, options);
   }
 
-  /** Update an A2A inbound contact rule (admin-only). */
+  /** Update a directional A2A contact rule (admin-only). */
   a2aUpdateContactRule(
     ruleId: string,
     options: {
@@ -1359,7 +1359,7 @@ export class AgentIdentity {
     );
   }
 
-  /** Delete an A2A inbound contact rule (admin-only). */
+  /** Delete a directional A2A contact rule (admin-only). */
   a2aDeleteContactRule(ruleId: string): Promise<void> {
     return this._inkbox._a2a.deleteContactRule(this.agentHandle, ruleId);
   }
@@ -1378,7 +1378,11 @@ export class AgentIdentity {
         "A2A calls require this claimed identity's agent-scoped API key",
       );
     }
-    return new A2AClient(this._inkbox._apiKey, this._inkbox._baseUrl);
+    return new A2AClient(
+      this._inkbox._apiKey,
+      this._inkbox._baseUrl,
+      { requestTimeoutMs: this._inkbox._timeoutMs },
+    );
   }
 
   // ------------------------------------------------------------------

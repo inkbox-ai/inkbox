@@ -162,6 +162,7 @@ class Inkbox:
         _api_base = f"{base_url.rstrip('/')}/api"
         _api_root = f"{base_url.rstrip('/')}/api/v1"
         self._base_url = base_url.rstrip("/")
+        self._timeout = timeout
         _cookie_jar = CookieJar()
         _ua = sdk_user_agent(user_agent_prefix)
 

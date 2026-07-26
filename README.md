@@ -146,6 +146,11 @@ Keyword search matches string and numeric content values from `text` and
 newest-first. A message's `role` is its author (`caller` or `agent`),
 independent of task direction.
 
+Calls between Inkbox identities use bilateral contact rules. The requester must
+allow the worker in its `outbound` direction, and the worker must allow the
+requester in its `inbound` direction. Use `both` when the same peer rule should
+apply in either role.
+
 ```python
 identity = inkbox.get_identity("coordinator")
 

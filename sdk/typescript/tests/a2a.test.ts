@@ -366,15 +366,37 @@ describe("A2AResource", () => {
     ).rejects.toThrow(/at least one/);
   });
 
-  it("rejects outbound-only contact-rule direction", async () => {
-    const resource = new A2AResource({} as HttpTransport);
-    await expect(
-      resource.addContactRule("coordinator", {
-        handle: "peer",
+  it("sends outbound contact-rule direction", async () => {
+    const http = {
+      post: vi.fn().mockResolvedValue({
+        id: "rule-1",
         action: "allow",
+        match_type: "handle",
+        match_target: "peer",
         direction: "outbound",
+        status: "active",
+        created_at: "2026-07-24T00:00:00Z",
+        updated_at: "2026-07-25T00:00:00Z",
       }),
-    ).rejects.toThrow(/inbound.*both/);
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const rule = await resource.addContactRule("coordinator", {
+      handle: "peer",
+      action: "allow",
+      direction: "outbound",
+    });
+
+    expect(rule.direction).toBe("outbound");
+    expect(http.post).toHaveBeenCalledWith(
+      "/identities/coordinator/a2a/contact-rules",
+      {
+        action: "allow",
+        match_type: "handle",
+        match_target: "peer",
+        direction: "outbound",
+      },
+    );
   });
 
   it("uses the exact reply body", async () => {

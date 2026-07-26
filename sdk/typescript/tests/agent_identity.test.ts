@@ -120,6 +120,29 @@ describe("AgentIdentity properties", () => {
   });
 });
 
+describe("AgentIdentity A2A client", () => {
+  it("inherits the parent Inkbox request timeout", async () => {
+    const ink = {
+      ...mockInkbox(),
+      _apiKey: "ApiKey_secret",
+      _baseUrl: "https://inkbox.ai",
+      _timeoutMs: 7_250,
+      whoami: vi.fn().mockResolvedValue({
+        authType: "api_key",
+        authSubtype: "api_key.agent_scoped.claimed",
+        scope: `agent_identity:${RAW_IDENTITY_DETAIL.id}`,
+      }),
+    } as unknown as Inkbox;
+    const identity = new AgentIdentity(makeData(), ink);
+
+    const client = await identity.a2aClient();
+
+    expect(
+      (client as unknown as { requestTimeoutMs: number }).requestTimeoutMs,
+    ).toBe(7_250);
+  });
+});
+
 describe("AgentIdentity channel management", () => {
   it("provisionPhoneNumber provisions and links", async () => {
     const ink = mockInkbox();

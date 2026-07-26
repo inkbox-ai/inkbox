@@ -49,6 +49,7 @@ class A2ARuleAction(ForwardCompatibleStrEnum):
 
 class A2ARuleDirection(ForwardCompatibleStrEnum):
     INBOUND = "inbound"
+    OUTBOUND = "outbound"
     BOTH = "both"
 
 

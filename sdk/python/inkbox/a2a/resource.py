@@ -48,8 +48,10 @@ class A2AResource:
             if isinstance(direction, A2ARuleDirection)
             else direction
         )
-        if value not in {"inbound", "both"}:
-            raise ValueError("A2A rule direction must be 'inbound' or 'both'")
+        if value not in {"inbound", "outbound", "both"}:
+            raise ValueError(
+                "A2A rule direction must be 'inbound', 'outbound', or 'both'"
+            )
         return value
 
     def settings(self, handle: str) -> A2ASettings:

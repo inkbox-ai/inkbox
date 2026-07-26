@@ -177,6 +177,8 @@ export class Inkbox {
   readonly _apiKey: string;
   /** @internal — canonical platform origin used for A2A credential pinning. */
   readonly _baseUrl: string;
+  /** @internal — request deadline inherited by identity-bound A2A clients. */
+  readonly _timeoutMs: number;
   /** @internal */
   _vaultUnlockPromise: Promise<unknown> | null = null;
 
@@ -209,6 +211,7 @@ export class Inkbox {
     }
     const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;
+    this._timeoutMs = ms;
     const userAgent = sdkUserAgent(options.userAgentPrefix);
     const cookieJar = new CookieJar();
 

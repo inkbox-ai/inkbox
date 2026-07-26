@@ -31,11 +31,19 @@ function base(handle: string): string {
   return `/identities/${encodeURIComponent(handle)}/a2a`;
 }
 
-function ruleDirection(direction: A2ARuleDirection): "inbound" | "both" {
-  if (direction !== "inbound" && direction !== "both") {
-    throw new TypeError("A2A rule direction must be 'inbound' or 'both'");
+function ruleDirection(
+  direction: A2ARuleDirection,
+): "inbound" | "outbound" | "both" {
+  if (
+    direction !== "inbound"
+    && direction !== "outbound"
+    && direction !== "both"
+  ) {
+    throw new TypeError(
+      "A2A rule direction must be 'inbound', 'outbound', or 'both'",
+    );
   }
-  return direction === "inbound" ? "inbound" : "both";
+  return direction as "inbound" | "outbound" | "both";
 }
 
 function parseSettings(raw: Raw): A2ASettings {

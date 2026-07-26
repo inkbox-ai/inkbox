@@ -14,6 +14,7 @@ from inkbox.a2a.types import (
     A2AHistoryDirection,
     A2AMessageRole,
     A2AReplyIntent,
+    A2ARuleDirection,
     A2ATaskState,
 )
 from inkbox.exceptions import InkboxError
@@ -370,15 +371,37 @@ def test_contact_rule_update_requires_a_change() -> None:
         resource.update_contact_rule("coordinator", "rule-1")
 
 
-def test_contact_rules_reject_outbound_only_direction() -> None:
-    resource = A2AResource(MagicMock())
-    with pytest.raises(ValueError, match="inbound.*both"):
-        resource.add_contact_rule(
-            "coordinator",
-            peer_handle="peer",
-            action="allow",
-            direction="outbound",
-        )
+def test_contact_rules_send_outbound_direction() -> None:
+    http = MagicMock()
+    http.post.return_value = {
+        "id": "rule-1",
+        "action": "allow",
+        "match_type": "handle",
+        "match_target": "peer",
+        "direction": "outbound",
+        "status": "active",
+        "created_at": "2026-07-24T00:00:00Z",
+        "updated_at": "2026-07-25T00:00:00Z",
+    }
+    resource = A2AResource(http)
+
+    rule = resource.add_contact_rule(
+        "coordinator",
+        peer_handle="peer",
+        action="allow",
+        direction="outbound",
+    )
+
+    assert rule.direction is A2ARuleDirection.OUTBOUND
+    http.post.assert_called_once_with(
+        "/identities/coordinator/a2a/contact-rules",
+        json={
+            "action": "allow",
+            "match_type": "handle",
+            "match_target": "peer",
+            "direction": "outbound",
+        },
+    )
 
 
 def test_inbox_reply_uses_exact_wire_body() -> None:
@@ -526,6 +549,39 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
     assert list_body["params"]["statusTimestampAfter"] == (
         "2026-07-25T12:30:00Z"
     )
+    client.close()
+
+
+def test_a2a_wait_caps_get_task_request_to_remaining_deadline() -> None:
+    client = A2AClient(
+        api_key="ApiKey_secret",
+        platform_base_url="https://inkbox.ai",
+        timeout=30,
+    )
+    target = MagicMock()
+    observed_timeouts: list[float] = []
+
+    def stalled_get_task(
+        _target,
+        _task_id,
+        *,
+        history_length,
+        request_timeout,
+    ):
+        assert history_length is None
+        observed_timeouts.append(request_timeout)
+        raise httpx.ReadTimeout("stalled")
+
+    client._get_task = stalled_get_task  # type: ignore[method-assign]
+
+    with pytest.raises(
+        TimeoutError,
+        match="task-1 did not stop before timeout",
+    ):
+        client.wait(target, "task-1", timeout=0.05, interval=1)
+
+    assert len(observed_timeouts) == 1
+    assert 0 < observed_timeouts[0] <= 0.05
     client.close()
 
 
