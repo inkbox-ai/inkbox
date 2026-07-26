@@ -920,9 +920,111 @@ pub struct CallEndedWebhookPayload {
     pub data: CallEndedWebhookData,
 }
 
+// ---- A2A task lifecycle --------------------------------------------------
+
+/// A2A task-lifecycle webhook event-type discriminator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum A2AWebhookEventType {
+    #[serde(rename = "a2a.task.created")]
+    TaskCreated,
+    #[serde(rename = "a2a.task.message")]
+    TaskMessage,
+    #[serde(rename = "a2a.task.canceled")]
+    TaskCanceled,
+    #[serde(rename = "a2a.sent_task.updated")]
+    SentTaskUpdated,
+}
+
+/// Authenticated caller attached to an A2A task event.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct A2AWebhookCaller {
+    pub identity_id: String,
+    pub organization_id: String,
+    pub handle: Option<String>,
+}
+
+/// Task-ledger data carried by every A2A task event.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct A2AWebhookData {
+    pub task_id: String,
+    pub context_id: String,
+    pub state: String,
+    pub caller: A2AWebhookCaller,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parts: Option<Vec<serde_json::Value>>,
+}
+
+/// Top-level A2A webhook payload (`{event_type, timestamp, data}` envelope).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct A2AWebhookPayload {
+    pub id: String,
+    pub event_type: A2AWebhookEventType,
+    pub timestamp: String,
+    pub data: A2AWebhookData,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a2a_canceled_payload_omits_message_fields() {
+        let raw = r#"{
+            "id": "evt_a2a_canceled",
+            "event_type": "a2a.task.canceled",
+            "timestamp": "2026-07-25T00:00:00Z",
+            "data": {
+                "task_id": "task-id",
+                "context_id": "context-id",
+                "state": "canceled",
+                "caller": {
+                    "identity_id": "caller-id",
+                    "organization_id": "org-caller",
+                    "handle": "caller"
+                }
+            }
+        }"#;
+
+        let payload: A2AWebhookPayload = serde_json::from_str(raw).unwrap();
+        assert_eq!(payload.event_type, A2AWebhookEventType::TaskCanceled);
+        assert!(payload.data.message_id.is_none());
+        assert!(payload.data.parts.is_none());
+    }
+
+    #[test]
+    fn a2a_message_payload_includes_message_fields() {
+        let raw = r#"{
+            "id": "evt_a2a_message",
+            "event_type": "a2a.task.message",
+            "timestamp": "2026-07-25T00:00:00Z",
+            "data": {
+                "task_id": "task-id",
+                "context_id": "context-id",
+                "state": "working",
+                "caller": {
+                    "identity_id": "caller-id",
+                    "organization_id": "org-caller",
+                    "handle": "caller"
+                },
+                "message_id": "message-id",
+                "parts": [{"text": "Continue"}]
+            }
+        }"#;
+
+        let payload: A2AWebhookPayload = serde_json::from_str(raw).unwrap();
+        assert_eq!(payload.event_type, A2AWebhookEventType::TaskMessage);
+        assert_eq!(payload.data.message_id.as_deref(), Some("message-id"));
+        assert_eq!(
+            payload
+                .data
+                .parts
+                .as_ref()
+                .and_then(|parts| { parts[0].get("text").and_then(serde_json::Value::as_str) }),
+            Some("Continue")
+        );
+    }
 
     #[test]
     fn imessage_group_webhook_parses_nullable_assignment_and_participants() {

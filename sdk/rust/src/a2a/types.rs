@@ -75,6 +75,13 @@ pub struct A2AMessageListOptions {
     pub limit: Option<u32>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct A2AContextListOptions {
+    pub direction: Option<A2AHistoryDirection>,
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2ACaller {
     pub identity_id: Uuid,

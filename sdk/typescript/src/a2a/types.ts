@@ -174,12 +174,10 @@ export interface A2ACard {
 }
 
 export interface A2AResolvedTarget {
-  cardUrl: string;
-  rpcUrl: string;
-  protocolVersion: "1.0";
-  card: A2ACard;
-  /** @internal Credential pinned to rpcUrl's canonical origin. */
-  credential?: string;
+  readonly cardUrl: string;
+  readonly rpcUrl: string;
+  readonly protocolVersion: "1.0";
+  readonly card: A2ACard;
 }
 
 export interface A2AWireMessage {

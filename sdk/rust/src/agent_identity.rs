@@ -36,8 +36,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::a2a::{
-    A2AContext, A2AContextPage, A2AHistoryMessagePage, A2AMessageListOptions,
-    A2ASentTaskListOptions, A2ATask, A2ATaskListOptions, A2ATaskPage,
+    A2AContext, A2AContextListOptions, A2AContextPage, A2AHistoryMessagePage,
+    A2AMessageListOptions, A2ASentTaskListOptions, A2ATask, A2ATaskListOptions, A2ATaskPage,
 };
 use crate::client::Inkbox;
 use crate::credentials::Credentials;
@@ -136,10 +136,8 @@ impl AgentIdentity {
         self.inkbox.a2a().messages(&self.agent_handle(), options)
     }
 
-    pub fn a2a_contexts(&self, cursor: Option<&str>, limit: Option<u32>) -> Result<A2AContextPage> {
-        self.inkbox
-            .a2a()
-            .contexts(&self.agent_handle(), cursor, limit)
+    pub fn a2a_contexts(&self, options: &A2AContextListOptions) -> Result<A2AContextPage> {
+        self.inkbox.a2a().contexts(&self.agent_handle(), options)
     }
 
     pub fn a2a_sent_contexts(

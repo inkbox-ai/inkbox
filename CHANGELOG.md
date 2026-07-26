@@ -13,13 +13,16 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - **A standard A2A 1.0 client.** Identity-bound clients fetch Agent Cards without credentials, refuse redirects, validate canonical HTTPS origins, send with `returnImmediately`, poll/list/cancel tasks, and preserve exact wire task/message types.
 - **Credential pinning.** The Inkbox API key is attached only when both the Inkbox-hosted card and selected RPC interface match the configured Inkbox origin. External agents receive no Inkbox credential unless the caller explicitly supplies their credential.
 - **CLI A2A workflow.** `inkbox a2a` covers receiver enablement, cards, skills, rules, filterable task/message history, replies, remote calls, checks/waits, and cancellation.
-- **A2A webhook types.** All four task lifecycle events are available in Python and TypeScript webhook envelopes and subscription validation.
+- **A2A webhook types.** All four task lifecycle events are available in Python, TypeScript, and Rust webhook envelopes and subscription validation.
 
 ### Changed
 
 - Python, TypeScript, CLI, and Rust package metadata move to 0.5.6; the CLI depends on `@inkbox/sdk` `^0.5.6`. Rust exposes the A2A task, context, and message-history surface; receiver configuration and the standard protocol client remain Python/TypeScript-only.
 - Task detail exposes current state and message history.
 - Python and TypeScript A2A clients unwrap the standard task/message result envelope while retaining compatibility with direct task payloads.
+- Python and TypeScript standard task lists accept `statusTimestampAfter` for incremental polling.
+- TypeScript keeps resolved credentials out of returned target objects, freezes resolved endpoints after validation, and applies bounded timeouts to Agent Card and JSON-RPC requests.
+- **Rust note (source-breaking).** Combined context history now takes `A2AContextListOptions`, including an explicit `direction`; update positional `a2a_contexts(cursor, limit)` calls to pass the options struct.
 - Identity-owned iMessage, call-lifecycle, and A2A webhook events use separate subscription rows. Disjoint rows may share the same destination URL.
 - Python, TypeScript, Rust, and the CLI reject mixed-family webhook updates and non-null conversation context on A2A subscriptions before sending the request.
 

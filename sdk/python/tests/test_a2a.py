@@ -493,6 +493,10 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
     result = client.send(target, text="Investigate", message_id="msg-1")
     fetched = client.get_task(target, "task-1")
     canceled = client.cancel(target, "task-1")
+    listed = client.list_tasks(
+        target,
+        status_timestamp_after="2026-07-25T12:30:00Z",
+    )
 
     assert "X-API-Key" not in requests[0].headers
     assert requests[1].headers["X-API-Key"] == "ApiKey_secret"
@@ -516,6 +520,12 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
     assert result.task.id == "task-1"
     assert fetched.id == "task-1"
     assert canceled.id == "task-1"
+    assert listed.tasks == []
+    list_body = json.loads(requests[4].content)
+    assert list_body["method"] == "ListTasks"
+    assert list_body["params"]["statusTimestampAfter"] == (
+        "2026-07-25T12:30:00Z"
+    )
     client.close()
 
 

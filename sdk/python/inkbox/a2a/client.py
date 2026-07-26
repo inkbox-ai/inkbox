@@ -180,6 +180,7 @@ class A2AClient:
         *,
         context_id: str | None = None,
         status: A2AWireTaskState | str | None = None,
+        status_timestamp_after: str | None = None,
         cursor: str | None = None,
         page_size: int = 50,
         history_length: int | None = None,
@@ -189,6 +190,8 @@ class A2AClient:
             params["contextId"] = context_id
         if status:
             params["status"] = status.value if isinstance(status, A2AWireTaskState) else status
+        if status_timestamp_after is not None:
+            params["statusTimestampAfter"] = status_timestamp_after
         if cursor:
             params["pageToken"] = cursor
         if history_length is not None:

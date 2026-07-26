@@ -219,7 +219,8 @@ Python and TypeScript SDKs.
 
 ```rust
 use inkbox::a2a::{
-    A2AHistoryDirection, A2AMessageListOptions, A2ATaskListOptions,
+    A2AContextListOptions, A2AHistoryDirection, A2AMessageListOptions,
+    A2ATaskListOptions,
 };
 
 let tasks = identity.a2a_tasks(&A2ATaskListOptions {
@@ -238,7 +239,14 @@ let messages = identity.a2a_messages(&A2AMessageListOptions {
     ..Default::default()
 })?;
 
+let contexts = identity.a2a_contexts(&A2AContextListOptions {
+    direction: Some(A2AHistoryDirection::Both),
+    limit: Some(25),
+    ..Default::default()
+})?;
+
 println!("{:?}", tasks.next_cursor);
+println!("{:?}", contexts.next_cursor);
 for message in messages.items {
     println!("{} {} {:?}", message.task_id, message.task_state, message.parts);
 }
@@ -251,6 +259,9 @@ and worker provenance. Search covers string and numeric content values from
 relevance-ranked. `role` is the message author (`caller` or `agent`),
 independent of task direction. Cursors are opaque; pass `next_cursor` with the
 same filters to fetch the next page.
+
+The `webhooks::types` module includes `A2AWebhookPayload` and its typed event
+discriminator for all four A2A task-lifecycle events.
 
 ## Crypto
 

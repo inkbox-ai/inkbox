@@ -3,8 +3,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::a2a::types::{
-    A2AContext, A2AContextPage, A2AHistoryMessagePage, A2AMessageListOptions,
-    A2ASentTaskListOptions, A2ATask, A2ATaskListOptions, A2ATaskPage,
+    A2AContext, A2AContextListOptions, A2AContextPage, A2AHistoryDirection, A2AHistoryMessagePage,
+    A2AMessageListOptions, A2ASentTaskListOptions, A2ATask, A2ATaskListOptions, A2ATaskPage,
 };
 use crate::error::Result;
 use crate::http::{HttpTransport, NO_QUERY};
@@ -155,10 +155,16 @@ impl A2AResource {
         &self,
         agent_handle: &str,
         sent: bool,
+        direction: Option<A2AHistoryDirection>,
         cursor: Option<&str>,
         limit: Option<u32>,
     ) -> Result<A2AContextPage> {
         let mut params = Vec::new();
+        if !sent {
+            if let Some(value) = direction {
+                params.push(("direction", value.as_str().to_string()));
+            }
+        }
         if let Some(value) = cursor {
             params.push(("cursor", value.to_string()));
         }
@@ -175,10 +181,15 @@ impl A2AResource {
     pub fn contexts(
         &self,
         agent_handle: &str,
-        cursor: Option<&str>,
-        limit: Option<u32>,
+        options: &A2AContextListOptions,
     ) -> Result<A2AContextPage> {
-        self.context_page(agent_handle, false, cursor, limit)
+        self.context_page(
+            agent_handle,
+            false,
+            options.direction,
+            options.cursor.as_deref(),
+            options.limit,
+        )
     }
 
     pub fn sent_contexts(
@@ -187,7 +198,7 @@ impl A2AResource {
         cursor: Option<&str>,
         limit: Option<u32>,
     ) -> Result<A2AContextPage> {
-        self.context_page(agent_handle, true, cursor, limit)
+        self.context_page(agent_handle, true, None, cursor, limit)
     }
 
     pub fn context(&self, agent_handle: &str, context_id: Uuid) -> Result<A2AContext> {
@@ -214,8 +225,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::a2a::{
-        A2AHistoryDirection, A2AMessageListOptions, A2AMessageRole, A2ASentTaskListOptions,
-        A2ATaskListOptions,
+        A2AContextListOptions, A2AHistoryDirection, A2AMessageListOptions, A2AMessageRole,
+        A2ASentTaskListOptions, A2ATaskListOptions,
     };
     use crate::client::Inkbox;
 
@@ -315,6 +326,38 @@ mod tests {
                     ),
                     q: Some("quarterly 2026".to_string()),
                     since: Some("2026-07-01T00:00:00Z".to_string()),
+                    cursor: Some("opaque".to_string()),
+                    limit: Some(20),
+                },
+            )
+            .unwrap();
+
+        request.assert();
+    }
+
+    #[test]
+    fn contexts_send_combined_direction_and_page_options() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/identities/coordinator/a2a/contexts")
+                .query_param("direction", "both")
+                .query_param("cursor", "opaque")
+                .query_param("limit", "20");
+            then.status(200)
+                .json_body(json!({"items": [], "next_cursor": null}));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+
+        client
+            .a2a()
+            .contexts(
+                "coordinator",
+                &A2AContextListOptions {
+                    direction: Some(A2AHistoryDirection::Both),
                     cursor: Some("opaque".to_string()),
                     limit: Some(20),
                 },

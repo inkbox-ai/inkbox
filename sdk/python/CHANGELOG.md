@@ -12,6 +12,7 @@
 ### Changed
 
 - The A2A client unwraps the standard task/message result envelope while retaining compatibility with direct task payloads.
+- Standard task lists accept `status_timestamp_after` for incremental polling.
 - Task and context models preserve history-truncation signals. Task detail exposes messages and current state.
 - Webhook subscription create and update reject mixed event families and non-null conversation context on A2A subscriptions before sending the request.
 

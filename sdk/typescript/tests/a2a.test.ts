@@ -3,7 +3,25 @@ import { A2AClient } from "../src/a2a/client.js";
 import { A2AResource } from "../src/a2a/resource.js";
 import type { HttpTransport } from "../src/_http.js";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+function neverRespond(init?: RequestInit): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    const signal = init?.signal;
+    if (!signal) {
+      reject(new Error("request is missing an abort signal"));
+      return;
+    }
+    signal.addEventListener(
+      "abort",
+      () => reject(new Error("aborted")),
+      { once: true },
+    );
+  });
+}
 
 describe("A2AResource", () => {
   it("parses participant task counts from settings", async () => {
@@ -465,6 +483,13 @@ describe("A2AClient", () => {
     const client = new A2AClient("ApiKey_secret", "https://inkbox.ai");
 
     const target = await client.fetchCard("https://inkbox.ai/a2a/helper/card");
+    expect(Object.isFrozen(target)).toBe(true);
+    expect(Object.keys(target)).not.toContain("credential");
+    expect(JSON.stringify(target)).not.toContain("ApiKey_secret");
+    expect(() => {
+      (target as unknown as { rpcUrl: string }).rpcUrl =
+        "https://attacker.example/rpc";
+    }).toThrow();
     const sent = await client.send(target, { text: "Investigate", messageId: "msg-1" });
     const fetched = await client.getTask(target, "task-1");
     const canceled = await client.cancel(target, "task-1");
@@ -518,6 +543,83 @@ describe("A2AClient", () => {
     await client.getTask(target, "task-1");
 
     expect(fetchMock.mock.calls[1][1].headers).not.toHaveProperty("X-API-Key");
+  });
+
+  it("passes statusTimestampAfter to standard ListTasks", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          tasks: [],
+          nextPageToken: "",
+          pageSize: 25,
+          totalSize: 0,
+        },
+      }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new A2AClient("ApiKey_secret", "https://inkbox.ai");
+    const target = {
+      cardUrl: "https://agent.example/card",
+      rpcUrl: "https://agent.example/rpc",
+      protocolVersion: "1.0" as const,
+      card: { name: "agent", supportedInterfaces: [] },
+    };
+
+    await client.listTasks(target, {
+      pageSize: 25,
+      statusTimestampAfter: "2026-07-25T12:30:00Z",
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      method: "ListTasks",
+      params: {
+        pageSize: 25,
+        statusTimestampAfter: "2026-07-25T12:30:00Z",
+      },
+    });
+  });
+
+  it("times out an Agent Card request that never responds", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn((_url, init) => neverRespond(init)));
+    const client = new A2AClient(
+      "ApiKey_secret",
+      "https://inkbox.ai",
+      { requestTimeoutMs: 25 },
+    );
+
+    const pending = expect(
+      client.fetchCard("https://agent.example/card"),
+    ).rejects.toThrow("Agent Card request timed out after 25 ms");
+    await vi.advanceTimersByTimeAsync(25);
+
+    await pending;
+  });
+
+  it("enforces the wait deadline while an RPC request is stalled", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        name: "external",
+        supportedInterfaces: [{
+          url: "https://agent.example/rpc",
+          protocolBinding: "JSONRPC",
+          protocolVersion: "1.0",
+        }],
+      }), { status: 200 }))
+      .mockImplementationOnce((_url, init) => neverRespond(init));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new A2AClient("ApiKey_secret", "https://inkbox.ai");
+    const target = await client.fetchCard("https://agent.example/card");
+
+    const pending = expect(
+      client.wait(target, "task-1", { timeoutMs: 25 }),
+    ).rejects.toThrow("task task-1 did not stop before timeout");
+    await vi.advanceTimersByTimeAsync(25);
+
+    await pending;
   });
 
   it("refuses card redirects", async () => {

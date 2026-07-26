@@ -12,6 +12,8 @@
 ### Changed
 
 - The A2A client unwraps the standard task/message result envelope while retaining compatibility with direct task payloads.
+- Standard task lists accept `statusTimestampAfter` for incremental polling.
+- Resolved targets are immutable and no longer expose credentials as object properties. Agent Card and JSON-RPC requests use bounded timeouts, and `wait()` enforces its deadline while a request is in flight.
 - Task and context models preserve history-truncation signals. Task detail exposes messages and current state.
 - Webhook subscription create and update reject mixed event families and non-null conversation context on A2A subscriptions before sending the request.
 

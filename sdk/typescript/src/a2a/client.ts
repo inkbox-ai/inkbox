@@ -10,6 +10,9 @@ import type {
   A2AWireTaskState,
 } from "./types.js";
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_REQUEST_TIMEOUT_MS = 2_147_483_647;
+
 export class A2AProtocolError extends InkboxError {
   constructor(
     readonly code: number,
@@ -45,34 +48,87 @@ function origin(value: string): string {
   return new URL(canonicalUrl(value)).origin;
 }
 
+function requestTimeout(value: number): number {
+  if (
+    !Number.isFinite(value)
+    || value <= 0
+    || value > MAX_REQUEST_TIMEOUT_MS
+  ) {
+    throw new TypeError(
+      `A2A request timeout must be between 1 and ${MAX_REQUEST_TIMEOUT_MS} ms`,
+    );
+  }
+  return value;
+}
+
+async function withRequestTimeout<T>(
+  timeoutMs: number,
+  operation: string,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await run(controller.signal);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new InkboxError(`${operation} timed out after ${timeoutMs} ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class A2AClient {
   private nextId = 0;
   private readonly platformOrigin: string;
+  private readonly requestTimeoutMs: number;
+  private readonly targetCredentials = new WeakMap<
+    A2AResolvedTarget,
+    string
+  >();
 
   constructor(
     private readonly apiKey: string,
     platformBaseUrl: string,
+    options: { requestTimeoutMs?: number } = {},
   ) {
     this.platformOrigin = origin(platformBaseUrl);
+    this.requestTimeoutMs = requestTimeout(
+      options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+    );
   }
 
   async fetchCard(
     cardUrl: string,
-    options: { credential?: string } = {},
+    options: {
+      credential?: string;
+      requestTimeoutMs?: number;
+    } = {},
   ): Promise<A2AResolvedTarget> {
     const canonicalCardUrl = canonicalUrl(cardUrl);
-    const response = await fetch(canonicalCardUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      redirect: "manual",
-    });
-    if (response.status >= 300 && response.status < 400) {
-      throw new InkboxError("A2A Agent Card redirects are refused");
-    }
-    if (!response.ok) {
-      throw new InkboxError(`A2A Agent Card request failed with HTTP ${response.status}`);
-    }
-    const card = await response.json() as A2ACard;
+    const card = await withRequestTimeout(
+      requestTimeout(options.requestTimeoutMs ?? this.requestTimeoutMs),
+      "A2A Agent Card request",
+      async (signal) => {
+        const response = await fetch(canonicalCardUrl, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          redirect: "manual",
+          signal,
+        });
+        if (response.status >= 300 && response.status < 400) {
+          throw new InkboxError("A2A Agent Card redirects are refused");
+        }
+        if (!response.ok) {
+          throw new InkboxError(
+            `A2A Agent Card request failed with HTTP ${response.status}`,
+          );
+        }
+        return await response.json() as A2ACard;
+      },
+    );
     const selected = card.supportedInterfaces?.find(
       (item) =>
         item.protocolVersion === "1.0"
@@ -97,13 +153,16 @@ export class A2AClient {
       }
       credential = this.apiKey;
     }
-    return {
+    const target: A2AResolvedTarget = Object.freeze({
       cardUrl: canonicalCardUrl,
       rpcUrl,
       protocolVersion: "1.0",
       card,
-      credential,
-    };
+    });
+    if (credential !== undefined) {
+      this.targetCredentials.set(target, credential);
+    }
+    return target;
   }
 
   async send(
@@ -145,14 +204,22 @@ export class A2AClient {
   async getTask(
     target: A2AResolvedTarget,
     taskId: string,
-    options: { historyLength?: number } = {},
+    options: {
+      historyLength?: number;
+      requestTimeoutMs?: number;
+    } = {},
   ): Promise<A2AWireTask> {
-    const result = await this.rpc<Record<string, any>>(target, "GetTask", {
-      id: taskId,
-      ...(options.historyLength === undefined
-        ? {}
-        : { historyLength: options.historyLength }),
-    });
+    const result = await this.rpc<Record<string, any>>(
+      target,
+      "GetTask",
+      {
+        id: taskId,
+        ...(options.historyLength === undefined
+          ? {}
+          : { historyLength: options.historyLength }),
+      },
+      requestTimeout(options.requestTimeoutMs ?? this.requestTimeoutMs),
+    );
     return result.task && typeof result.task === "object"
       ? result.task as A2AWireTask
       : result as A2AWireTask;
@@ -166,6 +233,7 @@ export class A2AClient {
       cursor?: string;
       pageSize?: number;
       historyLength?: number;
+      statusTimestampAfter?: string;
     } = {},
   ): Promise<A2AWireTaskPage> {
     const raw = await this.rpc<Record<string, any>>(target, "ListTasks", {
@@ -176,6 +244,9 @@ export class A2AClient {
       ...(options.historyLength === undefined
         ? {}
         : { historyLength: options.historyLength }),
+      ...(options.statusTimestampAfter === undefined
+        ? {}
+        : { statusTimestampAfter: options.statusTimestampAfter }),
     });
     return {
       tasks: raw.tasks ?? [],
@@ -201,7 +272,9 @@ export class A2AClient {
     taskId: string,
     options: { timeoutMs?: number; intervalMs?: number } = {},
   ): Promise<A2AWireTask> {
-    const deadline = Date.now() + (options.timeoutMs ?? 120_000);
+    const timeoutMs = requestTimeout(options.timeoutMs ?? 120_000);
+    const intervalMs = requestTimeout(options.intervalMs ?? 5_000);
+    const deadline = Date.now() + timeoutMs;
     const stopped = new Set<A2AWireTaskState>([
       "TASK_STATE_COMPLETED",
       "TASK_STATE_FAILED",
@@ -211,14 +284,35 @@ export class A2AClient {
       "TASK_STATE_AUTH_REQUIRED",
     ]);
     while (true) {
-      const task = await this.getTask(target, taskId);
+      const remainingBeforeRequest = deadline - Date.now();
+      if (remainingBeforeRequest <= 0) {
+        throw new InkboxError(
+          `A2A task ${taskId} did not stop before timeout`,
+        );
+      }
+      let task: A2AWireTask;
+      try {
+        task = await this.getTask(target, taskId, {
+          requestTimeoutMs: Math.min(
+            this.requestTimeoutMs,
+            remainingBeforeRequest,
+          ),
+        });
+      } catch (error) {
+        if (Date.now() >= deadline) {
+          throw new InkboxError(
+            `A2A task ${taskId} did not stop before timeout`,
+          );
+        }
+        throw error;
+      }
       if (stopped.has(task.status.state)) return task;
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
         throw new InkboxError(`A2A task ${taskId} did not stop before timeout`);
       }
       await new Promise((resolve) =>
-        setTimeout(resolve, Math.min(options.intervalMs ?? 5_000, remaining)),
+        setTimeout(resolve, Math.min(intervalMs, remaining)),
       );
     }
   }
@@ -227,8 +321,10 @@ export class A2AClient {
     target: A2AResolvedTarget,
     method: string,
     params: Record<string, unknown>,
+    timeoutMs: number = this.requestTimeoutMs,
   ): Promise<T> {
-    if (canonicalUrl(target.rpcUrl) !== target.rpcUrl) {
+    const rpcUrl = target.rpcUrl;
+    if (canonicalUrl(rpcUrl) !== rpcUrl) {
       throw new TypeError("A2A target RPC URL is not canonical");
     }
     const headers: Record<string, string> = {
@@ -236,28 +332,38 @@ export class A2AClient {
       "Content-Type": "application/json",
       "A2A-Version": "1.0",
     };
-    if (target.credential) headers["X-API-Key"] = target.credential;
-    const response = await fetch(target.rpcUrl, {
-      method: "POST",
-      headers,
-      redirect: "manual",
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: ++this.nextId,
-        method,
-        params,
-      }),
-    });
-    if (response.status >= 300 && response.status < 400) {
-      throw new InkboxError("A2A RPC redirects are refused");
-    }
-    if (!response.ok) {
-      throw new InkboxError(`A2A RPC request failed with HTTP ${response.status}`);
-    }
-    const payload = await response.json() as {
-      result?: T;
-      error?: { code?: number; message?: string; data?: unknown };
-    };
+    const credential = this.targetCredentials.get(target);
+    if (credential) headers["X-API-Key"] = credential;
+    const payload = await withRequestTimeout(
+      requestTimeout(timeoutMs),
+      "A2A RPC request",
+      async (signal) => {
+        const response = await fetch(rpcUrl, {
+          method: "POST",
+          headers,
+          redirect: "manual",
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: ++this.nextId,
+            method,
+            params,
+          }),
+          signal,
+        });
+        if (response.status >= 300 && response.status < 400) {
+          throw new InkboxError("A2A RPC redirects are refused");
+        }
+        if (!response.ok) {
+          throw new InkboxError(
+            `A2A RPC request failed with HTTP ${response.status}`,
+          );
+        }
+        return await response.json() as {
+          result?: T;
+          error?: { code?: number; message?: string; data?: unknown };
+        };
+      },
+    );
     if (payload.error) {
       throw new A2AProtocolError(
         payload.error.code ?? -32603,
