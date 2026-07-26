@@ -17,6 +17,7 @@ from typing import cast, get_args, get_type_hints
 import pytest
 
 from inkbox import (
+    A2AWebhookPayload,
     CallEndedWebhookPayload,
     IMessageReactionTypeWire,
     IMessageWebhookReaction,
@@ -515,3 +516,45 @@ def test_call_ended_hosted_outcome_and_post_call_action_items():
     # Canceled rows are omitted from the payload — every shipped row is open.
     assert all(a["status"] == "open" for a in actions)
     assert all(isinstance(a["id"], str) for a in actions)
+
+
+def test_a2a_canceled_payload_omits_message_fields():
+    payload: A2AWebhookPayload = {
+        "id": "evt_a2a_canceled",
+        "event_type": "a2a.task.canceled",
+        "timestamp": "2026-07-25T00:00:00Z",
+        "data": {
+            "task_id": "task-id",
+            "context_id": "context-id",
+            "state": "canceled",
+            "caller": {
+                "identity_id": "caller-id",
+                "organization_id": "org-caller",
+                "handle": "caller",
+            },
+        },
+    }
+    assert "message_id" not in payload["data"]
+    assert "parts" not in payload["data"]
+
+
+def test_a2a_message_payload_includes_message_fields():
+    payload: A2AWebhookPayload = {
+        "id": "evt_a2a_message",
+        "event_type": "a2a.task.message",
+        "timestamp": "2026-07-25T00:00:00Z",
+        "data": {
+            "task_id": "task-id",
+            "context_id": "context-id",
+            "state": "working",
+            "caller": {
+                "identity_id": "caller-id",
+                "organization_id": "org-caller",
+                "handle": "caller",
+            },
+            "message_id": "message-id",
+            "parts": [{"text": "Continue"}],
+        },
+    }
+    assert payload["data"]["message_id"] == "message-id"
+    assert payload["data"]["parts"] == [{"text": "Continue"}]

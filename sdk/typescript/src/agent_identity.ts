@@ -67,6 +67,24 @@ import type {
 } from "./identities/types.js";
 import type { TunnelSummary } from "./tunnels/types.js";
 import type { Inkbox } from "./inkbox.js";
+import { A2AClient } from "./a2a/client.js";
+import type {
+  A2AContactRule,
+  A2AContext,
+  A2AContextPage,
+  A2AHistoryMessage,
+  A2AHistoryMessagePage,
+  A2AMessageListOptions,
+  A2AReplyIntent,
+  A2ARuleAction,
+  A2ARuleDirection,
+  A2ASettings,
+  A2ASkill,
+  A2ATask,
+  A2ATaskListOptions,
+  A2ATaskPage,
+  A2ASentTaskListOptions,
+} from "./a2a/types.js";
 
 export class AgentIdentity {
   private _data: _AgentIdentityData;
@@ -1181,6 +1199,190 @@ export class AgentIdentity {
    */
   async delete(): Promise<void> {
     await this._inkbox._idsResource.delete(this.agentHandle);
+  }
+
+  // ------------------------------------------------------------------
+  // A2A
+  // ------------------------------------------------------------------
+
+  /** Enable this identity's A2A receiver. */
+  a2aEnable(): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { enabled: true });
+  }
+
+  /** Disable this identity's A2A receiver. */
+  a2aDisable(): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { enabled: false });
+  }
+
+  /** Return this identity's A2A channel settings. */
+  a2aSettings(): Promise<A2ASettings> {
+    return this._inkbox._a2a.settings(this.agentHandle);
+  }
+
+  /** Replace the skills advertised on this identity's Agent Card. */
+  a2aSetSkills(skills: A2ASkill[]): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { skills });
+  }
+
+  /** Restore the receiver's default advertised skills. */
+  a2aResetSkills(): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(this.agentHandle, { skills: null });
+  }
+
+  /** Set A2A admission to whitelist or blacklist mode (admin-only). */
+  a2aSetFilterMode(filterMode: FilterMode): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(
+      this.agentHandle,
+      { filter_mode: filterMode },
+    );
+  }
+
+  /** Return this identity's Agent Card preview. */
+  a2aCard(): Promise<Record<string, unknown>> {
+    return this._inkbox._a2a.card(this.agentHandle);
+  }
+
+  /** List the receiver-side A2A task inbox. */
+  a2aTasks(options: A2ATaskListOptions = {}): Promise<A2ATaskPage> {
+    return this._inkbox._a2a.tasks(this.agentHandle, options);
+  }
+
+  /** Drain every page in the receiver-side A2A inbox. */
+  iterA2ATasks(
+    options: Omit<A2ATaskListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2ATask> {
+    return this._inkbox._a2a.iterTasks(this.agentHandle, options);
+  }
+
+  /** Get an A2A task with its message history. */
+  a2aTask(taskId: string): Promise<A2ATask> {
+    return this._inkbox._a2a.task(this.agentHandle, taskId);
+  }
+
+  /** List A2A tasks sent by this identity. */
+  a2aSentTasks(options: A2ASentTaskListOptions = {}): Promise<A2ATaskPage> {
+    return this._inkbox._a2a.sentTasks(this.agentHandle, options);
+  }
+
+  /** Drain every page of A2A tasks sent by this identity. */
+  iterA2ASentTasks(
+    options: Omit<A2ASentTaskListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2ATask> {
+    return this._inkbox._a2a.iterSentTasks(this.agentHandle, options);
+  }
+
+  /** Get a full A2A task sent by this identity. */
+  a2aSentTask(taskId: string): Promise<A2ATask> {
+    return this._inkbox._a2a.sentTask(this.agentHandle, taskId);
+  }
+
+  /** List this identity's inbound and outbound A2A messages. */
+  a2aMessages(
+    options: A2AMessageListOptions = {},
+  ): Promise<A2AHistoryMessagePage> {
+    return this._inkbox._a2a.messages(this.agentHandle, options);
+  }
+
+  /** Drain every page of this identity's A2A message history. */
+  iterA2AMessages(
+    options: Omit<A2AMessageListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2AHistoryMessage> {
+    return this._inkbox._a2a.iterMessages(this.agentHandle, options);
+  }
+
+  /** Reply to an inbound A2A task and choose its next state. */
+  a2aReply(
+    taskId: string,
+    options: {
+      intent: A2AReplyIntent;
+      text?: string;
+      parts?: Record<string, unknown>[];
+    },
+  ): Promise<A2ATask> {
+    return this._inkbox._a2a.reply(this.agentHandle, taskId, options);
+  }
+
+  /** List receiver-side A2A contexts. */
+  a2aContexts(options: {
+    direction?: "inbound" | "outbound" | "both";
+    cursor?: string;
+    limit?: number;
+  } = {}): Promise<A2AContextPage> {
+    return this._inkbox._a2a.contexts(this.agentHandle, options);
+  }
+
+  /** Get a receiver-side A2A context and its tasks. */
+  a2aContext(contextId: string): Promise<A2AContext> {
+    return this._inkbox._a2a.context(this.agentHandle, contextId);
+  }
+
+  /** List A2A contexts started by this identity. */
+  a2aSentContexts(options: {
+    cursor?: string;
+    limit?: number;
+  } = {}): Promise<A2AContextPage> {
+    return this._inkbox._a2a.sentContexts(this.agentHandle, options);
+  }
+
+  /** Get an A2A context started by this identity. */
+  a2aSentContext(contextId: string): Promise<A2AContext> {
+    return this._inkbox._a2a.sentContext(this.agentHandle, contextId);
+  }
+
+  /** List this identity's directional A2A contact rules. */
+  a2aContactRules(): Promise<A2AContactRule[]> {
+    return this._inkbox._a2a.contactRules(this.agentHandle);
+  }
+
+  /** Add a directional A2A contact rule (admin-only). */
+  a2aAddContactRule(options: {
+    handle: string;
+    action: A2ARuleAction;
+    direction?: A2ARuleDirection;
+  }): Promise<A2AContactRule> {
+    return this._inkbox._a2a.addContactRule(this.agentHandle, options);
+  }
+
+  /** Update a directional A2A contact rule (admin-only). */
+  a2aUpdateContactRule(
+    ruleId: string,
+    options: {
+      action?: A2ARuleAction;
+      direction?: A2ARuleDirection;
+    },
+  ): Promise<A2AContactRule> {
+    return this._inkbox._a2a.updateContactRule(
+      this.agentHandle,
+      ruleId,
+      options,
+    );
+  }
+
+  /** Delete a directional A2A contact rule (admin-only). */
+  a2aDeleteContactRule(ruleId: string): Promise<void> {
+    return this._inkbox._a2a.deleteContactRule(this.agentHandle, ruleId);
+  }
+
+  /**
+   * Create an A2A client bound to this claimed identity's agent-scoped key.
+   */
+  async a2aClient(): Promise<A2AClient> {
+    const principal = await this._inkbox.whoami();
+    if (
+      principal.authType !== "api_key"
+      || principal.authSubtype !== "api_key.agent_scoped.claimed"
+      || principal.scope !== `agent_identity:${this.id}`
+    ) {
+      throw new InkboxError(
+        "A2A calls require this claimed identity's agent-scoped API key",
+      );
+    }
+    return new A2AClient(
+      this._inkbox._apiKey,
+      this._inkbox._baseUrl,
+      { requestTimeoutMs: this._inkbox._timeoutMs },
+    );
   }
 
   // ------------------------------------------------------------------

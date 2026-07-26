@@ -350,6 +350,52 @@ Group conversation rows expose `groupCreationStatus` as `creating`,
 conversation; send again with its conversation id to retry. Successful retry
 changes the status to `ready`.
 
+### a2a
+
+```bash
+# Receiver setup and advertised capabilities
+inkbox a2a enable -i researcher
+inkbox a2a card -i researcher
+inkbox a2a skills set -i researcher --file skills.json
+
+# Bilateral admission for coordinator -> researcher calls
+inkbox a2a rules add -i coordinator --handle researcher \
+  --action allow --direction outbound
+inkbox a2a rules add -i researcher --handle coordinator \
+  --action allow --direction inbound
+
+# Unified task history. Omit --direction for the receiver inbox.
+inkbox a2a tasks -i coordinator --direction both \
+  --requester coordinator --worker researcher \
+  --state working --query "quarterly report" --limit 25
+
+# Search individual messages with task and participant provenance.
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --role agent --query revenue --limit 25 --json
+
+# Continue a cursor page with the same filters.
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --role agent --query revenue \
+  --cursor '<nextCursor>' --limit 25 --json
+
+# The outbound alias lists only work requested by the identity.
+inkbox a2a sent -i coordinator --worker researcher
+inkbox a2a sent-task <task-id> -i coordinator
+
+# A worker can request more input or finish a task.
+inkbox a2a reply <task-id> -i researcher --ask --text "Which quarter?"
+inkbox a2a reply <task-id> -i researcher --complete --text "Done."
+```
+
+JSON list output contains both `items` and `nextCursor`. Human-readable output
+prints a next-cursor hint when another page exists. Keyword search covers
+string and numeric content values from `text` and `data` parts, excludes
+metadata, and returns newest-first results rather than relevance ranking.
+`--role` selects the message author (`caller` or `agent`), independent of task
+direction. Task detail exposes messages and current state. A protocol call must
+pass both the requester identity's outbound policy and the worker identity's
+inbound policy. Contact-rule directions are `inbound`, `outbound`, and `both`.
+
 ### vault
 
 Encrypted vault operations. `get`, `create`, and credential listing require a vault key.

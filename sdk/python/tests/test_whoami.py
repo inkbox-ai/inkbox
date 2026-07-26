@@ -16,6 +16,7 @@ from inkbox.whoami.types import (
 RAW_API_KEY = {
     "auth_type": "api_key",
     "auth_subtype": "human",
+    "scope": "organization:org_001",
     "organization_id": "org_001",
     "created_by": "user_abc",
     "creator_type": "human",
@@ -45,6 +46,7 @@ class TestParseWhoami:
         assert isinstance(result, WhoamiApiKeyResponse)
         assert result.auth_type == "api_key"
         assert result.organization_id == "org_001"
+        assert result.scope == "organization:org_001"
         assert result.key_id == "key_xyz"
         assert result.label == "My Key"
         assert result.expires_at is None

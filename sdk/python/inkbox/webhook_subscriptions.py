@@ -5,13 +5,11 @@ Webhook subscriptions -- fan-out per ``(owner, url, event_types)``.
 
 Replaces the legacy per-resource ``webhook_url`` columns on mailboxes
 and phone numbers. Use this resource to attach HTTPS receivers to mail
-(``message.*``), phone-text (``text.*``), iMessage (``imessage.*``), or
-post-call lifecycle (``call.ended``) events. Mail and text subscriptions
-are owned by the mailbox / phone number; iMessage and call-lifecycle
-subscriptions are owned by the agent identity, since shared iMessage pool
-numbers are not org resources and a call is only ever owned by its
-identity. An identity may hold an iMessage sub and a call-lifecycle sub,
-but a single subscription carries only one channel. Incoming-call
+(``message.*``), phone-text (``text.*``), iMessage (``imessage.*``),
+post-call lifecycle (``call.ended``), or A2A (``a2a.*``) events. Mail and
+text subscriptions are owned by the mailbox / phone number; the other
+channels are owned by the agent identity. Each subscription contains events
+from one channel. Incoming-call
 webhooks (``phone.incoming_call``) are still set on the phone-number
 resource itself -- that channel is a synchronous control-plane
 callback whose response body drives call routing, so fan-out is not
@@ -79,9 +77,9 @@ class WebhookSubscription:
     ``agent_identity_id`` (the raw owner FK) is populated.
     ``owner_identity_id`` is the **resolved** owning agent identity for
     every subscription regardless of channel — mail/phone subs resolve
-    it server-side through the mailbox / phone number, while iMessage
-    subs carry it directly. (Optional for forward-compatibility: ``None``
-    on servers that predate the field.)
+    it server-side through the mailbox / phone number, while
+    identity-owned subscriptions carry it directly. (Optional for
+    forward-compatibility: ``None`` on servers that predate the field.)
     ``organization_id`` is an ``"org_..."`` token string, not a UUID.
     ``status`` is always ``"active"`` for subscriptions callers can
     observe; deleted subscriptions are not returned by ``list`` /
@@ -177,21 +175,41 @@ def _assert_no_incoming_call(event_types: list[str]) -> None:
 
 
 # Wire event-type prefix -> the owning resource whose channel it belongs to.
-# An agent identity owns two channels (iMessage + post-call lifecycle), so two
-# prefixes map to it; a single subscription may still only carry one channel.
+# An agent identity owns iMessage, post-call, and A2A channels.
 _EVENT_PREFIX_TO_OWNER = {
     "message.": "mailbox",
     "text.": "phone_number",
     "imessage.": "agent_identity",
     "call.": "agent_identity",
+    "a2a.": "agent_identity",
 }
 
 # Owner resource -> the event-type prefixes it may subscribe to.
 _OWNER_EVENT_PREFIXES = {
     "mailbox": ("message.",),
     "phone_number": ("text.",),
-    "agent_identity": ("imessage.", "call."),
+    "agent_identity": ("imessage.", "call.", "a2a."),
 }
+
+
+def _selected_event_prefixes(event_types: list[str]) -> set[str]:
+    selected_prefixes: set[str] = set()
+    for event_type in event_types:
+        prefix = next(
+            (p for p in _EVENT_PREFIX_TO_OWNER if event_type.startswith(p)),
+            None,
+        )
+        if prefix is None:
+            raise ValueError(
+                f"event_type {event_type!r} does not belong to any known channel",
+            )
+        selected_prefixes.add(prefix)
+    if len(selected_prefixes) > 1:
+        raise ValueError(
+            "event_types must all belong to one channel; got "
+            f"{sorted(selected_prefixes)!r}",
+        )
+    return selected_prefixes
 
 
 def _assert_channel_coherence(
@@ -200,27 +218,31 @@ def _assert_channel_coherence(
     event_types: list[str],
 ) -> None:
     allowed = _OWNER_EVENT_PREFIXES[owner]
-    # The first event's prefix fixes the channel; every event must share it so
-    # one subscription never straddles two channels (e.g. imessage.* + call.ended).
-    channel_prefix: str | None = None
+    selected_prefixes = _selected_event_prefixes(event_types)
     for e in event_types:
         prefix = next((p for p in _EVENT_PREFIX_TO_OWNER if e.startswith(p)), None)
-        if prefix is None:
-            raise ValueError(
-                f"event_type {e!r} does not belong to any known channel",
-            )
+        assert prefix is not None
         if prefix not in allowed:
             raise ValueError(
                 f"event_type {e!r} does not belong to the {owner!r} channel "
                 f"(it belongs to {_EVENT_PREFIX_TO_OWNER[prefix]!r})",
             )
-        if channel_prefix is None:
-            channel_prefix = prefix
-        elif prefix != channel_prefix:
-            raise ValueError(
-                f"event_type {e!r} does not belong to the same channel as the "
-                f"other event types in this subscription",
-            )
+    if not selected_prefixes:
+        raise ValueError(
+            "event_types must be a non-empty list",
+        )
+
+
+def _assert_a2a_context_absent(
+    event_types: list[str],
+    context_config: Any,
+) -> None:
+    if context_config is not None and any(
+        event_type.startswith("a2a.") for event_type in event_types
+    ):
+        raise ValueError(
+            "context_config is not supported for A2A subscriptions",
+        )
 
 
 def _assert_valid_context_config(cfg: Any) -> None:
@@ -336,9 +358,10 @@ class WebhookSubscriptionsResource:
         subscription carries a single channel, so an identity sub may not
         mix ``imessage.*`` with ``call.ended``.
 
-        ``context_config`` opts the subscription into per-class conversation
-        context (email/texts/calls) delivered on received events; omit it
-        for none. See :class:`WebhookContextConfig`.
+        ``context_config`` opts mail, text, or iMessage subscriptions into
+        per-class conversation context (email/texts/calls) delivered on
+        received events. It is not supported for A2A subscriptions. See
+        :class:`WebhookContextConfig`.
 
         Returns a :class:`WebhookSubscriptionCreateResponse`. Its
         ``signing_key`` is populated **once** when this is the first
@@ -374,6 +397,7 @@ class WebhookSubscriptionsResource:
         }
         if context_config is not None:
             _assert_valid_context_config(context_config)
+            _assert_a2a_context_absent(event_types, context_config)
             body["context_config"] = context_config
         data = self._http.post(_BASE, json=body)
         return WebhookSubscriptionCreateResponse._from_dict(data)
@@ -393,8 +417,9 @@ class WebhookSubscriptionsResource:
 
         ``context_config`` is tri-state and the one field where ``None``
         is meaningful on the wire: omitted = unchanged, ``None`` = clear
-        (send JSON ``null``), a dict = validate and replace. Omitting
-        every kwarg is a no-op.
+        (send JSON ``null``), a dict = validate and replace. A2A
+        subscriptions do not support a context object. Omitting every kwarg
+        is a no-op.
         """
         body: dict[str, Any] = {}
         if url is not _UNSET:
@@ -404,12 +429,15 @@ class WebhookSubscriptionsResource:
             _assert_event_types_not_none(event_types)
             _assert_event_types_non_empty_distinct(event_types)
             _assert_no_incoming_call(event_types)
+            _selected_event_prefixes(event_types)
             body["event_types"] = list(event_types)
         if context_config is not _UNSET:
             if context_config is None:
                 body["context_config"] = None
             else:
                 _assert_valid_context_config(context_config)
+                if event_types is not _UNSET:
+                    _assert_a2a_context_absent(event_types, context_config)
                 body["context_config"] = context_config
         data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}", json=body)
         return WebhookSubscription._from_dict(data)

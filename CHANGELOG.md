@@ -4,6 +4,34 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.6 — A2A 1.0
+
+### Added
+
+- **A2A receiver inboxes in Python and TypeScript.** `AgentIdentity` can enable the channel, configure Agent Card skills, manage directional contact rules, list contexts and tasks, and reply with an explicit `ask_caller`, `complete`, or `fail` lifecycle decision.
+- **Two-sided A2A history in Python, TypeScript, and Rust.** Identity-scoped task history supports inbound, outbound, or combined views with requester, worker, state, context, time, and keyword filters. Message history adds task and participant provenance with opaque cursor pagination.
+- **A standard A2A 1.0 client.** Identity-bound clients fetch Agent Cards without credentials, refuse redirects, validate canonical HTTPS origins, send with `returnImmediately`, poll/list/cancel tasks, and preserve exact wire task/message types.
+- **Credential pinning.** The Inkbox API key is attached only when both the Inkbox-hosted card and selected RPC interface match the configured Inkbox origin. External agents receive no Inkbox credential unless the caller explicitly supplies their credential.
+- **CLI A2A workflow.** `inkbox a2a` covers receiver enablement, cards, skills, rules, filterable task/message history, replies, remote calls, checks/waits, and cancellation.
+- **A2A webhook types.** All four task lifecycle events are available in Python, TypeScript, and Rust webhook envelopes and subscription validation.
+
+### Changed
+
+- Python, TypeScript, CLI, and Rust package metadata move to 0.5.6; the CLI depends on `@inkbox/sdk` `^0.5.6`. Rust exposes the A2A task, context, and message-history surface; receiver configuration and the standard protocol client remain Python/TypeScript-only.
+- Task detail exposes current state and message history.
+- Python and TypeScript A2A clients unwrap the standard task/message result envelope while retaining compatibility with direct task payloads.
+- Python and TypeScript standard task lists accept `statusTimestampAfter` for incremental polling.
+- Python and TypeScript identity-bound A2A clients inherit their parent SDK request timeout; Python `wait()` caps in-flight polling requests to its remaining deadline.
+- TypeScript keeps resolved credentials out of returned target objects, freezes resolved endpoints after validation, and applies bounded timeouts to Agent Card and JSON-RPC requests.
+- A2A contact rules support `inbound`, `outbound`, and `both`; protocol calls require both the requester outbound policy and worker inbound policy to allow the peer.
+- **Rust note (source-breaking).** Combined context history now takes `A2AContextListOptions`, including an explicit `direction`; update positional `a2a_contexts(cursor, limit)` calls to pass the options struct.
+- Identity-owned iMessage, call-lifecycle, and A2A webhook events use separate subscription rows. Disjoint rows may share the same destination URL.
+- Python, TypeScript, Rust, and the CLI reject mixed-family webhook updates and non-null conversation context on A2A subscriptions before sending the request.
+
+### Compatibility and rollout
+
+- Existing SDK methods are unchanged. A2A methods require the matching server rollout. Remote calling requires a claimed, agent-scoped key bound to the same identity.
+
 ## 0.5.5 — Action-only contact-rule updates
 
 ### Changed

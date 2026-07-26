@@ -19,6 +19,7 @@ export const AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_UNCLAIMED = "api_key.agent_scoped
 export interface WhoamiApiKeyResponse {
   authType: "api_key";
   authSubtype: string | null;
+  scope?: string | null;
   organizationId: string | null;
   createdBy: string | null;
   creatorType: string | null;
@@ -48,6 +49,7 @@ export type WhoamiResponse = WhoamiApiKeyResponse | WhoamiJwtResponse;
 export interface RawWhoamiApiKeyResponse {
   auth_type: "api_key";
   auth_subtype: string | null;
+  scope?: string | null;
   organization_id: string | null;
   created_by: string | null;
   creator_type: string | null;
@@ -79,6 +81,7 @@ export function parseWhoamiResponse(r: RawWhoamiResponse): WhoamiResponse {
     return {
       authType: r.auth_type,
       authSubtype: r.auth_subtype,
+      scope: r.scope ?? null,
       organizationId: r.organization_id,
       createdBy: r.created_by,
       creatorType: r.creator_type,

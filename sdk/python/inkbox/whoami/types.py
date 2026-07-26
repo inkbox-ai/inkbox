@@ -32,12 +32,14 @@ class WhoamiApiKeyResponse:
     created_at: float | None
     last_used_at: float | None
     expires_at: float | None
+    scope: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WhoamiApiKeyResponse:
         return cls(
             auth_type=d["auth_type"],
             auth_subtype=d.get("auth_subtype"),
+            scope=d.get("scope"),
             organization_id=d.get("organization_id"),
             created_by=d.get("created_by"),
             creator_type=d.get("creator_type"),

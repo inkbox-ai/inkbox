@@ -582,6 +582,62 @@ the five `imessage.*` event types.
 
 ---
 
+## Agent-to-Agent (A2A)
+
+```python
+identity = inkbox.get_identity("coordinator")
+
+# Omit direction for the receiver inbox. Use "outbound" for requested work
+# or "both" for the complete identity-scoped history.
+page = identity.a2a_tasks(
+    direction="both",
+    requester_handle="coordinator",
+    worker_handle="researcher",
+    state="working",
+    q="quarterly report",
+    since="2026-07-01T00:00:00Z",
+    limit=25,
+)
+if page.next_cursor:
+    next_page = identity.a2a_tasks(
+        direction="both",
+        requester_handle="coordinator",
+        worker_handle="researcher",
+        state="working",
+        q="quarterly report",
+        since="2026-07-01T00:00:00Z",
+        cursor=page.next_cursor,
+        limit=25,
+    )
+
+# Iterators preserve every filter while following opaque cursors.
+for message in identity.iter_a2a_messages(
+    direction="outbound",
+    worker_handle="researcher",
+    role="agent",
+    q="revenue",
+):
+    print(message.task_id, message.task_state, message.parts)
+
+# The outbound alias is convenient when only requested work is needed.
+sent = identity.a2a_sent_tasks(worker_handle="researcher")
+```
+
+Task keyword filtering returns tasks containing a matching message. Message
+filtering returns the individual matching messages with task, context,
+requester, and worker provenance. Search covers string and numeric content
+values from `text` and `data` parts, excludes metadata, and is newest-first
+rather than relevance-ranked. `role` is the message author (`caller` or
+`agent`), independent of task direction. Task detail exposes message history
+and current state.
+
+Receiver enablement and advertised skills accept the identity's agent-scoped
+key. Filter-mode and contact-rule create/update/delete operations require an
+admin API key. Use `a2a_reset_skills()` to restore default skills; rule
+directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
+requester's outbound policy and the worker's inbound policy; `both` applies in
+either role.
+
 ## Credentials
 
 Access credentials stored in the vault through the agent-facing `credentials` surface. The vault must be unlocked first.
@@ -1079,9 +1135,9 @@ prefix check, so most shape mistakes surface as `ValueError` before
 the request leaves the client. The server remains authoritative for the exact event-name
 enum, so a typo with a valid prefix (e.g. `message.received_typo`)
 passes the SDK's check and is rejected as 422 by the server. On
-`update` the SDK mirrors the non-empty / distinct /
-no-`phone.incoming_call` checks; channel coherence is deferred to the
-server because the SDK doesn't know the owner FK from a sub_id alone.
+`update` the SDK also rejects mixed event families. Owner compatibility
+remains server-validated because the SDK doesn't know the owner FK from a
+subscription ID alone.
 
 ### Conversation context
 
@@ -1089,7 +1145,8 @@ Opt a subscription into per-class conversation history on **received**
 events (`message.received`, `text.received`, `imessage.received`) by
 passing `context_config`. Each class (`email`, `texts`, `calls`) takes a
 `count` mode (last N items, 1..50) or a `window` mode (last H hours,
-1..168); omit a class to leave it unconfigured.
+1..168); omit a class to leave it unconfigured. Conversation context is
+not supported for A2A subscriptions.
 
 ```python
 inkbox.webhooks.subscriptions.create(

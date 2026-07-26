@@ -11,6 +11,7 @@ import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { describe, expect, it } from "vitest";
 import type {
+  A2AWebhookPayload,
   CallEndedWebhookPayload,
   MailWebhookPayload,
   IMessageWebhookPayload,
@@ -628,5 +629,49 @@ describe("CallEndedWebhookPayload", () => {
     expect(actions[1].details).toBeNull();
     // Canceled rows are omitted from the payload — every shipped row is open.
     expect(actions.every((a) => a.status === "open")).toBe(true);
+  });
+});
+
+describe("A2AWebhookPayload", () => {
+  it("allows cancellation payloads to omit message fields", () => {
+    const payload: A2AWebhookPayload = {
+      id: "evt_a2a_canceled",
+      event_type: "a2a.task.canceled",
+      timestamp: "2026-07-25T00:00:00Z",
+      data: {
+        task_id: "task-id",
+        context_id: "context-id",
+        state: "canceled",
+        caller: {
+          identity_id: "caller-id",
+          organization_id: "org-caller",
+          handle: "caller",
+        },
+      },
+    };
+    expect(payload.data.message_id).toBeUndefined();
+    expect(payload.data.parts).toBeUndefined();
+  });
+
+  it("accepts message-bearing payloads", () => {
+    const payload: A2AWebhookPayload = {
+      id: "evt_a2a_message",
+      event_type: "a2a.task.message",
+      timestamp: "2026-07-25T00:00:00Z",
+      data: {
+        task_id: "task-id",
+        context_id: "context-id",
+        state: "working",
+        caller: {
+          identity_id: "caller-id",
+          organization_id: "org-caller",
+          handle: "caller",
+        },
+        message_id: "message-id",
+        parts: [{ text: "Continue" }],
+      },
+    };
+    expect(payload.data.message_id).toBe("message-id");
+    expect(payload.data.parts).toEqual([{ text: "Continue" }]);
   });
 });

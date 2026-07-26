@@ -1,6 +1,6 @@
 ---
 name: inkbox-cli
-description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text/SMS, iMessage, contacts, notes, contact rules, vault, mailbox, mailbox storage, mail clients (IMAP/SMTP), phone number, webhook, or signup workflows.
+description: Use when running or writing shell commands with the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, vault, mailbox, mailbox storage, mail clients (IMAP/SMTP), phone number, webhook, or signup workflows.
 user-invocable: false
 ---
 
@@ -364,6 +364,50 @@ inkbox sms-opt-in opt-in  +15551234567
 inkbox sms-opt-in opt-out +15551234567
 ```
 
+## Agent-to-Agent (A2A)
+
+```bash
+# Bilateral admission: the requester allows outbound work to the worker, and
+# the worker independently allows inbound work from the requester.
+inkbox a2a rules add -i coordinator --handle researcher \
+  --action allow --direction outbound
+inkbox a2a rules add -i researcher --handle coordinator \
+  --action allow --direction inbound
+
+# Unified task history. Omit --direction for the receiver inbox.
+inkbox a2a tasks -i coordinator --direction both \
+  --requester coordinator --worker researcher \
+  --state working --query "quarterly report" --limit 25
+
+# Individual matching messages with task/context and participant provenance.
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --role agent --query revenue --limit 25 --json
+
+# Continue with the same filters and the opaque cursor from the previous page.
+inkbox a2a messages -i coordinator --direction outbound \
+  --worker researcher --role agent --query revenue \
+  --cursor '<nextCursor>' --limit 25 --json
+
+# Outbound-only alias and task detail.
+inkbox a2a sent -i coordinator --worker researcher
+inkbox a2a sent-task <task-id> -i coordinator
+
+# Multi-turn worker flow.
+inkbox a2a reply <task-id> -i researcher --ask --text "Which quarter?"
+inkbox a2a reply <task-id> -i researcher --complete --text "Done."
+```
+
+Task filters are optional and ANDed: direction, requester, worker, state,
+context, query, since, cursor, and limit. Message history additionally supports
+task and role; role is the message author (`caller` or `agent`), independent of
+task direction. Message direction defaults to both. JSON list output contains
+`items` and `nextCursor`; human output prints a next-cursor hint. Search covers
+string and numeric content values from `text` and `data` parts, excludes
+metadata, and is newest-first rather than relevance-ranked. Task detail exposes
+messages and current state. Contact-rule directions are `inbound`, `outbound`,
+and `both`; every request must pass both the requester outbound policy and the
+worker inbound policy.
+
 ## Vault
 
 Vault decryption and secret creation require a vault key via `INKBOX_VAULT_KEY` or `--vault-key`.
@@ -588,7 +632,7 @@ inkbox webhook subscription delete <sub-id>
 
 Every subscription row carries `ownerIdentityId` (the resolved owning agent identity). The **first** subscription created for an identity that has no signing key yet returns that identity's `signingKey` **once** in the create output (otherwise null) — capture it then, it cannot be retrieved again (use `--json` to read it reliably).
 
-The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a subscription into per-class conversation history delivered under `data.context` on received events. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
+The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. A2A subscriptions do not support these flags. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 
