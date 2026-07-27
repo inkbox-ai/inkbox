@@ -8,6 +8,7 @@ import {
   MailRuleMatchType,
   MailImportFormat,
   MailImportJobStatus,
+  MailImportUploadError,
 } from "@inkbox/sdk";
 import type { Inkbox, Mailbox, MailImportCreateResult, MailImportJob } from "@inkbox/sdk";
 import { createClient, getGlobalOpts, resolveBaseUrl } from "../client.js";
@@ -137,9 +138,9 @@ export function createImportProgressReporter(
 }
 
 /**
- * Upload the archive, re-issuing the upload target once if the first attempt
- * fails. Targets expire in minutes while uploads can run far longer, so an
- * expired policy is the expected failure on a large archive. A job left in
+ * Upload the archive, re-issuing once after a transport failure or rejected
+ * target. Targets expire in minutes while uploads can run far longer, so an
+ * expired policy is expected on a large archive. A job left in
  * `pending_upload` blocks the mailbox for a day, so give it up on the way out.
  */
 async function uploadWithRetry(
@@ -154,7 +155,13 @@ async function uploadWithRetry(
   try {
     try {
       await imports.upload(created.upload, blob, { fileName, timeoutMs: remainingTimeoutMs() });
-    } catch {
+    } catch (error) {
+      if (
+        !(error instanceof MailImportUploadError)
+        || (error.statusCode !== null && error.statusCode !== 403)
+      ) {
+        throw error;
+      }
       console.error("Upload failed; re-issuing the upload target and retrying once...");
       const refreshed = await imports.refreshUploadTarget(emailAddress, created.job.id);
       await imports.upload(refreshed, blob, { fileName, timeoutMs: remainingTimeoutMs() });

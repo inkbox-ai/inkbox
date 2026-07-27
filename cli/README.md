@@ -481,8 +481,9 @@ per organization and share overall import capacity, so a long `queued` stretch
 is normal rather than a stall.
 
 Upload targets expire after 5 minutes, so `run` re-issues one and retries once
-if the upload fails, then cancels the job it created rather than leaving the
-mailbox blocked. If a `run` is interrupted, `inkbox mailbox imports list <email>`
+after a transport failure or rejected upload target, then cancels the job it
+created rather than leaving the mailbox blocked. If a `run` is interrupted,
+`inkbox mailbox imports list <email>`
 and `inkbox mailbox imports cancel <email> <job-id>` release the mailbox; an
 abandoned job otherwise holds it for 24 hours. Other limits: 1 GiB per upload,
 50 MiB per message, 100,000 messages and 20 `--original-address` values per job,

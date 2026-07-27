@@ -9,7 +9,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - Python, TypeScript, and Rust SDK resources for creating, uploading, starting, listing, inspecting, cancelling, and waiting for mailbox imports from an MBOX or EML file, or a ZIP holding either. Direct uploads stream without API credentials, and polling returns completed, failed, or cancelled jobs.
-- `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits. `run` re-issues an expired upload target and retries once, then cancels the job it created rather than leaving the mailbox blocked.
+- `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits. `run` re-issues the upload target and retries once after a transport failure or rejected target, then cancels the job it created rather than leaving the mailbox blocked.
 - `MailImportQuotaExceededError` (Rust `InkboxError::MailImportQuotaExceeded`) on the 429 import-job quota rejection, carrying the server's `Retry-After` value.
 - Import provenance on message models through nullable `import_job_id` (TypeScript `importJobId`), plus unsafe-content rejection counters on import jobs.
 

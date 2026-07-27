@@ -468,13 +468,15 @@ ZIP imports as-is); other entries, including nested archives, are ignored.
 Progress is stderr-only; `--json` stdout contains one job object. Failed or
 cancelled `run`/`wait` jobs exit nonzero. A local timeout or Ctrl-C does not
 cancel the job. Counters are cumulative and never go backwards, so a stalled
-counter is a signal, not normal churn; they are not a percentage. Jobs run one
+counter is a signal, not normal churn; counters may still remain unchanged while
+a slow message is processed, and they are not a percentage. Jobs run one
 at a time per organization and share overall import capacity, so a long `queued`
 stretch is normal; do not cancel and recreate. Unsafe imported content may be
 rejected.
 
-`run` re-issues the 5-minute upload target and retries once if the upload
-fails, then cancels the job it created. After an interrupted `run`, use
+`run` re-issues the 5-minute upload target and retries once after a transport
+failure or rejected upload target, then cancels the job it created. After an
+interrupted `run`, use
 `imports list` + `imports cancel` to release the mailbox; otherwise the
 abandoned job blocks new imports for 24 hours. Limits: 1 GiB per upload, 50 MiB
 per message, 100,000 messages and 20 `--original-address` values per job, 65,000

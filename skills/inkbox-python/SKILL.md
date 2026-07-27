@@ -142,7 +142,8 @@ files (a Gmail Takeout ZIP imports as-is); other entries, including nested
 archives, are ignored. `wait` returns all terminal states; failure/cancellation
 are job results, not transport errors. A timeout does not cancel. Counters are
 cumulative and never go backwards, so a stalled counter is a signal, not normal
-churn; they must not be treated as a percentage. Jobs run one at a time per
+churn; counters may still remain unchanged while a slow message is processed,
+and they must not be treated as a percentage. Jobs run one at a time per
 organization and share overall import capacity, so a long `queued` stretch is
 normal; do not cancel and recreate. Unsafe imported content may be rejected.
 

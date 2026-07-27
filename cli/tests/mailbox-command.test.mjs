@@ -338,7 +338,7 @@ const IMPORT_JOB = {
 };
 
 /** Import server whose upload endpoint rejects the first `failUploads` attempts. */
-function importRunServer(email, failUploads) {
+function importRunServer(email, failUploads, failureStatus = 403) {
   const seen = { uploads: 0, reissues: 0, cancels: 0 };
   const server = createServer((req, res) => {
     const base = `/api/v1/mail/mailboxes/${email}/imports`;
@@ -350,7 +350,8 @@ function importRunServer(email, failUploads) {
     if (req.url === "/upload") {
       seen.uploads += 1;
       req.resume();
-      if (seen.uploads <= failUploads) res.writeHead(403).end("expired");
+      if (seen.uploads <= failUploads && failureStatus === null) req.socket.destroy();
+      else if (seen.uploads <= failUploads) res.writeHead(failureStatus).end("upload rejected");
       else res.writeHead(204).end();
       return;
     }
@@ -414,6 +415,20 @@ test("mailbox imports run re-issues the upload target and retries once", async (
   assert.equal(seen.cancels, 0);
 });
 
+test("mailbox imports run retries once after an upload transport failure", async () => {
+  const email = "archive@example.com";
+  const { server, seen } = importRunServer(email, 1, null);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const result = await runImport(server.address().port, email, importFixtureFile());
+  server.close();
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(seen.uploads, 2);
+  assert.equal(seen.reissues, 1);
+  assert.equal(seen.cancels, 0);
+});
+
 test("mailbox imports run cancels its job when the upload cannot be completed", async () => {
   const email = "archive@example.com";
   const { server, seen } = importRunServer(email, 2);
@@ -426,4 +441,19 @@ test("mailbox imports run cancels its job when the upload cannot be completed", 
   assert.equal(seen.uploads, 2);
   assert.equal(seen.cancels, 1);
   assert.match(result.stderr, /import upload failed|HTTP 403/i);
+});
+
+test("mailbox imports run does not retry a deterministic upload rejection", async () => {
+  const email = "archive@example.com";
+  const { server, seen } = importRunServer(email, 1, 400);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const result = await runImport(server.address().port, email, importFixtureFile());
+  server.close();
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(seen.uploads, 1);
+  assert.equal(seen.reissues, 0);
+  assert.equal(seen.cancels, 1);
+  assert.match(result.stderr, /HTTP 400/i);
 });
