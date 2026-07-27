@@ -42,7 +42,7 @@ def test_lifecycle_paths_and_parsing():
         "upload": {
             "url": "https://uploads.example.test",
             "fields": {"key": "value"},
-            "expires_in_seconds": 3600,
+            "expires_in_seconds": 300,
         },
     }
 
@@ -111,7 +111,7 @@ def test_upload_streams_file_without_api_transport(tmp_path: Path):
     target = MailImportUploadTarget(
         url="https://uploads.example.test",
         fields={"policy": "p", "key": "k"},
-        expires_in_seconds=3600,
+        expires_in_seconds=300,
     )
 
     def fake_post(url, **kwargs):
@@ -129,7 +129,7 @@ def test_upload_streams_file_without_api_transport(tmp_path: Path):
 def test_upload_error_is_distinct(tmp_path: Path):
     path = tmp_path / "mail.eml"
     path.write_bytes(b"Subject: Test\n\nBody")
-    target = MailImportUploadTarget("https://uploads.example.test", {}, 3600)
+    target = MailImportUploadTarget("https://uploads.example.test", {}, 300)
     with (
         patch(
             "inkbox.mail.resources.imports.httpx.post",
@@ -139,3 +139,24 @@ def test_upload_error_is_distinct(tmp_path: Path):
     ):
         MailboxImportsResource(MagicMock()).upload(target, path)
     assert exc.value.status_code == 403
+
+
+def test_quota_rejection_carries_retry_after():
+    from inkbox import MailImportQuotaExceededError
+    from inkbox._http import _raise_for_status
+
+    response = httpx.Response(
+        429,
+        json={
+            "detail": {
+                "error": "mail_import_quota_exceeded",
+                "message": "Import job quota reached (20 per 24 hours).",
+            }
+        },
+        headers={"Retry-After": "3600"},
+        request=httpx.Request("POST", "https://api.example.test/imports"),
+    )
+    with pytest.raises(MailImportQuotaExceededError) as exc:
+        _raise_for_status(response)
+    assert exc.value.retry_after_seconds == 3600
+    assert "quota" in exc.value.message

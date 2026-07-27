@@ -28,7 +28,7 @@ impl MailboxesResource {
         }
     }
 
-    /// Import MBOX, EML, or ZIP-of-EML files into a mailbox.
+    /// Import an MBOX or EML file, or a ZIP holding either, into a mailbox.
     pub fn imports(&self) -> &MailboxImportsResource {
         &self.imports
     }

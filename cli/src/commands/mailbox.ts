@@ -9,7 +9,7 @@ import {
   MailImportFormat,
   MailImportJobStatus,
 } from "@inkbox/sdk";
-import type { Mailbox, MailImportJob } from "@inkbox/sdk";
+import type { Inkbox, Mailbox, MailImportCreateResult, MailImportJob } from "@inkbox/sdk";
 import { createClient, getGlobalOpts, resolveBaseUrl } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -136,6 +136,40 @@ export function createImportProgressReporter(
   };
 }
 
+/**
+ * Upload the archive, re-issuing the upload target once if the first attempt
+ * fails. Targets expire in minutes while uploads can run far longer, so an
+ * expired policy is the expected failure on a large archive. A job left in
+ * `pending_upload` blocks the mailbox for a day, so give it up on the way out.
+ */
+async function uploadWithRetry(
+  inkbox: Inkbox,
+  emailAddress: string,
+  created: MailImportCreateResult,
+  blob: Blob,
+  fileName: string,
+  remainingTimeoutMs: () => number | undefined,
+): Promise<void> {
+  const imports = inkbox.mailboxes.imports;
+  try {
+    try {
+      await imports.upload(created.upload, blob, { fileName, timeoutMs: remainingTimeoutMs() });
+    } catch {
+      console.error("Upload failed; re-issuing the upload target and retrying once...");
+      const refreshed = await imports.refreshUploadTarget(emailAddress, created.job.id);
+      await imports.upload(refreshed, blob, { fileName, timeoutMs: remainingTimeoutMs() });
+    }
+  } catch (error) {
+    await imports.cancel(emailAddress, created.job.id).catch(() => {
+      console.error(
+        `Hint: Release the mailbox with 'inkbox mailbox imports cancel ` +
+          `${emailAddress} ${created.job.id}'.`,
+      );
+    });
+    throw error;
+  }
+}
+
 function setTerminalExitCode(job: MailImportJob): void {
   if (job.status === MailImportJobStatus.FAILED || job.status === MailImportJobStatus.CANCELLED) {
     process.exitCode = 1;
@@ -143,7 +177,9 @@ function setTerminalExitCode(job: MailImportJob): void {
 }
 
 function registerMailboxImportCommands(parent: Command): void {
-  const imports = parent.command("imports").description("Import MBOX, EML, or ZIP-of-EML mail");
+  const imports = parent
+    .command("imports")
+    .description("Import mail from an MBOX, EML, or ZIP archive");
 
   imports
     .command("run <email> <file>")
@@ -185,10 +221,7 @@ function registerMailboxImportCommands(parent: Command): void {
         });
         console.error(`Uploading ${basename(file)}...`);
         const blob = await openAsBlob(file);
-        await inkbox.mailboxes.imports.upload(created.upload, blob, {
-          fileName: basename(file),
-          timeoutMs: remainingTimeoutMs(),
-        });
+        await uploadWithRetry(inkbox, email, created, blob, basename(file), remainingTimeoutMs);
         console.error("Upload complete; starting import...");
         const controlClient = createClient(opts, remainingTimeoutMs());
         const queued = await controlClient.mailboxes.imports.start(email, created.job.id);

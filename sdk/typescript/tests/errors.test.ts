@@ -9,6 +9,7 @@ import {
   InkboxError,
   InkboxVaultKeyError,
   IdempotencyKeyReusedError,
+  MailImportQuotaExceededError,
   RecipientBlockedError,
   RedundantContactAccessGrantError,
   StorageLimitExceededError,
@@ -289,6 +290,34 @@ describe("HttpTransport 409 routing", () => {
       statusCode: 503,
       numberType: "dedicated_outbound",
       retryAfterSeconds: 3600,
+    });
+  });
+
+  it("routes the import quota rejection with its Retry-After", async () => {
+    const response = makeErrorResponse(429, {
+      detail: {
+        error: "mail_import_quota_exceeded",
+        message: "Import job quota reached (20 per 24 hours).",
+      },
+    });
+    Object.defineProperty(response, "headers", {
+      value: {
+        get(name: string) {
+          return name.toLowerCase() === "retry-after" ? "1800" : null;
+        },
+        getSetCookie() { return []; },
+      } as unknown as Headers,
+    });
+    vi.mocked(fetch).mockResolvedValue(response);
+    const http = new HttpTransport(API_KEY, BASE);
+
+    const err = await http.post("/mailboxes/agent01@inkbox.ai/imports").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(MailImportQuotaExceededError);
+    expect(err).toMatchObject({
+      statusCode: 429,
+      retryAfterSeconds: 1800,
+      detailMessage: "Import job quota reached (20 per 24 hours).",
     });
   });
 

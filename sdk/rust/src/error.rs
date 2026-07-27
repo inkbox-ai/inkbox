@@ -141,6 +141,21 @@ pub enum InkboxError {
     #[error("transport error: {0}")]
     Transport(#[from] reqwest::Error),
 
+    /// 429 when the organization's daily mailbox-import job quota is spent.
+    #[error("HTTP {status_code}: mail import quota exceeded ({message})")]
+    MailImportQuotaExceeded {
+        status_code: u16,
+        message: Box<str>,
+        /// Parsed delta-seconds value from the HTTP `Retry-After` header.
+        retry_after_header: Option<u64>,
+        detail: Box<Value>,
+    },
+
+    /// A local wait exceeded its wall-clock budget. The remote job is
+    /// untouched; waiting again picks it back up.
+    #[error("timed out: {0}")]
+    Timeout(String),
+
     /// A direct mailbox import upload returned an HTTP error.
     #[error("import upload failed with HTTP {status_code}: {detail}")]
     MailImportUpload { status_code: u16, detail: String },

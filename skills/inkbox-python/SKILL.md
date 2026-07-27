@@ -137,10 +137,21 @@ inkbox.mailboxes.imports.start(email, str(created.job.id))
 job = inkbox.mailboxes.imports.wait(email, str(created.job.id), poll_interval=5)
 ```
 
-Formats: `auto`, `mbox`, `eml`, `zip` (ZIP-of-EML). `wait` returns all terminal
-states; failure/cancellation are job results, not transport errors. A timeout
-does not cancel. Counters may pause or reset and must not be treated as a
-percentage. Unsafe imported content may be rejected.
+Formats: `auto`, `mbox`, `eml`, `zip`. A ZIP may hold `.eml` and/or `.mbox`
+files (a Gmail Takeout ZIP imports as-is); other entries, including nested
+archives, are ignored. `wait` returns all terminal states; failure/cancellation
+are job results, not transport errors. A timeout does not cancel. Counters are
+cumulative and never go backwards, so a stalled counter is a signal, not normal
+churn; they must not be treated as a percentage. Jobs run one at a time per
+organization and share overall import capacity, so a long `queued` stretch is
+normal; do not cancel and recreate. Unsafe imported content may be rejected.
+
+Upload targets expire after 5 minutes: `refresh_upload_target(email, job_id)`
+and upload again, or `cancel` the job so it does not hold the mailbox for 24
+hours. Limits: 1 GiB per upload, 50 MiB per message, 100,000 messages and 20
+`original_addresses` per job, 65,000 entries per ZIP, 20 jobs per organization
+per 24 hours (`MailImportQuotaExceededError.retry_after_seconds`), and one
+in-flight import per mailbox.
 
 ### Send
 

@@ -174,16 +174,14 @@ impl MailboxImportsResource {
         loop {
             let remaining = match timeout {
                 Some(timeout) => Some(timeout.checked_sub(started.elapsed()).ok_or_else(|| {
-                    InkboxError::InvalidArgument(format!(
-                        "timed out waiting for import job {job_id}"
-                    ))
+                    InkboxError::Timeout(format!("waiting for import job {job_id}"))
                 })?),
                 None => None,
             };
             let job = match self.get_with_timeout(email_address, job_id, remaining) {
                 Err(InkboxError::Transport(error)) if timeout.is_some() && error.is_timeout() => {
-                    return Err(InkboxError::InvalidArgument(format!(
-                        "timed out waiting for import job {job_id}"
+                    return Err(InkboxError::Timeout(format!(
+                        "waiting for import job {job_id}"
                     )));
                 }
                 result => result?,
@@ -194,9 +192,7 @@ impl MailboxImportsResource {
             let delay = match timeout {
                 Some(timeout) => {
                     let remaining = timeout.checked_sub(started.elapsed()).ok_or_else(|| {
-                        InkboxError::InvalidArgument(format!(
-                            "timed out waiting for import job {job_id}"
-                        ))
+                        InkboxError::Timeout(format!("waiting for import job {job_id}"))
                     })?;
                     poll_interval.min(remaining)
                 }
@@ -281,6 +277,66 @@ mod tests {
         assert_eq!(result.status, MailImportJobStatus::Failed);
         create.assert();
         terminal.assert();
+    }
+
+    #[test]
+    fn quota_rejection_keeps_the_retry_after_header() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/imports"));
+            then.status(429)
+                .header("Retry-After", "1800")
+                .json_body(json!({"detail": {
+                    "error": "mail_import_quota_exceeded",
+                    "message": "Import job quota reached (20 per 24 hours)."
+                }}));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let error = client
+            .mailboxes()
+            .imports()
+            .create(MAILBOX, MailImportFormat::Auto, None, true)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            InkboxError::MailImportQuotaExceeded {
+                status_code: 429,
+                retry_after_header: Some(1800),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn wait_timeout_is_distinct_from_caller_misuse() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/imports/{JOB_ID}"));
+            then.status(200).json_body(job("running"));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let imports = client.mailboxes().imports();
+        let timed_out = imports
+            .wait(
+                MAILBOX,
+                JOB_ID,
+                Some(Duration::from_millis(1)),
+                Some(Duration::from_millis(1)),
+            )
+            .unwrap_err();
+        assert!(matches!(timed_out, InkboxError::Timeout(_)));
+        let misuse = imports
+            .wait(MAILBOX, JOB_ID, None, Some(Duration::ZERO))
+            .unwrap_err();
+        assert!(matches!(misuse, InkboxError::InvalidArgument(_)));
     }
 
     #[test]

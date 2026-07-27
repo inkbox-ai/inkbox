@@ -76,11 +76,22 @@ Two cross-cutting mail facts worth knowing before you pick a skill. Each SDK/CLI
 
 All SDKs expose mailbox imports under `mailboxes.imports`; the CLI uses
 `inkbox mailbox imports run|get|list|wait|cancel`. The lifecycle is create,
-direct upload, start, then poll. Supported inputs are MBOX, EML, and ZIP-of-EML.
-Waiters fetch immediately, poll every five seconds by default, and return every
-terminal state (`completed`, `failed`, `cancelled`). A local timeout does not
-cancel the job. Counters may pause or reset during recovery and are not a
-percentage. Unsafe imported content may be rejected and counted separately.
+direct upload, start, then poll. Supported inputs are MBOX and EML files, or a
+ZIP holding either (a Gmail Takeout ZIP imports as-is); ZIP entries that are not
+mail, including nested archives, are ignored. Waiters fetch immediately, poll
+every five seconds by default, and return every terminal state (`completed`,
+`failed`, `cancelled`). A local timeout does not cancel the job. Counters are
+cumulative and never go backwards, so a stalled counter is a signal, not normal
+churn; they can still sit unchanged while a large message is processed and are
+not a percentage. Jobs run one at a time per organization and share overall
+import capacity, so a long `queued` stretch is normal; do not cancel and
+recreate. Unsafe imported content may be rejected and counted separately.
+
+Limits: 1 GiB per upload, 50 MiB per message, 100,000 messages and 20 original
+addresses per job, 65,000 entries per ZIP, 20 import jobs per organization per
+24 hours, and one in-flight import per mailbox. Upload targets expire after 5
+minutes; re-issue one and upload again, or cancel the job. An abandoned job
+holds the mailbox for 24 hours.
 
 ## How To Choose
 

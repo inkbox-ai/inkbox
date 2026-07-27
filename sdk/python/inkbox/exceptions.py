@@ -146,6 +146,36 @@ class DedicatedIMessageNumberInventoryPendingError(InkboxAPIError):
         )
 
 
+class MailImportQuotaExceededError(InkboxAPIError):
+    """
+    Raised on 429 when the organization's daily import-job quota is spent.
+
+    Attributes:
+        message: Human-readable explanation from the server.
+        retry_after_seconds: Seconds to wait before creating another job,
+            from the ``Retry-After`` header when the server sends one.
+    """
+
+    def __init__(
+        self,
+        status_code: int,
+        detail: dict[str, Any],
+        *,
+        retry_after: str | None = None,
+    ) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.message: str = str(detail.get("message", ""))
+        raw_retry = detail.get("retry_after_seconds")
+        if retry_after is not None:
+            try:
+                raw_retry = int(retry_after)
+            except ValueError:
+                pass
+        self.retry_after_seconds: int | None = (
+            int(raw_retry) if raw_retry is not None else None
+        )
+
+
 class IdempotencyKeyReusedError(InkboxAPIError):
     """Raised when an iMessage claim key is reused incompatibly."""
 

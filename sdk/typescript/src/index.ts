@@ -52,6 +52,7 @@ export {
   InkboxConnectionError,
   InkboxError,
   InkboxVaultKeyError,
+  MailImportQuotaExceededError,
   MailImportUploadError,
   RecipientBlockedError,
   RedundantContactAccessGrantError,

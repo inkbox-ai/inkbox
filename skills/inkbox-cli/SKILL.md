@@ -463,10 +463,22 @@ inkbox mailbox imports cancel <email> <job-id>
 
 `run` supports `--source-format auto|mbox|eml|zip`, repeatable
 `--original-address`, `--mark-unread`, `--no-wait`, `--timeout`, and
-`--poll-interval`. Progress is stderr-only; `--json` stdout contains one job
-object. Failed or cancelled `run`/`wait` jobs exit nonzero. A local timeout or
-Ctrl-C does not cancel the job. Counters may pause or reset and are not a
-percentage. Unsafe imported content may be rejected.
+`--poll-interval`. A ZIP may hold `.eml` and/or `.mbox` files (a Gmail Takeout
+ZIP imports as-is); other entries, including nested archives, are ignored.
+Progress is stderr-only; `--json` stdout contains one job object. Failed or
+cancelled `run`/`wait` jobs exit nonzero. A local timeout or Ctrl-C does not
+cancel the job. Counters are cumulative and never go backwards, so a stalled
+counter is a signal, not normal churn; they are not a percentage. Jobs run one
+at a time per organization and share overall import capacity, so a long `queued`
+stretch is normal; do not cancel and recreate. Unsafe imported content may be
+rejected.
+
+`run` re-issues the 5-minute upload target and retries once if the upload
+fails, then cancels the job it created. After an interrupted `run`, use
+`imports list` + `imports cancel` to release the mailbox; otherwise the
+abandoned job blocks new imports for 24 hours. Limits: 1 GiB per upload, 50 MiB
+per message, 100,000 messages and 20 `--original-address` values per job, 65,000
+entries per ZIP, and 20 import jobs per organization per 24 hours.
 
 Mailboxes are provisioned atomically by `inkbox identity create` and removed by `inkbox identity delete` (cascade); there is no standalone create / delete here. The human-readable name lives on the identity now — `inkbox identity update --display-name`; the mailbox PATCH endpoint hard-rejects `display_name` with a 422.
 

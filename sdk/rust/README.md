@@ -137,10 +137,22 @@ let job = imports.wait(
 )?;
 ```
 
-Imports support MBOX, EML, and ZIP-of-EML files. `wait` returns completed,
-failed, and cancelled jobs; timing out locally does not cancel the job. Counters
-may pause or reset during recovery and do not represent a percentage. Unsafe
-imported content may be rejected in `messages_rejected_unsafe`.
+Imports support MBOX and EML files, or a ZIP holding either (a Gmail Takeout ZIP
+imports as-is); ZIP entries that are not mail, including nested archives, are
+ignored. `wait` returns completed, failed, and cancelled jobs, and reports a
+local wall-clock timeout as `InkboxError::Timeout` without cancelling the job.
+Counters are cumulative and never go backwards, but they can sit unchanged while
+a large message is processed and do not represent a percentage. Jobs run one at
+a time per organization and share overall import capacity, so a long `queued`
+stretch is normal. Unsafe imported content may be rejected in
+`messages_rejected_unsafe`.
+
+Upload targets expire after 5 minutes; call `refresh_upload_target` and upload
+again if one expires, or `cancel` the job so the mailbox is not held by an
+upload that never landed. Other limits: 1 GiB per upload, 50 MiB per message,
+100,000 messages and 20 original addresses per job, 65,000 entries per ZIP, 20
+import jobs per organization per 24 hours (`InkboxError::MailImportQuotaExceeded`
+carries the `Retry-After` value), and one in-flight import per mailbox.
 
 ### Dedicated iMessage numbers
 

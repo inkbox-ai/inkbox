@@ -190,10 +190,12 @@ listener.wait()
 
 ### Mailbox Imports
 
-Import MBOX, EML, or ZIP-of-EML archives through `mailboxes.imports`. Create a
-job, upload directly with the returned target, start it, then wait for any
-terminal state (`completed`, `failed`, or `cancelled`). Imported content that is
-unsafe may be rejected and counted separately.
+Import MBOX and EML files, or a ZIP holding either (a Gmail Takeout ZIP imports
+as-is), through `mailboxes.imports`. Create a job, upload directly with the
+returned target, start it, then wait for any terminal state (`completed`,
+`failed`, or `cancelled`). Entries in a ZIP that are not mail, including nested
+archives, are ignored. Imported content that is unsafe may be rejected and
+counted separately.
 
 ```bash
 inkbox mailbox imports run agent@inkboxmail.com ./archive.mbox \
@@ -201,9 +203,16 @@ inkbox mailbox imports run agent@inkboxmail.com ./archive.mbox \
 ```
 
 Use `--no-wait` to return after queueing, or `inkbox mailbox imports wait
-<email> <job-id>` to resume watching later. Processing counters are checkpointed
-and may pause or reset during recovery, so do not calculate a percentage from
-them.
+<email> <job-id>` to resume watching later. Processing counters are cumulative
+and never go backwards, but they can sit unchanged while a large message is
+processed, and they do not yield a percentage. Jobs run one at a time per
+organization and share overall import capacity, so a long `queued` stretch is
+normal rather than a stall.
+
+Limits: 1 GiB per upload, 50 MiB per message, 100,000 messages and 20
+`original_addresses` per job, 65,000 entries per ZIP, and 20 import jobs per
+organization per 24 hours. Upload targets expire after 5 minutes and can be
+re-issued; a job whose upload never arrives is cancelled after 24 hours.
 
 ### Tunnels (TypeScript)
 

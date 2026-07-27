@@ -452,7 +452,9 @@ Secret type flags:
 
 ### mailbox
 
-Import historical mail from MBOX, EML, or ZIP-of-EML files:
+Import historical mail from an MBOX or EML file, or a ZIP holding either (a
+Gmail Takeout ZIP imports as-is; ZIP entries that are not mail, including nested
+archives, are ignored):
 
 ```bash
 inkbox mailbox imports run <email> <file>
@@ -473,7 +475,18 @@ inkbox mailbox imports cancel <email> <job-id>
 processing progress goes to stderr; `--json` keeps stdout to one job object.
 `run` and `wait` exit nonzero when the terminal job is failed or cancelled.
 Unsafe imported content may be rejected and counted separately. Processing
-counters may pause or reset during recovery and are not a percentage.
+counters are cumulative and never go backwards, but they can sit unchanged while
+a large message is processed and are not a percentage. Jobs run one at a time
+per organization and share overall import capacity, so a long `queued` stretch
+is normal rather than a stall.
+
+Upload targets expire after 5 minutes, so `run` re-issues one and retries once
+if the upload fails, then cancels the job it created rather than leaving the
+mailbox blocked. If a `run` is interrupted, `inkbox mailbox imports list <email>`
+and `inkbox mailbox imports cancel <email> <job-id>` release the mailbox; an
+abandoned job otherwise holds it for 24 hours. Other limits: 1 GiB per upload,
+50 MiB per message, 100,000 messages and 20 `--original-address` values per job,
+65,000 entries per ZIP, and 20 import jobs per organization per 24 hours.
 
 Org-level mailbox read + update. Mailboxes are provisioned atomically
 by `inkbox identity create` and removed by `inkbox identity delete`

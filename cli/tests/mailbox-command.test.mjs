@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { spawn } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -315,4 +315,115 @@ test("mailbox imports wait prints the failed job and exits nonzero", async () =>
 
   assert.equal(exitCode, 1);
   assert.equal(JSON.parse(stdout).status, "failed");
+});
+
+const IMPORT_JOB = {
+  id: "11111111-1111-1111-1111-111111111111",
+  mailbox_id: "22222222-2222-2222-2222-222222222222",
+  status: "completed",
+  source_format: "eml",
+  original_addresses: null,
+  mark_as_read: true,
+  upload_size_bytes: 19,
+  messages_processed: 1,
+  messages_imported: 1,
+  messages_skipped_duplicate: 0,
+  messages_failed: 0,
+  messages_rejected_unsafe: 0,
+  error_detail: null,
+  created_at: "2026-07-24T12:00:00Z",
+  updated_at: "2026-07-24T12:01:00Z",
+  started_at: "2026-07-24T12:00:10Z",
+  finished_at: "2026-07-24T12:01:00Z",
+};
+
+/** Import server whose upload endpoint rejects the first `failUploads` attempts. */
+function importRunServer(email, failUploads) {
+  const seen = { uploads: 0, reissues: 0, cancels: 0 };
+  const server = createServer((req, res) => {
+    const base = `/api/v1/mail/mailboxes/${email}/imports`;
+    const uploadTarget = {
+      url: `http://127.0.0.1:${server.address().port}/upload`,
+      fields: { key: "k" },
+      expires_in_seconds: 300,
+    };
+    if (req.url === "/upload") {
+      seen.uploads += 1;
+      req.resume();
+      if (seen.uploads <= failUploads) res.writeHead(403).end("expired");
+      else res.writeHead(204).end();
+      return;
+    }
+    res.setHeader("content-type", "application/json");
+    if (req.method === "POST" && req.url === base) {
+      res.writeHead(201).end(JSON.stringify({
+        job: { ...IMPORT_JOB, status: "pending_upload", finished_at: null },
+        upload: uploadTarget,
+      }));
+    } else if (req.url === `${base}/${IMPORT_JOB.id}/upload-url`) {
+      seen.reissues += 1;
+      res.writeHead(200).end(JSON.stringify(uploadTarget));
+    } else if (req.url === `${base}/${IMPORT_JOB.id}/cancel`) {
+      seen.cancels += 1;
+      res.writeHead(200).end(JSON.stringify({ ...IMPORT_JOB, status: "cancelled" }));
+    } else {
+      res.writeHead(200).end(JSON.stringify(IMPORT_JOB));
+    }
+  });
+  return { server, seen };
+}
+
+async function runImport(port, email, path) {
+  const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+  const child = spawn(process.execPath, [
+    cli,
+    "--json",
+    "--api-key", "ApiKey_test",
+    "--base-url", `http://127.0.0.1:${port}`,
+    "mailbox", "imports", "run", email, path,
+    "--source-format", "eml",
+    "--poll-interval", "0.01",
+  ]);
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk) => { stdout += chunk; });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  const [exitCode] = await once(child, "close");
+  return { exitCode, stdout, stderr };
+}
+
+function importFixtureFile() {
+  const dir = mkdtempSync(join(tmpdir(), "inkbox-import-retry-test-"));
+  const path = join(dir, "message.eml");
+  writeFileSync(path, "Subject: Test\n\nBody");
+  return path;
+}
+
+test("mailbox imports run re-issues the upload target and retries once", async () => {
+  const email = "archive@example.com";
+  const { server, seen } = importRunServer(email, 1);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const result = await runImport(server.address().port, email, importFixtureFile());
+  server.close();
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(JSON.parse(result.stdout).status, "completed");
+  assert.equal(seen.reissues, 1);
+  assert.equal(seen.uploads, 2);
+  assert.equal(seen.cancels, 0);
+});
+
+test("mailbox imports run cancels its job when the upload cannot be completed", async () => {
+  const email = "archive@example.com";
+  const { server, seen } = importRunServer(email, 2);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const result = await runImport(server.address().port, email, importFixtureFile());
+  server.close();
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(seen.uploads, 2);
+  assert.equal(seen.cancels, 1);
+  assert.match(result.stderr, /import upload failed|HTTP 403/i);
 });

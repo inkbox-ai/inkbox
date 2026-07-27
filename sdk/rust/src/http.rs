@@ -503,6 +503,23 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
         }
     }
 
+    if status == 429 {
+        if let Value::Object(map) = &raw_detail {
+            if map.get("error").and_then(|e| e.as_str()) == Some("mail_import_quota_exceeded") {
+                return Err(InkboxError::MailImportQuotaExceeded {
+                    status_code: status,
+                    message: map
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    retry_after_header,
+                    detail: Box::new(raw_detail),
+                });
+            }
+        }
+    }
+
     let detail = match raw_detail {
         Value::String(s) => ApiErrorDetail::Message(s),
         other => ApiErrorDetail::Structured(other),

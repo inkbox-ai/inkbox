@@ -183,6 +183,28 @@ export class DedicatedIMessageNumberInventoryPendingError extends InkboxAPIError
   }
 }
 
+/** Thrown when the organization's daily mailbox-import job quota is spent. */
+export class MailImportQuotaExceededError extends InkboxAPIError {
+  /** Seconds to wait before creating another import job, or null when unknown. */
+  readonly retryAfterSeconds: number | null;
+  readonly detailMessage: string;
+
+  constructor(
+    statusCode: number,
+    detail: Record<string, unknown>,
+    retryAfterHeader: string | null,
+  ) {
+    super(statusCode, detail);
+    this.name = "MailImportQuotaExceededError";
+    const headerSeconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
+    this.retryAfterSeconds = Number.isFinite(headerSeconds) && headerSeconds >= 0
+      ? headerSeconds
+      : null;
+    this.detailMessage = String(detail["message"] ?? "");
+    if (this.detailMessage) this.message = this.detailMessage;
+  }
+}
+
 /** Thrown when an idempotency key is reused with a different request. */
 export class IdempotencyKeyReusedError extends InkboxAPIError {
   readonly detailMessage: string;
@@ -244,6 +266,18 @@ function raiseForErrorResponse(
     && rawDetail["error"] === "dedicated_imessage_number_inventory_pending"
   ) {
     throw new DedicatedIMessageNumberInventoryPendingError(
+      status,
+      rawDetail,
+      headers?.get("Retry-After") ?? null,
+    );
+  }
+  if (
+    status === 429
+    && typeof rawDetail === "object"
+    && rawDetail !== null
+    && rawDetail["error"] === "mail_import_quota_exceeded"
+  ) {
+    throw new MailImportQuotaExceededError(
       status,
       rawDetail,
       headers?.get("Retry-After") ?? null,

@@ -8,16 +8,18 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Python, TypeScript, and Rust SDK resources for creating, uploading, starting, listing, inspecting, cancelling, and waiting for MBOX, EML, and ZIP-of-EML mailbox imports. Direct uploads stream without API credentials, and polling returns completed, failed, or cancelled jobs.
-- `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits.
+- Python, TypeScript, and Rust SDK resources for creating, uploading, starting, listing, inspecting, cancelling, and waiting for mailbox imports from an MBOX or EML file, or a ZIP holding either. Direct uploads stream without API credentials, and polling returns completed, failed, or cancelled jobs.
+- `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits. `run` re-issues an expired upload target and retries once, then cancels the job it created rather than leaving the mailbox blocked.
+- `MailImportQuotaExceededError` (Rust `InkboxError::MailImportQuotaExceeded`) on the 429 import-job quota rejection, carrying the server's `Retry-After` value.
 - Import provenance on message models through nullable `import_job_id` (TypeScript `importJobId`), plus unsafe-content rejection counters on import jobs.
 
 ### Changed
 
 - Version bumped to 0.5.7 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.7`.
-- Import waits poll every five seconds by default. Local timeouts stop waiting without cancelling the job; processing counters are checkpoints and are not a percentage.
+- Import waits poll every five seconds by default. Local timeouts stop waiting without cancelling the job; processing counters are cumulative, never go backwards, and are not a percentage.
+- The CLI prints the server's sentence for structured error details instead of the raw JSON object, and points at `imports list` / `imports cancel` when a mailbox already has an import in flight.
 - **TypeScript note (source-breaking).** `Message` gains required `importJobId: string | null`; hand-built message object literals must add it. Parsing defaults an omitted wire field to `null`.
-- **Rust note (source-breaking).** `Message` gains public `import_job_id: Option<Uuid>`, and `InkboxError` gains `MailImportUpload` and `MailImportUploadTransport` variants. Struct literals and exhaustive error matches must account for them; omitted message fields still deserialize as `None`.
+- **Rust note (source-breaking).** `Message` gains public `import_job_id: Option<Uuid>`, and `InkboxError` gains `MailImportUpload`, `MailImportUploadTransport`, `MailImportQuotaExceeded`, and `Timeout` variants. Struct literals and exhaustive error matches must account for them; omitted message fields still deserialize as `None`. Import `wait` now returns `Timeout` rather than `InvalidArgument` when the local wall-clock budget runs out.
 
 ## 0.5.6 — A2A 1.0
 
