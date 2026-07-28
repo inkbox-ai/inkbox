@@ -203,6 +203,7 @@ export {
   CallOrigin,
   HostedAgentAuthorityMode,
   IncomingCallAction,
+  VoicemailDetection,
   PhoneRuleAction,
   PhoneRuleMatchType,
   SmsDeliveryStatus,

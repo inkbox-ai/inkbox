@@ -327,6 +327,25 @@ class TestAgentIdentityPlaceCall:
             reason=None,
         )
 
+    def test_place_call_forwards_voicemail_detection_when_set(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        identity.place_call(
+            to_number="+15551234567",
+            voicemail_detection="disabled",
+        )
+
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination=CallOrigin.DEDICATED_NUMBER,
+            from_number="+18335794607",
+            client_websocket_url=None,
+            mode=CallMode.CLIENT_WEBSOCKET,
+            reason=None,
+            voicemail_detection="disabled",
+        )
+
 
 class TestAgentIdentityListCalls:
     def test_list_calls_scopes_to_identity_with_defaults(self):

@@ -14,9 +14,25 @@ function help(...args) {
 
 test("phone help exposes authority controls", () => {
   assert.match(help("phone", "call"), /--authority-mode <mode>/);
+  assert.match(help("phone", "call"), /--no-voicemail-detection/);
   const authorityHelp = help("phone", "hosted-agent", "authority-mode");
   assert.match(authorityHelp, /--idempotency-key <key>/);
   assert.match(authorityHelp, /admin API key/);
+});
+
+test("buildPlaceCallOptions disables voicemail detection only when requested", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    voicemailDetection: false,
+  });
+
+  assert.deepEqual(result, {
+    callOptions: {
+      toNumber: "+15551234567",
+      voicemailDetection: "disabled",
+    },
+  });
 });
 
 test("buildPlaceCallOptions builds a plain client-driven call", () => {

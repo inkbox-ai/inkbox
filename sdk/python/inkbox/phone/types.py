@@ -88,6 +88,13 @@ class CallMode(StrEnum):
     HOSTED_AGENT = "hosted_agent"
 
 
+class VoicemailDetection(StrEnum):
+    """Whether an outbound call hangs up when voicemail is detected."""
+
+    ENABLED = "enabled"
+    DISABLED = "disabled"
+
+
 class HostedAgentAuthorityMode(StrEnum):
     """How broadly a hosted voice agent may act.
 

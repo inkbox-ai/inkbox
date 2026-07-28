@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.7 — Hosted-agent authority
+## 0.5.8 — Hosted-agent authority and voicemail detection
 
 ### Added
 
@@ -10,11 +10,13 @@
   identity's mode for future incoming calls with an admin API key and
   idempotency key. Outbound calls use `phone call --authority-mode`.
 - Call and hosted-agent config output includes the resolved authority mode.
+- `inkbox phone call --no-voicemail-detection` keeps a call connected after
+  voicemail is detected so the caller can leave a message.
 
 ### Changed
 
-- CLI version moved in lockstep to 0.5.7 and now depends on `@inkbox/sdk`
-  `^0.5.7`.
+- CLI version moved in lockstep to 0.5.8 and now depends on `@inkbox/sdk`
+  `^0.5.8`.
 
 ## 0.5.6 — A2A 1.0
 

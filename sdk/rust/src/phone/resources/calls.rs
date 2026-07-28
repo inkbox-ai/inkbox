@@ -8,7 +8,8 @@ use crate::error::Result;
 use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{
-    CallOrigin, HostedAgentAuthorityMode, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript,
+    CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedCallPlacementOptions,
+    PhoneCall, PhoneCallWithRateLimit, PhoneTranscript,
 };
 
 pub struct CallsResource {
@@ -154,6 +155,29 @@ impl CallsResource {
         agent_identity_id: Option<&str>,
         client_websocket_url: Option<&str>,
     ) -> Result<PhoneCallWithRateLimit> {
+        self.place_with_options(
+            to_number,
+            origination,
+            from_number,
+            agent_identity_id,
+            client_websocket_url,
+            &CallPlacementOptions::default(),
+        )
+    }
+
+    /// Place an outbound call with optional call controls.
+    ///
+    /// `voicemail_detection` is omitted when unset, preserving the server's
+    /// default behavior and the wire shape of [`CallsResource::place`].
+    pub fn place_with_options(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        from_number: Option<&str>,
+        agent_identity_id: Option<&str>,
+        client_websocket_url: Option<&str>,
+        options: &CallPlacementOptions,
+    ) -> Result<PhoneCallWithRateLimit> {
         // Always send origination; include the rest only when provided.
         let mut body = Map::new();
         body.insert("to_number".into(), to_number.into());
@@ -166,6 +190,9 @@ impl CallsResource {
         }
         if let Some(url) = client_websocket_url {
             body.insert("client_websocket_url".into(), url.into());
+        }
+        if let Some(detection) = options.voicemail_detection {
+            body.insert("voicemail_detection".into(), detection.as_str().into());
         }
         let data = self
             .http
@@ -199,11 +226,40 @@ impl CallsResource {
         agent_identity_id: Option<&str>,
         reason: &str,
     ) -> Result<PhoneCallWithRateLimit> {
+        self.place_hosted_with_options(
+            to_number,
+            origination,
+            from_number,
+            agent_identity_id,
+            reason,
+            &HostedCallPlacementOptions::default(),
+        )
+    }
+
+    /// Place an outbound hosted-agent call with optional call controls.
+    pub fn place_hosted_with_options(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        from_number: Option<&str>,
+        agent_identity_id: Option<&str>,
+        reason: &str,
+        options: &HostedCallPlacementOptions,
+    ) -> Result<PhoneCallWithRateLimit> {
         let mut body = Map::new();
         body.insert("to_number".into(), to_number.into());
         body.insert("origination".into(), origination.as_str().into());
         body.insert("mode".into(), "hosted_agent".into());
         body.insert("reason".into(), reason.into());
+        if let Some(authority_mode) = options.authority_mode {
+            body.insert(
+                "hosted_agent_authority_mode".into(),
+                authority_mode.as_str().into(),
+            );
+        }
+        if let Some(detection) = options.voicemail_detection {
+            body.insert("voicemail_detection".into(), detection.as_str().into());
+        }
         if let Some(n) = from_number {
             body.insert("from_number".into(), n.into());
         }
@@ -226,26 +282,17 @@ impl CallsResource {
         reason: &str,
         authority_mode: HostedAgentAuthorityMode,
     ) -> Result<PhoneCallWithRateLimit> {
-        // Always send origination + mode + reason; scope keys only when set.
-        let mut body = Map::new();
-        body.insert("to_number".into(), to_number.into());
-        body.insert("origination".into(), origination.as_str().into());
-        body.insert("mode".into(), "hosted_agent".into());
-        body.insert("reason".into(), reason.into());
-        body.insert(
-            "hosted_agent_authority_mode".into(),
-            authority_mode.as_str().into(),
-        );
-        if let Some(n) = from_number {
-            body.insert("from_number".into(), n.into());
-        }
-        if let Some(id) = agent_identity_id {
-            body.insert("agent_identity_id".into(), id.into());
-        }
-        let data = self
-            .http
-            .post("/place-call", Some(&body), crate::http::NO_QUERY)?;
-        Ok(serde_json::from_value(data)?)
+        self.place_hosted_with_options(
+            to_number,
+            origination,
+            from_number,
+            agent_identity_id,
+            reason,
+            &HostedCallPlacementOptions {
+                authority_mode: Some(authority_mode),
+                voicemail_detection: None,
+            },
+        )
     }
 }
 
@@ -256,7 +303,10 @@ mod tests {
 
     use crate::client::Inkbox;
     use crate::error::{ApiErrorDetail, InkboxError};
-    use crate::phone::types::{CallOrigin, HostedAgentAuthorityMode};
+    use crate::phone::types::{
+        CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedCallPlacementOptions,
+        VoicemailDetection,
+    };
 
     /// Client whose phone transport points at the mock server (phone resources
     /// ride the `/api/v1/phone` sub-base).
@@ -602,6 +652,37 @@ mod tests {
     }
 
     #[test]
+    fn place_with_options_sends_disabled_voicemail_detection() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "from_number": "+15550001111",
+                    "voicemail_detection": "disabled"
+                }));
+            then.status(200)
+                .json_body(placed_json("dedicated_number", json!("+15550001111")));
+        });
+        client(&server)
+            .calls()
+            .place_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                None,
+                &CallPlacementOptions {
+                    voicemail_detection: Some(VoicemailDetection::Disabled),
+                },
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
     fn place_body_never_carries_mode_key() {
         // The classic `place` preserves its established wire body.
         fn body_has_no_mode(req: &HttpMockRequest) -> bool {
@@ -710,6 +791,47 @@ mod tests {
             placed.call.hosted_agent_authority_mode,
             HostedAgentAuthorityMode::Yolo
         );
+    }
+
+    #[test]
+    fn place_hosted_with_options_combines_authority_and_voicemail_detection() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "mode": "hosted_agent",
+                    "reason": "Leave the appointment details in a voicemail",
+                    "hosted_agent_authority_mode": "yolo",
+                    "voicemail_detection": "disabled",
+                    "from_number": "+15550001111"
+                }));
+            then.status(200).json_body({
+                let mut v = placed_json("dedicated_number", json!("+15550001111"));
+                v["mode"] = json!("hosted_agent");
+                v["hosted_agent_authority_mode"] = json!("yolo");
+                v
+            });
+        });
+
+        client(&server)
+            .calls()
+            .place_hosted_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                "Leave the appointment details in a voicemail",
+                &HostedCallPlacementOptions {
+                    authority_mode: Some(HostedAgentAuthorityMode::Yolo),
+                    voicemail_detection: Some(VoicemailDetection::Disabled),
+                },
+            )
+            .unwrap();
+
+        mock.assert();
     }
 
     #[test]

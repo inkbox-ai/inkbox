@@ -154,6 +154,43 @@ impl CallOrigin {
     }
 }
 
+/// Whether Inkbox should end an outbound call after detecting voicemail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VoicemailDetection {
+    /// Detect voicemail and end the call. This is the default.
+    #[default]
+    Enabled,
+    /// Keep the call connected so the caller can leave a voicemail.
+    Disabled,
+}
+
+impl VoicemailDetection {
+    /// The wire string value (`"enabled"` / `"disabled"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            VoicemailDetection::Enabled => "enabled",
+            VoicemailDetection::Disabled => "disabled",
+        }
+    }
+}
+
+/// Optional controls for a client-driven outbound call.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CallPlacementOptions {
+    /// Omit to retain the server default (`enabled`).
+    pub voicemail_detection: Option<VoicemailDetection>,
+}
+
+/// Optional controls for an Inkbox Voice AI outbound call.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HostedCallPlacementOptions {
+    /// Omit to use the identity's configured authority.
+    pub authority_mode: Option<HostedAgentAuthorityMode>,
+    /// Omit to retain the server default (`enabled`).
+    pub voicemail_detection: Option<VoicemailDetection>,
+}
+
 /// How broadly a hosted voice agent may act.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

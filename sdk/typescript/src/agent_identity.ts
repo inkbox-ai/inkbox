@@ -31,6 +31,7 @@ import {
   CallOrigin,
   HostedAgentAuthorityMode,
   IncomingCallAction,
+  VoicemailDetection,
 } from "./phone/types.js";
 import type {
   CreateMailIdentityContactRuleOptions,
@@ -571,6 +572,8 @@ export class AgentIdentity {
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
    * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults
    *   to `contact_scoped`.
+   * @param options.voicemailDetection - Whether to hang up when voicemail is
+   *   detected. Omit for the server's `enabled` default.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise (server 422).
    */
@@ -580,6 +583,7 @@ export class AgentIdentity {
     clientWebsocketUrl?: string;
     mode?: CallMode;
     hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
+    voicemailDetection?: VoicemailDetection;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const origination = options.origination ?? CallOrigin.DEDICATED_NUMBER;
@@ -593,6 +597,7 @@ export class AgentIdentity {
         clientWebsocketUrl:  options.clientWebsocketUrl,
         mode:                options.mode,
         hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
+        voicemailDetection: options.voicemailDetection,
         reason:              options.reason,
       });
     }
@@ -604,6 +609,7 @@ export class AgentIdentity {
       clientWebsocketUrl:  options.clientWebsocketUrl,
       mode:                options.mode,
       hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
+      voicemailDetection: options.voicemailDetection,
       reason:              options.reason,
     });
   }

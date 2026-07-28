@@ -16,6 +16,7 @@ from inkbox.phone.types import (
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneTranscript,
+    VoicemailDetection,
 )
 
 if TYPE_CHECKING:
@@ -126,6 +127,7 @@ class CallsResource:
         client_websocket_url: str | None = None,
         mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
         hosted_agent_authority_mode: HostedAgentAuthorityMode | str | None = None,
+        voicemail_detection: VoicemailDetection | str | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call.
@@ -152,6 +154,8 @@ class CallsResource:
                 Omit for the server's ``contact_scoped`` default. ``yolo`` is
                 valid only with ``mode=hosted_agent``; invalid combinations
                 surface the server's 422 response.
+            voicemail_detection: Whether to hang up when voicemail is detected.
+                Omit for the server's ``enabled`` default.
             reason: Voice AI's task brief for the call — what to
                 accomplish. Required with ``mode=hosted_agent``, invalid
                 otherwise.
@@ -173,6 +177,12 @@ class CallsResource:
                 hosted_agent_authority_mode.value
                 if isinstance(hosted_agent_authority_mode, HostedAgentAuthorityMode)
                 else hosted_agent_authority_mode
+            )
+        if voicemail_detection is not None:
+            body["voicemail_detection"] = (
+                voicemail_detection.value
+                if isinstance(voicemail_detection, VoicemailDetection)
+                else voicemail_detection
             )
         if from_number is not None:
             body["from_number"] = from_number

@@ -6,6 +6,7 @@ import {
   CallOrigin,
   HostedAgentAuthorityMode,
   IncomingCallAction,
+  VoicemailDetection,
 } from "../src/phone/types.js";
 import { InkboxError } from "../src/_http.js";
 import type { Inkbox } from "../src/inkbox.js";
@@ -435,6 +436,23 @@ describe("AgentIdentity phone helpers", () => {
       hostedAgentAuthorityMode: undefined,
       reason: "Confirm the appointment",
     });
+  });
+
+  it("placeCall forwards voicemailDetection", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.placeCall({
+      toNumber: "+15551234567",
+      voicemailDetection: VoicemailDetection.DISABLED,
+    });
+
+    expect(ink._calls.place).toHaveBeenCalledWith(
+      expect.objectContaining({
+        voicemailDetection: VoicemailDetection.DISABLED,
+      }),
+    );
   });
 
   it("getHostedAgentConfig delegates scoped by identity id", async () => {

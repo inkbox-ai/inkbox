@@ -18,6 +18,7 @@ from inkbox.phone.types import (
     CallOrigin,
     HostedAgentAuthorityMode,
     PhoneCall,
+    VoicemailDetection,
 )
 from sample_data import (
     PHONE_CALL_BLOCKED_DICT,
@@ -279,6 +280,17 @@ class TestCallsPlace:
             "origination": "dedicated_number",
             "mode": "client_websocket",
         }
+
+    def test_voicemail_detection_forwarded_only_when_set(self, client, transport):
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.place(
+            to_number="+15551234567",
+            voicemail_detection=VoicemailDetection.DISABLED,
+        )
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["voicemail_detection"] == "disabled"
 
     def test_string_origination_passed_verbatim(self, client, transport):
         """A raw string origination is forwarded as-is (no enum coercion)."""

@@ -83,6 +83,7 @@ from inkbox.phone.types import (
     PhoneRuleMatchType,
     PhoneTranscript,
     TextConversationSummary,
+    VoicemailDetection,
     TextConversationUpdateResult,
     TextMessage,
 )
@@ -699,6 +700,7 @@ class AgentIdentity:
         client_websocket_url: str | None = None,
         mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
         hosted_agent_authority_mode: HostedAgentAuthorityMode | str | None = None,
+        voicemail_detection: VoicemailDetection | str | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call as this identity.
@@ -717,6 +719,8 @@ class AgentIdentity:
                 See :class:`CallMode`.
             hosted_agent_authority_mode: Hosted-agent authority for this call.
                 Omit for the server's ``contact_scoped`` default.
+            voicemail_detection: Whether to hang up when voicemail is detected.
+                Omit for the server's ``enabled`` default.
             reason: Voice AI's task brief for the call. Required
                 with ``mode=hosted_agent``, invalid otherwise (server 422).
         """
@@ -739,6 +743,8 @@ class AgentIdentity:
                 call_options["hosted_agent_authority_mode"] = (
                     hosted_agent_authority_mode
                 )
+            if voicemail_detection is not None:
+                call_options["voicemail_detection"] = voicemail_detection
             return self._inkbox._calls.place(**call_options)
         # Shared-number origination scopes by identity id, no from_number.
         call_options = {
@@ -751,6 +757,8 @@ class AgentIdentity:
         }
         if hosted_agent_authority_mode is not None:
             call_options["hosted_agent_authority_mode"] = hosted_agent_authority_mode
+        if voicemail_detection is not None:
+            call_options["voicemail_detection"] = voicemail_detection
         return self._inkbox._calls.place(**call_options)
 
     def list_calls(

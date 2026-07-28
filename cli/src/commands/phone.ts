@@ -4,6 +4,7 @@ import {
   CallOrigin,
   HostedAgentAuthorityMode,
   IncomingCallAction,
+  VoicemailDetection,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -17,6 +18,7 @@ interface PlaceCallCommandOptions {
   reason?: string;
   origination?: CallOrigin;
   authorityMode?: string;
+  voicemailDetection?: boolean;
 }
 
 interface PlaceCallOptions {
@@ -26,6 +28,7 @@ interface PlaceCallOptions {
   reason?: string;
   origination?: CallOrigin;
   hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
+  voicemailDetection?: VoicemailDetection;
 }
 
 export function buildPlaceCallOptions(
@@ -69,6 +72,9 @@ export function buildPlaceCallOptions(
     callOptions.hostedAgentAuthorityMode =
       cmdOpts.authorityMode as HostedAgentAuthorityMode;
   }
+  if (cmdOpts.voicemailDetection === false) {
+    callOptions.voicemailDetection = VoicemailDetection.DISABLED;
+  }
   return { callOptions };
 }
 
@@ -92,6 +98,10 @@ export function registerPhoneCommands(program: Command): void {
     .option(
       "--origination <origin>",
       "Call origin: dedicated_number or shared_imessage_number",
+    )
+    .option(
+      "--no-voicemail-detection",
+      "Keep the call connected when voicemail is detected",
     )
     .action(
       withErrorHandler(async function (

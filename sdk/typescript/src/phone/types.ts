@@ -85,6 +85,12 @@ export enum CallMode {
   HOSTED_AGENT = "hosted_agent",
 }
 
+/** Whether an outbound call hangs up when voicemail is detected. */
+export enum VoicemailDetection {
+  ENABLED = "enabled",
+  DISABLED = "disabled",
+}
+
 /** How broadly a hosted voice agent may act. */
 export enum HostedAgentAuthorityMode {
   CONTACT_SCOPED = "contact_scoped",

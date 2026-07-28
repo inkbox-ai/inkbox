@@ -4,14 +4,10 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
-## 0.5.7 — Mailbox imports and hosted-agent authority
+## 0.5.8 — Hosted-agent authority and voicemail detection
 
 ### Added
 
-- Python, TypeScript, and Rust SDK resources for creating, uploading, starting, listing, inspecting, cancelling, and waiting for mailbox imports from an MBOX or EML file, or a ZIP holding either. Direct uploads stream without API credentials, and polling returns completed, failed, or cancelled jobs.
-- `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits. `run` re-issues the upload target and retries once after a transport failure or rejected target, then cancels the job it created rather than leaving the mailbox blocked.
-- `MailImportQuotaExceededError` (Rust `InkboxError::MailImportQuotaExceeded`) on the 429 import-job quota rejection, carrying the server's `Retry-After` value.
-- Import provenance on message models through nullable `import_job_id` (TypeScript `importJobId`), plus unsafe-content rejection counters on import jobs.
 - **Hosted-agent authority modes.** Python, TypeScript, and Rust expose
   `contact_scoped` and `yolo` as typed authority modes on hosted-agent config,
   call responses, and `call.ended` webhook payloads.
@@ -24,14 +20,16 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   for hosted-agent calls made with an admin API key.
 - **CLI controls.** `inkbox phone call` accepts `--authority-mode`, and
   `inkbox phone hosted-agent authority-mode` updates the saved mode.
+- **Voicemail detection control.** Outbound calls can disable voicemail
+  detection so a caller can stay connected and leave a message. Python,
+  TypeScript, and Rust omit the setting by default, preserving detection, and
+  the CLI exposes `--no-voicemail-detection`.
 
 ### Changed
 
-- Version bumped to 0.5.7 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.7`.
-- Import waits poll every five seconds by default. Local timeouts stop waiting without cancelling the job; processing counters are cumulative, never go backwards, and are not a percentage.
-- The CLI prints the server's sentence for structured error details instead of the raw JSON object, and points at `imports list` / `imports cancel` when a mailbox already has an import in flight.
-- **TypeScript note (source-breaking).** `Message` gains required `importJobId: string | null`; hand-built message object literals must add it. Parsing defaults an omitted wire field to `null`.
-- **Rust note (source-breaking).** `Message` gains public `import_job_id: Option<Uuid>`, and `InkboxError` gains `MailImportUpload`, `MailImportUploadTransport`, `MailImportQuotaExceeded`, and `Timeout` variants. Struct literals and exhaustive error matches must account for them; omitted message fields still deserialize as `None`. Import `wait` now returns `Timeout` rather than `InvalidArgument` when the local wall-clock budget runs out.
+- Version bumped to 0.5.8 across `@inkbox/sdk` (TypeScript), `inkbox`
+  (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on
+  `@inkbox/sdk` `^0.5.8`.
 - PUT transports accept optional per-request headers.
 
 ### Compatibility
@@ -40,6 +38,25 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `contact_scoped`. Older `call.ended` replays may omit the optional field.
 - Existing call-placement and hosted-agent config methods retain
   `contact_scoped` behavior by default.
+- Existing call-placement methods omit voicemail detection, retaining the
+  server default (`enabled`).
+
+## 0.5.7 — Mailbox imports
+
+### Added
+
+- Python, TypeScript, and Rust SDK resources for creating, uploading, starting, listing, inspecting, cancelling, and waiting for mailbox imports from an MBOX or EML file, or a ZIP holding either. Direct uploads stream without API credentials, and polling returns completed, failed, or cancelled jobs.
+- `inkbox mailbox imports run|get|list|wait|cancel`, with file-size validation, disk-backed uploads, stderr progress, machine-readable JSON output, configurable polling, and nonzero terminal failure/cancellation exits. `run` re-issues the upload target and retries once after a transport failure or rejected target, then cancels the job it created rather than leaving the mailbox blocked.
+- `MailImportQuotaExceededError` (Rust `InkboxError::MailImportQuotaExceeded`) on the 429 import-job quota rejection, carrying the server's `Retry-After` value.
+- Import provenance on message models through nullable `import_job_id` (TypeScript `importJobId`), plus unsafe-content rejection counters on import jobs.
+
+### Changed
+
+- Version bumped to 0.5.7 across `@inkbox/sdk` (TypeScript), `inkbox` (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on `@inkbox/sdk` `^0.5.7`.
+- Import waits poll every five seconds by default. Local timeouts stop waiting without cancelling the job; processing counters are cumulative, never go backwards, and are not a percentage.
+- The CLI prints the server's sentence for structured error details instead of the raw JSON object, and points at `imports list` / `imports cancel` when a mailbox already has an import in flight.
+- **TypeScript note (source-breaking).** `Message` gains required `importJobId: string | null`; hand-built message object literals must add it. Parsing defaults an omitted wire field to `null`.
+- **Rust note (source-breaking).** `Message` gains public `import_job_id: Option<Uuid>`, and `InkboxError` gains `MailImportUpload`, `MailImportUploadTransport`, `MailImportQuotaExceeded`, and `Timeout` variants. Struct literals and exhaustive error matches must account for them; omitted message fields still deserialize as `None`. Import `wait` now returns `Timeout` rather than `InvalidArgument` when the local wall-clock budget runs out.
 
 ## 0.5.6 — A2A 1.0
 

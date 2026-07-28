@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.7 — Hosted-agent authority
+## 0.5.8 — Hosted-agent authority and voicemail detection
 
 ### Added
 
@@ -12,6 +12,8 @@
   call authority with admin API keys. Outbound calls select authority per call.
 - Per-call `hosted_agent_authority_mode` selection on outbound placement;
   `yolo` requires an admin API key.
+- Optional `voicemail_detection` control on outbound calls. It is omitted by
+  default; pass `disabled` to stay connected and leave a voicemail.
 
 ### Compatibility
 

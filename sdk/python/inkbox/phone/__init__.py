@@ -24,6 +24,7 @@ from inkbox.phone.types import (
     TextMediaItem,
     TextMessage,
     TextMessageRecipient,
+    VoicemailDetection,
 )
 from inkbox.signing_keys import SigningKey
 
@@ -51,4 +52,5 @@ __all__ = [
     "TextMediaItem",
     "TextMessage",
     "TextMessageRecipient",
+    "VoicemailDetection",
 ]

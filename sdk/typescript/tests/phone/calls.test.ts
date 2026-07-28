@@ -5,6 +5,7 @@ import {
   CallMode,
   CallOrigin,
   HostedAgentAuthorityMode,
+  VoicemailDetection,
 } from "../../src/phone/types.js";
 import { HttpTransport, InkboxAPIError } from "../../src/_http.js";
 import {
@@ -275,6 +276,24 @@ describe("CallsResource.place", () => {
     expect(body["reason"]).toBeUndefined();
     expect(body["mode"]).toBe("client_websocket");
     expect(body["hosted_agent_authority_mode"]).toBeUndefined();
+    expect(body["voicemail_detection"]).toBeUndefined();
+  });
+
+  it("forwards voicemail detection only when provided", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
+    const res = new CallsResource(http);
+
+    await res.place({
+      toNumber: "+15551234567",
+      voicemailDetection: VoicemailDetection.DISABLED,
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["voicemail_detection"]).toBe("disabled");
   });
 
   it("parses the response including origin and rateLimit", async () => {

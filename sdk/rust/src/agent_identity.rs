@@ -57,10 +57,10 @@ use crate::mail::types::{
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    CallOrigin, HostedAgentAuthorityMode, HostedAgentConfig, IncomingCallAction,
-    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
-    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
-    TextConversationUpdateResult, TextMessage,
+    CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedAgentConfig,
+    HostedCallPlacementOptions, IncomingCallAction, IncomingCallActionConfig, PhoneCall,
+    PhoneCallWithRateLimit, PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType,
+    PhoneTranscript, TextConversationSummary, TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::TunnelSummary;
@@ -576,6 +576,40 @@ impl AgentIdentity {
         }
     }
 
+    /// Place an outbound call with optional call controls.
+    pub fn place_call_with_options(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        client_websocket_url: Option<&str>,
+        options: &CallPlacementOptions,
+    ) -> Result<PhoneCallWithRateLimit> {
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                let number = self.require_phone()?;
+                self.inkbox.calls().place_with_options(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    client_websocket_url,
+                    options,
+                )
+            }
+            CallOrigin::SharedImessageNumber => {
+                let id = self.id().to_string();
+                self.inkbox.calls().place_with_options(
+                    to_number,
+                    origination,
+                    None,
+                    Some(&id),
+                    client_websocket_url,
+                    options,
+                )
+            }
+        }
+    }
+
     /// List calls made to/from this identity.
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
@@ -648,6 +682,40 @@ impl AgentIdentity {
                 self.inkbox
                     .calls()
                     .place_hosted(to_number, origination, None, Some(&id), reason)
+            }
+        }
+    }
+
+    /// Place an outbound hosted-agent call with optional call controls.
+    pub fn place_hosted_call_with_options(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        reason: &str,
+        options: &HostedCallPlacementOptions,
+    ) -> Result<PhoneCallWithRateLimit> {
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                let number = self.require_phone()?;
+                self.inkbox.calls().place_hosted_with_options(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    reason,
+                    options,
+                )
+            }
+            CallOrigin::SharedImessageNumber => {
+                let id = self.id().to_string();
+                self.inkbox.calls().place_hosted_with_options(
+                    to_number,
+                    origination,
+                    None,
+                    Some(&id),
+                    reason,
+                    options,
+                )
             }
         }
     }
@@ -1667,6 +1735,7 @@ mod tests {
 
     use super::*;
     use crate::identities::types::AgentIdentityData;
+    use crate::phone::types::VoicemailDetection;
 
     /// The fixture identity's UUID, shared by the scoping assertions below.
     const IDENTITY_ID: &str = "11111111-1111-1111-1111-111111111111";
@@ -1842,6 +1911,35 @@ mod tests {
     }
 
     #[test]
+    fn place_call_with_options_forwards_voicemail_detection() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "from_number": "+15550001111",
+                    "voicemail_detection": "disabled"
+                }));
+            then.status(200)
+                .json_body(call_json("dedicated_number", json!("+15550001111")));
+        });
+        let identity = identity_at(&server.base_url(), true);
+        identity
+            .place_call_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                None,
+                &CallPlacementOptions {
+                    voicemail_detection: Some(VoicemailDetection::Disabled),
+                },
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
     fn place_hosted_call_dedicated_uses_identitys_own_number() {
         let server = MockServer::start();
         // Exact body: hosted_agent mode + reason ride the wire, no ws-url key.
@@ -1900,6 +1998,38 @@ mod tests {
                 "+15550002222",
                 CallOrigin::SharedImessageNumber,
                 "Confirm the appointment",
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn place_hosted_call_with_options_forwards_voicemail_detection() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "shared_imessage_number",
+                    "mode": "hosted_agent",
+                    "reason": "Leave a voicemail",
+                    "agent_identity_id": IDENTITY_ID,
+                    "voicemail_detection": "disabled"
+                }));
+            then.status(200)
+                .json_body(call_json("shared_imessage_number", serde_json::Value::Null));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        identity
+            .place_hosted_call_with_options(
+                "+15550002222",
+                CallOrigin::SharedImessageNumber,
+                "Leave a voicemail",
+                &HostedCallPlacementOptions {
+                    authority_mode: None,
+                    voicemail_detection: Some(VoicemailDetection::Disabled),
+                },
             )
             .unwrap();
         mock.assert();

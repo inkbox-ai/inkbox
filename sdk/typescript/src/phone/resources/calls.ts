@@ -15,6 +15,7 @@ import {
   RawPhoneCall,
   RawPhoneCallWithRateLimit,
   RawPhoneTranscript,
+  VoicemailDetection,
   parsePhoneCall,
   parsePhoneCallWithRateLimit,
   parsePhoneTranscript,
@@ -123,6 +124,8 @@ export class CallsResource {
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
    * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults
    *   to `contact_scoped`; `yolo` is valid only with `hosted_agent`.
+   * @param options.voicemailDetection - Whether to hang up when voicemail is
+   *   detected. Omit for the server's `enabled` default.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise.
    * @returns The created call record with current rate limit info.
@@ -135,6 +138,7 @@ export class CallsResource {
     clientWebsocketUrl?: string;
     mode?: CallMode;
     hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
+    voicemailDetection?: VoicemailDetection;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const body: Record<string, unknown> = {
@@ -146,6 +150,9 @@ export class CallsResource {
     };
     if (options.hostedAgentAuthorityMode !== undefined) {
       body["hosted_agent_authority_mode"] = options.hostedAgentAuthorityMode;
+    }
+    if (options.voicemailDetection !== undefined) {
+      body["voicemail_detection"] = options.voicemailDetection;
     }
     if (options.fromNumber !== undefined) {
       body["from_number"] = options.fromNumber;
