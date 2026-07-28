@@ -105,6 +105,45 @@ pub enum SendingDomainStatus {
     PendingDeletion,
 }
 
+/// Container format for a mailbox import upload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailImportFormat {
+    Auto,
+    Mbox,
+    Eml,
+    Zip,
+}
+
+impl MailImportFormat {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Mbox => "mbox",
+            Self::Eml => "eml",
+            Self::Zip => "zip",
+        }
+    }
+}
+
+/// Lifecycle status of a mailbox import job.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailImportJobStatus {
+    PendingUpload,
+    Queued,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+impl MailImportJobStatus {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Completed | Self::Failed | Self::Cancelled)
+    }
+}
+
 impl SendingDomainStatus {
     /// The exact wire string for this status, used when building query params.
     pub fn as_str(&self) -> &'static str {
@@ -318,6 +357,65 @@ pub struct Message {
     pub open_count: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_opened_at: Option<String>,
+    /// Import job that created this historical message, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import_job_id: Option<Uuid>,
+}
+
+/// Unauthenticated multipart upload destination for an import file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailImportUploadTarget {
+    pub url: String,
+    pub fields: std::collections::BTreeMap<String, String>,
+    pub expires_in_seconds: u64,
+}
+
+/// A mailbox import job and its processing counters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailImportJob {
+    pub id: Uuid,
+    pub mailbox_id: Uuid,
+    pub status: MailImportJobStatus,
+    pub source_format: MailImportFormat,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_addresses: Option<Vec<String>>,
+    pub mark_as_read: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload_size_bytes: Option<u64>,
+    #[serde(default)]
+    pub messages_processed: u64,
+    #[serde(default)]
+    pub messages_imported: u64,
+    #[serde(default)]
+    pub messages_skipped_duplicate: u64,
+    #[serde(default)]
+    pub messages_failed: u64,
+    #[serde(default)]
+    pub messages_rejected_unsafe: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_detail: Option<String>,
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
+}
+
+/// Result of creating an import job.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailImportCreateResult {
+    pub job: MailImportJob,
+    pub upload: MailImportUploadTarget,
+}
+
+/// Cursor page of mailbox import jobs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailImportJobPage {
+    pub items: Vec<MailImportJob>,
+    pub next_cursor: Option<String>,
+    pub has_more: bool,
 }
 
 /// Full message including body content.

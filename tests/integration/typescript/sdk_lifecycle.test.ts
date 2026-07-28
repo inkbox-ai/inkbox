@@ -6,6 +6,8 @@ import {
   Inkbox,
   MailRuleAction,
   MailRuleMatchType,
+  MailImportFormat,
+  MailImportJobStatus,
   MessageDirection,
 } from "@inkbox/sdk";
 import type { Message, DecryptedVaultSecret, APIKeyPayload } from "@inkbox/sdk";
@@ -71,6 +73,25 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     expect(bravo.agentHandle).toBe(bravoHandle);
     expect(bravo.mailbox).not.toBeNull();
     expect(bravo.tunnel).not.toBeNull();
+
+    logStep(config, "import one EML through the TypeScript SDK");
+    const importedSubject = `typescript-import-${runSuffix}`;
+    const eml = new Blob([
+      `From: sender@example.com\r\nTo: ${alpha.emailAddress}\r\n` +
+        `Subject: ${importedSubject}\r\nMessage-ID: <${runSuffix}@example.com>\r\n` +
+        "Date: Wed, 1 Jul 2026 12:00:00 +0000\r\n\r\nImported body.\r\n",
+    ]);
+    const createdImport = await inkbox.mailboxes.imports.create(alpha.emailAddress!, {
+      sourceFormat: MailImportFormat.EML,
+    });
+    await inkbox.mailboxes.imports.upload(createdImport.upload, eml, { fileName: "message.eml" });
+    await inkbox.mailboxes.imports.start(alpha.emailAddress!, createdImport.job.id);
+    const imported = await inkbox.mailboxes.imports.wait(alpha.emailAddress!, createdImport.job.id, {
+      timeoutMs: config.pollTimeout,
+      pollIntervalMs: config.pollInterval,
+    });
+    expect(imported.status).toBe(MailImportJobStatus.COMPLETED);
+    expect(imported.messagesImported).toBe(1);
 
     logStep(config, "list identities shows 2");
     const identities = await inkbox.listIdentities();

@@ -1,10 +1,16 @@
 import { Command } from "commander";
+import { openAsBlob } from "node:fs";
+import { stat } from "node:fs/promises";
+import { basename } from "node:path";
 import {
   FilterMode,
   MailRuleAction,
   MailRuleMatchType,
+  MailImportFormat,
+  MailImportJobStatus,
+  MailImportUploadError,
 } from "@inkbox/sdk";
-import type { Mailbox } from "@inkbox/sdk";
+import type { Inkbox, Mailbox, MailImportCreateResult, MailImportJob } from "@inkbox/sdk";
 import { createClient, getGlobalOpts, resolveBaseUrl } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -20,6 +26,7 @@ const MAILBOX_LIST_COLUMNS = [
 ];
 
 const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB"];
+export const MAIL_IMPORT_MAX_UPLOAD_BYTES = 1024 ** 3;
 
 // Storage caps are binary (2 GiB = 2 * 1024 ** 3), so this divides by 1024 and
 // labels GiB/MiB — never pair base-2 math with a decimal "GB".
@@ -72,6 +79,229 @@ export function mailboxGetRecord(
     record.storage = formatStorage(mb.storageUsedBytes, mb.storageLimitBytes);
   }
   return record;
+}
+
+function parsePositiveSeconds(value: string): number {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    throw new Error(`Expected a positive number of seconds (got '${value}')`);
+  }
+  return seconds;
+}
+
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+export function assertMailImportFormat(value: string): MailImportFormat {
+  if (!Object.values(MailImportFormat).includes(value as MailImportFormat)) {
+    throw new Error(`--source-format must be auto, mbox, eml, or zip (got '${value}')`);
+  }
+  return value as MailImportFormat;
+}
+
+export async function assertImportFileSize(path: string): Promise<number> {
+  const size = (await stat(path)).size;
+  if (size > MAIL_IMPORT_MAX_UPLOAD_BYTES) {
+    throw new Error(
+      `Import file is ${size} bytes; the maximum is ${MAIL_IMPORT_MAX_UPLOAD_BYTES} bytes.`,
+    );
+  }
+  return size;
+}
+
+function progressSignature(job: MailImportJob): string {
+  return [
+    job.status,
+    job.messagesProcessed,
+    job.messagesImported,
+    job.messagesSkippedDuplicate,
+    job.messagesFailed,
+    job.messagesRejectedUnsafe,
+  ].join(":");
+}
+
+export function createImportProgressReporter(
+  write: (message: string) => void = (message) => console.error(message),
+): (job: MailImportJob) => void {
+  let previous = "";
+  return (job) => {
+    const signature = progressSignature(job);
+    if (signature === previous) return;
+    previous = signature;
+    write(
+      `Import ${job.id}: ${job.status}; processed=${job.messagesProcessed} ` +
+        `imported=${job.messagesImported} duplicates=${job.messagesSkippedDuplicate} ` +
+        `failed=${job.messagesFailed} unsafe=${job.messagesRejectedUnsafe}`,
+    );
+  };
+}
+
+/**
+ * Upload the archive, re-issuing once after a transport failure or rejected
+ * target. Targets expire in minutes while uploads can run far longer, so an
+ * expired policy is expected on a large archive. A job left in
+ * `pending_upload` blocks the mailbox for a day, so give it up on the way out.
+ */
+async function uploadWithRetry(
+  inkbox: Inkbox,
+  emailAddress: string,
+  created: MailImportCreateResult,
+  blob: Blob,
+  fileName: string,
+  remainingTimeoutMs: () => number | undefined,
+): Promise<void> {
+  const imports = inkbox.mailboxes.imports;
+  try {
+    try {
+      await imports.upload(created.upload, blob, { fileName, timeoutMs: remainingTimeoutMs() });
+    } catch (error) {
+      if (
+        !(error instanceof MailImportUploadError)
+        || (error.statusCode !== null && error.statusCode !== 403)
+      ) {
+        throw error;
+      }
+      console.error("Upload failed; re-issuing the upload target and retrying once...");
+      const refreshed = await imports.refreshUploadTarget(emailAddress, created.job.id);
+      await imports.upload(refreshed, blob, { fileName, timeoutMs: remainingTimeoutMs() });
+    }
+  } catch (error) {
+    await imports.cancel(emailAddress, created.job.id).catch(() => {
+      console.error(
+        `Hint: Release the mailbox with 'inkbox mailbox imports cancel ` +
+          `${emailAddress} ${created.job.id}'.`,
+      );
+    });
+    throw error;
+  }
+}
+
+function setTerminalExitCode(job: MailImportJob): void {
+  if (job.status === MailImportJobStatus.FAILED || job.status === MailImportJobStatus.CANCELLED) {
+    process.exitCode = 1;
+  }
+}
+
+function registerMailboxImportCommands(parent: Command): void {
+  const imports = parent
+    .command("imports")
+    .description("Import mail from an MBOX, EML, or ZIP archive");
+
+  imports
+    .command("run <email> <file>")
+    .description("Create, upload, and start a mailbox import")
+    .option("--source-format <format>", "auto, mbox, eml, or zip", "auto")
+    .option("--original-address <email>", "Original mailbox address (repeatable)", collect, [])
+    .option("--mark-unread", "Import messages as unread")
+    .option("--no-wait", "Return after the import is queued")
+    .option("--timeout <seconds>", "Stop waiting after this many seconds", parsePositiveSeconds)
+    .option("--poll-interval <seconds>", "Polling interval", parsePositiveSeconds, 5)
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        email: string,
+        file: string,
+        cmdOpts: {
+          sourceFormat: string;
+          originalAddress: string[];
+          markUnread?: boolean;
+          wait: boolean;
+          timeout?: number;
+          pollInterval: number;
+        },
+      ) {
+        const opts = getGlobalOpts(this);
+        const startedAt = performance.now();
+        const remainingTimeoutMs = () => {
+          if (cmdOpts.timeout === undefined) return undefined;
+          const remaining = cmdOpts.timeout * 1000 - (performance.now() - startedAt);
+          if (remaining <= 0) throw new Error("Mailbox import timed out");
+          return remaining;
+        };
+        await assertImportFileSize(file);
+        const inkbox = createClient(opts, remainingTimeoutMs());
+        const created = await inkbox.mailboxes.imports.create(email, {
+          sourceFormat: assertMailImportFormat(cmdOpts.sourceFormat),
+          originalAddresses: cmdOpts.originalAddress.length ? cmdOpts.originalAddress : undefined,
+          markAsRead: !cmdOpts.markUnread,
+        });
+        console.error(`Uploading ${basename(file)}...`);
+        const blob = await openAsBlob(file);
+        await uploadWithRetry(inkbox, email, created, blob, basename(file), remainingTimeoutMs);
+        console.error("Upload complete; starting import...");
+        const controlClient = createClient(opts, remainingTimeoutMs());
+        const queued = await controlClient.mailboxes.imports.start(email, created.job.id);
+        if (!cmdOpts.wait) {
+          output(queued, { json: !!opts.json });
+          return;
+        }
+        const result = await controlClient.mailboxes.imports.wait(email, created.job.id, {
+          timeoutMs: remainingTimeoutMs(),
+          pollIntervalMs: cmdOpts.pollInterval * 1000,
+          onPoll: createImportProgressReporter(),
+        });
+        output(result, { json: !!opts.json });
+        setTerminalExitCode(result);
+      }),
+    );
+
+  imports
+    .command("get <email> <job-id>")
+    .description("Get a mailbox import job")
+    .action(withErrorHandler(async function (this: Command, email: string, jobId: string) {
+      const opts = getGlobalOpts(this);
+      const result = await createClient(opts).mailboxes.imports.get(email, jobId);
+      output(result, { json: !!opts.json });
+    }));
+
+  imports
+    .command("list <email>")
+    .description("List mailbox import jobs")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Maximum jobs", (value) => parseInt(value, 10), 50)
+    .action(withErrorHandler(async function (
+      this: Command,
+      email: string,
+      cmdOpts: { cursor?: string; limit: number },
+    ) {
+      const opts = getGlobalOpts(this);
+      const page = await createClient(opts).mailboxes.imports.list(email, cmdOpts);
+      output(opts.json ? page : page.items, {
+        json: !!opts.json,
+        columns: ["id", "status", "sourceFormat", "messagesProcessed", "messagesImported", "createdAt"],
+      });
+    }));
+
+  imports
+    .command("wait <email> <job-id>")
+    .description("Wait for a mailbox import to finish")
+    .option("--timeout <seconds>", "Stop waiting after this many seconds", parsePositiveSeconds)
+    .option("--poll-interval <seconds>", "Polling interval", parsePositiveSeconds, 5)
+    .action(withErrorHandler(async function (
+      this: Command,
+      email: string,
+      jobId: string,
+      cmdOpts: { timeout?: number; pollInterval: number },
+    ) {
+      const opts = getGlobalOpts(this);
+      const result = await createClient(opts).mailboxes.imports.wait(email, jobId, {
+        timeoutMs: cmdOpts.timeout === undefined ? undefined : cmdOpts.timeout * 1000,
+        pollIntervalMs: cmdOpts.pollInterval * 1000,
+        onPoll: createImportProgressReporter(),
+      });
+      output(result, { json: !!opts.json });
+      setTerminalExitCode(result);
+    }));
+
+  imports
+    .command("cancel <email> <job-id>")
+    .description("Cancel an active mailbox import")
+    .action(withErrorHandler(async function (this: Command, email: string, jobId: string) {
+      const opts = getGlobalOpts(this);
+      const result = await createClient(opts).mailboxes.imports.cancel(email, jobId);
+      output(result, { json: !!opts.json });
+    }));
 }
 
 const MAIL_DOMAIN_BY_API_HOST = new Map([
@@ -388,4 +618,5 @@ export function registerMailboxCommands(program: Command): void {
     );
 
   registerMailboxRulesCommands(mailbox);
+  registerMailboxImportCommands(mailbox);
 }

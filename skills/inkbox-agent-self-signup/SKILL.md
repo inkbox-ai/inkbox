@@ -51,7 +51,7 @@ The four published plugins:
 
 | | Unclaimed | Claimed (after verification) |
 |---|---|---|
-| Max sends/day | 10 | 500 |
+| Recipient sends per fixed 24-hour window | 5 | Plan-based (100–5,000) |
 | Allowed recipients | `human_email` only | No restriction |
 | Can receive email | Yes | Yes |
 | Can create mailboxes | No | No |
@@ -97,7 +97,7 @@ resend = Inkbox.resend_signup_verification(api_key)
 status = Inkbox.get_signup_status(api_key)
 # status.claim_status      → "agent_unclaimed" or "agent_claimed"
 # status.human_state        → "human_no_account", "human_account_unverified", etc.
-# status.restrictions.max_sends_per_day → 10 (unclaimed) or 500 (claimed)
+# status.restrictions.max_sends_per_day → effective 24-hour recipient-send limit
 # status.restrictions.allowed_recipients → ["john@example.com"] (unclaimed)
 ```
 
@@ -152,7 +152,7 @@ const resend = await Inkbox.resendSignupVerification(apiKey);
 const status = await Inkbox.getSignupStatus(apiKey);
 // status.claimStatus       → "agent_unclaimed" or "agent_claimed"
 // status.humanState         → "human_no_account", "human_account_unverified", etc.
-// status.restrictions.maxSendsPerDay → 10 (unclaimed) or 500 (claimed)
+// status.restrictions.maxSendsPerDay → effective 24-hour recipient-send limit
 // status.restrictions.allowedRecipients → ["john@example.com"] (unclaimed)
 ```
 
@@ -243,7 +243,7 @@ Response:
   "human_state": "human_no_account",
   "human_email": "john@example.com",
   "restrictions": {
-    "max_sends_per_day": 10,
+    "max_sends_per_day": 5,
     "allowed_recipients": ["john@example.com"],
     "can_receive": true,
     "can_create_mailboxes": false

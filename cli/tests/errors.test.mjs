@@ -61,3 +61,29 @@ test("withErrorHandler degrades to the generic API error for a string 402 (old s
   );
   assert.equal(lines.length, 1); // no storage hint on an untyped 402
 });
+
+test("withErrorHandler renders the message from structured API details", async () => {
+  const { lines, exitCode } = await runAndCapture(
+    new InkboxAPIError(400, {
+      error: "mail_import_invalid_request",
+      message: "The import request is invalid.",
+    }),
+  );
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(lines, ["Error: HTTP 400: The import request is invalid."]);
+});
+
+test("withErrorHandler explains how to release an in-flight mailbox import", async () => {
+  const { lines, exitCode } = await runAndCapture(
+    new InkboxAPIError(409, {
+      error: "mail_import_already_in_flight",
+      message: "An import is already in flight for this mailbox.",
+    }),
+  );
+
+  assert.equal(exitCode, 1);
+  assert.equal(lines[0], "Error: HTTP 409: An import is already in flight for this mailbox.");
+  assert.match(lines[1], /inkbox mailbox imports list <email>/);
+  assert.match(lines[1], /inkbox mailbox imports cancel <email> <job-id>/);
+});

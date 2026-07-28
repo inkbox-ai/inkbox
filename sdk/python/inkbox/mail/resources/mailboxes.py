@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from inkbox.mail.types import FilterMode, Mailbox, Message
+from inkbox.mail.resources.imports import MailboxImportsResource
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -20,9 +21,9 @@ _UNSET = object()
 
 
 class MailboxesResource:
-
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+        self.imports = MailboxImportsResource(http)
 
     def list(self) -> list[Mailbox]:
         """List all mailboxes for your organisation."""

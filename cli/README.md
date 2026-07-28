@@ -452,6 +452,43 @@ Secret type flags:
 
 ### mailbox
 
+Import historical mail from an MBOX or EML file, or a ZIP holding either (a
+Gmail Takeout ZIP imports as-is; ZIP entries that are not mail, including nested
+archives, are ignored):
+
+```bash
+inkbox mailbox imports run <email> <file>
+  --source-format <auto|mbox|eml|zip>       # Default: auto
+  --original-address <email>                # Repeatable; identifies sent mail
+  --mark-unread                             # Default imports as read
+  --no-wait                                 # Return after queueing
+  --timeout <seconds>                       # Local wait timeout; does not cancel
+  --poll-interval <seconds>                 # Default: 5
+
+inkbox mailbox imports get <email> <job-id>
+inkbox mailbox imports list <email> [--cursor <cursor>] [--limit <n>]
+inkbox mailbox imports wait <email> <job-id> [--timeout <seconds>] [--poll-interval <seconds>]
+inkbox mailbox imports cancel <email> <job-id>
+```
+
+`run` uploads from disk without loading the full file into memory. Upload and
+processing progress goes to stderr; `--json` keeps stdout to one job object.
+`run` and `wait` exit nonzero when the terminal job is failed or cancelled.
+Unsafe imported content may be rejected and counted separately. Processing
+counters are cumulative and never go backwards, but they can sit unchanged while
+a large message is processed and are not a percentage. Jobs run one at a time
+per organization and share overall import capacity, so a long `queued` stretch
+is normal rather than a stall.
+
+Upload targets expire after 5 minutes, so `run` re-issues one and retries once
+after a transport failure or rejected upload target, then cancels the job it
+created rather than leaving the mailbox blocked. If a `run` is interrupted,
+`inkbox mailbox imports list <email>`
+and `inkbox mailbox imports cancel <email> <job-id>` release the mailbox; an
+abandoned job otherwise holds it for 24 hours. Other limits: 1 GiB per upload,
+50 MiB per message, 100,000 messages and 20 `--original-address` values per job,
+65,000 entries per ZIP, and 20 import jobs per organization per 24 hours.
+
 Org-level mailbox read + update. Mailboxes are provisioned atomically
 by `inkbox identity create` and removed by `inkbox identity delete`
 (cascade) — there is no standalone create / delete here. `display_name`

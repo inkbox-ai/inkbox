@@ -95,7 +95,7 @@ Inkbox.resend_signup_verification(api_key)
 # Check status and restrictions
 status = Inkbox.get_signup_status(api_key)
 print(status.claim_status)                    # "agent_unclaimed" or "agent_claimed"
-print(status.restrictions.max_sends_per_day)  # 10 (unclaimed) or 500 (claimed)
+print(status.restrictions.max_sends_per_day)  # Effective 24-hour recipient-send limit
 ```
 
 | Method | Auth | Returns |
@@ -186,6 +186,44 @@ identity.revoke_access(viewer.id)
 ---
 
 ## Mail
+
+### Mailbox imports
+
+```python
+from inkbox import MailImportFormat
+
+created = inkbox.mailboxes.imports.create(
+    "agent@inkboxmail.com",
+    source_format=MailImportFormat.AUTO,
+    original_addresses=["old-address@example.com"],
+)
+inkbox.mailboxes.imports.upload(created.upload, "./archive.mbox")
+inkbox.mailboxes.imports.start("agent@inkboxmail.com", str(created.job.id))
+job = inkbox.mailboxes.imports.wait(
+    "agent@inkboxmail.com",
+    str(created.job.id),
+    timeout=3600,
+    poll_interval=5,
+)
+```
+
+Supported formats are `auto`, `mbox`, `eml`, and `zip`. A ZIP may hold `.eml`
+and/or `.mbox` files (a Gmail Takeout ZIP imports as-is); entries that are not
+mail, including nested archives, are ignored. `wait` fetches immediately, polls
+every five seconds by default, and returns every terminal state, including
+`failed` and `cancelled`. A local timeout does not cancel the job. Counters are
+cumulative and never go backwards, but they can sit unchanged while a large
+message is processed and never yield a percentage. Jobs run one at a time per
+organization and share overall import capacity, so a long `queued` stretch is
+normal. Unsafe imported content may be rejected and reported in
+`messages_rejected_unsafe`.
+
+Upload targets expire after 5 minutes; call `refresh_upload_target` and upload
+again if one expires, or `cancel` the job so the mailbox is not held by an
+upload that never landed. Other limits: 1 GiB per upload, 50 MiB per message,
+100,000 messages and 20 `original_addresses` per job, 65,000 entries per ZIP, 20
+import jobs per organization per 24 hours (`MailImportQuotaExceededError`
+carries `retry_after_seconds`), and one in-flight import per mailbox.
 
 ```python
 # Send an email (plain text and/or HTML)

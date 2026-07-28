@@ -22,6 +22,16 @@ class InkboxVaultKeyError(InkboxError):
     """
 
 
+class MailImportUploadError(InkboxError):
+    """Raised when a direct mailbox import upload fails."""
+
+    def __init__(self, status_code: int | None, detail: str) -> None:
+        prefix = f"HTTP {status_code}" if status_code is not None else "transport error"
+        super().__init__(f"Import upload failed ({prefix}): {detail}")
+        self.status_code = status_code
+        self.detail = detail
+
+
 class InkboxAPIError(InkboxError):
     """
     Raised when the API returns a 4xx or 5xx response.
@@ -34,9 +44,7 @@ class InkboxAPIError(InkboxError):
     """
 
     def __init__(self, status_code: int, detail: str | dict[str, Any]) -> None:
-        super().__init__(
-            f"HTTP {status_code}: {detail}"
-        )
+        super().__init__(f"HTTP {status_code}: {detail}")
         self.status_code = status_code
         self.detail: str | dict[str, Any] = detail
 
@@ -127,6 +135,36 @@ class DedicatedIMessageNumberInventoryPendingError(InkboxAPIError):
         super().__init__(status_code=status_code, detail=detail)
         self.message: str = str(detail.get("message", ""))
         self.number_type: str = str(detail.get("number_type", ""))
+        raw_retry = detail.get("retry_after_seconds")
+        if retry_after is not None:
+            try:
+                raw_retry = int(retry_after)
+            except ValueError:
+                pass
+        self.retry_after_seconds: int | None = (
+            int(raw_retry) if raw_retry is not None else None
+        )
+
+
+class MailImportQuotaExceededError(InkboxAPIError):
+    """
+    Raised on 429 when the organization's daily import-job quota is spent.
+
+    Attributes:
+        message: Human-readable explanation from the server.
+        retry_after_seconds: Seconds to wait before creating another job,
+            from the ``Retry-After`` header when the server sends one.
+    """
+
+    def __init__(
+        self,
+        status_code: int,
+        detail: dict[str, Any],
+        *,
+        retry_after: str | None = None,
+    ) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.message: str = str(detail.get("message", ""))
         raw_retry = detail.get("retry_after_seconds")
         if retry_after is not None:
             try:

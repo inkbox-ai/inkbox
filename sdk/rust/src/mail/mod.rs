@@ -12,12 +12,14 @@ pub mod types;
 // Re-export the public types.
 pub use types::{
     ContactRuleStatus, Domain, FilterMode, FilterModeChangeNotice, ForwardMode, MailContactRule,
-    MailIdentityContactRule, MailRuleAction, MailRuleMatchType, Mailbox, Message, MessageDetail,
-    MessageDirection, ReplyAllRecipients, SendingDomainStatus, Thread, ThreadDetail, ThreadFolder,
+    MailIdentityContactRule, MailImportCreateResult, MailImportFormat, MailImportJob,
+    MailImportJobPage, MailImportJobStatus, MailImportUploadTarget, MailRuleAction,
+    MailRuleMatchType, Mailbox, Message, MessageDetail, MessageDirection, ReplyAllRecipients,
+    SendingDomainStatus, Thread, ThreadDetail, ThreadFolder,
 };
 
 // Re-export the resources.
 pub use resources::{
     Attachment, DomainsResource, MailContactRulesResource, MailIdentityContactRulesResource,
-    MailboxesResource, MessagesResource, ThreadsResource,
+    MailboxImportsResource, MailboxesResource, MessagesResource, ThreadsResource,
 };

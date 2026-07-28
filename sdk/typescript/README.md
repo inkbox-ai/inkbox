@@ -107,7 +107,7 @@ await Inkbox.resendSignupVerification(apiKey);
 // Check status and restrictions
 const status = await Inkbox.getSignupStatus(apiKey);
 console.log(status.claimStatus);                    // "agent_unclaimed" or "agent_claimed"
-console.log(status.restrictions.maxSendsPerDay);    // 10 (unclaimed) or 500 (claimed)
+console.log(status.restrictions.maxSendsPerDay);    // Effective 24-hour recipient-send limit
 ```
 
 | Method | Auth | Returns |
@@ -195,6 +195,43 @@ await identity.revokeAccess(viewer.id);
 ---
 
 ## Mail
+
+### Mailbox imports
+
+```ts
+import { openAsBlob } from "node:fs";
+import { MailImportFormat } from "@inkbox/sdk";
+
+const file = await openAsBlob("./archive.zip");
+const created = await inkbox.mailboxes.imports.create("agent@inkboxmail.com", {
+  sourceFormat: MailImportFormat.ZIP,
+  originalAddresses: ["old-address@example.com"],
+});
+await inkbox.mailboxes.imports.upload(created.upload, file);
+await inkbox.mailboxes.imports.start("agent@inkboxmail.com", created.job.id);
+const job = await inkbox.mailboxes.imports.wait("agent@inkboxmail.com", created.job.id, {
+  timeoutMs: 3_600_000,
+  pollIntervalMs: 5_000,
+});
+```
+
+Supported formats are `auto`, `mbox`, `eml`, and `zip`. A ZIP may hold `.eml`
+and/or `.mbox` files (a Gmail Takeout ZIP imports as-is); entries that are not
+mail, including nested archives, are ignored. `wait` fetches immediately, polls
+every five seconds by default, and returns every terminal state, including
+`failed` and `cancelled`. A local timeout does not cancel the job. Counters are
+cumulative and never go backwards, but they can sit unchanged while a large
+message is processed and never yield a percentage. Jobs run one at a time per
+organization and share overall import capacity, so a long `queued` stretch is
+normal. Unsafe imported content may be rejected and reported in
+`messagesRejectedUnsafe`.
+
+Upload targets expire after 5 minutes; call `refreshUploadTarget` and upload
+again if one expires, or `cancel` the job so the mailbox is not held by an
+upload that never landed. Other limits: 1 GiB per upload, 50 MiB per message,
+100,000 messages and 20 `originalAddresses` per job, 65,000 entries per ZIP, 20
+import jobs per organization per 24 hours (`MailImportQuotaExceededError`
+carries `retryAfterSeconds`), and one in-flight import per mailbox.
 
 ```ts
 // Send an email (plain text and/or HTML)

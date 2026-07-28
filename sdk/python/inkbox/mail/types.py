@@ -113,6 +113,22 @@ class SendingDomainStatus(StrEnum):
     PENDING_DELETION = "pending_deletion"
 
 
+class MailImportFormat(StrEnum):
+    AUTO = "auto"
+    MBOX = "mbox"
+    EML = "eml"
+    ZIP = "zip"
+
+
+class MailImportJobStatus(StrEnum):
+    PENDING_UPLOAD = "pending_upload"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 @dataclass
 class FilterModeChangeNotice:
     """Summary returned on PATCH when ``filter_mode`` actually changed.
@@ -208,15 +224,9 @@ class Mailbox:
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
-            agent_identity_id=(
-                UUID(agent_identity_id)
-                if agent_identity_id
-                else None
-            ),
+            agent_identity_id=(UUID(agent_identity_id) if agent_identity_id else None),
             filter_mode_change_notice=(
-                FilterModeChangeNotice._from_dict(notice)
-                if notice
-                else None
+                FilterModeChangeNotice._from_dict(notice) if notice else None
             ),
             storage_used_bytes=d.get("storage_used_bytes") or 0,
             storage_limit_bytes=(
@@ -240,6 +250,7 @@ class Domain:
         verified_at: First time this domain reached ``VERIFIED``, or
             ``None`` if never verified.
     """
+
     id: str
     domain: str
     status: SendingDomainStatus
@@ -289,6 +300,7 @@ class Message:
     # count. Both absent/None on old servers and untracked sends.
     first_opened_at: datetime | None = None
     open_count: int = 0
+    import_job_id: UUID | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Message:
@@ -310,6 +322,101 @@ class Message:
             created_at=datetime.fromisoformat(d["created_at"]),
             first_opened_at=_dt(d.get("first_opened_at")),
             open_count=d.get("open_count") or 0,
+            import_job_id=UUID(d["import_job_id"]) if d.get("import_job_id") else None,
+        )
+
+
+@dataclass
+class MailImportUploadTarget:
+    url: str
+    fields: dict[str, str]
+    expires_in_seconds: int
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> MailImportUploadTarget:
+        return cls(
+            url=d["url"],
+            fields=dict(d["fields"]),
+            expires_in_seconds=int(d["expires_in_seconds"]),
+        )
+
+
+@dataclass
+class MailImportJob:
+    id: UUID
+    mailbox_id: UUID
+    status: MailImportJobStatus
+    source_format: MailImportFormat
+    original_addresses: list[str] | None
+    mark_as_read: bool
+    upload_size_bytes: int | None
+    messages_processed: int
+    messages_imported: int
+    messages_skipped_duplicate: int
+    messages_failed: int
+    messages_rejected_unsafe: int
+    error_detail: str | None
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in {
+            MailImportJobStatus.COMPLETED,
+            MailImportJobStatus.FAILED,
+            MailImportJobStatus.CANCELLED,
+        }
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> MailImportJob:
+        return cls(
+            id=UUID(d["id"]),
+            mailbox_id=UUID(d["mailbox_id"]),
+            status=MailImportJobStatus(d["status"]),
+            source_format=MailImportFormat(d["source_format"]),
+            original_addresses=d.get("original_addresses"),
+            mark_as_read=bool(d["mark_as_read"]),
+            upload_size_bytes=d.get("upload_size_bytes"),
+            messages_processed=int(d.get("messages_processed", 0)),
+            messages_imported=int(d.get("messages_imported", 0)),
+            messages_skipped_duplicate=int(d.get("messages_skipped_duplicate", 0)),
+            messages_failed=int(d.get("messages_failed", 0)),
+            messages_rejected_unsafe=int(d.get("messages_rejected_unsafe", 0)),
+            error_detail=d.get("error_detail"),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d.get("updated_at", d["created_at"])),
+            started_at=_dt(d.get("started_at")),
+            finished_at=_dt(d.get("finished_at")),
+        )
+
+
+@dataclass
+class MailImportCreateResult:
+    job: MailImportJob
+    upload: MailImportUploadTarget
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> MailImportCreateResult:
+        return cls(
+            job=MailImportJob._from_dict(d["job"]),
+            upload=MailImportUploadTarget._from_dict(d["upload"]),
+        )
+
+
+@dataclass
+class MailImportJobPage:
+    items: list[MailImportJob]
+    next_cursor: str | None
+    has_more: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> MailImportJobPage:
+        return cls(
+            items=[MailImportJob._from_dict(item) for item in d.get("items", [])],
+            next_cursor=d.get("next_cursor"),
+            has_more=bool(d.get("has_more", False)),
         )
 
 

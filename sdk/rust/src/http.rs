@@ -97,10 +97,20 @@ impl HttpTransport {
     }
 
     pub fn get(&self, path: &str, params: Query) -> Result<Value> {
-        let resp = self.send(
-            self.client.get(self.url(path)).query(params),
-            &self.url(path),
-        )?;
+        self.get_with_timeout(path, params, None)
+    }
+
+    pub(crate) fn get_with_timeout(
+        &self,
+        path: &str,
+        params: Query,
+        timeout: Option<Duration>,
+    ) -> Result<Value> {
+        let mut request = self.client.get(self.url(path)).query(params);
+        if let Some(timeout) = timeout {
+            request = request.timeout(timeout);
+        }
+        let resp = self.send(request, &self.url(path))?;
         raise_for_status(resp)?.json_value()
     }
 
@@ -487,6 +497,23 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .and_then(|r| r.as_str())
                         .unwrap_or("")
                         .to_string(),
+                    detail: Box::new(raw_detail),
+                });
+            }
+        }
+    }
+
+    if status == 429 {
+        if let Value::Object(map) = &raw_detail {
+            if map.get("error").and_then(|e| e.as_str()) == Some("mail_import_quota_exceeded") {
+                return Err(InkboxError::MailImportQuotaExceeded {
+                    status_code: status,
+                    message: map
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("")
+                        .into(),
+                    retry_after_header,
                     detail: Box::new(raw_detail),
                 });
             }

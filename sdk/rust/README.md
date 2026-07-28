@@ -114,6 +114,46 @@ exposes channel-scoped convenience methods: `send_email`, `forward_email`,
 (`list_mail_contact_rules`, `create_phone_contact_rule`, ...), `create_signing_key`,
 and more.
 
+### Mailbox imports
+
+```rust
+use std::time::Duration;
+use inkbox::mail::MailImportFormat;
+
+let imports = inkbox.mailboxes().imports();
+let created = imports.create(
+    "agent@inkboxmail.com",
+    MailImportFormat::Auto,
+    Some(&["old-address@example.com".to_string()]),
+    true,
+)?;
+imports.upload(&created.upload, "./archive.mbox")?;
+imports.start("agent@inkboxmail.com", &created.job.id.to_string())?;
+let job = imports.wait(
+    "agent@inkboxmail.com",
+    &created.job.id.to_string(),
+    Some(Duration::from_secs(3600)),
+    Some(Duration::from_secs(5)),
+)?;
+```
+
+Imports support MBOX and EML files, or a ZIP holding either (a Gmail Takeout ZIP
+imports as-is); ZIP entries that are not mail, including nested archives, are
+ignored. `wait` returns completed, failed, and cancelled jobs, and reports a
+local wall-clock timeout as `InkboxError::Timeout` without cancelling the job.
+Counters are cumulative and never go backwards, but they can sit unchanged while
+a large message is processed and do not represent a percentage. Jobs run one at
+a time per organization and share overall import capacity, so a long `queued`
+stretch is normal. Unsafe imported content may be rejected in
+`messages_rejected_unsafe`.
+
+Upload targets expire after 5 minutes; call `refresh_upload_target` and upload
+again if one expires, or `cancel` the job so the mailbox is not held by an
+upload that never landed. Other limits: 1 GiB per upload, 50 MiB per message,
+100,000 messages and 20 original addresses per job, 65,000 entries per ZIP, 20
+import jobs per organization per 24 hours (`InkboxError::MailImportQuotaExceeded`
+carries the `Retry-After` value), and one in-flight import per mailbox.
+
 ### Dedicated iMessage numbers
 
 List or claim organization-owned dedicated numbers through the iMessage resource:

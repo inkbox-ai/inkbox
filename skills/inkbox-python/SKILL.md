@@ -1,6 +1,6 @@
 ---
 name: inkbox-python
-description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
+description: Use when writing Python code that imports from `inkbox`, uses `pip install inkbox`, or when adding email, mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, vault, tunnels, mailbox storage, mail clients (IMAP/SMTP), or agent identity features using the Inkbox Python SDK.
 user-invocable: false
 ---
 
@@ -121,6 +121,38 @@ identity.revoke_access(viewer.id) # revoke one viewer (keyed by viewer UUID)
 Granting a viewer against an already-wildcard target raises `RedundantContactAccessGrantError` (409); revoking a non-existent grant raises `InkboxAPIError` (404).
 
 ## Mail
+
+### Import historical mail
+
+```python
+from inkbox import MailImportFormat
+
+created = inkbox.mailboxes.imports.create(
+    email,
+    source_format=MailImportFormat.AUTO,
+    original_addresses=["old@example.com"],
+)
+inkbox.mailboxes.imports.upload(created.upload, "archive.mbox")
+inkbox.mailboxes.imports.start(email, str(created.job.id))
+job = inkbox.mailboxes.imports.wait(email, str(created.job.id), poll_interval=5)
+```
+
+Formats: `auto`, `mbox`, `eml`, `zip`. A ZIP may hold `.eml` and/or `.mbox`
+files (a Gmail Takeout ZIP imports as-is); other entries, including nested
+archives, are ignored. `wait` returns all terminal states; failure/cancellation
+are job results, not transport errors. A timeout does not cancel. Counters are
+cumulative and never go backwards, so a stalled counter is a signal, not normal
+churn; counters may still remain unchanged while a slow message is processed,
+and they must not be treated as a percentage. Jobs run one at a time per
+organization and share overall import capacity, so a long `queued` stretch is
+normal; do not cancel and recreate. Unsafe imported content may be rejected.
+
+Upload targets expire after 5 minutes: `refresh_upload_target(email, job_id)`
+and upload again, or `cancel` the job so it does not hold the mailbox for 24
+hours. Limits: 1 GiB per upload, 50 MiB per message, 100,000 messages and 20
+`original_addresses` per job, 65,000 entries per ZIP, 20 jobs per organization
+per 24 hours (`MailImportQuotaExceededError.retry_after_seconds`), and one
+in-flight import per mailbox.
 
 ### Send
 

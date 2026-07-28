@@ -18,6 +18,7 @@ from inkbox.exceptions import (
     DuplicateContactRuleError,
     InkboxAPIError,
     IdempotencyKeyReusedError,
+    MailImportQuotaExceededError,
     RecipientBlockedError,
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
@@ -297,6 +298,17 @@ def _raise_for_status(resp: httpx.Response) -> None:
         raise IdempotencyKeyReusedError(
             status_code=resp.status_code,
             detail=raw_detail,
+        )
+
+    if (
+        resp.status_code == 429
+        and isinstance(raw_detail, dict)
+        and raw_detail.get("error") == "mail_import_quota_exceeded"
+    ):
+        raise MailImportQuotaExceededError(
+            status_code=resp.status_code,
+            detail=raw_detail,
+            retry_after=resp.headers.get("Retry-After"),
         )
 
     raise InkboxAPIError(status_code=resp.status_code, detail=raw_detail)

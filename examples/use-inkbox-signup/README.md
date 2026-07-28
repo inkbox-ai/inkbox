@@ -20,7 +20,7 @@ No Inkbox account or API key is required to start. The flow provisions a mailbox
 | 4. Send welcome | `send-welcome` | Signup API key (after verify) |
 | 5. Clean up | `cleanup` | Signup API key |
 
-While unclaimed, outbound email is restricted to the human email only (max 10 sends/day). After verification, restrictions lift.
+While unclaimed, outbound email is restricted to the human email only (max 5 recipient sends per fixed 24-hour window). After verification, recipient restrictions lift and the organization's plan-based limits apply.
 
 ## Run (Python)
 
@@ -72,7 +72,7 @@ npx tsx --env-file .env agent-signup.ts cleanup
 
 | | Unclaimed | Claimed (after verify) |
 |---|---|---|
-| Max sends/day | 10 | 500 |
+| Recipient sends per fixed 24-hour window | 5 | Plan-based (100–5,000) |
 | Allowed recipients | `human_email` only | No restriction |
 | Can receive email | Yes | Yes |
 

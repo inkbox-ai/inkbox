@@ -24,15 +24,15 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 - `inkbox-cli`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-cli/SKILL.md
-  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, phone, text, iMessage, A2A task/message history, vault, mailbox (including storage and IMAP/SMTP client settings), number, signing key, and webhook operations.
+  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, mailbox imports, phone, text, iMessage, A2A task/message history, vault, mailbox storage and mail-client settings, number, signing key, and webhook operations.
 
 - `inkbox-python`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
-  Python SDK reference for `inkbox`, including identities, email, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
+  Python SDK reference for `inkbox`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
 - `inkbox-ts`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-ts/SKILL.md
-  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
+  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
 For A2A history, search covers string and numeric content values from `text`
 and `data` parts, not metadata, with newest-first results. Message `role` is
@@ -71,6 +71,27 @@ Two cross-cutting mail facts worth knowing before you pick a skill. Each SDK/CLI
 **An inbox can be attached to a regular mail client** (Thunderbird, Apple Mail, mutt, …) with the API key an agent already has — there is no separate credential to create, and **no HTTP endpoint or SDK method is involved**; the gateway speaks IMAP and SMTP directly. Username = the inbox address; password = an **identity-scoped** API key (admin-scoped keys are rejected — one key maps to exactly one mailbox; revoking the key revokes mail-client access). Hosts `imap.inkboxmail.com` / `smtp.inkboxmail.com`, ports 993 (IMAPS), 465 (SMTPS), 587 (STARTTLS). `inkbox mailbox client-settings <email-address>` prints the table. Constraints: the `From` must be the authenticated inbox address (exactly one; aliases and "send as" are rejected); on the Free plan signed/encrypted mail (S/MIME, PGP) cannot be sent over SMTP (the required footer would break the signature). Leave "save a copy of sent messages" on — Inkbox recognizes the client's copy as the message it already stored, so there is one Sent entry, charged once. Full walkthrough: https://inkbox.ai/docs/capabilities/email/mail-clients
 
 **Mailboxes have a plan storage cap.** `mailboxes.list` / `.get` / `.update` carry `storage_used_bytes` / `storage_limit_bytes` (TS `storageUsedBytes` / `storageLimitBytes`; `null` when the server resolved no cap). Sends, reply-alls, and forwards over the cap fail with HTTP 402 — `StorageLimitExceededError` (Rust `InkboxError::StorageLimitExceeded`), carrying `message`, `upgrade_url`, and `limit_bytes`. Deleting messages or threads frees space immediately. Caps are **binary**: 2 GiB = `2 * 1024³` = 2,147,483,648 bytes — divide by 1024 and label GiB/MiB, never GB. On the Free plan a footer is appended to the **stored** body of outgoing mail, so a fetched message is not byte-for-byte what was sent.
+
+## Mailbox Imports
+
+All SDKs expose mailbox imports under `mailboxes.imports`; the CLI uses
+`inkbox mailbox imports run|get|list|wait|cancel`. The lifecycle is create,
+direct upload, start, then poll. Supported inputs are MBOX and EML files, or a
+ZIP holding either (a Gmail Takeout ZIP imports as-is); ZIP entries that are not
+mail, including nested archives, are ignored. Waiters fetch immediately, poll
+every five seconds by default, and return every terminal state (`completed`,
+`failed`, `cancelled`). A local timeout does not cancel the job. Counters are
+cumulative and never go backwards, so a stalled counter is a signal, not normal
+churn; they can still sit unchanged while a large message is processed and are
+not a percentage. Jobs run one at a time per organization and share overall
+import capacity, so a long `queued` stretch is normal; do not cancel and
+recreate. Unsafe imported content may be rejected and counted separately.
+
+Limits: 1 GiB per upload, 50 MiB per message, 100,000 messages and 20 original
+addresses per job, 65,000 entries per ZIP, 20 import jobs per organization per
+24 hours, and one in-flight import per mailbox. Upload targets expire after 5
+minutes; re-issue one and upload again, or cancel the job. An abandoned job
+holds the mailbox for 24 hours.
 
 ## How To Choose
 

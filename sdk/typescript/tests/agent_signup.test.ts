@@ -49,7 +49,7 @@ const RAW_STATUS_RESPONSE = {
   human_state: "pending",
   human_email: "human@example.com",
   restrictions: {
-    max_sends_per_day: 10,
+    max_sends_per_day: 5,
     allowed_recipients: ["human@example.com"],
     can_receive: true,
     can_create_mailboxes: false,
@@ -232,7 +232,7 @@ describe("Inkbox.getSignupStatus", () => {
       humanState: "pending",
       humanEmail: "human@example.com",
       restrictions: {
-        maxSendsPerDay: 10,
+        maxSendsPerDay: 5,
         allowedRecipients: ["human@example.com"],
         canReceive: true,
         canCreateMailboxes: false,

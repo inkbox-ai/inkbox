@@ -29,6 +29,7 @@ export const RAW_MESSAGE = {
   is_starred: false,
   has_attachments: false,
   created_at: "2026-03-09T00:00:00Z",
+  import_job_id: null,
 };
 
 export const RAW_MESSAGE_DETAIL = {
