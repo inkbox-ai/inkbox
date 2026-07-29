@@ -533,6 +533,61 @@ class PhoneTranscript:
         )
 
 
+class HostedAgentToolInvocationStatus(StrEnum):
+    """Execution state for a Voice AI tool invocation."""
+
+    STARTED = "started"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+@dataclass
+class HostedAgentToolInvocation:
+    """Safe activity record for one Voice AI tool invocation."""
+
+    id: UUID
+    call_id: UUID
+    tool_name: str
+    status: HostedAgentToolInvocationStatus
+    result: dict[str, str | int | bool | None] | None
+    started_at: datetime
+    completed_at: datetime | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentToolInvocation:
+        return cls(
+            id=UUID(d["id"]),
+            call_id=UUID(d["call_id"]),
+            tool_name=d["tool_name"],
+            status=HostedAgentToolInvocationStatus(d["status"]),
+            result=d.get("result"),
+            started_at=datetime.fromisoformat(d["started_at"]),
+            completed_at=_dt(d.get("completed_at")),
+        )
+
+
+@dataclass
+class HostedAgentToolInvocationPage:
+    """A page of Voice AI tool activity for one call."""
+
+    items: list[HostedAgentToolInvocation]
+    limit: int
+    offset: int
+    has_more: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentToolInvocationPage:
+        return cls(
+            items=[
+                HostedAgentToolInvocation._from_dict(item)
+                for item in d.get("items", [])
+            ],
+            limit=d["limit"],
+            offset=d["offset"],
+            has_more=d["has_more"],
+        )
+
+
 @dataclass
 class IncomingCallActionConfig:
     """Per-identity inbound-call handling configuration.

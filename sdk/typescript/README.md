@@ -411,6 +411,15 @@ for (const t of segments) {
   console.log(`[${t.party}] ${t.text}`);  // party: "local" or "remote"
 }
 
+// Inspect identity-wide tool activity for a Voice AI call
+const activity = await identity.listToolInvocations(calls[0].id, {
+  limit: 50,
+  offset: 0,
+});
+for (const invocation of activity.items) {
+  console.log(invocation.toolName, invocation.status);
+}
+
 // Read transcripts across all recent calls
 const recentCalls = await identity.listCalls({ limit: 10 });
 for (const call of recentCalls) {

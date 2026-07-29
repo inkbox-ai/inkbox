@@ -13,6 +13,7 @@ from inkbox.phone.types import (
     CallMode,
     CallOrigin,
     HostedAgentAuthorityMode,
+    HostedAgentToolInvocationPage,
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneTranscript,
@@ -116,6 +117,28 @@ class CallsResource:
         """
         data = self._http.get(f"/calls/{call_id}/transcripts")
         return [PhoneTranscript._from_dict(t) for t in data]
+
+    def tool_invocations(
+        self,
+        call_id: UUID | str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> HostedAgentToolInvocationPage:
+        """List a page of safe Voice AI tool activity for a call.
+
+        Tool arguments and provider details are intentionally excluded.
+
+        Args:
+            call_id: UUID of the call.
+            limit: Max results to return (1–200).
+            offset: Pagination offset.
+        """
+        data = self._http.get(
+            f"/calls/{call_id}/tool-invocations",
+            params={"limit": limit, "offset": offset},
+        )
+        return HostedAgentToolInvocationPage._from_dict(data)
 
     def place(
         self,

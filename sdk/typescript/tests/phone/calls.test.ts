@@ -205,6 +205,62 @@ describe("CallsResource.transcripts", () => {
   });
 });
 
+describe("CallsResource.toolInvocations", () => {
+  it("returns paginated safe Voice AI tool activity", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      items: [
+        {
+          id: "dddd4444-0000-0000-0000-000000000001",
+          call_id: CALL_ID,
+          tool_name: "send_email",
+          status: "succeeded",
+          result: { status: "sent" },
+          started_at: "2026-07-29T01:02:03+00:00",
+          completed_at: "2026-07-29T01:02:04+00:00",
+        },
+      ],
+      limit: 25,
+      offset: 50,
+      has_more: true,
+    });
+    const res = new CallsResource(http);
+
+    const page = await res.toolInvocations(CALL_ID, { limit: 25, offset: 50 });
+
+    expect(http.get).toHaveBeenCalledWith(
+      `/calls/${CALL_ID}/tool-invocations`,
+      { limit: 25, offset: 50 },
+    );
+    expect(page.hasMore).toBe(true);
+    expect(page.items[0].toolName).toBe("send_email");
+    expect(page.items[0].status).toBe("succeeded");
+    expect(page.items[0].result).toEqual({ status: "sent" });
+    expect(page.items[0].completedAt).toEqual(
+      new Date("2026-07-29T01:02:04+00:00"),
+    );
+  });
+
+  it("uses default pagination", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      items: [],
+      limit: 50,
+      offset: 0,
+      has_more: false,
+    });
+    const res = new CallsResource(http);
+
+    const page = await res.toolInvocations(CALL_ID);
+
+    expect(http.get).toHaveBeenCalledWith(
+      `/calls/${CALL_ID}/tool-invocations`,
+      { limit: 50, offset: 0 },
+    );
+    expect(page.items).toEqual([]);
+  });
+});
+
 describe("CallsResource.place", () => {
   it("places call with required fields (defaults origination to dedicated)", async () => {
     const http = mockHttp();
@@ -523,10 +579,17 @@ describe("CallsResource.place API errors", () => {
 });
 
 describe("CallsResource surface (identity-centered, v1.0.0)", () => {
-  it("exposes exactly list, get, hangup, transcripts, place", () => {
+  it("exposes the identity-centered call operations", () => {
     const methods = Object.getOwnPropertyNames(CallsResource.prototype)
       .filter((n) => n !== "constructor")
       .sort();
-    expect(methods).toEqual(["get", "hangup", "list", "place", "transcripts"]);
+    expect(methods).toEqual([
+      "get",
+      "hangup",
+      "list",
+      "place",
+      "toolInvocations",
+      "transcripts",
+    ]);
   });
 });

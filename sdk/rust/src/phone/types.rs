@@ -612,6 +612,38 @@ pub struct PhoneTranscript {
     pub created_at: String,
 }
 
+/// Execution state for a Voice AI tool invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedAgentToolInvocationStatus {
+    Started,
+    Succeeded,
+    Failed,
+}
+
+/// Safe activity record for one Voice AI tool invocation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostedAgentToolInvocation {
+    pub id: Uuid,
+    pub call_id: Uuid,
+    pub tool_name: String,
+    pub status: HostedAgentToolInvocationStatus,
+    #[serde(default)]
+    pub result: Option<serde_json::Map<String, serde_json::Value>>,
+    pub started_at: String,
+    #[serde(default)]
+    pub completed_at: Option<String>,
+}
+
+/// A page of Voice AI tool activity for one call.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostedAgentToolInvocationPage {
+    pub items: Vec<HostedAgentToolInvocation>,
+    pub limit: i64,
+    pub offset: i64,
+    pub has_more: bool,
+}
+
 /// A per-(org, receiver) SMS consent row.
 ///
 /// `receiver_number` is E.164 (`+15551234567`). Only one of `opted_in_at` /

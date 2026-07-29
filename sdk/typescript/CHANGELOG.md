@@ -14,6 +14,8 @@
   requires an admin API key.
 - Optional `voicemailDetection` control on outbound calls. It is omitted by
   default; pass `disabled` to stay connected and leave a voicemail.
+- Paginated `calls.toolInvocations()` and
+  `identity.listToolInvocations()` methods for safe Voice AI tool activity.
 
 ### Compatibility
 

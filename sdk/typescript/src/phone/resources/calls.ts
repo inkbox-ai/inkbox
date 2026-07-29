@@ -9,16 +9,19 @@ import {
   CallMode,
   CallOrigin,
   HostedAgentAuthorityMode,
+  HostedAgentToolInvocationPage,
   PhoneCall,
   PhoneCallWithRateLimit,
   PhoneTranscript,
   RawPhoneCall,
   RawPhoneCallWithRateLimit,
+  RawHostedAgentToolInvocationPage,
   RawPhoneTranscript,
   VoicemailDetection,
   parsePhoneCall,
   parsePhoneCallWithRateLimit,
   parsePhoneTranscript,
+  parseHostedAgentToolInvocationPage,
 } from "../types.js";
 
 export class CallsResource {
@@ -104,6 +107,25 @@ export class CallsResource {
       `/calls/${callId}/transcripts`,
     );
     return data.map(parsePhoneTranscript);
+  }
+
+  /**
+   * List a page of safe Voice AI tool activity for a call.
+   *
+   * Tool arguments and provider details are intentionally excluded.
+   */
+  async toolInvocations(
+    callId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<HostedAgentToolInvocationPage> {
+    const data = await this.http.get<RawHostedAgentToolInvocationPage>(
+      `/calls/${callId}/tool-invocations`,
+      {
+        limit: options?.limit ?? 50,
+        offset: options?.offset ?? 0,
+      },
+    );
+    return parseHostedAgentToolInvocationPage(data);
   }
 
   /**

@@ -390,6 +390,11 @@ segments = identity.list_transcripts(calls[0].id)
 for t in segments:
     print(f"[{t.party}] {t.text}")  # party: "local" or "remote"
 
+# Inspect identity-wide tool activity for a Voice AI call
+activity = identity.list_tool_invocations(calls[0].id, limit=50, offset=0)
+for invocation in activity.items:
+    print(invocation.tool_name, invocation.status)
+
 # Read transcripts across all recent calls
 for call in identity.list_calls(limit=10):
     segments = identity.list_transcripts(call.id)

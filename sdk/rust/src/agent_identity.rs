@@ -58,9 +58,10 @@ use crate::mail::types::{
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
     CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedAgentConfig,
-    HostedCallPlacementOptions, IncomingCallAction, IncomingCallActionConfig, PhoneCall,
-    PhoneCallWithRateLimit, PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType,
-    PhoneTranscript, TextConversationSummary, TextConversationUpdateResult, TextMessage,
+    HostedAgentToolInvocationPage, HostedCallPlacementOptions, IncomingCallAction,
+    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
+    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
+    TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::TunnelSummary;
@@ -759,6 +760,16 @@ impl AgentIdentity {
     /// List transcript segments for a specific call.
     pub fn list_transcripts(&self, call_id: &str) -> Result<Vec<PhoneTranscript>> {
         self.inkbox.calls().transcripts(call_id)
+    }
+
+    /// List a page of Voice AI tool activity for a specific call.
+    pub fn list_tool_invocations(
+        &self,
+        call_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<HostedAgentToolInvocationPage> {
+        self.inkbox.calls().tool_invocations(call_id, limit, offset)
     }
 
     /// Get this identity's Inkbox Voice AI config.
@@ -2206,6 +2217,30 @@ mod tests {
         mock.assert();
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].text, "Hi");
+    }
+
+    #[test]
+    fn list_tool_invocations_delegates_to_calls_resource() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/tool-invocations")
+                .query_param("limit", "10")
+                .query_param("offset", "20");
+            then.status(200).json_body(json!({
+                "items": [],
+                "limit": 10,
+                "offset": 20,
+                "has_more": false
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let page = identity
+            .list_tool_invocations("22222222-2222-2222-2222-222222222222", 10, 20)
+            .unwrap();
+        mock.assert();
+        assert!(page.items.is_empty());
+        assert_eq!(page.offset, 20);
     }
 
     #[test]

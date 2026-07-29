@@ -23,6 +23,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   detection so a caller can stay connected and leave a message. Python,
   TypeScript, and Rust omit the setting by default, preserving detection, and
   the CLI exposes `--no-voicemail-detection`.
+- **Voice AI tool activity.** Python, TypeScript, and Rust expose paginated,
+  call-scoped tool status and sanitized results without tool arguments.
 
 ### Changed
 

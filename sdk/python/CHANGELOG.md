@@ -14,6 +14,8 @@
   `yolo` requires an admin API key.
 - Optional `voicemail_detection` control on outbound calls. It is omitted by
   default; pass `disabled` to stay connected and leave a voicemail.
+- Paginated `calls.tool_invocations()` and
+  `identity.list_tool_invocations()` methods for safe Voice AI tool activity.
 
 ### Compatibility
 

@@ -74,6 +74,7 @@ from inkbox.phone.types import (
     CallOrigin,
     HostedAgentAuthorityMode,
     HostedAgentConfig,
+    HostedAgentToolInvocationPage,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -804,6 +805,20 @@ class AgentIdentity:
             call_id: ID of the call to fetch transcripts for.
         """
         return self._inkbox._calls.transcripts(call_id)
+
+    def list_tool_invocations(
+        self,
+        call_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> HostedAgentToolInvocationPage:
+        """List a page of Voice AI tool activity for a specific call."""
+        return self._inkbox._calls.tool_invocations(
+            call_id,
+            limit=limit,
+            offset=offset,
+        )
 
     def hangup_call(self, call_id: str) -> PhoneCall:
         """Hang up one of this identity's live calls, from outside the call.

@@ -59,6 +59,7 @@ import type {
 import type {
   PhoneCall,
   PhoneCallWithRateLimit,
+  HostedAgentToolInvocationPage,
   PhoneTranscript,
   TextConversationSummary,
   TextConversationUpdateResult,
@@ -640,6 +641,14 @@ export class AgentIdentity {
    */
   async listTranscripts(callId: string): Promise<PhoneTranscript[]> {
     return this._inkbox._calls.transcripts(callId);
+  }
+
+  /** List a page of Voice AI tool activity for a specific call. */
+  async listToolInvocations(
+    callId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<HostedAgentToolInvocationPage> {
+    return this._inkbox._calls.toolInvocations(callId, options);
   }
 
   /**

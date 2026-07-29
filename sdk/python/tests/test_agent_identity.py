@@ -23,6 +23,7 @@ from inkbox.phone.types import (
     IncomingCallActionConfig,
     PhoneCall,
     PhoneCallWithRateLimit,
+    HostedAgentToolInvocationPage,
     PhoneTranscript,
     TextConversationUpdateResult,
     TextMessage,
@@ -391,6 +392,23 @@ class TestAgentIdentityListTranscripts:
 
         inkbox._calls.transcripts.assert_called_once_with(CALL_ID)
         assert result is inkbox._calls.transcripts.return_value
+
+
+class TestAgentIdentityListToolInvocations:
+    def test_delegates_to_calls_resource(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.tool_invocations.return_value = MagicMock(
+            spec=HostedAgentToolInvocationPage
+        )
+
+        result = identity.list_tool_invocations(CALL_ID, limit=10, offset=20)
+
+        inkbox._calls.tool_invocations.assert_called_once_with(
+            CALL_ID,
+            limit=10,
+            offset=20,
+        )
+        assert result is inkbox._calls.tool_invocations.return_value
 
 
 class TestAgentIdentityIncomingCallAction:

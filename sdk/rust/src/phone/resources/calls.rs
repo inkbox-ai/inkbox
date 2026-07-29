@@ -8,8 +8,8 @@ use crate::error::Result;
 use crate::filters::DateRangeFilter;
 use crate::http::HttpTransport;
 use crate::phone::types::{
-    CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedCallPlacementOptions,
-    PhoneCall, PhoneCallWithRateLimit, PhoneTranscript,
+    CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedAgentToolInvocationPage,
+    HostedCallPlacementOptions, PhoneCall, PhoneCallWithRateLimit, PhoneTranscript,
 };
 
 pub struct CallsResource {
@@ -127,6 +127,22 @@ impl CallsResource {
         let data = self.http.get(
             &format!("/calls/{call_id}/transcripts"),
             crate::http::NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// List a page of safe Voice AI tool activity for a call.
+    ///
+    /// Tool arguments and provider details are intentionally excluded.
+    pub fn tool_invocations(
+        &self,
+        call_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<HostedAgentToolInvocationPage> {
+        let data = self.http.get(
+            &format!("/calls/{call_id}/tool-invocations"),
+            &[("limit", limit.to_string()), ("offset", offset.to_string())],
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -494,6 +510,44 @@ mod tests {
         assert_eq!(segments.len(), 2);
         assert_eq!(segments[0].seq, 0);
         assert_eq!(segments[1].text, "Hello!");
+    }
+
+    #[test]
+    fn tool_invocations_fetches_paginated_safe_activity() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/tool-invocations")
+                .query_param("limit", "25")
+                .query_param("offset", "50");
+            then.status(200).json_body(json!({
+                "items": [{
+                    "id": "77777777-7777-7777-7777-777777777777",
+                    "call_id": "22222222-2222-2222-2222-222222222222",
+                    "tool_name": "send_email",
+                    "status": "succeeded",
+                    "result": {"status": "sent"},
+                    "started_at": "2026-07-29T01:02:03+00:00",
+                    "completed_at": "2026-07-29T01:02:04+00:00"
+                }],
+                "limit": 25,
+                "offset": 50,
+                "has_more": true
+            }));
+        });
+        let page = client(&server)
+            .calls()
+            .tool_invocations("22222222-2222-2222-2222-222222222222", 25, 50)
+            .unwrap();
+        mock.assert();
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].tool_name, "send_email");
+        assert_eq!(
+            page.items[0].status,
+            crate::phone::types::HostedAgentToolInvocationStatus::Succeeded
+        );
+        assert_eq!(page.limit, 25);
+        assert!(page.has_more);
     }
 
     #[test]

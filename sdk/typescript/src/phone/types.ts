@@ -298,6 +298,33 @@ export interface PhoneTranscript {
   createdAt: Date;
 }
 
+export enum HostedAgentToolInvocationStatus {
+  STARTED = "started",
+  SUCCEEDED = "succeeded",
+  FAILED = "failed",
+}
+
+export type HostedAgentToolResultValue = string | number | boolean | null;
+
+/** Safe activity record for one Voice AI tool invocation. */
+export interface HostedAgentToolInvocation {
+  id: string;
+  callId: string;
+  toolName: string;
+  status: HostedAgentToolInvocationStatus;
+  result: Record<string, HostedAgentToolResultValue> | null;
+  startedAt: Date;
+  completedAt: Date | null;
+}
+
+/** A page of Voice AI tool activity for one call. */
+export interface HostedAgentToolInvocationPage {
+  items: HostedAgentToolInvocation[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
 /**
  * The incoming-call routing config for an agent identity.
  *
@@ -582,6 +609,23 @@ export interface RawPhoneTranscript {
   created_at: string;
 }
 
+export interface RawHostedAgentToolInvocation {
+  id: string;
+  call_id: string;
+  tool_name: string;
+  status: string;
+  result: Record<string, HostedAgentToolResultValue> | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface RawHostedAgentToolInvocationPage {
+  items: RawHostedAgentToolInvocation[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
 export interface RawIncomingCallActionConfig {
   agent_identity_id: string;
   incoming_call_action: string;
@@ -731,6 +775,31 @@ export function parsePhoneTranscript(r: RawPhoneTranscript): PhoneTranscript {
     party: r.party,
     text: r.text,
     createdAt: new Date(r.created_at),
+  };
+}
+
+export function parseHostedAgentToolInvocation(
+  r: RawHostedAgentToolInvocation,
+): HostedAgentToolInvocation {
+  return {
+    id: r.id,
+    callId: r.call_id,
+    toolName: r.tool_name,
+    status: r.status as HostedAgentToolInvocationStatus,
+    result: r.result,
+    startedAt: new Date(r.started_at),
+    completedAt: r.completed_at ? new Date(r.completed_at) : null,
+  };
+}
+
+export function parseHostedAgentToolInvocationPage(
+  r: RawHostedAgentToolInvocationPage,
+): HostedAgentToolInvocationPage {
+  return {
+    items: r.items.map(parseHostedAgentToolInvocation),
+    limit: r.limit,
+    offset: r.offset,
+    hasMore: r.has_more,
   };
 }
 

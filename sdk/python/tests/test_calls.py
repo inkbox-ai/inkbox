@@ -221,6 +221,58 @@ class TestCallsTranscripts:
         assert transcripts == []
 
 
+class TestCallsToolInvocations:
+    def test_returns_paginated_safe_activity(self, client, transport):
+        invocation_id = "dddd4444-0000-0000-0000-000000000001"
+        transport.get.return_value = {
+            "items": [
+                {
+                    "id": invocation_id,
+                    "call_id": CALL_ID,
+                    "tool_name": "send_email",
+                    "status": "succeeded",
+                    "result": {"status": "sent"},
+                    "started_at": "2026-07-29T01:02:03+00:00",
+                    "completed_at": "2026-07-29T01:02:04+00:00",
+                }
+            ],
+            "limit": 25,
+            "offset": 50,
+            "has_more": True,
+        }
+
+        page = client._calls.tool_invocations(CALL_ID, limit=25, offset=50)
+
+        transport.get.assert_called_once_with(
+            f"/calls/{CALL_ID}/tool-invocations",
+            params={"limit": 25, "offset": 50},
+        )
+        assert page.limit == 25
+        assert page.offset == 50
+        assert page.has_more is True
+        assert page.items[0].id == UUID(invocation_id)
+        assert page.items[0].tool_name == "send_email"
+        assert page.items[0].status.value == "succeeded"
+        assert page.items[0].result == {"status": "sent"}
+        assert page.items[0].completed_at is not None
+
+    def test_defaults_pagination(self, client, transport):
+        transport.get.return_value = {
+            "items": [],
+            "limit": 50,
+            "offset": 0,
+            "has_more": False,
+        }
+
+        page = client._calls.tool_invocations(UUID(CALL_ID))
+
+        transport.get.assert_called_once_with(
+            f"/calls/{CALL_ID}/tool-invocations",
+            params={"limit": 50, "offset": 0},
+        )
+        assert page.items == []
+
+
 class TestCallsPlace:
     def test_place_dedicated_call(self, client, transport):
         transport.post.return_value = {

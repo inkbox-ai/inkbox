@@ -84,6 +84,7 @@ function mockInkbox() {
       place: vi.fn(),
       list: vi.fn(),
       transcripts: vi.fn(),
+      toolInvocations: vi.fn(),
     },
     _incomingCallAction: { get: vi.fn(), set: vi.fn() },
     _hostedAgent: {
@@ -585,6 +586,29 @@ describe("AgentIdentity phone helpers", () => {
     const result = await identity.listTranscripts("call-1");
 
     expect(result).toBe(segments);
+  });
+
+  it("listToolInvocations delegates pagination to calls.toolInvocations", async () => {
+    const ink = mockInkbox();
+    const page = {
+      items: [],
+      limit: 10,
+      offset: 20,
+      hasMore: false,
+    };
+    vi.mocked(ink._calls.toolInvocations).mockResolvedValue(page);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    const result = await identity.listToolInvocations("call-1", {
+      limit: 10,
+      offset: 20,
+    });
+
+    expect(ink._calls.toolInvocations).toHaveBeenCalledWith("call-1", {
+      limit: 10,
+      offset: 20,
+    });
+    expect(result).toBe(page);
   });
 
   it("getIncomingCallAction delegates scoped by identity id", async () => {
