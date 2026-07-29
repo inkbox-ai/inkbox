@@ -120,7 +120,7 @@ def write_private_file(target: Path, content: bytes) -> None:
     if target.exists() or target.is_symlink():
         _atomic_write(target, content)
         return
-    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(target, flags, 0o600)
     try:
         os.write(fd, content)
