@@ -201,6 +201,42 @@ export function registerPhoneCommands(program: Command): void {
     );
 
   phone
+    .command("tool-activity <call-id>")
+    .description("List Voice AI tool activity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--limit <n>", "Max results", "50")
+    .option("--offset <n>", "Pagination offset", "0")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        callId: string,
+        cmdOpts: { identity: string; limit: string; offset: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        const activity = await identity.listToolInvocations(callId, {
+          limit: parseInt(cmdOpts.limit, 10),
+          offset: parseInt(cmdOpts.offset, 10),
+        });
+        if (opts.json) {
+          output(activity, { json: true });
+          return;
+        }
+        output(activity.items, {
+          json: false,
+          columns: [
+            "id",
+            "toolName",
+            "status",
+            "startedAt",
+            "completedAt",
+          ],
+        });
+      }),
+    );
+
+  phone
     .command("hangup <call-id>")
     .description("Hang up a live call")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

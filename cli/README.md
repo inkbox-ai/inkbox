@@ -218,6 +218,10 @@ inkbox phone hangup <call-id> -i <handle>    # Hang up a live call from outside 
 
 inkbox phone transcripts <call-id> -i <handle>  # Get call transcripts
 
+inkbox phone tool-activity <call-id> -i <handle> # List paginated Voice AI tool activity
+  --limit <n>                                #   Max results (default: 50)
+  --offset <n>                               #   Pagination offset (default: 0)
+
 inkbox phone search-transcripts -i <handle>  # Search transcripts
   -q, --query <query>                        #   Search query (required)
   --party <party>                            #   Filter: local or remote

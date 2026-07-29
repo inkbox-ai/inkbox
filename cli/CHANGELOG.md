@@ -12,6 +12,8 @@
 - Call and hosted-agent config output includes the resolved authority mode.
 - `inkbox phone call --no-voicemail-detection` keeps a call connected after
   voicemail is detected so the caller can leave a message.
+- `inkbox phone tool-activity <call-id>` lists safe, paginated Voice AI tool
+  activity for a call.
 
 ### Changed
 
