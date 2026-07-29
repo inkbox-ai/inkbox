@@ -19,11 +19,13 @@ import pytest
 from inkbox import (
     A2AWebhookPayload,
     CallEndedWebhookPayload,
+    HostedAgentAuthorityModeWire,
     IMessageReactionTypeWire,
     IMessageWebhookReaction,
     MailWebhookPayload,
     PhoneIncomingCallWebhookPayload,
     TextWebhookPayload,
+    VoicemailDetectionWire,
     WebhookMailAgentIdentity,
     WebhookMailContact,
 )
@@ -36,6 +38,18 @@ def test_imessage_group_reaction_assignment_is_nullable():
 def test_imessage_reaction_wire_keeps_eyes_and_inbound_custom_distinct():
     values = set(get_args(IMessageReactionTypeWire))
     assert {"eyes", "custom"} <= values
+
+
+def test_hosted_call_wire_types_are_exported_from_package_root():
+    assert set(get_args(HostedAgentAuthorityModeWire)) == {
+        "contact_scoped",
+        "yolo",
+    }
+    assert set(get_args(VoicemailDetectionWire)) == {
+        "disabled",
+        "enabled",
+    }
+
 
 # Repo layout: sdk/python/tests/test_webhook_types.py -> sdk/python/tests
 #                                                    -> sdk/python
