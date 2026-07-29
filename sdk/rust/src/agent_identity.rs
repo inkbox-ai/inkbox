@@ -791,13 +791,10 @@ impl AgentIdentity {
     pub fn set_hosted_agent_authority_mode(
         &self,
         authority_mode: HostedAgentAuthorityMode,
-        idempotency_key: &str,
     ) -> Result<HostedAgentConfig> {
-        self.inkbox.hosted_agent().set_authority_mode(
-            &self.id().to_string(),
-            authority_mode,
-            idempotency_key,
-        )
+        self.inkbox
+            .hosted_agent()
+            .set_authority_mode(&self.id().to_string(), authority_mode)
     }
 
     /// Hang up one of this identity's live calls, from outside the call.

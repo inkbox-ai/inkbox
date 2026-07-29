@@ -7,8 +7,8 @@
 - `inkbox phone call --authority-mode <contact_scoped|yolo>` selects authority
   for an outbound hosted-agent call; `yolo` requires an admin API key.
 - `inkbox phone hosted-agent authority-mode <contact_scoped|yolo>` updates an
-  identity's mode for future incoming calls with an admin API key and
-  idempotency key. Outbound calls use `phone call --authority-mode`.
+  identity's mode for future incoming calls with an admin API key. Outbound
+  calls use `phone call --authority-mode`.
 - Call and hosted-agent config output includes the resolved authority mode.
 - `inkbox phone call --no-voicemail-detection` keeps a call connected after
   voicemail is detected so the caller can leave a message.

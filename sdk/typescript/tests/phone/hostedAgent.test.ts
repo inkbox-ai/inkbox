@@ -141,7 +141,7 @@ describe("HostedAgentConfigResource.setConfig", () => {
 });
 
 describe("HostedAgentConfigResource.setAuthorityMode", () => {
-  it("sends the exact body and idempotency header", async () => {
+  it("sends the exact body", async () => {
     const http = mockHttp();
     vi.mocked(http.put).mockResolvedValue({
       ...RAW_HOSTED_AGENT_CONFIG,
@@ -152,7 +152,6 @@ describe("HostedAgentConfigResource.setAuthorityMode", () => {
     const config = await res.setAuthorityMode({
       agentIdentityId: IDENTITY_ID,
       authorityMode: HostedAgentAuthorityMode.YOLO,
-      idempotencyKey: "authority-update-1",
     });
 
     expect(http.put).toHaveBeenCalledWith(
@@ -161,21 +160,8 @@ describe("HostedAgentConfigResource.setAuthorityMode", () => {
         agent_identity_id: IDENTITY_ID,
         authority_mode: "yolo",
       },
-      { headers: { "Idempotency-Key": "authority-update-1" } },
     );
     expect(config.authorityMode).toBe(HostedAgentAuthorityMode.YOLO);
-  });
-
-  it("rejects invalid idempotency keys before transport", async () => {
-    const http = mockHttp();
-    const res = new HostedAgentConfigResource(http);
-
-    await expect(res.setAuthorityMode({
-      agentIdentityId: IDENTITY_ID,
-      authorityMode: HostedAgentAuthorityMode.YOLO,
-      idempotencyKey: "",
-    })).rejects.toThrow("idempotencyKey");
-    expect(http.put).not.toHaveBeenCalled();
   });
 });
 

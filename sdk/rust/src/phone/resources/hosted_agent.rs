@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde_json::Map;
 
 use crate::error::Result;
-use crate::http::{validate_idempotency_key, HttpTransport};
+use crate::http::HttpTransport;
 use crate::phone::types::{HostedAgentAuthorityMode, HostedAgentConfig};
 
 pub struct HostedAgentConfigResource {
@@ -75,23 +75,19 @@ impl HostedAgentConfigResource {
 
     /// Set authority for an identity's future incoming hosted calls.
     ///
-    /// This privileged operation requires an admin API key and a stable
-    /// caller-generated idempotency key. Outbound calls select authority
-    /// independently.
+    /// This privileged operation requires an admin API key. Outbound calls
+    /// select authority independently.
     pub fn set_authority_mode(
         &self,
         agent_identity_id: &str,
         authority_mode: HostedAgentAuthorityMode,
-        idempotency_key: &str,
     ) -> Result<HostedAgentConfig> {
-        validate_idempotency_key(idempotency_key)?;
         let mut body = Map::new();
         body.insert("agent_identity_id".into(), agent_identity_id.into());
         body.insert("authority_mode".into(), authority_mode.as_str().into());
-        let headers = [("Idempotency-Key", idempotency_key)];
-        let data =
-            self.http
-                .put_with_headers("/hosted-agent-config/authority-mode", &body, &headers)?;
+        let data = self
+            .http
+            .put("/hosted-agent-config/authority-mode", &body)?;
         Ok(serde_json::from_value(data)?)
     }
 }
@@ -245,12 +241,11 @@ mod tests {
     }
 
     #[test]
-    fn set_authority_mode_sends_exact_body_and_idempotency_header() {
+    fn set_authority_mode_sends_exact_body() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(PUT)
                 .path("/api/v1/phone/hosted-agent-config/authority-mode")
-                .header("Idempotency-Key", "authority-update-1")
                 .json_body(json!({
                     "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                     "authority_mode": "yolo"
@@ -269,25 +264,10 @@ mod tests {
             .set_authority_mode(
                 "33333333-3333-3333-3333-333333333333",
                 HostedAgentAuthorityMode::Yolo,
-                "authority-update-1",
             )
             .unwrap();
 
         mock.assert();
         assert_eq!(config.authority_mode, HostedAgentAuthorityMode::Yolo);
-    }
-
-    #[test]
-    fn set_authority_mode_rejects_invalid_idempotency_key() {
-        let server = MockServer::start();
-        let err = client(&server)
-            .hosted_agent()
-            .set_authority_mode(
-                "33333333-3333-3333-3333-333333333333",
-                HostedAgentAuthorityMode::Yolo,
-                "",
-            )
-            .unwrap_err();
-        assert!(err.to_string().contains("idempotency_key"));
     }
 }

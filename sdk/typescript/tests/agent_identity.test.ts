@@ -510,13 +510,11 @@ describe("AgentIdentity phone helpers", () => {
 
     await identity.setHostedAgentAuthorityMode({
       authorityMode: HostedAgentAuthorityMode.YOLO,
-      idempotencyKey: "authority-update-1",
     });
 
     expect(ink._hostedAgent.setAuthorityMode).toHaveBeenCalledWith({
       agentIdentityId: identity.id,
       authorityMode: HostedAgentAuthorityMode.YOLO,
-      idempotencyKey: "authority-update-1",
     });
   });
 

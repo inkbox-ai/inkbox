@@ -843,8 +843,6 @@ class AgentIdentity:
     def set_hosted_agent_authority_mode(
         self,
         authority_mode: HostedAgentAuthorityMode | str,
-        *,
-        idempotency_key: str,
     ) -> HostedAgentConfig:
         """Set authority for future incoming hosted calls with an admin API key.
 
@@ -854,7 +852,6 @@ class AgentIdentity:
         return self._inkbox._hosted_agent.set_authority_mode(
             agent_identity_id=self.id,
             authority_mode=authority_mode,
-            idempotency_key=idempotency_key,
         )
 
     def get_incoming_call_action(self) -> IncomingCallActionConfig:

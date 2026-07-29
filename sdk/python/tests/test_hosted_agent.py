@@ -166,9 +166,7 @@ class TestHostedAgentAuthorityMode:
         assert HostedAgentAuthorityMode.CONTACT_SCOPED.value == "contact_scoped"
         assert HostedAgentAuthorityMode.YOLO.value == "yolo"
 
-    def test_set_authority_mode_sends_body_and_idempotency_header(
-        self, client, transport
-    ):
+    def test_set_authority_mode_sends_exact_body(self, client, transport):
         transport.put.return_value = {
             **HOSTED_AGENT_CONFIG_DICT,
             "authority_mode": "yolo",
@@ -177,7 +175,6 @@ class TestHostedAgentAuthorityMode:
         cfg = client._hosted_agent.set_authority_mode(
             agent_identity_id=IDENTITY_ID,
             authority_mode=HostedAgentAuthorityMode.YOLO,
-            idempotency_key="authority-update-1",
         )
 
         transport.put.assert_called_once_with(
@@ -186,22 +183,8 @@ class TestHostedAgentAuthorityMode:
                 "agent_identity_id": IDENTITY_ID,
                 "authority_mode": "yolo",
             },
-            headers={"Idempotency-Key": "authority-update-1"},
         )
         assert cfg.authority_mode is HostedAgentAuthorityMode.YOLO
-
-    @pytest.mark.parametrize("key", ["", "x" * 256])
-    def test_set_authority_mode_rejects_invalid_idempotency_key(
-        self, client, transport, key
-    ):
-        with pytest.raises(ValueError, match="idempotency_key"):
-            client._hosted_agent.set_authority_mode(
-                agent_identity_id=IDENTITY_ID,
-                authority_mode=HostedAgentAuthorityMode.YOLO,
-                idempotency_key=key,
-            )
-        transport.put.assert_not_called()
-
 
 def _identity():
     data = _AgentIdentityData._from_dict(IDENTITY_DETAIL_DICT)
@@ -238,15 +221,11 @@ class TestAgentIdentityHostedAgentDelegation:
     def test_set_authority_mode_delegates_with_own_id(self):
         identity, inkbox = _identity()
 
-        identity.set_hosted_agent_authority_mode(
-            HostedAgentAuthorityMode.YOLO,
-            idempotency_key="authority-update-1",
-        )
+        identity.set_hosted_agent_authority_mode(HostedAgentAuthorityMode.YOLO)
 
         inkbox._hosted_agent.set_authority_mode.assert_called_once_with(
             agent_identity_id=identity.id,
             authority_mode=HostedAgentAuthorityMode.YOLO,
-            idempotency_key="authority-update-1",
         )
 
     def test_place_call_forwards_mode_and_reason(self):

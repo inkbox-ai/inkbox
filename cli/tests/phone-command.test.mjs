@@ -16,7 +16,6 @@ test("phone help exposes authority controls", () => {
   assert.match(help("phone", "call"), /--authority-mode <mode>/);
   assert.match(help("phone", "call"), /--no-voicemail-detection/);
   const authorityHelp = help("phone", "hosted-agent", "authority-mode");
-  assert.match(authorityHelp, /--idempotency-key <key>/);
   assert.match(authorityHelp, /admin API key/);
 });
 

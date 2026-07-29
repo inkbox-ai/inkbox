@@ -684,12 +684,10 @@ export class AgentIdentity {
    */
   async setHostedAgentAuthorityMode(options: {
     authorityMode: HostedAgentAuthorityMode;
-    idempotencyKey: string;
   }): Promise<HostedAgentConfig> {
     return this._inkbox._hostedAgent.setAuthorityMode({
       agentIdentityId: this.id,
       authorityMode: options.authorityMode,
-      idempotencyKey: options.idempotencyKey,
     });
   }
 

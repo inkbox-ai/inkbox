@@ -238,7 +238,6 @@ inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitt
   --instructions <text>                      #   Per-identity steering prompt
 
 inkbox phone hosted-agent authority-mode yolo -i <handle>  # Future incoming calls; admin API key
-  --idempotency-key <key>                    #   Stable key to reuse when retrying
 ```
 
 Shared origination uses the identity's active iMessage-line assignment and

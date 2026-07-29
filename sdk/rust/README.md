@@ -70,11 +70,8 @@ let call = identity.place_hosted_call_with_authority(
 
 identity.set_hosted_agent_authority_mode(
     HostedAgentAuthorityMode::Yolo,
-    "hosted-authority-update-1",
 )?;
 ```
-
-Reuse the same idempotency key when retrying an ambiguous saved-mode update.
 
 ### Advanced construction
 

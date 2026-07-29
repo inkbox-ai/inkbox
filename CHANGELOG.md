@@ -13,8 +13,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   call responses, and `call.ended` webhook payloads.
 - **Privileged authority updates.** Hosted-agent config resources and
   identity helpers can change the mode for future incoming calls with an admin
-  API key and a caller-generated idempotency key. Outbound calls select
-  authority per call.
+  API key. Outbound calls select authority per call.
 - **Per-call authority selection.** Outbound call placement accepts an
   authority mode. The default is `contact_scoped`; `yolo` is available only
   for hosted-agent calls made with an admin API key.

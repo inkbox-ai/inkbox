@@ -394,10 +394,9 @@ const hostedCall = await identity.placeCall({
 });
 
 // Set the mode for future incoming calls with an admin API key. Outbound calls
-// select authority per call. Reuse this key when retrying an ambiguous result.
+// select authority per call.
 await identity.setHostedAgentAuthorityMode({
   authorityMode: HostedAgentAuthorityMode.YOLO,
-  idempotencyKey: "hosted-authority-update-1",
 });
 
 // List calls (paginated)

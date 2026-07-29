@@ -385,15 +385,11 @@ export function registerPhoneCommands(program: Command): void {
     .command("authority-mode <mode>")
     .description("Set authority for future incoming hosted calls (admin API key)")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
-    .requiredOption(
-      "--idempotency-key <key>",
-      "Stable key to reuse when retrying the same update",
-    )
     .action(
       withErrorHandler(async function (
         this: Command,
         mode: string,
-        cmdOpts: { identity: string; idempotencyKey: string },
+        cmdOpts: { identity: string },
       ) {
         if (!Object.values(HostedAgentAuthorityMode).includes(
           mode as HostedAgentAuthorityMode,
@@ -406,7 +402,6 @@ export function registerPhoneCommands(program: Command): void {
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const config = await identity.setHostedAgentAuthorityMode({
           authorityMode: mode as HostedAgentAuthorityMode,
-          idempotencyKey: cmdOpts.idempotencyKey,
         });
         output(
           {
