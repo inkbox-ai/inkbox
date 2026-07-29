@@ -708,8 +708,8 @@ class AgentIdentity:
 
         For ``dedicated_number`` origination the call rides this identity's
         provisioned phone number (requires one). For
-        ``shared_imessage_number`` it rides the shared number and is scoped
-        by this identity's id instead.
+        either iMessage origination it is scoped by this identity's id
+        instead.
 
         Args:
             to_number: E.164 destination number.
@@ -747,7 +747,7 @@ class AgentIdentity:
             if voicemail_detection is not None:
                 call_options["voicemail_detection"] = voicemail_detection
             return self._inkbox._calls.place(**call_options)
-        # Shared-number origination scopes by identity id, no from_number.
+        # iMessage origination scopes by identity id, no from_number.
         call_options = {
             "to_number": to_number,
             "origination": origination,

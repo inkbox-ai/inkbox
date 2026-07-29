@@ -5,7 +5,7 @@
 //! string enums whose `#[serde(rename = ...)]` values match the Python
 //! `Literal[...]` unions in `inkbox/webhooks.py` exactly.
 
-use crate::phone::types::HostedAgentAuthorityMode;
+use crate::phone::types::{HostedAgentAuthorityMode, VoicemailDetection};
 use serde::{Deserialize, Serialize};
 
 // ---- Wire union types ----------------------------------------------------
@@ -98,13 +98,13 @@ pub enum HangupReasonWire {
     Rejected,
 }
 
-/// Where a call originated: the identity's dedicated number or the shared
-/// iMessage line.
+/// Where a call originated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallOriginWire {
     DedicatedNumber,
     SharedImessageNumber,
+    DedicatedImessageNumber,
 }
 
 // ---- Nested wire shapes --------------------------------------------------
@@ -848,6 +848,11 @@ pub struct WebhookPhoneCall {
         deserialize_with = "deserialize_webhook_authority_null_default"
     )]
     pub hosted_agent_authority_mode: HostedAgentAuthorityMode,
+    #[serde(
+        default,
+        deserialize_with = "deserialize_webhook_voicemail_detection_null_default"
+    )]
+    pub voicemail_detection: VoicemailDetection,
 }
 
 fn default_webhook_call_mode() -> String {
@@ -863,6 +868,15 @@ where
     D: serde::Deserializer<'de>,
 {
     Ok(Option::<HostedAgentAuthorityMode>::deserialize(deserializer)?.unwrap_or_default())
+}
+
+fn deserialize_webhook_voicemail_detection_null_default<'de, D>(
+    deserializer: D,
+) -> Result<VoicemailDetection, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<VoicemailDetection>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 /// One open action item Inkbox Voice AI recorded during the call.
@@ -1289,6 +1303,7 @@ mod tests {
                     "duration_seconds": 189,
                     "mode": "hosted_agent",
                     "hosted_agent_authority_mode": "yolo",
+                    "voicemail_detection": "disabled",
                     "reason": "Book a cleaning next week"
                 },
                 "contacts": [],
@@ -1314,6 +1329,10 @@ mod tests {
         assert_eq!(
             payload.data.call.hosted_agent_authority_mode,
             HostedAgentAuthorityMode::Yolo
+        );
+        assert_eq!(
+            payload.data.call.voicemail_detection,
+            VoicemailDetection::Disabled
         );
         assert_eq!(payload.data.outcome.as_deref(), Some("completed"));
         let actions = &payload.data.post_call_action_items;

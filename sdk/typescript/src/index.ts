@@ -114,6 +114,7 @@ export type {
   CallLifecycleWebhookEventType,
   CallModeWire,
   HostedAgentAuthorityModeWire,
+  VoicemailDetectionWire,
   CallOutcomeWire,
   WebhookPhoneCall,
   WebhookCallTranscript,

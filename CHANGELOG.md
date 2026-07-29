@@ -22,7 +22,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - **Voicemail detection control.** Outbound calls can disable voicemail
   detection so a caller can stay connected and leave a message. Python,
   TypeScript, and Rust omit the setting by default, preserving detection, and
-  the CLI exposes `--no-voicemail-detection`.
+  the CLI exposes `--no-voicemail-detection`. Call reads and lifecycle
+  webhooks expose the persisted choice.
+- **Dedicated iMessage call origin.** Call and webhook enums now include
+  `dedicated_imessage_number`, matching the existing API wire value.
 - **Voice AI tool activity.** Python, TypeScript, and Rust expose paginated,
   call-scoped tool status and sanitized results without tool arguments.
 
@@ -31,7 +34,6 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Version bumped to 0.5.8 across `@inkbox/sdk` (TypeScript), `inkbox`
   (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on
   `@inkbox/sdk` `^0.5.8`.
-- PUT transports accept optional per-request headers.
 
 ### Compatibility
 

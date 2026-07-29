@@ -157,7 +157,7 @@ class CallsResource:
 
         The server enforces the conditional shape: ``from_number`` is
         required for ``dedicated_number`` origination, ``agent_identity_id``
-        for ``shared_imessage_number``; ``hosted_agent`` mode requires
+        for either iMessage origination; ``hosted_agent`` mode requires
         ``reason`` and excludes ``client_websocket_url``. This method never
         client-gates — it forwards whatever is provided and surfaces the
         server's 422.
@@ -168,7 +168,7 @@ class CallsResource:
                 ``dedicated_number``. See :class:`CallOrigin`.
             from_number: E.164 number to call from (dedicated origination).
                 Must belong to your org and be active.
-            agent_identity_id: UUID of the placing identity (shared
+            agent_identity_id: UUID of the placing identity (iMessage
                 origination), or ``None`` for an agent-scoped key.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.

@@ -537,8 +537,8 @@ impl AgentIdentity {
     /// Place an outbound call as this identity.
     ///
     /// For `dedicated_number` origination the call rides this identity's
-    /// provisioned phone number (requires one). For `shared_imessage_number`
-    /// it rides the shared line and is scoped by this identity's id instead.
+    /// provisioned phone number (requires one). Either iMessage origination
+    /// is scoped by this identity's id instead.
     ///
     /// # Arguments
     /// * `to_number` - E.164 destination number.
@@ -563,7 +563,7 @@ impl AgentIdentity {
                     client_websocket_url,
                 )
             }
-            CallOrigin::SharedImessageNumber => {
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
                 // Shared-line origination scopes by identity id, no from_number.
                 let id = self.id().to_string();
                 self.inkbox.calls().place(
@@ -597,7 +597,7 @@ impl AgentIdentity {
                     options,
                 )
             }
-            CallOrigin::SharedImessageNumber => {
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
                 let id = self.id().to_string();
                 self.inkbox.calls().place_with_options(
                     to_number,
@@ -654,8 +654,8 @@ impl AgentIdentity {
     /// Place an outbound call driven by Inkbox Voice AI.
     ///
     /// Sibling of [`AgentIdentity::place_call`] (which stays client-driven);
-    /// origination resolution is identical — dedicated calls ride this
-    /// identity's own number, shared calls scope by its id.
+    /// origination resolution is identical — dedicated phone calls ride this
+    /// identity's own number, while iMessage calls scope by its id.
     ///
     /// # Arguments
     /// * `to_number` - E.164 destination number.
@@ -678,7 +678,7 @@ impl AgentIdentity {
                     reason,
                 )
             }
-            CallOrigin::SharedImessageNumber => {
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
                 let id = self.id().to_string();
                 self.inkbox
                     .calls()
@@ -707,7 +707,7 @@ impl AgentIdentity {
                     options,
                 )
             }
-            CallOrigin::SharedImessageNumber => {
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
                 let id = self.id().to_string();
                 self.inkbox.calls().place_hosted_with_options(
                     to_number,
@@ -742,7 +742,7 @@ impl AgentIdentity {
                     authority_mode,
                 )
             }
-            CallOrigin::SharedImessageNumber => {
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
                 // Shared-line origination scopes by identity id, no from_number.
                 let id = self.id().to_string();
                 self.inkbox.calls().place_hosted_with_authority(
@@ -2054,6 +2054,8 @@ mod tests {
                 "agent_identity_id": IDENTITY_ID,
                 "voice": "warm-voice",
                 "model": null,
+                "effective_voice": "warm-voice",
+                "effective_model": "realtime-default",
                 "instructions": null
             }));
         });
@@ -2079,6 +2081,8 @@ mod tests {
                 "agent_identity_id": IDENTITY_ID,
                 "voice": "warm-voice",
                 "model": null,
+                "effective_voice": "warm-voice",
+                "effective_model": "realtime-default",
                 "instructions": "Be brief."
             }));
         });

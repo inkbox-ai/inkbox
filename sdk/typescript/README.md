@@ -375,7 +375,11 @@ by 1024 and label the result GiB/MiB.
 ## Phone
 
 ```ts
-import { CallMode, HostedAgentAuthorityMode } from "@inkbox/sdk";
+import {
+  CallMode,
+  HostedAgentAuthorityMode,
+  VoicemailDetection,
+} from "@inkbox/sdk";
 
 // Place an outbound call — stream audio over WebSocket
 const call = await identity.placeCall({
@@ -391,6 +395,7 @@ const hostedCall = await identity.placeCall({
   mode: CallMode.HOSTED_AGENT,
   reason: "Coordinate the appointment and send confirmations.",
   hostedAgentAuthorityMode: HostedAgentAuthorityMode.YOLO,
+  voicemailDetection: VoicemailDetection.DISABLED,
 });
 
 // Set the mode for future incoming calls with an admin API key. Outbound calls
@@ -411,7 +416,7 @@ for (const t of segments) {
   console.log(`[${t.party}] ${t.text}`);  // party: "local" or "remote"
 }
 
-// Inspect identity-wide tool activity for a Voice AI call
+// Inspect tool activity for a Voice AI call
 const activity = await identity.listToolInvocations(calls[0].id, {
   limit: 50,
   offset: 0,

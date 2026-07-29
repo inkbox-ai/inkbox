@@ -16,7 +16,7 @@ interface PlaceCallCommandOptions {
   wsUrl?: string;
   hosted?: boolean;
   reason?: string;
-  origination?: CallOrigin;
+  origination?: string;
   authorityMode?: string;
   voicemailDetection?: boolean;
 }
@@ -46,6 +46,16 @@ export function buildPlaceCallOptions(
     return { error: "--reason is only valid with --hosted." };
   }
   if (
+    cmdOpts.origination !== undefined
+    && !Object.values(CallOrigin).includes(cmdOpts.origination as CallOrigin)
+  ) {
+    return {
+      error:
+        "--origination must be dedicated_number, shared_imessage_number, "
+        + "or dedicated_imessage_number.",
+    };
+  }
+  if (
     cmdOpts.authorityMode !== undefined
     && !Object.values(HostedAgentAuthorityMode).includes(
       cmdOpts.authorityMode as HostedAgentAuthorityMode,
@@ -53,8 +63,8 @@ export function buildPlaceCallOptions(
   ) {
     return { error: "--authority-mode must be contact_scoped or yolo." };
   }
-  if (!cmdOpts.hosted && cmdOpts.authorityMode === HostedAgentAuthorityMode.YOLO) {
-    return { error: "--authority-mode yolo requires --hosted." };
+  if (!cmdOpts.hosted && cmdOpts.authorityMode !== undefined) {
+    return { error: "--authority-mode requires --hosted." };
   }
 
   const callOptions: PlaceCallOptions = { toNumber: cmdOpts.to };
@@ -66,7 +76,7 @@ export function buildPlaceCallOptions(
     callOptions.reason = cmdOpts.reason;
   }
   if (cmdOpts.origination) {
-    callOptions.origination = cmdOpts.origination;
+    callOptions.origination = cmdOpts.origination as CallOrigin;
   }
   if (cmdOpts.authorityMode !== undefined) {
     callOptions.hostedAgentAuthorityMode =
@@ -97,7 +107,7 @@ export function registerPhoneCommands(program: Command): void {
     )
     .option(
       "--origination <origin>",
-      "Call origin: dedicated_number or shared_imessage_number",
+      "Call origin: dedicated_number, shared_imessage_number, or dedicated_imessage_number",
     )
     .option(
       "--no-voicemail-detection",
@@ -128,6 +138,7 @@ export function registerPhoneCommands(program: Command): void {
             mode: call.mode,
             reason: call.reason,
             authorityMode: call.hostedAgentAuthorityMode,
+            voicemailDetection: call.voicemailDetection,
             callsRemaining: call.rateLimit.callsRemaining,
           },
           { json: !!opts.json },
@@ -368,6 +379,8 @@ export function registerPhoneCommands(program: Command): void {
             agentIdentityId: config.agentIdentityId,
             voice: config.voice,
             model: config.model,
+            effectiveVoice: config.effectiveVoice,
+            effectiveModel: config.effectiveModel,
             instructions: config.instructions,
             authorityMode: config.authorityMode,
           },
@@ -409,6 +422,8 @@ export function registerPhoneCommands(program: Command): void {
             agentIdentityId: config.agentIdentityId,
             voice: config.voice,
             model: config.model,
+            effectiveVoice: config.effectiveVoice,
+            effectiveModel: config.effectiveModel,
             instructions: config.instructions,
             authorityMode: config.authorityMode,
           },

@@ -35,6 +35,8 @@ class TestHostedAgentGetConfig:
         assert cfg.agent_identity_id == UUID(IDENTITY_ID)
         assert cfg.voice == "warm-voice"
         assert cfg.model == "fast-model"
+        assert cfg.effective_voice == "warm-voice"
+        assert cfg.effective_model == "fast-model"
         assert cfg.instructions == "Always offer to text a summary after the call."
         assert cfg.authority_mode is HostedAgentAuthorityMode.CONTACT_SCOPED
 
@@ -65,6 +67,8 @@ class TestHostedAgentGetConfig:
             "agent_identity_id": IDENTITY_ID,
             "voice": None,
             "model": None,
+            "effective_voice": "voice-default",
+            "effective_model": "model-default",
             "instructions": None,
         }
 
@@ -103,6 +107,8 @@ class TestHostedAgentSetConfig:
             "agent_identity_id": IDENTITY_ID,
             "voice": None,
             "model": None,
+            "effective_voice": "voice-default",
+            "effective_model": "model-default",
             "instructions": None,
         }
 

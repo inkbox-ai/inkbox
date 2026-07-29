@@ -13,14 +13,16 @@
 - Per-call `hostedAgentAuthorityMode` selection on outbound placement; `yolo`
   requires an admin API key.
 - Optional `voicemailDetection` control on outbound calls. It is omitted by
-  default; pass `disabled` to stay connected and leave a voicemail.
+  default; pass `disabled` to stay connected and leave a voicemail. Call reads
+  and lifecycle webhook types expose the persisted value.
+- `CallOrigin.DEDICATED_IMESSAGE_NUMBER` and the matching webhook wire value.
 - Paginated `calls.toolInvocations()` and
   `identity.listToolInvocations()` methods for safe Voice AI tool activity.
 
 ### Compatibility
 
-- Existing methods default to `contact_scoped`; absent or null response fields
-  also parse as `contact_scoped`.
+- Existing methods default to `contact_scoped`; absent or null authority fields
+  parse as `contact_scoped`, and voicemail-detection fields parse as `enabled`.
 
 ## 0.5.6 — A2A 1.0
 

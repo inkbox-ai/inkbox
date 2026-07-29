@@ -367,13 +367,14 @@ print(call.status, call.rate_limit.calls_remaining)
 
 # Let the hosted agent work beyond the current caller for this call.
 # Requesting yolo authority requires an admin API key.
-from inkbox import CallMode, HostedAgentAuthorityMode
+from inkbox import CallMode, HostedAgentAuthorityMode, VoicemailDetection
 
 hosted_call = identity.place_call(
     to_number="+15551234567",
     mode=CallMode.HOSTED_AGENT,
     reason="Coordinate the appointment and send confirmations.",
     hosted_agent_authority_mode=HostedAgentAuthorityMode.YOLO,
+    voicemail_detection=VoicemailDetection.DISABLED,
 )
 
 # Set the mode for future incoming calls with an admin API key. Outbound calls
@@ -390,7 +391,7 @@ segments = identity.list_transcripts(calls[0].id)
 for t in segments:
     print(f"[{t.party}] {t.text}")  # party: "local" or "remote"
 
-# Inspect identity-wide tool activity for a Voice AI call
+# Inspect tool activity for a Voice AI call
 activity = identity.list_tool_invocations(calls[0].id, limit=50, offset=0)
 for invocation in activity.items:
     print(invocation.tool_name, invocation.status)

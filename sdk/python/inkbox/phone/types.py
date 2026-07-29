@@ -67,12 +67,14 @@ class CallOrigin(StrEnum):
     """How a call is placed / which line it rides.
 
     ``dedicated_number`` uses the identity's own provisioned phone number;
-    ``shared_imessage_number`` rides the shared iMessage service line, in
-    which case the call has no dedicated ``local_phone_number``.
+    ``shared_imessage_number`` rides the shared iMessage service line and
+    has no surfaced ``local_phone_number``; ``dedicated_imessage_number``
+    rides the identity's dedicated iMessage line.
     """
 
     DEDICATED_NUMBER = "dedicated_number"
     SHARED_IMESSAGE_NUMBER = "shared_imessage_number"
+    DEDICATED_IMESSAGE_NUMBER = "dedicated_imessage_number"
 
 
 class CallMode(StrEnum):
@@ -247,6 +249,9 @@ class PhoneCall:
     hosted_agent_authority_mode: HostedAgentAuthorityMode = (
         HostedAgentAuthorityMode.CONTACT_SCOPED
     )
+    # Whether voicemail detection ran. Missing/null legacy values preserve the
+    # server default.
+    voicemail_detection: VoicemailDetection = VoicemailDetection.ENABLED
     # Voice AI's recorded action items, surfaced inline (open items only,
     # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
@@ -276,6 +281,9 @@ class PhoneCall:
             reason=d.get("reason"),
             hosted_agent_authority_mode=HostedAgentAuthorityMode(
                 d.get("hosted_agent_authority_mode") or "contact_scoped"
+            ),
+            voicemail_detection=VoicemailDetection(
+                d.get("voicemail_detection") or "enabled"
             ),
             # Open items only, seq-ascending; empty for client_websocket calls.
             post_call_action_items=[
@@ -616,13 +624,15 @@ class IncomingCallActionConfig:
 class HostedAgentConfig:
     """Per-identity Inkbox Voice AI configuration.
 
-    ``voice`` / ``model`` / ``instructions`` are all nullable — ``None``
-    means the server default applies for that field.
+    ``voice`` / ``model`` / ``instructions`` are nullable overrides.
+    ``effective_voice`` and ``effective_model`` show the resolved settings.
     """
 
     agent_identity_id: UUID
     voice: str | None
     model: str | None
+    effective_voice: str
+    effective_model: str
     instructions: str | None
     authority_mode: HostedAgentAuthorityMode = HostedAgentAuthorityMode.CONTACT_SCOPED
 
@@ -632,6 +642,8 @@ class HostedAgentConfig:
             agent_identity_id=UUID(d["agent_identity_id"]),
             voice=d.get("voice"),
             model=d.get("model"),
+            effective_voice=d["effective_voice"],
+            effective_model=d["effective_model"],
             instructions=d.get("instructions"),
             authority_mode=HostedAgentAuthorityMode(
                 d.get("authority_mode") or "contact_scoped"

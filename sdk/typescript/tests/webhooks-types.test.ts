@@ -615,6 +615,7 @@ describe("CallEndedWebhookPayload", () => {
     // mode/reason live on data.call (mirrors the call REST shape), not data.
     expect(call.mode).toBe("hosted_agent");
     expect(call.hosted_agent_authority_mode).toBe("yolo");
+    expect(call.voicemail_detection).toBe("disabled");
     expect(call.reason?.startsWith("Call the dental office")).toBe(true);
     expect("mode" in payload.data).toBe(false);
     expect("reason" in payload.data).toBe(false);

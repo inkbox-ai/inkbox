@@ -563,8 +563,7 @@ export class AgentIdentity {
    *
    * For `dedicated_number` origination (the default) the call is placed
    * from this identity's own phone number (requires one to be assigned).
-   * For `shared_imessage_number` origination the call rides the shared
-   * pool and is scoped by this identity's id — no dedicated number needed.
+   * For either iMessage origination the call is scoped by this identity's id.
    *
    * @param options.toNumber - E.164 destination number.
    * @param options.origination - Where the call originates. Defaults to
@@ -602,7 +601,7 @@ export class AgentIdentity {
         reason:              options.reason,
       });
     }
-    // Shared-pool calls scope by identity id; no from_number.
+    // iMessage-line calls scope by identity id; no from_number.
     return this._inkbox._calls.place({
       toNumber:            options.toNumber,
       origination,

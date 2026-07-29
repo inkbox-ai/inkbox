@@ -46,6 +46,7 @@ fn main() -> inkbox::Result<()> {
     // when we don't actually place a call in a smoke run.
     let _ = CallOrigin::DedicatedNumber;
     let _ = CallOrigin::SharedImessageNumber;
+    let _ = CallOrigin::DedicatedImessageNumber;
     let _ = IncomingCallAction::AutoAccept;
     let _place = |i: &Inkbox| {
         i.calls().place(

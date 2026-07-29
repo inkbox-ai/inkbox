@@ -501,6 +501,7 @@ def test_call_ended_hosted_mode_and_reason_ride_the_call_block():
     # mode/reason live on data.call (mirrors the call REST shape), not data.
     assert call["mode"] == "hosted_agent"
     assert call["hosted_agent_authority_mode"] == "yolo"
+    assert call["voicemail_detection"] == "disabled"
     assert call["reason"].startswith("Call the dental office")
     assert "mode" not in payload["data"]
     assert "reason" not in payload["data"]

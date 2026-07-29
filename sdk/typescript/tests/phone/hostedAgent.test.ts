@@ -32,6 +32,8 @@ describe("HostedAgentConfigResource.getConfig", () => {
     expect(config.agentIdentityId).toBe(IDENTITY_ID);
     expect(config.voice).toBe("warm-voice");
     expect(config.model).toBe("fast-model");
+    expect(config.effectiveVoice).toBe("warm-voice");
+    expect(config.effectiveModel).toBe("fast-model");
     expect(config.instructions).toBe(
       "Always offer to text a summary after the call.",
     );

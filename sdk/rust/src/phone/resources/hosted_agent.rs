@@ -114,6 +114,8 @@ mod tests {
             "agent_identity_id": "33333333-3333-3333-3333-333333333333",
             "voice": "warm-voice",
             "model": "fast-model",
+            "effective_voice": "warm-voice",
+            "effective_model": "fast-model",
             "instructions": "Always offer to text a summary after the call."
         })
     }
@@ -138,6 +140,8 @@ mod tests {
         );
         assert_eq!(config.voice.as_deref(), Some("warm-voice"));
         assert_eq!(config.model.as_deref(), Some("fast-model"));
+        assert_eq!(config.effective_voice, "warm-voice");
+        assert_eq!(config.effective_model, "fast-model");
     }
 
     #[test]
@@ -155,6 +159,8 @@ mod tests {
                 "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                 "voice": null,
                 "model": null,
+                "effective_voice": "voice-default",
+                "effective_model": "model-default",
                 "instructions": null
             }));
         });
@@ -206,6 +212,8 @@ mod tests {
                 "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                 "voice": null,
                 "model": null,
+                "effective_voice": "voice-default",
+                "effective_model": "model-default",
                 "instructions": null
             }));
         });
@@ -228,6 +236,8 @@ mod tests {
                 "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                 "voice": "warm-voice",
                 "model": null,
+                "effective_voice": "warm-voice",
+                "effective_model": "model-default",
                 "instructions": null
             }));
         });
@@ -254,6 +264,8 @@ mod tests {
                 "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                 "voice": null,
                 "model": null,
+                "effective_voice": "voice-default",
+                "effective_model": "model-default",
                 "instructions": null,
                 "authority_mode": "yolo"
             }));

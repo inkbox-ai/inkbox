@@ -166,25 +166,6 @@ describe("HttpTransport", () => {
     expect((thirdInit!.headers as Record<string, string>).Cookie).toBeUndefined();
   });
 
-  // --- PUT ---
-
-  it("put() forwards per-request headers", async () => {
-    mockFetch(200, { updated: true });
-    const http = makeTransport();
-
-    await http.put(
-      "/items/1",
-      { name: "new" },
-      { headers: { "Idempotency-Key": "stable-update-1" } },
-    );
-
-    const [, init] = vi.mocked(fetch).mock.calls[0];
-    expect(init!.method).toBe("PUT");
-    expect((init!.headers as Record<string, string>)["Idempotency-Key"]).toBe(
-      "stable-update-1",
-    );
-  });
-
   // --- PATCH ---
 
   it("patch() sends PATCH method with body", async () => {

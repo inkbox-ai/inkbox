@@ -205,8 +205,10 @@ inkbox phone call -i <handle>                # Place an outbound call
   --reason <text>                            #   Voice AI's task brief — what to accomplish
   --authority-mode <mode>                    #   contact_scoped (default) or yolo;
                                              #     yolo requires --hosted and an admin API key
+  --no-voicemail-detection                   #   Stay connected after voicemail is detected
   --origination <origin>                     #   dedicated_number (default) or
-                                             #     shared_imessage_number
+                                             #     shared_imessage_number or
+                                             #     dedicated_imessage_number
 
 inkbox phone calls -i <handle>               # List calls
   --limit <n>                                #   Max results (default: 50)

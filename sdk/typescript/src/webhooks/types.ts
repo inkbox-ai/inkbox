@@ -41,7 +41,10 @@ export type SmsDeliveryStatusWire =
 
 export type TextMessageOriginWire = "user_initiated" | "auto_reply";
 
-export type CallOriginWire = "dedicated_number" | "shared_imessage_number";
+export type CallOriginWire =
+  | "dedicated_number"
+  | "shared_imessage_number"
+  | "dedicated_imessage_number";
 
 export type CallDirectionWire = "outbound" | "inbound";
 
@@ -55,6 +58,7 @@ export type CallStatusWire =
 
 export type CallModeWire = "client_websocket" | "hosted_agent";
 export type HostedAgentAuthorityModeWire = "contact_scoped" | "yolo";
+export type VoicemailDetectionWire = "enabled" | "disabled";
 
 export type CallOutcomeWire = "completed" | "no_answer" | "declined" | "failed";
 
@@ -642,6 +646,8 @@ export interface WebhookPhoneCall {
   reason?: string | null;
   /** Optional/nullable on older replays; treat either as `contact_scoped`. */
   hosted_agent_authority_mode?: HostedAgentAuthorityModeWire | null;
+  /** Optional/nullable on webhook replays that predate this control. */
+  voicemail_detection?: VoicemailDetectionWire | null;
 }
 
 /**

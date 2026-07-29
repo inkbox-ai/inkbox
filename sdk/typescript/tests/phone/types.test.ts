@@ -8,6 +8,7 @@ import {
   parsePhoneTranscript,
   parseIncomingCallActionConfig,
   CallOrigin,
+  VoicemailDetection,
   IncomingCallAction,
   SmsStatus,
 } from "../../src/phone/types.js";
@@ -87,6 +88,7 @@ describe("parsePhoneCall", () => {
     expect(c.endedAt).toBeInstanceOf(Date);
     expect(c.isBlocked).toBe(false);
     expect(c.origin).toBe(CallOrigin.DEDICATED_NUMBER);
+    expect(c.voicemailDetection).toBe(VoicemailDetection.ENABLED);
   });
 
   it("parses shared-pool origin and null localPhoneNumber", () => {
@@ -104,6 +106,30 @@ describe("parsePhoneCall", () => {
     void _ignored;
     const c = parsePhoneCall(legacyPayload);
     expect(c.origin).toBe(CallOrigin.DEDICATED_NUMBER);
+  });
+
+  it("parses dedicated iMessage origin", () => {
+    const c = parsePhoneCall({
+      ...RAW_PHONE_CALL,
+      origin: "dedicated_imessage_number",
+      local_phone_number: "+15555550123",
+    });
+    expect(c.origin).toBe(CallOrigin.DEDICATED_IMESSAGE_NUMBER);
+    expect(c.localPhoneNumber).toBe("+15555550123");
+  });
+
+  it("defaults legacy voicemail detection and preserves disabled", () => {
+    const { voicemail_detection: _ignored, ...legacyPayload } = RAW_PHONE_CALL;
+    void _ignored;
+    expect(parsePhoneCall(legacyPayload).voicemailDetection).toBe(
+      VoicemailDetection.ENABLED,
+    );
+    expect(
+      parsePhoneCall({
+        ...RAW_PHONE_CALL,
+        voicemail_detection: "disabled",
+      }).voicemailDetection,
+    ).toBe(VoicemailDetection.DISABLED);
   });
 
   it("handles null timestamps", () => {
@@ -189,4 +215,3 @@ describe("parseIncomingCallActionConfig", () => {
     expect(c.incomingCallWebhookUrl).toBeNull();
   });
 });
-

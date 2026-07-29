@@ -44,7 +44,11 @@ SmsDeliveryStatusWire = Literal[
 
 TextMessageOriginWire = Literal["user_initiated", "auto_reply"]
 
-CallOriginWire = Literal["dedicated_number", "shared_imessage_number"]
+CallOriginWire = Literal[
+    "dedicated_number",
+    "shared_imessage_number",
+    "dedicated_imessage_number",
+]
 
 CallDirectionWire = Literal["outbound", "inbound"]
 
@@ -67,6 +71,7 @@ HangupReasonWire = Literal[
 
 CallModeWire = Literal["client_websocket", "hosted_agent"]
 HostedAgentAuthorityModeWire = Literal["contact_scoped", "yolo"]
+VoicemailDetectionWire = Literal["enabled", "disabled"]
 
 CallOutcomeWire = Literal["completed", "no_answer", "declined", "failed"]
 
@@ -657,6 +662,8 @@ class WebhookPhoneCall(TypedDict):
     reason: NotRequired[str | None]
     # Optional/nullable for replay compatibility; treat either as contact_scoped.
     hosted_agent_authority_mode: NotRequired[HostedAgentAuthorityModeWire | None]
+    # Optional for webhook replays that predate voicemail detection controls.
+    voicemail_detection: NotRequired[VoicemailDetectionWire | None]
 
 
 class WebhookCallTranscript(TypedDict):

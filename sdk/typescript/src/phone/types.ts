@@ -66,10 +66,13 @@ export enum TextMessageOrigin {
  *   number (requires `fromNumber`).
  * - `shared_imessage_number` — placed over the shared iMessage-number
  *   pool (requires `agentIdentityId`, no `fromNumber`).
+ * - `dedicated_imessage_number` — placed over the identity's dedicated
+ *   iMessage line (requires `agentIdentityId`, no `fromNumber`).
  */
 export enum CallOrigin {
   DEDICATED_NUMBER = "dedicated_number",
   SHARED_IMESSAGE_NUMBER = "shared_imessage_number",
+  DEDICATED_IMESSAGE_NUMBER = "dedicated_imessage_number",
 }
 
 /**
@@ -265,6 +268,8 @@ export interface PhoneCall {
   reason: string | null;
   /** Hosted-agent authority. Defaults to `contact_scoped`. */
   hostedAgentAuthorityMode: HostedAgentAuthorityMode;
+  /** Whether voicemail detection ran. Defaults to `enabled`. */
+  voicemailDetection: VoicemailDetection;
   /**
    * Open action items Inkbox Voice AI recorded, `seq`-ascending.
    * Empty for client_websocket calls and Voice AI calls with no open items.
@@ -342,13 +347,15 @@ export interface IncomingCallActionConfig {
 /**
  * Per-identity Inkbox Voice AI configuration.
  *
- * `voice` / `model` / `instructions` are all nullable — `null` means the
- * server default applies for that field.
+ * `voice` / `model` / `instructions` are nullable overrides.
+ * `effectiveVoice` and `effectiveModel` show the resolved settings.
  */
 export interface HostedAgentConfig {
   agentIdentityId: string;
   voice: string | null;
   model: string | null;
+  effectiveVoice: string;
+  effectiveModel: string;
   instructions: string | null;
   authorityMode: HostedAgentAuthorityMode;
 }
@@ -522,6 +529,8 @@ export interface RawPhoneCall {
   reason?: string | null;
   // Optional/nullable for compatibility; parser defaults to contact_scoped.
   hosted_agent_authority_mode?: HostedAgentAuthorityMode | string | null;
+  // Optional/nullable for compatibility; parser defaults to enabled.
+  voicemail_detection?: VoicemailDetection | string | null;
   // Absent/empty for client_websocket calls and Voice AI calls with no open items.
   post_call_action_items?: RawPostCallActionItem[];
   created_at: string;
@@ -637,6 +646,8 @@ export interface RawHostedAgentConfig {
   agent_identity_id: string;
   voice?: string | null;
   model?: string | null;
+  effective_voice: string;
+  effective_model: string;
   instructions?: string | null;
   authority_mode?: HostedAgentAuthorityMode | string | null;
 }
@@ -740,6 +751,9 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     hostedAgentAuthorityMode:
       (r.hosted_agent_authority_mode as HostedAgentAuthorityMode | null | undefined)
       ?? HostedAgentAuthorityMode.CONTACT_SCOPED,
+    voicemailDetection:
+      (r.voicemail_detection as VoicemailDetection | null | undefined)
+      ?? VoicemailDetection.ENABLED,
     postCallActionItems: (r.post_call_action_items ?? []).map(parsePostCallActionItem),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
@@ -819,6 +833,8 @@ export function parseHostedAgentConfig(r: RawHostedAgentConfig): HostedAgentConf
     agentIdentityId: r.agent_identity_id,
     voice: r.voice ?? null,
     model: r.model ?? null,
+    effectiveVoice: r.effective_voice,
+    effectiveModel: r.effective_model,
     instructions: r.instructions ?? null,
     authorityMode:
       (r.authority_mode as HostedAgentAuthorityMode | null | undefined)

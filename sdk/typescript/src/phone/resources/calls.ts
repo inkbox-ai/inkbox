@@ -133,7 +133,7 @@ export class CallsResource {
    *
    * The server enforces the conditional requirements: `fromNumber` is
    * required for `dedicated_number`, `agentIdentityId` for
-   * `shared_imessage_number`; `hosted_agent` mode requires `reason` and
+   * either iMessage origination; `hosted_agent` mode requires `reason` and
    * excludes `clientWebsocketUrl`. This method never client-gates —
    * violations surface as a server 422.
    *
@@ -141,7 +141,7 @@ export class CallsResource {
    * @param options.origination - Where the call originates. Defaults to
    *   `dedicated_number`.
    * @param options.fromNumber - E.164 number to call from (dedicated origination).
-   * @param options.agentIdentityId - UUID of the placing identity (shared origination).
+   * @param options.agentIdentityId - UUID of the placing identity (iMessage origination).
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
    * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults

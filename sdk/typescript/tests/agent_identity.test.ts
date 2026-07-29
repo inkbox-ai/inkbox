@@ -462,6 +462,8 @@ describe("AgentIdentity phone helpers", () => {
       agentIdentityId: "id-1",
       voice: null,
       model: null,
+      effectiveVoice: "voice-default",
+      effectiveModel: "model-default",
       instructions: null,
       authorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
     });
@@ -480,6 +482,8 @@ describe("AgentIdentity phone helpers", () => {
       agentIdentityId: "id-1",
       voice: "warm-voice",
       model: null,
+      effectiveVoice: "warm-voice",
+      effectiveModel: "model-default",
       instructions: "Be brief.",
       authorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
     });
@@ -504,6 +508,8 @@ describe("AgentIdentity phone helpers", () => {
       agentIdentityId: "id-1",
       voice: null,
       model: null,
+      effectiveVoice: "voice-default",
+      effectiveModel: "model-default",
       instructions: null,
       authorityMode: HostedAgentAuthorityMode.YOLO,
     });

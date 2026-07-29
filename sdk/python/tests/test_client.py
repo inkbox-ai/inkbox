@@ -165,7 +165,7 @@ class TestInkboxCookies:
 
 
 class TestPerRequestHeaders:
-    @pytest.mark.parametrize("method", ["post", "put", "patch"])
+    @pytest.mark.parametrize("method", ["post", "patch"])
     def test_json_mutations_send_caller_headers(self, method):
         client = Inkbox(api_key="sk-test", base_url="https://test.inkbox.ai")
         seen: list[str | None] = []

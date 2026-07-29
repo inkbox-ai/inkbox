@@ -150,15 +150,15 @@ impl CallsResource {
     /// Place an outbound call.
     ///
     /// The server enforces the conditional requirements: `from_number` is
-    /// required for `dedicated_number`, `agent_identity_id` for
-    /// `shared_imessage_number`. Omissions surface as a server 422.
+    /// required for `dedicated_number`, `agent_identity_id` for either
+    /// iMessage origination. Omissions surface as a server 422.
     ///
     /// # Arguments
     /// * `to_number` - E.164 number to call.
     /// * `origination` - Where the call originates (defaults to
     ///   [`CallOrigin::DedicatedNumber`]).
     /// * `from_number` - E.164 number to call from (dedicated origination).
-    /// * `agent_identity_id` - UUID of the placing identity (shared origination).
+    /// * `agent_identity_id` - UUID of the placing identity (iMessage origination).
     /// * `client_websocket_url` - WebSocket URL (wss://) for audio bridging.
     ///
     /// # Returns
@@ -221,14 +221,14 @@ impl CallsResource {
     /// Sibling of [`CallsResource::place`] (which stays client-driven);
     /// sends `mode=hosted_agent` plus the required `reason` brief and no
     /// WebSocket URL. Origination rules are unchanged and server-enforced:
-    /// `from_number` for `dedicated_number`, `agent_identity_id` for
-    /// `shared_imessage_number` — violations surface as a server 422.
+    /// `from_number` for `dedicated_number`, `agent_identity_id` for either
+    /// iMessage origination — violations surface as a server 422.
     ///
     /// # Arguments
     /// * `to_number` - E.164 number to call.
     /// * `origination` - Where the call originates.
     /// * `from_number` - E.164 number to call from (dedicated origination).
-    /// * `agent_identity_id` - UUID of the placing identity (shared origination).
+    /// * `agent_identity_id` - UUID of the placing identity (iMessage origination).
     /// * `reason` - Voice AI's task brief for the call — what to
     ///   accomplish.
     ///
