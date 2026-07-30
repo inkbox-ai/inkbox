@@ -4,6 +4,27 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.9 — Voice AI authority inheritance
+
+### Changed
+
+- Voice AI outbound calls now treat an omitted authority mode as “use the
+  identity's saved Voice AI authority.” Python, TypeScript, Rust, and the CLI
+  continue to omit the wire field unless the caller supplies an override.
+- Explicit `contact_scoped` remains a safe per-call downscope. Explicit `yolo`
+  requires an admin credential only when it exceeds the identity's saved
+  authority.
+- Documentation, command help, and exact-wire tests now distinguish an omitted
+  inherited default from an explicit override.
+- Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.9; the CLI
+  now depends on `@inkbox/sdk` `^0.5.9`.
+
+### Compatibility and rollout
+
+- Existing method signatures and wire names are unchanged. Older API versions
+  may still resolve an omitted authority as `contact_scoped`; use an explicit
+  override when targeting mixed API versions.
+
 ## 0.5.8 — Hosted-agent authority and voicemail detection
 
 ### Added

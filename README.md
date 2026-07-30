@@ -118,7 +118,8 @@ inkbox phone call -i my-agent --to +15551234567
 inkbox phone call -i my-agent --to +15551234567 \
   --origination shared_imessage_number
 
-# Give one hosted-agent call broader authority (requires an admin API key).
+# Override one Voice AI call to use broader authority. This requires an admin
+# API key unless the identity's saved authority is already yolo.
 inkbox phone call -i my-agent --to +15551234567 \
   --hosted --reason "Coordinate the appointment and send confirmations." \
   --authority-mode yolo

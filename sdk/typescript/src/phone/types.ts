@@ -266,7 +266,7 @@ export interface PhoneCall {
   mode: string;
   /** Outbound Voice AI task brief; `null` on inbound and client-driven calls. */
   reason: string | null;
-  /** Hosted-agent authority. Defaults to `contact_scoped`. */
+  /** Resolved Voice AI authority. Missing legacy values parse as `contact_scoped`. */
   hostedAgentAuthorityMode: HostedAgentAuthorityMode;
   /** Whether voicemail detection ran. Defaults to `enabled`. */
   voicemailDetection: VoicemailDetection;

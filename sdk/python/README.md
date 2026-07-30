@@ -365,21 +365,28 @@ call = identity.place_call(
 )
 print(call.status, call.rate_limit.calls_remaining)
 
-# Let the hosted agent work beyond the current caller for this call.
-# Requesting yolo authority requires an admin API key.
+# Let Voice AI handle the call using this identity's saved authority.
 from inkbox import CallMode, HostedAgentAuthorityMode, VoicemailDetection
 
 hosted_call = identity.place_call(
     to_number="+15551234567",
     mode=CallMode.HOSTED_AGENT,
     reason="Coordinate the appointment and send confirmations.",
-    hosted_agent_authority_mode=HostedAgentAuthorityMode.YOLO,
     voicemail_detection=VoicemailDetection.DISABLED,
 )
 
-# Set the mode for future incoming calls with an admin API key. Outbound calls
-# select authority per call.
+# Set the saved default for future inbound and outbound Voice AI calls.
+# Changing the saved default requires an admin API key.
 identity.set_hosted_agent_authority_mode(HostedAgentAuthorityMode.YOLO)
+
+# Per-call overrides are optional. contact_scoped always downscopes. yolo
+# requires an admin credential unless the saved authority is already yolo.
+scoped_call = identity.place_call(
+    to_number="+15551234567",
+    mode=CallMode.HOSTED_AGENT,
+    reason="Confirm only this caller's appointment.",
+    hosted_agent_authority_mode=HostedAgentAuthorityMode.CONTACT_SCOPED,
+)
 
 # List calls (paginated)
 calls = identity.list_calls(limit=10, offset=0)

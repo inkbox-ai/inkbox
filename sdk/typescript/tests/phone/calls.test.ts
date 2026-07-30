@@ -381,12 +381,13 @@ describe("CallsResource.place", () => {
 });
 
 describe("CallsResource.place hosted_agent mode", () => {
-  it("sends mode=hosted_agent with the reason brief", async () => {
+  it("omits authority so the server inherits the saved default", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue({
       ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
       mode: "hosted_agent",
       reason: "Book a cleaning next week, mornings preferred",
+      hosted_agent_authority_mode: "yolo",
     });
     const res = new CallsResource(http);
 
@@ -406,14 +407,18 @@ describe("CallsResource.place hosted_agent mode", () => {
     });
     expect(call.mode).toBe("hosted_agent");
     expect(call.reason).toBe("Book a cleaning next week, mornings preferred");
+    expect(call.hostedAgentAuthorityMode).toBe(HostedAgentAuthorityMode.YOLO);
   });
 
-  it("forwards yolo authority on a hosted-agent call", async () => {
+  it.each([
+    HostedAgentAuthorityMode.CONTACT_SCOPED,
+    HostedAgentAuthorityMode.YOLO,
+  ])("forwards explicit %s authority on a hosted-agent call", async (authorityMode) => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue({
       ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
       mode: "hosted_agent",
-      hosted_agent_authority_mode: "yolo",
+      hosted_agent_authority_mode: authorityMode,
     });
     const res = new CallsResource(http);
 
@@ -421,7 +426,7 @@ describe("CallsResource.place hosted_agent mode", () => {
       toNumber: "+15551234567",
       fromNumber: "+18335794607",
       mode: CallMode.HOSTED_AGENT,
-      hostedAgentAuthorityMode: HostedAgentAuthorityMode.YOLO,
+      hostedAgentAuthorityMode: authorityMode,
       reason: "Coordinate the appointment",
     });
 
@@ -429,8 +434,8 @@ describe("CallsResource.place hosted_agent mode", () => {
       string,
       Record<string, unknown>,
     ];
-    expect(body["hosted_agent_authority_mode"]).toBe("yolo");
-    expect(call.hostedAgentAuthorityMode).toBe(HostedAgentAuthorityMode.YOLO);
+    expect(body["hosted_agent_authority_mode"]).toBe(authorityMode);
+    expect(call.hostedAgentAuthorityMode).toBe(authorityMode);
   });
 
   it("forwards a hosted_agent call with ws-url instead of client-gating (server 422s)", async () => {

@@ -76,10 +76,11 @@ export class HostedAgentConfigResource {
   }
 
   /**
-   * Set authority for an identity's future incoming hosted calls.
+   * Set an identity's saved Voice AI authority.
    *
-   * This privileged operation requires an admin API key. Outbound calls
-   * select authority independently.
+   * This privileged operation requires an admin API key. Incoming calls use
+   * this value, and outbound calls inherit it when they omit a per-call
+   * override.
    */
   async setAuthorityMode(options: {
     agentIdentityId: string;

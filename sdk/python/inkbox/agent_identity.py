@@ -718,8 +718,11 @@ class AgentIdentity:
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.
                 See :class:`CallMode`.
-            hosted_agent_authority_mode: Hosted-agent authority for this call.
-                Omit for the server's ``contact_scoped`` default.
+            hosted_agent_authority_mode: Voice AI authority override.
+                Omit to inherit this identity's saved Voice AI authority.
+                Explicit ``contact_scoped`` downscopes the call. Explicit
+                ``yolo`` requires an admin credential unless the saved
+                authority is already ``yolo``.
             voicemail_detection: Whether to hang up when voicemail is detected.
                 Omit for the server's ``enabled`` default.
             reason: Voice AI's task brief for the call. Required
@@ -859,10 +862,10 @@ class AgentIdentity:
         self,
         authority_mode: HostedAgentAuthorityMode | str,
     ) -> HostedAgentConfig:
-        """Set authority for future incoming hosted calls with an admin API key.
+        """Set the saved Voice AI authority with an admin API key.
 
-        Outbound calls select authority independently with
-        ``hosted_agent_authority_mode``.
+        Incoming calls use this value. Outbound calls inherit it when
+        ``hosted_agent_authority_mode`` is omitted.
         """
         return self._inkbox._hosted_agent.set_authority_mode(
             agent_identity_id=self.id,

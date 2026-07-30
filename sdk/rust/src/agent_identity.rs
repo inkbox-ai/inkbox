@@ -796,9 +796,10 @@ impl AgentIdentity {
         )
     }
 
-    /// Set authority for future incoming hosted calls with an admin API key.
+    /// Set the saved Voice AI authority with an admin API key.
     ///
-    /// Outbound calls select authority independently.
+    /// Incoming calls use this value. Outbound calls inherit it when the
+    /// placement options omit `authority_mode`.
     pub fn set_hosted_agent_authority_mode(
         &self,
         authority_mode: HostedAgentAuthorityMode,

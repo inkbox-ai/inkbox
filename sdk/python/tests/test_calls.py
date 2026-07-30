@@ -405,11 +405,12 @@ class TestCallsPlace:
 
 
 class TestCallsPlaceHosted:
-    def test_hosted_mode_and_reason_forwarded(self, client, transport):
+    def test_omitted_authority_inherits_saved_default(self, client, transport):
         transport.post.return_value = {
             **PHONE_CALL_DICT,
             "mode": "hosted_agent",
             "reason": "Book a cleaning next week, mornings preferred",
+            "hosted_agent_authority_mode": "yolo",
         }
 
         call = client._calls.place(
@@ -431,24 +432,37 @@ class TestCallsPlaceHosted:
         )
         assert call.mode == "hosted_agent"
         assert call.reason == "Book a cleaning next week, mornings preferred"
+        assert call.hosted_agent_authority_mode is HostedAgentAuthorityMode.YOLO
 
-    def test_yolo_authority_forwarded_and_parsed(self, client, transport):
+    @pytest.mark.parametrize(
+        "authority_mode",
+        [
+            HostedAgentAuthorityMode.CONTACT_SCOPED,
+            HostedAgentAuthorityMode.YOLO,
+        ],
+    )
+    def test_explicit_authority_override_forwarded_and_parsed(
+        self,
+        client,
+        transport,
+        authority_mode,
+    ):
         transport.post.return_value = {
             **PHONE_CALL_DICT,
             "mode": "hosted_agent",
-            "hosted_agent_authority_mode": "yolo",
+            "hosted_agent_authority_mode": authority_mode.value,
         }
 
         call = client._calls.place(
             to_number="+15551234567",
             mode=CallMode.HOSTED_AGENT,
-            hosted_agent_authority_mode=HostedAgentAuthorityMode.YOLO,
+            hosted_agent_authority_mode=authority_mode,
             reason="Coordinate the appointment",
         )
 
         _, kwargs = transport.post.call_args
-        assert kwargs["json"]["hosted_agent_authority_mode"] == "yolo"
-        assert call.hosted_agent_authority_mode is HostedAgentAuthorityMode.YOLO
+        assert kwargs["json"]["hosted_agent_authority_mode"] == authority_mode.value
+        assert call.hosted_agent_authority_mode is authority_mode
 
     def test_string_mode_passed_verbatim(self, client, transport):
         """A raw string mode is forwarded as-is (no enum coercion)."""

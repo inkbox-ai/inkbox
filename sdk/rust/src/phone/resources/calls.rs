@@ -768,9 +768,9 @@ mod tests {
     }
 
     #[test]
-    fn place_hosted_sends_mode_and_reason() {
+    fn place_hosted_omits_authority_and_parses_inherited_default() {
         let server = MockServer::start();
-        // Exact json_body match: hosted body carries mode + reason, no ws key.
+        // Exact body omits authority; the resolved response may still be Yolo.
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/v1/phone/place-call")
@@ -785,6 +785,7 @@ mod tests {
                 let mut v = placed_json("dedicated_number", json!("+15550001111"));
                 v["mode"] = json!("hosted_agent");
                 v["reason"] = json!("Book a cleaning next week, mornings preferred");
+                v["hosted_agent_authority_mode"] = json!("yolo");
                 v
             });
         });
@@ -803,6 +804,10 @@ mod tests {
         assert_eq!(
             placed.call.reason.as_deref(),
             Some("Book a cleaning next week, mornings preferred")
+        );
+        assert_eq!(
+            placed.call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::Yolo
         );
     }
 
@@ -845,6 +850,42 @@ mod tests {
             placed.call.hosted_agent_authority_mode,
             HostedAgentAuthorityMode::Yolo
         );
+    }
+
+    #[test]
+    fn place_hosted_with_authority_sends_contact_scoped() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "mode": "hosted_agent",
+                    "reason": "Confirm this caller's appointment",
+                    "hosted_agent_authority_mode": "contact_scoped",
+                    "from_number": "+15550001111"
+                }));
+            then.status(200).json_body({
+                let mut v = placed_json("dedicated_number", json!("+15550001111"));
+                v["mode"] = json!("hosted_agent");
+                v
+            });
+        });
+
+        client(&server)
+            .calls()
+            .place_hosted_with_authority(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                "Confirm this caller's appointment",
+                HostedAgentAuthorityMode::ContactScoped,
+            )
+            .unwrap();
+
+        mock.assert();
     }
 
     #[test]

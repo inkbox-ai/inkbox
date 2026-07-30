@@ -182,7 +182,7 @@ test("buildPlaceCallOptions rejects an unknown origination", () => {
   });
 });
 
-test("buildPlaceCallOptions builds a shared hosted call with mode and reason", () => {
+test("buildPlaceCallOptions omits authority so hosted calls inherit the saved default", () => {
   const result = buildPlaceCallOptions({
     identity: "support-bot",
     to: "+15551234567",
@@ -201,23 +201,25 @@ test("buildPlaceCallOptions builds a shared hosted call with mode and reason", (
   });
 });
 
-test("buildPlaceCallOptions forwards yolo authority on a hosted call", () => {
-  const result = buildPlaceCallOptions({
-    identity: "support-bot",
-    to: "+15551234567",
-    hosted: true,
-    reason: "Coordinate the appointment",
-    authorityMode: "yolo",
-  });
-
-  assert.deepEqual(result, {
-    callOptions: {
-      toNumber: "+15551234567",
-      mode: "hosted_agent",
+test("buildPlaceCallOptions forwards explicit authority overrides", () => {
+  for (const authorityMode of ["contact_scoped", "yolo"]) {
+    const result = buildPlaceCallOptions({
+      identity: "support-bot",
+      to: "+15551234567",
+      hosted: true,
       reason: "Coordinate the appointment",
-      hostedAgentAuthorityMode: "yolo",
-    },
-  });
+      authorityMode,
+    });
+
+    assert.deepEqual(result, {
+      callOptions: {
+        toNumber: "+15551234567",
+        mode: "hosted_agent",
+        reason: "Coordinate the appointment",
+        hostedAgentAuthorityMode: authorityMode,
+      },
+    });
+  }
 });
 
 test("buildPlaceCallOptions rejects authority without --hosted", () => {

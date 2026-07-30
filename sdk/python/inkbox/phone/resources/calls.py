@@ -173,10 +173,13 @@ class CallsResource:
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.
                 See :class:`CallMode`.
-            hosted_agent_authority_mode: Hosted-agent authority for this call.
-                Omit for the server's ``contact_scoped`` default. ``yolo`` is
-                valid only with ``mode=hosted_agent``; invalid combinations
-                surface the server's 422 response.
+            hosted_agent_authority_mode: Voice AI authority override.
+                Omit to inherit the identity's saved Voice AI authority.
+                Explicit ``contact_scoped`` downscopes the call. Explicit
+                ``yolo`` requires an admin credential unless the saved
+                authority is already ``yolo``. Valid only with
+                ``mode=hosted_agent``; invalid combinations surface the
+                server's 422 response.
             voicemail_detection: Whether to hang up when voicemail is detected.
                 Omit for the server's ``enabled`` default.
             reason: Voice AI's task brief for the call — what to
