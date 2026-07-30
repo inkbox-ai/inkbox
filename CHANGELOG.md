@@ -4,6 +4,46 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.8 — Hosted-agent authority and voicemail detection
+
+### Added
+
+- **Hosted-agent authority modes.** Python, TypeScript, and Rust expose
+  `contact_scoped` and `yolo` as typed authority modes on hosted-agent config,
+  call responses, and `call.ended` webhook payloads.
+- **Privileged authority updates.** Hosted-agent config resources and
+  identity helpers can change the mode for future incoming calls with an admin
+  API key. Outbound calls select authority per call.
+- **Per-call authority selection.** Outbound call placement accepts an
+  authority mode. The default is `contact_scoped`; `yolo` is available only
+  for hosted-agent calls made with an admin API key.
+- **CLI controls.** `inkbox phone call` accepts `--authority-mode`, and
+  `inkbox phone hosted-agent authority-mode` updates the saved mode.
+- **Voicemail detection control.** Outbound calls can disable voicemail
+  detection so a caller can stay connected and leave a message. Python,
+  TypeScript, and Rust omit the setting by default, preserving detection, and
+  the CLI exposes `--no-voicemail-detection`. Call reads and lifecycle
+  webhooks expose the persisted choice.
+- **Dedicated iMessage call origin.** Call and webhook enums now include
+  `dedicated_imessage_number`, matching the existing API wire value.
+- **Voice AI tool activity.** Python, TypeScript, and Rust expose paginated,
+  call-scoped tool status and sanitized results without tool arguments.
+
+### Changed
+
+- Version bumped to 0.5.8 across `@inkbox/sdk` (TypeScript), `inkbox`
+  (Python), `@inkbox/cli`, and `inkbox` (Rust). The CLI depends on
+  `@inkbox/sdk` `^0.5.8`.
+
+### Compatibility
+
+- Missing or null authority fields on older call and config responses parse as
+  `contact_scoped`. Older `call.ended` replays may omit the optional field.
+- Existing call-placement and hosted-agent config methods retain
+  `contact_scoped` behavior by default.
+- Existing call-placement methods omit voicemail detection, retaining the
+  server default (`enabled`).
+
 ## 0.5.7 — Mailbox imports
 
 ### Added

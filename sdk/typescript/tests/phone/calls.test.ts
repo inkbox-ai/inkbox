@@ -1,7 +1,12 @@
 // sdk/typescript/tests/phone/calls.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { CallsResource } from "../../src/phone/resources/calls.js";
-import { CallMode, CallOrigin } from "../../src/phone/types.js";
+import {
+  CallMode,
+  CallOrigin,
+  HostedAgentAuthorityMode,
+  VoicemailDetection,
+} from "../../src/phone/types.js";
 import { HttpTransport, InkboxAPIError } from "../../src/_http.js";
 import {
   RAW_PHONE_CALL,
@@ -200,6 +205,62 @@ describe("CallsResource.transcripts", () => {
   });
 });
 
+describe("CallsResource.toolInvocations", () => {
+  it("returns paginated safe Voice AI tool activity", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      items: [
+        {
+          id: "dddd4444-0000-0000-0000-000000000001",
+          call_id: CALL_ID,
+          tool_name: "send_email",
+          status: "succeeded",
+          result: { status: "sent" },
+          started_at: "2026-07-29T01:02:03+00:00",
+          completed_at: "2026-07-29T01:02:04+00:00",
+        },
+      ],
+      limit: 25,
+      offset: 50,
+      has_more: true,
+    });
+    const res = new CallsResource(http);
+
+    const page = await res.toolInvocations(CALL_ID, { limit: 25, offset: 50 });
+
+    expect(http.get).toHaveBeenCalledWith(
+      `/calls/${CALL_ID}/tool-invocations`,
+      { limit: 25, offset: 50 },
+    );
+    expect(page.hasMore).toBe(true);
+    expect(page.items[0].toolName).toBe("send_email");
+    expect(page.items[0].status).toBe("succeeded");
+    expect(page.items[0].result).toEqual({ status: "sent" });
+    expect(page.items[0].completedAt).toEqual(
+      new Date("2026-07-29T01:02:04+00:00"),
+    );
+  });
+
+  it("uses default pagination", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({
+      items: [],
+      limit: 50,
+      offset: 0,
+      has_more: false,
+    });
+    const res = new CallsResource(http);
+
+    const page = await res.toolInvocations(CALL_ID);
+
+    expect(http.get).toHaveBeenCalledWith(
+      `/calls/${CALL_ID}/tool-invocations`,
+      { limit: 50, offset: 0 },
+    );
+    expect(page.items).toEqual([]);
+  });
+});
+
 describe("CallsResource.place", () => {
   it("places call with required fields (defaults origination to dedicated)", async () => {
     const http = mockHttp();
@@ -270,6 +331,25 @@ describe("CallsResource.place", () => {
     // reason only rides hosted placements; mode is always on the wire.
     expect(body["reason"]).toBeUndefined();
     expect(body["mode"]).toBe("client_websocket");
+    expect(body["hosted_agent_authority_mode"]).toBeUndefined();
+    expect(body["voicemail_detection"]).toBeUndefined();
+  });
+
+  it("forwards voicemail detection only when provided", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
+    const res = new CallsResource(http);
+
+    await res.place({
+      toNumber: "+15551234567",
+      voicemailDetection: VoicemailDetection.DISABLED,
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["voicemail_detection"]).toBe("disabled");
   });
 
   it("parses the response including origin and rateLimit", async () => {
@@ -328,6 +408,31 @@ describe("CallsResource.place hosted_agent mode", () => {
     expect(call.reason).toBe("Book a cleaning next week, mornings preferred");
   });
 
+  it("forwards yolo authority on a hosted-agent call", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_PHONE_CALL_WITH_RATE_LIMIT,
+      mode: "hosted_agent",
+      hosted_agent_authority_mode: "yolo",
+    });
+    const res = new CallsResource(http);
+
+    const call = await res.place({
+      toNumber: "+15551234567",
+      fromNumber: "+18335794607",
+      mode: CallMode.HOSTED_AGENT,
+      hostedAgentAuthorityMode: HostedAgentAuthorityMode.YOLO,
+      reason: "Coordinate the appointment",
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["hosted_agent_authority_mode"]).toBe("yolo");
+    expect(call.hostedAgentAuthorityMode).toBe(HostedAgentAuthorityMode.YOLO);
+  });
+
   it("forwards a hosted_agent call with ws-url instead of client-gating (server 422s)", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
@@ -356,6 +461,9 @@ describe("CallsResource.place hosted_agent mode", () => {
 
     expect(call.mode).toBe(CallMode.CLIENT_WEBSOCKET);
     expect(call.reason).toBeNull();
+    expect(call.hostedAgentAuthorityMode).toBe(
+      HostedAgentAuthorityMode.CONTACT_SCOPED,
+    );
   });
 });
 
@@ -471,10 +579,17 @@ describe("CallsResource.place API errors", () => {
 });
 
 describe("CallsResource surface (identity-centered, v1.0.0)", () => {
-  it("exposes exactly list, get, hangup, transcripts, place", () => {
+  it("exposes the identity-centered call operations", () => {
     const methods = Object.getOwnPropertyNames(CallsResource.prototype)
       .filter((n) => n !== "constructor")
       .sort();
-    expect(methods).toEqual(["get", "hangup", "list", "place", "transcripts"]);
+    expect(methods).toEqual([
+      "get",
+      "hangup",
+      "list",
+      "place",
+      "toolInvocations",
+      "transcripts",
+    ]);
   });
 });

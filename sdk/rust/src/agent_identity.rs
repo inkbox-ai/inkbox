@@ -57,9 +57,11 @@ use crate::mail::types::{
 };
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
-    CallOrigin, HostedAgentConfig, IncomingCallAction, IncomingCallActionConfig, PhoneCall,
-    PhoneCallWithRateLimit, PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType,
-    PhoneTranscript, TextConversationSummary, TextConversationUpdateResult, TextMessage,
+    CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedAgentConfig,
+    HostedAgentToolInvocationPage, HostedCallPlacementOptions, IncomingCallAction,
+    IncomingCallActionConfig, PhoneCall, PhoneCallWithRateLimit, PhoneIdentityContactRule,
+    PhoneRuleAction, PhoneRuleMatchType, PhoneTranscript, TextConversationSummary,
+    TextConversationUpdateResult, TextMessage,
 };
 use crate::signing_keys::{SigningKey, SigningKeyStatus};
 use crate::tunnels::types::TunnelSummary;
@@ -535,8 +537,8 @@ impl AgentIdentity {
     /// Place an outbound call as this identity.
     ///
     /// For `dedicated_number` origination the call rides this identity's
-    /// provisioned phone number (requires one). For `shared_imessage_number`
-    /// it rides the shared line and is scoped by this identity's id instead.
+    /// provisioned phone number (requires one). Either iMessage origination
+    /// is scoped by this identity's id instead.
     ///
     /// # Arguments
     /// * `to_number` - E.164 destination number.
@@ -561,7 +563,7 @@ impl AgentIdentity {
                     client_websocket_url,
                 )
             }
-            CallOrigin::SharedImessageNumber => {
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
                 // Shared-line origination scopes by identity id, no from_number.
                 let id = self.id().to_string();
                 self.inkbox.calls().place(
@@ -570,6 +572,40 @@ impl AgentIdentity {
                     None,
                     Some(&id),
                     client_websocket_url,
+                )
+            }
+        }
+    }
+
+    /// Place an outbound call with optional call controls.
+    pub fn place_call_with_options(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        client_websocket_url: Option<&str>,
+        options: &CallPlacementOptions,
+    ) -> Result<PhoneCallWithRateLimit> {
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                let number = self.require_phone()?;
+                self.inkbox.calls().place_with_options(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    client_websocket_url,
+                    options,
+                )
+            }
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
+                let id = self.id().to_string();
+                self.inkbox.calls().place_with_options(
+                    to_number,
+                    origination,
+                    None,
+                    Some(&id),
+                    client_websocket_url,
+                    options,
                 )
             }
         }
@@ -618,8 +654,8 @@ impl AgentIdentity {
     /// Place an outbound call driven by Inkbox Voice AI.
     ///
     /// Sibling of [`AgentIdentity::place_call`] (which stays client-driven);
-    /// origination resolution is identical — dedicated calls ride this
-    /// identity's own number, shared calls scope by its id.
+    /// origination resolution is identical — dedicated phone calls ride this
+    /// identity's own number, while iMessage calls scope by its id.
     ///
     /// # Arguments
     /// * `to_number` - E.164 destination number.
@@ -633,7 +669,6 @@ impl AgentIdentity {
     ) -> Result<PhoneCallWithRateLimit> {
         match origination {
             CallOrigin::DedicatedNumber => {
-                // Dedicated origination needs this identity's own number.
                 let number = self.require_phone()?;
                 self.inkbox.calls().place_hosted(
                     to_number,
@@ -643,8 +678,7 @@ impl AgentIdentity {
                     reason,
                 )
             }
-            CallOrigin::SharedImessageNumber => {
-                // Shared-line origination scopes by identity id, no from_number.
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
                 let id = self.id().to_string();
                 self.inkbox
                     .calls()
@@ -653,9 +687,89 @@ impl AgentIdentity {
         }
     }
 
+    /// Place an outbound hosted-agent call with optional call controls.
+    pub fn place_hosted_call_with_options(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        reason: &str,
+        options: &HostedCallPlacementOptions,
+    ) -> Result<PhoneCallWithRateLimit> {
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                let number = self.require_phone()?;
+                self.inkbox.calls().place_hosted_with_options(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    reason,
+                    options,
+                )
+            }
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
+                let id = self.id().to_string();
+                self.inkbox.calls().place_hosted_with_options(
+                    to_number,
+                    origination,
+                    None,
+                    Some(&id),
+                    reason,
+                    options,
+                )
+            }
+        }
+    }
+
+    /// Place a hosted-agent call with an explicit authority mode.
+    pub fn place_hosted_call_with_authority(
+        &self,
+        to_number: &str,
+        origination: CallOrigin,
+        reason: &str,
+        authority_mode: HostedAgentAuthorityMode,
+    ) -> Result<PhoneCallWithRateLimit> {
+        match origination {
+            CallOrigin::DedicatedNumber => {
+                // Dedicated origination needs this identity's own number.
+                let number = self.require_phone()?;
+                self.inkbox.calls().place_hosted_with_authority(
+                    to_number,
+                    origination,
+                    Some(&number),
+                    None,
+                    reason,
+                    authority_mode,
+                )
+            }
+            CallOrigin::SharedImessageNumber | CallOrigin::DedicatedImessageNumber => {
+                // Shared-line origination scopes by identity id, no from_number.
+                let id = self.id().to_string();
+                self.inkbox.calls().place_hosted_with_authority(
+                    to_number,
+                    origination,
+                    None,
+                    Some(&id),
+                    reason,
+                    authority_mode,
+                )
+            }
+        }
+    }
+
     /// List transcript segments for a specific call.
     pub fn list_transcripts(&self, call_id: &str) -> Result<Vec<PhoneTranscript>> {
         self.inkbox.calls().transcripts(call_id)
+    }
+
+    /// List a page of Voice AI tool activity for a specific call.
+    pub fn list_tool_invocations(
+        &self,
+        call_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<HostedAgentToolInvocationPage> {
+        self.inkbox.calls().tool_invocations(call_id, limit, offset)
     }
 
     /// Get this identity's Inkbox Voice AI config.
@@ -680,6 +794,18 @@ impl AgentIdentity {
             model,
             instructions,
         )
+    }
+
+    /// Set authority for future incoming hosted calls with an admin API key.
+    ///
+    /// Outbound calls select authority independently.
+    pub fn set_hosted_agent_authority_mode(
+        &self,
+        authority_mode: HostedAgentAuthorityMode,
+    ) -> Result<HostedAgentConfig> {
+        self.inkbox
+            .hosted_agent()
+            .set_authority_mode(&self.id().to_string(), authority_mode)
     }
 
     /// Hang up one of this identity's live calls, from outside the call.
@@ -1617,6 +1743,7 @@ mod tests {
 
     use super::*;
     use crate::identities::types::AgentIdentityData;
+    use crate::phone::types::VoicemailDetection;
 
     /// The fixture identity's UUID, shared by the scoping assertions below.
     const IDENTITY_ID: &str = "11111111-1111-1111-1111-111111111111";
@@ -1792,6 +1919,35 @@ mod tests {
     }
 
     #[test]
+    fn place_call_with_options_forwards_voicemail_detection() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "from_number": "+15550001111",
+                    "voicemail_detection": "disabled"
+                }));
+            then.status(200)
+                .json_body(call_json("dedicated_number", json!("+15550001111")));
+        });
+        let identity = identity_at(&server.base_url(), true);
+        identity
+            .place_call_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                None,
+                &CallPlacementOptions {
+                    voicemail_detection: Some(VoicemailDetection::Disabled),
+                },
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
     fn place_hosted_call_dedicated_uses_identitys_own_number() {
         let server = MockServer::start();
         // Exact body: hosted_agent mode + reason ride the wire, no ws-url key.
@@ -1856,6 +2012,38 @@ mod tests {
     }
 
     #[test]
+    fn place_hosted_call_with_options_forwards_voicemail_detection() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "shared_imessage_number",
+                    "mode": "hosted_agent",
+                    "reason": "Leave a voicemail",
+                    "agent_identity_id": IDENTITY_ID,
+                    "voicemail_detection": "disabled"
+                }));
+            then.status(200)
+                .json_body(call_json("shared_imessage_number", serde_json::Value::Null));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        identity
+            .place_hosted_call_with_options(
+                "+15550002222",
+                CallOrigin::SharedImessageNumber,
+                "Leave a voicemail",
+                &HostedCallPlacementOptions {
+                    authority_mode: None,
+                    voicemail_detection: Some(VoicemailDetection::Disabled),
+                },
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
     fn hosted_agent_config_scopes_by_own_identity_id() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
@@ -1866,6 +2054,8 @@ mod tests {
                 "agent_identity_id": IDENTITY_ID,
                 "voice": "warm-voice",
                 "model": null,
+                "effective_voice": "warm-voice",
+                "effective_model": "realtime-default",
                 "instructions": null
             }));
         });
@@ -1891,6 +2081,8 @@ mod tests {
                 "agent_identity_id": IDENTITY_ID,
                 "voice": "warm-voice",
                 "model": null,
+                "effective_voice": "warm-voice",
+                "effective_model": "realtime-default",
                 "instructions": "Be brief."
             }));
         });
@@ -2029,6 +2221,30 @@ mod tests {
         mock.assert();
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].text, "Hi");
+    }
+
+    #[test]
+    fn list_tool_invocations_delegates_to_calls_resource() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls/22222222-2222-2222-2222-222222222222/tool-invocations")
+                .query_param("limit", "10")
+                .query_param("offset", "20");
+            then.status(200).json_body(json!({
+                "items": [],
+                "limit": 10,
+                "offset": 20,
+                "has_more": false
+            }));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        let page = identity
+            .list_tool_invocations("22222222-2222-2222-2222-222222222222", 10, 20)
+            .unwrap();
+        mock.assert();
+        assert!(page.items.is_empty());
+        assert_eq!(page.offset, 20);
     }
 
     #[test]

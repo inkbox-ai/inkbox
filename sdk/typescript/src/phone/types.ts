@@ -66,10 +66,13 @@ export enum TextMessageOrigin {
  *   number (requires `fromNumber`).
  * - `shared_imessage_number` — placed over the shared iMessage-number
  *   pool (requires `agentIdentityId`, no `fromNumber`).
+ * - `dedicated_imessage_number` — placed over the identity's dedicated
+ *   iMessage line (requires `agentIdentityId`, no `fromNumber`).
  */
 export enum CallOrigin {
   DEDICATED_NUMBER = "dedicated_number",
   SHARED_IMESSAGE_NUMBER = "shared_imessage_number",
+  DEDICATED_IMESSAGE_NUMBER = "dedicated_imessage_number",
 }
 
 /**
@@ -83,6 +86,18 @@ export enum CallOrigin {
 export enum CallMode {
   CLIENT_WEBSOCKET = "client_websocket",
   HOSTED_AGENT = "hosted_agent",
+}
+
+/** Whether an outbound call hangs up when voicemail is detected. */
+export enum VoicemailDetection {
+  ENABLED = "enabled",
+  DISABLED = "disabled",
+}
+
+/** How broadly a hosted voice agent may act. */
+export enum HostedAgentAuthorityMode {
+  CONTACT_SCOPED = "contact_scoped",
+  YOLO = "yolo",
 }
 
 /**
@@ -251,6 +266,10 @@ export interface PhoneCall {
   mode: string;
   /** Outbound Voice AI task brief; `null` on inbound and client-driven calls. */
   reason: string | null;
+  /** Hosted-agent authority. Defaults to `contact_scoped`. */
+  hostedAgentAuthorityMode: HostedAgentAuthorityMode;
+  /** Whether voicemail detection ran. Defaults to `enabled`. */
+  voicemailDetection: VoicemailDetection;
   /**
    * Open action items Inkbox Voice AI recorded, `seq`-ascending.
    * Empty for client_websocket calls and Voice AI calls with no open items.
@@ -284,6 +303,33 @@ export interface PhoneTranscript {
   createdAt: Date;
 }
 
+export enum HostedAgentToolInvocationStatus {
+  STARTED = "started",
+  SUCCEEDED = "succeeded",
+  FAILED = "failed",
+}
+
+export type HostedAgentToolResultValue = string | number | boolean | null;
+
+/** Safe activity record for one Voice AI tool invocation. */
+export interface HostedAgentToolInvocation {
+  id: string;
+  callId: string;
+  toolName: string;
+  status: HostedAgentToolInvocationStatus;
+  result: Record<string, HostedAgentToolResultValue> | null;
+  startedAt: Date;
+  completedAt: Date | null;
+}
+
+/** A page of Voice AI tool activity for one call. */
+export interface HostedAgentToolInvocationPage {
+  items: HostedAgentToolInvocation[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
 /**
  * The incoming-call routing config for an agent identity.
  *
@@ -301,14 +347,17 @@ export interface IncomingCallActionConfig {
 /**
  * Per-identity Inkbox Voice AI configuration.
  *
- * `voice` / `model` / `instructions` are all nullable — `null` means the
- * server default applies for that field.
+ * `voice` / `model` / `instructions` are nullable overrides.
+ * `effectiveVoice` and `effectiveModel` show the resolved settings.
  */
 export interface HostedAgentConfig {
   agentIdentityId: string;
   voice: string | null;
   model: string | null;
+  effectiveVoice: string;
+  effectiveModel: string;
   instructions: string | null;
+  authorityMode: HostedAgentAuthorityMode;
 }
 
 /**
@@ -478,6 +527,10 @@ export interface RawPhoneCall {
   // client_websocket.
   mode?: string | null;
   reason?: string | null;
+  // Optional/nullable for compatibility; parser defaults to contact_scoped.
+  hosted_agent_authority_mode?: HostedAgentAuthorityMode | string | null;
+  // Optional/nullable for compatibility; parser defaults to enabled.
+  voicemail_detection?: VoicemailDetection | string | null;
   // Absent/empty for client_websocket calls and Voice AI calls with no open items.
   post_call_action_items?: RawPostCallActionItem[];
   created_at: string;
@@ -565,6 +618,23 @@ export interface RawPhoneTranscript {
   created_at: string;
 }
 
+export interface RawHostedAgentToolInvocation {
+  id: string;
+  call_id: string;
+  tool_name: string;
+  status: string;
+  result: Record<string, HostedAgentToolResultValue> | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface RawHostedAgentToolInvocationPage {
+  items: RawHostedAgentToolInvocation[];
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
 export interface RawIncomingCallActionConfig {
   agent_identity_id: string;
   incoming_call_action: string;
@@ -576,7 +646,10 @@ export interface RawHostedAgentConfig {
   agent_identity_id: string;
   voice?: string | null;
   model?: string | null;
+  effective_voice: string;
+  effective_model: string;
   instructions?: string | null;
+  authority_mode?: HostedAgentAuthorityMode | string | null;
 }
 
 export interface RawPostCallActionItem {
@@ -675,6 +748,12 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     // Coerce a null/missing mode to client_websocket for back-compat.
     mode: r.mode ?? CallMode.CLIENT_WEBSOCKET,
     reason: r.reason ?? null,
+    hostedAgentAuthorityMode:
+      (r.hosted_agent_authority_mode as HostedAgentAuthorityMode | null | undefined)
+      ?? HostedAgentAuthorityMode.CONTACT_SCOPED,
+    voicemailDetection:
+      (r.voicemail_detection as VoicemailDetection | null | undefined)
+      ?? VoicemailDetection.ENABLED,
     postCallActionItems: (r.post_call_action_items ?? []).map(parsePostCallActionItem),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
@@ -713,6 +792,31 @@ export function parsePhoneTranscript(r: RawPhoneTranscript): PhoneTranscript {
   };
 }
 
+export function parseHostedAgentToolInvocation(
+  r: RawHostedAgentToolInvocation,
+): HostedAgentToolInvocation {
+  return {
+    id: r.id,
+    callId: r.call_id,
+    toolName: r.tool_name,
+    status: r.status as HostedAgentToolInvocationStatus,
+    result: r.result,
+    startedAt: new Date(r.started_at),
+    completedAt: r.completed_at ? new Date(r.completed_at) : null,
+  };
+}
+
+export function parseHostedAgentToolInvocationPage(
+  r: RawHostedAgentToolInvocationPage,
+): HostedAgentToolInvocationPage {
+  return {
+    items: r.items.map(parseHostedAgentToolInvocation),
+    limit: r.limit,
+    offset: r.offset,
+    hasMore: r.has_more,
+  };
+}
+
 export function parseIncomingCallActionConfig(
   r: RawIncomingCallActionConfig,
 ): IncomingCallActionConfig {
@@ -729,7 +833,12 @@ export function parseHostedAgentConfig(r: RawHostedAgentConfig): HostedAgentConf
     agentIdentityId: r.agent_identity_id,
     voice: r.voice ?? null,
     model: r.model ?? null,
+    effectiveVoice: r.effective_voice,
+    effectiveModel: r.effective_model,
     instructions: r.instructions ?? null,
+    authorityMode:
+      (r.authority_mode as HostedAgentAuthorityMode | null | undefined)
+      ?? HostedAgentAuthorityMode.CONTACT_SCOPED,
   };
 }
 

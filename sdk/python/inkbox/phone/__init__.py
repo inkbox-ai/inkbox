@@ -6,7 +6,11 @@ from inkbox.phone.exceptions import InkboxAPIError, InkboxError
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
+    HostedAgentAuthorityMode,
     HostedAgentConfig,
+    HostedAgentToolInvocation,
+    HostedAgentToolInvocationPage,
+    HostedAgentToolInvocationStatus,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -23,6 +27,7 @@ from inkbox.phone.types import (
     TextMediaItem,
     TextMessage,
     TextMessageRecipient,
+    VoicemailDetection,
 )
 from inkbox.signing_keys import SigningKey
 
@@ -31,7 +36,11 @@ __all__ = [
     "InkboxAPIError",
     "CallMode",
     "CallOrigin",
+    "HostedAgentAuthorityMode",
     "HostedAgentConfig",
+    "HostedAgentToolInvocation",
+    "HostedAgentToolInvocationPage",
+    "HostedAgentToolInvocationStatus",
     "IncomingCallAction",
     "IncomingCallActionConfig",
     "PhoneCall",
@@ -49,4 +58,5 @@ __all__ = [
     "TextMediaItem",
     "TextMessage",
     "TextMessageRecipient",
+    "VoicemailDetection",
 ]

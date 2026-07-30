@@ -6,6 +6,7 @@
 
 import { HttpTransport } from "../../_http.js";
 import {
+  HostedAgentAuthorityMode,
   HostedAgentConfig,
   RawHostedAgentConfig,
   parseHostedAgentConfig,
@@ -70,6 +71,26 @@ export class HostedAgentConfigResource {
     const data = await this.http.put<RawHostedAgentConfig>(
       "/hosted-agent-config",
       body,
+    );
+    return parseHostedAgentConfig(data);
+  }
+
+  /**
+   * Set authority for an identity's future incoming hosted calls.
+   *
+   * This privileged operation requires an admin API key. Outbound calls
+   * select authority independently.
+   */
+  async setAuthorityMode(options: {
+    agentIdentityId: string;
+    authorityMode: HostedAgentAuthorityMode;
+  }): Promise<HostedAgentConfig> {
+    const data = await this.http.put<RawHostedAgentConfig>(
+      "/hosted-agent-config/authority-mode",
+      {
+        agent_identity_id: options.agentIdentityId,
+        authority_mode: options.authorityMode,
+      },
     );
     return parseHostedAgentConfig(data);
   }

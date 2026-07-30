@@ -84,6 +84,15 @@ fn main() {
                             );
                         }
                     }
+                    CallOrigin::DedicatedImessageNumber => {
+                        shared += 1;
+                        if c.local_phone_number.is_some() {
+                            println!(
+                                "    WARN dedicated iMessage call {} has non-null local_phone_number",
+                                c.id
+                            );
+                        }
+                    }
                 }
             }
             println!("    origins: dedicated={ded} shared={shared}");

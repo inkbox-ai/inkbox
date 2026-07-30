@@ -19,11 +19,13 @@ import pytest
 from inkbox import (
     A2AWebhookPayload,
     CallEndedWebhookPayload,
+    HostedAgentAuthorityModeWire,
     IMessageReactionTypeWire,
     IMessageWebhookReaction,
     MailWebhookPayload,
     PhoneIncomingCallWebhookPayload,
     TextWebhookPayload,
+    VoicemailDetectionWire,
     WebhookMailAgentIdentity,
     WebhookMailContact,
 )
@@ -36,6 +38,18 @@ def test_imessage_group_reaction_assignment_is_nullable():
 def test_imessage_reaction_wire_keeps_eyes_and_inbound_custom_distinct():
     values = set(get_args(IMessageReactionTypeWire))
     assert {"eyes", "custom"} <= values
+
+
+def test_hosted_call_wire_types_are_exported_from_package_root():
+    assert set(get_args(HostedAgentAuthorityModeWire)) == {
+        "contact_scoped",
+        "yolo",
+    }
+    assert set(get_args(VoicemailDetectionWire)) == {
+        "disabled",
+        "enabled",
+    }
+
 
 # Repo layout: sdk/python/tests/test_webhook_types.py -> sdk/python/tests
 #                                                    -> sdk/python
@@ -490,6 +504,7 @@ def test_call_ended_pre_hosted_payload_omits_new_fields():
     # NotRequired keys: absent on old payloads, never a parse failure.
     assert "mode" not in data["call"]
     assert "reason" not in data["call"]
+    assert "hosted_agent_authority_mode" not in data["call"]
     assert "outcome" not in data
     assert "post_call_action_items" not in data
 
@@ -499,6 +514,8 @@ def test_call_ended_hosted_mode_and_reason_ride_the_call_block():
     call = payload["data"]["call"]
     # mode/reason live on data.call (mirrors the call REST shape), not data.
     assert call["mode"] == "hosted_agent"
+    assert call["hosted_agent_authority_mode"] == "yolo"
+    assert call["voicemail_detection"] == "disabled"
     assert call["reason"].startswith("Call the dental office")
     assert "mode" not in payload["data"]
     assert "reason" not in payload["data"]

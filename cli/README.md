@@ -203,8 +203,12 @@ inkbox phone call -i <handle>                # Place an outbound call
   --hosted                                   #   Let Inkbox Voice AI drive the call
                                              #     (requires --reason; conflicts with --ws-url)
   --reason <text>                            #   Voice AI's task brief — what to accomplish
+  --authority-mode <mode>                    #   contact_scoped (default) or yolo;
+                                             #     yolo requires --hosted and an admin API key
+  --no-voicemail-detection                   #   Stay connected after voicemail is detected
   --origination <origin>                     #   dedicated_number (default) or
-                                             #     shared_imessage_number
+                                             #     shared_imessage_number or
+                                             #     dedicated_imessage_number
 
 inkbox phone calls -i <handle>               # List calls
   --limit <n>                                #   Max results (default: 50)
@@ -215,6 +219,10 @@ inkbox phone calls -i <handle>               # List calls
 inkbox phone hangup <call-id> -i <handle>    # Hang up a live call from outside it
 
 inkbox phone transcripts <call-id> -i <handle>  # Get call transcripts
+
+inkbox phone tool-activity <call-id> -i <handle> # List paginated Voice AI tool activity
+  --limit <n>                                #   Max results (default: 50)
+  --offset <n>                               #   Pagination offset (default: 0)
 
 inkbox phone search-transcripts -i <handle>  # Search transcripts
   -q, --query <query>                        #   Search query (required)
@@ -234,6 +242,8 @@ inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitt
   --voice <voice>                            #   Voice override
   --model <model>                            #   Model override
   --instructions <text>                      #   Per-identity steering prompt
+
+inkbox phone hosted-agent authority-mode yolo -i <handle>  # Future incoming calls; admin API key
 ```
 
 Shared origination uses the identity's active iMessage-line assignment and

@@ -23,6 +23,7 @@ from inkbox.phone.types import (
     IncomingCallActionConfig,
     PhoneCall,
     PhoneCallWithRateLimit,
+    HostedAgentToolInvocationPage,
     PhoneTranscript,
     TextConversationUpdateResult,
     TextMessage,
@@ -327,6 +328,25 @@ class TestAgentIdentityPlaceCall:
             reason=None,
         )
 
+    def test_place_call_forwards_voicemail_detection_when_set(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        identity.place_call(
+            to_number="+15551234567",
+            voicemail_detection="disabled",
+        )
+
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination=CallOrigin.DEDICATED_NUMBER,
+            from_number="+18335794607",
+            client_websocket_url=None,
+            mode=CallMode.CLIENT_WEBSOCKET,
+            reason=None,
+            voicemail_detection="disabled",
+        )
+
 
 class TestAgentIdentityListCalls:
     def test_list_calls_scopes_to_identity_with_defaults(self):
@@ -372,6 +392,23 @@ class TestAgentIdentityListTranscripts:
 
         inkbox._calls.transcripts.assert_called_once_with(CALL_ID)
         assert result is inkbox._calls.transcripts.return_value
+
+
+class TestAgentIdentityListToolInvocations:
+    def test_delegates_to_calls_resource(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.tool_invocations.return_value = MagicMock(
+            spec=HostedAgentToolInvocationPage
+        )
+
+        result = identity.list_tool_invocations(CALL_ID, limit=10, offset=20)
+
+        inkbox._calls.tool_invocations.assert_called_once_with(
+            CALL_ID,
+            limit=10,
+            offset=20,
+        )
+        assert result is inkbox._calls.tool_invocations.return_value
 
 
 class TestAgentIdentityIncomingCallAction:

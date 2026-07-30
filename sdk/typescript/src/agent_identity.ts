@@ -26,7 +26,13 @@ import type {
   IncomingCallActionConfig,
   HostedAgentConfig,
 } from "./phone/types.js";
-import { CallMode, CallOrigin, IncomingCallAction } from "./phone/types.js";
+import {
+  CallMode,
+  CallOrigin,
+  HostedAgentAuthorityMode,
+  IncomingCallAction,
+  VoicemailDetection,
+} from "./phone/types.js";
 import type {
   CreateMailIdentityContactRuleOptions,
   ListMailIdentityContactRulesOptions,
@@ -53,6 +59,7 @@ import type {
 import type {
   PhoneCall,
   PhoneCallWithRateLimit,
+  HostedAgentToolInvocationPage,
   PhoneTranscript,
   TextConversationSummary,
   TextConversationUpdateResult,
@@ -556,14 +563,17 @@ export class AgentIdentity {
    *
    * For `dedicated_number` origination (the default) the call is placed
    * from this identity's own phone number (requires one to be assigned).
-   * For `shared_imessage_number` origination the call rides the shared
-   * pool and is scoped by this identity's id — no dedicated number needed.
+   * For either iMessage origination the call is scoped by this identity's id.
    *
    * @param options.toNumber - E.164 destination number.
    * @param options.origination - Where the call originates. Defaults to
    *   `dedicated_number`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
+   * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults
+   *   to `contact_scoped`.
+   * @param options.voicemailDetection - Whether to hang up when voicemail is
+   *   detected. Omit for the server's `enabled` default.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise (server 422).
    */
@@ -572,6 +582,8 @@ export class AgentIdentity {
     origination?: CallOrigin;
     clientWebsocketUrl?: string;
     mode?: CallMode;
+    hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
+    voicemailDetection?: VoicemailDetection;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const origination = options.origination ?? CallOrigin.DEDICATED_NUMBER;
@@ -584,16 +596,20 @@ export class AgentIdentity {
         fromNumber:          this._phoneNumber!.number,
         clientWebsocketUrl:  options.clientWebsocketUrl,
         mode:                options.mode,
+        hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
+        voicemailDetection: options.voicemailDetection,
         reason:              options.reason,
       });
     }
-    // Shared-pool calls scope by identity id; no from_number.
+    // iMessage-line calls scope by identity id; no from_number.
     return this._inkbox._calls.place({
       toNumber:            options.toNumber,
       origination,
       agentIdentityId:     this.id,
       clientWebsocketUrl:  options.clientWebsocketUrl,
       mode:                options.mode,
+      hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
+      voicemailDetection: options.voicemailDetection,
       reason:              options.reason,
     });
   }
@@ -624,6 +640,14 @@ export class AgentIdentity {
    */
   async listTranscripts(callId: string): Promise<PhoneTranscript[]> {
     return this._inkbox._calls.transcripts(callId);
+  }
+
+  /** List a page of Voice AI tool activity for a specific call. */
+  async listToolInvocations(
+    callId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<HostedAgentToolInvocationPage> {
+    return this._inkbox._calls.toolInvocations(callId, options);
   }
 
   /**
@@ -659,6 +683,19 @@ export class AgentIdentity {
       model: options?.model,
       instructions: options?.instructions,
       agentIdentityId: this.id,
+    });
+  }
+
+  /**
+   * Set authority for future incoming hosted calls with an admin API key.
+   * Outbound calls select authority independently with `hostedAgentAuthorityMode`.
+   */
+  async setHostedAgentAuthorityMode(options: {
+    authorityMode: HostedAgentAuthorityMode;
+  }): Promise<HostedAgentConfig> {
+    return this._inkbox._hostedAgent.setAuthorityMode({
+      agentIdentityId: this.id,
+      authorityMode: options.authorityMode,
     });
   }
 

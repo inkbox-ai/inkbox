@@ -604,6 +604,7 @@ describe("CallEndedWebhookPayload", () => {
     // Optional keys: absent on old payloads, never a parse failure.
     expect("mode" in payload.data.call).toBe(false);
     expect("reason" in payload.data.call).toBe(false);
+    expect("hosted_agent_authority_mode" in payload.data.call).toBe(false);
     expect("outcome" in payload.data).toBe(false);
     expect("post_call_action_items" in payload.data).toBe(false);
   });
@@ -613,6 +614,8 @@ describe("CallEndedWebhookPayload", () => {
     const call = payload.data.call;
     // mode/reason live on data.call (mirrors the call REST shape), not data.
     expect(call.mode).toBe("hosted_agent");
+    expect(call.hosted_agent_authority_mode).toBe("yolo");
+    expect(call.voicemail_detection).toBe("disabled");
     expect(call.reason?.startsWith("Call the dental office")).toBe(true);
     expect("mode" in payload.data).toBe(false);
     expect("reason" in payload.data).toBe(false);

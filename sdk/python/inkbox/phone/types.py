@@ -67,12 +67,14 @@ class CallOrigin(StrEnum):
     """How a call is placed / which line it rides.
 
     ``dedicated_number`` uses the identity's own provisioned phone number;
-    ``shared_imessage_number`` rides the shared iMessage service line, in
-    which case the call has no dedicated ``local_phone_number``.
+    ``shared_imessage_number`` rides the shared iMessage service line and
+    has no surfaced ``local_phone_number``; ``dedicated_imessage_number``
+    rides the identity's dedicated iMessage line.
     """
 
     DEDICATED_NUMBER = "dedicated_number"
     SHARED_IMESSAGE_NUMBER = "shared_imessage_number"
+    DEDICATED_IMESSAGE_NUMBER = "dedicated_imessage_number"
 
 
 class CallMode(StrEnum):
@@ -86,6 +88,24 @@ class CallMode(StrEnum):
 
     CLIENT_WEBSOCKET = "client_websocket"
     HOSTED_AGENT = "hosted_agent"
+
+
+class VoicemailDetection(StrEnum):
+    """Whether an outbound call hangs up when voicemail is detected."""
+
+    ENABLED = "enabled"
+    DISABLED = "disabled"
+
+
+class HostedAgentAuthorityMode(StrEnum):
+    """How broadly a hosted voice agent may act.
+
+    ``contact_scoped`` confines activity to the current caller. ``yolo``
+    allows the hosted agent to work across the identity's available channels.
+    """
+
+    CONTACT_SCOPED = "contact_scoped"
+    YOLO = "yolo"
 
 
 class IncomingCallAction(StrEnum):
@@ -224,6 +244,14 @@ class PhoneCall:
     mode: str = "client_websocket"
     # Outbound Voice AI task brief; None on inbound and client_websocket calls.
     reason: str | None = None
+    # Hosted-agent authority. Missing/null values from older responses retain
+    # the safe contact-scoped behavior.
+    hosted_agent_authority_mode: HostedAgentAuthorityMode = (
+        HostedAgentAuthorityMode.CONTACT_SCOPED
+    )
+    # Whether voicemail detection ran. Missing/null legacy values preserve the
+    # server default.
+    voicemail_detection: VoicemailDetection = VoicemailDetection.ENABLED
     # Voice AI's recorded action items, surfaced inline (open items only,
     # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
@@ -251,6 +279,12 @@ class PhoneCall:
             # Coerce a null/missing mode to client_websocket for back-compat.
             mode=d.get("mode") or "client_websocket",
             reason=d.get("reason"),
+            hosted_agent_authority_mode=HostedAgentAuthorityMode(
+                d.get("hosted_agent_authority_mode") or "contact_scoped"
+            ),
+            voicemail_detection=VoicemailDetection(
+                d.get("voicemail_detection") or "enabled"
+            ),
             # Open items only, seq-ascending; empty for client_websocket calls.
             post_call_action_items=[
                 PostCallActionItem._from_dict(a) for a in d.get("post_call_action_items", [])
@@ -507,6 +541,61 @@ class PhoneTranscript:
         )
 
 
+class HostedAgentToolInvocationStatus(StrEnum):
+    """Execution state for a Voice AI tool invocation."""
+
+    STARTED = "started"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+@dataclass
+class HostedAgentToolInvocation:
+    """Safe activity record for one Voice AI tool invocation."""
+
+    id: UUID
+    call_id: UUID
+    tool_name: str
+    status: HostedAgentToolInvocationStatus
+    result: dict[str, str | int | bool | None] | None
+    started_at: datetime
+    completed_at: datetime | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentToolInvocation:
+        return cls(
+            id=UUID(d["id"]),
+            call_id=UUID(d["call_id"]),
+            tool_name=d["tool_name"],
+            status=HostedAgentToolInvocationStatus(d["status"]),
+            result=d.get("result"),
+            started_at=datetime.fromisoformat(d["started_at"]),
+            completed_at=_dt(d.get("completed_at")),
+        )
+
+
+@dataclass
+class HostedAgentToolInvocationPage:
+    """A page of Voice AI tool activity for one call."""
+
+    items: list[HostedAgentToolInvocation]
+    limit: int
+    offset: int
+    has_more: bool
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentToolInvocationPage:
+        return cls(
+            items=[
+                HostedAgentToolInvocation._from_dict(item)
+                for item in d.get("items", [])
+            ],
+            limit=d["limit"],
+            offset=d["offset"],
+            has_more=d["has_more"],
+        )
+
+
 @dataclass
 class IncomingCallActionConfig:
     """Per-identity inbound-call handling configuration.
@@ -535,14 +624,17 @@ class IncomingCallActionConfig:
 class HostedAgentConfig:
     """Per-identity Inkbox Voice AI configuration.
 
-    ``voice`` / ``model`` / ``instructions`` are all nullable — ``None``
-    means the server default applies for that field.
+    ``voice`` / ``model`` / ``instructions`` are nullable overrides.
+    ``effective_voice`` and ``effective_model`` show the resolved settings.
     """
 
     agent_identity_id: UUID
     voice: str | None
     model: str | None
+    effective_voice: str
+    effective_model: str
     instructions: str | None
+    authority_mode: HostedAgentAuthorityMode = HostedAgentAuthorityMode.CONTACT_SCOPED
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> HostedAgentConfig:
@@ -550,7 +642,12 @@ class HostedAgentConfig:
             agent_identity_id=UUID(d["agent_identity_id"]),
             voice=d.get("voice"),
             model=d.get("model"),
+            effective_voice=d["effective_voice"],
+            effective_model=d["effective_model"],
             instructions=d.get("instructions"),
+            authority_mode=HostedAgentAuthorityMode(
+                d.get("authority_mode") or "contact_scoped"
+            ),
         )
 
 

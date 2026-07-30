@@ -22,6 +22,7 @@ from inkbox.phone.types import (
     PhoneCallWithRateLimit,
     PhoneTranscript,
     SmsStatus,
+    VoicemailDetection,
 )
 
 
@@ -112,6 +113,34 @@ class TestPhoneCallParsing:
         c = PhoneCall._from_dict(d)
         assert c.origin is CallOrigin.SHARED_IMESSAGE_NUMBER
         assert c.local_phone_number is None
+
+    def test_dedicated_imessage_origin_preserves_local_number(self):
+        c = PhoneCall._from_dict(
+            {
+                **PHONE_CALL_DICT,
+                "origin": "dedicated_imessage_number",
+                "local_phone_number": "+15555550123",
+            }
+        )
+        assert c.origin is CallOrigin.DEDICATED_IMESSAGE_NUMBER
+        assert c.local_phone_number == "+15555550123"
+
+    def test_voicemail_detection_defaults_and_disabled_parse(self):
+        legacy = {
+            key: value
+            for key, value in PHONE_CALL_DICT.items()
+            if key != "voicemail_detection"
+        }
+        assert (
+            PhoneCall._from_dict(legacy).voicemail_detection
+            is VoicemailDetection.ENABLED
+        )
+        assert (
+            PhoneCall._from_dict(
+                {**PHONE_CALL_DICT, "voicemail_detection": "disabled"}
+            ).voicemail_detection
+            is VoicemailDetection.DISABLED
+        )
 
     def test_origin_dedicated_explicit(self):
         c = PhoneCall._from_dict({**PHONE_CALL_DICT, "origin": "dedicated_number"})

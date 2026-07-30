@@ -112,6 +112,8 @@ export const RAW_PHONE_CALL = {
   is_blocked: false,
   origin: "dedicated_number",
   mode: "client_websocket",
+  hosted_agent_authority_mode: "contact_scoped",
+  voicemail_detection: "enabled",
   reason: null,
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:05:00Z",
@@ -169,7 +171,10 @@ export const RAW_HOSTED_AGENT_CONFIG = {
   agent_identity_id: "eeee5555-0000-0000-0000-000000000001",
   voice: "warm-voice",
   model: "fast-model",
+  effective_voice: "warm-voice",
+  effective_model: "fast-model",
   instructions: "Always offer to text a summary after the call.",
+  authority_mode: "contact_scoped",
 };
 
 // Slim, open-only rows as surfaced inline on the call resource.

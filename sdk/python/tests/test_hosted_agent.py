@@ -9,7 +9,14 @@ from uuid import UUID
 
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
-from inkbox.phone.types import CallMode, HostedAgentConfig
+import pytest
+
+from inkbox.phone.types import (
+    CallMode,
+    CallOrigin,
+    HostedAgentAuthorityMode,
+    HostedAgentConfig,
+)
 from sample_data import HOSTED_AGENT_CONFIG_DICT
 from sample_data_identities import IDENTITY_DETAIL_DICT
 
@@ -28,7 +35,10 @@ class TestHostedAgentGetConfig:
         assert cfg.agent_identity_id == UUID(IDENTITY_ID)
         assert cfg.voice == "warm-voice"
         assert cfg.model == "fast-model"
+        assert cfg.effective_voice == "warm-voice"
+        assert cfg.effective_model == "fast-model"
         assert cfg.instructions == "Always offer to text a summary after the call."
+        assert cfg.authority_mode is HostedAgentAuthorityMode.CONTACT_SCOPED
 
     def test_get_with_identity(self, client, transport):
         transport.get.return_value = HOSTED_AGENT_CONFIG_DICT
@@ -57,6 +67,8 @@ class TestHostedAgentGetConfig:
             "agent_identity_id": IDENTITY_ID,
             "voice": None,
             "model": None,
+            "effective_voice": "voice-default",
+            "effective_model": "model-default",
             "instructions": None,
         }
 
@@ -95,6 +107,8 @@ class TestHostedAgentSetConfig:
             "agent_identity_id": IDENTITY_ID,
             "voice": None,
             "model": None,
+            "effective_voice": "voice-default",
+            "effective_model": "model-default",
             "instructions": None,
         }
 
@@ -153,6 +167,31 @@ class TestCallModeEnum:
         assert CallMode("client_websocket") is CallMode.CLIENT_WEBSOCKET
 
 
+class TestHostedAgentAuthorityMode:
+    def test_wire_values(self):
+        assert HostedAgentAuthorityMode.CONTACT_SCOPED.value == "contact_scoped"
+        assert HostedAgentAuthorityMode.YOLO.value == "yolo"
+
+    def test_set_authority_mode_sends_exact_body(self, client, transport):
+        transport.put.return_value = {
+            **HOSTED_AGENT_CONFIG_DICT,
+            "authority_mode": "yolo",
+        }
+
+        cfg = client._hosted_agent.set_authority_mode(
+            agent_identity_id=IDENTITY_ID,
+            authority_mode=HostedAgentAuthorityMode.YOLO,
+        )
+
+        transport.put.assert_called_once_with(
+            "/hosted-agent-config/authority-mode",
+            json={
+                "agent_identity_id": IDENTITY_ID,
+                "authority_mode": "yolo",
+            },
+        )
+        assert cfg.authority_mode is HostedAgentAuthorityMode.YOLO
+
 def _identity():
     data = _AgentIdentityData._from_dict(IDENTITY_DETAIL_DICT)
     inkbox = MagicMock()
@@ -185,6 +224,16 @@ class TestAgentIdentityHostedAgentDelegation:
             agent_identity_id=identity.id,
         )
 
+    def test_set_authority_mode_delegates_with_own_id(self):
+        identity, inkbox = _identity()
+
+        identity.set_hosted_agent_authority_mode(HostedAgentAuthorityMode.YOLO)
+
+        inkbox._hosted_agent.set_authority_mode.assert_called_once_with(
+            agent_identity_id=identity.id,
+            authority_mode=HostedAgentAuthorityMode.YOLO,
+        )
+
     def test_place_call_forwards_mode_and_reason(self):
         identity, inkbox = _identity()
 
@@ -196,7 +245,29 @@ class TestAgentIdentityHostedAgentDelegation:
 
         _, kwargs = inkbox._calls.place.call_args
         assert kwargs["mode"] is CallMode.HOSTED_AGENT
+        assert "hosted_agent_authority_mode" not in kwargs
         assert kwargs["reason"] == "Book a table for two"
+
+    @pytest.mark.parametrize(
+        "origination",
+        [CallOrigin.DEDICATED_NUMBER, CallOrigin.SHARED_IMESSAGE_NUMBER],
+    )
+    def test_place_call_forwards_explicit_authority(self, origination):
+        identity, inkbox = _identity()
+
+        identity.place_call(
+            to_number="+15551234567",
+            origination=origination,
+            mode=CallMode.HOSTED_AGENT,
+            hosted_agent_authority_mode=HostedAgentAuthorityMode.YOLO,
+            reason="Coordinate the appointment",
+        )
+
+        _, kwargs = inkbox._calls.place.call_args
+        assert (
+            kwargs["hosted_agent_authority_mode"]
+            is HostedAgentAuthorityMode.YOLO
+        )
 
     def test_place_call_defaults_stay_client_websocket(self):
         identity, inkbox = _identity()

@@ -6,7 +6,7 @@ use serde_json::Map;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::phone::types::HostedAgentConfig;
+use crate::phone::types::{HostedAgentAuthorityMode, HostedAgentConfig};
 
 pub struct HostedAgentConfigResource {
     http: Arc<HttpTransport>,
@@ -72,6 +72,24 @@ impl HostedAgentConfigResource {
         let data = self.http.put("/hosted-agent-config", &body)?;
         Ok(serde_json::from_value(data)?)
     }
+
+    /// Set authority for an identity's future incoming hosted calls.
+    ///
+    /// This privileged operation requires an admin API key. Outbound calls
+    /// select authority independently.
+    pub fn set_authority_mode(
+        &self,
+        agent_identity_id: &str,
+        authority_mode: HostedAgentAuthorityMode,
+    ) -> Result<HostedAgentConfig> {
+        let mut body = Map::new();
+        body.insert("agent_identity_id".into(), agent_identity_id.into());
+        body.insert("authority_mode".into(), authority_mode.as_str().into());
+        let data = self
+            .http
+            .put("/hosted-agent-config/authority-mode", &body)?;
+        Ok(serde_json::from_value(data)?)
+    }
 }
 
 #[cfg(test)]
@@ -80,6 +98,7 @@ mod tests {
     use serde_json::json;
 
     use crate::client::Inkbox;
+    use crate::phone::types::HostedAgentAuthorityMode;
 
     /// Client whose phone transport points at the mock server.
     fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
@@ -95,6 +114,8 @@ mod tests {
             "agent_identity_id": "33333333-3333-3333-3333-333333333333",
             "voice": "warm-voice",
             "model": "fast-model",
+            "effective_voice": "warm-voice",
+            "effective_model": "fast-model",
             "instructions": "Always offer to text a summary after the call."
         })
     }
@@ -119,6 +140,8 @@ mod tests {
         );
         assert_eq!(config.voice.as_deref(), Some("warm-voice"));
         assert_eq!(config.model.as_deref(), Some("fast-model"));
+        assert_eq!(config.effective_voice, "warm-voice");
+        assert_eq!(config.effective_model, "fast-model");
     }
 
     #[test]
@@ -136,6 +159,8 @@ mod tests {
                 "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                 "voice": null,
                 "model": null,
+                "effective_voice": "voice-default",
+                "effective_model": "model-default",
                 "instructions": null
             }));
         });
@@ -187,6 +212,8 @@ mod tests {
                 "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                 "voice": null,
                 "model": null,
+                "effective_voice": "voice-default",
+                "effective_model": "model-default",
                 "instructions": null
             }));
         });
@@ -209,6 +236,8 @@ mod tests {
                 "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                 "voice": "warm-voice",
                 "model": null,
+                "effective_voice": "warm-voice",
+                "effective_model": "model-default",
                 "instructions": null
             }));
         });
@@ -219,5 +248,38 @@ mod tests {
         mock.assert();
         assert_eq!(config.voice.as_deref(), Some("warm-voice"));
         assert_eq!(config.model, None);
+    }
+
+    #[test]
+    fn set_authority_mode_sends_exact_body() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(PUT)
+                .path("/api/v1/phone/hosted-agent-config/authority-mode")
+                .json_body(json!({
+                    "agent_identity_id": "33333333-3333-3333-3333-333333333333",
+                    "authority_mode": "yolo"
+                }));
+            then.status(200).json_body(json!({
+                "agent_identity_id": "33333333-3333-3333-3333-333333333333",
+                "voice": null,
+                "model": null,
+                "effective_voice": "voice-default",
+                "effective_model": "model-default",
+                "instructions": null,
+                "authority_mode": "yolo"
+            }));
+        });
+
+        let config = client(&server)
+            .hosted_agent()
+            .set_authority_mode(
+                "33333333-3333-3333-3333-333333333333",
+                HostedAgentAuthorityMode::Yolo,
+            )
+            .unwrap();
+
+        mock.assert();
+        assert_eq!(config.authority_mode, HostedAgentAuthorityMode::Yolo);
     }
 }

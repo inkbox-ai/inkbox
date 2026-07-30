@@ -52,6 +52,27 @@ fn main() -> inkbox::Result<()> {
 }
 ```
 
+### Hosted-agent authority
+
+Hosted-agent calls default to contact-scoped authority. Requesting broader
+authority for one hosted call, or setting it for future incoming calls,
+requires an admin API key. Outbound calls always select authority per call:
+
+```rust
+use inkbox::phone::{CallOrigin, HostedAgentAuthorityMode};
+
+let call = identity.place_hosted_call_with_authority(
+    "+15551234567",
+    CallOrigin::DedicatedNumber,
+    "Coordinate the appointment and send confirmations.",
+    HostedAgentAuthorityMode::Yolo,
+)?;
+
+identity.set_hosted_agent_authority_mode(
+    HostedAgentAuthorityMode::Yolo,
+)?;
+```
+
 ### Advanced construction
 
 ```rust

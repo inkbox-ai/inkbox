@@ -32,6 +32,8 @@ PHONE_CALL_DICT = {
     "ended_at": "2026-03-09T00:05:00Z",
     "is_blocked": False,
     "mode": "client_websocket",
+    "hosted_agent_authority_mode": "contact_scoped",
+    "voicemail_detection": "enabled",
     "reason": None,
     "created_at": "2026-03-09T00:00:00Z",
     "updated_at": "2026-03-09T00:05:00Z",
@@ -257,7 +259,10 @@ HOSTED_AGENT_CONFIG_DICT = {
     "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
     "voice": "warm-voice",
     "model": "fast-model",
+    "effective_voice": "warm-voice",
+    "effective_model": "fast-model",
     "instructions": "Always offer to text a summary after the call.",
+    "authority_mode": "contact_scoped",
 }
 
 # Slim wire shape: surfaced inline on the call resource, open items only.

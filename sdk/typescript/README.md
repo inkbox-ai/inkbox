@@ -375,12 +375,34 @@ by 1024 and label the result GiB/MiB.
 ## Phone
 
 ```ts
+import {
+  CallMode,
+  HostedAgentAuthorityMode,
+  VoicemailDetection,
+} from "@inkbox/sdk";
+
 // Place an outbound call — stream audio over WebSocket
 const call = await identity.placeCall({
   toNumber: "+15551234567",
   clientWebsocketUrl: "wss://your-agent.example.com/ws",
 });
 console.log(call.status, call.rateLimit.callsRemaining);
+
+// Let the hosted agent work beyond the current caller for this call.
+// Requesting yolo authority requires an admin API key.
+const hostedCall = await identity.placeCall({
+  toNumber: "+15551234567",
+  mode: CallMode.HOSTED_AGENT,
+  reason: "Coordinate the appointment and send confirmations.",
+  hostedAgentAuthorityMode: HostedAgentAuthorityMode.YOLO,
+  voicemailDetection: VoicemailDetection.DISABLED,
+});
+
+// Set the mode for future incoming calls with an admin API key. Outbound calls
+// select authority per call.
+await identity.setHostedAgentAuthorityMode({
+  authorityMode: HostedAgentAuthorityMode.YOLO,
+});
 
 // List calls (paginated)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
@@ -392,6 +414,15 @@ for (const c of calls) {
 const segments = await identity.listTranscripts(calls[0].id);
 for (const t of segments) {
   console.log(`[${t.party}] ${t.text}`);  // party: "local" or "remote"
+}
+
+// Inspect tool activity for a Voice AI call
+const activity = await identity.listToolInvocations(calls[0].id, {
+  limit: 50,
+  offset: 0,
+});
+for (const invocation of activity.items) {
+  console.log(invocation.toolName, invocation.status);
 }
 
 // Read transcripts across all recent calls

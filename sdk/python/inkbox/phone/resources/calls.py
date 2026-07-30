@@ -12,9 +12,12 @@ from uuid import UUID
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
+    HostedAgentAuthorityMode,
+    HostedAgentToolInvocationPage,
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneTranscript,
+    VoicemailDetection,
 )
 
 if TYPE_CHECKING:
@@ -115,6 +118,28 @@ class CallsResource:
         data = self._http.get(f"/calls/{call_id}/transcripts")
         return [PhoneTranscript._from_dict(t) for t in data]
 
+    def tool_invocations(
+        self,
+        call_id: UUID | str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> HostedAgentToolInvocationPage:
+        """List a page of safe Voice AI tool activity for a call.
+
+        Tool arguments and provider details are intentionally excluded.
+
+        Args:
+            call_id: UUID of the call.
+            limit: Max results to return (1–200).
+            offset: Pagination offset.
+        """
+        data = self._http.get(
+            f"/calls/{call_id}/tool-invocations",
+            params={"limit": limit, "offset": offset},
+        )
+        return HostedAgentToolInvocationPage._from_dict(data)
+
     def place(
         self,
         *,
@@ -124,13 +149,15 @@ class CallsResource:
         agent_identity_id: UUID | str | None = None,
         client_websocket_url: str | None = None,
         mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
+        hosted_agent_authority_mode: HostedAgentAuthorityMode | str | None = None,
+        voicemail_detection: VoicemailDetection | str | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call.
 
         The server enforces the conditional shape: ``from_number`` is
         required for ``dedicated_number`` origination, ``agent_identity_id``
-        for ``shared_imessage_number``; ``hosted_agent`` mode requires
+        for either iMessage origination; ``hosted_agent`` mode requires
         ``reason`` and excludes ``client_websocket_url``. This method never
         client-gates — it forwards whatever is provided and surfaces the
         server's 422.
@@ -141,11 +168,17 @@ class CallsResource:
                 ``dedicated_number``. See :class:`CallOrigin`.
             from_number: E.164 number to call from (dedicated origination).
                 Must belong to your org and be active.
-            agent_identity_id: UUID of the placing identity (shared
+            agent_identity_id: UUID of the placing identity (iMessage
                 origination), or ``None`` for an agent-scoped key.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.
                 See :class:`CallMode`.
+            hosted_agent_authority_mode: Hosted-agent authority for this call.
+                Omit for the server's ``contact_scoped`` default. ``yolo`` is
+                valid only with ``mode=hosted_agent``; invalid combinations
+                surface the server's 422 response.
+            voicemail_detection: Whether to hang up when voicemail is detected.
+                Omit for the server's ``enabled`` default.
             reason: Voice AI's task brief for the call — what to
                 accomplish. Required with ``mode=hosted_agent``, invalid
                 otherwise.
@@ -162,6 +195,18 @@ class CallsResource:
             "origination": origination_value,
             "mode": mode_value,
         }
+        if hosted_agent_authority_mode is not None:
+            body["hosted_agent_authority_mode"] = (
+                hosted_agent_authority_mode.value
+                if isinstance(hosted_agent_authority_mode, HostedAgentAuthorityMode)
+                else hosted_agent_authority_mode
+            )
+        if voicemail_detection is not None:
+            body["voicemail_detection"] = (
+                voicemail_detection.value
+                if isinstance(voicemail_detection, VoicemailDetection)
+                else voicemail_detection
+            )
         if from_number is not None:
             body["from_number"] = from_number
         if agent_identity_id is not None:

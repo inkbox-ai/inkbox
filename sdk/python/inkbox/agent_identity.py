@@ -72,7 +72,9 @@ from inkbox.mail.types import (
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
+    HostedAgentAuthorityMode,
     HostedAgentConfig,
+    HostedAgentToolInvocationPage,
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
@@ -82,6 +84,7 @@ from inkbox.phone.types import (
     PhoneRuleMatchType,
     PhoneTranscript,
     TextConversationSummary,
+    VoicemailDetection,
     TextConversationUpdateResult,
     TextMessage,
 )
@@ -697,14 +700,16 @@ class AgentIdentity:
         origination: CallOrigin | str = CallOrigin.DEDICATED_NUMBER,
         client_websocket_url: str | None = None,
         mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
+        hosted_agent_authority_mode: HostedAgentAuthorityMode | str | None = None,
+        voicemail_detection: VoicemailDetection | str | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call as this identity.
 
         For ``dedicated_number`` origination the call rides this identity's
         provisioned phone number (requires one). For
-        ``shared_imessage_number`` it rides the shared number and is scoped
-        by this identity's id instead.
+        either iMessage origination it is scoped by this identity's id
+        instead.
 
         Args:
             to_number: E.164 destination number.
@@ -713,6 +718,10 @@ class AgentIdentity:
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             mode: Who drives the call. Defaults to ``client_websocket``.
                 See :class:`CallMode`.
+            hosted_agent_authority_mode: Hosted-agent authority for this call.
+                Omit for the server's ``contact_scoped`` default.
+            voicemail_detection: Whether to hang up when voicemail is detected.
+                Omit for the server's ``enabled`` default.
             reason: Voice AI's task brief for the call. Required
                 with ``mode=hosted_agent``, invalid otherwise (server 422).
         """
@@ -723,23 +732,35 @@ class AgentIdentity:
         if is_dedicated:
             # Dedicated origination needs this identity's own number.
             self._require_phone()
-            return self._inkbox._calls.place(
-                to_number=to_number,
-                origination=origination,
-                from_number=self._phone_number.number,  # type: ignore[union-attr]
-                client_websocket_url=client_websocket_url,
-                mode=mode,
-                reason=reason,
-            )
-        # Shared-number origination scopes by identity id, no from_number.
-        return self._inkbox._calls.place(
-            to_number=to_number,
-            origination=origination,
-            agent_identity_id=self.id,
-            client_websocket_url=client_websocket_url,
-            mode=mode,
-            reason=reason,
-        )
+            call_options: dict[str, Any] = {
+                "to_number": to_number,
+                "origination": origination,
+                "from_number": self._phone_number.number,  # type: ignore[union-attr]
+                "client_websocket_url": client_websocket_url,
+                "mode": mode,
+                "reason": reason,
+            }
+            if hosted_agent_authority_mode is not None:
+                call_options["hosted_agent_authority_mode"] = (
+                    hosted_agent_authority_mode
+                )
+            if voicemail_detection is not None:
+                call_options["voicemail_detection"] = voicemail_detection
+            return self._inkbox._calls.place(**call_options)
+        # iMessage origination scopes by identity id, no from_number.
+        call_options = {
+            "to_number": to_number,
+            "origination": origination,
+            "agent_identity_id": self.id,
+            "client_websocket_url": client_websocket_url,
+            "mode": mode,
+            "reason": reason,
+        }
+        if hosted_agent_authority_mode is not None:
+            call_options["hosted_agent_authority_mode"] = hosted_agent_authority_mode
+        if voicemail_detection is not None:
+            call_options["voicemail_detection"] = voicemail_detection
+        return self._inkbox._calls.place(**call_options)
 
     def list_calls(
         self,
@@ -785,6 +806,20 @@ class AgentIdentity:
         """
         return self._inkbox._calls.transcripts(call_id)
 
+    def list_tool_invocations(
+        self,
+        call_id: str,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> HostedAgentToolInvocationPage:
+        """List a page of Voice AI tool activity for a specific call."""
+        return self._inkbox._calls.tool_invocations(
+            call_id,
+            limit=limit,
+            offset=offset,
+        )
+
     def hangup_call(self, call_id: str) -> PhoneCall:
         """Hang up one of this identity's live calls, from outside the call.
 
@@ -818,6 +853,20 @@ class AgentIdentity:
             model=model,
             instructions=instructions,
             agent_identity_id=self.id,
+        )
+
+    def set_hosted_agent_authority_mode(
+        self,
+        authority_mode: HostedAgentAuthorityMode | str,
+    ) -> HostedAgentConfig:
+        """Set authority for future incoming hosted calls with an admin API key.
+
+        Outbound calls select authority independently with
+        ``hosted_agent_authority_mode``.
+        """
+        return self._inkbox._hosted_agent.set_authority_mode(
+            agent_identity_id=self.id,
+            authority_mode=authority_mode,
         )
 
     def get_incoming_call_action(self) -> IncomingCallActionConfig:

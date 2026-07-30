@@ -8,15 +8,20 @@ import { HttpTransport } from "../../_http.js";
 import {
   CallMode,
   CallOrigin,
+  HostedAgentAuthorityMode,
+  HostedAgentToolInvocationPage,
   PhoneCall,
   PhoneCallWithRateLimit,
   PhoneTranscript,
   RawPhoneCall,
   RawPhoneCallWithRateLimit,
+  RawHostedAgentToolInvocationPage,
   RawPhoneTranscript,
+  VoicemailDetection,
   parsePhoneCall,
   parsePhoneCallWithRateLimit,
   parsePhoneTranscript,
+  parseHostedAgentToolInvocationPage,
 } from "../types.js";
 
 export class CallsResource {
@@ -105,11 +110,30 @@ export class CallsResource {
   }
 
   /**
+   * List a page of safe Voice AI tool activity for a call.
+   *
+   * Tool arguments and provider details are intentionally excluded.
+   */
+  async toolInvocations(
+    callId: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<HostedAgentToolInvocationPage> {
+    const data = await this.http.get<RawHostedAgentToolInvocationPage>(
+      `/calls/${callId}/tool-invocations`,
+      {
+        limit: options?.limit ?? 50,
+        offset: options?.offset ?? 0,
+      },
+    );
+    return parseHostedAgentToolInvocationPage(data);
+  }
+
+  /**
    * Place an outbound call.
    *
    * The server enforces the conditional requirements: `fromNumber` is
    * required for `dedicated_number`, `agentIdentityId` for
-   * `shared_imessage_number`; `hosted_agent` mode requires `reason` and
+   * either iMessage origination; `hosted_agent` mode requires `reason` and
    * excludes `clientWebsocketUrl`. This method never client-gates —
    * violations surface as a server 422.
    *
@@ -117,9 +141,13 @@ export class CallsResource {
    * @param options.origination - Where the call originates. Defaults to
    *   `dedicated_number`.
    * @param options.fromNumber - E.164 number to call from (dedicated origination).
-   * @param options.agentIdentityId - UUID of the placing identity (shared origination).
+   * @param options.agentIdentityId - UUID of the placing identity (iMessage origination).
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
+   * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults
+   *   to `contact_scoped`; `yolo` is valid only with `hosted_agent`.
+   * @param options.voicemailDetection - Whether to hang up when voicemail is
+   *   detected. Omit for the server's `enabled` default.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise.
    * @returns The created call record with current rate limit info.
@@ -131,6 +159,8 @@ export class CallsResource {
     agentIdentityId?: string;
     clientWebsocketUrl?: string;
     mode?: CallMode;
+    hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
+    voicemailDetection?: VoicemailDetection;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const body: Record<string, unknown> = {
@@ -140,6 +170,12 @@ export class CallsResource {
       // Always sent (defaults to client_websocket).
       mode: options.mode ?? CallMode.CLIENT_WEBSOCKET,
     };
+    if (options.hostedAgentAuthorityMode !== undefined) {
+      body["hosted_agent_authority_mode"] = options.hostedAgentAuthorityMode;
+    }
+    if (options.voicemailDetection !== undefined) {
+      body["voicemail_detection"] = options.voicemailDetection;
+    }
     if (options.fromNumber !== undefined) {
       body["from_number"] = options.fromNumber;
     }

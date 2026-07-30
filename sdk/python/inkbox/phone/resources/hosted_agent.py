@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.phone.types import HostedAgentConfig
+from inkbox.phone.types import HostedAgentAuthorityMode, HostedAgentConfig
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -74,4 +74,29 @@ class HostedAgentConfigResource:
         if instructions is not None:
             body["instructions"] = instructions
         data = self._http.put("/hosted-agent-config", json=body)
+        return HostedAgentConfig._from_dict(data)
+
+    def set_authority_mode(
+        self,
+        *,
+        agent_identity_id: UUID | str,
+        authority_mode: HostedAgentAuthorityMode | str,
+    ) -> HostedAgentConfig:
+        """Set authority for an identity's future incoming hosted calls.
+
+        This privileged operation requires an admin API key. Outbound calls
+        select authority independently.
+        """
+        mode = (
+            authority_mode.value
+            if isinstance(authority_mode, HostedAgentAuthorityMode)
+            else authority_mode
+        )
+        data = self._http.put(
+            "/hosted-agent-config/authority-mode",
+            json={
+                "agent_identity_id": str(agent_identity_id),
+                "authority_mode": mode,
+            },
+        )
         return HostedAgentConfig._from_dict(data)

@@ -134,22 +134,84 @@ pub enum TextMessageOrigin {
 /// Where an outbound (or observed) call originates.
 ///
 /// `dedicated_number` rides an identity's own provisioned phone number;
-/// `shared_imessage_number` rides the shared iMessage line and is scoped by
-/// agent identity instead. Defaults to `dedicated_number`.
+/// `shared_imessage_number` rides the shared iMessage line;
+/// `dedicated_imessage_number` rides the identity's dedicated iMessage line.
+/// Both iMessage origins are scoped by agent identity; only the shared origin
+/// omits `local_phone_number`. Defaults to `dedicated_number`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CallOrigin {
     #[default]
     DedicatedNumber,
     SharedImessageNumber,
+    DedicatedImessageNumber,
 }
 
 impl CallOrigin {
-    /// The wire string value (`"dedicated_number"` / `"shared_imessage_number"`).
+    /// The call-origin wire string.
     pub fn as_str(&self) -> &'static str {
         match self {
             CallOrigin::DedicatedNumber => "dedicated_number",
             CallOrigin::SharedImessageNumber => "shared_imessage_number",
+            CallOrigin::DedicatedImessageNumber => "dedicated_imessage_number",
+        }
+    }
+}
+
+/// Whether Inkbox should end an outbound call after detecting voicemail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum VoicemailDetection {
+    /// Detect voicemail and end the call. This is the default.
+    #[default]
+    Enabled,
+    /// Keep the call connected so the caller can leave a voicemail.
+    Disabled,
+}
+
+impl VoicemailDetection {
+    /// The wire string value (`"enabled"` / `"disabled"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            VoicemailDetection::Enabled => "enabled",
+            VoicemailDetection::Disabled => "disabled",
+        }
+    }
+}
+
+/// Optional controls for a client-driven outbound call.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CallPlacementOptions {
+    /// Omit to retain the server default (`enabled`).
+    pub voicemail_detection: Option<VoicemailDetection>,
+}
+
+/// Optional controls for an Inkbox Voice AI outbound call.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HostedCallPlacementOptions {
+    /// Omit to use the per-call `contact_scoped` default.
+    pub authority_mode: Option<HostedAgentAuthorityMode>,
+    /// Omit to retain the server default (`enabled`).
+    pub voicemail_detection: Option<VoicemailDetection>,
+}
+
+/// How broadly a hosted voice agent may act.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedAgentAuthorityMode {
+    /// Confine activity to the current caller.
+    #[default]
+    ContactScoped,
+    /// Allow activity across the identity's available channels.
+    Yolo,
+}
+
+impl HostedAgentAuthorityMode {
+    /// The wire string value (`"contact_scoped"` / `"yolo"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HostedAgentAuthorityMode::ContactScoped => "contact_scoped",
+            HostedAgentAuthorityMode::Yolo => "yolo",
         }
     }
 }
@@ -250,6 +312,24 @@ where
         .unwrap_or_else(default_call_mode_client_websocket))
 }
 
+fn deserialize_authority_mode_null_default<'de, D>(
+    deserializer: D,
+) -> Result<HostedAgentAuthorityMode, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<HostedAgentAuthorityMode>::deserialize(deserializer)?.unwrap_or_default())
+}
+
+fn deserialize_voicemail_detection_null_default<'de, D>(
+    deserializer: D,
+) -> Result<VoicemailDetection, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<VoicemailDetection>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 // ---------------------------------------------------------------------------
 // Phone structs.
 // ---------------------------------------------------------------------------
@@ -342,6 +422,17 @@ pub struct PhoneCall {
     /// Outbound Voice AI task brief; `None` on inbound and client-driven calls.
     #[serde(default)]
     pub reason: Option<String>,
+    /// Hosted-agent authority. Missing/null values retain contact-scoped
+    /// behavior for compatibility with older responses.
+    #[serde(default, deserialize_with = "deserialize_authority_mode_null_default")]
+    pub hosted_agent_authority_mode: HostedAgentAuthorityMode,
+    /// Whether voicemail detection ran. Missing/null legacy values retain the
+    /// server default.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_voicemail_detection_null_default"
+    )]
+    pub voicemail_detection: VoicemailDetection,
     /// Open action items Voice AI recorded, `seq`-ascending. Empty for
     /// client-driven calls and Voice AI calls with no open items.
     #[serde(default)]
@@ -389,8 +480,8 @@ pub struct IncomingCallActionConfig {
 
 /// Per-identity Inkbox Voice AI configuration.
 ///
-/// `voice` / `model` / `instructions` are all nullable — `None` means the
-/// server default applies for that field.
+/// `voice` / `model` / `instructions` are nullable overrides.
+/// `effective_voice` and `effective_model` show the resolved settings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HostedAgentConfig {
     pub agent_identity_id: Uuid,
@@ -398,8 +489,12 @@ pub struct HostedAgentConfig {
     pub voice: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
+    pub effective_voice: String,
+    pub effective_model: String,
     #[serde(default)]
     pub instructions: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_authority_mode_null_default")]
+    pub authority_mode: HostedAgentAuthorityMode,
 }
 
 /// An action item Inkbox Voice AI recorded during a call.
@@ -537,6 +632,38 @@ pub struct PhoneTranscript {
     pub party: String,
     pub text: String,
     pub created_at: String,
+}
+
+/// Execution state for a Voice AI tool invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostedAgentToolInvocationStatus {
+    Started,
+    Succeeded,
+    Failed,
+}
+
+/// Safe activity record for one Voice AI tool invocation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostedAgentToolInvocation {
+    pub id: Uuid,
+    pub call_id: Uuid,
+    pub tool_name: String,
+    pub status: HostedAgentToolInvocationStatus,
+    #[serde(default)]
+    pub result: Option<serde_json::Map<String, serde_json::Value>>,
+    pub started_at: String,
+    #[serde(default)]
+    pub completed_at: Option<String>,
+}
+
+/// A page of Voice AI tool activity for one call.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostedAgentToolInvocationPage {
+    pub items: Vec<HostedAgentToolInvocation>,
+    pub limit: i64,
+    pub offset: i64,
+    pub has_more: bool,
 }
 
 /// A per-(org, receiver) SMS consent row.
@@ -746,6 +873,10 @@ mod tests {
         let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
         assert_eq!(call.mode, "client_websocket");
         assert_eq!(call.reason, None);
+        assert_eq!(
+            call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::ContactScoped
+        );
     }
 
     #[test]
@@ -772,12 +903,49 @@ mod tests {
             "agent_identity_id": "33333333-3333-3333-3333-333333333333",
             "voice": "warm-voice",
             "model": null,
+            "effective_voice": "warm-voice",
+            "effective_model": "realtime-default",
             "instructions": "Be brief."
         }))
         .unwrap();
         assert_eq!(cfg.voice.as_deref(), Some("warm-voice"));
         assert_eq!(cfg.model, None);
+        assert_eq!(cfg.effective_voice, "warm-voice");
+        assert_eq!(cfg.effective_model, "realtime-default");
         assert_eq!(cfg.instructions.as_deref(), Some("Be brief."));
+        assert_eq!(cfg.authority_mode, HostedAgentAuthorityMode::ContactScoped);
+    }
+
+    #[test]
+    fn hosted_agent_authority_mode_parses_yolo_and_null_defaults() {
+        let mut v = call_json();
+        v["hosted_agent_authority_mode"] = json!("yolo");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(
+            call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::Yolo
+        );
+
+        let mut v = call_json();
+        v["hosted_agent_authority_mode"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(
+            call.hosted_agent_authority_mode,
+            HostedAgentAuthorityMode::ContactScoped
+        );
+    }
+
+    #[test]
+    fn voicemail_detection_parses_disabled_and_null_defaults() {
+        let mut v = call_json();
+        v["voicemail_detection"] = json!("disabled");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.voicemail_detection, VoicemailDetection::Disabled);
+
+        let mut v = call_json();
+        v["voicemail_detection"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.voicemail_detection, VoicemailDetection::Enabled);
     }
 
     #[test]
@@ -800,6 +968,10 @@ mod tests {
         let cases = [
             (CallOrigin::DedicatedNumber, "dedicated_number"),
             (CallOrigin::SharedImessageNumber, "shared_imessage_number"),
+            (
+                CallOrigin::DedicatedImessageNumber,
+                "dedicated_imessage_number",
+            ),
         ];
         for (variant, wire) in cases {
             assert_eq!(variant.as_str(), wire);

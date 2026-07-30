@@ -13,7 +13,13 @@ import pytest
 from inkbox._http import HttpTransport
 from inkbox.exceptions import InkboxAPIError
 from inkbox.phone.resources.calls import CallsResource
-from inkbox.phone.types import CallMode, CallOrigin, PhoneCall
+from inkbox.phone.types import (
+    CallMode,
+    CallOrigin,
+    HostedAgentAuthorityMode,
+    PhoneCall,
+    VoicemailDetection,
+)
 from sample_data import (
     PHONE_CALL_BLOCKED_DICT,
     PHONE_CALL_DICT,
@@ -113,6 +119,26 @@ class TestCallsList:
             params={"limit": 50, "offset": 0, "agent_identity_id": IDENTITY_ID},
         )
 
+    def test_date_filters_pass_through(self, client, transport):
+        transport.get.return_value = []
+
+        client._calls.list(
+            start_datetime="2026-07-01",
+            end_datetime="2026-07-25",
+            tz="America/New_York",
+        )
+
+        transport.get.assert_called_once_with(
+            "/calls",
+            params={
+                "limit": 50,
+                "offset": 0,
+                "start_datetime": "2026-07-01",
+                "end_datetime": "2026-07-25",
+                "tz": "America/New_York",
+            },
+        )
+
     def test_is_blocked_default_when_field_missing(self, client, transport):
         """Older server responses without is_blocked deserialize to False (back-compat)."""
         old_payload = {k: v for k, v in PHONE_CALL_DICT.items() if k != "is_blocked"}
@@ -195,6 +221,58 @@ class TestCallsTranscripts:
         assert transcripts == []
 
 
+class TestCallsToolInvocations:
+    def test_returns_paginated_safe_activity(self, client, transport):
+        invocation_id = "dddd4444-0000-0000-0000-000000000001"
+        transport.get.return_value = {
+            "items": [
+                {
+                    "id": invocation_id,
+                    "call_id": CALL_ID,
+                    "tool_name": "send_email",
+                    "status": "succeeded",
+                    "result": {"status": "sent"},
+                    "started_at": "2026-07-29T01:02:03+00:00",
+                    "completed_at": "2026-07-29T01:02:04+00:00",
+                }
+            ],
+            "limit": 25,
+            "offset": 50,
+            "has_more": True,
+        }
+
+        page = client._calls.tool_invocations(CALL_ID, limit=25, offset=50)
+
+        transport.get.assert_called_once_with(
+            f"/calls/{CALL_ID}/tool-invocations",
+            params={"limit": 25, "offset": 50},
+        )
+        assert page.limit == 25
+        assert page.offset == 50
+        assert page.has_more is True
+        assert page.items[0].id == UUID(invocation_id)
+        assert page.items[0].tool_name == "send_email"
+        assert page.items[0].status.value == "succeeded"
+        assert page.items[0].result == {"status": "sent"}
+        assert page.items[0].completed_at is not None
+
+    def test_defaults_pagination(self, client, transport):
+        transport.get.return_value = {
+            "items": [],
+            "limit": 50,
+            "offset": 0,
+            "has_more": False,
+        }
+
+        page = client._calls.tool_invocations(UUID(CALL_ID))
+
+        transport.get.assert_called_once_with(
+            f"/calls/{CALL_ID}/tool-invocations",
+            params={"limit": 50, "offset": 0},
+        )
+        assert page.items == []
+
+
 class TestCallsPlace:
     def test_place_dedicated_call(self, client, transport):
         transport.post.return_value = {
@@ -254,6 +332,17 @@ class TestCallsPlace:
             "origination": "dedicated_number",
             "mode": "client_websocket",
         }
+
+    def test_voicemail_detection_forwarded_only_when_set(self, client, transport):
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.place(
+            to_number="+15551234567",
+            voicemail_detection=VoicemailDetection.DISABLED,
+        )
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["voicemail_detection"] == "disabled"
 
     def test_string_origination_passed_verbatim(self, client, transport):
         """A raw string origination is forwarded as-is (no enum coercion)."""
@@ -343,6 +432,24 @@ class TestCallsPlaceHosted:
         assert call.mode == "hosted_agent"
         assert call.reason == "Book a cleaning next week, mornings preferred"
 
+    def test_yolo_authority_forwarded_and_parsed(self, client, transport):
+        transport.post.return_value = {
+            **PHONE_CALL_DICT,
+            "mode": "hosted_agent",
+            "hosted_agent_authority_mode": "yolo",
+        }
+
+        call = client._calls.place(
+            to_number="+15551234567",
+            mode=CallMode.HOSTED_AGENT,
+            hosted_agent_authority_mode=HostedAgentAuthorityMode.YOLO,
+            reason="Coordinate the appointment",
+        )
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["hosted_agent_authority_mode"] == "yolo"
+        assert call.hosted_agent_authority_mode is HostedAgentAuthorityMode.YOLO
+
     def test_string_mode_passed_verbatim(self, client, transport):
         """A raw string mode is forwarded as-is (no enum coercion)."""
         transport.post.return_value = PHONE_CALL_DICT
@@ -390,6 +497,7 @@ class TestCallsPlaceHosted:
 
         assert call.mode == "client_websocket"
         assert call.reason is None
+        assert call.hosted_agent_authority_mode is HostedAgentAuthorityMode.CONTACT_SCOPED
 
 
 class TestPostCallActionItems:

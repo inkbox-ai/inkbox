@@ -1,7 +1,13 @@
 // sdk/typescript/tests/agent_identity.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { AgentIdentity } from "../src/agent_identity.js";
-import { CallMode, CallOrigin, IncomingCallAction } from "../src/phone/types.js";
+import {
+  CallMode,
+  CallOrigin,
+  HostedAgentAuthorityMode,
+  IncomingCallAction,
+  VoicemailDetection,
+} from "../src/phone/types.js";
 import { InkboxError } from "../src/_http.js";
 import type { Inkbox } from "../src/inkbox.js";
 import type { _AgentIdentityData } from "../src/identities/types.js";
@@ -78,9 +84,14 @@ function mockInkbox() {
       place: vi.fn(),
       list: vi.fn(),
       transcripts: vi.fn(),
+      toolInvocations: vi.fn(),
     },
     _incomingCallAction: { get: vi.fn(), set: vi.fn() },
-    _hostedAgent: { getConfig: vi.fn(), setConfig: vi.fn() },
+    _hostedAgent: {
+      getConfig: vi.fn(),
+      setConfig: vi.fn(),
+      setAuthorityMode: vi.fn(),
+    },
     _texts: { send: vi.fn(), update: vi.fn(), updateConversation: vi.fn() },
     _idsResource: {
       get: vi.fn(),
@@ -400,6 +411,7 @@ describe("AgentIdentity phone helpers", () => {
       fromNumber: PARSED_PHONE.number,
       clientWebsocketUrl: undefined,
       mode: CallMode.HOSTED_AGENT,
+      hostedAgentAuthorityMode: undefined,
       reason: "Book a table for two",
     });
   });
@@ -422,8 +434,26 @@ describe("AgentIdentity phone helpers", () => {
       agentIdentityId: identity.id,
       clientWebsocketUrl: undefined,
       mode: CallMode.HOSTED_AGENT,
+      hostedAgentAuthorityMode: undefined,
       reason: "Confirm the appointment",
     });
+  });
+
+  it("placeCall forwards voicemailDetection", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.placeCall({
+      toNumber: "+15551234567",
+      voicemailDetection: VoicemailDetection.DISABLED,
+    });
+
+    expect(ink._calls.place).toHaveBeenCalledWith(
+      expect.objectContaining({
+        voicemailDetection: VoicemailDetection.DISABLED,
+      }),
+    );
   });
 
   it("getHostedAgentConfig delegates scoped by identity id", async () => {
@@ -432,7 +462,10 @@ describe("AgentIdentity phone helpers", () => {
       agentIdentityId: "id-1",
       voice: null,
       model: null,
+      effectiveVoice: "voice-default",
+      effectiveModel: "model-default",
       instructions: null,
+      authorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
     });
     const identity = new AgentIdentity(makeData(), ink);
 
@@ -449,7 +482,10 @@ describe("AgentIdentity phone helpers", () => {
       agentIdentityId: "id-1",
       voice: "warm-voice",
       model: null,
+      effectiveVoice: "warm-voice",
+      effectiveModel: "model-default",
       instructions: "Be brief.",
+      authorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
     });
     const identity = new AgentIdentity(makeData(), ink);
 
@@ -463,6 +499,29 @@ describe("AgentIdentity phone helpers", () => {
       model: undefined,
       instructions: "Be brief.",
       agentIdentityId: identity.id,
+    });
+  });
+
+  it("setHostedAgentAuthorityMode delegates with identity id", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._hostedAgent.setAuthorityMode).mockResolvedValue({
+      agentIdentityId: "id-1",
+      voice: null,
+      model: null,
+      effectiveVoice: "voice-default",
+      effectiveModel: "model-default",
+      instructions: null,
+      authorityMode: HostedAgentAuthorityMode.YOLO,
+    });
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.setHostedAgentAuthorityMode({
+      authorityMode: HostedAgentAuthorityMode.YOLO,
+    });
+
+    expect(ink._hostedAgent.setAuthorityMode).toHaveBeenCalledWith({
+      agentIdentityId: identity.id,
+      authorityMode: HostedAgentAuthorityMode.YOLO,
     });
   });
 
@@ -533,6 +592,29 @@ describe("AgentIdentity phone helpers", () => {
     const result = await identity.listTranscripts("call-1");
 
     expect(result).toBe(segments);
+  });
+
+  it("listToolInvocations delegates pagination to calls.toolInvocations", async () => {
+    const ink = mockInkbox();
+    const page = {
+      items: [],
+      limit: 10,
+      offset: 20,
+      hasMore: false,
+    };
+    vi.mocked(ink._calls.toolInvocations).mockResolvedValue(page);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    const result = await identity.listToolInvocations("call-1", {
+      limit: 10,
+      offset: 20,
+    });
+
+    expect(ink._calls.toolInvocations).toHaveBeenCalledWith("call-1", {
+      limit: 10,
+      offset: 20,
+    });
+    expect(result).toBe(page);
   });
 
   it("getIncomingCallAction delegates scoped by identity id", async () => {

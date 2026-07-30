@@ -118,6 +118,11 @@ inkbox phone call -i my-agent --to +15551234567
 inkbox phone call -i my-agent --to +15551234567 \
   --origination shared_imessage_number
 
+# Give one hosted-agent call broader authority (requires an admin API key).
+inkbox phone call -i my-agent --to +15551234567 \
+  --hosted --reason "Coordinate the appointment and send confirmations." \
+  --authority-mode yolo
+
 # Send a text message (SMS/MMS; comma-separate --to for groups)
 inkbox text send -i my-agent --to +15551234567 --text "Hi from my agent!"
 
