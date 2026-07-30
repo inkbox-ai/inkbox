@@ -147,8 +147,8 @@ export class CallsResource {
    * @param options.hostedAgentAuthorityMode - Voice AI authority override.
    *   Omit to inherit the identity's saved Voice AI authority. Explicit
    *   `contact_scoped` downscopes the call. Explicit `yolo` requires an admin
-   *   credential unless the saved authority is already `yolo`. Valid only with
-   *   `mode=hosted_agent`.
+   *   credential unless the saved authority is already `yolo`. `yolo` is
+   *   valid only with `mode=hosted_agent`.
    * @param options.voicemailDetection - Whether to hang up when voicemail is
    *   detected. Omit for the server's `enabled` default.
    * @param options.reason - Voice AI's task brief for the call.

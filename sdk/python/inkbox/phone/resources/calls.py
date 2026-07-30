@@ -177,7 +177,7 @@ class CallsResource:
                 Omit to inherit the identity's saved Voice AI authority.
                 Explicit ``contact_scoped`` downscopes the call. Explicit
                 ``yolo`` requires an admin credential unless the saved
-                authority is already ``yolo``. Valid only with
+                authority is already ``yolo``. ``yolo`` is valid only with
                 ``mode=hosted_agent``; invalid combinations surface the
                 server's 422 response.
             voicemail_detection: Whether to hang up when voicemail is detected.
