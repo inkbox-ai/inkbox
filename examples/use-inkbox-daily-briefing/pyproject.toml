@@ -1,0 +1,21 @@
+[project]
+name = "use-inkbox-daily-briefing"
+version = "0.1.0"
+description = "Daily briefing mode - AI voice agent with 2-minute morning briefings"
+requires-python = ">=3.11"
+dependencies = [
+    "inkbox",
+    "schedule>=1.2.0",
+    "pydantic>=2.0.0",
+    "python-dateutil>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
