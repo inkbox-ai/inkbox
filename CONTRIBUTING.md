@@ -2,17 +2,16 @@
 
 Thank you for your interest in contributing to Inkbox!
 
-## AI-Generated PRs
+## Location Restrictions
 
-**We do not accept AI-generated pull requests for contributor status.**
+**We do not accept pull requests from contributors located in Bangladesh or India.**
 
 To maintain the integrity of our contributor community and ensure meaningful contributions:
 
-- PRs must be genuinely written by humans
-- AI tools may be used as assistants, but the final submission must be human-curated and reviewed
-- Our CI includes automated detection for AI-generated patterns
-- Suspicious PRs will be flagged for additional review
-- Attempts to game the system with AI-generated content will result in rejection
+- PRs from accounts with Bangladesh or India listed in their GitHub profile location will be automatically rejected
+- Contributors must have a valid location set in their GitHub profile
+- Our CI includes automated location verification using the GitHub API
+- Attempts to circumvent this restriction will result in rejection
 
 ## What we look for
 
