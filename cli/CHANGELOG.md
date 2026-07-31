@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.9 — Voice AI authority inheritance
+
+### Changed
+
+- `inkbox phone call --hosted` omits the authority override unless
+  `--authority-mode` is supplied, allowing the call to inherit the identity's
+  saved Voice AI authority.
+- `--authority-mode contact_scoped` explicitly downscopes one call.
+  `--authority-mode yolo` requires an admin credential only when it exceeds the
+  saved authority.
+- CLI version moved in lockstep to 0.5.9 and now depends on `@inkbox/sdk`
+  `^0.5.9`.
+
+### Compatibility
+
+- Command names and flags are unchanged. Older API versions may still resolve an
+  omitted authority as `contact_scoped`.
+
 ## 0.5.8 — Hosted-agent authority and voicemail detection
 
 ### Added

@@ -189,7 +189,11 @@ pub struct CallPlacementOptions {
 /// Optional controls for an Inkbox Voice AI outbound call.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HostedCallPlacementOptions {
-    /// Omit to use the per-call `contact_scoped` default.
+    /// Omit to inherit the identity's saved Voice AI authority.
+    ///
+    /// An explicit `ContactScoped` downscopes the call. An explicit `Yolo`
+    /// requires an admin credential unless the saved authority is already
+    /// `Yolo`.
     pub authority_mode: Option<HostedAgentAuthorityMode>,
     /// Omit to retain the server default (`enabled`).
     pub voicemail_detection: Option<VoicemailDetection>,

@@ -570,8 +570,10 @@ export class AgentIdentity {
    *   `dedicated_number`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
-   * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults
-   *   to `contact_scoped`.
+   * @param options.hostedAgentAuthorityMode - Voice AI authority override.
+   *   Omit to inherit this identity's saved Voice AI authority. Explicit
+   *   `contact_scoped` downscopes the call. Explicit `yolo` requires an admin
+   *   credential unless the saved authority is already `yolo`.
    * @param options.voicemailDetection - Whether to hang up when voicemail is
    *   detected. Omit for the server's `enabled` default.
    * @param options.reason - Voice AI's task brief for the call.
@@ -687,8 +689,9 @@ export class AgentIdentity {
   }
 
   /**
-   * Set authority for future incoming hosted calls with an admin API key.
-   * Outbound calls select authority independently with `hostedAgentAuthorityMode`.
+   * Set the saved Voice AI authority with an admin API key.
+   * Incoming calls use this value. Outbound calls inherit it when
+   * `hostedAgentAuthorityMode` is omitted.
    */
   async setHostedAgentAuthorityMode(options: {
     authorityMode: HostedAgentAuthorityMode;

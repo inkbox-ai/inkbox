@@ -103,7 +103,7 @@ export function registerPhoneCommands(program: Command): void {
     .option("--reason <text>", "Voice AI's task brief — what to accomplish")
     .option(
       "--authority-mode <mode>",
-      "Hosted-agent authority: contact_scoped or yolo; yolo requires an admin API key",
+      "Voice AI authority override: contact_scoped or yolo; omit to inherit the saved default",
     )
     .option(
       "--origination <origin>",
@@ -434,7 +434,7 @@ export function registerPhoneCommands(program: Command): void {
 
   hostedAgent
     .command("authority-mode <mode>")
-    .description("Set authority for future incoming hosted calls (admin API key)")
+    .description("Set the saved authority for future Voice AI calls (admin API key)")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (

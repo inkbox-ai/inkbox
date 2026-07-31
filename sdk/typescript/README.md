@@ -388,20 +388,27 @@ const call = await identity.placeCall({
 });
 console.log(call.status, call.rateLimit.callsRemaining);
 
-// Let the hosted agent work beyond the current caller for this call.
-// Requesting yolo authority requires an admin API key.
+// Let Voice AI handle the call using this identity's saved authority.
 const hostedCall = await identity.placeCall({
   toNumber: "+15551234567",
   mode: CallMode.HOSTED_AGENT,
   reason: "Coordinate the appointment and send confirmations.",
-  hostedAgentAuthorityMode: HostedAgentAuthorityMode.YOLO,
   voicemailDetection: VoicemailDetection.DISABLED,
 });
 
-// Set the mode for future incoming calls with an admin API key. Outbound calls
-// select authority per call.
+// Set the saved default for future inbound and outbound Voice AI calls.
+// Changing the saved default requires an admin API key.
 await identity.setHostedAgentAuthorityMode({
   authorityMode: HostedAgentAuthorityMode.YOLO,
+});
+
+// Per-call overrides are optional. CONTACT_SCOPED always downscopes. YOLO
+// requires an admin credential unless the saved authority is already YOLO.
+const scopedCall = await identity.placeCall({
+  toNumber: "+15551234567",
+  mode: CallMode.HOSTED_AGENT,
+  reason: "Confirm only this caller's appointment.",
+  hostedAgentAuthorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
 });
 
 // List calls (paginated)

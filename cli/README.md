@@ -203,8 +203,8 @@ inkbox phone call -i <handle>                # Place an outbound call
   --hosted                                   #   Let Inkbox Voice AI drive the call
                                              #     (requires --reason; conflicts with --ws-url)
   --reason <text>                            #   Voice AI's task brief — what to accomplish
-  --authority-mode <mode>                    #   contact_scoped (default) or yolo;
-                                             #     yolo requires --hosted and an admin API key
+  --authority-mode <mode>                    #   Optional contact_scoped or yolo override;
+                                             #     omit to inherit the saved Voice AI authority
   --no-voicemail-detection                   #   Stay connected after voicemail is detected
   --origination <origin>                     #   dedicated_number (default) or
                                              #     shared_imessage_number or
@@ -243,7 +243,7 @@ inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitt
   --model <model>                            #   Model override
   --instructions <text>                      #   Per-identity steering prompt
 
-inkbox phone hosted-agent authority-mode yolo -i <handle>  # Future incoming calls; admin API key
+inkbox phone hosted-agent authority-mode yolo -i <handle>  # Saved inbound/outbound default; admin API key
 ```
 
 Shared origination uses the identity's active iMessage-line assignment and

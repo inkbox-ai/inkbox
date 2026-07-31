@@ -52,24 +52,32 @@ fn main() -> inkbox::Result<()> {
 }
 ```
 
-### Hosted-agent authority
+### Voice AI authority
 
-Hosted-agent calls default to contact-scoped authority. Requesting broader
-authority for one hosted call, or setting it for future incoming calls,
-requires an admin API key. Outbound calls always select authority per call:
+Voice AI calls inherit the identity's saved authority when no per-call override
+is supplied. An explicit `ContactScoped` override always downscopes the call.
+An explicit `Yolo` override requires an admin credential unless the saved
+authority is already `Yolo`. Changing the saved default requires an admin API
+key:
 
 ```rust
 use inkbox::phone::{CallOrigin, HostedAgentAuthorityMode};
 
-let call = identity.place_hosted_call_with_authority(
+let call = identity.place_hosted_call(
     "+15551234567",
     CallOrigin::DedicatedNumber,
     "Coordinate the appointment and send confirmations.",
-    HostedAgentAuthorityMode::Yolo,
 )?;
 
 identity.set_hosted_agent_authority_mode(
     HostedAgentAuthorityMode::Yolo,
+)?;
+
+let scoped_call = identity.place_hosted_call_with_authority(
+    "+15551234567",
+    CallOrigin::DedicatedNumber,
+    "Confirm only this caller's appointment.",
+    HostedAgentAuthorityMode::ContactScoped,
 )?;
 ```
 

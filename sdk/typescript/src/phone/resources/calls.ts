@@ -144,8 +144,11 @@ export class CallsResource {
    * @param options.agentIdentityId - UUID of the placing identity (iMessage origination).
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.mode - Who drives the call. Defaults to `client_websocket`.
-   * @param options.hostedAgentAuthorityMode - Hosted-agent authority. Defaults
-   *   to `contact_scoped`; `yolo` is valid only with `hosted_agent`.
+   * @param options.hostedAgentAuthorityMode - Voice AI authority override.
+   *   Omit to inherit the identity's saved Voice AI authority. Explicit
+   *   `contact_scoped` downscopes the call. Explicit `yolo` requires an admin
+   *   credential unless the saved authority is already `yolo`. `yolo` is
+   *   valid only with `mode=hosted_agent`.
    * @param options.voicemailDetection - Whether to hang up when voicemail is
    *   detected. Omit for the server's `enabled` default.
    * @param options.reason - Voice AI's task brief for the call.

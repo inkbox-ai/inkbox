@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.9 — Voice AI authority inheritance
+
+### Changed
+
+- `calls.place()` and `identity.place_call()` continue to omit
+  `hosted_agent_authority_mode` when it is `None`, allowing Voice AI outbound
+  calls to inherit the identity's saved Voice AI authority.
+- Explicit `contact_scoped` downscopes one call. Explicit `yolo` requires an
+  admin credential only when it exceeds the saved authority.
+- Package version moved in lockstep to 0.5.9.
+
+### Compatibility
+
+- Method signatures and wire names are unchanged. Older API versions may still
+  resolve an omitted authority as `contact_scoped`.
+
 ## 0.5.8 — Hosted-agent authority and voicemail detection
 
 ### Added
