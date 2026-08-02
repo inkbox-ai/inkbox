@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 
 from inkbox.tunnels.client._asgi import (
@@ -1185,7 +1186,11 @@ async def test_url_forward_streaming_under_cap_succeeds():
     class _FakeStream:
         def __init__(self) -> None:
             self.status_code = 201
-            self.headers = {"content-type": "text/plain"}
+            self.headers = httpx.Headers([
+                ("content-type", "text/plain"),
+                ("set-cookie", "sid=abc; Path=/"),
+                ("set-cookie", "theme=dark; Path=/"),
+            ])
 
         async def __aenter__(self):
             return self
@@ -1212,6 +1217,11 @@ async def test_url_forward_streaming_under_cap_succeeds():
     assert result.status == 201
     assert result.body == b"hello world"
     assert result.inkbox_reason is None
+    assert result.headers == [
+        ("content-type", "text/plain"),
+        ("set-cookie", "sid=abc; Path=/"),
+        ("set-cookie", "theme=dark; Path=/"),
+    ]
 
 
 # ---------------------------------------------------------------------------

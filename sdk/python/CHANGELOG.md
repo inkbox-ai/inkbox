@@ -10,6 +10,7 @@
 ### Changed
 
 - Package version moved in lockstep to 0.5.10.
+- Tunnel URL forwarding preserves multiple `Set-Cookie` response headers.
 
 ### Compatibility
 

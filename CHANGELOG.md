@@ -16,6 +16,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.10; the
   CLI now depends on `@inkbox/sdk` `^0.5.10`.
+- Python and TypeScript URL forwarding preserve multiple `Set-Cookie` response
+  headers instead of combining them into one value.
 
 ### Compatibility
 
