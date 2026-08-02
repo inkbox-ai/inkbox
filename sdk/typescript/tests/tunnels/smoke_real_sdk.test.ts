@@ -93,6 +93,7 @@ describeMaybe("Real-SDK smoke against deployed tunnel service", () => {
       name: tunnelName,
       forwardTo: `http://127.0.0.1:${upstreamPort}`,
     });
+    void listener.serveForever();
     publicUrl = listener.publicUrl;
     const readyDeadline = Date.now() + 15_000;
     while (Date.now() < readyDeadline) {
