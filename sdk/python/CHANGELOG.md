@@ -15,6 +15,8 @@
 
 - Missing and null timestamps parse as `None`. Use
   `Tunnel.currently_connected`, not timestamp ordering, to determine liveness.
+- Existing direct `Tunnel(...)` constructors may omit the new field; it defaults
+  to `None`.
 
 ## 0.5.9 — Voice AI authority inheritance
 

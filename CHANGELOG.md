@@ -21,6 +21,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Missing and null disconnect timestamps parse as `None`/`null`, so tunnel
   responses from API versions that do not report the field remain supported.
+- Existing Python constructors may omit the new field. This release is
+  source-breaking for TypeScript and Rust consumers that construct tunnel values
+  directly: TypeScript object literals must add `lastDisconnectedAt` (normally
+  `null`), and Rust struct literals must add `last_disconnected_at` (normally
+  `None`). Deserialization remains compatible when the wire field is absent.
 - The timestamp records an observed disconnect on a best-effort basis. Use the
   tunnel's current connection state, not timestamp ordering, to determine
   liveness.

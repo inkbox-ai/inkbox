@@ -15,6 +15,9 @@
 
 - Missing and null timestamps parse as `null`. Use
   `Tunnel.currentlyConnected`, not timestamp ordering, to determine liveness.
+- This release is source-breaking for direct `Tunnel` object literals, which must
+  add `lastDisconnectedAt` (normally `null`); response parsing remains compatible
+  when the wire field is absent.
 
 ## 0.5.9 — Voice AI authority inheritance
 

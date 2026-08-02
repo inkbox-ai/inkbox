@@ -83,13 +83,13 @@ class Tunnel:
     status: TunnelStatus | str
     last_connected_at: datetime | None
     last_connected_ip_addr: str | None
-    last_disconnected_at: datetime | None
     currently_connected: bool | None
     public_host: str
     zone: str
     metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    last_disconnected_at: datetime | None = None
 
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> Tunnel:

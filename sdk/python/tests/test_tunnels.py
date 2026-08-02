@@ -20,7 +20,7 @@ from inkbox.tunnels.exceptions import (
     TunnelTLSModeMismatch,
 )
 from inkbox.tunnels.resources.tunnels import TunnelsResource
-from inkbox.tunnels.types import Tunnel, TunnelStatus
+from inkbox.tunnels.types import TLSMode, Tunnel, TunnelStatus
 
 
 def _server_tunnel(**overrides):
@@ -132,6 +132,31 @@ def test_last_disconnected_at_parsing(tunnels, http, payload, expected):
     http.get.return_value = response
 
     assert tunnels.get("abc").last_disconnected_at == expected
+
+
+def test_tunnel_constructor_keeps_disconnect_timestamp_optional():
+    """Existing direct constructors do not need the additive field."""
+    tunnel = Tunnel(
+        id=uuid4(),
+        organization_id="org_test",
+        tunnel_name="my-agent",
+        agent_identity_id=None,
+        tls_mode=TLSMode.EDGE,
+        cert_pem=None,
+        cert_fingerprint_sha256=None,
+        cert_expires_at=None,
+        status=TunnelStatus.ACTIVE,
+        last_connected_at=None,
+        last_connected_ip_addr=None,
+        currently_connected=False,
+        public_host="my-agent.inkboxwire.com",
+        zone="inkboxwire.com",
+        metadata={},
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        updated_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert tunnel.last_disconnected_at is None
 
 
 def test_summary_payload_parses_with_omitted_fields(tunnels, http):
