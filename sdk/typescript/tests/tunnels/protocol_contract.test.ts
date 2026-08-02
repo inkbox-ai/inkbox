@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+  INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX,
   INKBOX_FORWARDED_HEADER_PREFIX,
   INKBOX_NAMESPACE_PREFIX,
   ControlHeaders,
@@ -30,6 +31,7 @@ const manifestPath = path.join(
 interface Manifest {
   INKBOX_NAMESPACE_PREFIX: string;
   INKBOX_FORWARDED_HEADER_PREFIX: string;
+  INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX: string;
   TunnelMetaHeader: Record<string, string>;
   TunnelRouteKind: Record<string, string>;
   TunnelSubprotocol: Record<string, string>;
@@ -46,6 +48,9 @@ describe("protocol_contract", () => {
     expect(INKBOX_NAMESPACE_PREFIX).toBe(manifest.INKBOX_NAMESPACE_PREFIX);
     expect(INKBOX_FORWARDED_HEADER_PREFIX).toBe(
       manifest.INKBOX_FORWARDED_HEADER_PREFIX,
+    );
+    expect(INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX).toBe(
+      manifest.INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX,
     );
   });
 

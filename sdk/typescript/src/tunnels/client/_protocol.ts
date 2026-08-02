@@ -14,6 +14,8 @@
 
 export const INKBOX_NAMESPACE_PREFIX = "inkbox-" as const;
 export const INKBOX_FORWARDED_HEADER_PREFIX = "inkbox-h-" as const;
+export const INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX =
+  "inkbox-duplicate-h-" as const;
 
 /**
  * The closed set of inkbox-defined meta headers exchanged on the

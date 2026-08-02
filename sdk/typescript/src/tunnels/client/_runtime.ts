@@ -46,6 +46,7 @@ import {
   ControlHeaders,
   ControlPaths,
   HOP_BY_HOP_RESPONSE,
+  INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX,
   INKBOX_FORWARDED_HEADER_PREFIX,
   TunnelMetaHeader,
   TunnelRouteKind,
@@ -2245,20 +2246,18 @@ export class TunnelRuntime {
       [TunnelMetaHeader.REQUEST_ID]: requestId,
       "content-length": String(body.length),
     };
+    const seenHeaderNames = new Map<string, number>();
     for (const [k, v] of userHeaders) {
       const kl = k.toLowerCase();
       if (kl === "content-length" || kl === "transfer-encoding") continue;
-      // The reason meta header is already top-level; pass through the
-      // forwarded-h-* prefix for the rest. The spec allows multiple
-      // values per name; flatten by appending under indexed keys.
-      const targetKey = `${INKBOX_FORWARDED_HEADER_PREFIX}${kl}`;
-      const existing = reqHeaders[targetKey];
-      if (existing === undefined) {
-        reqHeaders[targetKey] = v;
-      } else if (Array.isArray(existing)) {
-        existing.push(v);
+      const occurrence = seenHeaderNames.get(kl) ?? 0;
+      seenHeaderNames.set(kl, occurrence + 1);
+      if (occurrence === 0) {
+        reqHeaders[`${INKBOX_FORWARDED_HEADER_PREFIX}${kl}`] = v;
       } else {
-        reqHeaders[targetKey] = [String(existing), v];
+        reqHeaders[
+          `${INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX}${occurrence}`
+        ] = Buffer.from(JSON.stringify([kl, v]), "utf8").toString("base64url");
       }
       // The TunnelMetaHeader.REASON is also forwarded above as
       // `inkbox-h-inkbox-reason` — that's OK since it's also surfaced
