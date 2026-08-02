@@ -111,7 +111,6 @@ HANDOFF_SETTLE_SEC = 2.0
 # new active connection before giving up (the server response deadline +
 # the third-party retry recover a dropped reply).
 POST_ACTIVE_WAIT_SEC = 5.0
-_DUPLICATE_FORWARDED_HEADER_PREFIX = "inkbox-duplicate-h-"
 
 # WS/passthrough close code surfaced to live bridges when the server
 # drains (NO_ERROR GOAWAY). In the 4500 application range; must not
@@ -2760,24 +2759,11 @@ class TunnelRuntime:
             ("inkbox-request-id", request_id),
             ("content-length", str(len(body))),
         ]
-        seen_header_names: dict[str, int] = {}
         for k, v in headers:
             kl = k.lower()
             if kl in ("content-length", "transfer-encoding"):
                 continue
-            occurrence = seen_header_names.get(kl, 0)
-            seen_header_names[kl] = occurrence + 1
-            if occurrence == 0:
-                req_headers.append((f"inkbox-h-{kl}", v))
-                continue
-
-            encoded = base64.urlsafe_b64encode(
-                json.dumps([kl, v], separators=(",", ":")).encode("utf-8"),
-            ).decode("ascii").rstrip("=")
-            req_headers.append((
-                f"{_DUPLICATE_FORWARDED_HEADER_PREFIX}{occurrence}",
-                encoded,
-            ))
+            req_headers.append((f"inkbox-h-{kl}", v))
 
         async with conn.send_lock:
             stream_id = self._open_stream_locked(

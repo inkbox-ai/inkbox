@@ -9,16 +9,6 @@
 pub const INKBOX_NAMESPACE_PREFIX: &str = "inkbox-";
 /// Prefix marking a forwarded third-party request header.
 pub const INKBOX_FORWARDED_HEADER_PREFIX: &str = "inkbox-h-";
-/// Prefix carrying additional values of a repeated response header.
-pub const INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX: &str = "inkbox-duplicate-h-";
-
-/// Encode one repeated response header as unpadded base64url JSON.
-pub fn encode_duplicate_forwarded_header(name: &str, value: &str) -> String {
-    use base64::Engine as _;
-
-    let wire = serde_json::to_vec(&(name, value)).expect("string pair serializes");
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(wire)
-}
 
 // --- Meta headers exchanged on the intake / response streams -------------
 
@@ -97,21 +87,4 @@ pub fn is_hop_by_hop_response(name_lower: &str) -> bool {
 /// True iff `name` (already lowercased) is a hop-by-hop request header.
 pub fn is_hop_by_hop_request(name_lower: &str) -> bool {
     HOP_BY_HOP_REQUEST.contains(&name_lower)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn duplicate_forwarded_header_is_base64url_json_pair() {
-        use base64::Engine as _;
-
-        let encoded = encode_duplicate_forwarded_header("set-cookie", "theme=dark; Path=/");
-        let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(encoded)
-            .unwrap();
-        let pair: (String, String) = serde_json::from_slice(&decoded).unwrap();
-        assert_eq!(pair, ("set-cookie".into(), "theme=dark; Path=/".into()));
-    }
 }

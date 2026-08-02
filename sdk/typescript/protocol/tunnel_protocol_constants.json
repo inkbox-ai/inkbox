@@ -2,7 +2,6 @@
   "$schema-note": "Hand-vendored manifest mirroring servers/src/data_models/tunnel.py. Update deliberately when the wire protocol changes; both SDKs and the server must stay in lockstep.",
   "INKBOX_NAMESPACE_PREFIX": "inkbox-",
   "INKBOX_FORWARDED_HEADER_PREFIX": "inkbox-h-",
-  "INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX": "inkbox-duplicate-h-",
   "TunnelMetaHeader": {
     "REQUEST_ID": "inkbox-request-id",
     "METHOD": "inkbox-method",

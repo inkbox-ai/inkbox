@@ -1434,11 +1434,9 @@ async def test_webhook_reply_rides_new_active_conn():
     runtime._active = new
 
     opened_on: list[int] = []
-    opened_headers: list[tuple[str, str]] = []
 
     def _fake_open(headers, *, end_stream, conn=None):
         opened_on.append(conn.conn_id)
-        opened_headers.extend(headers)
         conn.streams[99] = asyncio.Queue()
         # Immediately signal the response so _post_response returns.
         conn.streams[99].put_nowait(
@@ -1451,24 +1449,13 @@ async def test_webhook_reply_rides_new_active_conn():
     await runtime._post_response(
         "req-mid-drain",
         status=200,
-        headers=[
-            ("content-type", "text/plain"),
-            ("set-cookie", "sid=abc; Path=/"),
-            ("set-cookie", "theme=dark; Path=/"),
-        ],
+        headers=[("content-type", "text/plain")],
         body=b"",
     )
     # The reply must have been opened on the new (active) conn, not old.
     assert opened_on == [new.conn_id], (
         f"reply opened on {opened_on}, expected new conn {new.conn_id}"
     )
-    assert ("inkbox-h-set-cookie", "sid=abc; Path=/") in opened_headers
-    duplicate = next(
-        value for name, value in opened_headers
-        if name == "inkbox-duplicate-h-1"
-    )
-    decoded = base64.urlsafe_b64decode(duplicate + ("=" * (-len(duplicate) % 4)))
-    assert json.loads(decoded) == ["set-cookie", "theme=dark; Path=/"]
 
 
 def _make_stream_end_event():

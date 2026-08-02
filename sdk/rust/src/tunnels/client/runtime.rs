@@ -12,7 +12,6 @@
 //! implemented. WebSocket and TCP-passthrough bridges are dispatched through
 //! [`bridge`](super::bridge) (see [`TunnelRuntime::dispatch`]).
 
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -27,8 +26,7 @@ use crate::error::{InkboxError, Result};
 use super::bootstrap::TunnelBundle;
 use super::envelope::{filter_response_headers, parse_envelope, Envelope};
 use super::protocol::{
-    encode_duplicate_forwarded_header, INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX, META_REASON,
-    META_STATUS, PATH_HELLO, PATH_INTAKE, PATH_RESPONSE_PREFIX, ROUTE_KIND_TCP_STREAM,
+    META_REASON, META_STATUS, PATH_HELLO, PATH_INTAKE, PATH_RESPONSE_PREFIX, ROUTE_KIND_TCP_STREAM,
     ROUTE_KIND_WEBHOOK, ROUTE_KIND_WS_UPGRADE,
 };
 use super::url_forward::{forward_envelope_to_url, validate_envelope_path, ForwardResult};
@@ -724,26 +722,17 @@ impl TunnelRuntime {
         if let Some(reason) = inkbox_reason {
             builder = builder.header(META_REASON, reason);
         }
-        // Keep the first value under the legacy key. Additional values use
-        // unique encoded keys so proxies cannot collapse repeated names.
-        let mut seen_header_names: HashMap<String, usize> = HashMap::new();
+        // Forward each upstream header as `inkbox-h-{lower}`, skipping the
+        // framing headers the edge recomputes.
         for (k, v) in headers {
             let kl = k.to_ascii_lowercase();
             if kl == "content-length" || kl == "transfer-encoding" {
                 continue;
             }
-            let occurrence = seen_header_names.entry(kl.clone()).or_insert(0);
-            let (wire_name, wire_value) = if *occurrence == 0 {
-                (format!("inkbox-h-{kl}"), v.clone())
-            } else {
-                (
-                    format!("{INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX}{occurrence}"),
-                    encode_duplicate_forwarded_header(&kl, v),
-                )
-            };
-            *occurrence += 1;
-            if let Ok(name) = http::header::HeaderName::from_bytes(wire_name.as_bytes()) {
-                if let Ok(val) = http::header::HeaderValue::from_str(&wire_value) {
+            if let Ok(name) =
+                http::header::HeaderName::from_bytes(format!("inkbox-h-{kl}").as_bytes())
+            {
+                if let Ok(val) = http::header::HeaderValue::from_str(v) {
                     builder = builder.header(name, val);
                 }
             }

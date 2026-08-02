@@ -23,7 +23,6 @@
 //! `SendStream` (reserving capacity), rather than Python's manual
 //! `acknowledge_received_data` crediting.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -41,8 +40,7 @@ use super::bridge::{
 };
 use super::envelope::Envelope;
 use super::protocol::{
-    encode_duplicate_forwarded_header, is_hop_by_hop_request, is_hop_by_hop_response,
-    INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX, PATH_RESPONSE_PREFIX, PATH_TCP_PREFIX,
+    is_hop_by_hop_request, is_hop_by_hop_response, PATH_RESPONSE_PREFIX, PATH_TCP_PREFIX,
     PATH_WS_PREFIX, SUBPROTOCOL_TCP, SUBPROTOCOL_WS,
 };
 use super::url_forward::{join_forward_path, url_split, validate_envelope_path};
@@ -1092,26 +1090,16 @@ async fn post_reply_inner(
     if let Some(r) = reason {
         builder = builder.header("inkbox-reason", r);
     }
-    // Keep the first value under the legacy key. Additional values use unique
-    // encoded keys so proxies cannot collapse repeated names.
-    let mut seen_header_names: HashMap<String, usize> = HashMap::new();
+    // Forward each header as `inkbox-h-{lower}`, skipping framing headers the
+    // edge recomputes.
     for (k, v) in headers {
         let kl = k.to_ascii_lowercase();
         if kl == "content-length" || kl == "transfer-encoding" {
             continue;
         }
-        let occurrence = seen_header_names.entry(kl.clone()).or_insert(0);
-        let (wire_name, wire_value) = if *occurrence == 0 {
-            (format!("inkbox-h-{kl}"), v.clone())
-        } else {
-            (
-                format!("{INKBOX_DUPLICATE_FORWARDED_HEADER_PREFIX}{occurrence}"),
-                encode_duplicate_forwarded_header(&kl, v),
-            )
-        };
-        *occurrence += 1;
-        if let Ok(name) = http::header::HeaderName::from_bytes(wire_name.as_bytes()) {
-            if let Ok(val) = http::header::HeaderValue::from_str(&wire_value) {
+        if let Ok(name) = http::header::HeaderName::from_bytes(format!("inkbox-h-{kl}").as_bytes())
+        {
+            if let Ok(val) = http::header::HeaderValue::from_str(v) {
                 builder = builder.header(name, val);
             }
         }

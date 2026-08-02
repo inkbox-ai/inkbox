@@ -122,13 +122,7 @@ describe("TunnelRuntime — make-before-break on NO_ERROR GOAWAY", () => {
     const gate = new Promise<void>((r) => { release = r; });
     const handler: InkboxHandler = async () => {
       await gate;
-      return new Response("migrated", {
-        status: 200,
-        headers: [
-          ["set-cookie", "sid=abc; Path=/"],
-          ["set-cookie", "theme=dark; Path=/"],
-        ],
-      });
+      return new Response("migrated", { status: 200 });
     };
     const runtime = makeRuntime({ handler });
     const servePromise = runtime.serveForever();
@@ -155,11 +149,6 @@ describe("TunnelRuntime — make-before-break on NO_ERROR GOAWAY", () => {
     const post = await fakeServer.awaitResponsePost("req-migrate", 6000);
     expect(post.headers["inkbox-status"]).toBe("200");
     expect(post.sessionIdx).toBe(1);
-    expect(post.headers["inkbox-h-set-cookie"]).toBe("sid=abc; Path=/");
-    const duplicate = post.headers["inkbox-duplicate-h-1"];
-    expect(duplicate).toBeTypeOf("string");
-    expect(JSON.parse(Buffer.from(String(duplicate), "base64url").toString("utf8")))
-      .toEqual(["set-cookie", "theme=dark; Path=/"]);
 
     await runtime.aclose();
     await servePromise;
