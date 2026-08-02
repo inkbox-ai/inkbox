@@ -94,9 +94,16 @@ describeMaybe("Real-SDK smoke against deployed tunnel service", () => {
       forwardTo: `http://127.0.0.1:${upstreamPort}`,
     });
     publicUrl = listener.publicUrl;
-    // serveForever runs in the background (started by connect's listener
-    // wrapper). Give it a moment for hello + intake parking.
-    await new Promise((r) => setTimeout(r, 1500));
+    const readyDeadline = Date.now() + 15_000;
+    while (Date.now() < readyDeadline) {
+      if ((await inkbox.tunnels.get(listener.tunnel.id)).currentlyConnected) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!(await inkbox.tunnels.get(listener.tunnel.id)).currentlyConnected) {
+      throw new Error("tunnel listener did not become connected");
+    }
   }, 30_000);
 
   afterAll(async () => {
@@ -113,6 +120,7 @@ describeMaybe("Real-SDK smoke against deployed tunnel service", () => {
       }
     }
     if (upstream !== undefined) {
+      upstream.closeAllConnections();
       await new Promise<void>((resolve) => upstream.close(() => resolve()));
     }
   });
