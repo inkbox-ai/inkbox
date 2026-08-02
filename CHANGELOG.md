@@ -4,6 +4,27 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.10 — Tunnel disconnect timestamps
+
+### Added
+
+- Python, TypeScript, and Rust tunnel records expose the nullable,
+  best-effort `last_disconnected_at` timestamp (`lastDisconnectedAt` in
+  TypeScript). `inkbox tunnel get` includes the timestamp in its output.
+
+### Changed
+
+- Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.10; the
+  CLI now depends on `@inkbox/sdk` `^0.5.10`.
+
+### Compatibility
+
+- Missing and null disconnect timestamps parse as `None`/`null`, so tunnel
+  responses from API versions that do not report the field remain supported.
+- The timestamp records an observed disconnect on a best-effort basis. Use the
+  tunnel's current connection state, not timestamp ordering, to determine
+  liveness.
+
 ## 0.5.9 — Voice AI authority inheritance
 
 ### Changed

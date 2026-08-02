@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.10 — Tunnel disconnect timestamps
+
+### Added
+
+- `inkbox tunnel get` includes the nullable, best-effort
+  `lastDisconnectedAt` timestamp.
+
+### Changed
+
+- CLI version moved in lockstep to 0.5.10 and now depends on `@inkbox/sdk`
+  `^0.5.10`.
+
+### Compatibility
+
+- Existing commands and flags are unchanged.
+
 ## 0.5.9 — Voice AI authority inheritance
 
 ### Changed

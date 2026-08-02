@@ -30,6 +30,7 @@ function serverTunnel(overrides: Record<string, unknown> = {}) {
     status: "active",
     last_connected_at: null,
     last_connected_ip_addr: null,
+    last_disconnected_at: null,
     currently_connected: false,
     public_host: "my-agent.inkboxwire.com",
     zone: "inkboxwire.com",
@@ -117,6 +118,19 @@ describe("TunnelsResource", () => {
     expect(out.metadata).toEqual({});
   });
 
+  it.each([
+    ["absent", undefined, null],
+    ["null", null, null],
+    ["timestamp", "2026-08-02T07:30:45Z", "2026-08-02T07:30:45.000Z"],
+  ])("parses last_disconnected_at when %s", async (_case, value, expected) => {
+    const response = serverTunnel({ last_disconnected_at: value }) as Record<string, unknown>;
+    if (value === undefined) delete response.last_disconnected_at;
+    vi.mocked(fetch).mockResolvedValue(makeResponse(200, response));
+
+    const out = await tunnels().get("abc");
+    expect(out.lastDisconnectedAt?.toISOString() ?? null).toBe(expected);
+  });
+
   it("parses a durable-config-only payload without fabricating omitted fields", async () => {
     // Identity-embedded tunnels may be slimmed to durable config; omitted
     // fields must surface as null/{} and unknown keys must be ignored.
@@ -139,6 +153,7 @@ describe("TunnelsResource", () => {
     expect(out.currentlyConnected).toBeNull();
     expect(out.certPem).toBeNull();
     expect(out.lastConnectedAt).toBeNull();
+    expect(out.lastDisconnectedAt).toBeNull();
     expect(out.metadata).toEqual({});
     expect(out.publicHost).toBe("my-agent.inkboxwire.com");
   });

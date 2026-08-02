@@ -57,6 +57,7 @@ def _make_bundle() -> TunnelBundle:
             status=TunnelStatus.ACTIVE,
             last_connected_at=None,
             last_connected_ip_addr=None,
+            last_disconnected_at=None,
             currently_connected=False,
             public_host="my-agent.inkboxwire.example",
             zone="inkboxwire.example",

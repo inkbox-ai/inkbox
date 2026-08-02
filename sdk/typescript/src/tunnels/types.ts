@@ -43,6 +43,11 @@ export interface Tunnel {
   status: TunnelStatus | string;
   lastConnectedAt: Date | null;
   lastConnectedIpAddr: string | null;
+  /**
+   * Best-effort time when the tunnel's last connection was observed closing.
+   * `null` means no disconnect was recorded. Use `currentlyConnected` for liveness.
+   */
+  lastDisconnectedAt: Date | null;
   /** `null` when connection state was not reported. A failed lookup does not establish current state. */
   currentlyConnected: boolean | null;
   /** Customer-facing hostname. */
@@ -75,6 +80,7 @@ export interface RawTunnel {
   status: string;
   last_connected_at?: string | null;
   last_connected_ip_addr?: string | null;
+  last_disconnected_at?: string | null;
   currently_connected?: boolean | null;
   public_host: string;
   zone: string;
@@ -114,6 +120,7 @@ export function parseTunnel(raw: RawTunnel): Tunnel {
     status: raw.status,
     lastConnectedAt: parseDate(raw.last_connected_at),
     lastConnectedIpAddr: raw.last_connected_ip_addr ?? null,
+    lastDisconnectedAt: parseDate(raw.last_disconnected_at),
     currentlyConnected: raw.currently_connected == null ? null : Boolean(raw.currently_connected),
     publicHost: raw.public_host,
     zone: raw.zone,

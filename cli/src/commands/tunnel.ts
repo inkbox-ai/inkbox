@@ -1,8 +1,26 @@
 import * as fs from "node:fs";
+import type { Tunnel } from "@inkbox/sdk";
 import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
+
+export function tunnelGetRecord(t: Tunnel) {
+  return {
+    id: t.id,
+    tunnelName: t.tunnelName,
+    publicHost: t.publicHost,
+    zone: t.zone,
+    tlsMode: t.tlsMode,
+    status: t.status,
+    currentlyConnected: t.currentlyConnected,
+    lastConnectedAt: t.lastConnectedAt,
+    lastDisconnectedAt: t.lastDisconnectedAt,
+    metadata: t.metadata,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  };
+}
 
 export function registerTunnelCommands(program: Command): void {
   const tunnel = program
@@ -64,22 +82,7 @@ export function registerTunnelCommands(program: Command): void {
           tunnelId = summary.id;
         }
         const t = await inkbox.tunnels.get(tunnelId);
-        output(
-          {
-            id: t.id,
-            tunnelName: t.tunnelName,
-            publicHost: t.publicHost,
-            zone: t.zone,
-            tlsMode: t.tlsMode,
-            status: t.status,
-            currentlyConnected: t.currentlyConnected,
-            lastConnectedAt: t.lastConnectedAt,
-            metadata: t.metadata,
-            createdAt: t.createdAt,
-            updatedAt: t.updatedAt,
-          },
-          { json: !!opts.json },
-        );
+        output(tunnelGetRecord(t), { json: !!opts.json });
       }),
     );
 

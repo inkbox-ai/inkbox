@@ -97,6 +97,10 @@ pub struct Tunnel {
     pub last_connected_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_connected_ip_addr: Option<String>,
+    /// Best-effort ISO-8601 timestamp for the last observed disconnect.
+    /// `None` means no disconnect was recorded; use `currently_connected` for liveness.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_disconnected_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub currently_connected: Option<bool>,
     /// Customer-facing hostname (e.g. `my-agent.inkboxwire.com`). Non-empty
@@ -196,6 +200,7 @@ impl Tunnel {
             status,
             last_connected_at: opt_str(obj, "last_connected_at"),
             last_connected_ip_addr: opt_str(obj, "last_connected_ip_addr"),
+            last_disconnected_at: opt_str(obj, "last_disconnected_at"),
             // `None` when the server didn't report liveness.
             currently_connected: obj.get("currently_connected").and_then(|v| v.as_bool()),
             public_host,
@@ -393,6 +398,7 @@ mod tests {
         assert_eq!(t.currently_connected, None);
         assert_eq!(t.cert_pem, None);
         assert_eq!(t.last_connected_at, None);
+        assert_eq!(t.last_disconnected_at, None);
         assert!(t.metadata.is_empty());
         assert_eq!(t.public_host, "my-agent.inkboxwire.com");
     }
@@ -403,7 +409,40 @@ mod tests {
         let t: Tunnel = serde_json::from_value(summary_json()).unwrap();
         assert_eq!(t.organization_id, None);
         assert_eq!(t.currently_connected, None);
+        assert_eq!(t.last_disconnected_at, None);
         assert!(t.metadata.is_empty());
         assert_eq!(t.status, TunnelStatusValue::Known(TunnelStatus::Active));
+    }
+
+    #[test]
+    fn last_disconnected_at_parses_absent_null_and_timestamp() {
+        let absent = summary_json();
+        assert_eq!(
+            Tunnel::from_value(&absent).unwrap().last_disconnected_at,
+            None
+        );
+
+        let mut null = summary_json();
+        null["last_disconnected_at"] = Value::Null;
+        assert_eq!(
+            Tunnel::from_value(&null).unwrap().last_disconnected_at,
+            None
+        );
+
+        let mut timestamp = summary_json();
+        timestamp["last_disconnected_at"] = json!("2026-08-02T07:30:45Z");
+        assert_eq!(
+            Tunnel::from_value(&timestamp)
+                .unwrap()
+                .last_disconnected_at
+                .as_deref(),
+            Some("2026-08-02T07:30:45Z")
+        );
+
+        let derived: Tunnel = serde_json::from_value(timestamp).unwrap();
+        assert_eq!(
+            derived.last_disconnected_at.as_deref(),
+            Some("2026-08-02T07:30:45Z")
+        );
     }
 }
