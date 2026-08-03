@@ -208,7 +208,7 @@ class UpstreamUrlDispatch:
                 await response.send_head(
                     DispatchResponseHead(
                         status=resp.status_code,
-                        headers=list(resp.headers.items()),
+                        headers=list(resp.headers.multi_items()),
                     ),
                 )
                 async for chunk in resp.aiter_bytes():

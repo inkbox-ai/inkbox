@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -19,7 +20,7 @@ from inkbox.tunnels.exceptions import (
     TunnelTLSModeMismatch,
 )
 from inkbox.tunnels.resources.tunnels import TunnelsResource
-from inkbox.tunnels.types import Tunnel, TunnelStatus
+from inkbox.tunnels.types import TLSMode, Tunnel, TunnelStatus
 
 
 def _server_tunnel(**overrides):
@@ -34,6 +35,7 @@ def _server_tunnel(**overrides):
         "status": "active",
         "last_connected_at": None,
         "last_connected_ip_addr": None,
+        "last_disconnected_at": None,
         "currently_connected": False,
         "public_host": "my-agent.inkboxwire.com",
         "zone": "inkboxwire.com",
@@ -111,6 +113,52 @@ def test_metadata_always_dict(tunnels, http):
     assert out.metadata == {}
 
 
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        ({}, None),
+        ({"last_disconnected_at": None}, None),
+        (
+            {"last_disconnected_at": "2026-08-02T07:30:45Z"},
+            datetime(2026, 8, 2, 7, 30, 45, tzinfo=timezone.utc),
+        ),
+    ],
+    ids=["absent", "null", "timestamp"],
+)
+def test_last_disconnected_at_parsing(tunnels, http, payload, expected):
+    response = _server_tunnel()
+    response.pop("last_disconnected_at")
+    response.update(payload)
+    http.get.return_value = response
+
+    assert tunnels.get("abc").last_disconnected_at == expected
+
+
+def test_tunnel_constructor_keeps_disconnect_timestamp_optional():
+    """Existing direct constructors do not need the additive field."""
+    tunnel = Tunnel(
+        id=uuid4(),
+        organization_id="org_test",
+        tunnel_name="my-agent",
+        agent_identity_id=None,
+        tls_mode=TLSMode.EDGE,
+        cert_pem=None,
+        cert_fingerprint_sha256=None,
+        cert_expires_at=None,
+        status=TunnelStatus.ACTIVE,
+        last_connected_at=None,
+        last_connected_ip_addr=None,
+        currently_connected=False,
+        public_host="my-agent.inkboxwire.com",
+        zone="inkboxwire.com",
+        metadata={},
+        created_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        updated_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert tunnel.last_disconnected_at is None
+
+
 def test_summary_payload_parses_with_omitted_fields(tunnels, http):
     """A durable-config-only tunnel payload (as embedded in identity
     responses) parses cleanly: omitted fields surface as None/{} rather
@@ -132,6 +180,7 @@ def test_summary_payload_parses_with_omitted_fields(tunnels, http):
     assert out.currently_connected is None
     assert out.cert_pem is None
     assert out.last_connected_at is None
+    assert out.last_disconnected_at is None
     assert out.metadata == {}
     assert out.public_host == "my-agent.inkboxwire.com"
 

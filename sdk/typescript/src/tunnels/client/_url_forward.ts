@@ -329,8 +329,17 @@ export async function forwardEnvelopeToUrl(
 
 function collectResponseHeaders(h: Headers): Array<[string, string]> {
   const out: Array<[string, string]> = [];
+  const getSetCookie = (h as Headers & {
+    getSetCookie?: () => string[];
+  }).getSetCookie;
+  const setCookies = getSetCookie ? getSetCookie.call(h) : [];
   h.forEach((value, key) => {
-    out.push([key, value]);
+    if (key.toLowerCase() === "set-cookie" && setCookies.length > 0) {
+      return;
+    } else {
+      out.push([key, value]);
+    }
   });
+  for (const cookie of setCookies) out.push(["set-cookie", cookie]);
   return out;
 }

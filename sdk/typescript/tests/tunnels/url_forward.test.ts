@@ -121,6 +121,31 @@ describe("forwardEnvelopeToUrl streaming cap", () => {
     }
   });
 
+  it("preserves duplicate Set-Cookie response headers", async () => {
+    const fakeFetch: typeof fetch = async () =>
+      new Response("ok", {
+        status: 200,
+        headers: [
+          ["set-cookie", "sid=abc; Path=/"],
+          ["set-cookie", "theme=dark; Path=/"],
+        ],
+      });
+    const result = await forwardEnvelopeToUrl({
+      envelope: makeEnvelope(),
+      forwardTo: "http://localhost:8080",
+      publicHost: "my-agent.example.com",
+      fetcher: fakeFetch,
+      maxResponseBytes: 1024,
+    });
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.headers.filter(([key]) => key === "set-cookie")).toEqual([
+        ["set-cookie", "sid=abc; Path=/"],
+        ["set-cookie", "theme=dark; Path=/"],
+      ]);
+    }
+  });
+
   it("returns upstream-unreachable when fetch throws", async () => {
     const fakeFetch: typeof fetch = async () => {
       throw new Error("ECONNREFUSED");

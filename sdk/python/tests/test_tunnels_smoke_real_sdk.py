@@ -135,19 +135,39 @@ def deployed_tunnel():
             name=name,
             forward_to=f"http://127.0.0.1:{upstream_port}",
         )
-        # listener.wait() would block; the sync API runs the runtime in
-        # a background thread already, so we just give it a moment to
-        # park its intake pool before the first request.
-        time.sleep(2.0)
-        public_host = listener.public_url.removeprefix("https://")
-        _wait_for_dns(public_host, timeout=30.0)
+        # ``connect()`` prepares the listener; ``wait()`` drives its sync
+        # runtime. Run it in a test-owned thread so requests can execute in
+        # parallel while preserving the public blocking API contract.
+        listener_errors: list[BaseException] = []
+
+        def _run_listener() -> None:
+            try:
+                listener.wait()
+            except BaseException as exc:  # surfaced after cleanup below
+                listener_errors.append(exc)
+
+        listener_thread = threading.Thread(target=_run_listener, daemon=True)
+        listener_thread.start()
+
         try:
+            deadline = time.monotonic() + 15.0
+            while time.monotonic() < deadline:
+                if listener_errors:
+                    raise listener_errors[0]
+                if inkbox.tunnels.get(listener.tunnel.id).currently_connected:
+                    break
+                time.sleep(0.1)
+            else:
+                raise RuntimeError("tunnel listener did not become connected")
+            public_host = listener.public_url.removeprefix("https://")
+            _wait_for_dns(public_host, timeout=30.0)
             yield {
                 "public_url": listener.public_url,
                 "tunnel_id": listener.tunnel.id,
             }
         finally:
             listener.close()
+            listener_thread.join(timeout=5.0)
             # Identity-delete cascades to the linked mailbox + tunnel.
             try:
                 inkbox.get_identity(name).delete()
@@ -155,6 +175,10 @@ def deployed_tunnel():
                 # best-effort cleanup
                 pass
             _stop_local_upstream(upstream_server, upstream_thread)
+            if listener_thread.is_alive():
+                raise RuntimeError("tunnel listener did not stop")
+            if listener_errors:
+                raise listener_errors[0]
 
 
 def test_http_get_round_trips(deployed_tunnel: dict[str, object]) -> None:

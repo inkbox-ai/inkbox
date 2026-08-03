@@ -247,7 +247,7 @@ async def forward_envelope_to_url(
                     inkbox_reason="response-too-large",
                 )
             resp_headers: list[tuple[str, str]] = [
-                (k, v) for k, v in resp.headers.items()
+                (k, v) for k, v in resp.headers.multi_items()
             ]
             return ForwardResult(
                 status=resp.status_code,

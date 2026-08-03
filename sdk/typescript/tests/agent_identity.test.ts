@@ -802,7 +802,7 @@ describe("AgentIdentity management", () => {
       id: "tun-1", organizationId: "org-1", tunnelName: "sales-agent",
       tlsMode: TLSMode.EDGE, certPem: null, certFingerprintSha256: null,
       certExpiresAt: null, status: TunnelStatus.ACTIVE, lastConnectedAt: null,
-      lastConnectedIpAddr: null, currentlyConnected: false,
+      lastConnectedIpAddr: null, lastDisconnectedAt: null, currentlyConnected: false,
       publicHost: "sales-agent.inkboxwire.com", zone: "inkboxwire.com",
       metadata: {}, createdAt: new Date(), updatedAt: new Date(),
     };

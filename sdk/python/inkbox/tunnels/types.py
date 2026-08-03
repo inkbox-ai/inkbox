@@ -68,6 +68,9 @@ class Tunnel:
     server omits them — identity-embedded tunnel payloads may carry
     summary fields only. Fetch ``tunnels.get(id)`` when connection state is
     needed; a failed lookup does not establish the tunnel's current state.
+
+    ``last_disconnected_at`` is a best-effort observation. ``None`` means no
+    disconnect was recorded; use ``currently_connected`` for liveness.
     """
     id: UUID
     organization_id: str | None
@@ -86,6 +89,7 @@ class Tunnel:
     metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    last_disconnected_at: datetime | None = None
 
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> Tunnel:
@@ -121,6 +125,7 @@ class Tunnel:
             status=status,
             last_connected_at=_parse_dt(data.get("last_connected_at")),
             last_connected_ip_addr=data.get("last_connected_ip_addr"),
+            last_disconnected_at=_parse_dt(data.get("last_disconnected_at")),
             currently_connected=None if raw_connected is None else bool(raw_connected),
             public_host=public_host,
             zone=zone,

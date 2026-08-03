@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.10 — Tunnel disconnect timestamps
+
+### Added
+
+- `Tunnel.lastDisconnectedAt` exposes the nullable, best-effort timestamp of
+  the last recorded disconnect as a `Date`.
+
+### Changed
+
+- Package version moved in lockstep to 0.5.10.
+- Tunnel URL forwarding preserves multiple `Set-Cookie` response headers.
+
+### Compatibility
+
+- Missing and null timestamps parse as `null`. Use
+  `Tunnel.currentlyConnected`, not timestamp ordering, to determine liveness.
+- This release is source-breaking for direct `Tunnel` object literals, which must
+  add `lastDisconnectedAt` (normally `null`); response parsing remains compatible
+  when the wire field is absent.
+
 ## 0.5.9 — Voice AI authority inheritance
 
 ### Changed

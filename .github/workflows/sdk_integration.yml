@@ -106,6 +106,7 @@ jobs:
     env:
       SDK_INTEGRATION_ENV: ${{ matrix.environment }}
       SDK_INTEGRATION_VERBOSE: "1"
+      SDK_INTEGRATION_TUNNEL_SMOKE: ${{ matrix.environment == 'development' && matrix.source == 'local' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -189,6 +190,7 @@ jobs:
     env:
       SDK_INTEGRATION_ENV: ${{ matrix.environment }}
       SDK_INTEGRATION_VERBOSE: "1"
+      SDK_INTEGRATION_TUNNEL_SMOKE: ${{ matrix.environment == 'development' && matrix.source == 'local' && '1' || '0' }}
 
     steps:
       - uses: actions/checkout@v5
@@ -338,4 +340,3 @@ jobs:
             -d '{
               "text": "⚠️ CLI integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }'
-

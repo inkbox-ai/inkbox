@@ -29,6 +29,7 @@ function fakeTunnel(): Tunnel {
     status: TunnelStatus.ACTIVE,
     lastConnectedAt: null,
     lastConnectedIpAddr: null,
+    lastDisconnectedAt: null,
     currentlyConnected: false,
     publicHost: "my-agent.inkboxwire.com",
     zone: "inkboxwire.com",
