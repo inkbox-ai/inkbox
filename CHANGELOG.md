@@ -4,6 +4,33 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.11 — Nullable webhook contact names
+
+### Changed
+
+- `WebhookContact.name` and `WebhookMailContact.name` are now nullable across
+  Python, TypeScript, and Rust. A contact created automatically from an inbound
+  message carries an `id` and `memories` before it has a name, and the field is
+  `None`/`null` in that case rather than repeating the phone number or email
+  address the contact was matched on.
+- Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.11; the
+  CLI now depends on `@inkbox/sdk` `^0.5.11`.
+
+### Compatibility
+
+- **Source-breaking for Rust and TypeScript consumers that read
+  `contact.name` as a non-optional value.** Rust `name` becomes
+  `Option<String>`, so matches and struct literals must handle `None`;
+  TypeScript `name` becomes `string | null`, so a strict `null` check is
+  required before using it. Python's `TypedDict` widens to `str | None`, which
+  type checkers will flag at the use site.
+- Rust deserialization of these payloads previously failed outright on a null
+  `name`; it now parses. Upgrade if your receiver handles inbound calls, texts,
+  iMessage, or mail webhooks.
+- Guard the field before addressing anyone by name. It never falls back to the
+  identifier, which is the point: a missing name should read as unknown, not as
+  a phone number.
+
 ## 0.5.10 — Tunnel disconnect timestamps
 
 ### Added

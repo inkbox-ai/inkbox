@@ -150,7 +150,10 @@ pub struct RateLimitInfoWire {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookContact {
     pub id: String,
-    pub name: String,
+    /// The contact's name, or `None` when the contact has no name on file.
+    /// Never falls back to the phone number or email address.
+    #[serde(default)]
+    pub name: Option<String>,
     /// Active contact memories, newest first. Defaults empty for older replays.
     #[serde(default)]
     pub memories: Vec<String>,
@@ -376,7 +379,10 @@ pub struct WebhookMailContact {
     pub bucket: MailContactBucket,
     pub address: String,
     pub id: String,
-    pub name: String,
+    /// The contact's name, or `None` when the contact has no name on file.
+    /// Never falls back to the email address.
+    #[serde(default)]
+    pub name: Option<String>,
     /// Active contact memories, newest first. Defaults empty for older replays.
     #[serde(default)]
     pub memories: Vec<String>,

@@ -78,7 +78,11 @@ export type HangupReasonWire =
  */
 export interface WebhookContact {
   id: string;
-  name: string;
+  /**
+   * The contact's name, or null when the contact has no name on file.
+   * Never falls back to the phone number or email address.
+   */
+  name: string | null;
   /** Active memories, newest first; optional only for older replays. */
   memories?: string[];
 }
@@ -239,7 +243,11 @@ export interface WebhookMailContact {
   bucket: MailContactBucket;
   address: string;
   id: string;
-  name: string;
+  /**
+   * The contact's name, or null when the contact has no name on file.
+   * Never falls back to the email address.
+   */
+  name: string | null;
   /** Active memories, newest first; optional only for older replays. */
   memories?: string[];
 }

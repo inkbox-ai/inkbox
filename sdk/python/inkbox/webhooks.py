@@ -117,7 +117,9 @@ class WebhookContact(TypedDict):
     ``inkbox.contacts.get()`` to hydrate.
     """
     id: str
-    name: str
+    # None when the contact has no name on file. Never falls back to the
+    # phone number or email address.
+    name: str | None
     # Active memories, newest first; optional only for older replays.
     memories: NotRequired[list[str]]
 
@@ -280,7 +282,9 @@ class WebhookMailContact(TypedDict):
     bucket: MailContactBucket
     address: str
     id: str
-    name: str
+    # None when the contact has no name on file. Never falls back to the
+    # email address.
+    name: str | None
     # Active memories, newest first; optional only for older replays.
     memories: NotRequired[list[str]]
 
