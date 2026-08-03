@@ -1287,6 +1287,12 @@ first, in `memories`; use `match.get("memories", [])` for replayed
 payloads that predate contact memories. This is separate from the
 optional conversation `context`.
 
+`name` is `None` when the contact has no name on file -- a contact
+created automatically from an inbound message has an `id` and
+`memories` before anyone gives it a name. It never falls back to the
+phone number or email address, so guard it before addressing someone
+by name.
+
 On inbound `message.received`, `data["message"]` carries the plain-text
 `body`: the whole message when it fits the size cap, otherwise a prefix
 with `body_truncated: true` and `body_state: "truncated"` (else

@@ -1314,6 +1314,12 @@ Every resolved contact carries active memory text, newest first, in
 predate contact memories. This is separate from the optional
 conversation `context`.
 
+`name` is `null` when the contact has no name on file — a contact
+created automatically from an inbound message has an `id` and
+`memories` before anyone gives it a name. It never falls back to the
+phone number or email address, so guard it before addressing someone
+by name.
+
 Phone-text payloads carry several fields for group sends:
 
 - `text_message.recipients` — `null` on inbound, a one-element list
