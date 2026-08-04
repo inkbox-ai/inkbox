@@ -767,12 +767,14 @@ rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
 
-Context names are generated from the first task message and persisted. Either
-participant can rename the shared context. Names are available immediately and
-may be refined asynchronously; applications should display the returned value
-as-is. Context-level `caller` and `target` always identify the original opener
-and recipient. Nested task participants are authoritative for each task's
-direction, and multiple tasks can run concurrently in either direction.
+New contexts immediately expose the persisted name `New A2A Session`. That
+exact default may be replaced asynchronously with a short name based on the
+first task message. Either participant can rename the shared context at any
+time; a non-default name is not replaced by automatic naming.
+Applications should display the returned value as-is. Context-level `caller`
+and `target` always identify the original opener and recipient. Nested task
+participants are authoritative for each task's direction, and multiple tasks
+can run concurrently in either direction.
 
 The standard client reuses the existing `contextId` option. Supplying a context
 without a task starts a sibling task; supplying `taskId` continues that

@@ -392,8 +392,8 @@ inkbox a2a messages -i coordinator --direction outbound \
 inkbox a2a sent -i coordinator --worker researcher
 inkbox a2a sent-task <task-id> -i coordinator
 
-# List, inspect, and rename shared contexts. Names are generated from the
-# first task message and can be changed by either participant.
+# List, inspect, and rename shared contexts. New contexts start as
+# "New A2A Session"; that exact default may be named from the first message.
 inkbox a2a contexts -i coordinator --direction both
 inkbox a2a context <context-id> -i researcher
 inkbox a2a sent-contexts -i coordinator

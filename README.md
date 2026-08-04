@@ -161,8 +161,9 @@ An A2A context is a shared collaboration between its original two
 participants. Either participant can start another task in that context, and
 tasks in both directions may run concurrently. The context's top-level caller
 and target remain the original opener and recipient; each task's caller and
-target identify that task's direction. Context names are generated from the
-first task message, persisted, and can be renamed by either participant.
+target identify that task's direction. New contexts start as `New A2A Session`;
+that exact default may be replaced with a short name based on the first task
+message. Either participant can rename the persisted value at any time.
 
 ```python
 identity = inkbox.get_identity("coordinator")

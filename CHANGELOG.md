@@ -21,7 +21,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   retain independent participants, state, and message history.
 - Context-level caller and target remain the original opener and recipient;
   each nested task's participants are authoritative for that task's direction.
-- Context names are generated from the first task message and remain patchable.
+- New contexts immediately expose `New A2A Session`. That exact default may be
+  replaced with a name based on the first task message, and either participant
+  can rename the persisted value at any time.
 - Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.12; the
   CLI now depends on `@inkbox/sdk` `^0.5.12`.
 

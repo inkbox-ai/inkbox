@@ -326,12 +326,14 @@ for message in messages.items {
 }
 ```
 
-Context names are generated from the first task message and persisted. Either
-participant can rename the shared context. The context's top-level caller and
-target remain the original opener and recipient, while each nested task's
-participants identify that task's direction. Tasks in both directions may run
-concurrently. Rust exposes the persisted ledger and rename operation; it does
-not provide the outbound protocol client.
+New contexts immediately expose the persisted name `New A2A Session`. That
+exact default may be replaced asynchronously with a short name based on the
+first task message. Either participant can rename the shared context at any
+time; a non-default name is not replaced by automatic naming. The
+context's top-level caller and target remain the original opener and recipient,
+while each nested task's participants identify that task's direction. Tasks in
+both directions may run concurrently. Rust exposes the persisted ledger and
+rename operation; it does not provide the outbound protocol client.
 
 Task keyword filtering returns tasks containing a matching message. Message
 filtering returns individual matching messages with task, context, requester,

@@ -626,8 +626,10 @@ rather than relevance-ranked.
 
 Use `a2a_task` / `a2a_sent_task` for a task's current state and message history.
 
-Context names are generated from the first task message, persisted, and
-patchable by either participant. Context-level `caller` and `target` remain the
+New contexts start with the persisted name `New A2A Session`. That exact
+default may be replaced with a name based on the first task message. Either
+participant can rename a context at any time; automatic naming does not replace
+a non-default name. Context-level `caller` and `target` remain the
 original opener and recipient. Each nested task carries its own authoritative
 participants, and tasks in both directions can run concurrently.
 

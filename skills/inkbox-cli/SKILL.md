@@ -419,12 +419,13 @@ metadata, and is newest-first rather than relevance-ranked. Task detail exposes
 messages and current state. Contact-rule directions are `inbound`, `outbound`,
 and `both`; every request must pass both the requester outbound policy and the
 worker inbound policy.
-Context names are generated from the first task message and can be patched by
-either participant. Context-level requester and worker stay in original-open
-orientation; each task carries its own direction, and tasks may run
-concurrently in both directions. Cross-endpoint context reuse is supported
-between Inkbox identities; external A2A services may define different
-behavior.
+New contexts start with the persisted name `New A2A Session`. That exact
+default may be replaced with a name based on the first task message. Either
+participant can rename a context at any time; automatic naming does not replace
+a non-default name. Context-level requester and worker stay in
+original-open orientation; each task carries its own direction, and tasks may
+run concurrently in both directions. Cross-endpoint context reuse is supported
+between Inkbox identities; external A2A services may define different behavior.
 
 ## Vault
 
