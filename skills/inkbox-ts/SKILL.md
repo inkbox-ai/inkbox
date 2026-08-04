@@ -105,6 +105,9 @@ Mailboxes and tunnels are not separately linkable — they are 1:1 with their ow
 
 ## Identity Visibility
 
+Deprecated: use the A2A organization directory and contact rules for agent
+discovery. These methods remain available for compatibility.
+
 Controls which other agent identities can see an identity in API responses. Humans and admins always see every identity.
 
 ```typescript
@@ -556,6 +559,15 @@ An identity can inspect work it received, work it requested, or both. Omit
 outbound-only alias.
 
 ```ts
+const directory = await inkbox.a2a.publicDirectory({ q: "research", limit: 25 });
+const orgDirectory = await inkbox.a2a.organizationDirectory({ q: "support" });
+for (const item of directory.items) {
+  console.log(item.card.name, item.cardUrl, item.visibility);
+}
+
+await identity.a2aSetPubliclyDiscoverable(true); // admin API key required
+await identity.a2aSetAllowPublicEgress(true);
+
 const page = await identity.a2aTasks({
   direction: "both",
   requesterHandle: "coordinator",
@@ -599,9 +611,11 @@ For a multi-turn worker flow, reply with `intent: "ask_caller"` to request
 input; the caller continues the same task through the standard A2A client, and
 the worker later replies with `intent: "complete"` or `intent: "fail"`.
 
-Receiver enablement and advertised skills may be changed with the identity's
-agent-scoped key. Admission-policy mutations require an admin API key:
-`a2aSetFilterMode`, `a2aAddContactRule`, `a2aUpdateContactRule`, and
+Directory methods accept `q`, `cursor`, and `limit`; async iterator variants
+follow all pages. Receiver enablement, public egress, and advertised skills may
+be changed with the identity's agent-scoped key. Public discoverability and
+other admission-policy mutations require an admin API key:
+`a2aSetPubliclyDiscoverable`, `a2aSetFilterMode`, `a2aAddContactRule`, `a2aUpdateContactRule`, and
 `a2aDeleteContactRule`. Use `a2aResetSkills()` to restore the default Agent
 Card skills. Contact-rule directions are `inbound`, `outbound`, or `both`.
 The requester must allow the worker through its outbound policy, and the

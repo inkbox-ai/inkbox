@@ -388,6 +388,7 @@ class AgentIdentity:
     def list_access(self) -> list[IdentityAccess]:
         """List who can see this identity.
 
+        Deprecated: use the A2A organization directory and contact rules.
         See :meth:`IdentitiesResource.list_access`.
         """
         return self._inkbox._ids_resource.list_access(self.agent_handle)
@@ -396,6 +397,8 @@ class AgentIdentity:
         self, viewer_identity_id: UUID | str | None
     ) -> IdentityAccess:
         """Grant visibility on this identity.
+
+        Deprecated: use A2A settings and contact rules for discovery.
 
         Args:
             viewer_identity_id: UUID of the viewer identity to grant, or
@@ -408,6 +411,8 @@ class AgentIdentity:
 
     def revoke_access(self, viewer_identity_id: UUID | str) -> None:
         """Revoke one viewer's visibility on this identity.
+
+        Deprecated: use A2A settings and contact rules for discovery.
 
         Args:
             viewer_identity_id: UUID of the viewer identity to drop
@@ -1454,6 +1459,20 @@ class AgentIdentity:
     def a2a_settings(self) -> A2ASettings:
         """Return this identity's A2A channel settings."""
         return self._inkbox._a2a.settings(self.agent_handle)
+
+    def a2a_set_publicly_discoverable(self, enabled: bool) -> A2ASettings:
+        """Set public directory visibility (admin-only)."""
+        return self._inkbox._a2a.update_settings(
+            self.agent_handle,
+            publicly_discoverable=enabled,
+        )
+
+    def a2a_set_allow_public_egress(self, enabled: bool) -> A2ASettings:
+        """Allow or deny A2A calls to publicly discoverable agents."""
+        return self._inkbox._a2a.update_settings(
+            self.agent_handle,
+            allow_public_egress=enabled,
+        )
 
     def a2a_set_skills(self, skills: list[A2ASkill]) -> A2ASettings:
         """Replace the skills advertised on this identity's Agent Card."""

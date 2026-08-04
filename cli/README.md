@@ -117,7 +117,11 @@ inkbox identity access grant-everyone <target-handle>         # Make visible to 
 inkbox identity access revoke <target-handle> <viewer-handle> # Revoke a viewer identity's visibility
 ```
 
-`identity access` controls which other agent identities can see an identity in API responses (humans and admins always see it). Viewer identities are passed as handles and resolved to UUIDs automatically. This is unrelated to `identity revoke-access`, which manages vault-secret access.
+`identity access` is deprecated in favor of the A2A organization directory and
+contact rules, but remains available for compatibility. It controls which other
+agent identities can see an identity in API responses. Viewer identities are
+passed as handles and resolved to UUIDs automatically. This is unrelated to
+`identity revoke-access`, which manages vault-secret access.
 
 ### email
 
@@ -365,8 +369,15 @@ changes the status to `ready`.
 ```bash
 # Receiver setup and advertised capabilities
 inkbox a2a enable -i researcher
+inkbox a2a settings -i researcher
+inkbox a2a publicly-discoverable true -i researcher
+inkbox a2a public-egress true -i researcher
 inkbox a2a card -i researcher
 inkbox a2a skills set -i researcher --file skills.json
+
+# Search enabled agents. Organization scope is the default.
+inkbox a2a directory --query support
+inkbox a2a directory --public --query research --limit 25
 
 # Bilateral admission for coordinator -> researcher calls
 inkbox a2a rules add -i coordinator --handle researcher \

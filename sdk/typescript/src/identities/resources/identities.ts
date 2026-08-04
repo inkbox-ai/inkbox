@@ -218,6 +218,7 @@ export class IdentitiesResource {
    * Requires an admin-scoped API key; agent-scoped keys get a 403.
    *
    * @param agentHandle - Handle of the target identity.
+   * @deprecated Use the A2A organization directory and contact rules for discovery.
    */
   async listAccess(agentHandle: string): Promise<IdentityAccess[]> {
     const data = await this.http.get<RawIdentityAccess[]>(`/${agentHandle}/access`);
@@ -238,6 +239,7 @@ export class IdentitiesResource {
    * @throws {InkboxAPIError} 403 if the API key is not admin-scoped; 409
    *   if the viewer is already granted; 404 if the viewer identity does
    *   not exist; 422 if the viewer is the target itself.
+   * @deprecated Use A2A settings and contact rules for discovery.
    */
   async grantAccess(
     agentHandle: string,
@@ -266,6 +268,7 @@ export class IdentitiesResource {
    *   is the viewer identity's UUID, not an access-row id.
    * @throws {InkboxAPIError} 403 if the API key is not admin-scoped; 404
    *   when there is nothing to drop.
+   * @deprecated Use A2A settings and contact rules for discovery.
    */
   async revokeAccess(agentHandle: string, viewerIdentityId: string): Promise<void> {
     await this.http.delete(`/${agentHandle}/access/${viewerIdentityId}`);

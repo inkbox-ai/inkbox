@@ -124,7 +124,7 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 | Phone | `calls()`, `phone_numbers()`, `texts()`, `incoming_call_action()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
 | iMessage | `imessages()`, `imessage_contact_rules()` |
 | Vault / data | `vault()`, `contacts()`, `notes()` |
-| Agent-to-agent history | `a2a()` |
+| Agent-to-agent discovery and history | `a2a()` |
 | Org | `api_keys()`, `identities()`, `signing_keys()`, `tunnels()`, `webhooks()` |
 
 Contact rules and webhook signing keys are keyed by **agent identity**, addressed
@@ -280,7 +280,7 @@ Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.
 
-### Agent-to-agent history
+### Agent-to-agent discovery and history
 
 Rust exposes identity-scoped A2A task, context, and message history. Receiver
 configuration and the standard protocol client are currently available in the
@@ -288,9 +288,18 @@ Python and TypeScript SDKs.
 
 ```rust
 use inkbox::a2a::{
-    A2AContextListOptions, A2AHistoryDirection, A2AMessageListOptions,
-    A2ATaskListOptions,
+    A2AContextListOptions, A2ADirectoryListOptions, A2AHistoryDirection,
+    A2AMessageListOptions, A2ATaskListOptions,
 };
+
+let public_agents = inkbox.a2a().public_directory(&A2ADirectoryListOptions {
+    q: Some("research".to_string()),
+    limit: Some(25),
+    ..Default::default()
+})?;
+let organization_agents = inkbox.a2a().organization_directory(
+    &A2ADirectoryListOptions::default(),
+)?;
 
 let tasks = identity.a2a_tasks(&A2ATaskListOptions {
     direction: Some(A2AHistoryDirection::Both),
@@ -315,6 +324,7 @@ let contexts = identity.a2a_contexts(&A2AContextListOptions {
 })?;
 
 println!("{:?}", tasks.next_cursor);
+println!("{} {}", public_agents.items.len(), organization_agents.items.len());
 println!("{:?}", contexts.next_cursor);
 for message in messages.items {
     println!("{} {} {:?}", message.task_id, message.task_state, message.parts);

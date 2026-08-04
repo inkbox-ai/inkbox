@@ -106,6 +106,9 @@ Mailboxes and tunnels are not separately linkable — they are 1:1 with their ow
 
 ## Identity Visibility
 
+Deprecated: use the A2A organization directory and contact rules for agent
+discovery. These methods remain available for compatibility.
+
 Controls which other agent identities can see an identity in API responses. Humans and admins always see every identity.
 
 ```python
@@ -571,6 +574,14 @@ An identity can inspect work it received, work it requested, or both. Omit
 outbound-only alias.
 
 ```python
+page = inkbox.a2a.public_directory(q="research", limit=25)
+org_page = inkbox.a2a.organization_directory(q="support")
+for item in page.items:
+    print(item.card.name, item.card_url, item.visibility)
+
+identity.a2a_set_publicly_discoverable(True)  # admin API key required
+identity.a2a_set_allow_public_egress(True)
+
 page = identity.a2a_tasks(
     direction="both",
     requester_handle="coordinator",
@@ -622,9 +633,11 @@ For a multi-turn worker flow, reply with `intent="ask_caller"` to request input;
 the caller continues the same task through the standard A2A client, and the
 worker later replies with `intent="complete"` or `intent="fail"`.
 
-Receiver enablement and advertised skills may be changed with the identity's
-agent-scoped key. Admission-policy mutations require an admin API key:
-`a2a_set_filter_mode`, `a2a_add_contact_rule`, `a2a_update_contact_rule`, and
+Directory methods accept `q`, `cursor`, and `limit`; iterator variants follow
+all pages. Receiver enablement, public egress, and advertised skills may be
+changed with the identity's agent-scoped key. Public discoverability and other
+admission-policy mutations require an admin API key:
+`a2a_set_publicly_discoverable`, `a2a_set_filter_mode`, `a2a_add_contact_rule`, `a2a_update_contact_rule`, and
 `a2a_delete_contact_rule`. Use `a2a_reset_skills()` to restore the default
 Agent Card skills. Contact-rule directions are `inbound`, `outbound`, or
 `both`. The requester must allow the worker through its outbound policy, and

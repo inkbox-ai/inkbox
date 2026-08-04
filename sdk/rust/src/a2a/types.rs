@@ -82,6 +82,33 @@ pub struct A2AContextListOptions {
     pub limit: Option<u32>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct A2ADirectoryListOptions {
+    pub q: Option<String>,
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum A2ADirectoryVisibility {
+    Organization,
+    Public,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct A2ADirectoryItem {
+    pub card_url: String,
+    pub card: Value,
+    pub visibility: A2ADirectoryVisibility,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct A2ADirectoryPage {
+    pub items: Vec<A2ADirectoryItem>,
+    pub next_cursor: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2ACaller {
     pub identity_id: Uuid,

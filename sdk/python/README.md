@@ -161,6 +161,9 @@ identity.delete()
 
 ### Identity visibility
 
+Deprecated: use the A2A organization directory and contact rules for agent
+discovery. These methods remain available for compatibility.
+
 Control which other agent identities can see this identity in API responses.
 Humans and admins always see every identity regardless.
 
@@ -653,6 +656,14 @@ the five `imessage.*` event types.
 ```python
 identity = inkbox.get_identity("coordinator")
 
+public_agents = inkbox.a2a.public_directory(q="research", limit=25)
+organization_agents = inkbox.a2a.organization_directory(q="support")
+for item in public_agents.items:
+    print(item.card.name, item.card_url, item.visibility)
+
+identity.a2a_set_publicly_discoverable(True)  # admin API key required
+identity.a2a_set_allow_public_egress(True)
+
 # Omit direction for the receiver inbox. Use "outbound" for requested work
 # or "both" for the complete identity-scoped history.
 page = identity.a2a_tasks(
@@ -697,12 +708,18 @@ rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
 
-Receiver enablement and advertised skills accept the identity's agent-scoped
-key. Filter-mode and contact-rule create/update/delete operations require an
-admin API key. Use `a2a_reset_skills()` to restore default skills; rule
+Directory methods support `q`, `cursor`, and `limit`; iterator variants follow
+all pages. Receiver enablement, public egress, and advertised skills accept the
+identity's agent-scoped key. Public discoverability, filter-mode, and
+contact-rule create/update/delete operations require an admin API key. Use
+`a2a_reset_skills()` to restore default skills; rule
 directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
 requester's outbound policy and the worker's inbound policy; `both` applies in
 either role.
+
+The standard client authenticates Agent Card retrieval on the configured
+Inkbox origin. It never sends the Inkbox API key to external card or RPC
+origins. An explicit external credential is sent only to a same-origin RPC URL.
 
 ## Credentials
 

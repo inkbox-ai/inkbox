@@ -217,6 +217,7 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
  * `viewerIdentityId === null` is the wildcard sentinel — every active
  * identity in the org can see the target. Otherwise it is a per-viewer
  * grant naming exactly one viewer identity.
+ * @deprecated Use A2A directory types for agent discovery.
  */
 export interface IdentityAccess {
   id: string;

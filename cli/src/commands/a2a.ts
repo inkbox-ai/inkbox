@@ -45,6 +45,7 @@ const MESSAGE_COLUMNS = [
   "createdAt",
 ];
 const RULE_COLUMNS = ["id", "action", "matchTarget", "direction", "status"];
+const DIRECTORY_COLUMNS = ["name", "cardUrl", "visibility", "description"];
 
 async function identityFor(command: Command, handle: string) {
   return createClient(getGlobalOpts(command)).getIdentity(handle);
@@ -105,6 +106,90 @@ export function registerA2ACommands(program: Command): void {
     ) {
       const result = await (await identityFor(this, options.identity)).a2aDisable();
       output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("settings")
+    .description("Show an identity's A2A settings")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { identity: string },
+    ) {
+      const result = await (await identityFor(this, options.identity)).a2aSettings();
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("publicly-discoverable <state>")
+    .description("Set public directory visibility (admin API key required)")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      state: string,
+      options: { identity: string },
+    ) {
+      if (!["true", "false"].includes(state)) {
+        throw new TypeError("state must be 'true' or 'false'");
+      }
+      const result = await (
+        await identityFor(this, options.identity)
+      ).a2aSetPubliclyDiscoverable(state === "true");
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("public-egress <state>")
+    .description("Allow or deny calls to publicly discoverable agents")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      state: string,
+      options: { identity: string },
+    ) {
+      if (!["true", "false"].includes(state)) {
+        throw new TypeError("state must be 'true' or 'false'");
+      }
+      const result = await (
+        await identityFor(this, options.identity)
+      ).a2aSetAllowPublicEgress(state === "true");
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("directory")
+    .description("Search the organization or public A2A directory")
+    .option("--public", "Search the public directory")
+    .option("-q, --query <query>", "Search handles, descriptions, and skills")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Results per page (1-100)", "50")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: {
+        public?: boolean;
+        query?: string;
+        cursor?: string;
+        limit: string;
+      },
+    ) {
+      const client = createClient(getGlobalOpts(this));
+      const result = options.public
+        ? await client.a2a.publicDirectory({
+          q: options.query,
+          cursor: options.cursor,
+          limit: positiveInt(options.limit, "--limit"),
+        })
+        : await client.a2a.organizationDirectory({
+          q: options.query,
+          cursor: options.cursor,
+          limit: positiveInt(options.limit, "--limit"),
+        });
+      outputCursorPage(
+        result,
+        this,
+        DIRECTORY_COLUMNS,
+        result.items.map((item) => ({
+          ...item,
+          name: item.card.name,
+          description: item.card.description ?? "",
+        })),
+      );
     }));
 
   a2a.command("card")

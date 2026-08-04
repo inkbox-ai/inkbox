@@ -83,7 +83,13 @@ class A2AClient:
         credential: str | None = None,
     ) -> A2AResolvedTarget:
         canonical_card_url = _canonical_url(card_url)
-        response = self._client.get(canonical_card_url)
+        card_origin = _origin(canonical_card_url)
+        headers = (
+            {"X-API-Key": self._api_key}
+            if card_origin == self._platform_origin
+            else None
+        )
+        response = self._client.get(canonical_card_url, headers=headers)
         if 300 <= response.status_code < 400:
             raise InkboxError("A2A Agent Card redirects are refused")
         response.raise_for_status()
@@ -101,7 +107,6 @@ class A2AClient:
         if selected is None:
             raise ValueError("Agent Card does not advertise A2A 1.0 JSON-RPC")
         rpc_url = _canonical_url(selected["url"])
-        card_origin = _origin(canonical_card_url)
         rpc_origin = _origin(rpc_url)
         if credential is not None and rpc_origin != card_origin:
             raise ValueError(

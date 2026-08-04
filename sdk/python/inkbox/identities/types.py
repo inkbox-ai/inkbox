@@ -358,6 +358,8 @@ class IdentityAccess:
     """
     A single identity-visibility grant on a target identity.
 
+    Deprecated: use A2A directory types for agent discovery.
+
     ``viewer_identity_id=None`` is the wildcard sentinel — every active
     identity in the org can see the target. Otherwise it is a per-viewer
     grant naming exactly one viewer identity.

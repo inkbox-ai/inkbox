@@ -249,6 +249,7 @@ impl Inkbox {
         let domains_http = mk(&format!("{api_root}/domains"))?;
         let root_api_http = mk(&api_base)?;
         let api_http = mk(&api_root)?;
+        let public_http = mk(trimmed)?;
 
         let vault = VaultResource::new(vault_http, root_api_http.clone());
         if let Some(key) = vault_key.as_deref() {
@@ -294,7 +295,7 @@ impl Inkbox {
             api_keys: ApiKeysResource::new(api_http.clone()),
             identities: IdentitiesResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
-            a2a: A2AResource::new(api_http.clone()),
+            a2a: A2AResource::new(api_http.clone(), public_http.clone()),
 
             root_api_http: root_api_http.clone(),
             api_key: api_key.clone(),

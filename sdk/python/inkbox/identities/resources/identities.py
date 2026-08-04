@@ -238,6 +238,8 @@ class IdentitiesResource:
     def list_access(self, agent_handle: str) -> list[IdentityAccess]:
         """List who can see this identity (agent visibility).
 
+        Deprecated: use the A2A organization directory and contact rules.
+
         Returns either a single wildcard row
         (``viewer_identity_id=None`` — every active identity in the org
         sees it) or explicit per-viewer rows. An empty list means no
@@ -255,6 +257,8 @@ class IdentitiesResource:
         viewer_identity_id: UUID | str | None,
     ) -> IdentityAccess:
         """Grant visibility on this identity.
+
+        Deprecated: use A2A settings and contact rules for discovery.
 
         Args:
             agent_handle: Handle of the target identity.
@@ -291,6 +295,8 @@ class IdentitiesResource:
         viewer_identity_id: UUID | str,
     ) -> None:
         """Revoke one viewer's visibility on this identity.
+
+        Deprecated: use A2A settings and contact rules for discovery.
 
         Args:
             agent_handle: Handle of the target identity.

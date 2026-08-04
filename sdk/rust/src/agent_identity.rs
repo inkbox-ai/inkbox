@@ -275,6 +275,8 @@ impl AgentIdentity {
 
     /// List who can see this identity. See
     /// [`IdentitiesResource::list_access`](crate::identities::IdentitiesResource::list_access).
+    #[allow(deprecated)]
+    #[deprecated(note = "Use the A2A organization directory and contact rules for discovery.")]
     pub fn list_access(&self) -> Result<Vec<IdentityAccess>> {
         self.inkbox.identities().list_access(&self.agent_handle())
     }
@@ -285,6 +287,8 @@ impl AgentIdentity {
     /// * `viewer_identity_id` - UUID of the viewer identity to grant, or `None`
     ///   to reset this identity to the org-wide wildcard (every active identity
     ///   in the org sees it).
+    #[allow(deprecated)]
+    #[deprecated(note = "Use A2A settings and contact rules for discovery.")]
     pub fn grant_access(&self, viewer_identity_id: Option<&str>) -> Result<IdentityAccess> {
         self.inkbox
             .identities()
@@ -296,6 +300,8 @@ impl AgentIdentity {
     /// # Arguments
     /// * `viewer_identity_id` - UUID of the viewer identity to drop (the viewer
     ///   identity's UUID, not an access-row id).
+    #[allow(deprecated)]
+    #[deprecated(note = "Use A2A settings and contact rules for discovery.")]
     pub fn revoke_access(&self, viewer_identity_id: &str) -> Result<()> {
         self.inkbox
             .identities()

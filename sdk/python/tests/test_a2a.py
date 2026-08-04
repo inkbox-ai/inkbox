@@ -24,6 +24,8 @@ def test_settings_parse_participant_task_counts() -> None:
     http = MagicMock()
     http.get.return_value = {
         "enabled": True,
+        "publicly_discoverable": True,
+        "allow_public_egress": False,
         "filter_mode": "whitelist",
         "skills": None,
         "card_url": "https://example.test/a2a/helper/card",
@@ -37,7 +39,74 @@ def test_settings_parse_participant_task_counts() -> None:
 
     assert settings.inbound_task_count == 3
     assert settings.outbound_task_count == 5
+    assert settings.publicly_discoverable is True
+    assert settings.allow_public_egress is False
     http.get.assert_called_once_with("/identities/helper/a2a/settings")
+
+
+def test_settings_update_sends_discovery_controls() -> None:
+    http = MagicMock()
+    http.put.return_value = {
+        "enabled": True,
+        "publicly_discoverable": True,
+        "allow_public_egress": False,
+        "filter_mode": "whitelist",
+        "skills": None,
+        "card_url": "https://example.test/a2a/helper/card",
+        "inbound_task_count": 0,
+        "outbound_task_count": 0,
+        "updated_at": None,
+    }
+    resource = A2AResource(http)
+
+    settings = resource.update_settings(
+        "helper",
+        publicly_discoverable=True,
+        allow_public_egress=False,
+    )
+
+    assert settings.publicly_discoverable is True
+    assert settings.allow_public_egress is False
+    http.put.assert_called_once_with(
+        "/identities/helper/a2a/settings",
+        json={
+            "publicly_discoverable": True,
+            "allow_public_egress": False,
+        },
+    )
+
+
+def test_directory_paths_search_and_pagination() -> None:
+    http = MagicMock()
+    public_http = MagicMock()
+    response = {
+        "items": [{
+            "card_url": "https://inkbox.ai/a2a/helper/card",
+            "card": {"name": "@helper", "supportedInterfaces": []},
+            "visibility": "public",
+        }],
+        "next_cursor": "next-page",
+    }
+    public_http.get.return_value = response
+    http.get.return_value = response
+    resource = A2AResource(http, public_http)
+
+    public_page = resource.public_directory(q="research", cursor="page", limit=20)
+    organization_page = resource.organization_directory(
+        q="research", cursor="page", limit=20
+    )
+
+    assert public_page.items[0].card.name == "@helper"
+    assert public_page.next_cursor == "next-page"
+    assert organization_page.items[0].visibility.value == "public"
+    public_http.get.assert_called_once_with(
+        "/a2a/directory",
+        params={"q": "research", "cursor": "page", "limit": 20},
+    )
+    http.get.assert_called_once_with(
+        "/identities/a2a/directory",
+        params={"q": "research", "cursor": "page", "limit": 20},
+    )
 
 
 def test_inbox_tasks_use_exact_path_and_query() -> None:
@@ -471,7 +540,7 @@ def test_inbox_reply_supports_progress_updates() -> None:
     )
 
 
-def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
+def test_a2a_client_authenticates_platform_card_and_pins_rpc_key() -> None:
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -521,7 +590,7 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
         status_timestamp_after="2026-07-25T12:30:00Z",
     )
 
-    assert "X-API-Key" not in requests[0].headers
+    assert requests[0].headers["X-API-Key"] == "ApiKey_secret"
     assert requests[1].headers["X-API-Key"] == "ApiKey_secret"
     assert requests[1].headers["A2A-Version"] == "1.0"
     body = json.loads(requests[1].content)
@@ -624,6 +693,77 @@ def test_external_card_never_receives_inkbox_key() -> None:
     client.get_task(target, "task-1")
 
     assert all("X-API-Key" not in request.headers for request in requests)
+    client.close()
+
+
+def test_external_credential_is_rpc_only_and_same_origin() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "name": "external",
+                    "supportedInterfaces": [{
+                        "url": "https://agent.example/rpc",
+                        "protocolBinding": "JSONRPC",
+                        "protocolVersion": "1.0",
+                    }],
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "id": "task-1",
+                    "contextId": "context-1",
+                    "status": {"state": "TASK_STATE_SUBMITTED"},
+                },
+            },
+        )
+
+    client = A2AClient(api_key="ApiKey_secret", platform_base_url="https://inkbox.ai")
+    client._client.close()
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+    target = client.fetch_card(
+        "https://agent.example/card",
+        credential="external-secret",
+    )
+    client.get_task(target, "task-1")
+
+    assert "X-API-Key" not in requests[0].headers
+    assert requests[1].headers["X-API-Key"] == "external-secret"
+    client.close()
+
+
+def test_external_credential_rejects_cross_origin_rpc() -> None:
+    client = A2AClient(api_key="ApiKey_secret", platform_base_url="https://inkbox.ai")
+    client._client.close()
+    client._client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={
+                    "name": "external",
+                    "supportedInterfaces": [{
+                        "url": "https://rpc.example/rpc",
+                        "protocolBinding": "JSONRPC",
+                        "protocolVersion": "1.0",
+                    }],
+                },
+            )
+        )
+    )
+
+    with pytest.raises(ValueError, match="matching card and RPC origins"):
+        client.fetch_card(
+            "https://agent.example/card",
+            credential="external-secret",
+        )
     client.close()
 
 

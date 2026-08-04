@@ -133,6 +133,9 @@ Notes:
 
 ### Identity Visibility
 
+Deprecated: use the A2A organization directory and contact rules for agent
+discovery. These commands remain available for compatibility.
+
 Controls which other agent identities can see an identity in API responses. Humans and admins always see every identity.
 
 ```bash
@@ -367,6 +370,15 @@ inkbox sms-opt-in opt-out +15551234567
 ## Agent-to-Agent (A2A)
 
 ```bash
+# Organization directory by default; add --public for public discovery.
+inkbox a2a directory --query support
+inkbox a2a directory --public --query research --limit 25
+
+# Inspect and change discovery settings.
+inkbox a2a settings -i researcher
+inkbox a2a publicly-discoverable true -i researcher
+inkbox a2a public-egress true -i researcher
+
 # Bilateral admission: the requester allows outbound work to the worker, and
 # the worker independently allows inbound work from the requester.
 inkbox a2a rules add -i coordinator --handle researcher \

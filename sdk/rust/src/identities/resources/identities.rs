@@ -346,6 +346,7 @@ impl IdentitiesResource {
     /// always see it).
     ///
     /// Requires an admin-scoped API key; agent-scoped keys get a 403.
+    #[deprecated(note = "Use the A2A organization directory and contact rules for discovery.")]
     pub fn list_access(&self, agent_handle: &str) -> Result<Vec<IdentityAccess>> {
         let data = self
             .http
@@ -365,6 +366,7 @@ impl IdentitiesResource {
     /// / update): this route's 409s are not handle collisions, and the wrapper
     /// would downgrade the `RedundantContactAccessGrant` error the transport
     /// already raised.
+    #[deprecated(note = "Use A2A settings and contact rules for discovery.")]
     pub fn grant_access(
         &self,
         agent_handle: &str,
@@ -387,6 +389,7 @@ impl IdentitiesResource {
     /// * `agent_handle` - Handle of the target identity.
     /// * `viewer_identity_id` - UUID of the viewer identity to drop. This is the
     ///   viewer identity's UUID, not an access-row id.
+    #[deprecated(note = "Use A2A settings and contact rules for discovery.")]
     pub fn revoke_access(&self, agent_handle: &str, viewer_identity_id: &str) -> Result<()> {
         self.http
             .delete(&format!("/{agent_handle}/access/{viewer_identity_id}"))

@@ -330,6 +330,7 @@ export class AgentIdentity {
    * List who can see this identity.
    *
    * See {@link IdentitiesResource.listAccess}.
+   * @deprecated Use the A2A organization directory and contact rules for discovery.
    */
   async listAccess(): Promise<IdentityAccess[]> {
     return this._inkbox._idsResource.listAccess(this.agentHandle);
@@ -341,6 +342,7 @@ export class AgentIdentity {
    * @param viewerIdentityId - UUID of the viewer identity to grant, or
    *   `null` to reset this identity to the org-wide wildcard (every
    *   active identity in the org sees it).
+   * @deprecated Use A2A settings and contact rules for discovery.
    */
   async grantAccess(viewerIdentityId: string | null): Promise<IdentityAccess> {
     return this._inkbox._idsResource.grantAccess(this.agentHandle, viewerIdentityId);
@@ -351,6 +353,7 @@ export class AgentIdentity {
    *
    * @param viewerIdentityId - UUID of the viewer identity to drop
    *   (the viewer identity's UUID, not an access-row id).
+   * @deprecated Use A2A settings and contact rules for discovery.
    */
   async revokeAccess(viewerIdentityId: string): Promise<void> {
     await this._inkbox._idsResource.revokeAccess(this.agentHandle, viewerIdentityId);
@@ -1258,6 +1261,22 @@ export class AgentIdentity {
   /** Return this identity's A2A channel settings. */
   a2aSettings(): Promise<A2ASettings> {
     return this._inkbox._a2a.settings(this.agentHandle);
+  }
+
+  /** Set public directory visibility (admin-only). */
+  a2aSetPubliclyDiscoverable(enabled: boolean): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(
+      this.agentHandle,
+      { publicly_discoverable: enabled },
+    );
+  }
+
+  /** Allow or deny A2A calls to publicly discoverable agents. */
+  a2aSetAllowPublicEgress(enabled: boolean): Promise<A2ASettings> {
+    return this._inkbox._a2a.updateSettings(
+      this.agentHandle,
+      { allow_public_egress: enabled },
+    );
   }
 
   /** Replace the skills advertised on this identity's Agent Card. */

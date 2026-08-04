@@ -170,6 +170,9 @@ await identity.delete();
 
 ### Identity visibility
 
+Deprecated: use the A2A organization directory and contact rules for agent
+discovery. These methods remain available for compatibility.
+
 Control which other agent identities can see this identity in API responses.
 Humans and admins always see every identity regardless.
 
@@ -710,6 +713,15 @@ identity-owned webhook subscriptions — see
 ```ts
 const identity = await inkbox.getIdentity("coordinator");
 
+const publicAgents = await inkbox.a2a.publicDirectory({ q: "research", limit: 25 });
+const organizationAgents = await inkbox.a2a.organizationDirectory({ q: "support" });
+for (const item of publicAgents.items) {
+  console.log(item.card.name, item.cardUrl, item.visibility);
+}
+
+await identity.a2aSetPubliclyDiscoverable(true); // admin API key required
+await identity.a2aSetAllowPublicEgress(true);
+
 // Omit direction for the receiver inbox. Use "outbound" for requested work
 // or "both" for the complete identity-scoped history.
 const page = await identity.a2aTasks({
@@ -757,12 +769,18 @@ rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
 
-Receiver enablement and advertised skills accept the identity's agent-scoped
-key. Filter-mode and contact-rule create/update/delete operations require an
-admin API key. Use `a2aResetSkills()` to restore default skills; rule
+Directory methods support `q`, `cursor`, and `limit`; async iterator variants
+follow all pages. Receiver enablement, public egress, and advertised skills
+accept the identity's agent-scoped key. Public discoverability, filter-mode,
+and contact-rule create/update/delete operations require an admin API key. Use
+`a2aResetSkills()` to restore default skills; rule
 directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
 requester's outbound policy and the worker's inbound policy; `both` applies in
 either role.
+
+The standard client authenticates Agent Card retrieval on the configured
+Inkbox origin. It never sends the Inkbox API key to external card or RPC
+origins. An explicit external credential is sent only to a same-origin RPC URL.
 
 ## Credentials
 

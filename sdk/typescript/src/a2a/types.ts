@@ -43,6 +43,8 @@ export interface A2ASkill {
 
 export interface A2ASettings {
   enabled: boolean;
+  publiclyDiscoverable: boolean;
+  allowPublicEgress: boolean;
   filterMode: string;
   skills: A2ASkill[] | null;
   cardUrl: string;
@@ -60,6 +62,25 @@ export interface A2AContactRule {
   status: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export type A2ADirectoryVisibility = "organization" | "public" | (string & {});
+
+export interface A2ADirectoryItem {
+  cardUrl: string;
+  card: A2ACard;
+  visibility: A2ADirectoryVisibility;
+}
+
+export interface A2ADirectoryPage {
+  items: A2ADirectoryItem[];
+  nextCursor: string | null;
+}
+
+export interface A2ADirectoryListOptions {
+  q?: string;
+  cursor?: string;
+  limit?: number;
 }
 
 export interface A2ACaller {
