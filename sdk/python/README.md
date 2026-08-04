@@ -687,6 +687,16 @@ for message in identity.iter_a2a_messages(
 
 # The outbound alias is convenient when only requested work is needed.
 sent = identity.a2a_sent_tasks(worker_handle="researcher")
+
+# Context caller/target stays in original-open orientation. Each nested task
+# carries its own caller and target, so both directions can run concurrently.
+for context in identity.a2a_contexts(direction="both").items:
+    print(context.name, context.id)
+
+renamed = identity.a2a_update_context(
+    "context-uuid",
+    name="Quarterly Research Review",
+)
 ```
 
 Task keyword filtering returns tasks containing a matching message. Message
@@ -696,6 +706,30 @@ values from `text` and `data` parts, excludes metadata, and is newest-first
 rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
+
+Context names are generated from the first task message and persisted. Either
+participant can rename the shared context. Names are available immediately and
+may be refined asynchronously; applications should display the returned value
+as-is. Context-level `caller` and `target` always identify the original opener
+and recipient. Nested task participants are authoritative for each task's
+direction, and multiple tasks can run concurrently in either direction.
+
+The standard client reuses the existing `context_id` option. Supplying a
+context without a task starts a sibling task; supplying `task_id` continues
+that specific task:
+
+```python
+client = identity.a2a_client()
+target = client.fetch_card("https://example.test/a2a/researcher/card")
+result = client.send(
+    target,
+    text="Review the updated findings",
+    context_id="context-uuid",
+)
+```
+
+Cross-endpoint context reuse is supported between Inkbox identities. External
+A2A services may define different context reuse behavior.
 
 Receiver enablement and advertised skills accept the identity's agent-scoped
 key. Filter-mode and contact-rule create/update/delete operations require an

@@ -78,6 +78,7 @@ import { A2AClient } from "./a2a/client.js";
 import type {
   A2AContactRule,
   A2AContext,
+  A2AContextListOptions,
   A2AContextPage,
   A2AHistoryMessage,
   A2AHistoryMessagePage,
@@ -91,6 +92,7 @@ import type {
   A2ATaskListOptions,
   A2ATaskPage,
   A2ASentTaskListOptions,
+  A2ASentContextListOptions,
 } from "./a2a/types.js";
 
 export class AgentIdentity {
@@ -1344,28 +1346,35 @@ export class AgentIdentity {
   }
 
   /** List receiver-side A2A contexts. */
-  a2aContexts(options: {
-    direction?: "inbound" | "outbound" | "both";
-    cursor?: string;
-    limit?: number;
-  } = {}): Promise<A2AContextPage> {
+  a2aContexts(options: A2AContextListOptions = {}): Promise<A2AContextPage> {
     return this._inkbox._a2a.contexts(this.agentHandle, options);
   }
 
-  /** Get a receiver-side A2A context and its tasks. */
+  /** Get a context this identity originally received and its tasks. */
   a2aContext(contextId: string): Promise<A2AContext> {
     return this._inkbox._a2a.context(this.agentHandle, contextId);
   }
 
+  /** Rename a context shared with this identity. */
+  a2aUpdateContext(
+    contextId: string,
+    options: { name: string },
+  ): Promise<A2AContext> {
+    return this._inkbox._a2a.updateContext(
+      this.agentHandle,
+      contextId,
+      options,
+    );
+  }
+
   /** List A2A contexts started by this identity. */
-  a2aSentContexts(options: {
-    cursor?: string;
-    limit?: number;
-  } = {}): Promise<A2AContextPage> {
+  a2aSentContexts(
+    options: A2ASentContextListOptions = {},
+  ): Promise<A2AContextPage> {
     return this._inkbox._a2a.sentContexts(this.agentHandle, options);
   }
 
-  /** Get an A2A context started by this identity. */
+  /** Get a context originally opened by this identity. */
   a2aSentContext(contextId: string): Promise<A2AContext> {
     return this._inkbox._a2a.sentContext(this.agentHandle, contextId);
   }

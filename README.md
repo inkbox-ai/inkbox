@@ -157,6 +157,13 @@ allow the worker in its `outbound` direction, and the worker must allow the
 requester in its `inbound` direction. Use `both` when the same peer rule should
 apply in either role.
 
+An A2A context is a shared collaboration between its original two
+participants. Either participant can start another task in that context, and
+tasks in both directions may run concurrently. The context's top-level caller
+and target remain the original opener and recipient; each task's caller and
+target identify that task's direction. Context names are generated from the
+first task message, persisted, and can be renamed by either participant.
+
 ```python
 identity = inkbox.get_identity("coordinator")
 
@@ -173,7 +180,15 @@ for message in identity.iter_a2a_messages(
     worker_handle="researcher",
     q="revenue",
 ):
-    print(message.task_id, message.role, message.parts)
+    print(message.task_id, message.task_state, message.role, message.parts)
+
+for context in identity.a2a_contexts(direction="both").items:
+    print(context.name, context.id)
+
+identity.a2a_update_context(
+    "context-uuid",
+    name="Quarterly Research Review",
+)
 ```
 
 ```bash

@@ -314,12 +314,24 @@ let contexts = identity.a2a_contexts(&A2AContextListOptions {
     ..Default::default()
 })?;
 
+let renamed = identity.a2a_update_context(
+    contexts.items[0].id,
+    "Quarterly Research Review",
+)?;
+
 println!("{:?}", tasks.next_cursor);
 println!("{:?}", contexts.next_cursor);
 for message in messages.items {
     println!("{} {} {:?}", message.task_id, message.task_state, message.parts);
 }
 ```
+
+Context names are generated from the first task message and persisted. Either
+participant can rename the shared context. The context's top-level caller and
+target remain the original opener and recipient, while each nested task's
+participants identify that task's direction. Tasks in both directions may run
+concurrently. Rust exposes the persisted ledger and rename operation; it does
+not provide the outbound protocol client.
 
 Task keyword filtering returns tasks containing a matching message. Message
 filtering returns individual matching messages with task, context, requester,

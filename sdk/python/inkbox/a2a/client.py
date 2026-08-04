@@ -130,6 +130,12 @@ class A2AClient:
         context_id: str | None = None,
         task_id: str | None = None,
     ) -> A2ASendResult:
+        """Send a message or task request to an A2A agent.
+
+        ``context_id`` without ``task_id`` starts a new task in an existing
+        context. ``task_id`` continues that task; ``context_id`` may also be
+        supplied to assert that the task belongs to the expected context.
+        """
         if (text is None) == (parts is None):
             raise ValueError("Pass exactly one of text or parts")
         message: dict[str, Any] = {

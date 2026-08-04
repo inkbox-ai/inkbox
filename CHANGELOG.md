@@ -4,6 +4,38 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.12 — Bidirectional A2A contexts
+
+### Added
+
+- Python, TypeScript, and Rust context models expose the persisted context
+  `name`. Either participant can rename a shared context through the canonical
+  identity-scoped update method.
+- The CLI can list and inspect originally received and originally opened
+  contexts, and `a2a rename-context` updates a context name.
+
+### Changed
+
+- Between Inkbox identities, the existing A2A `contextId` send option can start
+  a new task in either direction when no `taskId` is supplied. Concurrent tasks
+  retain independent participants, state, and message history.
+- Context-level caller and target remain the original opener and recipient;
+  each nested task's participants are authoritative for that task's direction.
+- Context names are generated from the first task message and remain patchable.
+- Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.12; the
+  CLI now depends on `@inkbox/sdk` `^0.5.12`.
+
+### Compatibility
+
+- Existing send signatures and wire keys are unchanged. External A2A services
+  may define different cross-endpoint context reuse behavior.
+- The required context name is source-breaking for Python, TypeScript, and Rust
+  callers that construct context values directly. Context deserialization
+  requires the matching API rollout; older SDK versions ignore the additive
+  response field.
+- Received and sent context routes retain their original-open meanings. The
+  participant-symmetric update route does not change read-route selection.
+
 ## 0.5.11 — Nullable webhook contact names
 
 ### Changed

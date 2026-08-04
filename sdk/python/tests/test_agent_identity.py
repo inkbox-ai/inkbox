@@ -74,6 +74,19 @@ def test_a2a_client_inherits_parent_request_timeout():
     )
 
 
+def test_a2a_update_context_delegates_with_exact_name():
+    identity, inkbox = _identity_with_mailbox()
+    context_id = UUID("22222222-2222-2222-2222-222222222222")
+
+    identity.a2a_update_context(context_id, name="Analyse Überprüfung")
+
+    inkbox._a2a.update_context.assert_called_once_with(
+        identity.agent_handle,
+        str(context_id),
+        name="Analyse Überprüfung",
+    )
+
+
 class TestAgentIdentityGetMessage:
     def test_get_message_returns_message_detail(self):
         identity, inkbox = _identity_with_mailbox()

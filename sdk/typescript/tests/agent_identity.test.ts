@@ -93,6 +93,7 @@ function mockInkbox() {
       setAuthorityMode: vi.fn(),
     },
     _texts: { send: vi.fn(), update: vi.fn(), updateConversation: vi.fn() },
+    _a2a: { updateContext: vi.fn() },
     _idsResource: {
       get: vi.fn(),
       create: vi.fn(),
@@ -151,6 +152,24 @@ describe("AgentIdentity A2A client", () => {
     expect(
       (client as unknown as { requestTimeoutMs: number }).requestTimeoutMs,
     ).toBe(7_250);
+  });
+});
+
+describe("AgentIdentity A2A contexts", () => {
+  it("delegates participant context renames", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._a2a.updateContext).mockResolvedValue(undefined as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.a2aUpdateContext("context-1", {
+      name: "Analyse Überprüfung",
+    });
+
+    expect(ink._a2a.updateContext).toHaveBeenCalledWith(
+      "sales-agent",
+      "context-1",
+      { name: "Analyse Überprüfung" },
+    );
   });
 });
 
