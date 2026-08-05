@@ -64,8 +64,13 @@ All signup methods are **class methods** on `Inkbox` — no instance required.
 
 `human_email` and `note_to_human` are required. `display_name`, `agent_handle`, and
 `email_local_part` are optional.
+`invitation_token` is also optional; read it from
+`INKBOX_A2A_INVITATION_TOKEN` rather than logging it. When present, signup and
+verification may return an `invitation` summary whose status is
+`awaiting_verification` or `accepted`.
 
 ```python
+import os
 from inkbox import Inkbox
 
 # 1. Register
@@ -76,6 +81,7 @@ result = Inkbox.signup(
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
     harness="claude-code",               # optional — names the calling runtime
+    invitation_token=os.environ.get("INKBOX_A2A_INVITATION_TOKEN"),
 )
 
 # Save these — the api_key is shown only once
@@ -119,6 +125,9 @@ All signup methods are **static methods** on `Inkbox` — no instance required.
 
 `humanEmail` and `noteToHuman` are required. `displayName`, `agentHandle`, and
 `emailLocalPart` are optional.
+`invitationToken` is also optional and may be loaded from
+`INKBOX_A2A_INVITATION_TOKEN`; invitation-assisted responses expose the same
+optional `invitation` summary.
 
 ```ts
 import { Inkbox } from "@inkbox/sdk";
@@ -131,6 +140,7 @@ const result = await Inkbox.signup({
   agentHandle: "sales-agent",      // optional
   emailLocalPart: "sales.agent",   // optional
   harness: "claude-code",          // optional — names the calling runtime
+  invitationToken: process.env.INKBOX_A2A_INVITATION_TOKEN,
 });
 
 // Save these — the apiKey is shown only once

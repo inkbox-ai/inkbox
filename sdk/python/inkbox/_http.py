@@ -311,4 +311,8 @@ def _raise_for_status(resp: httpx.Response) -> None:
             retry_after=resp.headers.get("Retry-After"),
         )
 
-    raise InkboxAPIError(status_code=resp.status_code, detail=raw_detail)
+    raise InkboxAPIError(
+        status_code=resp.status_code,
+        detail=raw_detail,
+        retry_after=resp.headers.get("Retry-After"),
+    )

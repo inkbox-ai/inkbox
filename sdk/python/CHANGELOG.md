@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.14 — A2A invitations
+
+- Added `inkbox.a2a_invitations` create, list, get, revoke, and accept methods.
+- Agent signup accepts `invitation_token` and normalizes the optional
+  invitation summary on signup and verification responses.
+- Invitation errors retain structured detail and expose `retry_after_seconds`
+  when the response includes `Retry-After`.
+- Package version moved in lockstep to 0.5.14.
+
 ## 0.5.13 — A2A agent discovery
 
 ### Added

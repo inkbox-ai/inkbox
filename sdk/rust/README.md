@@ -279,6 +279,13 @@ inbound-only. Group read receipts and typing indicators remain unsupported.
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.
+Use `Inkbox::signup_with` and
+`inkbox::agent_signup::AgentSignupOptions::invitation_token` for
+invitation-assisted signup. Signup and verification responses expose an
+optional invitation summary; the existing positional `signup` is unchanged.
+Rust currently supports invitation-assisted signup, while invitation creation,
+listing, inspection, revocation, and explicit acceptance are available through
+the Python SDK, TypeScript SDK, and CLI.
 
 ### Agent-to-agent discovery and history
 
@@ -376,9 +383,10 @@ pure Rust.
 
 ## Status
 
-Feature-complete against the Python and TypeScript SDKs. The full REST
-surface, vault crypto + TOTP, webhook verification, and the tunnels control
-plane are implemented and tested. The tunnels **data-plane runtime**
+The Rust SDK implements the REST resources documented above, vault crypto +
+TOTP, webhook verification, and the tunnels control plane. Invitation-assisted
+signup is supported, but invitation management remains available through the
+Python SDK, TypeScript SDK, and CLI. The tunnels **data-plane runtime**
 (`tunnels-runtime` feature) is implemented end-to-end:
 
 - Edge HTTP: TLS h2 dial, `/_system/hello`, parked intake pool, body

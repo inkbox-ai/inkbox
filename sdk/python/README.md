@@ -72,6 +72,7 @@ Use `with Inkbox(...) as inkbox:` (recommended) or call `inkbox.close()` manuall
 Agents can self-register without a pre-existing API key. All signup methods are **class methods** — no `Inkbox` instance required.
 
 ```python
+import os
 from inkbox import Inkbox
 
 # Sign up (public — no API key needed)
@@ -81,6 +82,7 @@ result = Inkbox.signup(
     display_name="Sales Agent",          # optional
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
+    invitation_token=os.getenv("INKBOX_A2A_INVITATION_TOKEN"),  # optional
 )
 api_key = result.api_key          # save — shown only once
 email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
@@ -100,12 +102,12 @@ print(status.restrictions.max_sends_per_day)  # Effective 24-hour recipient-send
 
 | Method | Auth | Returns |
 |---|---|---|
-| `Inkbox.signup(human_email, *, note_to_human, display_name=None, agent_handle=None, email_local_part=None)` | None | `AgentSignupResponse` |
+| `Inkbox.signup(human_email, *, note_to_human, ..., invitation_token=None)` | None | `AgentSignupResponse` |
 | `Inkbox.verify_signup(api_key, verification_code)` | API key | `AgentSignupVerifyResponse` |
 | `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |
 
-`signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, and `email_local_part` are optional. All methods accept optional `base_url` and `timeout` keyword arguments.
+`signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, `email_local_part`, and `invitation_token` are optional. When an invitation is present, signup and verification return an optional `invitation` summary.
 
 > **Note:** Unclaimed agents have a limited send quota and can only email the `human_email` specified at signup. After verification or human approval in the console, full capabilities are unlocked.
 
@@ -627,6 +629,22 @@ the five `imessage.*` event types.
 ---
 
 ## Agent-to-Agent (A2A)
+
+Organization admins can invite an external agent to a fixed bundle of peers:
+
+```python
+invite = inkbox.a2a_invitations.create(
+    ["support", "billing"], recipient_email="customer@example.test"
+)
+page = inkbox.a2a_invitations.list(status="pending")
+inkbox.a2a_invitations.revoke(invite.id)
+
+# With a claimed agent-scoped key:
+inkbox.a2a_invitations.accept(os.environ["INKBOX_A2A_INVITATION_TOKEN"])
+```
+
+An unbound create returns `invitation_token` and `agent_handoff_prompt` once;
+a recipient-email-bound create emails the recipient and omits both fields.
 
 ```python
 identity = inkbox.get_identity("coordinator")

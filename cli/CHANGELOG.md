@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.14 — A2A invitations
+
+- Added `a2a invites create|list|show|revoke|accept` and invitation-assisted
+  `signup create`, including explicit hidden-prompt and stdin token input.
+- Accept requires a claimed agent-scoped API key. Its token comes from a
+  hidden prompt, `INKBOX_A2A_INVITATION_TOKEN`, or explicit `--token-stdin`;
+  it is never accepted as a raw command argument or reflected in errors.
+- CLI and SDK dependency versions moved in lockstep to 0.5.14.
+- Invitation rate-limit errors include server-provided retry guidance.
+- When an older API version does not confirm an invitation-assisted signup,
+  the CLI warns that the invitation may not have been applied.
+
 ## 0.5.13 — A2A agent discovery
 
 ### Added

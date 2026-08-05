@@ -69,6 +69,14 @@ class TestDetailUnion:
         assert isinstance(err.detail, dict)
         assert err.detail["error"] == "x"
 
+    def test_retry_after_defaults_to_none(self):
+        assert InkboxAPIError(429, "slow down").retry_after_seconds is None
+
+    def test_retry_after_parses_delta_seconds(self):
+        assert InkboxAPIError(
+            429, "slow down", retry_after="120"
+        ).retry_after_seconds == 120
+
 
 class TestRaiseForStatusPlainString:
     def test_plain_string_409_stays_base_class(self):
@@ -308,6 +316,29 @@ class TestIdentityConflictMapping:
 
 
 class TestRaiseForStatusOtherCodes:
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "a2a_invitation_issuer_rate_limited",
+            "a2a_invitation_issuer_outstanding_limit",
+            "a2a_invitation_recipient_unavailable",
+            "a2a_invitation_attempt_rate_limited",
+        ],
+    )
+    def test_invitation_429_preserves_retry_after(self, code: str):
+        resp = httpx.Response(
+            status_code=429,
+            headers={"Retry-After": "900"},
+            json={"detail": {"code": code, "message": "Try again later."}},
+        )
+        with pytest.raises(InkboxAPIError) as info:
+            _raise_for_status(resp)
+        assert info.value.detail == {
+            "code": code,
+            "message": "Try again later.",
+        }
+        assert info.value.retry_after_seconds == 900
+
     def test_404_stays_base_class(self):
         resp = _resp(404, {"detail": "not found"})
         with pytest.raises(InkboxAPIError) as info:

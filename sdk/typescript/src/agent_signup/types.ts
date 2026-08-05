@@ -13,6 +13,16 @@ export interface AgentSignupRequest {
   agentHandle?: string;
   emailLocalPart?: string;
   harness?: string;
+  invitationToken?: string;
+}
+
+export interface AgentSignupInvitationSummary {
+  invitationId: string;
+  status: "awaiting_verification" | "accepted";
+  inviteeIdentityId: string;
+  inviteeAgentHandle: string;
+  peerAgentHandles: string[];
+  acceptedAt: string | null;
 }
 
 export interface AgentSignupResponse {
@@ -23,6 +33,7 @@ export interface AgentSignupResponse {
   claimStatus: string;
   humanEmail: string;
   message: string;
+  invitation?: AgentSignupInvitationSummary;
 }
 
 export interface AgentSignupVerifyRequest {
@@ -33,6 +44,7 @@ export interface AgentSignupVerifyResponse {
   claimStatus: string;
   organizationId: string;
   message: string;
+  invitation?: AgentSignupInvitationSummary;
 }
 
 export interface AgentSignupResendResponse {
@@ -65,12 +77,23 @@ export interface RawAgentSignupResponse {
   claim_status: string;
   human_email: string;
   message: string;
+  invitation?: RawAgentSignupInvitationSummary | null;
+}
+
+export interface RawAgentSignupInvitationSummary {
+  invitation_id: string;
+  status: "awaiting_verification" | "accepted";
+  invitee_identity_id: string;
+  invitee_agent_handle: string;
+  peer_agent_handles: string[];
+  accepted_at: string | null;
 }
 
 export interface RawAgentSignupVerifyResponse {
   claim_status: string;
   organization_id: string;
   message: string;
+  invitation?: RawAgentSignupInvitationSummary | null;
 }
 
 export interface RawAgentSignupResendResponse {
@@ -104,6 +127,7 @@ export function parseAgentSignupResponse(r: RawAgentSignupResponse): AgentSignup
     claimStatus: r.claim_status,
     humanEmail: r.human_email,
     message: r.message,
+    ...(r.invitation ? { invitation: parseInvitationSummary(r.invitation) } : {}),
   };
 }
 
@@ -112,6 +136,18 @@ export function parseAgentSignupVerifyResponse(r: RawAgentSignupVerifyResponse):
     claimStatus: r.claim_status,
     organizationId: r.organization_id,
     message: r.message,
+    ...(r.invitation ? { invitation: parseInvitationSummary(r.invitation) } : {}),
+  };
+}
+
+function parseInvitationSummary(r: RawAgentSignupInvitationSummary): AgentSignupInvitationSummary {
+  return {
+    invitationId: r.invitation_id,
+    status: r.status,
+    inviteeIdentityId: r.invitee_identity_id,
+    inviteeAgentHandle: r.invitee_agent_handle,
+    peerAgentHandles: r.peer_agent_handles,
+    acceptedAt: r.accepted_at,
   };
 }
 
@@ -154,6 +190,7 @@ export function agentSignupRequestToWire(
   if (req.agentHandle !== undefined) body["agent_handle"] = req.agentHandle;
   if (req.emailLocalPart !== undefined) body["email_local_part"] = req.emailLocalPart;
   if (req.harness !== undefined) body["harness"] = req.harness;
+  if (req.invitationToken !== undefined) body["invitation_token"] = req.invitationToken;
   return body;
 }
 

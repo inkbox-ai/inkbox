@@ -3,6 +3,10 @@ import { getGlobalOpts, type GlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import { Inkbox } from "@inkbox/sdk";
+import {
+  redactSecretError,
+  resolveOptionalA2AInvitationToken,
+} from "../invitation-token.js";
 
 function requireApiKey(opts: GlobalOpts): string {
   const apiKey = opts.apiKey ?? process.env.INKBOX_API_KEY;
@@ -29,21 +33,35 @@ export function registerSignupCommands(program: Command): void {
     .option("--agent-handle <handle>", "Requested handle for the agent identity")
     .option("--email-local-part <local>", "Requested mailbox local part before the sending domain")
     .option("--harness <harness>", "Identifier for the agent harness/runtime (e.g. claude-code, codex)")
+    .option("--invitation-token-stdin", "Read the optional A2A invitation token from stdin")
+    .option("--invitation-token-prompt", "Prompt privately for an optional A2A invitation token")
     .action(
       withErrorHandler(async function (this: Command) {
         const globalOpts = getGlobalOpts(this);
         const cmdOpts = this.opts();
-        const result = await Inkbox.signup(
-          {
-            humanEmail: cmdOpts.humanEmail,
-            noteToHuman: cmdOpts.noteToHuman,
-            displayName: cmdOpts.displayName,
-            agentHandle: cmdOpts.agentHandle,
-            emailLocalPart: cmdOpts.emailLocalPart,
-            harness: cmdOpts.harness,
-          },
-          { baseUrl: globalOpts.baseUrl },
+        const invitationToken = await resolveOptionalA2AInvitationToken(
+          !!cmdOpts.invitationTokenStdin,
+          !!cmdOpts.invitationTokenPrompt,
         );
+        let result;
+        try {
+          result = await Inkbox.signup(
+            {
+              humanEmail: cmdOpts.humanEmail,
+              noteToHuman: cmdOpts.noteToHuman,
+              displayName: cmdOpts.displayName,
+              agentHandle: cmdOpts.agentHandle,
+              emailLocalPart: cmdOpts.emailLocalPart,
+              harness: cmdOpts.harness,
+              invitationToken,
+            },
+            { baseUrl: globalOpts.baseUrl },
+          );
+        } catch (error) {
+          throw invitationToken
+            ? redactSecretError(error, invitationToken)
+            : error;
+        }
         if (globalOpts.json) {
           output(result, { json: true });
         } else {
@@ -58,7 +76,13 @@ export function registerSignupCommands(program: Command): void {
           console.log(`  API Key:  ${result.apiKey}`);
           console.log();
           console.log("Save the API key — it is shown only once.");
-          console.log(`A verification email has been sent to ${result.humanEmail}.`);
+          console.log(result.message);
+        }
+        if (invitationToken && !result.invitation) {
+          console.warn(
+            "WARNING: The server response did not confirm that the A2A invitation was applied. " +
+            "Save the API key, then verify the invitation before relying on the connection.",
+          );
         }
       }),
     );

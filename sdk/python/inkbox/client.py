@@ -16,6 +16,7 @@ from inkbox._http import HttpTransport, sdk_user_agent
 from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
 from inkbox.a2a.resource import A2AResource
+from inkbox.a2a.invitations import A2AInvitationsResource
 from inkbox.agent_identity import AgentIdentity
 from inkbox.api_keys.resources.api_keys import ApiKeysResource
 from inkbox.contacts.resources.contacts import ContactsResource
@@ -280,6 +281,7 @@ class Inkbox:
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
         self._a2a = A2AResource(self._api_http, self._public_http)
+        self._a2a_invitations = A2AInvitationsResource(self._api_http)
 
         self._contacts = ContactsResource(self._contacts_http)
         self._notes = NotesResource(self._contacts_http)
@@ -433,6 +435,11 @@ class Inkbox:
     def a2a(self) -> A2AResource:
         """A2A public and organization directories."""
         return self._a2a
+
+    @property
+    def a2a_invitations(self) -> A2AInvitationsResource:
+        """Create, inspect, revoke, and accept A2A invitations."""
+        return self._a2a_invitations
 
     @property
     def signing_keys(self) -> SigningKeysResource:
@@ -609,7 +616,13 @@ class Inkbox:
                 detail = resp.json().get("detail", resp.text)
             except Exception:
                 detail = resp.text
-            raise InkboxAPIError(status_code=resp.status_code, detail=str(detail))
+            if not isinstance(detail, (str, dict)):
+                detail = str(detail)
+            raise InkboxAPIError(
+                status_code=resp.status_code,
+                detail=detail,
+                retry_after=resp.headers.get("Retry-After"),
+            )
         return resp.json()
 
     @classmethod
@@ -622,6 +635,7 @@ class Inkbox:
         agent_handle: str | None = None,
         email_local_part: str | None = None,
         harness: str | None = None,
+        invitation_token: str | None = None,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
     ) -> AgentSignupResponse:
@@ -640,6 +654,8 @@ class Inkbox:
             harness: Optional identifier for the agent harness/runtime (e.g.
                 ``"claude-code"``, ``"codex"``). Free-form string passed to the
                 server to record the calling runtime.
+            invitation_token: Optional A2A invitation token to accept as part
+                of signup.
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
 
@@ -658,6 +674,8 @@ class Inkbox:
             body["email_local_part"] = email_local_part
         if harness is not None:
             body["harness"] = harness
+        if invitation_token is not None:
+            body["invitation_token"] = invitation_token
         data = cls._signup_request(
             "POST", "", json=body, base_url=base_url, timeout=timeout,
         )

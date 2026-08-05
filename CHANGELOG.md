@@ -4,6 +4,34 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.14 — A2A invitations
+
+### Added
+
+- Python and TypeScript expose organization-managed A2A invitation create,
+  list, get, revoke, and agent-only accept operations. Agent signup can carry
+  an invitation token and returns the invitation acceptance summary.
+- Rust adds `signup_with` options for invitation-assisted signup and returns
+  the same optional summary without changing the existing positional signup.
+- The CLI adds `a2a invites create|list|show|revoke|accept`; accept requires a
+  claimed agent key and reads its token from a hidden prompt, environment, or
+  deliberate stdin.
+- Invitation errors retain their structured codes. Python and TypeScript API
+  errors expose a parsed retry delay when the response includes `Retry-After`.
+
+### Security
+
+- Invitation acceptance does not retry or fall back to admin credentials, and
+  reflected token values are redacted from CLI errors.
+- Versions moved in lockstep to 0.5.14; the CLI now depends on `@inkbox/sdk`
+  `^0.5.14`.
+
+### Compatibility
+
+- Older API versions may ignore the additive signup invitation field. Callers
+  should only treat the invitation as applied when the response includes an
+  invitation summary.
+
 ## 0.5.13 — A2A agent discovery and identity access retirement
 
 ### Added

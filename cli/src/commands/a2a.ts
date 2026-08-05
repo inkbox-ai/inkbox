@@ -11,10 +11,13 @@ import type {
   A2ASkill,
   A2ATaskState,
   FilterMode,
+  A2AInvitationStatus,
 } from "@inkbox/sdk";
+import { AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output } from "../output.js";
+import { redactSecretError, resolveA2AInvitationToken } from "../invitation-token.js";
 
 const TASK_COLUMNS = [
   "id",
@@ -55,6 +58,14 @@ const CONTEXT_COLUMNS = [
 ];
 const RULE_COLUMNS = ["id", "action", "matchTarget", "direction", "status"];
 const DIRECTORY_COLUMNS = ["name", "cardUrl", "visibility", "description"];
+const INVITATION_COLUMNS = [
+  "id",
+  "status",
+  "recipientEmail",
+  "peerAgentHandles",
+  "inviteeAgentHandle",
+  "expiresAt",
+];
 
 async function identityFor(command: Command, handle: string) {
   return createClient(getGlobalOpts(command)).getIdentity(handle);
@@ -111,6 +122,81 @@ function contextTableItem(
 
 export function registerA2ACommands(program: Command): void {
   const a2a = program.command("a2a").description("Work with A2A agents and tasks");
+
+  const invites = a2a.command("invites").description("Manage A2A connection invitations");
+
+  invites.command("create")
+    .description("Create an A2A invitation (organization admin)")
+    .requiredOption("--peer-agent-handle <handle...>", "Agent handles to connect")
+    .option("--recipient-email <email>", "Bind and email the invitation to this recipient")
+    .option("--expires-in-seconds <seconds>", "Invitation lifetime", (value) => positiveInt(value, "expires-in-seconds"))
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { peerAgentHandle: string[]; recipientEmail?: string; expiresInSeconds?: number },
+    ) {
+      const result = await createClient(getGlobalOpts(this)).a2aInvitations.create({
+        peerAgentHandles: options.peerAgentHandle,
+        recipientEmail: options.recipientEmail,
+        expiresInSeconds: options.expiresInSeconds,
+      });
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  invites.command("list")
+    .description("List invitations issued by the organization")
+    .option("--status <status>", "Filter by invitation status")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Maximum results", (value) => positiveInt(value, "limit"), 50)
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { status?: A2AInvitationStatus; cursor?: string; limit: number },
+    ) {
+      const page = await createClient(getGlobalOpts(this)).a2aInvitations.list(options);
+      outputCursorPage(
+        page,
+        this,
+        INVITATION_COLUMNS,
+        page.items.map((item) => ({ ...item })),
+      );
+    }));
+
+  invites.command("show <invitation-id>")
+    .description("Show an invitation")
+    .action(withErrorHandler(async function (this: Command, invitationId: string) {
+      const result = await createClient(getGlobalOpts(this)).a2aInvitations.get(invitationId);
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  invites.command("revoke <invitation-id>")
+    .description("Revoke a pending invitation")
+    .action(withErrorHandler(async function (this: Command, invitationId: string) {
+      const result = await createClient(getGlobalOpts(this)).a2aInvitations.revoke(invitationId);
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  invites.command("accept")
+    .description("Accept an invitation with a claimed agent-scoped API key")
+    .option("--token-stdin", "Read the invitation token from stdin")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { tokenStdin?: boolean },
+    ) {
+      const client = createClient(getGlobalOpts(this));
+      const principal = await client.whoami();
+      if (
+        principal.authType !== "api_key"
+        || principal.authSubtype !== AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED
+      ) {
+        throw new Error("Accepting an invitation requires a claimed agent-scoped API key.");
+      }
+      const token = await resolveA2AInvitationToken(!!options.tokenStdin);
+      try {
+        const result = await client.a2aInvitations.accept(token);
+        output(result, { json: !!getGlobalOpts(this).json });
+      } catch (error) {
+        throw redactSecretError(error, token);
+      }
+    }));
 
   a2a.command("enable")
     .description("Enable an identity's A2A receiver")

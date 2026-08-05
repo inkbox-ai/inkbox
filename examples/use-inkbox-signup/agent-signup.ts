@@ -59,6 +59,7 @@ async function cmdRegister(): Promise<void> {
     agentHandle,
     emailLocalPart: agentHandle,
     harness: "cursor",
+    invitationToken: process.env.INKBOX_A2A_INVITATION_TOKEN,
   });
 
   console.log();
@@ -68,6 +69,7 @@ async function cmdRegister(): Promise<void> {
   console.log(`  Handle:   ${result.agentHandle}`);
   console.log(`  Org:      ${result.organizationId}`);
   console.log(`  Status:   ${result.claimStatus}`);
+  if (result.invitation) console.log(`  Invite:   ${result.invitation.status}`);
   console.log();
   console.log(`  API Key:  ${result.apiKey}`);
   console.log();

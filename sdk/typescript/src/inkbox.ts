@@ -5,6 +5,7 @@
  */
 
 import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
+import type { InkboxAPIErrorDetail } from "./_http.js";
 import { VERSION } from "./version.js";
 import { resolveClientSettings } from "./_config.js";
 import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
@@ -37,6 +38,7 @@ import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
 import { A2AResource } from "./a2a/resource.js";
+import { A2AInvitationsResource } from "./a2a/invitations.js";
 import type {
   AgentIdentitySummary,
   CreateIdentityOptions,
@@ -173,6 +175,7 @@ export class Inkbox {
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
   readonly _a2a: A2AResource;
+  readonly _a2aInvitations: A2AInvitationsResource;
   /** @internal — used by the tunnel-agent runtime for data-plane auth. */
   readonly _apiKey: string;
   /** @internal — canonical platform origin used for A2A credential pinning. */
@@ -261,6 +264,7 @@ export class Inkbox {
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
     this._a2a = new A2AResource(apiHttp, publicHttp);
+    this._a2aInvitations = new A2AInvitationsResource(apiHttp);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
@@ -309,6 +313,9 @@ export class Inkbox {
 
   /** Thread operations (list, get, delete). */
   get threads(): ThreadsResource { return this._threads; }
+
+  /** Create, inspect, revoke, and accept A2A invitations. */
+  get a2aInvitations(): A2AInvitationsResource { return this._a2aInvitations; }
 
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
@@ -555,14 +562,30 @@ export class Inkbox {
     }
 
     if (!resp.ok) {
-      let detail: string;
+      let detail: InkboxAPIErrorDetail;
       try {
-        const err = (await resp.json()) as { detail?: string };
-        detail = err.detail ?? resp.statusText;
+        const parsed = await resp.json() as unknown;
+        const rawDetail = (
+          typeof parsed === "object"
+          && parsed !== null
+          && !Array.isArray(parsed)
+        )
+          ? (parsed as Record<string, unknown>)["detail"]
+          : undefined;
+        detail = (
+          typeof rawDetail === "string"
+          || (typeof rawDetail === "object" && rawDetail !== null && !Array.isArray(rawDetail))
+        )
+          ? rawDetail as InkboxAPIErrorDetail
+          : resp.statusText;
       } catch {
         detail = resp.statusText;
       }
-      throw new InkboxAPIError(resp.status, detail);
+      throw new InkboxAPIError(
+        resp.status,
+        detail,
+        resp.headers.get("Retry-After"),
+      );
     }
 
     return resp.json() as Promise<T>;

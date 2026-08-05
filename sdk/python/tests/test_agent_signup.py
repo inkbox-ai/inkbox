@@ -65,6 +65,7 @@ def _mock_httpx_client(mock_client_cls: MagicMock, status_code: int, json_data: 
     mock_response.status_code = status_code
     mock_response.json.return_value = json_data
     mock_response.text = str(json_data)
+    mock_response.headers = {}
 
     mock_client_instance = MagicMock()
     mock_client_instance.request.return_value = mock_response
@@ -75,6 +76,11 @@ def _mock_httpx_client(mock_client_cls: MagicMock, status_code: int, json_data: 
 
 
 class TestSignup:
+    def test_null_invitation_normalizes_to_none(self):
+        assert AgentSignupResponse._from_dict(
+            {**RAW_SIGNUP, "invitation": None}
+        ).invitation is None
+
     @patch("httpx.Client")
     def test_signup_sends_correct_request_and_parses_response(self, mock_client_cls: MagicMock):
         client = _mock_httpx_client(mock_client_cls, 200, RAW_SIGNUP)
@@ -123,6 +129,27 @@ class TestSignup:
                 "note_to_human": "Please approve me",
             },
         )
+    @patch("httpx.Client")
+    def test_signup_sends_invitation_and_parses_summary(self, mock_client_cls: MagicMock):
+        summary = {
+            "invitation_id": "inv_1",
+            "status": "awaiting_verification",
+            "invitee_identity_id": "identity_2",
+            "invitee_agent_handle": "buyer",
+            "peer_agent_handles": ["support"],
+            "accepted_at": None,
+        }
+        client = _mock_httpx_client(
+            mock_client_cls, 200, {**RAW_SIGNUP, "invitation": summary}
+        )
+        result = Inkbox.signup(
+            human_email="human@example.com",
+            note_to_human="Please approve me",
+            invitation_token="a2ai_secret",
+        )
+        assert client.request.call_args.kwargs["json"]["invitation_token"] == "a2ai_secret"
+        assert result.invitation is not None
+        assert result.invitation.invitation_id == "inv_1"
 
     @patch("httpx.Client")
     def test_signup_sends_optional_handle_and_email_local_part(self, mock_client_cls: MagicMock):
@@ -185,6 +212,24 @@ class TestVerifySignup:
         assert result.claim_status == "claimed"
         assert result.organization_id == "org-123"
         assert result.message == "Verified"
+        assert result.invitation is None
+
+    @patch("httpx.Client")
+    def test_verify_parses_accepted_invitation_summary(self, mock_client_cls: MagicMock):
+        _mock_httpx_client(mock_client_cls, 200, {
+            **RAW_VERIFY,
+            "invitation": {
+                "invitation_id": "inv_1",
+                "status": "accepted",
+                "invitee_identity_id": "identity_2",
+                "invitee_agent_handle": "buyer",
+                "peer_agent_handles": ["support"],
+                "accepted_at": "2026-08-04T02:00:00Z",
+            },
+        })
+        result = Inkbox.verify_signup("ApiKey_abc", "123456")
+        assert result.invitation is not None
+        assert result.invitation.status == "accepted"
 
 
 class TestResendSignupVerification:
@@ -243,11 +288,45 @@ class TestGetSignupStatus:
 
 class TestSignupErrors:
     @patch("httpx.Client")
+    def test_invitation_error_preserves_structured_detail_and_retry_after(
+        self, mock_client_cls: MagicMock
+    ):
+        mock_response = MagicMock()
+        mock_response.status_code = 429
+        mock_response.json.return_value = {
+            "detail": {
+                "code": "a2a_invitation_recipient_unavailable",
+                "message": "The recipient is temporarily unavailable.",
+            }
+        }
+        mock_response.text = "error"
+        mock_response.headers = {"Retry-After": "1800"}
+        mock_client_instance = MagicMock()
+        mock_client_instance.request.return_value = mock_response
+        mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+        mock_client_instance.__exit__ = MagicMock(return_value=False)
+        mock_client_cls.return_value = mock_client_instance
+
+        with pytest.raises(InkboxAPIError) as raised:
+            Inkbox.signup(
+                human_email="human@example.com",
+                note_to_human="Please approve me",
+                invitation_token="a2ai_example",
+            )
+
+        assert raised.value.detail == {
+            "code": "a2a_invitation_recipient_unavailable",
+            "message": "The recipient is temporarily unavailable.",
+        }
+        assert raised.value.retry_after_seconds == 1800
+
+    @patch("httpx.Client")
     def test_raises_inkbox_api_error_on_4xx(self, mock_client_cls: MagicMock):
         mock_response = MagicMock()
         mock_response.status_code = 422
         mock_response.json.return_value = {"detail": "Invalid verification code"}
         mock_response.text = "Invalid verification code"
+        mock_response.headers = {}
 
         mock_client_instance = MagicMock()
         mock_client_instance.request.return_value = mock_response

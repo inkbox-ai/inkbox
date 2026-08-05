@@ -17,6 +17,15 @@ function importAlreadyInFlight(err: InkboxAPIError): boolean {
   );
 }
 
+function isA2AInvitationError(err: InkboxAPIError): boolean {
+  return (
+    typeof err.detail === "object"
+    && err.detail !== null
+    && typeof err.detail["code"] === "string"
+    && err.detail["code"].startsWith("a2a_invitation_")
+  );
+}
+
 /** Structured details carry a human sentence; printing the raw JSON helps nobody. */
 function renderDetail(detail: string | Record<string, unknown>): string {
   if (typeof detail === "string") return detail;
@@ -56,6 +65,13 @@ export function withErrorHandler<T extends unknown[]>(
         }
       } else if (err instanceof InkboxAPIError) {
         console.error(`Error: HTTP ${err.statusCode}: ${renderDetail(err.detail)}`);
+        if (
+          err.statusCode === 429
+          && isA2AInvitationError(err)
+          && err.retryAfterSeconds !== null
+        ) {
+          console.error(`Hint: Retry in ${err.retryAfterSeconds} seconds.`);
+        }
         if (err.statusCode === 401) {
           console.error("Hint: Check your API key.");
         }

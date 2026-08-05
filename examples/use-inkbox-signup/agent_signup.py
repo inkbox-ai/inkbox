@@ -61,6 +61,7 @@ def cmd_register(args: argparse.Namespace) -> None:
         agent_handle=agent_handle,
         email_local_part=agent_handle,
         harness="cursor",
+        invitation_token=os.environ.get("INKBOX_A2A_INVITATION_TOKEN"),
     )
 
     print()
@@ -70,6 +71,8 @@ def cmd_register(args: argparse.Namespace) -> None:
     print(f"  Handle:   {result.agent_handle}")
     print(f"  Org:      {result.organization_id}")
     print(f"  Status:   {result.claim_status}")
+    if result.invitation is not None:
+        print(f"  Invite:   {result.invitation.status}")
     print()
     print(f"  API Key:  {result.api_key}")
     print()

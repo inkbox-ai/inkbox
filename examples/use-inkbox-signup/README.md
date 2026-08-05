@@ -10,6 +10,10 @@ No Inkbox account or API key is required to start. The flow provisions a mailbox
 2. A human email address (`INKBOX_HUMAN_EMAIL`) — receives the 6-digit verification code
 3. After registration, save the one-time `INKBOX_API_KEY` from the output
 
+If another organization invited the agent, optionally set
+`INKBOX_A2A_INVITATION_TOKEN`. The signup and verification responses then
+report whether the invitation is awaiting verification or accepted.
+
 ## Flow
 
 | Step | Command | Auth required |

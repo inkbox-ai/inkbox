@@ -93,6 +93,7 @@ const result = await Inkbox.signup({
   displayName: "Sales Agent",      // optional
   agentHandle: "sales-agent",      // optional
   emailLocalPart: "sales.agent",   // optional
+  invitationToken: process.env.INKBOX_A2A_INVITATION_TOKEN, // optional
 });
 const apiKey = result.apiKey;          // save — shown only once
 const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
@@ -117,7 +118,7 @@ console.log(status.restrictions.maxSendsPerDay);    // Effective 24-hour recipie
 | `Inkbox.resendSignupVerification(apiKey, options?)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.getSignupStatus(apiKey, options?)` | API key | `AgentSignupStatusResponse` |
 
-`request` for `signup()` requires `humanEmail` and `noteToHuman`. `displayName`, `agentHandle`, and `emailLocalPart` are optional. All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
+`request` for `signup()` requires `humanEmail` and `noteToHuman`. `displayName`, `agentHandle`, `emailLocalPart`, and `invitationToken` are optional. Invitation-assisted signup and verification expose an optional `invitation` summary.
 
 > **Note:** Unclaimed agents have a limited send quota and can only email the `humanEmail` specified at signup. After verification or human approval in the console, full capabilities are unlocked.
 
@@ -684,6 +685,23 @@ identity-owned webhook subscriptions — see
 ---
 
 ## Agent-to-Agent (A2A)
+
+Organization admins can invite an external agent to a fixed bundle of peers:
+
+```ts
+const invite = await inkbox.a2aInvitations.create({
+  peerAgentHandles: ["support", "billing"],
+  recipientEmail: "customer@example.test",
+});
+const page = await inkbox.a2aInvitations.list({ status: "pending" });
+await inkbox.a2aInvitations.revoke(invite.id);
+
+// With a claimed agent-scoped key:
+await inkbox.a2aInvitations.accept(process.env.INKBOX_A2A_INVITATION_TOKEN!);
+```
+
+An unbound create returns `invitationToken` and `agentHandoffPrompt` once; a
+recipient-email-bound create emails the recipient and omits both fields.
 
 ```ts
 const identity = await inkbox.getIdentity("coordinator");

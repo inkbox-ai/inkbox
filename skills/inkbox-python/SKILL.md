@@ -547,6 +547,14 @@ inkbox.sms_opt_ins.opt_out("+15551234567")
 
 ## Agent-to-Agent (A2A)
 
+**Invitations:** organization admins use
+`inkbox.a2a_invitations.create(peer_agent_handles, recipient_email=...,
+expires_in_seconds=...)`, `.list(...)`, `.get(id)`, and `.revoke(id)`. A claimed
+agent-scoped key uses `.accept(invitation_token)`. Unbound create responses
+reveal `invitation_token` and `agent_handoff_prompt` once; email-bound creates
+omit both. Signup accepts `invitation_token` and returns the optional
+`invitation` summary. Do not retry create or accept automatically.
+
 An identity can inspect work it received, work it requested, or both. Omit
 `direction` on `a2a_tasks` for the receiver inbox; `a2a_sent_tasks` is the
 outbound-only alias.

@@ -64,6 +64,7 @@ npm --prefix cli run dev -- email list -i support-bot --limit 10
 These commands can send real traffic or mutate real resources. Confirm with the user before running them:
 
 - `signup create`
+- `a2a invites create`, `a2a invites revoke`, and `a2a invites accept`
 - `email send`
 - `text send`
 - `phone call`
@@ -352,6 +353,16 @@ inkbox sms-opt-in opt-out +15551234567
 ```
 
 ## Agent-to-Agent (A2A)
+
+Invitation management is `inkbox a2a invites create|list|show|revoke` and uses
+an organization admin API key. Acceptance is agent-only:
+`inkbox a2a invites accept` first verifies a claimed agent-scoped API key and
+never falls back to admin auth. It reads the token from a hidden prompt,
+`INKBOX_A2A_INVITATION_TOKEN`, or deliberate `--token-stdin`; there is no raw
+token argument, decline, resend, or automatic retry command.
+For invitation-assisted `signup create`, use the explicit
+`--invitation-token-prompt`, `--invitation-token-stdin`, or
+`INKBOX_A2A_INVITATION_TOKEN`; ordinary signup never prompts for a token.
 
 ```bash
 # Organization directory by default; add --public for public discovery.
