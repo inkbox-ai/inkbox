@@ -379,6 +379,8 @@ Load the Inkbox skills into your coding agent so it automatically knows how to u
 
 The plugin loads the Inkbox skills and connects the remote MCP server. Sign in when prompted to authorize an identity.
 
+The plugin's version tracks the SDK and CLI release it documents, so `/plugin update` pulls the skills that match the version you're running.
+
 ### Codex (plugin)
 
 ```bash
