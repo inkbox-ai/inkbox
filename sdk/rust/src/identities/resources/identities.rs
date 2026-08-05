@@ -15,7 +15,7 @@ use crate::error::Result;
 use crate::http::{validate_idempotency_key, HttpTransport};
 use crate::identities::exceptions::map_identity_conflict_error;
 use crate::identities::types::{
-    AgentIdentityData, AgentIdentitySummary, IdentityAccess, IdentityMailboxCreateOptions,
+    AgentIdentityData, AgentIdentitySummary, IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions, Unset, VaultSecretIds,
 };
 use crate::imessage::types::IMessageNumberType;
@@ -337,63 +337,6 @@ impl IdentitiesResource {
     pub fn release_phone_number(&self, agent_handle: &str) -> Result<()> {
         self.http.delete(&format!("/{agent_handle}/phone_number"))
     }
-
-    /// List who can see this identity (agent visibility).
-    ///
-    /// Returns either a single wildcard row (`viewer_identity_id=None` — every
-    /// active identity in the org sees it) or explicit per-viewer rows. An empty
-    /// list means no scoped agent can see this identity (humans and admins
-    /// always see it).
-    ///
-    /// Requires an admin-scoped API key; agent-scoped keys get a 403.
-    #[deprecated(note = "Use the A2A organization directory and contact rules for discovery.")]
-    pub fn list_access(&self, agent_handle: &str) -> Result<Vec<IdentityAccess>> {
-        let data = self
-            .http
-            .get(&format!("/{agent_handle}/access"), crate::http::NO_QUERY)?;
-        Ok(serde_json::from_value(data)?)
-    }
-
-    /// Grant visibility on this identity.
-    ///
-    /// # Arguments
-    /// * `agent_handle` - Handle of the target identity.
-    /// * `viewer_identity_id` - UUID of the viewer identity to grant, or `None`
-    ///   to reset the target to the org-wide wildcard (every active identity in
-    ///   the org sees it).
-    ///
-    /// Deliberately NOT wrapped in `map_identity_conflict_error` (unlike create
-    /// / update): this route's 409s are not handle collisions, and the wrapper
-    /// would downgrade the `RedundantContactAccessGrant` error the transport
-    /// already raised.
-    #[deprecated(note = "Use A2A settings and contact rules for discovery.")]
-    pub fn grant_access(
-        &self,
-        agent_handle: &str,
-        viewer_identity_id: Option<&str>,
-    ) -> Result<IdentityAccess> {
-        let body = serde_json::json!({
-            "viewer_identity_id": viewer_identity_id,
-        });
-        let data = self.http.post(
-            &format!("/{agent_handle}/access"),
-            Some(&body),
-            crate::http::NO_QUERY,
-        )?;
-        Ok(serde_json::from_value(data)?)
-    }
-
-    /// Revoke one viewer's visibility on this identity.
-    ///
-    /// # Arguments
-    /// * `agent_handle` - Handle of the target identity.
-    /// * `viewer_identity_id` - UUID of the viewer identity to drop. This is the
-    ///   viewer identity's UUID, not an access-row id.
-    #[deprecated(note = "Use A2A settings and contact rules for discovery.")]
-    pub fn revoke_access(&self, agent_handle: &str, viewer_identity_id: &str) -> Result<()> {
-        self.http
-            .delete(&format!("/{agent_handle}/access/{viewer_identity_id}"))
-    }
 }
 
 #[cfg(test)]
@@ -454,15 +397,6 @@ mod tests {
                 "updated_at": "2026-07-01T00:00:00+00:00"
             }),
         );
-        object.insert(
-            "access".into(),
-            json!([{
-                "id": "55555555-5555-5555-5555-555555555555",
-                "target_identity_id": "11111111-1111-1111-1111-111111111111",
-                "viewer_identity_id": null,
-                "created_at": "2026-07-01T00:00:00+00:00"
-            }]),
-        );
         identity
     }
 
@@ -486,7 +420,6 @@ mod tests {
             identities[0].tunnel.as_ref().unwrap().tunnel_name,
             "support-bot"
         );
-        assert!(identities[0].access[0].viewer_identity_id.is_none());
     }
 
     #[test]
@@ -503,7 +436,6 @@ mod tests {
         assert_eq!(identities[0].agent_handle, "support-bot");
         assert!(identities[0].mailbox.is_none());
         assert!(identities[0].tunnel.is_none());
-        assert!(identities[0].access.is_empty());
     }
 
     #[test]

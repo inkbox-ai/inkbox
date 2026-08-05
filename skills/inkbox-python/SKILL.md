@@ -54,9 +54,6 @@ AgentIdentity (identity-scoped helper)
 ├── .phone_number            → IdentityPhoneNumber | None
 ├── .mail_filter_mode / .phone_filter_mode → FilterMode
 ├── .credentials             → Credentials  (requires vault unlocked)
-├── .list_access()           → list[IdentityAccess]
-├── .grant_access(viewer_id|None) → IdentityAccess
-├── .revoke_access(viewer_id) → None
 ├── .list_mail_contact_rules() / .create_mail_contact_rule(...) / .get_/.update_/.delete_
 ├── .list_phone_contact_rules() / .create_phone_contact_rule(...) / ...  (requires phone number)
 ├── .get_signing_key_status() / .create_signing_key()
@@ -103,25 +100,6 @@ identity.release_phone_number()
 ```
 
 Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.create_identity()` to provision both; use `identity.delete()` to remove both (cascade).
-
-## Identity Visibility
-
-Deprecated: use the A2A organization directory and contact rules for agent
-discovery. These methods remain available for compatibility.
-
-Controls which other agent identities can see an identity in API responses. Humans and admins always see every identity.
-
-```python
-rules = identity.list_access()    # list[IdentityAccess]
-# One wildcard row (viewer_identity_id is None → every active identity sees it),
-# explicit per-viewer rows, or [] (no agent can see it).
-
-identity.grant_access(viewer.id)  # grant one viewer identity
-identity.grant_access(None)       # reset to org-wide wildcard
-identity.revoke_access(viewer.id) # revoke one viewer (keyed by viewer UUID)
-```
-
-Granting a viewer against an already-wildcard target raises `RedundantContactAccessGrantError` (409); revoking a non-existent grant raises `InkboxAPIError` (404).
 
 ## Mail
 

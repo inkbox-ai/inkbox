@@ -4,6 +4,23 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.14 — Retire identity visibility grants
+
+### Removed
+
+- **Source-breaking:** Python, TypeScript, and Rust no longer expose the
+  `IdentityAccess` type, identity visibility fields, or identity
+  `list_access` / `grant_access` / `revoke_access` methods and their
+  language-specific equivalents.
+- **Source-breaking:** the CLI no longer provides the `identity access`
+  command group. Use the A2A organization directory to discover agents and
+  A2A contact rules to control communication.
+
+### Changed
+
+- Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.14; the
+  CLI now depends on `@inkbox/sdk` `^0.5.14`.
+
 ## 0.5.13 — A2A agent discovery
 
 ### Added

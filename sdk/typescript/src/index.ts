@@ -292,7 +292,6 @@ export type {
 export type {
   AgentIdentitySummary,
   CreateIdentityOptions,
-  IdentityAccess,
   IdentityMailboxCreateOptions,
   IdentityMailbox,
   IdentityPhoneNumberCreateOptions,

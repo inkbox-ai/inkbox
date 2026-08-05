@@ -147,7 +147,6 @@ from inkbox.imessage.types import (
 # Identity types
 from inkbox.identities.types import (
     AgentIdentitySummary,
-    IdentityAccess,
     IdentityMailboxCreateOptions,
     IdentityMailbox,
     IdentityIMessageNumber,
@@ -509,7 +508,6 @@ __all__ = [
     "IMessageTriageNumber",
     # Identity types
     "AgentIdentitySummary",
-    "IdentityAccess",
     "IdentityMailboxCreateOptions",
     "IdentityMailbox",
     "IdentityIMessageNumber",

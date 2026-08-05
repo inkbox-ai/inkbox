@@ -111,17 +111,7 @@ inkbox identity set-totp <handle> <secret-id>       # Add TOTP to login (vault k
 inkbox identity remove-totp <handle> <secret-id>    # Remove TOTP (vault key)
 inkbox identity totp-code <handle> <secret-id>      # Generate TOTP code (vault key)
 
-inkbox identity access list <target-handle>                   # List who can see an identity
-inkbox identity access grant <target-handle> <viewer-handle>  # Grant a viewer identity visibility
-inkbox identity access grant-everyone <target-handle>         # Make visible to every active identity (wildcard)
-inkbox identity access revoke <target-handle> <viewer-handle> # Revoke a viewer identity's visibility
 ```
-
-`identity access` is deprecated in favor of the A2A organization directory and
-contact rules, but remains available for compatibility. It controls which other
-agent identities can see an identity in API responses. Viewer identities are
-passed as handles and resolved to UUIDs automatically. This is unrelated to
-`identity revoke-access`, which manages vault-secret access.
 
 ### email
 

@@ -266,9 +266,8 @@ class AgentIdentitySummary:
     """Agent identity returned by list endpoints.
 
     ``imessage_enabled`` / ``imessage_filter_mode`` describe iMessage
-    reachability and filtering. Newer responses also include linked channels
-    and visibility grants; these fields default to empty values for older
-    responses.
+    reachability and filtering. Newer responses also include linked channels;
+    these fields default to empty values for older responses.
 
     ``mail_filter_mode`` / ``phone_filter_mode`` are the whitelist/blacklist
     modes for this identity's mail and phone contact rules. They live on the
@@ -295,7 +294,6 @@ class AgentIdentitySummary:
     phone_number: IdentityPhoneNumber | None = field(default=None)
     imessage_number: IdentityIMessageNumber | None = field(default=None)
     tunnel: TunnelSummary | None = field(default=None)
-    access: list[IdentityAccess] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentIdentitySummary:
@@ -333,7 +331,6 @@ class AgentIdentitySummary:
                 else None
             ),
             tunnel=TunnelSummary._from_dict(tunnel_data) if tunnel_data else None,
-            access=[IdentityAccess._from_dict(a) for a in d.get("access") or []],
         )
 
 
@@ -351,31 +348,3 @@ class _AgentIdentityData(AgentIdentitySummary):
     def _from_dict(cls, d: dict[str, Any]) -> _AgentIdentityData:  # type: ignore[override]
         base = AgentIdentitySummary._from_dict(d)
         return cls(**base.__dict__)
-
-
-@dataclass
-class IdentityAccess:
-    """
-    A single identity-visibility grant on a target identity.
-
-    Deprecated: use A2A directory types for agent discovery.
-
-    ``viewer_identity_id=None`` is the wildcard sentinel — every active
-    identity in the org can see the target. Otherwise it is a per-viewer
-    grant naming exactly one viewer identity.
-    """
-
-    id: UUID
-    target_identity_id: UUID
-    viewer_identity_id: UUID | None
-    created_at: datetime
-
-    @classmethod
-    def _from_dict(cls, d: dict[str, Any]) -> IdentityAccess:
-        viewer = d.get("viewer_identity_id")
-        return cls(
-            id=UUID(d["id"]),
-            target_identity_id=UUID(d["target_identity_id"]),
-            viewer_identity_id=UUID(viewer) if viewer else None,
-            created_at=datetime.fromisoformat(d["created_at"]),
-        )

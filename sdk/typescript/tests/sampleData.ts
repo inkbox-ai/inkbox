@@ -392,20 +392,6 @@ export const RAW_IDENTITY_DETAIL = {
   imessage_number: RAW_IDENTITY_IMESSAGE_NUMBER,
 };
 
-export const RAW_IDENTITY_ACCESS_WILDCARD = {
-  id: "cccc3333-0000-0000-0000-000000000001",
-  target_identity_id: "eeee5555-0000-0000-0000-000000000001",
-  viewer_identity_id: null,
-  created_at: "2026-05-21T00:00:00Z",
-};
-
-export const RAW_IDENTITY_ACCESS_VIEWER = {
-  id: "cccc3333-0000-0000-0000-000000000002",
-  target_identity_id: "eeee5555-0000-0000-0000-000000000001",
-  viewer_identity_id: "dddd4444-0000-0000-0000-000000000001",
-  created_at: "2026-05-21T00:00:00Z",
-};
-
 export const RAW_IDENTITY_LIST_DETAIL = {
   ...RAW_IDENTITY_DETAIL,
   tunnel: {
@@ -419,7 +405,6 @@ export const RAW_IDENTITY_LIST_DETAIL = {
     created_at: "2026-03-09T00:00:00Z",
     updated_at: "2026-03-09T00:00:00Z",
   },
-  access: [RAW_IDENTITY_ACCESS_WILDCARD],
 };
 
 // ---- Domains ----
