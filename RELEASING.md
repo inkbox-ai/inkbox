@@ -21,8 +21,14 @@ Each package has its own `publish.sh`: **dry run by default**, `--prod` to publi
 | `cli/package.json` (+ `package-lock.json`) | `version` **and** the `@inkbox/sdk` dependency → `^<new version>` |
 | `cli/src/client.ts` | `CLI_VERSION` (User-Agent constant) |
 | `sdk/rust/Cargo.toml` (+ `Cargo.lock` `inkbox` entry) | `version` |
+| `.claude-plugin/plugin.json` | `version` |
 
 The CLI declares `@inkbox/sdk: ^<version>` and `cli/publish.sh` refuses to publish unless that matches `sdk/typescript`'s version — so bump it too.
+
+The plugin isn't published to a registry, but its version is the cache key Claude
+Code uses to decide whether an installed copy is out of date. Leaving it behind
+means people who already installed the plugin keep the old skills no matter how
+many commits land, so it moves with the same number as everything else.
 
 ## 2. Update the changelog
 
