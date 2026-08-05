@@ -628,9 +628,11 @@ export class AgentIdentity {
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isBlocked - Tri-state filter. `true` for only blocked,
    *   `false` for only non-blocked, omit for all.
+   * @param options.pairedCallId - Opaque correlation UUID shared by related
+   *   managed call legs.
    */
   async listCalls(
-    options: { limit?: number; offset?: number; isBlocked?: boolean; startDatetime?: string; endDatetime?: string; tz?: string } = {},
+    options: { limit?: number; offset?: number; isBlocked?: boolean; pairedCallId?: string; startDatetime?: string; endDatetime?: string; tz?: string } = {},
   ): Promise<PhoneCall[]> {
     // Scope by identity id — no phone number required (a shared-only
     // identity can still have calls).

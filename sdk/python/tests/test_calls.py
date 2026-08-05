@@ -32,6 +32,7 @@ from sample_data import (
 
 IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001"
 CALL_ID = "bbbb2222-0000-0000-0000-000000000001"
+PAIRED_CALL_ID = "cccc3333-0000-0000-0000-000000000001"
 
 
 class TestCallsList:
@@ -107,6 +108,28 @@ class TestCallsList:
             params={"limit": 50, "offset": 0, "is_blocked": False},
         )
         assert calls[0].is_blocked is False
+
+    def test_paired_call_id_passes_through_and_parses(self, client, transport):
+        transport.get.return_value = [PHONE_CALL_DICT]
+
+        calls = client._calls.list(paired_call_id=PAIRED_CALL_ID)
+
+        transport.get.assert_called_once_with(
+            "/calls",
+            params={
+                "limit": 50,
+                "offset": 0,
+                "paired_call_id": PAIRED_CALL_ID,
+            },
+        )
+        assert calls[0].paired_call_id == UUID(PAIRED_CALL_ID)
+
+    def test_missing_paired_call_id_parses_as_none(self, client, transport):
+        legacy = dict(PHONE_CALL_DICT)
+        legacy.pop("paired_call_id")
+        transport.get.return_value = [legacy]
+
+        assert client._calls.list()[0].paired_call_id is None
 
     def test_agent_identity_id_accepts_uuid(self, client, transport):
         """UUID objects are stringified before hitting the wire."""
@@ -650,7 +673,7 @@ class TestRemovedNumberScopedSurface:
         # Keyword-only surface: no positional number slot.
         assert list(params) == [
             "self", "agent_identity_id", "limit", "offset", "is_blocked",
-            "start_datetime", "end_datetime", "tz",
+            "paired_call_id", "start_datetime", "end_datetime", "tz",
         ]
 
     def test_get_takes_only_call_id(self):

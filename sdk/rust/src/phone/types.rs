@@ -392,6 +392,9 @@ pub struct PhoneCall {
     #[serde(default)]
     pub local_phone_number: Option<String>,
     pub remote_phone_number: String,
+    /// Opaque correlation UUID shared by related managed call legs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paired_call_id: Option<Uuid>,
     pub direction: String,
     pub status: String,
     #[serde(default)]
@@ -745,6 +748,7 @@ mod tests {
             "id": "22222222-2222-2222-2222-222222222222",
             "local_phone_number": "+15550001111",
             "remote_phone_number": "+15550002222",
+            "paired_call_id": "33333333-3333-3333-3333-333333333333",
             "direction": "outbound",
             "status": "completed",
             "created_at": "2026-06-01T00:00:00+00:00",
@@ -758,7 +762,21 @@ mod tests {
     fn phone_call_dedicated_has_local_number_string() {
         let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
         assert_eq!(call.local_phone_number.as_deref(), Some("+15550001111"));
+        assert_eq!(
+            call.paired_call_id,
+            Some(Uuid::parse_str("33333333-3333-3333-3333-333333333333").unwrap())
+        );
         assert_eq!(call.origin, CallOrigin::DedicatedNumber);
+    }
+
+    #[test]
+    fn phone_call_missing_pair_id_defaults_to_none() {
+        let mut v = call_json();
+        v.as_object_mut().unwrap().remove("paired_call_id");
+
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+
+        assert_eq!(call.paired_call_id, None);
     }
 
     #[test]

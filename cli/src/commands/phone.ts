@@ -152,6 +152,7 @@ export function registerPhoneCommands(program: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
+    .option("--paired-call-id <uuid>", "Only the call leg matching this pair ID")
     .option("--start-datetime <date>", "Only calls with created_at >= this date/instant")
     .option("--end-datetime <date>", "Only calls with created_at <= this date (bare date is whole-day inclusive)")
     .option("--tz <zone>", "IANA timezone for bare/zone-less dates (default UTC)")
@@ -162,6 +163,7 @@ export function registerPhoneCommands(program: Command): void {
           identity: string;
           limit: string;
           offset: string;
+          pairedCallId?: string;
           startDatetime?: string;
           endDatetime?: string;
           tz?: string;
@@ -173,6 +175,7 @@ export function registerPhoneCommands(program: Command): void {
         const calls = await identity.listCalls({
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
+          pairedCallId: cmdOpts.pairedCallId,
           startDatetime: cmdOpts.startDatetime,
           endDatetime: cmdOpts.endDatetime,
           tz: cmdOpts.tz,
@@ -183,6 +186,7 @@ export function registerPhoneCommands(program: Command): void {
             "id",
             "direction",
             "remotePhoneNumber",
+            "pairedCallId",
             "status",
             "createdAt",
           ],

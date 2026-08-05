@@ -614,6 +614,7 @@ class PhoneIncomingCallWebhookPayload(TypedDict):
     id: str
     local_phone_number: str
     remote_phone_number: str
+    paired_call_id: NotRequired[str | None]
     direction: Literal["inbound"]
     status: CallStatusWire
     client_websocket_url: str | None
@@ -654,6 +655,7 @@ class WebhookPhoneCall(TypedDict):
     origin: CallOriginWire
     local_phone_number: str | None
     remote_phone_number: str
+    paired_call_id: NotRequired[str | None]
     direction: CallDirectionWire
     status: CallStatusWire
     hangup_reason: HangupReasonWire | None

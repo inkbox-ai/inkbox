@@ -658,6 +658,20 @@ impl AgentIdentity {
             .list_filtered(Some(&id), limit, offset, is_blocked, filter)
     }
 
+    /// List the call leg for this identity matching an opaque pair ID.
+    pub fn list_calls_by_pair_id(
+        &self,
+        paired_call_id: &str,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+    ) -> Result<Vec<PhoneCall>> {
+        let id = self.id().to_string();
+        self.inkbox
+            .calls()
+            .list_by_pair_id(Some(&id), paired_call_id, limit, offset, is_blocked)
+    }
+
     /// Place an outbound call driven by Inkbox Voice AI.
     ///
     /// Sibling of [`AgentIdentity::place_call`] (which stays client-driven);

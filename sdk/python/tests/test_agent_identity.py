@@ -373,6 +373,7 @@ class TestAgentIdentityListCalls:
             limit=50,
             offset=0,
             is_blocked=None,
+            paired_call_id=None,
             start_datetime=None,
             end_datetime=None,
             tz=None,
@@ -383,13 +384,19 @@ class TestAgentIdentityListCalls:
         identity, inkbox = _identity_with_mailbox()
         inkbox._calls.list.return_value = []
 
-        identity.list_calls(limit=10, offset=20, is_blocked=True)
+        identity.list_calls(
+            limit=10,
+            offset=20,
+            is_blocked=True,
+            paired_call_id="cccc3333-0000-0000-0000-000000000001",
+        )
 
         inkbox._calls.list.assert_called_once_with(
             agent_identity_id=IDENTITY_UUID,
             limit=10,
             offset=20,
             is_blocked=True,
+            paired_call_id="cccc3333-0000-0000-0000-000000000001",
             start_datetime=None,
             end_datetime=None,
             tz=None,

@@ -241,6 +241,8 @@ export interface PhoneCall {
    */
   localPhoneNumber: string | null;
   remotePhoneNumber: string;
+  /** Opaque correlation UUID shared by related managed call legs. */
+  pairedCallId: string | null;
   /** "outbound" | "inbound" */
   direction: string;
   /** "initiated" | "ringing" | "answered" | "completed" | "failed" | "canceled" */
@@ -509,6 +511,8 @@ export interface RawPhoneCall {
   // Nullable: absent/null when the call rode the shared iMessage pool.
   local_phone_number: string | null;
   remote_phone_number: string;
+  // Optional for calls created before pairing support and external calls.
+  paired_call_id?: string | null;
   direction: string;
   status: string;
   client_websocket_url: string | null;
@@ -735,6 +739,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     id: r.id,
     localPhoneNumber: r.local_phone_number ?? null,
     remotePhoneNumber: r.remote_phone_number,
+    pairedCallId: r.paired_call_id ?? null,
     direction: r.direction,
     status: r.status,
     clientWebsocketUrl: r.client_websocket_url,

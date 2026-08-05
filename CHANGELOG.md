@@ -4,6 +4,33 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
+## 0.5.13 — Paired call correlation
+
+### Added
+
+- Python, TypeScript, and Rust call records expose the nullable opaque pair ID
+  shared by related managed call legs.
+- Call listings accept that pair ID as a filter while retaining identity-scoped
+  authorization, allowing each participant to select its own leg precisely.
+- Inbound and lifecycle webhook types accept the pair ID, and `inkbox phone
+  calls` exposes `--paired-call-id`.
+
+### Changed
+
+- Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.13; the
+  CLI now depends on `@inkbox/sdk` `^0.5.13`.
+
+### Compatibility and rollout
+
+- Missing and null pair IDs parse as `None`/`null`, covering external calls,
+  calls created before pairing support, older API responses, and webhook
+  replays.
+- Existing list calls are wire-identical unless the new filter is supplied.
+  TypeScript and Rust callers that construct `PhoneCall` values directly must
+  add `pairedCallId: null` or `paired_call_id: None`.
+- Deploy the additive API field and filter before relying on pair-based lookup;
+  older SDK versions ignore the additional response field.
+
 ## 0.5.12 — Bidirectional A2A contexts
 
 ### Added

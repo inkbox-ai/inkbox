@@ -44,11 +44,12 @@ impl CallsResource {
     ) -> Result<Vec<PhoneCall>> {
         // Delegate to the filtered variant with an empty (default) date range,
         // which sends no extra params — wire-identical to the original list.
-        self.list_filtered(
+        self.list_with_filters(
             agent_identity_id,
             limit,
             offset,
             is_blocked,
+            None,
             &DateRangeFilter::default(),
         )
     }
@@ -72,7 +73,41 @@ impl CallsResource {
         is_blocked: Option<bool>,
         filter: &DateRangeFilter,
     ) -> Result<Vec<PhoneCall>> {
-        // Always send limit + offset; scope by identity + filter only when set.
+        self.list_with_filters(agent_identity_id, limit, offset, is_blocked, None, filter)
+    }
+
+    /// List the call leg visible to an identity for an opaque pair ID.
+    ///
+    /// Related managed legs share the same pair ID. Identity scoping still
+    /// applies, so this returns only the matching leg the caller may access.
+    pub fn list_by_pair_id(
+        &self,
+        agent_identity_id: Option<&str>,
+        paired_call_id: &str,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+    ) -> Result<Vec<PhoneCall>> {
+        self.list_with_filters(
+            agent_identity_id,
+            limit,
+            offset,
+            is_blocked,
+            Some(paired_call_id),
+            &DateRangeFilter::default(),
+        )
+    }
+
+    fn list_with_filters(
+        &self,
+        agent_identity_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+        is_blocked: Option<bool>,
+        paired_call_id: Option<&str>,
+        filter: &DateRangeFilter,
+    ) -> Result<Vec<PhoneCall>> {
+        // Always send limit + offset; scope by identity + filters only when set.
         let mut params: Vec<(&str, String)> =
             vec![("limit", limit.to_string()), ("offset", offset.to_string())];
         if let Some(id) = agent_identity_id {
@@ -80,6 +115,9 @@ impl CallsResource {
         }
         if let Some(b) = is_blocked {
             params.push(("is_blocked", b.to_string()));
+        }
+        if let Some(id) = paired_call_id {
+            params.push(("paired_call_id", id.to_string()));
         }
         filter.apply(&mut params);
         let data = self.http.get("/calls", &params)?;
@@ -339,6 +377,7 @@ mod tests {
             "id": "22222222-2222-2222-2222-222222222222",
             "local_phone_number": "+15550001111",
             "remote_phone_number": "+15550002222",
+            "paired_call_id": "44444444-4444-4444-4444-444444444444",
             "direction": "outbound",
             "status": "completed",
             "created_at": "2026-06-01T00:00:00+00:00",
@@ -418,6 +457,32 @@ mod tests {
             .list_filtered(None, 50, 0, None, &filter)
             .unwrap();
         mock.assert();
+    }
+
+    #[test]
+    fn list_by_pair_id_sends_pair_filter() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/calls")
+                .query_param("agent_identity_id", "33333333-3333-3333-3333-333333333333")
+                .query_param("paired_call_id", "44444444-4444-4444-4444-444444444444");
+            then.status(200).json_body(json!([call_json()]));
+        });
+
+        let calls = client(&server)
+            .calls()
+            .list_by_pair_id(
+                Some("33333333-3333-3333-3333-333333333333"),
+                "44444444-4444-4444-4444-444444444444",
+                50,
+                0,
+                None,
+            )
+            .unwrap();
+
+        mock.assert();
+        assert_eq!(calls.len(), 1);
     }
 
     #[test]

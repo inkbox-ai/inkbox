@@ -101,6 +101,7 @@ export const RAW_PHONE_CALL = {
   id: "bbbb2222-0000-0000-0000-000000000001",
   local_phone_number: "+18335794607",
   remote_phone_number: "+15551234567",
+  paired_call_id: "cccc3333-0000-0000-0000-000000000001",
   direction: "outbound",
   status: "completed",
   client_websocket_url: "wss://agent.example.com/ws",

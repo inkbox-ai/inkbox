@@ -28,6 +28,7 @@ function mockHttp() {
 
 const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
 const CALL_ID = "bbbb2222-0000-0000-0000-000000000001";
+const PAIRED_CALL_ID = "cccc3333-0000-0000-0000-000000000001";
 
 describe("CallsResource.list", () => {
   it("uses default limit and offset with no identity scope", async () => {
@@ -94,6 +95,31 @@ describe("CallsResource.list", () => {
       is_blocked: false,
     });
     expect(calls[0].isBlocked).toBe(false);
+  });
+
+  it("forwards pairedCallId and parses the shared correlation ID", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue([RAW_PHONE_CALL]);
+    const res = new CallsResource(http);
+
+    const [call] = await res.list({ pairedCallId: PAIRED_CALL_ID });
+
+    expect(http.get).toHaveBeenCalledWith("/calls", {
+      limit: 50,
+      offset: 0,
+      paired_call_id: PAIRED_CALL_ID,
+    });
+    expect(call.pairedCallId).toBe(PAIRED_CALL_ID);
+  });
+
+  it("defaults pairedCallId to null when missing from older responses", async () => {
+    const http = mockHttp();
+    const { paired_call_id: _ignored, ...legacyPayload } = RAW_PHONE_CALL;
+    void _ignored;
+    vi.mocked(http.get).mockResolvedValue([legacyPayload]);
+    const res = new CallsResource(http);
+
+    expect((await res.list())[0].pairedCallId).toBeNull();
   });
 
   it("defaults isBlocked to false when missing from server response (back-compat)", async () => {

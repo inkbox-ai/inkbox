@@ -599,6 +599,8 @@ export interface PhoneIncomingCallWebhookPayload {
   id: string;
   local_phone_number: string;
   remote_phone_number: string;
+  /** Opaque correlation UUID; absent on older payloads and external calls. */
+  paired_call_id?: string | null;
   direction: "inbound";
   status: CallStatusWire;
   client_websocket_url: string | null;
@@ -642,6 +644,8 @@ export interface WebhookPhoneCall {
   origin: CallOriginWire;
   local_phone_number: string | null;
   remote_phone_number: string;
+  /** Opaque correlation UUID; absent on older replays and external calls. */
+  paired_call_id?: string | null;
   direction: CallDirectionWire;
   status: CallStatusWire;
   hangup_reason: HangupReasonWire | null;

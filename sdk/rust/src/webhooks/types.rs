@@ -793,6 +793,9 @@ pub struct PhoneIncomingCallWebhookPayload {
     pub id: String,
     pub local_phone_number: String,
     pub remote_phone_number: String,
+    /// Opaque correlation UUID; absent on older payloads and external calls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paired_call_id: Option<String>,
     pub direction: CallDirectionWire,
     pub status: CallStatusWire,
     pub client_websocket_url: Option<String>,
@@ -837,6 +840,9 @@ pub struct WebhookPhoneCall {
     pub origin: CallOriginWire,
     pub local_phone_number: Option<String>,
     pub remote_phone_number: String,
+    /// Opaque correlation UUID; absent on older replays and external calls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paired_call_id: Option<String>,
     pub direction: CallDirectionWire,
     pub status: CallStatusWire,
     pub hangup_reason: Option<HangupReasonWire>,
@@ -1223,6 +1229,7 @@ mod tests {
                     "id": "c1", "origin": "dedicated_number",
                     "local_phone_number": "+14155550100",
                     "remote_phone_number": "+14155550999",
+                    "paired_call_id": "33333333-3333-3333-3333-333333333333",
                     "direction": "inbound", "status": "completed",
                     "hangup_reason": "remote", "started_at": "t0", "ended_at": "t1",
                     "created_at": "t0", "updated_at": "t1",
@@ -1246,6 +1253,10 @@ mod tests {
         assert_eq!(payload.event_type, CallLifecycleWebhookEventType::CallEnded);
         assert_eq!(payload.data.call.origin, CallOriginWire::DedicatedNumber);
         assert_eq!(payload.data.call.duration_seconds, Some(123));
+        assert_eq!(
+            payload.data.call.paired_call_id.as_deref(),
+            Some("33333333-3333-3333-3333-333333333333")
+        );
         assert_eq!(
             payload.data.contacts[0].memories,
             ["Prefers Thursday appointments."]

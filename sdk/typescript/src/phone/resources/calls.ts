@@ -43,12 +43,15 @@ export class CallsResource {
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isBlocked - Tri-state filter. `true` for only blocked,
    *   `false` for only non-blocked, omit for all.
+   * @param options.pairedCallId - Opaque correlation UUID shared by related
+   *   managed call legs. Selects the matching leg visible to this identity.
    */
   async list(options?: {
     agentIdentityId?: string;
     limit?: number;
     offset?: number;
     isBlocked?: boolean;
+    pairedCallId?: string;
     startDatetime?: string;
     endDatetime?: string;
     tz?: string;
@@ -63,6 +66,9 @@ export class CallsResource {
     }
     if (options?.isBlocked !== undefined) {
       params["is_blocked"] = options.isBlocked;
+    }
+    if (options?.pairedCallId !== undefined) {
+      params["paired_call_id"] = options.pairedCallId;
     }
     if (options?.startDatetime !== undefined) params["start_datetime"] = options.startDatetime;
     if (options?.endDatetime !== undefined) params["end_datetime"] = options.endDatetime;

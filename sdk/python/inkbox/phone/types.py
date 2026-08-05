@@ -252,6 +252,9 @@ class PhoneCall:
     # Whether voicemail detection ran. Missing/null legacy values preserve the
     # server default.
     voicemail_detection: VoicemailDetection = VoicemailDetection.ENABLED
+    # Opaque correlation shared by related managed call legs. Missing on calls
+    # created before pairing support and on calls to external numbers.
+    paired_call_id: UUID | None = None
     # Voice AI's recorded action items, surfaced inline (open items only,
     # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
@@ -284,6 +287,9 @@ class PhoneCall:
             ),
             voicemail_detection=VoicemailDetection(
                 d.get("voicemail_detection") or "enabled"
+            ),
+            paired_call_id=(
+                UUID(d["paired_call_id"]) if d.get("paired_call_id") else None
             ),
             # Open items only, seq-ascending; empty for client_websocket calls.
             post_call_action_items=[

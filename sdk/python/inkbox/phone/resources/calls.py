@@ -36,6 +36,7 @@ class CallsResource:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        paired_call_id: UUID | str | None = None,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -61,6 +62,9 @@ class CallsResource:
             offset: Pagination offset.
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            paired_call_id: Opaque correlation UUID shared by related managed
+                call legs. Pass it to select the matching leg visible to this
+                identity.
             start_datetime: Inclusive lower bound on ``created_at`` (str). Bare
                 dates resolve to the start of that day; naive datetimes are
                 interpreted in ``tz``; zoned datetimes are exact instants.
@@ -75,6 +79,8 @@ class CallsResource:
             params["agent_identity_id"] = str(agent_identity_id)
         if is_blocked is not None:
             params["is_blocked"] = is_blocked
+        if paired_call_id is not None:
+            params["paired_call_id"] = str(paired_call_id)
         if start_datetime is not None:
             params["start_datetime"] = start_datetime
         if end_datetime is not None:

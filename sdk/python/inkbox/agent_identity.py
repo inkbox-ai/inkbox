@@ -771,6 +771,7 @@ class AgentIdentity:
         limit: int = 50,
         offset: int = 0,
         is_blocked: bool | None = None,
+        paired_call_id: UUID | str | None = None,
         start_datetime: str | None = None,
         end_datetime: str | None = None,
         tz: str | None = None,
@@ -785,6 +786,8 @@ class AgentIdentity:
             offset: Pagination offset (default 0).
             is_blocked: Tri-state filter — ``True`` for only blocked,
                 ``False`` for only non-blocked, ``None`` for all.
+            paired_call_id: Opaque correlation UUID shared by related managed
+                call legs.
             start_datetime: Inclusive ``created_at`` lower bound (str); ``None``
                 leaves the side open. UTC unless ``tz`` is set.
             end_datetime: ``created_at`` upper bound (str), whole-day inclusive for
@@ -796,6 +799,7 @@ class AgentIdentity:
             limit=limit,
             offset=offset,
             is_blocked=is_blocked,
+            paired_call_id=paired_call_id,
             start_datetime=start_datetime,
             end_datetime=end_datetime,
             tz=tz,
