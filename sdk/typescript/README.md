@@ -759,6 +759,16 @@ for await (const message of identity.iterA2AMessages({
 
 // The outbound alias is convenient when only requested work is needed.
 const sent = await identity.a2aSentTasks({ workerHandle: "researcher" });
+
+// Context caller/target stays in original-open orientation. Each nested task
+// carries its own caller and target, so both directions can run concurrently.
+for (const context of (await identity.a2aContexts({ direction: "both" })).items) {
+  console.log(context.name, context.id);
+}
+
+const renamed = await identity.a2aUpdateContext("context-uuid", {
+  name: "Quarterly Research Review",
+});
 ```
 
 Task keyword filtering returns tasks containing a matching message. Message
@@ -773,10 +783,39 @@ Directory methods support `q`, `cursor`, and `limit`; async iterator variants
 follow all pages. Receiver enablement, public egress, and advertised skills
 accept the identity's agent-scoped key. Public discoverability, filter-mode,
 and contact-rule create/update/delete operations require an admin API key. Use
-`a2aResetSkills()` to restore default skills; rule
-directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
-requester's outbound policy and the worker's inbound policy; `both` applies in
-either role.
+`a2aResetSkills()` to restore default skills.
+
+New contexts immediately expose the persisted name `New A2A Session`. That
+exact default may be replaced asynchronously with a short name based on the
+first task message. Either participant can rename the shared context at any
+time; a non-default name is not replaced by automatic naming.
+Applications should display the returned value as-is. Context-level `caller`
+and `target` always identify the original opener and recipient. Nested task
+participants are authoritative for each task's direction, and multiple tasks
+can run concurrently in either direction.
+
+The standard client reuses the existing `contextId` option. Supplying a context
+without a task starts a sibling task; supplying `taskId` continues that
+specific task:
+
+```ts
+const client = await identity.a2aClient();
+const target = await client.fetchCard(
+  "https://example.test/a2a/researcher/card",
+);
+const result = await client.send(target, {
+  text: "Review the updated findings",
+  contextId: "context-uuid",
+});
+```
+
+Cross-endpoint context reuse is supported between Inkbox identities. External
+A2A services may define different context reuse behavior.
+
+Rule directions are `inbound`, `outbound`, or `both`. Same-organization and
+public discovery may imply admission; private cross-organization calls must
+pass the requester's outbound policy and the worker's inbound policy. `both`
+applies in either role, and explicit blocks always win.
 
 The standard client authenticates Agent Card retrieval on the configured
 Inkbox origin. It never sends the Inkbox API key to external card or RPC

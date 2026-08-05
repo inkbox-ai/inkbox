@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { A2AClient } from "../src/a2a/client.js";
 import { A2AResource } from "../src/a2a/resource.js";
-import type { HttpTransport } from "../src/_http.js";
+import { InkboxAPIError, type HttpTransport } from "../src/_http.js";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -354,6 +354,7 @@ describe("A2AResource", () => {
         })
         .mockResolvedValueOnce({
           id: "context-1",
+          name: "Quarterly Research",
           caller: {
             identity_id: "caller-1",
             organization_id: "org-caller",
@@ -369,6 +370,7 @@ describe("A2AResource", () => {
 
     await resource.sentTask("caller", "task-1");
     const context = await resource.sentContext("caller", "context-1");
+    expect(context.name).toBe("Quarterly Research");
     expect(context.tasksTruncated).toBe(true);
 
     expect(http.get).toHaveBeenNthCalledWith(
@@ -398,6 +400,152 @@ describe("A2AResource", () => {
       "/identities/coordinator/a2a/contexts",
       { direction: "both", cursor: "opaque", limit: 20 },
     );
+  });
+
+  it("preserves the original pair and mixed-direction nested tasks", async () => {
+    const http = {
+      get: vi.fn().mockResolvedValue({
+        id: "context-1",
+        name: "Analyse Überprüfung Ergebnis Jetzt",
+        caller: {
+          identity_id: "identity-a",
+          organization_id: "org-a",
+          handle: "coordinator",
+        },
+        target: {
+          identity_id: "identity-b",
+          organization_id: "org-b",
+          handle: "researcher",
+        },
+        tasks: [{
+          id: "task-a-b",
+          context_id: "context-1",
+          state: "working",
+          caller: {
+            identity_id: "identity-a",
+            organization_id: "org-a",
+            handle: "coordinator",
+          },
+          target: {
+            identity_id: "identity-b",
+            organization_id: "org-b",
+            handle: "researcher",
+          },
+          messages: [{
+            id: "message-a-b",
+            message_id: "protocol-a-b",
+            role: "caller",
+            parts: [{ text: "Analyse" }],
+            metadata: null,
+            extensions: null,
+            reference_task_ids: null,
+            created_at: "2026-08-01T00:00:00Z",
+          }],
+          completed_at: null,
+          created_at: "2026-08-01T00:00:00Z",
+          updated_at: "2026-08-01T00:01:00Z",
+        }, {
+          id: "task-b-a",
+          context_id: "context-1",
+          state: "submitted",
+          caller: {
+            identity_id: "identity-b",
+            organization_id: "org-b",
+            handle: "researcher",
+          },
+          target: {
+            identity_id: "identity-a",
+            organization_id: "org-a",
+            handle: "coordinator",
+          },
+          messages: [{
+            id: "message-b-a",
+            message_id: "protocol-b-a",
+            role: "caller",
+            parts: [{ text: "Review" }],
+            metadata: null,
+            extensions: null,
+            reference_task_ids: null,
+            created_at: "2026-08-01T00:00:30Z",
+          }],
+          completed_at: null,
+          created_at: "2026-08-01T00:00:30Z",
+          updated_at: "2026-08-01T00:00:30Z",
+        }],
+        created_at: "2026-08-01T00:00:00Z",
+        last_activity_at: "2026-08-01T00:01:00Z",
+      }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const context = await resource.context("coordinator", "context-1");
+
+    expect(context.name).toBe("Analyse Überprüfung Ergebnis Jetzt");
+    expect(context.caller.identityId).toBe("identity-a");
+    expect(context.target?.identityId).toBe("identity-b");
+    expect(context.tasks[0]).toMatchObject({
+      state: "working",
+      caller: { identityId: "identity-a" },
+      target: { identityId: "identity-b" },
+      messages: [{ parts: [{ text: "Analyse" }] }],
+    });
+    expect(context.tasks[1]).toMatchObject({
+      state: "submitted",
+      caller: { identityId: "identity-b" },
+      target: { identityId: "identity-a" },
+      messages: [{ parts: [{ text: "Review" }] }],
+    });
+  });
+
+  it("updates a context through the participant path and exact body", async () => {
+    const http = {
+      patch: vi.fn().mockResolvedValue({
+        id: "context-1",
+        name: "Analyse Überprüfung Ergebnis Jetzt",
+        caller: {
+          identity_id: "identity-a",
+          organization_id: "org-a",
+          handle: "coordinator",
+        },
+        target: {
+          identity_id: "identity-b",
+          organization_id: "org-b",
+          handle: "researcher",
+        },
+        tasks: [],
+        created_at: "2026-08-01T00:00:00Z",
+        last_activity_at: "2026-08-01T00:01:00Z",
+      }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const context = await resource.updateContext("coordinator", "context-1", {
+      name: "Analyse Überprüfung Ergebnis Jetzt",
+    });
+
+    expect(context.name).toBe("Analyse Überprüfung Ergebnis Jetzt");
+    expect(http.patch).toHaveBeenCalledWith(
+      "/identities/coordinator/a2a/contexts/context-1",
+      { name: "Analyse Überprüfung Ergebnis Jetzt" },
+    );
+  });
+
+  it("preserves context validation detail from the server", async () => {
+    const error = new InkboxAPIError(
+      422,
+      "Context names contain at most five words",
+    );
+    const http = {
+      patch: vi.fn().mockRejectedValue(error),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    await expect(
+      resource.updateContext("coordinator", "context-1", {
+        name: "Too many words",
+      }),
+    ).rejects.toBe(error);
+    expect(error.detail).toBe("Context names contain at most five words");
   });
 
   it("updates and deletes contact rules through the admin routes", async () => {
@@ -610,6 +758,56 @@ describe("A2AClient", () => {
         },
         configuration: { returnImmediately: true },
       },
+    });
+  });
+
+  it("sends exact context reuse fields with and without a task", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(
+      new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          task: {
+            id: "task-new",
+            contextId: "context-1",
+            status: { state: "TASK_STATE_SUBMITTED" },
+          },
+        },
+      }), { status: 200 }),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new A2AClient("ApiKey_secret", "https://inkbox.ai");
+    const target = {
+      cardUrl: "https://agent.example/card",
+      rpcUrl: "https://agent.example/rpc",
+      protocolVersion: "1.0" as const,
+      card: { name: "agent", supportedInterfaces: [] },
+    };
+
+    await client.send(target, {
+      text: "Start reverse review",
+      messageId: "message-1",
+      contextId: "context-1",
+    });
+    await client.send(target, {
+      text: "Continue the task",
+      messageId: "message-2",
+      contextId: "context-1",
+      taskId: "task-1",
+    });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).params.message).toEqual({
+      messageId: "message-1",
+      role: "ROLE_USER",
+      parts: [{ text: "Start reverse review" }],
+      contextId: "context-1",
+    });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).params.message).toEqual({
+      messageId: "message-2",
+      role: "ROLE_USER",
+      parts: [{ text: "Continue the task" }],
+      contextId: "context-1",
+      taskId: "task-1",
     });
   });
 

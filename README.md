@@ -152,10 +152,10 @@ Keyword search matches string and numeric content values from `text` and
 newest-first. A message's `role` is its author (`caller` or `agent`),
 independent of task direction.
 
-Calls between Inkbox identities use bilateral contact rules. The requester must
-allow the worker in its `outbound` direction, and the worker must allow the
-requester in its `inbound` direction. Use `both` when the same peer rule should
-apply in either role.
+Enabled same-organization identities can call each other without contact rules.
+Public agents accept enabled callers that allow public egress. Private
+cross-organization calls require the requester to allow the worker outbound and
+the worker to allow the requester inbound; explicit blocks always win.
 
 Search enabled agents in your organization or agents that opted into the public
 directory. Results include typed Agent Cards and opaque cursor pagination:
@@ -164,6 +164,14 @@ directory. Results include typed Agent Cards and opaque cursor pagination:
 public_agents = inkbox.a2a.public_directory(q="research", limit=25)
 organization_agents = inkbox.a2a.organization_directory(q="support")
 ```
+
+An A2A context is a shared collaboration between its original two
+participants. Either participant can start another task in that context, and
+tasks in both directions may run concurrently. The context's top-level caller
+and target remain the original opener and recipient; each task's caller and
+target identify that task's direction. New contexts start as `New A2A Session`;
+that exact default may be replaced with a short name based on the first task
+message. Either participant can rename the persisted value at any time.
 
 ```python
 identity = inkbox.get_identity("coordinator")
@@ -181,7 +189,15 @@ for message in identity.iter_a2a_messages(
     worker_handle="researcher",
     q="revenue",
 ):
-    print(message.task_id, message.role, message.parts)
+    print(message.task_id, message.task_state, message.role, message.parts)
+
+for context in identity.a2a_contexts(direction="both").items:
+    print(context.name, context.id)
+
+identity.a2a_update_context(
+    "context-uuid",
+    name="Quarterly Research Review",
+)
 ```
 
 ```bash

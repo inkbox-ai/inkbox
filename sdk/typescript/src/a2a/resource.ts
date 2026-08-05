@@ -5,6 +5,7 @@ import type { FilterMode } from "../mail/types.js";
 import type {
   A2AContactRule,
   A2AContext,
+  A2AContextListOptions,
   A2AContextPage,
   A2ADirectoryItem,
   A2ADirectoryListOptions,
@@ -21,6 +22,7 @@ import type {
   A2ATaskListOptions,
   A2ATaskPage,
   A2ASentTaskListOptions,
+  A2ASentContextListOptions,
 } from "./types.js";
 import {
   parseA2AContext,
@@ -295,11 +297,7 @@ export class A2AResource {
 
   async contexts(
     handle: string,
-    options: {
-      direction?: "inbound" | "outbound" | "both";
-      cursor?: string;
-      limit?: number;
-    } = {},
+    options: A2AContextListOptions = {},
   ): Promise<A2AContextPage> {
     const raw = await this.http.get<Raw>(`${base(handle)}/contexts`, {
       direction: options.direction,
@@ -318,9 +316,23 @@ export class A2AResource {
     );
   }
 
+  /** Rename a context visible to either participant. */
+  async updateContext(
+    handle: string,
+    contextId: string,
+    options: { name: string },
+  ): Promise<A2AContext> {
+    return parseA2AContext(
+      await this.http.patch<Raw>(
+        `${base(handle)}/contexts/${contextId}`,
+        { name: options.name },
+      ),
+    );
+  }
+
   async sentContexts(
     handle: string,
-    options: { cursor?: string; limit?: number } = {},
+    options: A2ASentContextListOptions = {},
   ): Promise<A2AContextPage> {
     const raw = await this.http.get<Raw>(`${base(handle)}/sent/contexts`, {
       cursor: options.cursor,

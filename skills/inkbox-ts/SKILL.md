@@ -593,6 +593,14 @@ for await (const message of identity.iterA2AMessages({
     message.parts,
   );
 }
+
+for (const context of (await identity.a2aContexts({ direction: "both" })).items) {
+  console.log(context.name, context.id);
+}
+
+await identity.a2aUpdateContext("context-uuid", {
+  name: "Quarterly Research Review",
+});
 ```
 
 Task filters: `direction`, `requesterHandle`, `workerHandle`, `state`,
@@ -607,6 +615,18 @@ rather than relevance-ranked.
 
 Use `a2aTask` / `a2aSentTask` for a task's current state and message history.
 
+New contexts start with the persisted name `New A2A Session`. That exact
+default may be replaced with a name based on the first task message. Either
+participant can rename a context at any time; automatic naming does not replace
+a non-default name. Context-level `caller` and `target` remain the
+original opener and recipient. Each nested task carries its own authoritative
+participants, and tasks in both directions can run concurrently.
+
+The standard client starts a sibling task when `contextId` is supplied without
+`taskId`. Supplying `taskId` continues that specific task. This cross-endpoint
+reuse is supported between Inkbox identities; external A2A services may define
+different behavior.
+
 For a multi-turn worker flow, reply with `intent: "ask_caller"` to request
 input; the caller continues the same task through the standard A2A client, and
 the worker later replies with `intent: "complete"` or `intent: "fail"`.
@@ -618,8 +638,9 @@ other admission-policy mutations require an admin API key:
 `a2aSetPubliclyDiscoverable`, `a2aSetFilterMode`, `a2aAddContactRule`, `a2aUpdateContactRule`, and
 `a2aDeleteContactRule`. Use `a2aResetSkills()` to restore the default Agent
 Card skills. Contact-rule directions are `inbound`, `outbound`, or `both`.
-The requester must allow the worker through its outbound policy, and the
-worker must allow the requester through its inbound policy.
+Same-organization and public discovery may imply admission. Private
+cross-organization calls require requester-outbound and worker-inbound
+permission; explicit blocks always win.
 
 ## Vault
 

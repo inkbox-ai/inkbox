@@ -171,6 +171,13 @@ export class A2AClient {
     return target;
   }
 
+  /**
+   * Send a message or task request to an A2A agent.
+   *
+   * `contextId` without `taskId` starts a new task in an existing context.
+   * `taskId` continues that task; `contextId` may also assert that the task
+   * belongs to the expected context.
+   */
   async send(
     target: A2AResolvedTarget,
     options: {

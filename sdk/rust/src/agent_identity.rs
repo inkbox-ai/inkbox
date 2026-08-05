@@ -156,6 +156,13 @@ impl AgentIdentity {
         self.inkbox.a2a().context(&self.agent_handle(), context_id)
     }
 
+    /// Rename a context shared with this identity.
+    pub fn a2a_update_context(&self, context_id: Uuid, name: &str) -> Result<A2AContext> {
+        self.inkbox
+            .a2a()
+            .update_context(&self.agent_handle(), context_id, name)
+    }
+
     pub fn a2a_sent_context(&self, context_id: Uuid) -> Result<A2AContext> {
         self.inkbox
             .a2a()

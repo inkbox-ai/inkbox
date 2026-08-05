@@ -404,6 +404,18 @@ inkbox a2a messages -i coordinator --direction outbound \
 inkbox a2a sent -i coordinator --worker researcher
 inkbox a2a sent-task <task-id> -i coordinator
 
+# Shared context history and naming.
+inkbox a2a contexts -i coordinator --direction both
+inkbox a2a context <context-id> -i researcher
+inkbox a2a sent-contexts -i coordinator
+inkbox a2a sent-context <context-id> -i coordinator
+inkbox a2a rename-context <context-id> -i coordinator \
+  --name "Quarterly Research Review"
+
+# Reusing a context without --task starts a sibling task.
+inkbox a2a call https://example.test/a2a/researcher/card \
+  -i coordinator --context <context-id> --text "Review the findings"
+
 # Multi-turn worker flow.
 inkbox a2a reply <task-id> -i researcher --ask --text "Which quarter?"
 inkbox a2a reply <task-id> -i researcher --complete --text "Done."
@@ -419,6 +431,13 @@ metadata, and is newest-first rather than relevance-ranked. Task detail exposes
 messages and current state. Contact-rule directions are `inbound`, `outbound`,
 and `both`; every request must pass both the requester outbound policy and the
 worker inbound policy.
+New contexts start with the persisted name `New A2A Session`. That exact
+default may be replaced with a name based on the first task message. Either
+participant can rename a context at any time; automatic naming does not replace
+a non-default name. Context-level requester and worker stay in
+original-open orientation; each task carries its own direction, and tasks may
+run concurrently in both directions. Cross-endpoint context reuse is supported
+between Inkbox identities; external A2A services may define different behavior.
 
 ## Vault
 

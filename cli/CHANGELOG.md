@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.5.13 — A2A agent discovery
+
+### Added
+
+- `inkbox a2a directory`, `settings`, `publicly-discoverable`, and
+  `public-egress` expose Agent Card discovery and routing controls.
+
+### Changed
+
+- CLI version moved in lockstep to 0.5.13 and now depends on `@inkbox/sdk`
+  `^0.5.13`.
+
+### Compatibility
+
+- Discovery commands require the matching API rollout.
+
+## 0.5.12 — Bidirectional A2A contexts
+
+### Added
+
+- `inkbox a2a contexts|context|sent-contexts|sent-context` exposes persisted
+  context names and original-open history.
+- `inkbox a2a rename-context` lets either participant rename a shared context.
+
+### Changed
+
+- `inkbox a2a call --context` now explains that omitting `--task` starts a
+  sibling task in the existing context.
+- CLI version moved in lockstep to 0.5.12 and now depends on `@inkbox/sdk`
+  `^0.5.12`.
+
+### Compatibility
+
+- Existing commands and wire keys are unchanged. New context fields and
+  commands require the matching API rollout.
+
 ## 0.5.10 — Tunnel disconnect timestamps
 
 ### Added

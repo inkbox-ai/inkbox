@@ -186,6 +186,7 @@ class A2ATaskPage:
 @dataclass(frozen=True)
 class A2AContext:
     id: str
+    name: str
     caller: A2ACaller
     target: A2ATarget | None
     tasks: list[A2ATask]
@@ -356,6 +357,7 @@ def parse_task(data: dict[str, Any]) -> A2ATask:
 def parse_context(data: dict[str, Any]) -> A2AContext:
     return A2AContext(
         id=data["id"],
+        name=data["name"],
         caller=parse_caller(data["caller"]),
         target=parse_target(data.get("target")),
         tasks=[parse_task(item) for item in data.get("tasks", [])],

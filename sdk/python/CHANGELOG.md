@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.5.13 — A2A agent discovery
+
+### Added
+
+- `inkbox.a2a.public_directory()` and `organization_directory()` expose typed,
+  searchable Agent Card directories with cursor iterators.
+- A2A settings expose `publicly_discoverable` and `allow_public_egress`.
+
+### Changed
+
+- Same-platform Agent Card retrieval authenticates without forwarding the
+  Inkbox key to external origins.
+- Package version moved in lockstep to 0.5.13.
+
+### Compatibility
+
+- New A2A settings fields preserve existing constructors through defaults.
+
+## 0.5.12 — Bidirectional A2A contexts
+
+### Added
+
+- `A2AContext.name` exposes the persisted name, and
+  `identity.a2a_update_context()` lets either participant rename a shared
+  context.
+
+### Changed
+
+- `A2AClient.send()` documents that `context_id` without `task_id` starts a
+  sibling task. Between Inkbox identities, either participant can use that
+  operation while tasks continue to preserve independent direction and state.
+- Package version moved in lockstep to 0.5.12.
+
+### Compatibility
+
+- Existing call signatures and wire keys are unchanged. Context parsing now
+  requires the matching API response with a persisted `name`.
+- Direct `A2AContext(...)` constructors must add `name`.
+- Received and sent context methods retain their original-open meanings.
+
 ## 0.5.10 — Tunnel disconnect timestamps
 
 ### Added

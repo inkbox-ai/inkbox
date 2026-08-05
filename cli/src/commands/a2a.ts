@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
 import type {
+  A2AContext,
   A2AHistoryDirection,
   A2AHistoryMessage,
   A2AMessageRole,
@@ -44,6 +45,14 @@ const MESSAGE_COLUMNS = [
   "text",
   "createdAt",
 ];
+const CONTEXT_COLUMNS = [
+  "id",
+  "name",
+  "peerHandle",
+  "originalDirection",
+  "taskCount",
+  "lastActivityAt",
+];
 const RULE_COLUMNS = ["id", "action", "matchTarget", "direction", "status"];
 const DIRECTORY_COLUMNS = ["name", "cardUrl", "visibility", "description"];
 
@@ -81,6 +90,23 @@ function messageText(message: A2AHistoryMessage): string {
     .map((part) => ("text" in part ? String(part.text) : ""))
     .filter(Boolean)
     .join(" ");
+}
+
+function contextTableItem(
+  context: A2AContext,
+  identityId: string,
+): Record<string, unknown> {
+  const openedByIdentity = context.caller.identityId === identityId;
+  return {
+    ...context,
+    peerHandle: openedByIdentity
+      ? context.target?.handle ?? null
+      : context.caller.handle,
+    originalDirection: openedByIdentity ? "outbound" : "inbound",
+    taskCount: context.tasksTruncated
+      ? `${context.tasks.length}+`
+      : context.tasks.length,
+  };
 }
 
 export function registerA2ACommands(program: Command): void {
@@ -453,6 +479,104 @@ export function registerA2ACommands(program: Command): void {
       output(result, { json: !!getGlobalOpts(this).json });
     }));
 
+  a2a.command("contexts")
+    .description("List an identity's A2A contexts")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--direction <direction>", "Filter: inbound, outbound, or both")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Results per page (1-100)", "50")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: {
+        identity: string;
+        direction?: string;
+        cursor?: string;
+        limit: string;
+      },
+    ) {
+      const identity = await identityFor(this, options.identity);
+      const result = await identity.a2aContexts({
+        direction: options.direction as
+          | "inbound"
+          | "outbound"
+          | "both"
+          | undefined,
+        cursor: options.cursor,
+        limit: positiveInt(options.limit, "--limit"),
+      });
+      outputCursorPage(
+        result,
+        this,
+        CONTEXT_COLUMNS,
+        result.items.map((context) => contextTableItem(context, identity.id)),
+      );
+    }));
+
+  a2a.command("context <context-id>")
+    .description("Show a context originally received by an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      contextId: string,
+      options: { identity: string },
+    ) {
+      const result = await (
+        await identityFor(this, options.identity)
+      ).a2aContext(contextId);
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("sent-contexts")
+    .description("List contexts originally opened by an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .option("--cursor <cursor>", "Pagination cursor")
+    .option("--limit <n>", "Results per page (1-100)", "50")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { identity: string; cursor?: string; limit: string },
+    ) {
+      const identity = await identityFor(this, options.identity);
+      const result = await identity.a2aSentContexts({
+        cursor: options.cursor,
+        limit: positiveInt(options.limit, "--limit"),
+      });
+      outputCursorPage(
+        result,
+        this,
+        CONTEXT_COLUMNS,
+        result.items.map((context) => contextTableItem(context, identity.id)),
+      );
+    }));
+
+  a2a.command("sent-context <context-id>")
+    .description("Show a context originally opened by an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(withErrorHandler(async function (
+      this: Command,
+      contextId: string,
+      options: { identity: string },
+    ) {
+      const result = await (
+        await identityFor(this, options.identity)
+      ).a2aSentContext(contextId);
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  a2a.command("rename-context <context-id>")
+    .description("Rename an A2A context shared with an identity")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .requiredOption("--name <name>", "New context name (up to five words)")
+    .action(withErrorHandler(async function (
+      this: Command,
+      contextId: string,
+      options: { identity: string; name: string },
+    ) {
+      const result = await (
+        await identityFor(this, options.identity)
+      ).a2aUpdateContext(contextId, { name: options.name });
+      output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
   a2a.command("messages")
     .description("List and search an identity's A2A message history")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
@@ -550,7 +674,10 @@ export function registerA2ACommands(program: Command): void {
     .description("Send a task to an A2A agent")
     .requiredOption("-i, --identity <handle>", "Local identity handle")
     .requiredOption("--text <text>", "Task text")
-    .option("--context <id>", "Continue a context")
+    .option(
+      "--context <id>",
+      "Start a new task in an existing context when --task is absent",
+    )
     .option("--task <id>", "Continue a task")
     .option("--message-id <id>", "Stable idempotency ID")
     .action(withErrorHandler(async function (

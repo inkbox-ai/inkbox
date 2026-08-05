@@ -141,6 +141,7 @@ export type A2ASentTaskListOptions = Omit<A2ATaskListOptions, "direction">;
 
 export interface A2AContext {
   id: string;
+  name: string;
   caller: A2ACaller;
   target: A2ATarget | null;
   tasks: A2ATask[];
@@ -153,6 +154,17 @@ export interface A2AContextPage {
   items: A2AContext[];
   nextCursor: string | null;
 }
+
+export interface A2AContextListOptions {
+  direction?: "inbound" | "outbound" | "both";
+  cursor?: string;
+  limit?: number;
+}
+
+export type A2ASentContextListOptions = Omit<
+  A2AContextListOptions,
+  "direction"
+>;
 
 export interface A2AHistoryMessage {
   id: string;
@@ -271,6 +283,7 @@ export function parseA2ATask(raw: Record<string, any>): A2ATask {
 export function parseA2AContext(raw: Record<string, any>): A2AContext {
   return {
     id: raw.id,
+    name: raw.name,
     caller: {
       identityId: raw.caller.identity_id,
       organizationId: raw.caller.organization_id,
