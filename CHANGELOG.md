@@ -18,6 +18,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Agent-scoped identity list and get operations now return only the caller's own
+  identity. Use the A2A organization directory to discover peers.
+- Webhook `agent_identities` enrichment now matches active identities throughout
+  the same organization instead of applying retired identity visibility grants.
 - Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.14; the
   CLI now depends on `@inkbox/sdk` `^0.5.14`.
 
