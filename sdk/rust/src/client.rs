@@ -523,7 +523,10 @@ impl Inkbox {
         Ok(AgentIdentity::new(data, self.clone()))
     }
 
-    /// List all agent identities for your organisation.
+    /// List identities visible to this credential.
+    ///
+    /// Agent-scoped credentials return only their own identity. Use the A2A
+    /// organization directory to discover peers.
     pub fn list_identities(&self) -> Result<Vec<AgentIdentitySummary>> {
         self.identities.list()
     }

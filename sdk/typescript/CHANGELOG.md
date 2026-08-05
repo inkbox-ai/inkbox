@@ -12,7 +12,15 @@
 
 - Same-platform Agent Card retrieval authenticates without forwarding the
   Inkbox key to external origins.
+- Agent-scoped identity list and get operations return only the caller's own
+  identity. Use the A2A organization directory to discover peers.
 - Package version moved in lockstep to 0.5.13.
+
+### Removed
+
+- **Source-breaking:** `IdentityAccess`, identity visibility response fields,
+  and identity access methods have been removed. Use A2A directories and
+  contact rules instead.
 
 ### Compatibility
 

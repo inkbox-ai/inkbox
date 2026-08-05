@@ -196,7 +196,6 @@ test("A2A context commands use canonical SDK routes and preserve names", async (
         phone_number: null,
         imessage_number: null,
         tunnel: null,
-        access: [],
       }));
       return;
     }

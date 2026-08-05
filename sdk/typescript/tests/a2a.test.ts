@@ -121,6 +121,54 @@ describe("A2AResource", () => {
     });
   });
 
+  it("follows directory cursors and stops after the final page", async () => {
+    const firstItem = {
+      card_url: "https://inkbox.ai/a2a/first/card",
+      card: { name: "@first", supportedInterfaces: [] },
+      visibility: "public",
+    };
+    const secondItem = {
+      card_url: "https://inkbox.ai/a2a/second/card",
+      card: { name: "@second", supportedInterfaces: [] },
+      visibility: "organization",
+    };
+    const http = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ items: [firstItem], next_cursor: "page-2" })
+        .mockResolvedValueOnce({ items: [secondItem], next_cursor: null }),
+    } as unknown as HttpTransport;
+    const publicHttp = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ items: [firstItem], next_cursor: "page-2" })
+        .mockResolvedValueOnce({ items: [secondItem], next_cursor: null }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http, publicHttp);
+
+    const publicItems = [];
+    for await (const item of resource.iterPublicDirectory({ q: "agent", limit: 2 })) {
+      publicItems.push(item.card.name);
+    }
+    const organizationItems = [];
+    for await (const item of resource.iterOrganizationDirectory({ q: "agent", limit: 2 })) {
+      organizationItems.push(item.card.name);
+    }
+
+    expect(publicItems).toEqual(["@first", "@second"]);
+    expect(organizationItems).toEqual(["@first", "@second"]);
+    expect(publicHttp.get).toHaveBeenNthCalledWith(1, "/a2a/directory", {
+      q: "agent", cursor: undefined, limit: 2,
+    });
+    expect(publicHttp.get).toHaveBeenNthCalledWith(2, "/a2a/directory", {
+      q: "agent", cursor: "page-2", limit: 2,
+    });
+    expect(http.get).toHaveBeenNthCalledWith(1, "/identities/a2a/directory", {
+      q: "agent", cursor: undefined, limit: 2,
+    });
+    expect(http.get).toHaveBeenNthCalledWith(2, "/identities/a2a/directory", {
+      q: "agent", cursor: "page-2", limit: 2,
+    });
+  });
+
   it("uses the exact task inbox path and query", async () => {
     const http = {
       get: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),

@@ -110,6 +110,57 @@ def test_directory_paths_search_and_pagination() -> None:
     )
 
 
+def test_directory_iterators_follow_cursors_and_stop() -> None:
+    first_item = {
+        "card_url": "https://inkbox.ai/a2a/first/card",
+        "card": {"name": "@first", "supportedInterfaces": []},
+        "visibility": "public",
+    }
+    second_item = {
+        "card_url": "https://inkbox.ai/a2a/second/card",
+        "card": {"name": "@second", "supportedInterfaces": []},
+        "visibility": "organization",
+    }
+    http = MagicMock()
+    public_http = MagicMock()
+    public_http.get.side_effect = [
+        {"items": [first_item], "next_cursor": "page-2"},
+        {"items": [second_item], "next_cursor": None},
+    ]
+    http.get.side_effect = [
+        {"items": [first_item], "next_cursor": "page-2"},
+        {"items": [second_item], "next_cursor": None},
+    ]
+    resource = A2AResource(http, public_http)
+
+    assert [item.card.name for item in resource.iter_public_directory(q="agent", limit=2)] == [
+        "@first",
+        "@second",
+    ]
+    assert [
+        item.card.name
+        for item in resource.iter_organization_directory(q="agent", limit=2)
+    ] == ["@first", "@second"]
+    expected_params = [
+        call("/a2a/directory", params={"q": "agent", "cursor": None, "limit": 2}),
+        call(
+            "/a2a/directory",
+            params={"q": "agent", "cursor": "page-2", "limit": 2},
+        ),
+    ]
+    assert public_http.get.call_args_list == expected_params
+    assert http.get.call_args_list == [
+        call(
+            "/identities/a2a/directory",
+            params={"q": "agent", "cursor": None, "limit": 2},
+        ),
+        call(
+            "/identities/a2a/directory",
+            params={"q": "agent", "cursor": "page-2", "limit": 2},
+        ),
+    ]
+
+
 def test_inbox_tasks_use_exact_path_and_query() -> None:
     http = MagicMock()
     http.get.return_value = {"items": [], "next_cursor": None}

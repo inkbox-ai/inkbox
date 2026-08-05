@@ -154,8 +154,12 @@ await inkbox.createIdentity("sales-bot-pt", { tunnel: { tlsMode: "passthrough" }
 const identity2 = await inkbox.getIdentity("sales-bot");
 await identity2.refresh();  // re-fetch channels from API
 
-// List all identities for your org
+// Admin credentials list organization identities; agent-scoped credentials
+// return only their own identity.
 const allIdentities = await inkbox.listIdentities();
+
+// Agent-scoped credentials discover peers through the A2A directory.
+const peers = await inkbox.a2a.organizationDirectory();
 
 // Update identity metadata or handle
 await identity.update({ newHandle: "sales-bot-v2" });

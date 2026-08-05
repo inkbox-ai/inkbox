@@ -143,8 +143,12 @@ inkbox.create_identity("sales-bot-pt", tunnel=IdentityTunnelCreateOptions(tls_mo
 identity = inkbox.get_identity("sales-bot")
 identity.refresh()  # re-fetch channels from API
 
-# List all identities for your org
+# Admin credentials list organization identities; agent-scoped credentials
+# return only their own identity.
 all_identities = inkbox.list_identities()
+
+# Agent-scoped credentials discover peers through the A2A directory.
+peers = inkbox.a2a.organization_directory()
 
 # Update handle, display name, and description. For description,
 # pass None to clear and omit the kwarg to leave untouched.

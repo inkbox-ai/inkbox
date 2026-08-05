@@ -276,7 +276,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::a2a::{
-        A2AContextListOptions, A2ADirectoryListOptions, A2ADirectoryVisibility,
+        A2AContextListOptions, A2ADirectoryListOptions, A2ADirectoryPage, A2ADirectoryVisibility,
         A2AHistoryDirection, A2AMessageListOptions, A2AMessageRole, A2ASentTaskListOptions,
         A2ATaskListOptions,
     };
@@ -339,6 +339,21 @@ mod tests {
             organization_page.items[0].visibility,
             A2ADirectoryVisibility::Organization
         );
+    }
+
+    #[test]
+    fn directory_visibility_tolerates_unknown_values() {
+        let page: A2ADirectoryPage = serde_json::from_value(json!({
+            "items": [{
+                "card_url": "https://example.com/a2a/helper/card",
+                "card": {"name": "@helper"},
+                "visibility": "partner"
+            }],
+            "next_cursor": null
+        }))
+        .unwrap();
+
+        assert_eq!(page.items[0].visibility, A2ADirectoryVisibility::Unknown);
     }
 
     #[test]

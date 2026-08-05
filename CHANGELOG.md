@@ -4,7 +4,18 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
 
-## 0.5.14 — Retire identity visibility grants
+## 0.5.13 — A2A agent discovery and identity access retirement
+
+### Added
+
+- Python, TypeScript, and Rust expose typed, searchable, cursor-paginated A2A
+  directories for publicly discoverable agents and enabled agents in the
+  authenticated organization.
+- Python and TypeScript A2A settings expose `publicly_discoverable` /
+  `publiclyDiscoverable` and `allow_public_egress` / `allowPublicEgress`, with
+  identity helpers for changing both settings.
+- The CLI adds `a2a directory`, `a2a settings`, `a2a publicly-discoverable`,
+  and `a2a public-egress` commands.
 
 ### Removed
 
@@ -18,41 +29,21 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
-- Agent-scoped identity list and get operations now return only the caller's own
-  identity. Use the A2A organization directory to discover peers.
-- Webhook `agent_identities` enrichment now matches active identities throughout
-  the same organization instead of applying retired identity visibility grants.
-- Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.14; the
-  CLI now depends on `@inkbox/sdk` `^0.5.14`.
-
-## 0.5.13 — A2A agent discovery
-
-### Added
-
-- Python, TypeScript, and Rust expose typed, searchable, cursor-paginated A2A
-  directories for publicly discoverable agents and enabled agents in the
-  authenticated organization.
-- Python and TypeScript A2A settings expose `publicly_discoverable` /
-  `publiclyDiscoverable` and `allow_public_egress` / `allowPublicEgress`, with
-  identity helpers for changing both settings.
-- The CLI adds `a2a directory`, `a2a settings`, `a2a publicly-discoverable`,
-  and `a2a public-egress` commands.
-
-### Changed
-
 - Python and TypeScript A2A clients authenticate Agent Card retrieval on the
   configured Inkbox origin. The Inkbox API key is never sent to external card
   or RPC origins; explicit external credentials remain restricted to a
   same-origin RPC endpoint.
-- Legacy identity-access types and methods remain available but are deprecated
-  in favor of A2A directories, settings, and contact rules.
+- Agent-scoped identity list and get operations now return only the caller's own
+  identity. Use the A2A organization directory to discover peers.
+- Webhook `agent_identities` enrichment now matches active identities throughout
+  the same organization instead of applying retired identity visibility grants.
 - Python, TypeScript, Rust, and CLI versions moved in lockstep to 0.5.13; the
   CLI now depends on `@inkbox/sdk` `^0.5.13`.
 
 ### Compatibility
 
-- Existing identity-access methods are unchanged. Directory and discovery
-  settings require an API version that supports A2A discovery.
+- Directory and discovery settings require an API version that supports A2A
+  discovery. Identity-access consumers must migrate before upgrading.
 - Settings responses from older API versions parse with the established
   defaults: public discovery disabled and public egress enabled.
 - TypeScript consumers that construct `A2ASettings` object literals must add

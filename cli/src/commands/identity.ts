@@ -328,7 +328,7 @@ export function registerIdentityCommands(program: Command): void {
 
   identity
     .command("list")
-    .description("List all identities")
+    .description("List visible identities (agent-scoped credentials return only themselves)")
     .action(
       withErrorHandler(async function (this: Command) {
         const opts = getGlobalOpts(this);

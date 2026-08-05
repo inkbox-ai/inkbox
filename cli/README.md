@@ -42,7 +42,7 @@ inkbox email send -i support-bot \
 # List recent emails
 inkbox email list -i support-bot --limit 10
 
-# List all identities (JSON output)
+# List identities visible to this credential (JSON output)
 inkbox --json identity list
 ```
 
@@ -74,8 +74,9 @@ inkbox signup status                             # Check claim status and restri
 Manage agent identities.
 
 ```bash
-inkbox identity list                         # List all identities
+inkbox identity list                         # Agent-scoped credentials return only themselves
 inkbox identity get <handle>                 # Get identity details
+inkbox a2a directory                         # Discover organization peers
 inkbox identity create <handle>              # Provisions identity + mailbox + tunnel atomically
   --display-name <name>                      #   Identity-level display name
   --description <text>                       #   Identity-level free-form description
