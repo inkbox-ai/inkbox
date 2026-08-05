@@ -223,6 +223,7 @@ export class Inkbox {
     const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar, userAgent);
     const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar, userAgent);
     const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar, userAgent);
+    const publicHttp   = new HttpTransport(apiKey, this._baseUrl, ms, cookieJar, userAgent);
 
     this._mailboxes        = new MailboxesResource(mailHttp);
     this._messages         = new MessagesResource(mailHttp);
@@ -259,7 +260,7 @@ export class Inkbox {
     this._notes = new NotesResource(apiHttp);
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
-    this._a2a = new A2AResource(apiHttp);
+    this._a2a = new A2AResource(apiHttp, publicHttp);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
@@ -376,6 +377,9 @@ export class Inkbox {
 
   /** Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys. */
   get apiKeys(): ApiKeysResource { return this._apiKeys; }
+
+  /** A2A public and organization directories. */
+  get a2a(): A2AResource { return this._a2a; }
 
   /**
    * Per-identity webhook signing keys. Use `createOrRotate(agentHandle)` /

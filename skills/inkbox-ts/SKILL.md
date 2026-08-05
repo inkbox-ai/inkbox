@@ -53,9 +53,6 @@ AgentIdentity (identity-scoped helper)
 ├── .phoneNumber            → IdentityPhoneNumber | null
 ├── .mailFilterMode / .phoneFilterMode → FilterMode
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
-├── .listAccess()           → Promise<IdentityAccess[]>
-├── .grantAccess(viewerId|null) → Promise<IdentityAccess>
-├── .revokeAccess(viewerId) → Promise<void>
 ├── .listMailContactRules() / .createMailContactRule(...) / .get/.update/.delete
 ├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (requires phone number)
 ├── .getSigningKeyStatus() / .createSigningKey()
@@ -102,22 +99,6 @@ await identity.releasePhoneNumber();
 ```
 
 Mailboxes and tunnels are not separately linkable — they are 1:1 with their owning identity. Use `inkbox.createIdentity()` to provision both; use `identity.delete()` to remove both (cascade).
-
-## Identity Visibility
-
-Controls which other agent identities can see an identity in API responses. Humans and admins always see every identity.
-
-```typescript
-const rules = await identity.listAccess();   // IdentityAccess[]
-// One wildcard row (viewerIdentityId === null → every active identity sees it),
-// explicit per-viewer rows, or [] (no agent can see it).
-
-await identity.grantAccess(viewer.id);        // grant one viewer identity
-await identity.grantAccess(null);             // reset to org-wide wildcard
-await identity.revokeAccess(viewer.id);       // revoke one viewer (keyed by viewer UUID)
-```
-
-Granting a viewer against an already-wildcard target raises `RedundantContactAccessGrantError` (409); revoking a non-existent grant raises `InkboxAPIError` (404).
 
 ## Mail
 
@@ -556,6 +537,15 @@ An identity can inspect work it received, work it requested, or both. Omit
 outbound-only alias.
 
 ```ts
+const directory = await inkbox.a2a.publicDirectory({ q: "research", limit: 25 });
+const orgDirectory = await inkbox.a2a.organizationDirectory({ q: "support" });
+for (const item of directory.items) {
+  console.log(item.card.name, item.cardUrl, item.visibility);
+}
+
+await identity.a2aSetPubliclyDiscoverable(true); // admin API key required
+await identity.a2aSetAllowPublicEgress(true);
+
 const page = await identity.a2aTasks({
   direction: "both",
   requesterHandle: "coordinator",
@@ -619,13 +609,16 @@ For a multi-turn worker flow, reply with `intent: "ask_caller"` to request
 input; the caller continues the same task through the standard A2A client, and
 the worker later replies with `intent: "complete"` or `intent: "fail"`.
 
-Receiver enablement and advertised skills may be changed with the identity's
-agent-scoped key. Admission-policy mutations require an admin API key:
-`a2aSetFilterMode`, `a2aAddContactRule`, `a2aUpdateContactRule`, and
+Directory methods accept `q`, `cursor`, and `limit`; async iterator variants
+follow all pages. Receiver enablement, public egress, and advertised skills may
+be changed with the identity's agent-scoped key. Public discoverability and
+other admission-policy mutations require an admin API key:
+`a2aSetPubliclyDiscoverable`, `a2aSetFilterMode`, `a2aAddContactRule`, `a2aUpdateContactRule`, and
 `a2aDeleteContactRule`. Use `a2aResetSkills()` to restore the default Agent
 Card skills. Contact-rule directions are `inbound`, `outbound`, or `both`.
-The requester must allow the worker through its outbound policy, and the
-worker must allow the requester through its inbound policy.
+Same-organization and public discovery may imply admission. Private
+cross-organization calls require requester-outbound and worker-inbound
+permission; explicit blocks always win.
 
 ## Vault
 

@@ -13,12 +13,9 @@ from sample_data_identities import (
     IDENTITY_DICT,
     IDENTITY_DETAIL_DICT,
     IDENTITY_LIST_DETAIL_DICT,
-    IDENTITY_ACCESS_WILDCARD_DICT,
-    IDENTITY_ACCESS_VIEWER_DICT,
 )
 from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.identities.types import (
-    IdentityAccess,
     IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions,
     IdentityTunnelCreateOptions,
@@ -155,7 +152,6 @@ class TestIdentitiesList:
         assert identities[0].agent_handle == HANDLE
         assert identities[0].mailbox.email_address == "sales-agent@inkbox.ai"
         assert identities[0].tunnel.tunnel_name == HANDLE
-        assert identities[0].access[0].viewer_identity_id is None
 
     def test_accepts_older_summary_response(self):
         res, http = _resource()
@@ -166,7 +162,6 @@ class TestIdentitiesList:
         assert identity.agent_handle == HANDLE
         assert identity.mailbox is None
         assert identity.tunnel is None
-        assert identity.access == []
 
     def test_empty_list(self):
         res, http = _resource()
@@ -312,83 +307,6 @@ class TestIdentitiesReleasePhoneNumber:
         res.release_phone_number(HANDLE)
 
         http.delete.assert_called_once_with(f"/{HANDLE}/phone_number")
-
-
-VIEWER_ID = "dddd4444-0000-0000-0000-000000000001"
-
-
-class TestIdentitiesListAccess:
-    def test_lists_per_viewer_rows(self):
-        res, http = _resource()
-        http.get.return_value = [IDENTITY_ACCESS_VIEWER_DICT]
-
-        rows = res.list_access(HANDLE)
-
-        http.get.assert_called_once_with(f"/{HANDLE}/access")
-        assert len(rows) == 1
-        assert isinstance(rows[0], IdentityAccess)
-        assert rows[0].viewer_identity_id == UUID(VIEWER_ID)
-        assert rows[0].target_identity_id == UUID(
-            "eeee5555-0000-0000-0000-000000000001"
-        )
-
-    def test_parses_wildcard_row(self):
-        res, http = _resource()
-        http.get.return_value = [IDENTITY_ACCESS_WILDCARD_DICT]
-
-        rows = res.list_access(HANDLE)
-
-        assert rows[0].viewer_identity_id is None
-
-    def test_empty_list(self):
-        res, http = _resource()
-        http.get.return_value = []
-
-        assert res.list_access(HANDLE) == []
-
-
-class TestIdentitiesGrantAccess:
-    def test_grants_per_viewer(self):
-        res, http = _resource()
-        http.post.return_value = IDENTITY_ACCESS_VIEWER_DICT
-
-        grant = res.grant_access(HANDLE, VIEWER_ID)
-
-        http.post.assert_called_once_with(
-            f"/{HANDLE}/access", json={"viewer_identity_id": VIEWER_ID}
-        )
-        assert isinstance(grant, IdentityAccess)
-        assert grant.viewer_identity_id == UUID(VIEWER_ID)
-
-    def test_grant_accepts_uuid_object(self):
-        res, http = _resource()
-        http.post.return_value = IDENTITY_ACCESS_VIEWER_DICT
-
-        res.grant_access(HANDLE, UUID(VIEWER_ID))
-
-        http.post.assert_called_once_with(
-            f"/{HANDLE}/access", json={"viewer_identity_id": VIEWER_ID}
-        )
-
-    def test_grant_wildcard_with_none(self):
-        res, http = _resource()
-        http.post.return_value = IDENTITY_ACCESS_WILDCARD_DICT
-
-        grant = res.grant_access(HANDLE, None)
-
-        http.post.assert_called_once_with(
-            f"/{HANDLE}/access", json={"viewer_identity_id": None}
-        )
-        assert grant.viewer_identity_id is None
-
-
-class TestIdentitiesRevokeAccess:
-    def test_revokes_viewer(self):
-        res, http = _resource()
-
-        res.revoke_access(HANDLE, VIEWER_ID)
-
-        http.delete.assert_called_once_with(f"/{HANDLE}/access/{VIEWER_ID}")
 
 
 class TestIdentitiesIMessageFields:

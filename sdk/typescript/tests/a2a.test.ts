@@ -28,6 +28,8 @@ describe("A2AResource", () => {
     const http = {
       get: vi.fn().mockResolvedValue({
         enabled: true,
+        publicly_discoverable: true,
+        allow_public_egress: false,
         filter_mode: "whitelist",
         skills: null,
         card_url: "https://example.test/a2a/helper/card",
@@ -42,9 +44,129 @@ describe("A2AResource", () => {
 
     expect(settings.inboundTaskCount).toBe(3);
     expect(settings.outboundTaskCount).toBe(5);
+    expect(settings.publiclyDiscoverable).toBe(true);
+    expect(settings.allowPublicEgress).toBe(false);
     expect(http.get).toHaveBeenCalledWith(
       "/identities/helper/a2a/settings",
     );
+  });
+
+  it("updates discovery settings with exact wire names", async () => {
+    const http = {
+      put: vi.fn().mockResolvedValue({
+        enabled: true,
+        publicly_discoverable: true,
+        allow_public_egress: false,
+        filter_mode: "whitelist",
+        skills: null,
+        card_url: "https://example.test/a2a/helper/card",
+        inbound_task_count: 0,
+        outbound_task_count: 0,
+        updated_at: null,
+      }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http);
+
+    const settings = await resource.updateSettings("helper", {
+      publicly_discoverable: true,
+      allow_public_egress: false,
+    });
+
+    expect(settings.publiclyDiscoverable).toBe(true);
+    expect(settings.allowPublicEgress).toBe(false);
+    expect(http.put).toHaveBeenCalledWith(
+      "/identities/helper/a2a/settings",
+      { publicly_discoverable: true, allow_public_egress: false },
+    );
+  });
+
+  it("uses typed public and organization directory paths", async () => {
+    const response = {
+      items: [{
+        card_url: "https://inkbox.ai/a2a/helper/card",
+        card: { name: "@helper", supportedInterfaces: [] },
+        visibility: "public",
+      }],
+      next_cursor: "next-page",
+    };
+    const http = { get: vi.fn().mockResolvedValue(response) } as unknown as HttpTransport;
+    const publicHttp = {
+      get: vi.fn().mockResolvedValue(response),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http, publicHttp);
+
+    const publicPage = await resource.publicDirectory({
+      q: "research",
+      cursor: "page",
+      limit: 20,
+    });
+    const organizationPage = await resource.organizationDirectory({
+      q: "research",
+      cursor: "page",
+      limit: 20,
+    });
+
+    expect(publicPage.items[0].card.name).toBe("@helper");
+    expect(publicPage.nextCursor).toBe("next-page");
+    expect(organizationPage.items[0].visibility).toBe("public");
+    expect(publicHttp.get).toHaveBeenCalledWith("/a2a/directory", {
+      q: "research",
+      cursor: "page",
+      limit: 20,
+    });
+    expect(http.get).toHaveBeenCalledWith("/identities/a2a/directory", {
+      q: "research",
+      cursor: "page",
+      limit: 20,
+    });
+  });
+
+  it("follows directory cursors and stops after the final page", async () => {
+    const firstItem = {
+      card_url: "https://inkbox.ai/a2a/first/card",
+      card: { name: "@first", supportedInterfaces: [] },
+      visibility: "public",
+    };
+    const secondItem = {
+      card_url: "https://inkbox.ai/a2a/second/card",
+      card: { name: "@second", supportedInterfaces: [] },
+      visibility: "organization",
+    };
+    const http = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ items: [firstItem], next_cursor: "page-2" })
+        .mockResolvedValueOnce({ items: [secondItem], next_cursor: null }),
+    } as unknown as HttpTransport;
+    const publicHttp = {
+      get: vi.fn()
+        .mockResolvedValueOnce({ items: [firstItem], next_cursor: "page-2" })
+        .mockResolvedValueOnce({ items: [secondItem], next_cursor: null }),
+    } as unknown as HttpTransport;
+    const resource = new A2AResource(http, publicHttp);
+
+    const publicItems = [];
+    for await (const item of resource.iterPublicDirectory({ q: "agent", limit: 2 })) {
+      publicItems.push(item.card.name);
+    }
+    const organizationItems = [];
+    for await (const item of resource.iterOrganizationDirectory({ q: "agent", limit: 2 })) {
+      organizationItems.push(item.card.name);
+    }
+
+    expect(publicItems).toEqual(["@first", "@second"]);
+    expect(organizationItems).toEqual(["@first", "@second"]);
+    expect(publicHttp.get).toHaveBeenNthCalledWith(1, "/a2a/directory", {
+      q: "agent", cursor: undefined, limit: 2,
+    });
+    expect(publicHttp.get).toHaveBeenNthCalledWith(2, "/a2a/directory", {
+      q: "agent", cursor: "page-2", limit: 2,
+    });
+    expect(http.get).toHaveBeenNthCalledWith(1, "/identities/a2a/directory", {
+      q: "agent", cursor: undefined, limit: 2,
+    });
+    expect(http.get).toHaveBeenNthCalledWith(2, "/identities/a2a/directory", {
+      q: "agent", cursor: "page-2", limit: 2,
+    });
   });
 
   it("uses the exact task inbox path and query", async () => {
@@ -606,7 +728,7 @@ describe("A2AResource", () => {
 });
 
 describe("A2AClient", () => {
-  it("fetches a card without credentials and pins the key to Inkbox RPC", async () => {
+  it("authenticates an Inkbox card fetch and pins the key to Inkbox RPC", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         name: "@helper",
@@ -668,7 +790,7 @@ describe("A2AClient", () => {
     expect(fetched.id).toBe("task-1");
     expect(canceled.status.state).toBe("TASK_STATE_CANCELED");
 
-    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty("X-API-Key");
+    expect(fetchMock.mock.calls[0][1].headers["X-API-Key"]).toBe("ApiKey_secret");
     const rpc = fetchMock.mock.calls[1][1];
     expect(rpc.headers["X-API-Key"]).toBe("ApiKey_secret");
     expect(rpc.headers["A2A-Version"]).toBe("1.0");
@@ -763,6 +885,55 @@ describe("A2AClient", () => {
     await client.getTask(target, "task-1");
 
     expect(fetchMock.mock.calls[1][1].headers).not.toHaveProperty("X-API-Key");
+  });
+
+  it("uses an external credential only for a same-origin RPC", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        name: "external",
+        supportedInterfaces: [{
+          url: "https://agent.example/rpc",
+          protocolBinding: "JSONRPC",
+          protocolVersion: "1.0",
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          id: "task-1",
+          contextId: "context-1",
+          status: { state: "TASK_STATE_SUBMITTED" },
+        },
+      }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new A2AClient("ApiKey_secret", "https://inkbox.ai");
+
+    const target = await client.fetchCard("https://agent.example/card", {
+      credential: "external-secret",
+    });
+    await client.getTask(target, "task-1");
+
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty("X-API-Key");
+    expect(fetchMock.mock.calls[1][1].headers["X-API-Key"]).toBe("external-secret");
+  });
+
+  it("rejects an external credential when card and RPC origins differ", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        name: "external",
+        supportedInterfaces: [{
+          url: "https://rpc.example/rpc",
+          protocolBinding: "JSONRPC",
+          protocolVersion: "1.0",
+        }],
+      }), { status: 200 }),
+    ));
+    const client = new A2AClient("ApiKey_secret", "https://inkbox.ai");
+
+    await expect(client.fetchCard("https://agent.example/card", {
+      credential: "external-secret",
+    })).rejects.toThrow("matching card and RPC origins");
   });
 
   it("passes statusTimestampAfter to standard ListTasks", async () => {

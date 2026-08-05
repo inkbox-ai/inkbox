@@ -154,8 +154,12 @@ await inkbox.createIdentity("sales-bot-pt", { tunnel: { tlsMode: "passthrough" }
 const identity2 = await inkbox.getIdentity("sales-bot");
 await identity2.refresh();  // re-fetch channels from API
 
-// List all identities for your org
+// Admin credentials list organization identities; agent-scoped credentials
+// return only their own identity.
 const allIdentities = await inkbox.listIdentities();
+
+// Agent-scoped credentials discover peers through the A2A directory.
+const peers = await inkbox.a2a.organizationDirectory();
 
 // Update identity metadata or handle
 await identity.update({ newHandle: "sales-bot-v2" });
@@ -167,32 +171,6 @@ await identity.releasePhoneNumber();
 // Delete (cascades to mailbox + tunnel + phone-number release; revokes scoped API keys).
 await identity.delete();
 ```
-
-### Identity visibility
-
-Control which other agent identities can see this identity in API responses.
-Humans and admins always see every identity regardless.
-
-```ts
-const identity = await inkbox.getIdentity("sales-bot");
-
-// List the current visibility rules. Either a single wildcard row
-// (viewerIdentityId === null — every active identity sees it) or
-// explicit per-viewer rows. An empty list means no agent can see it.
-const rules = await identity.listAccess();
-
-// Grant one viewer identity visibility
-const viewer = await inkbox.getIdentity("support-bot");
-await identity.grantAccess(viewer.id);
-
-// Make it visible to every active identity in the org (wildcard)
-await identity.grantAccess(null);
-
-// Revoke one viewer (keyed by the viewer identity's UUID)
-await identity.revokeAccess(viewer.id);
-```
-
----
 
 ## Mail
 
@@ -710,6 +688,15 @@ identity-owned webhook subscriptions — see
 ```ts
 const identity = await inkbox.getIdentity("coordinator");
 
+const publicAgents = await inkbox.a2a.publicDirectory({ q: "research", limit: 25 });
+const organizationAgents = await inkbox.a2a.organizationDirectory({ q: "support" });
+for (const item of publicAgents.items) {
+  console.log(item.card.name, item.cardUrl, item.visibility);
+}
+
+await identity.a2aSetPubliclyDiscoverable(true); // admin API key required
+await identity.a2aSetAllowPublicEgress(true);
+
 // Omit direction for the receiver inbox. Use "outbound" for requested work
 // or "both" for the complete identity-scoped history.
 const page = await identity.a2aTasks({
@@ -767,6 +754,12 @@ rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
 
+Directory methods support `q`, `cursor`, and `limit`; async iterator variants
+follow all pages. Receiver enablement, public egress, and advertised skills
+accept the identity's agent-scoped key. Public discoverability, filter-mode,
+and contact-rule create/update/delete operations require an admin API key. Use
+`a2aResetSkills()` to restore default skills.
+
 New contexts immediately expose the persisted name `New A2A Session`. That
 exact default may be replaced asynchronously with a short name based on the
 first task message. Either participant can rename the shared context at any
@@ -794,12 +787,14 @@ const result = await client.send(target, {
 Cross-endpoint context reuse is supported between Inkbox identities. External
 A2A services may define different context reuse behavior.
 
-Receiver enablement and advertised skills accept the identity's agent-scoped
-key. Filter-mode and contact-rule create/update/delete operations require an
-admin API key. Use `a2aResetSkills()` to restore default skills; rule
-directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
-requester's outbound policy and the worker's inbound policy; `both` applies in
-either role.
+Rule directions are `inbound`, `outbound`, or `both`. Same-organization and
+public discovery may imply admission; private cross-organization calls must
+pass the requester's outbound policy and the worker's inbound policy. `both`
+applies in either role, and explicit blocks always win.
+
+The standard client authenticates Agent Card retrieval on the configured
+Inkbox origin. It never sends the Inkbox API key to external card or RPC
+origins. An explicit external credential is sent only to a same-origin RPC URL.
 
 ## Credentials
 

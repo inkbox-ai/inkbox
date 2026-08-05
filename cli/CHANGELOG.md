@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.13 — A2A agent discovery
+
+### Added
+
+- `inkbox a2a directory`, `settings`, `publicly-discoverable`, and
+  `public-egress` expose Agent Card discovery and routing controls.
+
+### Changed
+
+- CLI version moved in lockstep to 0.5.13 and now depends on `@inkbox/sdk`
+  `^0.5.13`.
+- Agent-scoped `identity list` and `identity get` return only the caller's own
+  identity. Use `inkbox a2a directory` to discover peers.
+
+### Removed
+
+- **Source-breaking:** the `identity access` command group has been removed.
+  Use A2A directories and contact rules instead.
+
+### Compatibility
+
+- Discovery commands require the matching API rollout.
+
 ## 0.5.12 — Bidirectional A2A contexts
 
 ### Added

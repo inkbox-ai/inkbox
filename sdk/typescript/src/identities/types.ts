@@ -191,8 +191,6 @@ export interface AgentIdentitySummary {
   imessageNumber?: IdentityIMessageNumber | null;
   /** Linked tunnel summary when included by the response. */
   tunnel?: TunnelSummary | null;
-  /** Visibility grants when included by the response. */
-  access?: IdentityAccess[];
 }
 
 /** @internal Full identity data with channels — users interact with AgentIdentity (the class) instead. */
@@ -209,22 +207,6 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
    * `tunnels.get(identity.tunnel.id)`.
   */
   tunnel: TunnelSummary | null;
-}
-
-/**
- * A single identity-visibility grant on a target identity.
- *
- * `viewerIdentityId === null` is the wildcard sentinel — every active
- * identity in the org can see the target. Otherwise it is a per-viewer
- * grant naming exactly one viewer identity.
- */
-export interface IdentityAccess {
-  id: string;
-  /** The identity whose visibility this grant controls. */
-  targetIdentityId: string;
-  /** Viewer identity granted access, or `null` for the org-wide wildcard. */
-  viewerIdentityId: string | null;
-  createdAt: Date;
 }
 
 // ---- internal raw API shapes (snake_case from JSON) ----
@@ -279,7 +261,6 @@ export interface RawAgentIdentitySummary {
   phone_number?: RawIdentityPhoneNumber | null;
   imessage_number?: RawIdentityIMessageNumber | null;
   tunnel?: RawTunnelSummary | null;
-  access?: RawIdentityAccess[] | null;
 }
 
 export interface RawAgentIdentityData extends RawAgentIdentitySummary {
@@ -287,13 +268,6 @@ export interface RawAgentIdentityData extends RawAgentIdentitySummary {
   phone_number: RawIdentityPhoneNumber | null;
   imessage_number?: RawIdentityIMessageNumber | null;
   tunnel: RawTunnelSummary | null;
-}
-
-export interface RawIdentityAccess {
-  id: string;
-  target_identity_id: string;
-  viewer_identity_id: string | null;
-  created_at: string;
 }
 
 // ---- parsers ----
@@ -359,7 +333,6 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
       ? parseIdentityIMessageNumber(r.imessage_number)
       : null,
     tunnel: r.tunnel ? parseTunnelSummary(r.tunnel) : null,
-    access: (r.access ?? []).map(parseIdentityAccess),
   };
 }
 
@@ -372,15 +345,6 @@ export function parseAgentIdentityData(r: RawAgentIdentityData): _AgentIdentityD
       ? parseIdentityIMessageNumber(r.imessage_number)
       : null,
     tunnel: r.tunnel ? parseTunnelSummary(r.tunnel) : null,
-  };
-}
-
-export function parseIdentityAccess(r: RawIdentityAccess): IdentityAccess {
-  return {
-    id: r.id,
-    targetIdentityId: r.target_identity_id,
-    viewerIdentityId: r.viewer_identity_id,
-    createdAt: new Date(r.created_at),
   };
 }
 

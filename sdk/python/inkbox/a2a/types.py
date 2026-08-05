@@ -102,6 +102,8 @@ class A2ASettings:
     inbound_task_count: int
     outbound_task_count: int
     updated_at: datetime | None
+    publicly_discoverable: bool = False
+    allow_public_egress: bool = True
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,24 @@ class A2AContactRule:
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class A2ADirectoryVisibility(ForwardCompatibleStrEnum):
+    ORGANIZATION = "organization"
+    PUBLIC = "public"
+
+
+@dataclass(frozen=True)
+class A2ADirectoryItem:
+    card_url: str
+    card: A2ACard
+    visibility: A2ADirectoryVisibility
+
+
+@dataclass(frozen=True)
+class A2ADirectoryPage:
+    items: list[A2ADirectoryItem]
+    next_cursor: str | None
 
 
 @dataclass(frozen=True)
@@ -276,6 +296,14 @@ def parse_skill(data: dict[str, Any]) -> A2ASkill:
         examples=list(data.get("examples", [])),
         input_modes=list(data.get("inputModes", [])),
         output_modes=list(data.get("outputModes", [])),
+    )
+
+
+def parse_directory_item(data: dict[str, Any]) -> A2ADirectoryItem:
+    return A2ADirectoryItem(
+        card_url=data["card_url"],
+        card=A2ACard(data["card"]),
+        visibility=A2ADirectoryVisibility(data["visibility"]),
     )
 
 

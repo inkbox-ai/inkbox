@@ -39,7 +39,6 @@ from inkbox.vault.types import DecryptedVaultSecret, SecretPayload, VaultSecret
 from inkbox.identities.types import (
     _UNSET,
     _AgentIdentityData,
-    IdentityAccess,
     IdentityIMessageNumber,
     IdentityMailbox,
     IdentityPhoneNumber,
@@ -382,40 +381,6 @@ class AgentIdentity:
         self._require_phone()
         self._inkbox._ids_resource.release_phone_number(self.agent_handle)
         self._phone_number = None
-
-    ## Identity access / visibility
-
-    def list_access(self) -> list[IdentityAccess]:
-        """List who can see this identity.
-
-        See :meth:`IdentitiesResource.list_access`.
-        """
-        return self._inkbox._ids_resource.list_access(self.agent_handle)
-
-    def grant_access(
-        self, viewer_identity_id: UUID | str | None
-    ) -> IdentityAccess:
-        """Grant visibility on this identity.
-
-        Args:
-            viewer_identity_id: UUID of the viewer identity to grant, or
-                ``None`` to reset this identity to the org-wide wildcard
-                (every active identity in the org sees it).
-        """
-        return self._inkbox._ids_resource.grant_access(
-            self.agent_handle, viewer_identity_id
-        )
-
-    def revoke_access(self, viewer_identity_id: UUID | str) -> None:
-        """Revoke one viewer's visibility on this identity.
-
-        Args:
-            viewer_identity_id: UUID of the viewer identity to drop
-                (the viewer identity's UUID, not an access-row id).
-        """
-        self._inkbox._ids_resource.revoke_access(
-            self.agent_handle, viewer_identity_id
-        )
 
     ## Mail helpers
 
@@ -1454,6 +1419,20 @@ class AgentIdentity:
     def a2a_settings(self) -> A2ASettings:
         """Return this identity's A2A channel settings."""
         return self._inkbox._a2a.settings(self.agent_handle)
+
+    def a2a_set_publicly_discoverable(self, enabled: bool) -> A2ASettings:
+        """Set public directory visibility (admin-only)."""
+        return self._inkbox._a2a.update_settings(
+            self.agent_handle,
+            publicly_discoverable=enabled,
+        )
+
+    def a2a_set_allow_public_egress(self, enabled: bool) -> A2ASettings:
+        """Allow or deny A2A calls to publicly discoverable agents."""
+        return self._inkbox._a2a.update_settings(
+            self.agent_handle,
+            allow_public_egress=enabled,
+        )
 
     def a2a_set_skills(self, skills: list[A2ASkill]) -> A2ASettings:
         """Replace the skills advertised on this identity's Agent Card."""

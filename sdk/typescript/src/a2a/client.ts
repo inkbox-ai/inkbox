@@ -108,13 +108,19 @@ export class A2AClient {
     } = {},
   ): Promise<A2AResolvedTarget> {
     const canonicalCardUrl = canonicalUrl(cardUrl);
+    const cardOrigin = origin(canonicalCardUrl);
     const card = await withRequestTimeout(
       requestTimeout(options.requestTimeoutMs ?? this.requestTimeoutMs),
       "A2A Agent Card request",
       async (signal) => {
         const response = await fetch(canonicalCardUrl, {
           method: "GET",
-          headers: { Accept: "application/json" },
+          headers: {
+            Accept: "application/json",
+            ...(cardOrigin === this.platformOrigin
+              ? { "X-API-Key": this.apiKey }
+              : {}),
+          },
           redirect: "manual",
           signal,
         });
@@ -147,7 +153,7 @@ export class A2AClient {
         "External A2A credentials require matching card and RPC origins",
       );
     }
-    if (origin(canonicalCardUrl) === this.platformOrigin) {
+    if (cardOrigin === this.platformOrigin) {
       if (origin(rpcUrl) !== this.platformOrigin) {
         throw new TypeError("Inkbox Agent Card points to a non-Inkbox RPC origin");
       }

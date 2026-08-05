@@ -9,6 +9,8 @@ from inkbox.a2a.types import (
     A2AContactRule,
     A2AContext,
     A2AContextPage,
+    A2ADirectoryItem,
+    A2ADirectoryPage,
     A2AHistoryDirection,
     A2AHistoryMessage,
     A2AHistoryMessagePage,
@@ -23,6 +25,7 @@ from inkbox.a2a.types import (
     A2ATaskState,
     parse_context,
     parse_datetime,
+    parse_directory_item,
     parse_history_message,
     parse_skill,
     parse_task,
@@ -32,8 +35,13 @@ from inkbox.a2a.types import (
 class A2AResource:
     """Internal transport wrapper used by :class:`AgentIdentity`."""
 
-    def __init__(self, http: HttpTransport) -> None:
+    def __init__(
+        self,
+        http: HttpTransport,
+        public_http: HttpTransport | None = None,
+    ) -> None:
         self._http = http
+        self._public_http = public_http or http
 
     @staticmethod
     def _base(handle: str) -> str:
@@ -58,6 +66,8 @@ class A2AResource:
         data = self._http.get(f"{self._base(handle)}/settings")
         return A2ASettings(
             enabled=data["enabled"],
+            publicly_discoverable=data.get("publicly_discoverable", False),
+            allow_public_egress=data.get("allow_public_egress", True),
             filter_mode=data["filter_mode"],
             skills=(
                 [parse_skill(item) for item in data["skills"]]
@@ -74,6 +84,8 @@ class A2AResource:
         data = self._http.put(f"{self._base(handle)}/settings", json=changes)
         return A2ASettings(
             enabled=data["enabled"],
+            publicly_discoverable=data.get("publicly_discoverable", False),
+            allow_public_egress=data.get("allow_public_egress", True),
             filter_mode=data["filter_mode"],
             skills=(
                 [parse_skill(item) for item in data["skills"]]
@@ -84,6 +96,74 @@ class A2AResource:
             inbound_task_count=data.get("inbound_task_count", 0),
             outbound_task_count=data.get("outbound_task_count", 0),
             updated_at=parse_datetime(data.get("updated_at")),
+        )
+
+    def public_directory(
+        self,
+        *,
+        q: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2ADirectoryPage:
+        data = self._public_http.get(
+            "/a2a/directory",
+            params={"q": q, "cursor": cursor, "limit": limit},
+        )
+        return self._parse_directory(data)
+
+    def organization_directory(
+        self,
+        *,
+        q: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> A2ADirectoryPage:
+        data = self._http.get(
+            "/identities/a2a/directory",
+            params={"q": q, "cursor": cursor, "limit": limit},
+        )
+        return self._parse_directory(data)
+
+    def iter_public_directory(
+        self,
+        *,
+        q: str | None = None,
+        limit: int = 50,
+    ) -> Iterator[A2ADirectoryItem]:
+        yield from self._iter_directory(public=True, q=q, limit=limit)
+
+    def iter_organization_directory(
+        self,
+        *,
+        q: str | None = None,
+        limit: int = 50,
+    ) -> Iterator[A2ADirectoryItem]:
+        yield from self._iter_directory(public=False, q=q, limit=limit)
+
+    def _iter_directory(
+        self,
+        *,
+        public: bool,
+        q: str | None,
+        limit: int,
+    ) -> Iterator[A2ADirectoryItem]:
+        cursor = None
+        while True:
+            page = (
+                self.public_directory(q=q, cursor=cursor, limit=limit)
+                if public
+                else self.organization_directory(q=q, cursor=cursor, limit=limit)
+            )
+            yield from page.items
+            if not page.next_cursor:
+                return
+            cursor = page.next_cursor
+
+    @staticmethod
+    def _parse_directory(data: dict[str, Any]) -> A2ADirectoryPage:
+        return A2ADirectoryPage(
+            items=[parse_directory_item(item) for item in data["items"]],
+            next_cursor=data.get("next_cursor"),
         )
 
     def card(self, handle: str) -> dict[str, Any]:

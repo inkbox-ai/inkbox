@@ -143,8 +143,12 @@ inkbox.create_identity("sales-bot-pt", tunnel=IdentityTunnelCreateOptions(tls_mo
 identity = inkbox.get_identity("sales-bot")
 identity.refresh()  # re-fetch channels from API
 
-# List all identities for your org
+# Admin credentials list organization identities; agent-scoped credentials
+# return only their own identity.
 all_identities = inkbox.list_identities()
+
+# Agent-scoped credentials discover peers through the A2A directory.
+peers = inkbox.a2a.organization_directory()
 
 # Update handle, display name, and description. For description,
 # pass None to clear and omit the kwarg to leave untouched.
@@ -158,32 +162,6 @@ identity.release_phone_number()
 # Delete (cascades to mailbox + tunnel + phone-number release; revokes scoped API keys).
 identity.delete()
 ```
-
-### Identity visibility
-
-Control which other agent identities can see this identity in API responses.
-Humans and admins always see every identity regardless.
-
-```python
-identity = inkbox.get_identity("sales-bot")
-
-# List the current visibility rules. Either a single wildcard row
-# (viewer_identity_id is None — every active identity sees it) or
-# explicit per-viewer rows. An empty list means no agent can see it.
-rules = identity.list_access()
-
-# Grant one viewer identity visibility
-viewer = inkbox.get_identity("support-bot")
-identity.grant_access(viewer.id)
-
-# Make it visible to every active identity in the org (wildcard)
-identity.grant_access(None)
-
-# Revoke one viewer (keyed by the viewer identity's UUID)
-identity.revoke_access(viewer.id)
-```
-
----
 
 ## Mail
 
@@ -653,6 +631,14 @@ the five `imessage.*` event types.
 ```python
 identity = inkbox.get_identity("coordinator")
 
+public_agents = inkbox.a2a.public_directory(q="research", limit=25)
+organization_agents = inkbox.a2a.organization_directory(q="support")
+for item in public_agents.items:
+    print(item.card.name, item.card_url, item.visibility)
+
+identity.a2a_set_publicly_discoverable(True)  # admin API key required
+identity.a2a_set_allow_public_egress(True)
+
 # Omit direction for the receiver inbox. Use "outbound" for requested work
 # or "both" for the complete identity-scoped history.
 page = identity.a2a_tasks(
@@ -707,6 +693,12 @@ rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
 
+Directory methods support `q`, `cursor`, and `limit`; iterator variants follow
+all pages. Receiver enablement, public egress, and advertised skills accept the
+identity's agent-scoped key. Public discoverability, filter-mode, and
+contact-rule create/update/delete operations require an admin API key. Use
+`a2a_reset_skills()` to restore default skills.
+
 New contexts immediately expose the persisted name `New A2A Session`. That
 exact default may be replaced asynchronously with a short name based on the
 first task message. Either participant can rename the shared context at any
@@ -733,12 +725,14 @@ result = client.send(
 Cross-endpoint context reuse is supported between Inkbox identities. External
 A2A services may define different context reuse behavior.
 
-Receiver enablement and advertised skills accept the identity's agent-scoped
-key. Filter-mode and contact-rule create/update/delete operations require an
-admin API key. Use `a2a_reset_skills()` to restore default skills; rule
-directions are `inbound`, `outbound`, or `both`. A protocol call must pass the
-requester's outbound policy and the worker's inbound policy; `both` applies in
-either role.
+Rule directions are `inbound`, `outbound`, or `both`. Same-organization and
+public discovery may imply admission; private cross-organization calls must
+pass the requester's outbound policy and the worker's inbound policy. `both`
+applies in either role, and explicit blocks always win.
+
+The standard client authenticates Agent Card retrieval on the configured
+Inkbox origin. It never sends the Inkbox API key to external card or RPC
+origins. An explicit external credential is sent only to a same-origin RPC URL.
 
 ## Credentials
 

@@ -27,6 +27,10 @@ test("A2A exposes receiver inbox and caller sent-history commands", () => {
   assert.match(text, /sent-context (?:\[options\] )?<context-id>/);
   assert.match(text, /rename-context/);
   assert.match(text, /filter-mode/);
+  assert.match(text, /directory/);
+  assert.match(text, /settings/);
+  assert.match(text, /publicly-discoverable/);
+  assert.match(text, /public-egress/);
 });
 
 test("A2A call explains new-task context reuse", () => {
@@ -96,6 +100,17 @@ test("A2A admission controls expose complete admin operations", () => {
   assert.match(help("a2a", "rules", "update"), /--action <action>/);
   assert.match(help("a2a", "rules", "update"), /--direction <direction>/);
   assert.match(help("a2a", "rules", "delete"), /--identity <handle>/);
+  assert.match(help("a2a", "settings"), /--identity <handle>/);
+  assert.match(help("a2a", "publicly-discoverable"), /--identity <handle>/);
+  assert.match(help("a2a", "public-egress"), /--identity <handle>/);
+});
+
+test("A2A directory exposes search scope and pagination", () => {
+  const text = help("a2a", "directory");
+  assert.match(text, /--public/);
+  assert.match(text, /--query <query>/);
+  assert.match(text, /--cursor <cursor>/);
+  assert.match(text, /--limit <n>/);
 });
 
 test("A2A context commands use canonical SDK routes and preserve names", async (t) => {
@@ -181,7 +196,6 @@ test("A2A context commands use canonical SDK routes and preserve names", async (
         phone_number: null,
         imessage_number: null,
         tunnel: null,
-        access: [],
       }));
       return;
     }

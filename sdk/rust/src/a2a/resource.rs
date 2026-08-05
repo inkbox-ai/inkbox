@@ -4,23 +4,59 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::a2a::types::{
-    A2AContext, A2AContextListOptions, A2AContextPage, A2AHistoryDirection, A2AHistoryMessagePage,
-    A2AMessageListOptions, A2ASentTaskListOptions, A2ATask, A2ATaskListOptions, A2ATaskPage,
+    A2AContext, A2AContextListOptions, A2AContextPage, A2ADirectoryListOptions, A2ADirectoryPage,
+    A2AHistoryDirection, A2AHistoryMessagePage, A2AMessageListOptions, A2ASentTaskListOptions,
+    A2ATask, A2ATaskListOptions, A2ATaskPage,
 };
 use crate::error::Result;
 use crate::http::{HttpTransport, NO_QUERY};
 
 pub struct A2AResource {
     http: Arc<HttpTransport>,
+    public_http: Arc<HttpTransport>,
 }
 
 impl A2AResource {
-    pub(crate) fn new(http: Arc<HttpTransport>) -> Self {
-        Self { http }
+    pub(crate) fn new(http: Arc<HttpTransport>, public_http: Arc<HttpTransport>) -> Self {
+        Self { http, public_http }
     }
 
     fn base(agent_handle: &str) -> String {
         format!("/identities/{agent_handle}/a2a")
+    }
+
+    fn directory(
+        &self,
+        public: bool,
+        options: &A2ADirectoryListOptions,
+    ) -> Result<A2ADirectoryPage> {
+        let mut params = Vec::new();
+        if let Some(value) = &options.q {
+            params.push(("q", value.clone()));
+        }
+        if let Some(value) = &options.cursor {
+            params.push(("cursor", value.clone()));
+        }
+        if let Some(value) = options.limit {
+            params.push(("limit", value.to_string()));
+        }
+        let data = if public {
+            self.public_http.get("/a2a/directory", &params)?
+        } else {
+            self.http.get("/identities/a2a/directory", &params)?
+        };
+        Ok(serde_json::from_value(data)?)
+    }
+
+    pub fn public_directory(&self, options: &A2ADirectoryListOptions) -> Result<A2ADirectoryPage> {
+        self.directory(true, options)
+    }
+
+    pub fn organization_directory(
+        &self,
+        options: &A2ADirectoryListOptions,
+    ) -> Result<A2ADirectoryPage> {
+        self.directory(false, options)
     }
 
     pub fn tasks(&self, agent_handle: &str, options: &A2ATaskListOptions) -> Result<A2ATaskPage> {
@@ -240,10 +276,85 @@ mod tests {
     use uuid::Uuid;
 
     use crate::a2a::{
-        A2AContextListOptions, A2AHistoryDirection, A2AMessageListOptions, A2AMessageRole,
-        A2ASentTaskListOptions, A2ATaskListOptions,
+        A2AContextListOptions, A2ADirectoryListOptions, A2ADirectoryPage, A2ADirectoryVisibility,
+        A2AHistoryDirection, A2AMessageListOptions, A2AMessageRole, A2ASentTaskListOptions,
+        A2ATaskListOptions,
     };
     use crate::client::Inkbox;
+
+    #[test]
+    fn directory_methods_use_public_and_organization_paths() {
+        let server = MockServer::start();
+        let public_request = server.mock(|when, then| {
+            when.method(GET)
+                .path("/a2a/directory")
+                .query_param("q", "research")
+                .query_param("cursor", "page")
+                .query_param("limit", "20");
+            then.status(200).json_body(json!({
+                "items": [{
+                    "card_url": "https://example.com/a2a/helper/card",
+                    "card": {"name": "@helper"},
+                    "visibility": "public"
+                }],
+                "next_cursor": "next-page"
+            }));
+        });
+        let organization_request = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/identities/a2a/directory")
+                .query_param("q", "research")
+                .query_param("cursor", "page")
+                .query_param("limit", "20");
+            then.status(200).json_body(json!({
+                "items": [{
+                    "card_url": "https://example.com/a2a/helper/card",
+                    "card": {"name": "@helper"},
+                    "visibility": "organization"
+                }],
+                "next_cursor": null
+            }));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let options = A2ADirectoryListOptions {
+            q: Some("research".to_string()),
+            cursor: Some("page".to_string()),
+            limit: Some(20),
+        };
+
+        let public_page = client.a2a().public_directory(&options).unwrap();
+        let organization_page = client.a2a().organization_directory(&options).unwrap();
+
+        public_request.assert();
+        organization_request.assert();
+        assert_eq!(public_page.next_cursor.as_deref(), Some("next-page"));
+        assert_eq!(
+            public_page.items[0].visibility,
+            A2ADirectoryVisibility::Public
+        );
+        assert_eq!(
+            organization_page.items[0].visibility,
+            A2ADirectoryVisibility::Organization
+        );
+    }
+
+    #[test]
+    fn directory_visibility_tolerates_unknown_values() {
+        let page: A2ADirectoryPage = serde_json::from_value(json!({
+            "items": [{
+                "card_url": "https://example.com/a2a/helper/card",
+                "card": {"name": "@helper"},
+                "visibility": "partner"
+            }],
+            "next_cursor": null
+        }))
+        .unwrap();
+
+        assert_eq!(page.items[0].visibility, A2ADirectoryVisibility::Unknown);
+    }
 
     #[test]
     fn sent_tasks_use_caller_history_path_and_parse_target() {

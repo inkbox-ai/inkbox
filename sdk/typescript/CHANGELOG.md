@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.5.13 — A2A agent discovery
+
+### Added
+
+- `inkbox.a2a.publicDirectory()` and `organizationDirectory()` expose typed,
+  searchable Agent Card directories with cursor iterators.
+- A2A settings expose `publiclyDiscoverable` and `allowPublicEgress`.
+
+### Changed
+
+- Same-platform Agent Card retrieval authenticates without forwarding the
+  Inkbox key to external origins.
+- Agent-scoped identity list and get operations return only the caller's own
+  identity. Use the A2A organization directory to discover peers.
+- Package version moved in lockstep to 0.5.13.
+
+### Removed
+
+- **Source-breaking:** `IdentityAccess`, identity visibility response fields,
+  and identity access methods have been removed. Use A2A directories and
+  contact rules instead.
+
+### Compatibility
+
+- `A2ASettings` literals must add `publiclyDiscoverable` and
+  `allowPublicEgress`.
+
 ## 0.5.12 — Bidirectional A2A contexts
 
 ### Added

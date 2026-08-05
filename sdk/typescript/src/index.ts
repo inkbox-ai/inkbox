@@ -9,6 +9,10 @@ export type {
   A2AContext,
   A2AContextListOptions,
   A2AContextPage,
+  A2ADirectoryItem,
+  A2ADirectoryListOptions,
+  A2ADirectoryPage,
+  A2ADirectoryVisibility,
   A2AHistoryDirection,
   A2AHistoryMessage,
   A2AHistoryMessagePage,
@@ -288,7 +292,6 @@ export type {
 export type {
   AgentIdentitySummary,
   CreateIdentityOptions,
-  IdentityAccess,
   IdentityMailboxCreateOptions,
   IdentityMailbox,
   IdentityPhoneNumberCreateOptions,

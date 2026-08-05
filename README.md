@@ -143,7 +143,7 @@ inkbox vault secrets
 inkbox vault get <secret-id>
 ```
 
-### A2A history
+### A2A discovery and history
 
 Each identity can inspect work it received, work it requested, or both without
 duplicating task records. Task lists are newest-first and cursor-paginated.
@@ -152,10 +152,18 @@ Keyword search matches string and numeric content values from `text` and
 newest-first. A message's `role` is its author (`caller` or `agent`),
 independent of task direction.
 
-Calls between Inkbox identities use bilateral contact rules. The requester must
-allow the worker in its `outbound` direction, and the worker must allow the
-requester in its `inbound` direction. Use `both` when the same peer rule should
-apply in either role.
+Enabled same-organization identities can call each other without contact rules.
+Public agents accept enabled callers that allow public egress. Private
+cross-organization calls require the requester to allow the worker outbound and
+the worker to allow the requester inbound; explicit blocks always win.
+
+Search enabled agents in your organization or agents that opted into the public
+directory. Results include typed Agent Cards and opaque cursor pagination:
+
+```python
+public_agents = inkbox.a2a.public_directory(q="research", limit=25)
+organization_agents = inkbox.a2a.organization_directory(q="support")
+```
 
 An A2A context is a shared collaboration between its original two
 participants. Either participant can start another task in that context, and
@@ -193,6 +201,8 @@ identity.a2a_update_context(
 ```
 
 ```bash
+inkbox a2a directory --public --query research --limit 25
+inkbox a2a directory --query support
 inkbox a2a tasks -i coordinator --direction both --worker researcher
 inkbox a2a messages -i coordinator --direction outbound \
   --worker researcher --query revenue --json

@@ -12,6 +12,9 @@ from inkbox.a2a import (
     A2AContactRule,
     A2AContext,
     A2AContextPage,
+    A2ADirectoryItem,
+    A2ADirectoryPage,
+    A2ADirectoryVisibility,
     A2AHistoryDirection,
     A2AHistoryMessage,
     A2AHistoryMessagePage,
@@ -144,7 +147,6 @@ from inkbox.imessage.types import (
 # Identity types
 from inkbox.identities.types import (
     AgentIdentitySummary,
-    IdentityAccess,
     IdentityMailboxCreateOptions,
     IdentityMailbox,
     IdentityIMessageNumber,
@@ -382,6 +384,9 @@ __all__ = [
     "A2AContactRule",
     "A2AContext",
     "A2AContextPage",
+    "A2ADirectoryItem",
+    "A2ADirectoryPage",
+    "A2ADirectoryVisibility",
     "A2AHistoryDirection",
     "A2AHistoryMessage",
     "A2AHistoryMessagePage",
@@ -503,7 +508,6 @@ __all__ = [
     "IMessageTriageNumber",
     # Identity types
     "AgentIdentitySummary",
-    "IdentityAccess",
     "IdentityMailboxCreateOptions",
     "IdentityMailbox",
     "IdentityIMessageNumber",

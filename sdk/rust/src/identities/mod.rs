@@ -1,5 +1,5 @@
 //! The Inkbox **identities** domain: agent identities and their linked
-//! channels (mailbox, phone number, tunnel) plus identity-visibility grants.
+//! channels (mailbox, phone number, tunnel).
 //!
 //! Ported from `inkbox/identities/` in the Python SDK. The wire shape (JSON
 //! field names, enum string values, request bodies, query params, paths)
@@ -16,9 +16,9 @@ pub mod types;
 
 // Re-export the public types.
 pub use types::{
-    AgentIdentityData, AgentIdentitySummary, IdentityAccess, IdentityMailbox,
-    IdentityMailboxCreateOptions, IdentityPhoneNumber, IdentityPhoneNumberCreateOptions,
-    IdentityTunnelCreateOptions, Unset, VaultSecretIds,
+    AgentIdentityData, AgentIdentitySummary, IdentityMailbox, IdentityMailboxCreateOptions,
+    IdentityPhoneNumber, IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions, Unset,
+    VaultSecretIds,
 };
 
 // Re-export the domain exceptions.

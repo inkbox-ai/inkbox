@@ -233,6 +233,13 @@ class Inkbox:
             cookie_jar=_cookie_jar,
             user_agent=_ua,
         )
+        self._public_http = HttpTransport(
+            api_key=api_key,
+            base_url=self._base_url,
+            timeout=timeout,
+            cookie_jar=_cookie_jar,
+            user_agent=_ua,
+        )
 
         self._mailboxes = MailboxesResource(self._mail_http)
         self._messages = MessagesResource(self._mail_http)
@@ -272,7 +279,7 @@ class Inkbox:
         )
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
-        self._a2a = A2AResource(self._api_http)
+        self._a2a = A2AResource(self._api_http, self._public_http)
 
         self._contacts = ContactsResource(self._contacts_http)
         self._notes = NotesResource(self._contacts_http)
@@ -299,6 +306,7 @@ class Inkbox:
         self._vault_http.close()
         self._root_api_http.close()
         self._api_http.close()
+        self._public_http.close()
         self._contacts_http.close()
         self._domains_http.close()
 
@@ -420,6 +428,11 @@ class Inkbox:
     def api_keys(self) -> ApiKeysResource:
         """Org-level API key creation. Admin-scoped API keys can mint identity-scoped keys."""
         return self._api_keys
+
+    @property
+    def a2a(self) -> A2AResource:
+        """A2A public and organization directories."""
+        return self._a2a
 
     @property
     def signing_keys(self) -> SigningKeysResource:

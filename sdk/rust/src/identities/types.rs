@@ -385,8 +385,6 @@ pub struct AgentIdentitySummary {
     pub imessage_number: Option<IdentityIMessageNumber>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tunnel: Option<TunnelSummary>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub access: Vec<IdentityAccess>,
 }
 
 impl AgentIdentitySummary {
@@ -436,20 +434,6 @@ impl std::ops::DerefMut for AgentIdentityData {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.summary
     }
-}
-
-/// A single identity-visibility grant on a target identity.
-///
-/// `viewer_identity_id=None` is the wildcard sentinel — every active identity
-/// in the org can see the target. Otherwise it is a per-viewer grant naming
-/// exactly one viewer identity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IdentityAccess {
-    pub id: Uuid,
-    pub target_identity_id: Uuid,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub viewer_identity_id: Option<Uuid>,
-    pub created_at: String,
 }
 
 #[cfg(test)]

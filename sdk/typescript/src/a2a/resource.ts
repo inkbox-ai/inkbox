@@ -7,6 +7,9 @@ import type {
   A2AContext,
   A2AContextListOptions,
   A2AContextPage,
+  A2ADirectoryItem,
+  A2ADirectoryListOptions,
+  A2ADirectoryPage,
   A2AHistoryMessage,
   A2AHistoryMessagePage,
   A2AMessageListOptions,
@@ -51,12 +54,25 @@ function ruleDirection(
 function parseSettings(raw: Raw): A2ASettings {
   return {
     enabled: raw.enabled,
+    publiclyDiscoverable: raw.publicly_discoverable ?? false,
+    allowPublicEgress: raw.allow_public_egress ?? true,
     filterMode: raw.filter_mode,
     skills: raw.skills ?? null,
     cardUrl: raw.card_url,
     inboundTaskCount: raw.inbound_task_count ?? 0,
     outboundTaskCount: raw.outbound_task_count ?? 0,
     updatedAt: raw.updated_at ?? null,
+  };
+}
+
+function parseDirectory(raw: Raw): A2ADirectoryPage {
+  return {
+    items: (raw.items ?? []).map((item: Raw): A2ADirectoryItem => ({
+      cardUrl: item.card_url,
+      card: item.card,
+      visibility: item.visibility,
+    })),
+    nextCursor: raw.next_cursor ?? null,
   };
 }
 
@@ -74,7 +90,10 @@ function parseRule(raw: Raw): A2AContactRule {
 }
 
 export class A2AResource {
-  constructor(private readonly http: HttpTransport) {}
+  constructor(
+    private readonly http: HttpTransport,
+    private readonly publicHttp: HttpTransport = http,
+  ) {}
 
   async settings(handle: string): Promise<A2ASettings> {
     return parseSettings(await this.http.get<Raw>(`${base(handle)}/settings`));
@@ -82,11 +101,63 @@ export class A2AResource {
 
   async updateSettings(
     handle: string,
-    changes: { enabled?: boolean; filter_mode?: FilterMode; skills?: A2ASkill[] | null },
+    changes: {
+      enabled?: boolean;
+      publicly_discoverable?: boolean;
+      allow_public_egress?: boolean;
+      filter_mode?: FilterMode;
+      skills?: A2ASkill[] | null;
+    },
   ): Promise<A2ASettings> {
     return parseSettings(
       await this.http.put<Raw>(`${base(handle)}/settings`, changes),
     );
+  }
+
+  async publicDirectory(
+    options: A2ADirectoryListOptions = {},
+  ): Promise<A2ADirectoryPage> {
+    return parseDirectory(await this.publicHttp.get<Raw>("/a2a/directory", {
+      q: options.q,
+      cursor: options.cursor,
+      limit: options.limit ?? 50,
+    }));
+  }
+
+  async organizationDirectory(
+    options: A2ADirectoryListOptions = {},
+  ): Promise<A2ADirectoryPage> {
+    return parseDirectory(await this.http.get<Raw>("/identities/a2a/directory", {
+      q: options.q,
+      cursor: options.cursor,
+      limit: options.limit ?? 50,
+    }));
+  }
+
+  async *iterPublicDirectory(
+    options: Omit<A2ADirectoryListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2ADirectoryItem> {
+    yield* this.iterDirectory(true, options);
+  }
+
+  async *iterOrganizationDirectory(
+    options: Omit<A2ADirectoryListOptions, "cursor"> = {},
+  ): AsyncGenerator<A2ADirectoryItem> {
+    yield* this.iterDirectory(false, options);
+  }
+
+  private async *iterDirectory(
+    publicDirectory: boolean,
+    options: Omit<A2ADirectoryListOptions, "cursor">,
+  ): AsyncGenerator<A2ADirectoryItem> {
+    let cursor: string | undefined;
+    do {
+      const page = publicDirectory
+        ? await this.publicDirectory({ ...options, cursor })
+        : await this.organizationDirectory({ ...options, cursor });
+      yield* page.items;
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
   }
 
   card(handle: string): Promise<Record<string, unknown>> {
