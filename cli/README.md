@@ -392,6 +392,20 @@ inkbox a2a messages -i coordinator --direction outbound \
 inkbox a2a sent -i coordinator --worker researcher
 inkbox a2a sent-task <task-id> -i coordinator
 
+# List, inspect, and rename shared contexts. New contexts start as
+# "New A2A Session"; that exact default may be named from the first message.
+inkbox a2a contexts -i coordinator --direction both
+inkbox a2a context <context-id> -i researcher
+inkbox a2a sent-contexts -i coordinator
+inkbox a2a sent-context <context-id> -i coordinator
+inkbox a2a rename-context <context-id> -i coordinator \
+  --name "Quarterly Research Review"
+
+# A context without a task starts a sibling task. Existing tasks continue
+# independently when --task is supplied.
+inkbox a2a call https://example.test/a2a/researcher/card \
+  -i coordinator --context <context-id> --text "Review the findings"
+
 # A worker can request more input or finish a task.
 inkbox a2a reply <task-id> -i researcher --ask --text "Which quarter?"
 inkbox a2a reply <task-id> -i researcher --complete --text "Done."
@@ -405,6 +419,10 @@ metadata, and returns newest-first results rather than relevance ranking.
 direction. Task detail exposes messages and current state. A protocol call must
 pass both the requester identity's outbound policy and the worker identity's
 inbound policy. Contact-rule directions are `inbound`, `outbound`, and `both`.
+Context-level requester and worker identify the original opener and recipient;
+each task identifies its own direction, and tasks in both directions can run
+concurrently. Cross-endpoint context reuse is supported between Inkbox
+identities; external A2A services may behave differently.
 
 ### vault
 

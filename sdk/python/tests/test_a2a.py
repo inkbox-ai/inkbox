@@ -15,9 +15,10 @@ from inkbox.a2a.types import (
     A2AMessageRole,
     A2AReplyIntent,
     A2ARuleDirection,
+    A2AResolvedTarget,
     A2ATaskState,
 )
-from inkbox.exceptions import InkboxError
+from inkbox.exceptions import InkboxAPIError, InkboxError
 
 
 def test_settings_parse_participant_task_counts() -> None:
@@ -286,6 +287,7 @@ def test_sent_task_and_context_use_exact_paths() -> None:
         },
         {
             "id": "context-1",
+            "name": "Quarterly Research",
             "caller": {
                 "identity_id": "caller-1",
                 "organization_id": "org-caller",
@@ -302,6 +304,7 @@ def test_sent_task_and_context_use_exact_paths() -> None:
     assert resource.sent_task("caller", "task-1").id == "task-1"
     context = resource.sent_context("caller", "context-1")
     assert context.id == "context-1"
+    assert context.name == "Quarterly Research"
     assert context.tasks_truncated is True
     assert http.get.call_args_list == [
         call(
@@ -330,6 +333,149 @@ def test_context_history_forwards_direction() -> None:
         "/identities/coordinator/a2a/contexts",
         params={"direction": "both", "cursor": "opaque", "limit": 20},
     )
+
+
+def test_context_preserves_original_pair_and_mixed_direction_tasks() -> None:
+    http = MagicMock()
+    http.get.return_value = {
+        "id": "context-1",
+        "name": "Analyse Überprüfung Ergebnis Jetzt",
+        "caller": {
+            "identity_id": "identity-a",
+            "organization_id": "org-a",
+            "handle": "coordinator",
+        },
+        "target": {
+            "identity_id": "identity-b",
+            "organization_id": "org-b",
+            "handle": "researcher",
+        },
+        "tasks": [
+            {
+                "id": "task-a-b",
+                "context_id": "context-1",
+                "state": "working",
+                "caller": {
+                    "identity_id": "identity-a",
+                    "organization_id": "org-a",
+                    "handle": "coordinator",
+                },
+                "target": {
+                    "identity_id": "identity-b",
+                    "organization_id": "org-b",
+                    "handle": "researcher",
+                },
+                "messages": [{
+                    "id": "message-a-b",
+                    "message_id": "protocol-a-b",
+                    "role": "caller",
+                    "parts": [{"text": "Analyse"}],
+                    "metadata": None,
+                    "extensions": None,
+                    "reference_task_ids": None,
+                    "created_at": "2026-08-01T00:00:00Z",
+                }],
+                "completed_at": None,
+                "created_at": "2026-08-01T00:00:00Z",
+                "updated_at": "2026-08-01T00:01:00Z",
+            },
+            {
+                "id": "task-b-a",
+                "context_id": "context-1",
+                "state": "submitted",
+                "caller": {
+                    "identity_id": "identity-b",
+                    "organization_id": "org-b",
+                    "handle": "researcher",
+                },
+                "target": {
+                    "identity_id": "identity-a",
+                    "organization_id": "org-a",
+                    "handle": "coordinator",
+                },
+                "messages": [{
+                    "id": "message-b-a",
+                    "message_id": "protocol-b-a",
+                    "role": "caller",
+                    "parts": [{"text": "Review"}],
+                    "metadata": None,
+                    "extensions": None,
+                    "reference_task_ids": None,
+                    "created_at": "2026-08-01T00:00:30Z",
+                }],
+                "completed_at": None,
+                "created_at": "2026-08-01T00:00:30Z",
+                "updated_at": "2026-08-01T00:00:30Z",
+            },
+        ],
+        "created_at": "2026-08-01T00:00:00Z",
+        "last_activity_at": "2026-08-01T00:01:00Z",
+    }
+    resource = A2AResource(http)
+
+    context = resource.context("coordinator", "context-1")
+
+    assert context.name == "Analyse Überprüfung Ergebnis Jetzt"
+    assert context.caller.identity_id == "identity-a"
+    assert context.target is not None
+    assert context.target.identity_id == "identity-b"
+    assert context.tasks[0].caller.identity_id == "identity-a"
+    assert context.tasks[0].target is not None
+    assert context.tasks[0].target.identity_id == "identity-b"
+    assert context.tasks[0].state is A2ATaskState.WORKING
+    assert context.tasks[0].messages[0].parts == [{"text": "Analyse"}]
+    assert context.tasks[1].caller.identity_id == "identity-b"
+    assert context.tasks[1].target is not None
+    assert context.tasks[1].target.identity_id == "identity-a"
+    assert context.tasks[1].state is A2ATaskState.SUBMITTED
+    assert context.tasks[1].messages[0].parts == [{"text": "Review"}]
+
+
+def test_update_context_uses_participant_path_and_exact_body() -> None:
+    http = MagicMock()
+    http.patch.return_value = {
+        "id": "context-1",
+        "name": "Analyse Überprüfung Ergebnis Jetzt",
+        "caller": {
+            "identity_id": "identity-a",
+            "organization_id": "org-a",
+            "handle": "coordinator",
+        },
+        "target": {
+            "identity_id": "identity-b",
+            "organization_id": "org-b",
+            "handle": "researcher",
+        },
+        "tasks": [],
+        "created_at": "2026-08-01T00:00:00Z",
+        "last_activity_at": "2026-08-01T00:01:00Z",
+    }
+    resource = A2AResource(http)
+
+    context = resource.update_context(
+        "coordinator",
+        "context-1",
+        name="Analyse Überprüfung Ergebnis Jetzt",
+    )
+
+    assert context.name == "Analyse Überprüfung Ergebnis Jetzt"
+    http.patch.assert_called_once_with(
+        "/identities/coordinator/a2a/contexts/context-1",
+        json={"name": "Analyse Überprüfung Ergebnis Jetzt"},
+    )
+
+
+def test_update_context_preserves_server_validation_detail() -> None:
+    http = MagicMock()
+    error = InkboxAPIError(422, "Context names contain at most five words")
+    http.patch.side_effect = error
+    resource = A2AResource(http)
+
+    with pytest.raises(InkboxAPIError) as raised:
+        resource.update_context("coordinator", "context-1", name="Too many words")
+
+    assert raised.value is error
+    assert raised.value.detail == "Context names contain at most five words"
 
 
 def test_contact_rule_update_and_delete_use_admin_routes() -> None:
@@ -549,6 +695,69 @@ def test_a2a_client_fetches_card_without_key_then_pins_rpc_key() -> None:
     assert list_body["params"]["statusTimestampAfter"] == (
         "2026-07-25T12:30:00Z"
     )
+    client.close()
+
+
+def test_a2a_send_context_reuse_uses_exact_wire_fields() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": len(requests),
+                "result": {
+                    "task": {
+                        "id": f"task-{len(requests)}",
+                        "contextId": "context-1",
+                        "status": {"state": "TASK_STATE_SUBMITTED"},
+                    }
+                },
+            },
+        )
+
+    client = A2AClient(api_key="ApiKey_secret", platform_base_url="https://inkbox.ai")
+    client._client.close()
+    client._client = httpx.Client(transport=httpx.MockTransport(handler))
+    target = A2AResolvedTarget(
+        card_url="https://inkbox.ai/a2a/researcher/card",
+        rpc_url="https://inkbox.ai/a2a/researcher",
+        protocol_version="1.0",
+        card=MagicMock(),
+        credential="ApiKey_secret",
+    )
+
+    client.send(
+        target,
+        text="Start reverse review",
+        message_id="message-1",
+        context_id="context-1",
+    )
+    client.send(
+        target,
+        text="Continue the task",
+        message_id="message-2",
+        context_id="context-1",
+        task_id="task-1",
+    )
+
+    first = json.loads(requests[0].content)["params"]["message"]
+    assert first == {
+        "messageId": "message-1",
+        "role": "ROLE_USER",
+        "parts": [{"text": "Start reverse review"}],
+        "contextId": "context-1",
+    }
+    second = json.loads(requests[1].content)["params"]["message"]
+    assert second == {
+        "messageId": "message-2",
+        "role": "ROLE_USER",
+        "parts": [{"text": "Continue the task"}],
+        "contextId": "context-1",
+        "taskId": "task-1",
+    }
     client.close()
 
 

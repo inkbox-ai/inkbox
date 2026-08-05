@@ -1687,8 +1687,21 @@ class AgentIdentity:
         )
 
     def a2a_context(self, context_id: UUID | str) -> A2AContext:
-        """Get a receiver-side A2A context and its tasks."""
+        """Get a context this identity originally received and its tasks."""
         return self._inkbox._a2a.context(self.agent_handle, str(context_id))
+
+    def a2a_update_context(
+        self,
+        context_id: UUID | str,
+        *,
+        name: str,
+    ) -> A2AContext:
+        """Rename a context shared with this identity."""
+        return self._inkbox._a2a.update_context(
+            self.agent_handle,
+            str(context_id),
+            name=name,
+        )
 
     def a2a_sent_contexts(
         self,
@@ -1704,7 +1717,7 @@ class AgentIdentity:
         )
 
     def a2a_sent_context(self, context_id: UUID | str) -> A2AContext:
-        """Get an A2A context started by this identity."""
+        """Get a context originally opened by this identity."""
         return self._inkbox._a2a.sent_context(
             self.agent_handle,
             str(context_id),

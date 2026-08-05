@@ -604,6 +604,14 @@ for message in identity.iter_a2a_messages(
     q="revenue",
 ):
     print(message.task_id, message.context_id, message.task_state, message.parts)
+
+for context in identity.a2a_contexts(direction="both").items:
+    print(context.name, context.id)
+
+identity.a2a_update_context(
+    "context-uuid",
+    name="Quarterly Research Review",
+)
 ```
 
 Task filters: `direction`, `requester_handle`, `worker_handle`, `state`,
@@ -617,6 +625,18 @@ task/context provenance. Search covers string and numeric content values from
 rather than relevance-ranked.
 
 Use `a2a_task` / `a2a_sent_task` for a task's current state and message history.
+
+New contexts start with the persisted name `New A2A Session`. That exact
+default may be replaced with a name based on the first task message. Either
+participant can rename a context at any time; automatic naming does not replace
+a non-default name. Context-level `caller` and `target` remain the
+original opener and recipient. Each nested task carries its own authoritative
+participants, and tasks in both directions can run concurrently.
+
+The standard client starts a sibling task when `context_id` is supplied without
+`task_id`. Supplying `task_id` continues that specific task. This cross-endpoint
+reuse is supported between Inkbox identities; external A2A services may define
+different behavior.
 
 For a multi-turn worker flow, reply with `intent="ask_caller"` to request input;
 the caller continues the same task through the standard A2A client, and the

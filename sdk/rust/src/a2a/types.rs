@@ -162,6 +162,7 @@ pub struct A2AHistoryMessagePage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2AContext {
     pub id: Uuid,
+    pub name: String,
     pub caller: A2ACaller,
     #[serde(default)]
     pub target: Option<A2ATarget>,

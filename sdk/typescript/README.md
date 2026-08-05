@@ -747,6 +747,16 @@ for await (const message of identity.iterA2AMessages({
 
 // The outbound alias is convenient when only requested work is needed.
 const sent = await identity.a2aSentTasks({ workerHandle: "researcher" });
+
+// Context caller/target stays in original-open orientation. Each nested task
+// carries its own caller and target, so both directions can run concurrently.
+for (const context of (await identity.a2aContexts({ direction: "both" })).items) {
+  console.log(context.name, context.id);
+}
+
+const renamed = await identity.a2aUpdateContext("context-uuid", {
+  name: "Quarterly Research Review",
+});
 ```
 
 Task keyword filtering returns tasks containing a matching message. Message
@@ -756,6 +766,33 @@ values from `text` and `data` parts, excludes metadata, and is newest-first
 rather than relevance-ranked. `role` is the message author (`caller` or
 `agent`), independent of task direction. Task detail exposes message history
 and current state.
+
+New contexts immediately expose the persisted name `New A2A Session`. That
+exact default may be replaced asynchronously with a short name based on the
+first task message. Either participant can rename the shared context at any
+time; a non-default name is not replaced by automatic naming.
+Applications should display the returned value as-is. Context-level `caller`
+and `target` always identify the original opener and recipient. Nested task
+participants are authoritative for each task's direction, and multiple tasks
+can run concurrently in either direction.
+
+The standard client reuses the existing `contextId` option. Supplying a context
+without a task starts a sibling task; supplying `taskId` continues that
+specific task:
+
+```ts
+const client = await identity.a2aClient();
+const target = await client.fetchCard(
+  "https://example.test/a2a/researcher/card",
+);
+const result = await client.send(target, {
+  text: "Review the updated findings",
+  contextId: "context-uuid",
+});
+```
+
+Cross-endpoint context reuse is supported between Inkbox identities. External
+A2A services may define different context reuse behavior.
 
 Receiver enablement and advertised skills accept the identity's agent-scoped
 key. Filter-mode and contact-rule create/update/delete operations require an

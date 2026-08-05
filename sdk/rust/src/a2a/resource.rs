@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::a2a::types::{
@@ -209,6 +210,20 @@ impl A2AResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// Rename a context visible to either participant.
+    pub fn update_context(
+        &self,
+        agent_handle: &str,
+        context_id: Uuid,
+        name: &str,
+    ) -> Result<A2AContext> {
+        let data = self.http.patch(
+            &format!("{}/contexts/{context_id}", Self::base(agent_handle)),
+            &json!({"name": name}),
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
     pub fn sent_context(&self, agent_handle: &str, context_id: Uuid) -> Result<A2AContext> {
         let data = self.http.get(
             &format!("{}/sent/contexts/{context_id}", Self::base(agent_handle)),
@@ -365,6 +380,227 @@ mod tests {
             .unwrap();
 
         request.assert();
+    }
+
+    #[test]
+    fn context_preserves_name_original_pair_and_mixed_direction_tasks() {
+        let server = MockServer::start();
+        let context_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let request = server.mock(|when, then| {
+            when.method(GET).path(
+                "/api/v1/identities/coordinator/a2a/contexts/22222222-2222-2222-2222-222222222222",
+            );
+            then.status(200).json_body(json!({
+                "id": context_id,
+                "name": "Analyse Überprüfung Ergebnis Jetzt",
+                "caller": {
+                    "identity_id": "33333333-3333-3333-3333-333333333333",
+                    "organization_id": "org_a",
+                    "handle": "coordinator",
+                    "trust_tier": "inkbox_verified"
+                },
+                "target": {
+                    "identity_id": "44444444-4444-4444-4444-444444444444",
+                    "organization_id": "org_b",
+                    "handle": "researcher"
+                },
+                "tasks": [{
+                    "id": "55555555-5555-5555-5555-555555555555",
+                    "context_id": context_id,
+                    "state": "working",
+                    "caller": {
+                        "identity_id": "33333333-3333-3333-3333-333333333333",
+                        "organization_id": "org_a",
+                        "handle": "coordinator",
+                        "trust_tier": "inkbox_verified"
+                    },
+                    "target": {
+                        "identity_id": "44444444-4444-4444-4444-444444444444",
+                        "organization_id": "org_b",
+                        "handle": "researcher"
+                    },
+                    "messages": [{
+                        "id": "77777777-7777-7777-7777-777777777777",
+                        "message_id": "protocol-a-b",
+                        "role": "caller",
+                        "parts": [{"text": "Analyse"}],
+                        "metadata": null,
+                        "extensions": null,
+                        "reference_task_ids": null,
+                        "created_at": "2026-08-01T00:00:00Z"
+                    }],
+                    "completed_at": null,
+                    "created_at": "2026-08-01T00:00:00Z",
+                    "updated_at": "2026-08-01T00:01:00Z"
+                }, {
+                    "id": "66666666-6666-6666-6666-666666666666",
+                    "context_id": context_id,
+                    "state": "submitted",
+                    "caller": {
+                        "identity_id": "44444444-4444-4444-4444-444444444444",
+                        "organization_id": "org_b",
+                        "handle": "researcher",
+                        "trust_tier": "inkbox_verified"
+                    },
+                    "target": {
+                        "identity_id": "33333333-3333-3333-3333-333333333333",
+                        "organization_id": "org_a",
+                        "handle": "coordinator"
+                    },
+                    "messages": [{
+                        "id": "88888888-8888-8888-8888-888888888888",
+                        "message_id": "protocol-b-a",
+                        "role": "caller",
+                        "parts": [{"text": "Review"}],
+                        "metadata": null,
+                        "extensions": null,
+                        "reference_task_ids": null,
+                        "created_at": "2026-08-01T00:00:30Z"
+                    }],
+                    "completed_at": null,
+                    "created_at": "2026-08-01T00:00:30Z",
+                    "updated_at": "2026-08-01T00:00:30Z"
+                }],
+                "tasks_truncated": false,
+                "created_at": "2026-08-01T00:00:00Z",
+                "last_activity_at": "2026-08-01T00:01:00Z"
+            }));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+
+        let context = client.a2a().context("coordinator", context_id).unwrap();
+
+        request.assert();
+        assert_eq!(context.name, "Analyse Überprüfung Ergebnis Jetzt");
+        assert_eq!(context.caller.handle.as_deref(), Some("coordinator"));
+        assert_eq!(
+            context
+                .target
+                .as_ref()
+                .and_then(|target| target.handle.as_deref()),
+            Some("researcher")
+        );
+        assert_eq!(
+            context.tasks[0].caller.handle.as_deref(),
+            Some("coordinator")
+        );
+        assert_eq!(
+            context.tasks[0]
+                .target
+                .as_ref()
+                .and_then(|target| target.handle.as_deref()),
+            Some("researcher")
+        );
+        assert_eq!(context.tasks[0].state, "working");
+        assert_eq!(
+            context.tasks[0].messages[0].parts,
+            vec![json!({"text": "Analyse"})]
+        );
+        assert_eq!(
+            context.tasks[1].caller.handle.as_deref(),
+            Some("researcher")
+        );
+        assert_eq!(
+            context.tasks[1]
+                .target
+                .as_ref()
+                .and_then(|target| target.handle.as_deref()),
+            Some("coordinator")
+        );
+        assert_eq!(context.tasks[1].state, "submitted");
+        assert_eq!(
+            context.tasks[1].messages[0].parts,
+            vec![json!({"text": "Review"})]
+        );
+    }
+
+    #[test]
+    fn update_context_uses_participant_path_and_exact_body() {
+        let server = MockServer::start();
+        let context_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let request = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH)
+                .path(
+                    "/api/v1/identities/coordinator/a2a/contexts/22222222-2222-2222-2222-222222222222",
+                )
+                .json_body(json!({"name": "Analyse Überprüfung Ergebnis Jetzt"}));
+            then.status(200).json_body(json!({
+                "id": context_id,
+                "name": "Analyse Überprüfung Ergebnis Jetzt",
+                "caller": {
+                    "identity_id": "33333333-3333-3333-3333-333333333333",
+                    "organization_id": "org_a",
+                    "handle": "coordinator",
+                    "trust_tier": "inkbox_verified"
+                },
+                "target": {
+                    "identity_id": "44444444-4444-4444-4444-444444444444",
+                    "organization_id": "org_b",
+                    "handle": "researcher"
+                },
+                "tasks": [],
+                "tasks_truncated": false,
+                "created_at": "2026-08-01T00:00:00Z",
+                "last_activity_at": "2026-08-01T00:01:00Z"
+            }));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+
+        let context = client
+            .a2a()
+            .update_context(
+                "coordinator",
+                context_id,
+                "Analyse Überprüfung Ergebnis Jetzt",
+            )
+            .unwrap();
+
+        request.assert();
+        assert_eq!(context.name, "Analyse Überprüfung Ergebnis Jetzt");
+    }
+
+    #[test]
+    fn update_context_preserves_server_validation_detail() {
+        let server = MockServer::start();
+        let context_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        let request = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH).path(
+                "/api/v1/identities/coordinator/a2a/contexts/22222222-2222-2222-2222-222222222222",
+            );
+            then.status(422).json_body(json!({
+                "detail": "Context names contain at most five words"
+            }));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+
+        let error = client
+            .a2a()
+            .update_context("coordinator", context_id, "Too many words")
+            .unwrap_err();
+
+        request.assert();
+        match error {
+            crate::error::InkboxError::Api {
+                status_code,
+                detail,
+            } => {
+                assert_eq!(status_code, 422);
+                assert_eq!(
+                    detail.to_string(),
+                    "Context names contain at most five words"
+                );
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[test]

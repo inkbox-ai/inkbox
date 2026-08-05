@@ -351,6 +351,21 @@ class A2AResource:
             self._http.get(f"{self._base(handle)}/contexts/{context_id}")
         )
 
+    def update_context(
+        self,
+        handle: str,
+        context_id: str,
+        *,
+        name: str,
+    ) -> A2AContext:
+        """Rename a context visible to either participant."""
+        return parse_context(
+            self._http.patch(
+                f"{self._base(handle)}/contexts/{context_id}",
+                json={"name": name},
+            )
+        )
+
     def sent_contexts(
         self,
         handle: str,
