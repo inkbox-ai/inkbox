@@ -20,6 +20,7 @@ export type A2AInvitationEmailStatus =
 export interface A2AInvitation {
   id: string;
   issuerOrganizationId: string;
+  inviterEmail: string | null;
   peerAgentHandles: string[];
   recipientEmail: string | null;
   status: A2AInvitationStatus;
@@ -167,6 +168,7 @@ function parseInvitation(raw: Raw): A2AInvitation {
   return {
     id: raw.id,
     issuerOrganizationId: raw.issuer_organization_id,
+    inviterEmail: raw.inviter_email ?? null,
     peerAgentHandles: raw.peer_agent_handles,
     recipientEmail: raw.recipient_email ?? null,
     status: raw.status,

@@ -283,6 +283,7 @@ function claimedWhoami() {
 const managementInvitation = {
   id: "inv_1",
   issuer_organization_id: "org_1",
+  inviter_email: "owner@example.com",
   peer_agent_handles: ["support", "billing"],
   recipient_email: null,
   status: "pending",

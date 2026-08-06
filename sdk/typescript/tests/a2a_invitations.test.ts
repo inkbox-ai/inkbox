@@ -8,6 +8,7 @@ const TOKEN = "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const RAW = {
   id: "inv_1",
   issuer_organization_id: "org_1",
+  inviter_email: "owner@example.com",
   peer_agent_handles: ["support"],
   recipient_email: null,
   status: "pending",
@@ -53,6 +54,7 @@ describe("A2AInvitationsResource", () => {
     });
     expect(result.invitationToken).toBe(TOKEN);
     expect(result.invitationUrl).toContain("/a2a/invitations/accept#token=");
+    expect(result.inviterEmail).toBe("owner@example.com");
   });
 
   it("uses canonical list, get, revoke, and accept routes", async () => {
@@ -83,10 +85,12 @@ describe("A2AInvitationsResource", () => {
   });
 
   it("does not invent a share URL for an old server", async () => {
-    respond({ ...RAW, invitation_token: TOKEN });
+    const { inviter_email: _inviterEmail, ...oldServerInvitation } = RAW;
+    respond({ ...oldServerInvitation, invitation_token: TOKEN });
     const client = new Inkbox({ apiKey: "ApiKey_admin" });
     const result = await client.a2aInvitations.create({ peerAgentHandles: ["support"] });
     expect(result.invitationUrl).toBeUndefined();
+    expect(result.inviterEmail).toBeNull();
   });
 });
 

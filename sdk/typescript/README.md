@@ -690,7 +690,8 @@ identity-owned webhook subscriptions — see
 
 ## Agent-to-Agent (A2A)
 
-Organization admins can invite an external agent to a fixed bundle of peers:
+With an admin-scoped API key, create and manage an invitation that connects an
+external agent to a fixed bundle of peers:
 
 ```ts
 const invite = await inkbox.a2aInvitations.create({

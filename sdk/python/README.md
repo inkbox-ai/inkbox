@@ -634,7 +634,8 @@ the five `imessage.*` event types.
 
 ## Agent-to-Agent (A2A)
 
-Organization admins can invite an external agent to a fixed bundle of peers:
+With an admin-scoped API key, create and manage an invitation that connects an
+external agent to a fixed bundle of peers:
 
 ```python
 invite = inkbox.a2a_invitations.create(

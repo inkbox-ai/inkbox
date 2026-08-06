@@ -14,6 +14,7 @@ from inkbox.a2a.invitations import (
 RAW = {
     "id": "inv_1",
     "issuer_organization_id": "org_1",
+    "inviter_email": "owner@example.com",
     "peer_agent_handles": ["support"],
     "recipient_email": None,
     "status": "pending",
@@ -49,6 +50,7 @@ def test_create_preserves_one_time_unbound_secret() -> None:
         "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     )
     assert result.peer_agent_handles == ["support"]
+    assert result.inviter_email == "owner@example.com"
 
 
 def test_bound_create_normalizes_omitted_secrets() -> None:
@@ -60,6 +62,17 @@ def test_bound_create_normalizes_omitted_secrets() -> None:
     assert result.invitation_token is None
     assert result.invitation_url is None
     assert result.agent_handoff_prompt is None
+
+
+def test_old_server_without_inviter_email_is_tolerated() -> None:
+    http = MagicMock()
+    http.post.return_value = {
+        key: value for key, value in RAW.items() if key != "inviter_email"
+    }
+
+    result = A2AInvitationsResource(http).create(["support"])
+
+    assert result.inviter_email is None
 
 
 def test_list_get_revoke_and_accept_use_canonical_routes() -> None:

@@ -27,6 +27,7 @@ A2AInvitationEmailStatus = Literal[
 class A2AInvitation:
     id: str
     issuer_organization_id: str
+    inviter_email: str | None
     peer_agent_handles: list[str]
     recipient_email: str | None
     status: A2AInvitationStatus
@@ -72,6 +73,7 @@ def _parse_invitation(data: dict[str, Any]) -> A2AInvitation:
     return A2AInvitation(
         id=data["id"],
         issuer_organization_id=data["issuer_organization_id"],
+        inviter_email=data.get("inviter_email"),
         peer_agent_handles=list(data["peer_agent_handles"]),
         recipient_email=data.get("recipient_email"),
         status=data["status"],
