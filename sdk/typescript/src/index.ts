@@ -2,7 +2,11 @@ export { Inkbox } from "./inkbox.js";
 export { VERSION } from "./version.js";
 export { AgentIdentity } from "./agent_identity.js";
 export { A2AClient, A2AProtocolError } from "./a2a/client.js";
-export { A2AInvitationsResource } from "./a2a/invitations.js";
+export {
+  A2AInvitationParseError,
+  A2AInvitationsResource,
+  extractA2AInvitationToken,
+} from "./a2a/invitations.js";
 export type {
   A2AInvitation,
   A2AInvitationAcceptResult,

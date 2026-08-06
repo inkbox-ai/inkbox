@@ -11,7 +11,7 @@ No Inkbox account or API key is required to start. The flow provisions a mailbox
 3. After registration, save the one-time `INKBOX_API_KEY` from the output
 
 If another organization invited the agent, optionally set
-`INKBOX_A2A_INVITATION_TOKEN`. The signup and verification responses then
+`INKBOX_A2A_INVITATION` (an exact-origin share URL or raw token). The signup and verification responses then
 report whether the invitation is awaiting verification or accepted.
 When registration reports `accepted` or an already-claimed status, skip
 `verify` and `resend`; no verification code is sent for that path.

@@ -1,0 +1,52 @@
+{
+  "valid": [
+    {
+      "base_url": "https://inkbox.ai",
+      "input": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "base_url": "https://inkbox.ai",
+      "input": " \na2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+      "token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "base_url": "https://inkbox.ai/api/v1",
+      "input": "https://inkbox.ai/a2a/invitations/accept#token=a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+      "token": "a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    },
+    {
+      "base_url": "https://inkbox.ai",
+      "input": "  https://inkbox.ai/a2a/invitations/accept#token=a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n",
+      "token": "a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    },
+    {
+      "base_url": "http://127.0.0.1:8765",
+      "input": "http://127.0.0.1:8765/a2a/invitations/accept#token=a2ai_%43CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+      "token": "a2ai_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
+    }
+  ],
+  "invalid": [
+    { "base_url": "https://inkbox.ai", "input": "" },
+    { "base_url": "https://inkbox.ai", "input": "plain prose" },
+    { "base_url": "https://inkbox.ai", "input": "a2ai_short" },
+    { "base_url": "https://inkbox.ai", "input": "a2ad_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "a2ai_AAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "https:/inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "https://example.test/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "http://example.test", "input": "http://example.test/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "http://localhost.example.test", "input": "http://localhost.example.test/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "http://[::1]:8765", "input": "http://[::1]:8765/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "http://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept/#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept?token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept?#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept#token=" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept#token=a&token=b" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&extra=b" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA%2F" },
+    { "base_url": "https://inkbox.ai", "input": "https://inkbox.ai/a2a/invitations/accept#token=%ZZ" },
+    { "base_url": "https://inkbox.ai", "input": "https://user:pass@inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }
+  ]
+}

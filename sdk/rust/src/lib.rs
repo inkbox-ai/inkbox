@@ -54,6 +54,10 @@ pub mod webhooks;
 pub mod whoami;
 
 // Canonical re-exports.
+pub use a2a::{
+    extract_a2a_invitation_token, extract_a2a_invitation_token_with_base_url,
+    A2AInvitationParseError,
+};
 pub use agent_identity::AgentIdentity;
 pub use client::{Inkbox, InkboxBuilder, DEFAULT_BASE_URL};
 pub use credentials::Credentials;

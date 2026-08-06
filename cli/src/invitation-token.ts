@@ -12,10 +12,10 @@ async function readAllStdin(): Promise<string> {
 async function hiddenPrompt(stdinOption = "--token-stdin"): Promise<string> {
   if (!process.stdin.isTTY) {
     throw new Error(
-      `No invitation token available. Set INKBOX_A2A_INVITATION_TOKEN or use ${stdinOption}.`,
+      `No invitation available. Set INKBOX_A2A_INVITATION or use ${stdinOption}.`,
     );
   }
-  process.stderr.write("Invitation token: ");
+  process.stderr.write("Invitation link or token: ");
   const muted = new Writable({ write(_chunk, _encoding, callback) { callback(); } });
   const terminal = createInterface({
     input: process.stdin,
@@ -33,64 +33,87 @@ async function hiddenPrompt(stdinOption = "--token-stdin"): Promise<string> {
 
 /** Resolve a secret without accepting it as a command-line argument. */
 export async function resolveA2AInvitationToken(fromStdin: boolean): Promise<string> {
-  if (fromStdin) {
-    const token = await readAllStdin();
-    if (!token) throw new Error("No invitation token was provided on stdin.");
-    return token;
+  const fromEnv = invitationFromEnvironment();
+  if (fromStdin && fromEnv) {
+    throw new Error("Use only one invitation input source.");
   }
-  const fromEnv = process.env.INKBOX_A2A_INVITATION_TOKEN?.trim();
+  if (fromStdin) {
+    const invitation = await readAllStdin();
+    if (!invitation) throw new Error("No invitation was provided on stdin.");
+    return invitation;
+  }
   if (fromEnv) return fromEnv;
-  const token = await hiddenPrompt();
-  if (!token) throw new Error("An invitation token is required.");
-  return token;
+  const invitation = await hiddenPrompt();
+  if (!invitation) throw new Error("An invitation is required.");
+  return invitation;
 }
 
 /** Resolve an optional signup token without prompting ordinary signup flows. */
 export async function resolveOptionalA2AInvitationToken(
   fromStdin: boolean,
   fromPrompt: boolean,
-  promptReader: () => Promise<string> = () => hiddenPrompt("--invitation-token-stdin"),
+  promptReader: () => Promise<string> = () => hiddenPrompt("--invitation-stdin"),
 ): Promise<string | undefined> {
   if (fromStdin && fromPrompt) {
     throw new Error(
       "Use only one of --invitation-token-stdin or --invitation-token-prompt.",
     );
   }
+  const fromEnv = invitationFromEnvironment();
+  if ((fromStdin || fromPrompt) && fromEnv) {
+    throw new Error("Use only one invitation input source.");
+  }
   if (fromStdin) {
-    const token = await readAllStdin();
-    if (!token) throw new Error("No invitation token was provided on stdin.");
-    return token;
+    const invitation = await readAllStdin();
+    if (!invitation) throw new Error("No invitation was provided on stdin.");
+    return invitation;
   }
   if (fromPrompt) {
-    const token = (await promptReader()).trim();
-    if (!token) throw new Error("An invitation token is required.");
-    return token;
+    const invitation = (await promptReader()).trim();
+    if (!invitation) throw new Error("An invitation is required.");
+    return invitation;
   }
-  return process.env.INKBOX_A2A_INVITATION_TOKEN?.trim() || undefined;
+  return fromEnv;
 }
 
-function redactValue(value: unknown, secret: string): unknown {
-  if (typeof value === "string") return value.split(secret).join("[REDACTED]");
-  if (Array.isArray(value)) return value.map((item) => redactValue(item, secret));
+function invitationFromEnvironment(): string | undefined {
+  const neutral = process.env.INKBOX_A2A_INVITATION?.trim();
+  const legacy = process.env.INKBOX_A2A_INVITATION_TOKEN?.trim();
+  if (neutral && legacy) {
+    throw new Error(
+      "Set only one of INKBOX_A2A_INVITATION or INKBOX_A2A_INVITATION_TOKEN.",
+    );
+  }
+  return neutral || legacy || undefined;
+}
+
+function redactValue(value: unknown, secrets: string[]): unknown {
+  if (typeof value === "string") {
+    return secrets.reduce(
+      (redacted, secret) => secret ? redacted.split(secret).join("[REDACTED]") : redacted,
+      value,
+    );
+  }
+  if (Array.isArray(value)) return value.map((item) => redactValue(item, secrets));
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, redactValue(item, secret)]),
+      Object.entries(value).map(([key, item]) => [key, redactValue(item, secrets)]),
     );
   }
   return value;
 }
 
 /** Preserve an API error while ensuring it cannot reflect the submitted secret. */
-export function redactSecretError(error: unknown, secret: string): Error {
+export function redactSecretError(error: unknown, ...secrets: string[]): Error {
   if (error instanceof InkboxAPIError) {
     return new InkboxAPIError(
       error.statusCode,
-      redactValue(error.detail, secret) as typeof error.detail,
+      redactValue(error.detail, secrets) as typeof error.detail,
       error.retryAfterSeconds,
     );
   }
   const message = error instanceof Error ? error.message : String(error);
-  const safe = secret ? message.split(secret).join("[REDACTED]") : message;
+  const safe = redactValue(message, secrets) as string;
   const redacted = new Error(safe);
   if (error instanceof Error) redacted.name = error.name;
   return redacted;

@@ -606,7 +606,12 @@ impl Inkbox {
             body.insert("harness".into(), v.into());
         }
         if let Some(v) = options.invitation_token {
-            body.insert("invitation_token".into(), v.into());
+            let token = crate::a2a::extract_a2a_invitation_token_with_base_url(
+                v,
+                base_url.unwrap_or(DEFAULT_BASE_URL),
+            )
+            .map_err(|error| InkboxError::InvalidArgument(error.to_string()))?;
+            body.insert("invitation_token".into(), token.into());
         }
         let data = signup_request(
             "POST",
@@ -797,7 +802,7 @@ mod agent_signup_invitation_tests {
                     "human_email": "buyer@example.test",
                     "note_to_human": "Please approve",
                     "harness": "codex",
-                    "invitation_token": "a2ai_secret"
+                    "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                 }));
             then.status(200)
                 .json_body(signup_response(Some(serde_json::json!({
@@ -809,12 +814,16 @@ mod agent_signup_invitation_tests {
                     "accepted_at": null
                 }))));
         });
+        let invitation_url = format!(
+            "{}/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            server.base_url()
+        );
         let response = Inkbox::signup_with(
             "buyer@example.test",
             "Please approve",
             crate::agent_signup::AgentSignupOptions {
                 harness: Some("codex"),
-                invitation_token: Some("a2ai_secret"),
+                invitation_token: Some(&invitation_url),
                 ..Default::default()
             },
             Some(&server.base_url()),
@@ -888,7 +897,7 @@ mod agent_signup_invitation_tests {
             "buyer@example.test",
             "Please approve",
             crate::agent_signup::AgentSignupOptions {
-                invitation_token: Some("a2ai_example"),
+                invitation_token: Some("a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
                 ..Default::default()
             },
             Some(&server.base_url()),

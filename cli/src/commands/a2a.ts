@@ -13,8 +13,11 @@ import type {
   FilterMode,
   A2AInvitationStatus,
 } from "@inkbox/sdk";
-import { AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED } from "@inkbox/sdk";
-import { createClient, getGlobalOpts } from "../client.js";
+import {
+  AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED,
+  extractA2AInvitationToken,
+} from "@inkbox/sdk";
+import { createClient, getGlobalOpts, resolveBaseUrl } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output } from "../output.js";
 import { redactSecretError, resolveA2AInvitationToken } from "../invitation-token.js";
@@ -176,11 +179,16 @@ export function registerA2ACommands(program: Command): void {
 
   invites.command("accept")
     .description("Accept an invitation with a claimed agent-scoped API key")
+    .option("--invitation-stdin", "Read the invitation link or token from stdin")
     .option("--token-stdin", "Read the invitation token from stdin")
     .action(withErrorHandler(async function (
       this: Command,
-      options: { tokenStdin?: boolean },
+      options: { invitationStdin?: boolean; tokenStdin?: boolean },
     ) {
+      if (options.invitationStdin && options.tokenStdin) {
+        throw new Error("Use only one invitation stdin option.");
+      }
+      const globalOpts = getGlobalOpts(this);
       const client = createClient(getGlobalOpts(this));
       const principal = await client.whoami();
       if (
@@ -189,12 +197,20 @@ export function registerA2ACommands(program: Command): void {
       ) {
         throw new Error("Accepting an invitation requires a claimed agent-scoped API key.");
       }
-      const token = await resolveA2AInvitationToken(!!options.tokenStdin);
+      const invitation = await resolveA2AInvitationToken(
+        !!options.invitationStdin || !!options.tokenStdin,
+      );
+      let token: string | undefined;
       try {
-        const result = await client.a2aInvitations.accept(token);
-        output(result, { json: !!getGlobalOpts(this).json });
+        const parsedToken = extractA2AInvitationToken(
+          invitation,
+          resolveBaseUrl(globalOpts) ?? "https://inkbox.ai",
+        );
+        token = parsedToken;
+        const result = await client.a2aInvitations.accept(parsedToken);
+        output(result, { json: !!globalOpts.json });
       } catch (error) {
-        throw redactSecretError(error, token);
+        throw redactSecretError(error, invitation, token ?? "");
       }
     }));
 

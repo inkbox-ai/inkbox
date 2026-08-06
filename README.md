@@ -292,7 +292,7 @@ result = Inkbox.signup(
     display_name="My Agent",          # optional
     agent_handle="my-agent",          # optional
     email_local_part="my.agent",      # optional
-    invitation_token=os.getenv("INKBOX_A2A_INVITATION_TOKEN"),  # optional
+    invitation_token=os.getenv("INKBOX_A2A_INVITATION"),  # optional link or raw token
 )
 api_key = result.api_key  # save this — shown only once
 print(result.message)     # authoritative delivery/acceptance outcome
@@ -322,7 +322,7 @@ const result = await Inkbox.signup({
   displayName: "My Agent",      // optional
   agentHandle: "my-agent",      // optional
   emailLocalPart: "my.agent",   // optional
-  invitationToken: process.env.INKBOX_A2A_INVITATION_TOKEN, // optional
+  invitationToken: process.env.INKBOX_A2A_INVITATION, // optional link or raw token
 });
 const apiKey = result.apiKey; // save this — shown only once
 console.log(result.message);  // authoritative delivery/acceptance outcome
@@ -349,8 +349,8 @@ inkbox signup create --human-email john@example.com \
   --display-name "My Agent" \
   --agent-handle my-agent \
   --email-local-part my.agent
-# When invited, use --invitation-token-prompt, --invitation-token-stdin, or
-# INKBOX_A2A_INVITATION_TOKEN.
+# When invited, use --invitation-prompt, --invitation-stdin, or
+# INKBOX_A2A_INVITATION (the legacy token-named environment variable remains supported).
 
 # 2. Verify only if signup did not report an accepted/claimed invitation
 inkbox signup verify --code 483921

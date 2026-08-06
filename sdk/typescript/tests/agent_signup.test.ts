@@ -84,9 +84,9 @@ describe("Inkbox.signup", () => {
     const result = await Inkbox.signup({
       humanEmail: "human@example.com",
       noteToHuman: "Please approve me",
-      invitationToken: "a2ai_secret",
+      invitationToken: "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     });
-    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).invitation_token).toBe("a2ai_secret");
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).invitation_token).toBe("a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
     expect(result.invitation?.invitationId).toBe("inv_1");
   });
 
@@ -305,7 +305,7 @@ describe("Agent signup error handling", () => {
     const error = await Inkbox.signup({
       humanEmail: "human@example.com",
       noteToHuman: "Please approve me",
-      invitationToken: "a2ai_example",
+      invitationToken: "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
     }).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(InkboxAPIError);

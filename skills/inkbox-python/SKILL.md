@@ -550,9 +550,11 @@ inkbox.sms_opt_ins.opt_out("+15551234567")
 **Invitations:** organization admins use
 `inkbox.a2a_invitations.create(peer_agent_handles, recipient_email=...,
 expires_in_seconds=...)`, `.list(...)`, `.get(id)`, and `.revoke(id)`. A claimed
-agent-scoped key uses `.accept(invitation_token)`. Unbound create responses
-reveal `invitation_token` and `agent_handoff_prompt` once; email-bound creates
-omit both. Signup accepts `invitation_token` and returns the optional
+agent-scoped key uses `.accept(invitation)`. The value may be an exact-origin
+share URL or raw token; `extract_a2a_invitation_token()` performs the same strict local
+normalization. Unbound create responses may reveal `invitation_token`,
+`invitation_url`, and `agent_handoff_prompt`; email-bound creates omit
+capability fields. Signup accepts the same input and returns the optional
 `invitation` summary. Do not retry create or accept automatically.
 
 An identity can inspect work it received, work it requested, or both. Omit

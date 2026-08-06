@@ -45,6 +45,8 @@ export interface A2AInvitationCreateOptions {
 export interface A2AInvitationCreateResult extends A2AInvitation {
   /** Present only when the invitation is not bound to a recipient email. */
   invitationToken?: string;
+  /** Shareable acceptance link, when returned by the server. */
+  invitationUrl?: string;
   /** Present only when the invitation is not bound to a recipient email. */
   agentHandoffPrompt?: string;
 }
@@ -71,6 +73,96 @@ export interface A2AInvitationAcceptResult {
 
 type Raw = Record<string, any>;
 
+/** Raised when an A2A invitation link is invalid for the configured site. */
+export class A2AInvitationParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "A2AInvitationParseError";
+  }
+}
+
+const malformedEscape = /%(?![0-9A-Fa-f]{2})/;
+const invitationTokenPattern = /^a2ai_[A-Za-z0-9_-]{43}$/;
+const maxInvitationInputBytes = 2048;
+
+/**
+ * Return the raw token from an A2A invitation link or raw token.
+ * Links require HTTPS, except configured localhost/127.0.0.1 development URLs.
+ */
+export function extractA2AInvitationToken(
+  value: string,
+  baseUrl = "https://inkbox.ai",
+): string {
+  if (!value || new TextEncoder().encode(value).byteLength > maxInvitationInputBytes) {
+    throw new A2AInvitationParseError("The A2A invitation link or token is invalid.");
+  }
+  const candidate = value.trim();
+  if (invitationTokenPattern.test(candidate)) return candidate;
+  if (
+    !candidate.includes("://")
+    && !candidate.toLowerCase().startsWith("http:")
+    && !candidate.toLowerCase().startsWith("https:")
+  ) {
+    throw new A2AInvitationParseError("The A2A invitation link or token is invalid.");
+  }
+  if (!/^https?:\/\//i.test(candidate)) {
+    throw new A2AInvitationParseError("The A2A invitation link is invalid.");
+  }
+
+  let invitationUrl: URL;
+  let configuredUrl: URL;
+  try {
+    invitationUrl = new URL(candidate);
+    configuredUrl = new URL(baseUrl);
+  } catch {
+    throw new A2AInvitationParseError("The A2A invitation link is invalid.");
+  }
+  if (
+    !["http:", "https:"].includes(invitationUrl.protocol)
+    || !["http:", "https:"].includes(configuredUrl.protocol)
+    || invitationUrl.username
+    || invitationUrl.password
+  ) {
+    throw new A2AInvitationParseError("The A2A invitation link is invalid.");
+  }
+  if (
+    configuredUrl.protocol === "http:"
+    && configuredUrl.hostname !== "localhost"
+    && configuredUrl.hostname !== "127.0.0.1"
+  ) {
+    throw new A2AInvitationParseError("The configured site URL is invalid.");
+  }
+  if (invitationUrl.origin !== configuredUrl.origin) {
+    throw new A2AInvitationParseError(
+      "The A2A invitation link does not match the configured site.",
+    );
+  }
+  const fragmentStart = candidate.indexOf("#");
+  const beforeFragment = candidate.slice(
+    0,
+    fragmentStart < 0 ? undefined : fragmentStart,
+  );
+  if (
+    invitationUrl.pathname !== "/a2a/invitations/accept"
+    || beforeFragment.includes("?")
+  ) {
+    throw new A2AInvitationParseError("The A2A invitation link is invalid.");
+  }
+  const fragment = invitationUrl.hash.slice(1);
+  if (malformedEscape.test(fragment)) {
+    throw new A2AInvitationParseError("The A2A invitation link is invalid.");
+  }
+  const fields = [...new URLSearchParams(fragment).entries()];
+  if (
+    fields.length !== 1
+    || fields[0]?.[0] !== "token"
+    || !invitationTokenPattern.test(fields[0]?.[1] ?? "")
+  ) {
+    throw new A2AInvitationParseError("The A2A invitation link is invalid.");
+  }
+  return fields[0][1];
+}
+
 function parseInvitation(raw: Raw): A2AInvitation {
   return {
     id: raw.id,
@@ -93,7 +185,10 @@ function parseInvitation(raw: Raw): A2AInvitation {
 }
 
 export class A2AInvitationsResource {
-  constructor(private readonly http: HttpTransport) {}
+  constructor(
+    private readonly http: HttpTransport,
+    private readonly baseUrl = "https://inkbox.ai",
+  ) {}
 
   async create(options: A2AInvitationCreateOptions): Promise<A2AInvitationCreateResult> {
     const raw = await this.http.post<Raw>("/a2a/invitations", {
@@ -109,6 +204,9 @@ export class A2AInvitationsResource {
       ...parseInvitation(raw),
       ...(raw.invitation_token !== undefined
         ? { invitationToken: raw.invitation_token }
+        : {}),
+      ...(typeof raw.invitation_url === "string"
+        ? { invitationUrl: raw.invitation_url }
         : {}),
       ...(raw.agent_handoff_prompt !== undefined
         ? { agentHandoffPrompt: raw.agent_handoff_prompt }
@@ -142,7 +240,8 @@ export class A2AInvitationsResource {
     );
   }
 
-  async accept(invitationToken: string): Promise<A2AInvitationAcceptResult> {
+  async accept(invitation: string): Promise<A2AInvitationAcceptResult> {
+    const invitationToken = extractA2AInvitationToken(invitation, this.baseUrl);
     const raw = await this.http.post<Raw>("/a2a/invitations/accept", {
       invitation_token: invitationToken,
     });

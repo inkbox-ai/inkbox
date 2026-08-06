@@ -2,6 +2,11 @@
 
 ## 0.5.14 — A2A invitations
 
+- Accept invitation links or raw tokens through the neutral
+  `INKBOX_A2A_INVITATION`, `--invitation-stdin`, and `--invitation-prompt`
+  sources. Token-named sources remain aliases; capability argv remains
+  unsupported, and reflected links/tokens are redacted from failures.
+
 - Added `a2a invites create|list|show|revoke|accept` and invitation-assisted
   `signup create`, including explicit hidden-prompt and stdin token input.
 - Accept requires a claimed agent-scoped API key. Its token comes from a

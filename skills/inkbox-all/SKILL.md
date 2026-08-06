@@ -40,6 +40,9 @@ the author (`caller` or `agent`), independent of task direction.
 For A2A invitations use the language-specific `a2a_invitations` /
 `a2aInvitations` resource or `inkbox a2a invites`. Invitation acceptance is a
 claimed-agent operation; management is organization-admin scoped.
+Share URLs are capability-bearing: accept them only through the SDK parser or
+the CLI's neutral environment/stdin/prompt sources, and never log or put them
+directly in argv.
 
 - `inkbox-tunnels`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-tunnels/SKILL.md

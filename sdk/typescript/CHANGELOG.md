@@ -2,6 +2,11 @@
 
 ## 0.5.14 — A2A invitations
 
+- Preserve the server's optional `invitationUrl` on create and accept
+  exact-origin share URLs in `accept()` and signup through the exported
+  `extractA2AInvitationToken()` helper. Raw tokens remain supported and URLs
+  are reduced to tokens before transport.
+
 - Added `inkbox.a2aInvitations` create, list, get, revoke, and accept methods.
 - Agent signup accepts `invitationToken` and normalizes the optional invitation
   summary on signup and verification responses.

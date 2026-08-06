@@ -8,6 +8,7 @@ import { resolveOptionalA2AInvitationToken } from "../dist/invitation-token.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const execFileAsync = promisify(execFile);
+const invitationToken = (character) => `a2ai_${character.repeat(43)}`;
 
 function help(...args) {
   return execFileSync(process.execPath, [cli, ...args, "--help"], { encoding: "utf8" });
@@ -20,24 +21,29 @@ test("A2A invitation CLI exposes only the frozen command set", () => {
   }
   assert.doesNotMatch(commands, /decline|resend/);
   const accept = help("a2a", "invites", "accept");
+  assert.match(accept, /--invitation-stdin/);
   assert.match(accept, /--token-stdin/);
   assert.doesNotMatch(accept, /--invitation-token|--token </);
 });
 
 test("signup accepts invitation secrets only through safe input sources", () => {
   const signup = help("signup", "create");
+  assert.match(signup, /--invitation-stdin/);
+  assert.match(signup, /--invitation-prompt/);
   assert.match(signup, /--invitation-token-stdin/);
   assert.match(signup, /--invitation-token-prompt/);
   assert.doesNotMatch(signup, /--invitation-token <|--invitation-token \[/);
 });
 
 test("ordinary signup does not prompt while the explicit prompt source does", async () => {
+  const previousNeutral = process.env.INKBOX_A2A_INVITATION;
   const previous = process.env.INKBOX_A2A_INVITATION_TOKEN;
+  delete process.env.INKBOX_A2A_INVITATION;
   delete process.env.INKBOX_A2A_INVITATION_TOKEN;
   let promptCalls = 0;
   const prompt = async () => {
     promptCalls += 1;
-    return "a2ai_prompt_secret";
+    return invitationToken("P");
   };
   try {
     assert.equal(
@@ -47,7 +53,7 @@ test("ordinary signup does not prompt while the explicit prompt source does", as
     assert.equal(promptCalls, 0);
     assert.equal(
       await resolveOptionalA2AInvitationToken(false, true, prompt),
-      "a2ai_prompt_secret",
+      invitationToken("P"),
     );
     assert.equal(promptCalls, 1);
     await assert.rejects(
@@ -55,12 +61,14 @@ test("ordinary signup does not prompt while the explicit prompt source does", as
       /Use only one/,
     );
   } finally {
+    if (previousNeutral === undefined) delete process.env.INKBOX_A2A_INVITATION;
+    else process.env.INKBOX_A2A_INVITATION = previousNeutral;
     if (previous === undefined) delete process.env.INKBOX_A2A_INVITATION_TOKEN;
     else process.env.INKBOX_A2A_INVITATION_TOKEN = previous;
   }
 });
 
-test("signup sends an environment invitation token without printing it", async (t) => {
+test("signup extracts a neutral-environment invitation URL without printing it", async (t) => {
   let submitted;
   const baseUrl = await withServer(t, async (request, response) => {
     let body = "";
@@ -86,7 +94,8 @@ test("signup sends an environment invitation token without printing it", async (
       },
     }));
   });
-  const secret = "a2ai_signup_secret";
+  const secret = invitationToken("S");
+  const invitationUrl = `${baseUrl}/a2a/invitations/accept#token=${secret}`;
   const result = await execFileAsync(process.execPath, [
     cli,
     "--json",
@@ -101,13 +110,15 @@ test("signup sends an environment invitation token without printing it", async (
   ], {
     env: {
       ...process.env,
-      INKBOX_A2A_INVITATION_TOKEN: secret,
+      INKBOX_A2A_INVITATION: invitationUrl,
+      INKBOX_A2A_INVITATION_TOKEN: "",
       NODE_USE_ENV_PROXY: "0",
     },
   });
   assert.equal(submitted.url, "/api/v1/agent-signup");
   assert.equal(submitted.body.invitation_token, secret);
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secret));
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
 test("signup prints the authoritative auto-accept result without claiming an email was sent", async (t) => {
@@ -145,7 +156,7 @@ test("signup prints the authoritative auto-accept result without claiming an ema
   ], {
     env: {
       ...process.env,
-      INKBOX_A2A_INVITATION_TOKEN: "a2ai_auto_accept_secret",
+      INKBOX_A2A_INVITATION_TOKEN: invitationToken("A"),
       NODE_USE_ENV_PROXY: "0",
     },
   });
@@ -196,7 +207,7 @@ test("signup prints the authoritative verification delivery failure", async (t) 
   ], {
     env: {
       ...process.env,
-      INKBOX_A2A_INVITATION_TOKEN: "a2ai_delivery_failure_secret",
+      INKBOX_A2A_INVITATION_TOKEN: invitationToken("D"),
       NODE_USE_ENV_PROXY: "0",
     },
   });
@@ -207,7 +218,7 @@ test("signup prints the authoritative verification delivery failure", async (t) 
 });
 
 test("signup warns when a server does not confirm the supplied invitation", async (t) => {
-  const secret = "a2ai_unconfirmed_secret";
+  const secret = invitationToken("U");
   const baseUrl = await withServer(t, (_request, response) => {
     response.setHeader("Content-Type", "application/json");
     response.end(JSON.stringify({
@@ -300,7 +311,7 @@ test("management commands use the create, list, show, and revoke routes", async 
     } else if (request.url?.endsWith("/revoke")) {
       response.end(JSON.stringify({ ...managementInvitation, status: "revoked", revoked_at: "2026-08-04T01:00:00Z" }));
     } else if (request.method === "POST") {
-      response.end(JSON.stringify({ ...managementInvitation, invitation_token: "a2ai_once", agent_handoff_prompt: "handoff" }));
+      response.end(JSON.stringify({ ...managementInvitation, invitation_token: invitationToken("M"), agent_handoff_prompt: "handoff" }));
     } else {
       response.end(JSON.stringify(managementInvitation));
     }
@@ -322,7 +333,7 @@ test("management commands use the create, list, show, and revoke routes", async 
   assert.equal(requests[3].url, "/api/v1/a2a/invitations/inv_1/revoke");
 });
 
-test("accept verifies claimed agent auth and never prints its environment token", async (t) => {
+test("accept extracts a neutral-environment share URL and never prints either secret form", async (t) => {
   const requests = [];
   const baseUrl = await withServer(t, async (request, response) => {
     let body = "";
@@ -339,14 +350,16 @@ test("accept verifies claimed agent auth and never prints its environment token"
       accepted_at: "2026-08-04T01:00:00Z",
     }));
   });
-  const secret = "a2ai_test_secret";
+  const secret = invitationToken("T");
+  const invitationUrl = `${baseUrl}/a2a/invitations/accept#token=${secret}`;
   const result = await execFileAsync(process.execPath, [cli, "--json", "a2a", "invites", "accept"], {
-    env: { ...process.env, INKBOX_API_KEY: "ApiKey_agent", INKBOX_A2A_INVITATION_TOKEN: secret, INKBOX_BASE_URL: baseUrl, NODE_USE_ENV_PROXY: "0" },
+    env: { ...process.env, INKBOX_API_KEY: "ApiKey_agent", INKBOX_A2A_INVITATION: invitationUrl, INKBOX_A2A_INVITATION_TOKEN: "", INKBOX_BASE_URL: baseUrl, NODE_USE_ENV_PROXY: "0" },
   });
   assert.equal(requests[0].url, "/api/whoami");
   assert.equal(requests[1].url, "/api/v1/a2a/invitations/accept");
   assert.deepEqual(JSON.parse(requests[1].body), { invitation_token: secret });
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secret));
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
 test("accept rejects admin auth before submitting the invitation token", async (t) => {
@@ -357,13 +370,13 @@ test("accept rejects admin auth before submitting the invitation token", async (
     response.end(JSON.stringify({ ...claimedWhoami(), auth_subtype: "api_key.admin_scoped", scope: "admin" }));
   });
   await assert.rejects(execFileAsync(process.execPath, [cli, "a2a", "invites", "accept"], {
-    env: { ...process.env, INKBOX_API_KEY: "ApiKey_admin", INKBOX_A2A_INVITATION_TOKEN: "a2ai_test_secret", INKBOX_BASE_URL: baseUrl, NODE_USE_ENV_PROXY: "0" },
+    env: { ...process.env, INKBOX_API_KEY: "ApiKey_admin", INKBOX_A2A_INVITATION_TOKEN: invitationToken("T"), INKBOX_BASE_URL: baseUrl, NODE_USE_ENV_PROXY: "0" },
   }));
   assert.deepEqual(urls, ["/api/whoami"]);
 });
 
 test("accept redacts a reflected token from API errors", async (t) => {
-  const secret = "a2ai_reflected_secret";
+  const secret = invitationToken("R");
   const baseUrl = await withServer(t, (request, response) => {
     response.setHeader("Content-Type", "application/json");
     if (request.url === "/api/whoami") {
@@ -387,6 +400,30 @@ test("accept redacts a reflected token from API errors", async (t) => {
       assert.doesNotMatch(error.stdout + error.stderr, new RegExp(secret));
       assert.match(error.stderr, /\[REDACTED\]/);
       assert.match(error.stderr, /Retry in 120 seconds/);
+      return true;
+    },
+  );
+});
+
+test("invitation environment aliases conflict without reflecting either capability", async (t) => {
+  const baseUrl = await withServer(t, (_request, response) => {
+    response.setHeader("Content-Type", "application/json");
+    response.end(JSON.stringify(claimedWhoami()));
+  });
+  await assert.rejects(
+    execFileAsync(process.execPath, [cli, "--base-url", baseUrl, "a2a", "invites", "accept"], {
+      env: {
+        ...process.env,
+        INKBOX_API_KEY: "ApiKey_agent",
+        INKBOX_A2A_INVITATION: invitationToken("N"),
+        INKBOX_A2A_INVITATION_TOKEN: invitationToken("L"),
+        NODE_USE_ENV_PROXY: "0",
+      },
+    }),
+    (error) => {
+      const output = error.stdout + error.stderr;
+      assert.doesNotMatch(output, new RegExp(`${invitationToken("N")}|${invitationToken("L")}`));
+      assert.match(output, /Set only one/);
       return true;
     },
   );

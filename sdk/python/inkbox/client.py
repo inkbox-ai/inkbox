@@ -16,7 +16,10 @@ from inkbox._http import HttpTransport, sdk_user_agent
 from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
 from inkbox.a2a.resource import A2AResource
-from inkbox.a2a.invitations import A2AInvitationsResource
+from inkbox.a2a.invitations import (
+    A2AInvitationsResource,
+    extract_a2a_invitation_token,
+)
 from inkbox.agent_identity import AgentIdentity
 from inkbox.api_keys.resources.api_keys import ApiKeysResource
 from inkbox.contacts.resources.contacts import ContactsResource
@@ -281,7 +284,7 @@ class Inkbox:
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
         self._a2a = A2AResource(self._api_http, self._public_http)
-        self._a2a_invitations = A2AInvitationsResource(self._api_http)
+        self._a2a_invitations = A2AInvitationsResource(self._api_http, self._base_url)
 
         self._contacts = ContactsResource(self._contacts_http)
         self._notes = NotesResource(self._contacts_http)
@@ -675,7 +678,9 @@ class Inkbox:
         if harness is not None:
             body["harness"] = harness
         if invitation_token is not None:
-            body["invitation_token"] = invitation_token
+            body["invitation_token"] = extract_a2a_invitation_token(
+                invitation_token, base_url=base_url
+            )
         data = cls._signup_request(
             "POST", "", json=body, base_url=base_url, timeout=timeout,
         )

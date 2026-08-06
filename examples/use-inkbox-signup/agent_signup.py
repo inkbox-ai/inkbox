@@ -8,7 +8,7 @@ Environment variables (see .env.example):
   INKBOX_HUMAN_EMAIL       — human who owns or approves the agent (register)
   INKBOX_NOTE_TO_HUMAN     — message included in the verification email (register)
   INKBOX_AGENT_HANDLE      — optional base handle; a unique suffix is appended
-  INKBOX_A2A_INVITATION_TOKEN — optional A2A connection invitation
+  INKBOX_A2A_INVITATION — optional A2A connection invitation link or token
   INKBOX_API_KEY           — one-time key returned by register (all other steps)
   INKBOX_AGENT_HANDLE_SAVED — handle returned by register (send-welcome, cleanup)
 """
@@ -70,7 +70,7 @@ def cmd_register(args: argparse.Namespace) -> None:
         agent_handle=agent_handle,
         email_local_part=agent_handle,
         harness="cursor",
-        invitation_token=os.environ.get("INKBOX_A2A_INVITATION_TOKEN"),
+        invitation_token=os.environ.get("INKBOX_A2A_INVITATION"),
     )
 
     print()

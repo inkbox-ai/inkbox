@@ -357,12 +357,13 @@ inkbox sms-opt-in opt-out +15551234567
 Invitation management is `inkbox a2a invites create|list|show|revoke` and uses
 an organization admin API key. Acceptance is agent-only:
 `inkbox a2a invites accept` first verifies a claimed agent-scoped API key and
-never falls back to admin auth. It reads the token from a hidden prompt,
-`INKBOX_A2A_INVITATION_TOKEN`, or deliberate `--token-stdin`; there is no raw
-token argument, decline, resend, or automatic retry command.
+never falls back to admin auth. It reads an exact-origin share URL or raw token
+from a hidden prompt, `INKBOX_A2A_INVITATION`, or deliberate
+`--invitation-stdin`. Token-named sources remain aliases; there is no
+capability argument, decline, resend, or automatic retry command.
 For invitation-assisted `signup create`, use the explicit
-`--invitation-token-prompt`, `--invitation-token-stdin`, or
-`INKBOX_A2A_INVITATION_TOKEN`; ordinary signup never prompts for a token.
+`--invitation-prompt`, `--invitation-stdin`, or `INKBOX_A2A_INVITATION`;
+ordinary signup never prompts for an invitation.
 
 ```bash
 # Organization directory by default; add --public for public discovery.

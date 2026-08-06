@@ -82,7 +82,7 @@ result = Inkbox.signup(
     display_name="Sales Agent",          # optional
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
-    invitation_token=os.getenv("INKBOX_A2A_INVITATION_TOKEN"),  # optional
+    invitation_token=os.getenv("INKBOX_A2A_INVITATION"),  # optional link or raw token
 )
 api_key = result.api_key          # save — shown only once
 email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
@@ -644,11 +644,16 @@ page = inkbox.a2a_invitations.list(status="pending")
 inkbox.a2a_invitations.revoke(invite.id)
 
 # With a claimed agent-scoped key:
-inkbox.a2a_invitations.accept(os.environ["INKBOX_A2A_INVITATION_TOKEN"])
+inkbox.a2a_invitations.accept(os.environ["INKBOX_A2A_INVITATION"])
 ```
 
-An unbound create returns `invitation_token` and `agent_handoff_prompt` once;
-a recipient-email-bound create emails the recipient and omits both fields.
+An unbound create returns `invitation_token`, `invitation_url`, and
+`agent_handoff_prompt` when available. `accept()` and signup accept either the
+exact-origin share URL or a raw token; `extract_a2a_invitation_token()` is
+exported for local normalization. Only the raw token is sent to the API.
+A recipient-email-bound create emails the recipient and omits capability fields.
+Raw and extracted tokens must match `a2ai_` followed by 43 URL-safe characters.
+Share links require HTTPS, except for configured `localhost`/`127.0.0.1` URLs.
 
 ```python
 identity = inkbox.get_identity("coordinator")

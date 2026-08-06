@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import re
 from typing import Any, Literal
+from urllib.parse import parse_qsl, urlsplit
 
 from inkbox._http import HttpTransport
 from inkbox.a2a.types import parse_datetime
@@ -46,6 +48,7 @@ class A2AInvitationCreateResult(A2AInvitation):
     """Created invitation; secrets are present only for an unbound invitation."""
 
     invitation_token: str | None = None
+    invitation_url: str | None = None
     agent_handoff_prompt: str | None = None
 
 
@@ -86,13 +89,91 @@ def _parse_invitation(data: dict[str, Any]) -> A2AInvitation:
     )
 
 
+class A2AInvitationParseError(ValueError):
+    """Raised when an A2A invitation link is invalid for the configured site."""
+
+
+_TOKEN_PATTERN = re.compile(r"^a2ai_[A-Za-z0-9_-]{43}$")
+_MAX_INVITATION_INPUT_BYTES = 2048
+
+
+def _origin(value: str) -> tuple[str, str, int]:
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise A2AInvitationParseError("The A2A invitation link is invalid.")
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError as exc:
+        raise A2AInvitationParseError("The A2A invitation link is invalid.") from exc
+    return parsed.scheme, parsed.hostname.lower(), port
+
+
+def extract_a2a_invitation_token(
+    value: str, *, base_url: str = "https://inkbox.ai"
+) -> str:
+    """Return the raw token from an A2A invitation link or raw token.
+
+    Links must use HTTPS (HTTP only for localhost/127.0.0.1), the configured
+    site's exact origin, and the public invitation acceptance path. Error
+    messages never include the capability value.
+    """
+
+    if not value or len(value.encode("utf-8")) > _MAX_INVITATION_INPUT_BYTES:
+        raise A2AInvitationParseError("The A2A invitation link or token is invalid.")
+    candidate = value.strip()
+    if _TOKEN_PATTERN.fullmatch(candidate):
+        return candidate
+    if "://" not in candidate and not candidate.lower().startswith(("http:", "https:")):
+        raise A2AInvitationParseError("The A2A invitation link or token is invalid.")
+
+    try:
+        parsed = urlsplit(candidate)
+        expected_origin = _origin(base_url)
+        actual_origin = _origin(candidate)
+    except (TypeError, ValueError) as exc:
+        if isinstance(exc, A2AInvitationParseError):
+            raise
+        raise A2AInvitationParseError("The A2A invitation link is invalid.") from exc
+    if expected_origin[0] == "http" and expected_origin[1] not in {
+        "localhost",
+        "127.0.0.1",
+    }:
+        raise A2AInvitationParseError("The configured site URL is invalid.")
+    if parsed.username is not None or parsed.password is not None:
+        raise A2AInvitationParseError("The A2A invitation link is invalid.")
+    if actual_origin != expected_origin:
+        raise A2AInvitationParseError(
+            "The A2A invitation link does not match the configured site."
+        )
+    before_fragment = candidate.partition("#")[0]
+    if parsed.path != "/a2a/invitations/accept" or "?" in before_fragment:
+        raise A2AInvitationParseError("The A2A invitation link is invalid.")
+    fragment = parsed.fragment
+    if re.search(r"%(?![0-9A-Fa-f]{2})", fragment):
+        raise A2AInvitationParseError("The A2A invitation link is invalid.")
+    try:
+        fields = parse_qsl(fragment, keep_blank_values=True, strict_parsing=True)
+    except ValueError as exc:
+        raise A2AInvitationParseError("The A2A invitation link is invalid.") from exc
+    if (
+        len(fields) != 1
+        or fields[0][0] != "token"
+        or _TOKEN_PATTERN.fullmatch(fields[0][1]) is None
+    ):
+        raise A2AInvitationParseError("The A2A invitation link is invalid.")
+    return fields[0][1]
+
+
 class A2AInvitationsResource:
     """Create, inspect, revoke, and accept A2A invitations."""
 
     _BASE = "/a2a/invitations"
 
-    def __init__(self, http: HttpTransport) -> None:
+    def __init__(
+        self, http: HttpTransport, base_url: str = "https://inkbox.ai"
+    ) -> None:
         self._http = http
+        self._base_url = base_url
 
     def create(
         self,
@@ -111,6 +192,7 @@ class A2AInvitationsResource:
         return A2AInvitationCreateResult(
             **invitation.__dict__,
             invitation_token=data.get("invitation_token"),
+            invitation_url=data.get("invitation_url"),
             agent_handoff_prompt=data.get("agent_handoff_prompt"),
         )
 
@@ -139,6 +221,9 @@ class A2AInvitationsResource:
         )
 
     def accept(self, invitation_token: str) -> A2AInvitationAcceptResult:
+        invitation_token = extract_a2a_invitation_token(
+            invitation_token, base_url=self._base_url
+        )
         data = self._http.post(
             f"{self._BASE}/accept", json={"invitation_token": invitation_token}
         )

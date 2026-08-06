@@ -38,7 +38,10 @@ import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
 import { A2AResource } from "./a2a/resource.js";
-import { A2AInvitationsResource } from "./a2a/invitations.js";
+import {
+  A2AInvitationsResource,
+  extractA2AInvitationToken,
+} from "./a2a/invitations.js";
 import type {
   AgentIdentitySummary,
   CreateIdentityOptions,
@@ -264,7 +267,7 @@ export class Inkbox {
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
     this._a2a = new A2AResource(apiHttp, publicHttp);
-    this._a2aInvitations = new A2AInvitationsResource(apiHttp);
+    this._a2aInvitations = new A2AInvitationsResource(apiHttp, this._baseUrl);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
@@ -600,8 +603,17 @@ export class Inkbox {
     request: AgentSignupRequest,
     options?: SignupOptions,
   ): Promise<AgentSignupResponse> {
+    const normalizedRequest = request.invitationToken === undefined
+      ? request
+      : {
+          ...request,
+          invitationToken: extractA2AInvitationToken(
+            request.invitationToken,
+            options?.baseUrl ?? DEFAULT_BASE_URL,
+          ),
+        };
     const raw = await Inkbox._signupFetch<RawAgentSignupResponse>(
-      "POST", "", { body: agentSignupRequestToWire(request), ...options },
+      "POST", "", { body: agentSignupRequestToWire(normalizedRequest), ...options },
     );
     return parseAgentSignupResponse(raw);
   }

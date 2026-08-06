@@ -7,8 +7,10 @@ from inkbox.a2a.invitations import (
     A2AInvitationCreateResult,
     A2AInvitationEmailStatus,
     A2AInvitationPage,
+    A2AInvitationParseError,
     A2AInvitationsResource,
     A2AInvitationStatus,
+    extract_a2a_invitation_token,
 )
 from inkbox.a2a.types import (
     A2ACard,
@@ -59,8 +61,10 @@ __all__ = [
     "A2AInvitationCreateResult",
     "A2AInvitationEmailStatus",
     "A2AInvitationPage",
+    "A2AInvitationParseError",
     "A2AInvitationsResource",
     "A2AInvitationStatus",
+    "extract_a2a_invitation_token",
     "A2AMessage",
     "A2AMessageRole",
     "A2AProtocolError",

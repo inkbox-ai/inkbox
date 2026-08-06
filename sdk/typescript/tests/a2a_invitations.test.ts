@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { Inkbox } from "../src/inkbox.js";
+import { A2AInvitationParseError, extractA2AInvitationToken } from "../src/a2a/invitations.js";
+
+const TOKEN = "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 const RAW = {
   id: "inv_1",
@@ -34,7 +38,12 @@ function respond(body: unknown): void {
 
 describe("A2AInvitationsResource", () => {
   it("creates an invitation and preserves its one-time secret", async () => {
-    respond({ ...RAW, invitation_token: "a2ai_secret", agent_handoff_prompt: "handoff" });
+    respond({
+      ...RAW,
+      invitation_token: TOKEN,
+      invitation_url: `https://inkbox.ai/a2a/invitations/accept#token=${TOKEN}`,
+      agent_handoff_prompt: "handoff",
+    });
     const client = new Inkbox({ apiKey: "ApiKey_admin" });
     const result = await client.a2aInvitations.create({
       peerAgentHandles: ["support"], expiresInSeconds: 7200,
@@ -42,7 +51,8 @@ describe("A2AInvitationsResource", () => {
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({
       peer_agent_handles: ["support"], expires_in_seconds: 7200,
     });
-    expect(result.invitationToken).toBe("a2ai_secret");
+    expect(result.invitationToken).toBe(TOKEN);
+    expect(result.invitationUrl).toContain("/a2a/invitations/accept#token=");
   });
 
   it("uses canonical list, get, revoke, and accept routes", async () => {
@@ -60,8 +70,56 @@ describe("A2AInvitationsResource", () => {
     expect(vi.mocked(fetch).mock.calls[2][0]).toBe("https://inkbox.ai/api/v1/a2a/invitations/inv_1/revoke");
 
     respond({ invitation_id: "inv_1", status: "accepted", invitee_identity_id: "identity_2", invitee_agent_handle: "buyer", peer_agent_handles: ["support"], accepted_at: "2026-08-04T01:00:00Z" });
-    const result = await client.a2aInvitations.accept("a2ai_secret");
+    const result = await client.a2aInvitations.accept(TOKEN);
     expect(result.inviteeAgentHandle).toBe("buyer");
-    expect(JSON.parse(vi.mocked(fetch).mock.calls[3][1]!.body as string)).toEqual({ invitation_token: "a2ai_secret" });
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[3][1]!.body as string)).toEqual({ invitation_token: TOKEN });
+  });
+
+  it("extracts a share URL before sending accept", async () => {
+    const client = new Inkbox({ apiKey: "ApiKey_test", baseUrl: "https://beta.inkbox.ai" });
+    respond({ invitation_id: "inv_1", status: "accepted", invitee_identity_id: "identity_2", invitee_agent_handle: "buyer", peer_agent_handles: ["support"], accepted_at: "2026-08-04T01:00:00Z" });
+    await client.a2aInvitations.accept(`https://beta.inkbox.ai/a2a/invitations/accept#token=${TOKEN}`);
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ invitation_token: TOKEN });
+  });
+
+  it("does not invent a share URL for an old server", async () => {
+    respond({ ...RAW, invitation_token: TOKEN });
+    const client = new Inkbox({ apiKey: "ApiKey_admin" });
+    const result = await client.a2aInvitations.create({ peerAgentHandles: ["support"] });
+    expect(result.invitationUrl).toBeUndefined();
+  });
+});
+
+describe("extractA2AInvitationToken", () => {
+  const vectors = JSON.parse(readFileSync(
+    new URL("../../../tests/fixtures/a2a_invitation_inputs.json", import.meta.url),
+    "utf8",
+  )) as {
+    valid: Array<{ base_url: string; input: string; token: string }>;
+    invalid: Array<{ base_url: string; input: string }>;
+  };
+
+  it("passes the shared valid vectors", () => {
+    for (const item of vectors.valid) {
+      expect(extractA2AInvitationToken(item.input, item.base_url)).toBe(item.token);
+    }
+  });
+
+  it("rejects the shared adversarial vectors without reflecting secrets", () => {
+    for (const item of vectors.invalid) {
+      try {
+        extractA2AInvitationToken(item.input, item.base_url);
+        throw new Error("expected parser failure");
+      } catch (error) {
+        expect(error).toBeInstanceOf(A2AInvitationParseError);
+        expect(String(error)).not.toContain(TOKEN);
+      }
+    }
+  });
+
+  it("rejects oversized input", () => {
+    expect(() => extractA2AInvitationToken("x".repeat(2049))).toThrow(
+      A2AInvitationParseError,
+    );
   });
 });

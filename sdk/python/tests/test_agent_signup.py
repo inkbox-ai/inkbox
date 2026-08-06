@@ -145,9 +145,11 @@ class TestSignup:
         result = Inkbox.signup(
             human_email="human@example.com",
             note_to_human="Please approve me",
-            invitation_token="a2ai_secret",
+            invitation_token="https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         )
-        assert client.request.call_args.kwargs["json"]["invitation_token"] == "a2ai_secret"
+        assert client.request.call_args.kwargs["json"]["invitation_token"] == (
+            "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        )
         assert result.invitation is not None
         assert result.invitation.invitation_id == "inv_1"
 
@@ -311,7 +313,7 @@ class TestSignupErrors:
             Inkbox.signup(
                 human_email="human@example.com",
                 note_to_human="Please approve me",
-                invitation_token="a2ai_example",
+                invitation_token="a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             )
 
         assert raised.value.detail == {

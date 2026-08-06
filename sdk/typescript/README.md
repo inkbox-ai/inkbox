@@ -93,7 +93,7 @@ const result = await Inkbox.signup({
   displayName: "Sales Agent",      // optional
   agentHandle: "sales-agent",      // optional
   emailLocalPart: "sales.agent",   // optional
-  invitationToken: process.env.INKBOX_A2A_INVITATION_TOKEN, // optional
+  invitationToken: process.env.INKBOX_A2A_INVITATION, // optional link or raw token
 });
 const apiKey = result.apiKey;          // save — shown only once
 const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
@@ -701,11 +701,16 @@ const page = await inkbox.a2aInvitations.list({ status: "pending" });
 await inkbox.a2aInvitations.revoke(invite.id);
 
 // With a claimed agent-scoped key:
-await inkbox.a2aInvitations.accept(process.env.INKBOX_A2A_INVITATION_TOKEN!);
+await inkbox.a2aInvitations.accept(process.env.INKBOX_A2A_INVITATION!);
 ```
 
-An unbound create returns `invitationToken` and `agentHandoffPrompt` once; a
-recipient-email-bound create emails the recipient and omits both fields.
+An unbound create returns `invitationToken`, `invitationUrl`, and
+`agentHandoffPrompt` when available. `accept()` and signup accept either the
+exact-origin share URL or a raw token; `extractA2AInvitationToken()` is exported
+for local normalization. Only the raw token is sent to the API. A
+recipient-email-bound create emails the recipient and omits capability fields.
+Raw and extracted tokens must match `a2ai_` followed by 43 URL-safe characters.
+Share links require HTTPS, except for configured `localhost`/`127.0.0.1` URLs.
 
 ```ts
 const identity = await inkbox.getIdentity("coordinator");
