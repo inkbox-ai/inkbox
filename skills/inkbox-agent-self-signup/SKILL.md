@@ -89,15 +89,20 @@ api_key = result.api_key
 email = result.email_address       # e.g. "sales-agent-a1b2c3@inkboxmail.com"
 handle = result.agent_handle       # e.g. "sales-agent-a1b2c3"
 org_id = result.organization_id    # provisional org
+print(result.message)              # authoritative delivery/acceptance outcome
 
-# 2. Verify (after the human shares the 6-digit code)
-verify = Inkbox.verify_signup(api_key, verification_code="483921")
-# verify.claim_status → "agent_claimed"
-# verify.message      → result + plugin guidance for your harness (when one exists)
+already_claimed = (
+    result.invitation is not None and result.invitation.status == "accepted"
+) or result.claim_status == "agent_claimed"
+if not already_claimed:
+    # 2. If needed, resend before verification (5-minute cooldown)
+    # Inkbox.resend_signup_verification(api_key)
 
-# 3. Resend verification (5-minute cooldown)
-resend = Inkbox.resend_signup_verification(api_key)
-# resend.organization_id → current org (may differ from signup if migrated)
+    # 3. Verify after the human shares the 6-digit code
+    verify = Inkbox.verify_signup(api_key, verification_code="483921")
+    # verify.claim_status → "agent_claimed"
+    # verify.message      → result + plugin guidance for your harness (when one exists)
+# An accepted email-bound invitation is already claimed and sends no verification code.
 
 # 4. Check status
 status = Inkbox.get_signup_status(api_key)
@@ -148,15 +153,20 @@ const apiKey = result.apiKey;
 const email = result.emailAddress;       // e.g. "sales-agent-a1b2c3@inkboxmail.com"
 const handle = result.agentHandle;       // e.g. "sales-agent-a1b2c3"
 const orgId = result.organizationId;     // provisional org
+console.log(result.message);             // authoritative delivery/acceptance outcome
 
-// 2. Verify (after the human shares the 6-digit code)
-const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
-// verify.claimStatus → "agent_claimed"
-// verify.message     → result + plugin guidance for your harness (when one exists)
+const alreadyClaimed = result.invitation?.status === "accepted"
+  || result.claimStatus === "agent_claimed";
+if (!alreadyClaimed) {
+  // 2. If needed, resend before verification (5-minute cooldown)
+  // await Inkbox.resendSignupVerification(apiKey);
 
-// 3. Resend verification (5-minute cooldown)
-const resend = await Inkbox.resendSignupVerification(apiKey);
-// resend.organizationId → current org (may differ from signup if migrated)
+  // 3. Verify after the human shares the 6-digit code
+  const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+  // verify.claimStatus → "agent_claimed"
+  // verify.message     → result + plugin guidance for your harness (when one exists)
+}
+// An accepted email-bound invitation is already claimed and sends no verification code.
 
 // 4. Check status
 const status = await Inkbox.getSignupStatus(apiKey);

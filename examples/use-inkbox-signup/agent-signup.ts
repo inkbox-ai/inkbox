@@ -1,20 +1,21 @@
 /**
  * Agent self-signup example — register, verify, check status, send welcome email.
  *
- * Requires no pre-existing API key for registration. After the human approves
- * with the 6-digit code, verify and optionally send a welcome email.
+ * Requires no pre-existing API key for registration. Most agents are claimed
+ * with a 6-digit code; a matching email-bound invitation can claim immediately.
  *
  * Environment variables (see .env.example):
- *   INKBOX_HUMAN_EMAIL        — human who receives the verification email (register)
+ *   INKBOX_HUMAN_EMAIL        — human who owns or approves the agent (register)
  *   INKBOX_NOTE_TO_HUMAN      — message included in the verification email (register)
  *   INKBOX_AGENT_HANDLE       — optional base handle; a unique suffix is appended
+ *   INKBOX_A2A_INVITATION_TOKEN — optional A2A connection invitation
  *   INKBOX_API_KEY            — one-time key returned by register (all other steps)
  *   INKBOX_AGENT_HANDLE_SAVED — handle returned by register (send-welcome, cleanup)
  */
 
 import { randomUUID } from "node:crypto";
 import { Inkbox } from "@inkbox/sdk";
-import type { AgentSignupStatusResponse } from "@inkbox/sdk";
+import type { AgentSignupResponse, AgentSignupStatusResponse } from "@inkbox/sdk";
 
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -41,6 +42,10 @@ function printStatus(status: AgentSignupStatusResponse): void {
   console.log(
     `  can_create_mailboxes: ${status.restrictions.canCreateMailboxes}`,
   );
+}
+
+function signupIsClaimed(result: AgentSignupResponse): boolean {
+  return result.invitation?.status === "accepted" || result.claimStatus === "agent_claimed";
 }
 
 async function cmdRegister(): Promise<void> {
@@ -74,13 +79,17 @@ async function cmdRegister(): Promise<void> {
   console.log(`  API Key:  ${result.apiKey}`);
   console.log();
   console.log("Save the API key — it is shown only once.");
-  console.log(`A verification email has been sent to ${result.humanEmail}.`);
+  console.log(result.message);
   console.log();
   console.log("Next steps:");
   console.log("  1. Add INKBOX_API_KEY to your .env");
   console.log(`  2. Add INKBOX_AGENT_HANDLE_SAVED=${result.agentHandle} to your .env`);
   console.log("  3. Run: agent-signup.ts status");
-  console.log("  4. After the human shares the code: agent-signup.ts verify --code <code>");
+  if (signupIsClaimed(result)) {
+    console.log("  4. Already claimed; skip verification and run: agent-signup.ts send-welcome");
+  } else {
+    console.log("  4. After the human shares the code: agent-signup.ts verify --code <code>");
+  }
 }
 
 async function cmdStatus(): Promise<void> {
@@ -130,7 +139,7 @@ async function cmdSendWelcome(): Promise<void> {
     subject: "Hello from your agent!",
     bodyText:
       `Hi! I'm ${identity.agentHandle} (${identity.emailAddress}). ` +
-      "I'm all set up after verification.",
+      "I'm all set up and claimed.",
   });
   console.log(`Sent welcome email to ${status.humanEmail}`);
   console.log(`  from: ${identity.emailAddress}`);

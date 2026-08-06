@@ -87,12 +87,16 @@ result = Inkbox.signup(
 api_key = result.api_key          # save — shown only once
 email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
 handle = result.agent_handle      # e.g. "sales-agent-a1b2c3"
+print(result.message)             # authoritative delivery/acceptance outcome
 
-# Verify (after human shares the 6-digit code from the email)
-Inkbox.verify_signup(api_key, verification_code="483921")
-
-# Resend verification email (5-minute cooldown)
-Inkbox.resend_signup_verification(api_key)
+# A matching email-bound invitation can claim immediately without another email.
+already_claimed = (
+    result.invitation is not None and result.invitation.status == "accepted"
+) or result.claim_status == "agent_claimed"
+if not already_claimed:
+    # If the email is missing, resend before submitting its 6-digit code.
+    # Inkbox.resend_signup_verification(api_key)  # 5-minute cooldown
+    Inkbox.verify_signup(api_key, verification_code="483921")
 
 # Check status and restrictions
 status = Inkbox.get_signup_status(api_key)

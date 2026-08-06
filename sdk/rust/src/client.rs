@@ -777,7 +777,7 @@ mod agent_signup_invitation_tests {
             "organization_id": "org_2",
             "api_key": "ApiKey_once",
             "agent_handle": "buyer",
-            "claim_status": "unclaimed",
+            "claim_status": "agent_unclaimed",
             "human_email": "buyer@example.test",
             "message": "Verification email sent"
         });
@@ -855,7 +855,7 @@ mod agent_signup_invitation_tests {
     #[test]
     fn verify_response_parses_accepted_invitation_summary() {
         let response: AgentSignupVerifyResponse = serde_json::from_value(serde_json::json!({
-            "claim_status": "claimed",
+            "claim_status": "agent_claimed",
             "organization_id": "org_2",
             "message": "Verified",
             "invitation": {

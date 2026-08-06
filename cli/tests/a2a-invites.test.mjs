@@ -73,7 +73,7 @@ test("signup sends an environment invitation token without printing it", async (
       agent_handle: "buyer",
       email_address: "buyer@example.test",
       organization_id: "org_2",
-      claim_status: "pending_verification",
+      claim_status: "agent_unclaimed",
       human_email: "person@example.test",
       message: "Check your email.",
       invitation: {
@@ -119,7 +119,7 @@ test("signup prints the authoritative auto-accept result without claiming an ema
       agent_handle: "buyer",
       email_address: "buyer@example.test",
       organization_id: "org_2",
-      claim_status: "claimed",
+      claim_status: "agent_claimed",
       human_email: "person@example.test",
       message: "Agent registered, claimed, and connected through the A2A invitation.",
       invitation: {
@@ -170,7 +170,7 @@ test("signup prints the authoritative verification delivery failure", async (t) 
       agent_handle: "buyer",
       email_address: "buyer@example.test",
       organization_id: "org_2",
-      claim_status: "pending_verification",
+      claim_status: "agent_unclaimed",
       human_email: "person@example.test",
       message: serverMessage,
       invitation: {
@@ -216,7 +216,7 @@ test("signup warns when a server does not confirm the supplied invitation", asyn
       agent_handle: "buyer",
       email_address: "buyer@example.test",
       organization_id: "org_2",
-      claim_status: "pending_verification",
+      claim_status: "agent_unclaimed",
       human_email: "person@example.test",
       message: "Verification email sent to person@example.test.",
     }));

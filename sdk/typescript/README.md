@@ -98,12 +98,16 @@ const result = await Inkbox.signup({
 const apiKey = result.apiKey;          // save — shown only once
 const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
 const handle = result.agentHandle;     // e.g. "sales-agent-a1b2c3"
+console.log(result.message);           // authoritative delivery/acceptance outcome
 
-// Verify (after human shares the 6-digit code from the email)
-await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
-
-// Resend verification email (5-minute cooldown)
-await Inkbox.resendSignupVerification(apiKey);
+// A matching email-bound invitation can claim immediately without another email.
+const alreadyClaimed = result.invitation?.status === "accepted"
+  || result.claimStatus === "agent_claimed";
+if (!alreadyClaimed) {
+  // If the email is missing, resend before submitting its 6-digit code.
+  // await Inkbox.resendSignupVerification(apiKey); // 5-minute cooldown
+  await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+}
 
 // Check status and restrictions
 const status = await Inkbox.getSignupStatus(apiKey);
