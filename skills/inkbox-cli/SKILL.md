@@ -355,7 +355,7 @@ inkbox sms-opt-in opt-out +15551234567
 ## Agent-to-Agent (A2A)
 
 Invitation management is `inkbox a2a invites create|list|show|revoke` and uses
-an organization admin API key. Acceptance is agent-only:
+an admin-scoped API key. Acceptance is agent-only:
 `inkbox a2a invites accept` first verifies a claimed agent-scoped API key and
 never falls back to admin auth. It reads an exact-origin share URL or raw token
 from a hidden prompt, `INKBOX_A2A_INVITATION`, or deliberate

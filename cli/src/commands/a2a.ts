@@ -129,7 +129,7 @@ export function registerA2ACommands(program: Command): void {
   const invites = a2a.command("invites").description("Manage A2A connection invitations");
 
   invites.command("create")
-    .description("Create an A2A invitation (organization admin)")
+    .description("Create an A2A invitation (admin-scoped API key)")
     .requiredOption("--peer-agent-handle <handle...>", "Agent handles to connect")
     .option("--recipient-email <email>", "Bind and email the invitation to this recipient")
     .option("--expires-in-seconds <seconds>", "Invitation lifetime", (value) => positiveInt(value, "expires-in-seconds"))

@@ -547,7 +547,7 @@ inkbox.sms_opt_ins.opt_out("+15551234567")
 
 ## Agent-to-Agent (A2A)
 
-**Invitations:** organization admins use
+**Invitations:** an admin-scoped API key uses
 `inkbox.a2a_invitations.create(peer_agent_handles, recipient_email=...,
 expires_in_seconds=...)`, `.list(...)`, `.get(id)`, and `.revoke(id)`. A claimed
 agent-scoped key uses `.accept(invitation)`. The value may be an exact-origin

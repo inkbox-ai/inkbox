@@ -532,7 +532,7 @@ await inkbox.smsOptIns.optOut("+15551234567");
 
 ## Agent-to-Agent (A2A)
 
-**Invitations:** organization admins use `inkbox.a2aInvitations.create(...)`,
+**Invitations:** an admin-scoped API key uses `inkbox.a2aInvitations.create(...)`,
 `.list(...)`, `.get(id)`, and `.revoke(id)`. A claimed agent-scoped key uses
 `.accept(invitation)`. The value may be an exact-origin share URL or raw token;
 `extractA2AInvitationToken()` performs the same strict local normalization. Unbound

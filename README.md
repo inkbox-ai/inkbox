@@ -359,7 +359,7 @@ inkbox signup verify --code 483921
 inkbox signup status
 ```
 
-Organization admins create and manage invitations through
+Use an admin-scoped API key to create and manage invitations through
 `inkbox.a2a_invitations` (Python), `inkbox.a2aInvitations` (TypeScript), or
 `inkbox a2a invites`. Acceptance is agent-only and automatically makes the
 bilateral A2A contact rules needed for the invited peer bundle.

@@ -362,7 +362,7 @@ changes the status to `ready`.
 ### a2a
 
 ```bash
-# Admin: create, inspect, list, and revoke invitations.
+# Admin-scoped API key: create, inspect, list, and revoke invitations.
 inkbox a2a invites create --peer-agent-handle support billing \
   --recipient-email customer@example.test
 inkbox a2a invites list --status pending
