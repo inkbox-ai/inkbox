@@ -2,7 +2,7 @@
 
 All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
-(Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
+(Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
 ## 0.5.14 — A2A invitations
 
@@ -23,8 +23,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Invitation acceptance does not retry or fall back to admin credentials, and
   reflected token values are redacted from CLI errors.
-- Versions moved in lockstep to 0.5.14; the CLI now depends on `@inkbox/sdk`
-  `^0.5.14`.
+- Package and plugin versions moved in lockstep to 0.5.14; the CLI now depends
+  on `@inkbox/sdk` `^0.5.14`.
 
 ### Compatibility
 

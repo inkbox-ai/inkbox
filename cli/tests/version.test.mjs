@@ -37,9 +37,10 @@ test("CLI_VERSION matches package.json version (the User-Agent constant must not
   assert.equal(CLI_VERSION, pkg.version);
 });
 
-test("all packages share one version and the CLI targets that SDK release", () => {
+test("all release surfaces share one version and the CLI targets that SDK release", () => {
   const cliPackage = readJson("../package.json");
   const cliLock = readJson("../package-lock.json");
+  const pluginManifest = readJson("../../.claude-plugin/plugin.json");
   const typescriptPackage = readJson("../../sdk/typescript/package.json");
   const typescriptLock = readJson("../../sdk/typescript/package-lock.json");
   const pythonVersion = readTomlVersion("../../sdk/python/pyproject.toml", "project");
@@ -54,6 +55,7 @@ test("all packages share one version and the CLI targets that SDK release", () =
   );
 
   assert.equal(typescriptPackage.version, cliPackage.version);
+  assert.equal(pluginManifest.version, cliPackage.version);
   assert.equal(pythonVersion, cliPackage.version);
   assert.equal(pythonLockVersion, cliPackage.version);
   assert.equal(rustVersion, cliPackage.version);
