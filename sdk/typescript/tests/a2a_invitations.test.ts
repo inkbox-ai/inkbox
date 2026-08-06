@@ -76,9 +76,9 @@ describe("A2AInvitationsResource", () => {
   });
 
   it("extracts a share URL before sending accept", async () => {
-    const client = new Inkbox({ apiKey: "ApiKey_test", baseUrl: "https://beta.inkbox.ai" });
+    const client = new Inkbox({ apiKey: "ApiKey_test", baseUrl: "https://tenant.example.test" });
     respond({ invitation_id: "inv_1", status: "accepted", invitee_identity_id: "identity_2", invitee_agent_handle: "buyer", peer_agent_handles: ["support"], accepted_at: "2026-08-04T01:00:00Z" });
-    await client.a2aInvitations.accept(`https://beta.inkbox.ai/a2a/invitations/accept#token=${TOKEN}`);
+    await client.a2aInvitations.accept(`https://tenant.example.test/a2a/invitations/accept#token=${TOKEN}`);
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ invitation_token: TOKEN });
   });
 

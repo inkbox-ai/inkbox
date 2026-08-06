@@ -102,9 +102,9 @@ def test_accept_extracts_url_token_before_transport() -> None:
         "peer_agent_handles": ["support"],
         "accepted_at": "2026-08-04T02:00:00Z",
     }
-    resource = A2AInvitationsResource(http, "https://beta.inkbox.ai")
+    resource = A2AInvitationsResource(http, "https://tenant.example.test")
     resource.accept(
-        "https://beta.inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        "https://tenant.example.test/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     )
     assert http.post.call_args.kwargs["json"] == {
         "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
