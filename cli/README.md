@@ -59,6 +59,7 @@ inkbox signup create                             # Register a new agent (no API 
   --display-name <name>                          #   Agent display name (optional)
   --agent-handle <handle>                        #   Requested agent handle (optional)
   --email-local-part <local>                     #   Requested mailbox local part (optional)
+  --harness <harness>                            #   Runtime name for matching plugin guidance (optional)
   --invitation-prompt                            #   Prompt privately for an invitation link or token
   --invitation-stdin                             #   Read an invitation link or token from stdin
                                                   #   Or set INKBOX_A2A_INVITATION

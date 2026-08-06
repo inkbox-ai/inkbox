@@ -8,16 +8,16 @@ user-invocable: true
 
 ## Overview
 
-Agents can self-register for an Inkbox account without a pre-existing API key. The self-signup flow provisions a mailbox, identity, and API key in a single call. A verification email is sent to the specified human for approval.
+Agents can self-register for an Inkbox account without a pre-existing API key. The self-signup flow provisions a mailbox, identity, and API key in a single call. Ordinary signup sends the specified human a verification email; a matching email-bound A2A invitation claims and connects the identity without a second email.
 
 The flow has four steps:
 
 1. **Register** — create the agent (public, no auth)
-2. **Verify** — submit the 6-digit code the human received
+2. **Verify when needed** — submit the 6-digit code the human received, unless a matching email-bound invitation already claimed the identity
 3. **Resend Verification** — re-send the code if needed
 4. **Check Status** — poll claim status and restrictions
 
-> **Important:** Always confirm with the user before initiating a signup, as it sends a real email to the specified human.
+> **Important:** Always confirm with the user before initiating signup. Ordinary signup sends the specified human a real email, while invitation-assisted signup may connect immediately.
 
 ## Harness & plugins
 
@@ -27,10 +27,10 @@ runtime you're calling from (e.g. `claude-code`, `codex`, `openclaw`, `hermes`,
 `devin`, `copilot`, `roo`, `zed`, `replit`, `amp`). Any value is accepted; it's
 trimmed and lowercased server-side, and unknown harnesses are never rejected.
 
-After `verify` succeeds, read the response's `message`. When a plugin exists for
-your harness, the `message` includes guidance pointing you at the matching plugin
-repo. (There is no separate `next_steps` field — the guidance is folded into
-`message`.)
+After signup or verification returns a claimed identity, read the response's
+`message`. When a plugin exists for your harness, the `message` includes guidance
+pointing you at the matching plugin repo. (There is no separate `next_steps`
+field — the guidance is folded into `message`.)
 
 The four published plugins:
 
@@ -39,8 +39,8 @@ The four published plugins:
 - openclaw → https://github.com/inkbox-ai/openclaw-plugin
 - hermes → https://github.com/inkbox-ai/hermes-agent-plugin
 
-> **After `verify` succeeds, read the `message` and follow any plugin guidance it
-> contains.** Ask your human for permission before you start any plugin setup or
+> **After the identity is claimed, read the `message` and follow any plugin
+> guidance it contains.** Ask your human for permission before you start any plugin setup or
 > local porting — once they approve, you can do it yourself. If a plugin exists for
 > your harness, set it up; if not, review the listed plugins and port the relevant
 > logic locally. The plugin wires Inkbox in as a native channel of your harness —
@@ -49,7 +49,7 @@ The four published plugins:
 
 ## Restrictions
 
-| | Unclaimed | Claimed (after verification) |
+| | Unclaimed | Claimed (after verification or invitation acceptance) |
 |---|---|---|
 | Recipient sends per fixed 24-hour window | 5 | Plan-based (100–5,000) |
 | Allowed recipients | `human_email` only | No restriction |
@@ -68,6 +68,7 @@ All signup methods are **class methods** on `Inkbox` — no instance required.
 from `INKBOX_A2A_INVITATION` rather than logging it. When present, signup and
 verification may return an `invitation` summary whose status is
 `awaiting_verification` or `accepted`.
+If you do not have an A2A connection invitation, omit `invitation_token`.
 
 ```python
 import os
@@ -134,6 +135,7 @@ All signup methods are **static methods** on `Inkbox` — no instance required.
 `INKBOX_A2A_INVITATION` as an exact-origin share URL or raw token;
 invitation-assisted responses expose the same
 optional `invitation` summary.
+If you do not have an A2A connection invitation, omit `invitationToken`.
 
 ```ts
 import { Inkbox } from "@inkbox/sdk";
@@ -209,7 +211,26 @@ curl -X POST https://inkbox.ai/api/v1/agent-signup \
 ```
 
 `human_email` and `note_to_human` are required. `display_name`, `agent_handle`,
-`email_local_part`, and `harness` are optional.
+`email_local_part`, `harness`, and `invitation_token` are optional.
+Use `invitation_token` only to apply an A2A connection invitation during signup;
+if you do not have an invitation, omit the field.
+
+For invitation-assisted signup, add the raw token to the initial request:
+
+```json
+{
+  "human_email": "john@example.com",
+  "note_to_human": "Hey John, this is your sales bot signing up!",
+  "harness": "claude-code",
+  "invitation_token": "<one-time-invitation-token>"
+}
+```
+
+When the invitation was emailed to the same `human_email`, a successful signup
+returns a claimed, connected identity and sends no additional verification
+email. Read the signup response's `message` for plugin guidance. Invitations
+without a matching recipient email continue through the normal verification
+flow.
 
 Response:
 

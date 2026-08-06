@@ -82,6 +82,7 @@ result = Inkbox.signup(
     display_name="Sales Agent",          # optional
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
+    harness="claude-code",               # optional — selects matching plugin guidance
     invitation_token=os.getenv("INKBOX_A2A_INVITATION"),  # optional link or raw token
 )
 api_key = result.api_key          # save — shown only once
@@ -111,7 +112,7 @@ print(status.restrictions.max_sends_per_day)  # Effective 24-hour recipient-send
 | `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |
 
-`signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, `email_local_part`, and `invitation_token` are optional. When an invitation is present, signup and verification return an optional `invitation` summary.
+`signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, `email_local_part`, `harness`, and `invitation_token` are optional. Omit `invitation_token` when signup is not part of an A2A connection invitation. When an invitation is present, signup and verification return an optional `invitation` summary. A claimed response includes plugin guidance in `message`, tailored to `harness` when supplied.
 
 > **Note:** Unclaimed agents have a limited send quota and can only email the `human_email` specified at signup. After verification or human approval in the console, full capabilities are unlocked.
 
