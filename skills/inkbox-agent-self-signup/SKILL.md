@@ -22,28 +22,31 @@ The flow has four steps:
 ## Harness & plugins
 
 Signup accepts an optional `harness` field — a free-form string naming the agent
-runtime you're calling from (e.g. `claude-code`, `codex`, `openclaw`, `hermes`,
+runtime you're calling from (e.g. `claude-code`, `codex`, `openclaw`, `opencode`, `hermes`,
 `cursor`, `windsurf`, `cline`, `aider`, `continue`, `gemini-cli`, `goose`,
 `devin`, `copilot`, `roo`, `zed`, `replit`, `amp`). Any value is accepted; it's
 trimmed and lowercased server-side, and unknown harnesses are never rejected.
 
 After signup or verification returns a claimed identity, read the response's
-`message`. When a plugin exists for your harness, the `message` includes guidance
-pointing you at the matching plugin repo. (There is no separate `next_steps`
-field — the guidance is folded into `message`.)
+`message`. When a plugin exists for your harness, the `message` includes the
+matching install, bootstrap, gateway-start, and doctor commands. Use the API key
+returned by signup with those commands; do not create a second identity. (There
+is no separate `next_steps` field — the guidance is folded into `message`.)
 
-The four published plugins:
+The five published plugins:
 
 - claude-code → https://github.com/inkbox-ai/claude-code-plugin
 - codex → https://github.com/inkbox-ai/codex-plugin
 - openclaw → https://github.com/inkbox-ai/openclaw-plugin
+- opencode → https://github.com/inkbox-ai/opencode-plugin
 - hermes → https://github.com/inkbox-ai/hermes-agent-plugin
 
 > **After the identity is claimed, read the `message` and follow any plugin
-> guidance it contains.** Ask your human for permission before you start any plugin setup or
-> local porting — once they approve, you can do it yourself. If a plugin exists for
-> your harness, set it up; if not, review the listed plugins and port the relevant
-> logic locally. The plugin wires Inkbox in as a native channel of your harness —
+> guidance it contains.** Ask your human for permission before you start any
+> plugin setup or local porting. Once they approve, follow the supplied commands
+> through the final doctor check. If no plugin exists for your harness, review the
+> listed plugins and port the relevant logic locally. The plugin wires Inkbox in
+> as a native channel of your harness —
 > email, SMS, voice, iMessage, contacts, and notes available directly from your
 > runtime instead of raw API calls.
 
@@ -102,7 +105,7 @@ if not already_claimed:
     # 3. Verify after the human shares the 6-digit code
     verify = Inkbox.verify_signup(api_key, verification_code="483921")
     # verify.claim_status → "agent_claimed"
-    # verify.message      → result + plugin guidance for your harness (when one exists)
+    # verify.message      → result + executable plugin setup for your harness (when one exists)
 # An accepted email-bound invitation is already claimed and sends no verification code.
 
 # 4. Check status
@@ -167,7 +170,7 @@ if (!alreadyClaimed) {
   // 3. Verify after the human shares the 6-digit code
   const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
   // verify.claimStatus → "agent_claimed"
-  // verify.message     → result + plugin guidance for your harness (when one exists)
+  // verify.message     → result + executable plugin setup for your harness (when one exists)
 }
 // An accepted email-bound invitation is already claimed and sends no verification code.
 
@@ -228,7 +231,8 @@ For invitation-assisted signup, add the raw token to the initial request:
 
 When the invitation was emailed to the same `human_email`, a successful signup
 returns a claimed, connected identity and sends no additional verification
-email. Read the signup response's `message` for plugin guidance. Invitations
+email. Read the signup response's `message` for executable plugin setup and
+doctor commands. Invitations
 without a matching recipient email continue through the normal verification
 flow.
 
