@@ -16,6 +16,8 @@ pub enum A2AInvitationStatus {
     Declined,
     Revoked,
     Expired,
+    #[serde(other)]
+    Unknown,
 }
 
 impl A2AInvitationStatus {
@@ -27,6 +29,7 @@ impl A2AInvitationStatus {
             Self::Declined => "declined",
             Self::Revoked => "revoked",
             Self::Expired => "expired",
+            Self::Unknown => "unknown",
         }
     }
 }
@@ -41,6 +44,8 @@ pub enum A2AInvitationEmailStatus {
     Sent,
     Failed,
     Indeterminate,
+    #[serde(other)]
+    Unknown,
 }
 
 /// An organization-managed A2A connection invitation.
@@ -314,5 +319,32 @@ mod tests {
     #[test]
     fn rejects_oversized_input() {
         assert!(extract_a2a_invitation_token(&"x".repeat(2049)).is_err());
+    }
+
+    #[test]
+    fn invitation_models_tolerate_unknown_status_values() {
+        let invitation: A2AInvitation = serde_json::from_value(serde_json::json!({
+            "id": "00000000-0000-0000-0000-000000000001",
+            "issuer_organization_id": "org_example",
+            "inviter_email": "owner@example.com",
+            "peer_agent_handles": ["peer-agent"],
+            "recipient_email": null,
+            "status": "future_invitation_status",
+            "email_status": "future_email_status",
+            "email_sent_at": null,
+            "invitee_identity_id": null,
+            "invitee_agent_handle": null,
+            "invitee_organization_id": null,
+            "expires_at": "2026-08-14T00:00:00Z",
+            "accepted_at": null,
+            "declined_at": null,
+            "revoked_at": null,
+            "created_at": "2026-08-07T00:00:00Z",
+            "updated_at": "2026-08-07T00:00:00Z"
+        }))
+        .unwrap();
+
+        assert_eq!(invitation.status, A2AInvitationStatus::Unknown);
+        assert_eq!(invitation.email_status, A2AInvitationEmailStatus::Unknown);
     }
 }
