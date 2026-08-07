@@ -7,6 +7,6 @@
 pub mod types;
 
 pub use types::{
-    AgentSignupResendResponse, AgentSignupResponse, AgentSignupStatusResponse,
-    AgentSignupVerifyResponse, SignupRestrictions,
+    AgentSignupInvitationSummary, AgentSignupOptions, AgentSignupResendResponse,
+    AgentSignupResponse, AgentSignupStatusResponse, AgentSignupVerifyResponse, SignupRestrictions,
 };

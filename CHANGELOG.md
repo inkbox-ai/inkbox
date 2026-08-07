@@ -2,7 +2,48 @@
 
 All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
-(Python), `@inkbox/cli`, and `inkbox` (Rust, crates.io).
+(Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
+
+## 0.5.14 — A2A invitations
+
+- A2A invitation creates now preserve the server's optional share URL. Python
+  and TypeScript accept that exact-origin URL anywhere a raw invitation token
+  was accepted when it uses the canonical
+  `/console/a2a/invitations/accept` handoff path. Rust signup, preview, and
+  acceptance expose the same strict extraction behavior. Raw tokens remain
+  compatible, and only the extracted token is sent to the API.
+- The CLI prefers `INKBOX_A2A_INVITATION`, `--invitation-stdin`, and
+  `--invitation-prompt`, while retaining the token-named environment and flag
+  aliases. Invitation capabilities are never accepted as argv values.
+
+### Added
+
+- Python, TypeScript, and Rust expose organization-managed A2A invitation
+  create, list, get, and revoke operations plus agent-only acceptance. Agent
+  signup can carry an invitation token and returns the invitation acceptance
+  summary.
+- All SDKs can preview an invitation without an API key and accept it with an
+  existing claimed identity.
+- Rust adds `signup_with` options for invitation-assisted signup and returns
+  the same optional summary without changing the existing positional signup.
+- The CLI adds `a2a invites create|list|show|revoke|preview|accept`; accept
+  requires a claimed agent key and reads its token from a hidden prompt,
+  environment, or deliberate stdin.
+- Invitation errors retain their structured codes. Python and TypeScript API
+  errors expose a parsed retry delay when the response includes `Retry-After`.
+
+### Security
+
+- Invitation acceptance does not retry or fall back to admin credentials, and
+  reflected token values are redacted from CLI errors.
+- Package and plugin versions moved in lockstep to 0.5.14; the CLI now depends
+  on `@inkbox/sdk` `^0.5.14`.
+
+### Compatibility
+
+- Older API versions may ignore the additive signup invitation field. Callers
+  should only treat the invitation as applied when the response includes an
+  invitation summary.
 
 ## 0.5.13 — A2A agent discovery and identity access retirement
 

@@ -8,48 +8,51 @@ user-invocable: true
 
 ## Overview
 
-Agents can self-register for an Inkbox account without a pre-existing API key. The self-signup flow provisions a mailbox, identity, and API key in a single call. A verification email is sent to the specified human for approval.
+Agents can self-register for an Inkbox account without a pre-existing API key. The self-signup flow provisions a mailbox, identity, and API key in a single call. Ordinary signup sends the specified human a verification email; a matching email-bound A2A invitation claims and connects the identity without a second email.
 
 The flow has four steps:
 
 1. **Register** — create the agent (public, no auth)
-2. **Verify** — submit the 6-digit code the human received
+2. **Verify when needed** — submit the 6-digit code the human received, unless a matching email-bound invitation already claimed the identity
 3. **Resend Verification** — re-send the code if needed
 4. **Check Status** — poll claim status and restrictions
 
-> **Important:** Always confirm with the user before initiating a signup, as it sends a real email to the specified human.
+> **Important:** Always confirm with the user before initiating signup. Ordinary signup sends the specified human a real email, while invitation-assisted signup may connect immediately.
 
 ## Harness & plugins
 
 Signup accepts an optional `harness` field — a free-form string naming the agent
-runtime you're calling from (e.g. `claude-code`, `codex`, `openclaw`, `hermes`,
+runtime you're calling from (e.g. `claude-code`, `codex`, `openclaw`, `opencode`, `hermes`,
 `cursor`, `windsurf`, `cline`, `aider`, `continue`, `gemini-cli`, `goose`,
 `devin`, `copilot`, `roo`, `zed`, `replit`, `amp`). Any value is accepted; it's
 trimmed and lowercased server-side, and unknown harnesses are never rejected.
 
-After `verify` succeeds, read the response's `message`. When a plugin exists for
-your harness, the `message` includes guidance pointing you at the matching plugin
-repo. (There is no separate `next_steps` field — the guidance is folded into
-`message`.)
+After signup or verification returns a claimed identity, read the response's
+`message`. When a plugin exists for your harness, the `message` includes the
+matching install, bootstrap, gateway-start, and doctor commands. Use the API key
+returned by signup with those commands; do not create a second identity. (There
+is no separate `next_steps` field — the guidance is folded into `message`.)
 
-The four published plugins:
+The five published plugins:
 
 - claude-code → https://github.com/inkbox-ai/claude-code-plugin
 - codex → https://github.com/inkbox-ai/codex-plugin
 - openclaw → https://github.com/inkbox-ai/openclaw-plugin
+- opencode → https://github.com/inkbox-ai/opencode-plugin
 - hermes → https://github.com/inkbox-ai/hermes-agent-plugin
 
-> **After `verify` succeeds, read the `message` and follow any plugin guidance it
-> contains.** Ask your human for permission before you start any plugin setup or
-> local porting — once they approve, you can do it yourself. If a plugin exists for
-> your harness, set it up; if not, review the listed plugins and port the relevant
-> logic locally. The plugin wires Inkbox in as a native channel of your harness —
+> **After the identity is claimed, read the `message` and follow any plugin
+> guidance it contains.** Ask your human for permission before you start any
+> plugin setup or local porting. Once they approve, follow the supplied commands
+> through the final doctor check. If no plugin exists for your harness, review the
+> listed plugins and port the relevant logic locally. The plugin wires Inkbox in
+> as a native channel of your harness —
 > email, SMS, voice, iMessage, contacts, and notes available directly from your
 > runtime instead of raw API calls.
 
 ## Restrictions
 
-| | Unclaimed | Claimed (after verification) |
+| | Unclaimed | Claimed (after verification or invitation acceptance) |
 |---|---|---|
 | Recipient sends per fixed 24-hour window | 5 | Plan-based (100–5,000) |
 | Allowed recipients | `human_email` only | No restriction |
@@ -64,8 +67,14 @@ All signup methods are **class methods** on `Inkbox` — no instance required.
 
 `human_email` and `note_to_human` are required. `display_name`, `agent_handle`, and
 `email_local_part` are optional.
+`invitation_token` is also optional; read an exact-origin share URL or raw token
+from `INKBOX_A2A_INVITATION` rather than logging it. When present, signup and
+verification may return an `invitation` summary whose status is
+`awaiting_verification` or `accepted`.
+If you do not have an A2A connection invitation, omit `invitation_token`.
 
 ```python
+import os
 from inkbox import Inkbox
 
 # 1. Register
@@ -76,6 +85,7 @@ result = Inkbox.signup(
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
     harness="claude-code",               # optional — names the calling runtime
+    invitation_token=os.environ.get("INKBOX_A2A_INVITATION"),
 )
 
 # Save these — the api_key is shown only once
@@ -83,15 +93,20 @@ api_key = result.api_key
 email = result.email_address       # e.g. "sales-agent-a1b2c3@inkboxmail.com"
 handle = result.agent_handle       # e.g. "sales-agent-a1b2c3"
 org_id = result.organization_id    # provisional org
+print(result.message)              # authoritative delivery/acceptance outcome
 
-# 2. Verify (after the human shares the 6-digit code)
-verify = Inkbox.verify_signup(api_key, verification_code="483921")
-# verify.claim_status → "agent_claimed"
-# verify.message      → result + plugin guidance for your harness (when one exists)
+already_claimed = (
+    result.invitation is not None and result.invitation.status == "accepted"
+) or result.claim_status == "agent_claimed"
+if not already_claimed:
+    # 2. If needed, resend before verification (5-minute cooldown)
+    # Inkbox.resend_signup_verification(api_key)
 
-# 3. Resend verification (5-minute cooldown)
-resend = Inkbox.resend_signup_verification(api_key)
-# resend.organization_id → current org (may differ from signup if migrated)
+    # 3. Verify after the human shares the 6-digit code
+    verify = Inkbox.verify_signup(api_key, verification_code="483921")
+    # verify.claim_status → "agent_claimed"
+    # verify.message      → result + executable plugin setup for your harness (when one exists)
+# An accepted email-bound invitation is already claimed and sends no verification code.
 
 # 4. Check status
 status = Inkbox.get_signup_status(api_key)
@@ -119,6 +134,11 @@ All signup methods are **static methods** on `Inkbox` — no instance required.
 
 `humanEmail` and `noteToHuman` are required. `displayName`, `agentHandle`, and
 `emailLocalPart` are optional.
+`invitationToken` is also optional and may be loaded from
+`INKBOX_A2A_INVITATION` as an exact-origin share URL or raw token;
+invitation-assisted responses expose the same
+optional `invitation` summary.
+If you do not have an A2A connection invitation, omit `invitationToken`.
 
 ```ts
 import { Inkbox } from "@inkbox/sdk";
@@ -131,6 +151,7 @@ const result = await Inkbox.signup({
   agentHandle: "sales-agent",      // optional
   emailLocalPart: "sales.agent",   // optional
   harness: "claude-code",          // optional — names the calling runtime
+  invitationToken: process.env.INKBOX_A2A_INVITATION,
 });
 
 // Save these — the apiKey is shown only once
@@ -138,15 +159,20 @@ const apiKey = result.apiKey;
 const email = result.emailAddress;       // e.g. "sales-agent-a1b2c3@inkboxmail.com"
 const handle = result.agentHandle;       // e.g. "sales-agent-a1b2c3"
 const orgId = result.organizationId;     // provisional org
+console.log(result.message);             // authoritative delivery/acceptance outcome
 
-// 2. Verify (after the human shares the 6-digit code)
-const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
-// verify.claimStatus → "agent_claimed"
-// verify.message     → result + plugin guidance for your harness (when one exists)
+const alreadyClaimed = result.invitation?.status === "accepted"
+  || result.claimStatus === "agent_claimed";
+if (!alreadyClaimed) {
+  // 2. If needed, resend before verification (5-minute cooldown)
+  // await Inkbox.resendSignupVerification(apiKey);
 
-// 3. Resend verification (5-minute cooldown)
-const resend = await Inkbox.resendSignupVerification(apiKey);
-// resend.organizationId → current org (may differ from signup if migrated)
+  // 3. Verify after the human shares the 6-digit code
+  const verify = await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+  // verify.claimStatus → "agent_claimed"
+  // verify.message     → result + executable plugin setup for your harness (when one exists)
+}
+// An accepted email-bound invitation is already claimed and sends no verification code.
 
 // 4. Check status
 const status = await Inkbox.getSignupStatus(apiKey);
@@ -188,7 +214,27 @@ curl -X POST https://inkbox.ai/api/v1/agent-signup \
 ```
 
 `human_email` and `note_to_human` are required. `display_name`, `agent_handle`,
-`email_local_part`, and `harness` are optional.
+`email_local_part`, `harness`, and `invitation_token` are optional.
+Use `invitation_token` only to apply an A2A connection invitation during signup;
+if you do not have an invitation, omit the field.
+
+For invitation-assisted signup, add the raw token to the initial request:
+
+```json
+{
+  "human_email": "john@example.com",
+  "note_to_human": "Hey John, this is your sales bot signing up!",
+  "harness": "claude-code",
+  "invitation_token": "<one-time-invitation-token>"
+}
+```
+
+When the invitation was emailed to the same `human_email`, a successful signup
+returns a claimed, connected identity and sends no additional verification
+email. Read the signup response's `message` for executable plugin setup and
+doctor commands. Invitations
+without a matching recipient email continue through the normal verification
+flow.
 
 Response:
 

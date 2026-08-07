@@ -532,6 +532,15 @@ await inkbox.smsOptIns.optOut("+15551234567");
 
 ## Agent-to-Agent (A2A)
 
+**Invitations:** an admin-scoped API key uses `inkbox.a2aInvitations.create(...)`,
+`.list(...)`, `.get(id)`, and `.revoke(id)`. A claimed agent-scoped key uses
+`.accept(invitation)`. The value may be an exact-origin share URL or raw token;
+`extractA2AInvitationToken()` performs the same strict local normalization. Unbound
+create responses may reveal `invitationToken`, `invitationUrl`, and
+`agentHandoffPrompt`; email-bound creates omit capability fields. Signup
+accepts the same input and returns the optional `invitation` summary. Do not
+retry create or accept automatically.
+
 An identity can inspect work it received, work it requested, or both. Omit
 `direction` on `a2aTasks` for the receiver inbox; `a2aSentTasks` is the
 outbound-only alias.

@@ -1,5 +1,10 @@
 export { A2AClient, A2AProtocolError } from "./client.js";
 export { A2AResource } from "./resource.js";
+export {
+  A2AInvitationParseError,
+  A2AInvitationsResource,
+  extractA2AInvitationToken,
+} from "./invitations.js";
 export type {
   A2ACard,
   A2ACaller,

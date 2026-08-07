@@ -1,7 +1,7 @@
 {
   "name": "inkbox",
   "description": "Inkbox communication tools and SDK skills for Claude Code.",
-  "version": "0.5.13",
+  "version": "0.5.14",
   "author": {
     "name": "Inkbox AI",
     "email": "hello@inkbox.ai"

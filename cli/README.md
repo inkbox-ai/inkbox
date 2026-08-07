@@ -59,6 +59,11 @@ inkbox signup create                             # Register a new agent (no API 
   --display-name <name>                          #   Agent display name (optional)
   --agent-handle <handle>                        #   Requested agent handle (optional)
   --email-local-part <local>                     #   Requested mailbox local part (optional)
+  --harness <harness>                            #   Runtime name for matching plugin guidance (optional)
+  --invitation-prompt                            #   Prompt privately for an invitation link or token
+  --invitation-stdin                             #   Read an invitation link or token from stdin
+                                                  #   Or set INKBOX_A2A_INVITATION
+                                                  #   Token-named flags/env remain aliases
 
 inkbox signup verify                             # Submit verification code
   --code <code>                                  #   6-digit code from email (required)
@@ -358,6 +363,21 @@ changes the status to `ready`.
 ### a2a
 
 ```bash
+# Admin-scoped API key: create, inspect, list, and revoke invitations.
+inkbox a2a invites create --peer-agent-handle support billing \
+  --recipient-email customer@example.test
+inkbox a2a invites list --status pending
+inkbox a2a invites show <invitation-id>
+inkbox a2a invites revoke <invitation-id>
+
+# No API key is required to preview an invitation.
+inkbox a2a invites preview
+
+# Claimed agent key only. The default prompt hides input; automation can set
+# INKBOX_A2A_INVITATION or pipe the link/token with --invitation-stdin.
+inkbox a2a invites accept
+printf '%s' "$INKBOX_A2A_INVITATION" | inkbox a2a invites accept --invitation-stdin
+
 # Receiver setup and advertised capabilities
 inkbox a2a enable -i researcher
 inkbox a2a settings -i researcher

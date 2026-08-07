@@ -74,6 +74,25 @@ test("withErrorHandler renders the message from structured API details", async (
   assert.deepEqual(lines, ["Error: HTTP 400: The import request is invalid."]);
 });
 
+for (const code of [
+  "a2a_invitation_issuer_rate_limited",
+  "a2a_invitation_issuer_outstanding_limit",
+  "a2a_invitation_recipient_unavailable",
+  "a2a_invitation_membership_verification_unavailable",
+]) {
+  test(`withErrorHandler renders invitation Retry-After guidance for ${code}`, async () => {
+    const { lines, exitCode } = await runAndCapture(
+      new InkboxAPIError(429, { code, message: "Try again later." }, 900),
+    );
+
+    assert.equal(exitCode, 1);
+    assert.deepEqual(lines, [
+      "Error: HTTP 429: Try again later.",
+      "Hint: Retry in 900 seconds.",
+    ]);
+  });
+}
+
 test("withErrorHandler explains how to release an in-flight mailbox import", async () => {
   const { lines, exitCode } = await runAndCapture(
     new InkboxAPIError(409, {

@@ -408,4 +408,31 @@ describe("HttpTransport 409 routing", () => {
       expect((detail as Record<string, unknown>).misc).toBe("field");
     }
   });
+
+  for (const code of [
+    "a2a_invitation_issuer_rate_limited",
+    "a2a_invitation_issuer_outstanding_limit",
+    "a2a_invitation_recipient_unavailable",
+    "a2a_invitation_membership_verification_unavailable",
+  ]) {
+    it(`preserves Retry-After for ${code}`, async () => {
+      const response = makeErrorResponse(429, {
+        detail: { code, message: "Try again later." },
+      });
+      Object.defineProperty(response, "headers", {
+        value: new Headers({ "Retry-After": "900" }),
+      });
+      vi.mocked(fetch).mockResolvedValue(response);
+
+      const error = await new HttpTransport(API_KEY, BASE)
+        .post("/a2a/invitations", {})
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(InkboxAPIError);
+      expect(error).toMatchObject({
+        detail: { code, message: "Try again later." },
+        retryAfterSeconds: 900,
+      });
+    });
+  }
 });

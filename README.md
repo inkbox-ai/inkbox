@@ -282,6 +282,7 @@ Agents can self-register without a pre-existing API key. The flow provisions a m
 ### Python
 
 ```python
+import os
 from inkbox import Inkbox
 
 # 1. Sign up (no API key needed)
@@ -291,11 +292,17 @@ result = Inkbox.signup(
     display_name="My Agent",          # optional
     agent_handle="my-agent",          # optional
     email_local_part="my.agent",      # optional
+    invitation_token=os.getenv("INKBOX_A2A_INVITATION"),  # optional link or raw token
 )
 api_key = result.api_key  # save this — shown only once
+print(result.message)     # authoritative delivery/acceptance outcome
 
-# 2. Verify (after human shares the 6-digit code)
-Inkbox.verify_signup(api_key, verification_code="483921")
+# 2. Verify only when signup did not already accept and claim the invitation
+already_claimed = (
+    result.invitation is not None and result.invitation.status == "accepted"
+) or result.claim_status == "agent_claimed"
+if not already_claimed:
+    Inkbox.verify_signup(api_key, verification_code="483921")
 
 # 3. Use the API key
 with Inkbox(api_key=api_key) as inkbox:
@@ -315,11 +322,17 @@ const result = await Inkbox.signup({
   displayName: "My Agent",      // optional
   agentHandle: "my-agent",      // optional
   emailLocalPart: "my.agent",   // optional
+  invitationToken: process.env.INKBOX_A2A_INVITATION, // optional link or raw token
 });
 const apiKey = result.apiKey; // save this — shown only once
+console.log(result.message);  // authoritative delivery/acceptance outcome
 
-// 2. Verify (after human shares the 6-digit code)
-await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+// 2. Verify only when signup did not already accept and claim the invitation
+const alreadyClaimed = result.invitation?.status === "accepted"
+  || result.claimStatus === "agent_claimed";
+if (!alreadyClaimed) {
+  await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+}
 
 // 3. Use the API key
 const inkbox = new Inkbox({ apiKey });
@@ -336,13 +349,20 @@ inkbox signup create --human-email john@example.com \
   --display-name "My Agent" \
   --agent-handle my-agent \
   --email-local-part my.agent
+# When invited, use --invitation-prompt, --invitation-stdin, or
+# INKBOX_A2A_INVITATION (the legacy token-named environment variable remains supported).
 
-# 2. Verify (after human shares the 6-digit code)
+# 2. Verify only if signup did not report an accepted/claimed invitation
 inkbox signup verify --code 483921
 
 # 3. Check status
 inkbox signup status
 ```
+
+Use an admin-scoped API key to create and manage invitations through
+`inkbox.a2a_invitations` (Python), `inkbox.a2aInvitations` (TypeScript), or
+`inkbox a2a invites`. Acceptance is agent-only and automatically makes the
+bilateral A2A contact rules needed for the invited peer bundle.
 
 ---
 

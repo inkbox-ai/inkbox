@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.14 — A2A invitations
+
+- Added `Inkbox.previewA2AInvitation()` for review without an API key.
+- Preserve the server's optional `invitationUrl` on create and accept
+  exact-origin share URLs at `/console/a2a/invitations/accept` in `accept()`
+  and signup through the exported `extractA2AInvitationToken()` helper. Raw
+  tokens remain supported and URLs are reduced to tokens before transport.
+
+- Added `inkbox.a2aInvitations` create, list, get, revoke, and accept methods.
+- Agent signup accepts `invitationToken` and normalizes the optional invitation
+  summary on signup and verification responses.
+- Invitation errors retain structured detail and expose `retryAfterSeconds`
+  when the response includes `Retry-After`.
+- Package version moved in lockstep to 0.5.14.
+
 ## 0.5.13 — A2A agent discovery
 
 ### Added

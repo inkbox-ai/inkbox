@@ -17,6 +17,7 @@ function mockFetch(status: number, body: unknown, ok = status < 400) {
     status,
     statusText: "Error",
     json: () => Promise.resolve(body),
+    headers: new Headers(),
   } as Response);
 }
 
@@ -59,6 +60,36 @@ const RAW_STATUS_RESPONSE = {
 // ---- Tests ----
 
 describe("Inkbox.signup", () => {
+  it("normalizes a null invitation to no summary", async () => {
+    mockFetch(200, { ...RAW_SIGNUP_RESPONSE, invitation: null });
+    const result = await Inkbox.signup({
+      humanEmail: "human@example.com",
+      noteToHuman: "Please approve me",
+    });
+    expect(result).not.toHaveProperty("invitation");
+  });
+
+  it("serializes an invitation token and parses its summary", async () => {
+    mockFetch(200, {
+      ...RAW_SIGNUP_RESPONSE,
+      invitation: {
+        invitation_id: "inv_1",
+        status: "awaiting_verification",
+        invitee_identity_id: "identity_2",
+        invitee_agent_handle: "buyer",
+        peer_agent_handles: ["support"],
+        accepted_at: null,
+      },
+    });
+    const result = await Inkbox.signup({
+      humanEmail: "human@example.com",
+      noteToHuman: "Please approve me",
+      invitationToken: "https://inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    });
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).invitation_token).toBe("a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    expect(result.invitation?.invitationId).toBe("inv_1");
+  });
+
   it("sends POST to /api/v1/agent-signup with snake_case body and no auth header", async () => {
     mockFetch(200, RAW_SIGNUP_RESPONSE);
 
@@ -167,6 +198,22 @@ describe("Inkbox.signup", () => {
 });
 
 describe("Inkbox.verifySignup", () => {
+  it("parses an accepted invitation summary", async () => {
+    mockFetch(200, {
+      ...RAW_VERIFY_RESPONSE,
+      invitation: {
+        invitation_id: "inv_1",
+        status: "accepted",
+        invitee_identity_id: "identity_2",
+        invitee_agent_handle: "buyer",
+        peer_agent_handles: ["support"],
+        accepted_at: "2026-08-04T02:00:00Z",
+      },
+    });
+    const result = await Inkbox.verifySignup("ApiKey_abc", { verificationCode: "123456" });
+    expect(result.invitation?.status).toBe("accepted");
+  });
+
   it("sends POST to /verify with auth header and verification code", async () => {
     mockFetch(200, RAW_VERIFY_RESPONSE);
 
@@ -242,6 +289,32 @@ describe("Inkbox.getSignupStatus", () => {
 });
 
 describe("Agent signup error handling", () => {
+  it("preserves structured invitation details and Retry-After", async () => {
+    const detail = {
+      code: "a2a_invitation_recipient_unavailable",
+      message: "The recipient is temporarily unavailable.",
+    };
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: "Too Many Requests",
+      headers: new Headers({ "Retry-After": "1800" }),
+      json: () => Promise.resolve({ detail }),
+    } as Response);
+
+    const error = await Inkbox.signup({
+      humanEmail: "human@example.com",
+      noteToHuman: "Please approve me",
+      invitationToken: "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(InkboxAPIError);
+    expect(error).toMatchObject({
+      detail,
+      retryAfterSeconds: 1800,
+    });
+  });
+
   it("throws InkboxAPIError on non-ok response", async () => {
     mockFetch(422, { detail: "Invalid verification code" }, false);
 
@@ -260,6 +333,7 @@ describe("Agent signup error handling", () => {
       status: 500,
       statusText: "Internal Server Error",
       json: () => Promise.resolve({}),
+      headers: new Headers(),
     } as Response);
 
     await expect(

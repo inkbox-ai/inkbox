@@ -279,6 +279,24 @@ inbound-only. Group read receipts and typing indicators remain unsupported.
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
 `get_signup_status`.
+Use `Inkbox::signup_with` for additive options.
+Set `inkbox::agent_signup::AgentSignupOptions::harness` to the current runtime
+so a claimed response can return matching plugin guidance in `message`.
+`inkbox::agent_signup::AgentSignupOptions::invitation_token` accepts an
+exact-origin share URL or raw token. `inkbox::extract_a2a_invitation_token`
+uses the production site, while
+`inkbox::extract_a2a_invitation_token_with_base_url` accepts an explicit site.
+Only the token is sent during signup. Use this option for invitation-assisted
+signup and omit it when you do not have an A2A connection invitation. Signup
+and verification responses expose an optional invitation summary; the existing
+positional `signup` is unchanged.
+Raw and extracted tokens must match `a2ai_` followed by 43 URL-safe characters.
+Share links require HTTPS, except for configured `localhost`/`127.0.0.1` URLs.
+Review an invitation before signup without an API key using
+`Inkbox::preview_a2a_invitation`. An existing claimed identity can accept it
+with `inkbox.a2a().accept_invitation(...)`. Organization credentials can manage
+the issuer lifecycle with `create_invitation`, `list_invitations`,
+`get_invitation`, and `revoke_invitation` on the same A2A resource.
 
 ### Agent-to-agent discovery and history
 
@@ -376,9 +394,10 @@ pure Rust.
 
 ## Status
 
-Feature-complete against the Python and TypeScript SDKs. The full REST
-surface, vault crypto + TOTP, webhook verification, and the tunnels control
-plane are implemented and tested. The tunnels **data-plane runtime**
+The Rust SDK implements the REST resources documented above, vault crypto +
+TOTP, webhook verification, and the tunnels control plane. Invitation-assisted
+signup, unauthenticated preview, claimed-agent acceptance, and organization-side
+invitation management are supported. The tunnels **data-plane runtime**
 (`tunnels-runtime` feature) is implemented end-to-end:
 
 - Edge HTTP: TLS h2 dial, `/_system/hello`, parked intake pool, body

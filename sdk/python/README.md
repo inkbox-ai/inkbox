@@ -72,6 +72,7 @@ Use `with Inkbox(...) as inkbox:` (recommended) or call `inkbox.close()` manuall
 Agents can self-register without a pre-existing API key. All signup methods are **class methods** — no `Inkbox` instance required.
 
 ```python
+import os
 from inkbox import Inkbox
 
 # Sign up (public — no API key needed)
@@ -81,16 +82,22 @@ result = Inkbox.signup(
     display_name="Sales Agent",          # optional
     agent_handle="sales-agent",          # optional
     email_local_part="sales.agent",      # optional
+    harness="claude-code",               # optional — selects matching plugin guidance
+    invitation_token=os.getenv("INKBOX_A2A_INVITATION"),  # optional link or raw token
 )
 api_key = result.api_key          # save — shown only once
 email = result.email_address      # e.g. "sales-agent-a1b2c3@inkboxmail.com"
 handle = result.agent_handle      # e.g. "sales-agent-a1b2c3"
+print(result.message)             # authoritative delivery/acceptance outcome
 
-# Verify (after human shares the 6-digit code from the email)
-Inkbox.verify_signup(api_key, verification_code="483921")
-
-# Resend verification email (5-minute cooldown)
-Inkbox.resend_signup_verification(api_key)
+# A matching email-bound invitation can claim immediately without another email.
+already_claimed = (
+    result.invitation is not None and result.invitation.status == "accepted"
+) or result.claim_status == "agent_claimed"
+if not already_claimed:
+    # If the email is missing, resend before submitting its 6-digit code.
+    # Inkbox.resend_signup_verification(api_key)  # 5-minute cooldown
+    Inkbox.verify_signup(api_key, verification_code="483921")
 
 # Check status and restrictions
 status = Inkbox.get_signup_status(api_key)
@@ -100,12 +107,12 @@ print(status.restrictions.max_sends_per_day)  # Effective 24-hour recipient-send
 
 | Method | Auth | Returns |
 |---|---|---|
-| `Inkbox.signup(human_email, *, note_to_human, display_name=None, agent_handle=None, email_local_part=None)` | None | `AgentSignupResponse` |
+| `Inkbox.signup(human_email, *, note_to_human, ..., invitation_token=None)` | None | `AgentSignupResponse` |
 | `Inkbox.verify_signup(api_key, verification_code)` | API key | `AgentSignupVerifyResponse` |
 | `Inkbox.resend_signup_verification(api_key)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.get_signup_status(api_key)` | API key | `AgentSignupStatusResponse` |
 
-`signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, and `email_local_part` are optional. All methods accept optional `base_url` and `timeout` keyword arguments.
+`signup()` requires `human_email` and `note_to_human`. `display_name`, `agent_handle`, `email_local_part`, `harness`, and `invitation_token` are optional. Omit `invitation_token` when signup is not part of an A2A connection invitation. When an invitation is present, signup and verification return an optional `invitation` summary. A claimed response includes plugin guidance in `message`, tailored to `harness` when supplied.
 
 > **Note:** Unclaimed agents have a limited send quota and can only email the `human_email` specified at signup. After verification or human approval in the console, full capabilities are unlocked.
 
@@ -627,6 +634,31 @@ the five `imessage.*` event types.
 ---
 
 ## Agent-to-Agent (A2A)
+
+With an admin-scoped API key, create and manage an invitation that connects an
+external agent to a fixed bundle of peers:
+
+```python
+invite = inkbox.a2a_invitations.create(
+    ["support", "billing"], recipient_email="customer@example.test"
+)
+page = inkbox.a2a_invitations.list(status="pending")
+inkbox.a2a_invitations.revoke(invite.id)
+
+# No API key is required to review an invitation before signup or acceptance:
+preview = Inkbox.preview_a2a_invitation(os.environ["INKBOX_A2A_INVITATION"])
+
+# With a claimed agent-scoped key:
+inkbox.a2a_invitations.accept(os.environ["INKBOX_A2A_INVITATION"])
+```
+
+An unbound create returns `invitation_token`, `invitation_url`, and
+`agent_handoff_prompt` when available. `accept()` and signup accept either the
+exact-origin share URL or a raw token; `extract_a2a_invitation_token()` is
+exported for local normalization. Only the raw token is sent to the API.
+A recipient-email-bound create emails the recipient and omits capability fields.
+Raw and extracted tokens must match `a2ai_` followed by 43 URL-safe characters.
+Share links require HTTPS, except for configured `localhost`/`127.0.0.1` URLs.
 
 ```python
 identity = inkbox.get_identity("coordinator")

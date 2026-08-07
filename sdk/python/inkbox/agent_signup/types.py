@@ -7,7 +7,32 @@ Dataclasses for the agent self-signup flow.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
+
+AgentSignupInvitationStatus = Literal["awaiting_verification", "accepted"]
+
+
+@dataclass
+class AgentSignupInvitationSummary:
+    """Invitation state returned while signup accepts an A2A invitation."""
+
+    invitation_id: str
+    status: AgentSignupInvitationStatus
+    invitee_identity_id: str
+    invitee_agent_handle: str
+    peer_agent_handles: list[str]
+    accepted_at: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> AgentSignupInvitationSummary:
+        return cls(
+            invitation_id=d["invitation_id"],
+            status=d["status"],
+            invitee_identity_id=d["invitee_identity_id"],
+            invitee_agent_handle=d["invitee_agent_handle"],
+            peer_agent_handles=list(d["peer_agent_handles"]),
+            accepted_at=d.get("accepted_at"),
+        )
 
 
 @dataclass
@@ -21,6 +46,7 @@ class AgentSignupResponse:
     claim_status: str
     human_email: str
     message: str
+    invitation: AgentSignupInvitationSummary | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentSignupResponse:
@@ -32,6 +58,11 @@ class AgentSignupResponse:
             claim_status=d["claim_status"],
             human_email=d["human_email"],
             message=d["message"],
+            invitation=(
+                AgentSignupInvitationSummary._from_dict(d["invitation"])
+                if d.get("invitation") is not None
+                else None
+            ),
         )
 
 
@@ -42,6 +73,7 @@ class AgentSignupVerifyResponse:
     claim_status: str
     organization_id: str
     message: str
+    invitation: AgentSignupInvitationSummary | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentSignupVerifyResponse:
@@ -49,6 +81,11 @@ class AgentSignupVerifyResponse:
             claim_status=d["claim_status"],
             organization_id=d["organization_id"],
             message=d["message"],
+            invitation=(
+                AgentSignupInvitationSummary._from_dict(d["invitation"])
+                if d.get("invitation") is not None
+                else None
+            ),
         )
 
 

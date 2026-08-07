@@ -41,12 +41,31 @@ class InkboxAPIError(InkboxError):
         detail: Error detail from the response body. May be a human-readable
             string, or a structured ``dict`` for errors that carry extra
             machine-readable fields (e.g. ``{"existing_rule_id": ..., ...}``).
+        retry_after_seconds: Parsed delta-seconds value from ``Retry-After``,
+            or ``None`` when the response did not provide one.
     """
 
-    def __init__(self, status_code: int, detail: str | dict[str, Any]) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        detail: str | dict[str, Any],
+        *,
+        retry_after: str | int | None = None,
+    ) -> None:
         super().__init__(f"HTTP {status_code}: {detail}")
         self.status_code = status_code
         self.detail: str | dict[str, Any] = detail
+        try:
+            parsed_retry_after = (
+                int(retry_after) if retry_after is not None else None
+            )
+        except (TypeError, ValueError):
+            parsed_retry_after = None
+        self.retry_after_seconds: int | None = (
+            parsed_retry_after
+            if parsed_retry_after is not None and parsed_retry_after >= 0
+            else None
+        )
 
 
 class DuplicateContactRuleError(InkboxAPIError):

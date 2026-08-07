@@ -5,6 +5,7 @@
  */
 
 import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
+import type { InkboxAPIErrorDetail } from "./_http.js";
 import { VERSION } from "./version.js";
 import { resolveClientSettings } from "./_config.js";
 import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
@@ -37,6 +38,11 @@ import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
 import { A2AResource } from "./a2a/resource.js";
+import {
+  A2AInvitationsResource,
+  extractA2AInvitationToken,
+} from "./a2a/invitations.js";
+import type { A2AInvitationPreview } from "./a2a/invitations.js";
 import type {
   AgentIdentitySummary,
   CreateIdentityOptions,
@@ -173,6 +179,7 @@ export class Inkbox {
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
   readonly _a2a: A2AResource;
+  readonly _a2aInvitations: A2AInvitationsResource;
   /** @internal — used by the tunnel-agent runtime for data-plane auth. */
   readonly _apiKey: string;
   /** @internal — canonical platform origin used for A2A credential pinning. */
@@ -261,6 +268,7 @@ export class Inkbox {
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
     this._a2a = new A2AResource(apiHttp, publicHttp);
+    this._a2aInvitations = new A2AInvitationsResource(apiHttp, this._baseUrl);
 
     this._rootApiHttp = rootApiHttp;
     this._vaultResource = new VaultResource(vaultHttp, rootApiHttp);
@@ -309,6 +317,9 @@ export class Inkbox {
 
   /** Thread operations (list, get, delete). */
   get threads(): ThreadsResource { return this._threads; }
+
+  /** Create, inspect, revoke, and accept A2A invitations. */
+  get a2aInvitations(): A2AInvitationsResource { return this._a2aInvitations; }
 
   /** Org-level phone number operations (list, get, provision, release). */
   get phoneNumbers(): PhoneNumbersResource { return this._numbers; }
@@ -513,8 +524,8 @@ export class Inkbox {
   // Agent signup (static — no instance required)
   // ------------------------------------------------------------------
 
-  /** @internal One-shot fetch for agent-signup endpoints. */
-  private static async _signupFetch<T>(
+  /** @internal One-shot fetch that does not require an `Inkbox` instance. */
+  private static async _oneShotFetch<T>(
     method: string,
     path: string,
     opts: { apiKey?: string; body?: unknown; baseUrl?: string; timeoutMs?: number },
@@ -529,7 +540,7 @@ export class Inkbox {
         );
       }
     }
-    const url = `${base.replace(/\/$/, "")}/api/v1/agent-signup${path}`;
+    const url = `${base.replace(/\/$/, "")}${path}`;
     const ms = opts.timeoutMs ?? 30_000;
 
     const headers: Record<string, string> = {
@@ -555,17 +566,55 @@ export class Inkbox {
     }
 
     if (!resp.ok) {
-      let detail: string;
+      let detail: InkboxAPIErrorDetail;
       try {
-        const err = (await resp.json()) as { detail?: string };
-        detail = err.detail ?? resp.statusText;
+        const parsed = await resp.json() as unknown;
+        const rawDetail = (
+          typeof parsed === "object"
+          && parsed !== null
+          && !Array.isArray(parsed)
+        )
+          ? (parsed as Record<string, unknown>)["detail"]
+          : undefined;
+        detail = (
+          typeof rawDetail === "string"
+          || (typeof rawDetail === "object" && rawDetail !== null && !Array.isArray(rawDetail))
+        )
+          ? rawDetail as InkboxAPIErrorDetail
+          : resp.statusText;
       } catch {
         detail = resp.statusText;
       }
-      throw new InkboxAPIError(resp.status, detail);
+      throw new InkboxAPIError(
+        resp.status,
+        detail,
+        resp.headers.get("Retry-After"),
+      );
     }
 
     return resp.json() as Promise<T>;
+  }
+
+  /** Review an A2A invitation without accepting it or supplying an API key. */
+  static async previewA2AInvitation(
+    invitation: string,
+    options?: SignupOptions,
+  ): Promise<A2AInvitationPreview> {
+    const invitationToken = extractA2AInvitationToken(
+      invitation,
+      options?.baseUrl ?? DEFAULT_BASE_URL,
+    );
+    const raw = await Inkbox._oneShotFetch<Record<string, unknown>>(
+      "POST",
+      "/api/v1/a2a/invitations/preview",
+      { body: { invitation_token: invitationToken }, ...options },
+    );
+    return {
+      inviterEmail: String(raw.inviter_email),
+      peerAgentHandles: raw.peer_agent_handles as string[],
+      expiresAt: String(raw.expires_at),
+      agentHandoffPrompt: String(raw.agent_handoff_prompt),
+    };
   }
 
   /**
@@ -577,8 +626,19 @@ export class Inkbox {
     request: AgentSignupRequest,
     options?: SignupOptions,
   ): Promise<AgentSignupResponse> {
-    const raw = await Inkbox._signupFetch<RawAgentSignupResponse>(
-      "POST", "", { body: agentSignupRequestToWire(request), ...options },
+    const normalizedRequest = request.invitationToken === undefined
+      ? request
+      : {
+          ...request,
+          invitationToken: extractA2AInvitationToken(
+            request.invitationToken,
+            options?.baseUrl ?? DEFAULT_BASE_URL,
+          ),
+        };
+    const raw = await Inkbox._oneShotFetch<RawAgentSignupResponse>(
+      "POST", "/api/v1/agent-signup", {
+        body: agentSignupRequestToWire(normalizedRequest), ...options,
+      },
     );
     return parseAgentSignupResponse(raw);
   }
@@ -591,8 +651,10 @@ export class Inkbox {
     request: AgentSignupVerifyRequest,
     options?: SignupOptions,
   ): Promise<AgentSignupVerifyResponse> {
-    const raw = await Inkbox._signupFetch<RawAgentSignupVerifyResponse>(
-      "POST", "/verify", { apiKey, body: agentSignupVerifyRequestToWire(request), ...options },
+    const raw = await Inkbox._oneShotFetch<RawAgentSignupVerifyResponse>(
+      "POST", "/api/v1/agent-signup/verify", {
+        apiKey, body: agentSignupVerifyRequestToWire(request), ...options,
+      },
     );
     return parseAgentSignupVerifyResponse(raw);
   }
@@ -604,8 +666,8 @@ export class Inkbox {
     apiKey: string,
     options?: SignupOptions,
   ): Promise<AgentSignupResendResponse> {
-    const raw = await Inkbox._signupFetch<RawAgentSignupResendResponse>(
-      "POST", "/resend-verification", { apiKey, ...options },
+    const raw = await Inkbox._oneShotFetch<RawAgentSignupResendResponse>(
+      "POST", "/api/v1/agent-signup/resend-verification", { apiKey, ...options },
     );
     return parseAgentSignupResendResponse(raw);
   }
@@ -617,8 +679,8 @@ export class Inkbox {
     apiKey: string,
     options?: SignupOptions,
   ): Promise<AgentSignupStatusResponse> {
-    const raw = await Inkbox._signupFetch<RawAgentSignupStatusResponse>(
-      "GET", "/status", { apiKey, ...options },
+    const raw = await Inkbox._oneShotFetch<RawAgentSignupStatusResponse>(
+      "GET", "/api/v1/agent-signup/status", { apiKey, ...options },
     );
     return parseAgentSignupStatusResponse(raw);
   }

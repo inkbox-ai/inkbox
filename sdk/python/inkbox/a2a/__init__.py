@@ -1,6 +1,18 @@
 """A2A inbox and standard-protocol client."""
 
 from inkbox.a2a.client import A2AClient, A2AProtocolError
+from inkbox.a2a.invitations import (
+    A2AInvitation,
+    A2AInvitationAcceptResult,
+    A2AInvitationCreateResult,
+    A2AInvitationEmailStatus,
+    A2AInvitationPage,
+    A2AInvitationParseError,
+    A2AInvitationPreview,
+    A2AInvitationsResource,
+    A2AInvitationStatus,
+    extract_a2a_invitation_token,
+)
 from inkbox.a2a.types import (
     A2ACard,
     A2ACaller,
@@ -45,6 +57,16 @@ __all__ = [
     "A2AHistoryDirection",
     "A2AHistoryMessage",
     "A2AHistoryMessagePage",
+    "A2AInvitation",
+    "A2AInvitationAcceptResult",
+    "A2AInvitationCreateResult",
+    "A2AInvitationEmailStatus",
+    "A2AInvitationPage",
+    "A2AInvitationParseError",
+    "A2AInvitationPreview",
+    "A2AInvitationsResource",
+    "A2AInvitationStatus",
+    "extract_a2a_invitation_token",
     "A2AMessage",
     "A2AMessageRole",
     "A2AProtocolError",

@@ -60,12 +60,20 @@ export type InkboxAPIErrorDetail = string | Record<string, unknown>;
 export class InkboxAPIError extends InkboxError {
   readonly statusCode: number;
   readonly detail: InkboxAPIErrorDetail;
+  /** Parsed delta-seconds value from `Retry-After`, when supplied. */
+  readonly retryAfterSeconds: number | null;
 
-  constructor(statusCode: number, detail: InkboxAPIErrorDetail) {
+  constructor(
+    statusCode: number,
+    detail: InkboxAPIErrorDetail,
+    retryAfter: string | number | null = null,
+  ) {
     super(`HTTP ${statusCode}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
     this.name = "InkboxAPIError";
     this.statusCode = statusCode;
     this.detail = detail;
+    const parsed = retryAfter === null ? Number.NaN : Number(retryAfter);
+    this.retryAfterSeconds = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
   }
 }
 
@@ -283,7 +291,11 @@ function raiseForErrorResponse(
       headers?.get("Retry-After") ?? null,
     );
   }
-  throw new InkboxAPIError(status, rawDetail);
+  throw new InkboxAPIError(
+    status,
+    rawDetail,
+    headers?.get("Retry-After") ?? null,
+  );
 }
 
 /** NODE_USE_ENV_PROXY exists on Node 22.21+ within the 22.x line, and 24+. */

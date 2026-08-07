@@ -8,17 +8,31 @@ use crate::a2a::types::{
     A2AHistoryDirection, A2AHistoryMessagePage, A2AMessageListOptions, A2ASentTaskListOptions,
     A2ATask, A2ATaskListOptions, A2ATaskPage,
 };
-use crate::error::Result;
+use crate::a2a::{
+    extract_a2a_invitation_token_with_base_url, A2AInvitation, A2AInvitationAcceptResult,
+    A2AInvitationCreateOptions, A2AInvitationCreateResult, A2AInvitationListOptions,
+    A2AInvitationPage,
+};
+use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
 pub struct A2AResource {
     http: Arc<HttpTransport>,
     public_http: Arc<HttpTransport>,
+    base_url: String,
 }
 
 impl A2AResource {
-    pub(crate) fn new(http: Arc<HttpTransport>, public_http: Arc<HttpTransport>) -> Self {
-        Self { http, public_http }
+    pub(crate) fn new(
+        http: Arc<HttpTransport>,
+        public_http: Arc<HttpTransport>,
+        base_url: String,
+    ) -> Self {
+        Self {
+            http,
+            public_http,
+            base_url,
+        }
     }
 
     fn base(agent_handle: &str) -> String {
@@ -57,6 +71,70 @@ impl A2AResource {
         options: &A2ADirectoryListOptions,
     ) -> Result<A2ADirectoryPage> {
         self.directory(false, options)
+    }
+
+    /// Create an invitation for one or more claimed, A2A-enabled agents.
+    pub fn create_invitation(
+        &self,
+        options: &A2AInvitationCreateOptions,
+    ) -> Result<A2AInvitationCreateResult> {
+        let mut body = json!({"peer_agent_handles": options.peer_agent_handles});
+        if let Some(recipient_email) = &options.recipient_email {
+            body["recipient_email"] = json!(recipient_email);
+        }
+        if let Some(expires_in_seconds) = options.expires_in_seconds {
+            body["expires_in_seconds"] = json!(expires_in_seconds);
+        }
+        let data = self.http.post("/a2a/invitations", Some(&body), NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// List invitations created by the current organization.
+    pub fn list_invitations(
+        &self,
+        options: &A2AInvitationListOptions,
+    ) -> Result<A2AInvitationPage> {
+        let mut params = Vec::new();
+        if let Some(status) = options.status {
+            params.push(("status", status.as_str().to_string()));
+        }
+        if let Some(cursor) = &options.cursor {
+            params.push(("cursor", cursor.clone()));
+        }
+        params.push(("limit", options.limit.unwrap_or(50).to_string()));
+        let data = self.http.get("/a2a/invitations", &params)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Get one invitation created by the current organization.
+    pub fn get_invitation(&self, invitation_id: Uuid) -> Result<A2AInvitation> {
+        let data = self
+            .http
+            .get(&format!("/a2a/invitations/{invitation_id}"), NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Revoke an open invitation created by the current organization.
+    pub fn revoke_invitation(&self, invitation_id: Uuid) -> Result<A2AInvitation> {
+        let data = self.http.post::<serde_json::Value>(
+            &format!("/a2a/invitations/{invitation_id}/revoke"),
+            None,
+            NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Accept an invitation with the client's claimed agent-scoped API key.
+    pub fn accept_invitation(&self, invitation: &str) -> Result<A2AInvitationAcceptResult> {
+        let invitation_token =
+            extract_a2a_invitation_token_with_base_url(invitation, &self.base_url)
+                .map_err(|error| InkboxError::InvalidArgument(error.to_string()))?;
+        let data = self.http.post(
+            "/a2a/invitations/accept",
+            Some(&json!({"invitation_token": invitation_token})),
+            NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
     }
 
     pub fn tasks(&self, agent_handle: &str, options: &A2ATaskListOptions) -> Result<A2ATaskPage> {
@@ -277,10 +355,33 @@ mod tests {
 
     use crate::a2a::{
         A2AContextListOptions, A2ADirectoryListOptions, A2ADirectoryPage, A2ADirectoryVisibility,
-        A2AHistoryDirection, A2AMessageListOptions, A2AMessageRole, A2ASentTaskListOptions,
+        A2AHistoryDirection, A2AInvitationCreateOptions, A2AInvitationListOptions,
+        A2AInvitationStatus, A2AMessageListOptions, A2AMessageRole, A2ASentTaskListOptions,
         A2ATaskListOptions,
     };
     use crate::client::Inkbox;
+
+    fn invitation_json(invitation_id: Uuid, status: &str) -> serde_json::Value {
+        json!({
+            "id": invitation_id,
+            "issuer_organization_id": "org_sender",
+            "inviter_email": "sender@example.com",
+            "peer_agent_handles": ["support"],
+            "recipient_email": "customer@example.com",
+            "status": status,
+            "email_status": "sent",
+            "email_sent_at": "2026-08-04T00:01:00Z",
+            "invitee_identity_id": null,
+            "invitee_agent_handle": null,
+            "invitee_organization_id": null,
+            "expires_at": "2026-08-11T00:00:00Z",
+            "accepted_at": null,
+            "declined_at": null,
+            "revoked_at": null,
+            "created_at": "2026-08-04T00:00:00Z",
+            "updated_at": "2026-08-04T00:01:00Z"
+        })
+    }
 
     #[test]
     fn directory_methods_use_public_and_organization_paths() {
@@ -354,6 +455,117 @@ mod tests {
         .unwrap();
 
         assert_eq!(page.items[0].visibility, A2ADirectoryVisibility::Unknown);
+    }
+
+    #[test]
+    fn accepts_an_invitation_with_the_configured_agent_key() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/a2a/invitations/accept")
+                .header("x-api-key", "ApiKey_claimed_agent")
+                .json_body(json!({
+                    "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                }));
+            then.status(200).json_body(json!({
+                "invitation_id": "inv_1",
+                "status": "accepted",
+                "invitee_identity_id": "identity_2",
+                "invitee_agent_handle": "buyer",
+                "peer_agent_handles": ["support"],
+                "accepted_at": "2026-08-04T01:00:00Z"
+            }));
+        });
+        let client = Inkbox::builder("ApiKey_claimed_agent")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let invitation_url = format!(
+            "{}/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            server.base_url()
+        );
+
+        let result = client.a2a().accept_invitation(&invitation_url).unwrap();
+
+        request.assert();
+        assert_eq!(result.status, "accepted");
+        assert_eq!(result.invitee_agent_handle, "buyer");
+    }
+
+    #[test]
+    fn manages_the_complete_invitation_issuer_lifecycle() {
+        let server = MockServer::start();
+        let invitation_id = Uuid::new_v4();
+        let mut create_response = invitation_json(invitation_id, "pending");
+        create_response["invitation_token"] = json!(null);
+        create_response["invitation_url"] = json!(null);
+        create_response["agent_handoff_prompt"] = json!(null);
+
+        let create_request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/a2a/invitations")
+                .header("x-api-key", "ApiKey_admin")
+                .json_body(json!({
+                    "peer_agent_handles": ["support"],
+                    "recipient_email": "customer@example.com",
+                    "expires_in_seconds": 86400
+                }));
+            then.status(201).json_body(create_response.clone());
+        });
+        let list_request = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/a2a/invitations")
+                .query_param("status", "pending")
+                .query_param("cursor", "next-page")
+                .query_param("limit", "25");
+            then.status(200).json_body(json!({
+                "items": [invitation_json(invitation_id, "pending")],
+                "next_cursor": null
+            }));
+        });
+        let get_request = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/a2a/invitations/{invitation_id}"));
+            then.status(200)
+                .json_body(invitation_json(invitation_id, "pending"));
+        });
+        let revoke_request = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/a2a/invitations/{invitation_id}/revoke"));
+            then.status(200)
+                .json_body(invitation_json(invitation_id, "revoked"));
+        });
+        let client = Inkbox::builder("ApiKey_admin")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+
+        let created = client
+            .a2a()
+            .create_invitation(&A2AInvitationCreateOptions {
+                peer_agent_handles: vec!["support".into()],
+                recipient_email: Some("customer@example.com".into()),
+                expires_in_seconds: Some(86_400),
+            })
+            .unwrap();
+        let page = client
+            .a2a()
+            .list_invitations(&A2AInvitationListOptions {
+                status: Some(A2AInvitationStatus::Pending),
+                cursor: Some("next-page".into()),
+                limit: Some(25),
+            })
+            .unwrap();
+        let fetched = client.a2a().get_invitation(invitation_id).unwrap();
+        let revoked = client.a2a().revoke_invitation(invitation_id).unwrap();
+
+        create_request.assert();
+        list_request.assert();
+        get_request.assert();
+        revoke_request.assert();
+        assert_eq!(created.invitation.id, invitation_id);
+        assert_eq!(page.items, vec![fetched]);
+        assert_eq!(revoked.status, A2AInvitationStatus::Revoked);
     }
 
     #[test]

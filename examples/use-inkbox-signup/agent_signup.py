@@ -1,13 +1,14 @@
 """
 Agent self-signup example — register, verify, check status, send welcome email.
 
-Requires no pre-existing API key for registration. After the human approves
-with the 6-digit code, verify and optionally send a welcome email.
+Requires no pre-existing API key for registration. Most agents are claimed
+with a 6-digit code; a matching email-bound invitation can claim immediately.
 
 Environment variables (see .env.example):
-  INKBOX_HUMAN_EMAIL       — human who receives the verification email (register)
+  INKBOX_HUMAN_EMAIL       — human who owns or approves the agent (register)
   INKBOX_NOTE_TO_HUMAN     — message included in the verification email (register)
   INKBOX_AGENT_HANDLE      — optional base handle; a unique suffix is appended
+  INKBOX_A2A_INVITATION — optional A2A connection invitation link or token
   INKBOX_API_KEY           — one-time key returned by register (all other steps)
   INKBOX_AGENT_HANDLE_SAVED — handle returned by register (send-welcome, cleanup)
 """
@@ -19,7 +20,7 @@ import os
 import sys
 import uuid
 
-from inkbox import Inkbox
+from inkbox import AgentSignupResponse, Inkbox
 
 
 def _require_env(name: str) -> str:
@@ -44,6 +45,14 @@ def _print_status(status) -> None:
     print(f"  can_create_mailboxes: {status.restrictions.can_create_mailboxes}")
 
 
+def _signup_is_claimed(result: AgentSignupResponse) -> bool:
+    invitation = result.invitation
+    return (
+        (invitation is not None and invitation.status == "accepted")
+        or result.claim_status == "agent_claimed"
+    )
+
+
 def cmd_register(args: argparse.Namespace) -> None:
     human_email = _require_env("INKBOX_HUMAN_EMAIL")
     note = os.environ.get(
@@ -61,6 +70,7 @@ def cmd_register(args: argparse.Namespace) -> None:
         agent_handle=agent_handle,
         email_local_part=agent_handle,
         harness="cursor",
+        invitation_token=os.environ.get("INKBOX_A2A_INVITATION"),
     )
 
     print()
@@ -70,17 +80,22 @@ def cmd_register(args: argparse.Namespace) -> None:
     print(f"  Handle:   {result.agent_handle}")
     print(f"  Org:      {result.organization_id}")
     print(f"  Status:   {result.claim_status}")
+    if result.invitation is not None:
+        print(f"  Invite:   {result.invitation.status}")
     print()
     print(f"  API Key:  {result.api_key}")
     print()
     print("Save the API key — it is shown only once.")
-    print(f"A verification email has been sent to {result.human_email}.")
+    print(result.message)
     print()
     print("Next steps:")
     print("  1. Add INKBOX_API_KEY to your .env")
     print(f"  2. Add INKBOX_AGENT_HANDLE_SAVED={result.agent_handle} to your .env")
     print("  3. Run: agent_signup.py status")
-    print("  4. After the human shares the code: agent_signup.py verify --code <code>")
+    if _signup_is_claimed(result):
+        print("  4. Already claimed; skip verification and run: agent_signup.py send-welcome")
+    else:
+        print("  4. After the human shares the code: agent_signup.py verify --code <code>")
 
 
 def cmd_status(_args: argparse.Namespace) -> None:
@@ -129,7 +144,7 @@ def cmd_send_welcome(_args: argparse.Namespace) -> None:
             subject="Hello from your agent!",
             body_text=(
                 f"Hi! I'm {identity.agent_handle} ({identity.email_address}). "
-                "I'm all set up after verification."
+                "I'm all set up and claimed."
             ),
         )
         print(f"Sent welcome email to {status.human_email}")
@@ -157,7 +172,7 @@ def main() -> None:
     verify_p = sub.add_parser("verify", help="Submit the 6-digit verification code")
     verify_p.add_argument("--code", help="6-digit code from the verification email")
     sub.add_parser("resend", help="Resend the verification email (5-minute cooldown)")
-    sub.add_parser("send-welcome", help="Send a welcome email to the human (after verify)")
+    sub.add_parser("send-welcome", help="Send a welcome email to the human (after claim)")
     sub.add_parser("cleanup", help="Delete the demo identity")
 
     args = parser.parse_args()

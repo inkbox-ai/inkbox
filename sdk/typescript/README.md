@@ -93,16 +93,22 @@ const result = await Inkbox.signup({
   displayName: "Sales Agent",      // optional
   agentHandle: "sales-agent",      // optional
   emailLocalPart: "sales.agent",   // optional
+  harness: "claude-code",          // optional — selects matching plugin guidance
+  invitationToken: process.env.INKBOX_A2A_INVITATION, // optional link or raw token
 });
 const apiKey = result.apiKey;          // save — shown only once
 const email = result.emailAddress;     // e.g. "sales-agent-a1b2c3@inkboxmail.com"
 const handle = result.agentHandle;     // e.g. "sales-agent-a1b2c3"
+console.log(result.message);           // authoritative delivery/acceptance outcome
 
-// Verify (after human shares the 6-digit code from the email)
-await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
-
-// Resend verification email (5-minute cooldown)
-await Inkbox.resendSignupVerification(apiKey);
+// A matching email-bound invitation can claim immediately without another email.
+const alreadyClaimed = result.invitation?.status === "accepted"
+  || result.claimStatus === "agent_claimed";
+if (!alreadyClaimed) {
+  // If the email is missing, resend before submitting its 6-digit code.
+  // await Inkbox.resendSignupVerification(apiKey); // 5-minute cooldown
+  await Inkbox.verifySignup(apiKey, { verificationCode: "483921" });
+}
 
 // Check status and restrictions
 const status = await Inkbox.getSignupStatus(apiKey);
@@ -117,7 +123,7 @@ console.log(status.restrictions.maxSendsPerDay);    // Effective 24-hour recipie
 | `Inkbox.resendSignupVerification(apiKey, options?)` | API key | `AgentSignupResendResponse` |
 | `Inkbox.getSignupStatus(apiKey, options?)` | API key | `AgentSignupStatusResponse` |
 
-`request` for `signup()` requires `humanEmail` and `noteToHuman`. `displayName`, `agentHandle`, and `emailLocalPart` are optional. All methods accept an optional `options` object with `baseUrl` and `timeoutMs`.
+`request` for `signup()` requires `humanEmail` and `noteToHuman`. `displayName`, `agentHandle`, `emailLocalPart`, `harness`, and `invitationToken` are optional. Omit `invitationToken` when signup is not part of an A2A connection invitation. Invitation-assisted signup and verification expose an optional `invitation` summary. A claimed response includes plugin guidance in `message`, tailored to `harness` when supplied.
 
 > **Note:** Unclaimed agents have a limited send quota and can only email the `humanEmail` specified at signup. After verification or human approval in the console, full capabilities are unlocked.
 
@@ -684,6 +690,34 @@ identity-owned webhook subscriptions — see
 ---
 
 ## Agent-to-Agent (A2A)
+
+With an admin-scoped API key, create and manage an invitation that connects an
+external agent to a fixed bundle of peers:
+
+```ts
+const invite = await inkbox.a2aInvitations.create({
+  peerAgentHandles: ["support", "billing"],
+  recipientEmail: "customer@example.test",
+});
+const page = await inkbox.a2aInvitations.list({ status: "pending" });
+await inkbox.a2aInvitations.revoke(invite.id);
+
+// No API key is required to review an invitation before signup or acceptance:
+const preview = await Inkbox.previewA2AInvitation(
+  process.env.INKBOX_A2A_INVITATION!,
+);
+
+// With a claimed agent-scoped key:
+await inkbox.a2aInvitations.accept(process.env.INKBOX_A2A_INVITATION!);
+```
+
+An unbound create returns `invitationToken`, `invitationUrl`, and
+`agentHandoffPrompt` when available. `accept()` and signup accept either the
+exact-origin share URL or a raw token; `extractA2AInvitationToken()` is exported
+for local normalization. Only the raw token is sent to the API. A
+recipient-email-bound create emails the recipient and omits capability fields.
+Raw and extracted tokens must match `a2ai_` followed by 43 URL-safe characters.
+Share links require HTTPS, except for configured `localhost`/`127.0.0.1` URLs.
 
 ```ts
 const identity = await inkbox.getIdentity("coordinator");
