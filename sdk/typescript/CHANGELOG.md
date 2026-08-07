@@ -2,6 +2,7 @@
 
 ## 0.5.14 — A2A invitations
 
+- Added `Inkbox.previewA2AInvitation()` for review without an API key.
 - Preserve the server's optional `invitationUrl` on create and accept
   exact-origin share URLs at `/console/a2a/invitations/accept` in `accept()`
   and signup through the exported `extractA2AInvitationToken()` helper. Raw

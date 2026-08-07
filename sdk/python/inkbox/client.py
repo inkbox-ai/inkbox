@@ -17,7 +17,9 @@ from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
 from inkbox.a2a.resource import A2AResource
 from inkbox.a2a.invitations import (
+    A2AInvitationPreview,
     A2AInvitationsResource,
+    _parse_invitation_preview,
     extract_a2a_invitation_token,
 )
 from inkbox.agent_identity import AgentIdentity
@@ -591,7 +593,7 @@ class Inkbox:
                 )
 
     @classmethod
-    def _signup_request(
+    def _one_shot_request(
         cls,
         method: str,
         path: str,
@@ -601,9 +603,9 @@ class Inkbox:
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
     ) -> dict:
-        """One-shot HTTP request for agent-signup endpoints."""
+        """One-shot HTTP request that does not require an ``Inkbox`` instance."""
         cls._validate_base_url(base_url)
-        url = f"{base_url.rstrip('/')}/api/v1/agent-signup{path}"
+        url = f"{base_url.rstrip('/')}{path}"
         headers: dict[str, str] = {
             "Accept": "application/json",
             "User-Agent": sdk_user_agent(),
@@ -627,6 +629,27 @@ class Inkbox:
                 retry_after=resp.headers.get("Retry-After"),
             )
         return resp.json()
+
+    @classmethod
+    def preview_a2a_invitation(
+        cls,
+        invitation: str,
+        *,
+        base_url: str = _DEFAULT_BASE_URL,
+        timeout: float = 30.0,
+    ) -> A2AInvitationPreview:
+        """Review an A2A invitation without accepting it or supplying an API key."""
+        invitation_token = extract_a2a_invitation_token(
+            invitation, base_url=base_url
+        )
+        data = cls._one_shot_request(
+            "POST",
+            "/api/v1/a2a/invitations/preview",
+            json={"invitation_token": invitation_token},
+            base_url=base_url,
+            timeout=timeout,
+        )
+        return _parse_invitation_preview(data)
 
     @classmethod
     def signup(
@@ -681,8 +704,12 @@ class Inkbox:
             body["invitation_token"] = extract_a2a_invitation_token(
                 invitation_token, base_url=base_url
             )
-        data = cls._signup_request(
-            "POST", "", json=body, base_url=base_url, timeout=timeout,
+        data = cls._one_shot_request(
+            "POST",
+            "/api/v1/agent-signup",
+            json=body,
+            base_url=base_url,
+            timeout=timeout,
         )
         return AgentSignupResponse._from_dict(data)
 
@@ -704,8 +731,8 @@ class Inkbox:
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
         """
-        data = cls._signup_request(
-            "POST", "/verify",
+        data = cls._one_shot_request(
+            "POST", "/api/v1/agent-signup/verify",
             api_key=api_key,
             json={"verification_code": verification_code},
             base_url=base_url,
@@ -729,8 +756,8 @@ class Inkbox:
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
         """
-        data = cls._signup_request(
-            "POST", "/resend-verification",
+        data = cls._one_shot_request(
+            "POST", "/api/v1/agent-signup/resend-verification",
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
@@ -753,8 +780,8 @@ class Inkbox:
             base_url: Override the API base URL.
             timeout: Request timeout in seconds.
         """
-        data = cls._signup_request(
-            "GET", "/status",
+        data = cls._one_shot_request(
+            "GET", "/api/v1/agent-signup/status",
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,

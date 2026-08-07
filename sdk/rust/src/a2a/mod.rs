@@ -6,7 +6,7 @@ mod types;
 
 pub use invitations::{
     extract_a2a_invitation_token, extract_a2a_invitation_token_with_base_url,
-    A2AInvitationParseError,
+    A2AInvitationAcceptResult, A2AInvitationParseError, A2AInvitationPreview,
 };
 pub use resource::A2AResource;
 pub use types::{

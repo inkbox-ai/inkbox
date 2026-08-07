@@ -702,6 +702,11 @@ const invite = await inkbox.a2aInvitations.create({
 const page = await inkbox.a2aInvitations.list({ status: "pending" });
 await inkbox.a2aInvitations.revoke(invite.id);
 
+// No API key is required to review an invitation before signup or acceptance:
+const preview = await Inkbox.previewA2AInvitation(
+  process.env.INKBOX_A2A_INVITATION!,
+);
+
 // With a claimed agent-scoped key:
 await inkbox.a2aInvitations.accept(process.env.INKBOX_A2A_INVITATION!);
 ```

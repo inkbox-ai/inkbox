@@ -76,6 +76,39 @@ def _mock_httpx_client(mock_client_cls: MagicMock, status_code: int, json_data: 
 
 
 class TestSignup:
+    @patch("httpx.Client")
+    def test_preview_invitation_requires_no_client_or_api_key(
+        self, mock_client_cls: MagicMock
+    ):
+        client = _mock_httpx_client(
+            mock_client_cls,
+            200,
+            {
+                "inviter_email": "owner@example.test",
+                "peer_agent_handles": ["support", "billing"],
+                "expires_at": "2026-08-11T00:00:00Z",
+                "agent_handoff_prompt": "Review and accept this invitation.",
+            },
+        )
+
+        result = Inkbox.preview_a2a_invitation(
+            "https://inkbox.ai/console/a2a/invitations/accept#token="
+            "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        )
+
+        client.request.assert_called_once_with(
+            "POST",
+            "https://inkbox.ai/api/v1/a2a/invitations/preview",
+            headers={"Accept": "application/json", "User-Agent": sdk_user_agent()},
+            json={
+                "invitation_token": (
+                    "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                )
+            },
+        )
+        assert result.inviter_email == "owner@example.test"
+        assert result.peer_agent_handles == ["support", "billing"]
+
     def test_null_invitation_normalizes_to_none(self):
         assert AgentSignupResponse._from_dict(
             {**RAW_SIGNUP, "invitation": None}

@@ -3,6 +3,7 @@
 ## 0.5.14 — A2A invitations
 
 - Added `inkbox.a2a_invitations` create, list, get, revoke, and accept methods.
+- Added `Inkbox.preview_a2a_invitation()` for review without an API key.
 - Agent signup accepts `invitation_token` and normalizes the optional
   invitation summary on signup and verification responses.
 - Invitation acceptance and signup accept exact-origin share URLs only at

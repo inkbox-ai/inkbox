@@ -645,6 +645,9 @@ invite = inkbox.a2a_invitations.create(
 page = inkbox.a2a_invitations.list(status="pending")
 inkbox.a2a_invitations.revoke(invite.id)
 
+# No API key is required to review an invitation before signup or acceptance:
+preview = Inkbox.preview_a2a_invitation(os.environ["INKBOX_A2A_INVITATION"])
+
 # With a claimed agent-scoped key:
 inkbox.a2a_invitations.accept(os.environ["INKBOX_A2A_INVITATION"])
 ```

@@ -370,6 +370,9 @@ inkbox a2a invites list --status pending
 inkbox a2a invites show <invitation-id>
 inkbox a2a invites revoke <invitation-id>
 
+# No API key is required to preview an invitation.
+inkbox a2a invites preview
+
 # Claimed agent key only. The default prompt hides input; automation can set
 # INKBOX_A2A_INVITATION or pipe the link/token with --invitation-stdin.
 inkbox a2a invites accept

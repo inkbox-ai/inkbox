@@ -9,9 +9,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - A2A invitation creates now preserve the server's optional share URL. Python
   and TypeScript accept that exact-origin URL anywhere a raw invitation token
   was accepted when it uses the canonical
-  `/console/a2a/invitations/accept` handoff path. Rust signup exposes the same
-  strict extraction helpers. Raw tokens remain compatible, and only the
-  extracted token is sent to the API.
+  `/console/a2a/invitations/accept` handoff path. Rust signup, preview, and
+  acceptance expose the same strict extraction behavior. Raw tokens remain
+  compatible, and only the extracted token is sent to the API.
 - The CLI prefers `INKBOX_A2A_INVITATION`, `--invitation-stdin`, and
   `--invitation-prompt`, while retaining the token-named environment and flag
   aliases. Invitation capabilities are never accepted as argv values.
@@ -21,11 +21,13 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Python and TypeScript expose organization-managed A2A invitation create,
   list, get, revoke, and agent-only accept operations. Agent signup can carry
   an invitation token and returns the invitation acceptance summary.
+- All SDKs can preview an invitation without an API key. Rust also supports
+  accepting an invitation with an existing claimed identity.
 - Rust adds `signup_with` options for invitation-assisted signup and returns
   the same optional summary without changing the existing positional signup.
-- The CLI adds `a2a invites create|list|show|revoke|accept`; accept requires a
-  claimed agent key and reads its token from a hidden prompt, environment, or
-  deliberate stdin.
+- The CLI adds `a2a invites create|list|show|revoke|preview|accept`; accept
+  requires a claimed agent key and reads its token from a hidden prompt,
+  environment, or deliberate stdin.
 - Invitation errors retain their structured codes. Python and TypeScript API
   errors expose a parsed retry delay when the response includes `Retry-After`.
 

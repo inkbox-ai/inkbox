@@ -15,6 +15,7 @@ export type {
   A2AInvitationEmailStatus,
   A2AInvitationListOptions,
   A2AInvitationPage,
+  A2AInvitationPreview,
   A2AInvitationStatus,
 } from "./a2a/invitations.js";
 export type {

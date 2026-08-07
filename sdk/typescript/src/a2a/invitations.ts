@@ -72,6 +72,13 @@ export interface A2AInvitationAcceptResult {
   acceptedAt: string;
 }
 
+export interface A2AInvitationPreview {
+  inviterEmail: string;
+  peerAgentHandles: string[];
+  expiresAt: string;
+  agentHandoffPrompt: string;
+}
+
 type Raw = Record<string, any>;
 
 /** Raised when an A2A invitation link is invalid for the configured site. */

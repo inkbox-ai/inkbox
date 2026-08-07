@@ -16,7 +16,7 @@ function help(...args) {
 
 test("A2A invitation CLI exposes only the frozen command set", () => {
   const commands = help("a2a", "invites");
-  for (const command of ["create", "list", "show", "revoke", "accept"]) {
+  for (const command of ["create", "list", "show", "revoke", "preview", "accept"]) {
     assert.match(commands, new RegExp(command));
   }
   assert.doesNotMatch(commands, /decline|resend/);
@@ -24,6 +24,9 @@ test("A2A invitation CLI exposes only the frozen command set", () => {
   assert.match(accept, /--invitation-stdin/);
   assert.match(accept, /--token-stdin/);
   assert.doesNotMatch(accept, /--invitation-token|--token </);
+  const preview = help("a2a", "invites", "preview");
+  assert.match(preview, /--invitation-stdin/);
+  assert.match(preview, /--token-stdin/);
 });
 
 test("signup accepts invitation secrets only through safe input sources", () => {
@@ -263,6 +266,46 @@ async function withServer(t, handler) {
   return `http://127.0.0.1:${address.port}`;
 }
 
+test("preview works without an API key and does not accept the invitation", async (t) => {
+  let submitted;
+  const baseUrl = await withServer(t, async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    submitted = { url: request.url, headers: request.headers, body: JSON.parse(body) };
+    response.setHeader("Content-Type", "application/json");
+    response.end(JSON.stringify({
+      inviter_email: "owner@example.test",
+      peer_agent_handles: ["support", "billing"],
+      expires_at: "2026-08-11T00:00:00Z",
+      agent_handoff_prompt: "Review and accept this invitation.",
+    }));
+  });
+  const secret = invitationToken("V");
+  const result = await execFileAsync(process.execPath, [
+    cli,
+    "--json",
+    "--base-url",
+    baseUrl,
+    "a2a",
+    "invites",
+    "preview",
+  ], {
+    env: {
+      ...process.env,
+      INKBOX_API_KEY: "",
+      INKBOX_A2A_INVITATION: secret,
+      INKBOX_A2A_INVITATION_TOKEN: "",
+      NODE_USE_ENV_PROXY: "0",
+    },
+  });
+
+  assert.equal(submitted.url, "/api/v1/a2a/invitations/preview");
+  assert.equal(submitted.headers["x-api-key"], undefined);
+  assert.deepEqual(submitted.body, { invitation_token: secret });
+  assert.match(result.stdout, /owner@example\.test/);
+  assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secret));
+});
+
 function claimedWhoami() {
   return {
     auth_type: "api_key",
@@ -406,7 +449,7 @@ test("accept redacts a reflected token from API errors", async (t) => {
       response.setHeader("Retry-After", "120");
       response.end(JSON.stringify({
         detail: {
-          code: "a2a_invitation_attempt_rate_limited",
+          code: "a2a_invitation_membership_verification_unavailable",
           message: `invalid ${secret}`,
         },
       }));

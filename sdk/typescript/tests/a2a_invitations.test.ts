@@ -38,6 +38,30 @@ function respond(body: unknown): void {
 }
 
 describe("A2AInvitationsResource", () => {
+  it("previews an invitation without constructing a client or sending a key", async () => {
+    respond({
+      inviter_email: "owner@example.test",
+      peer_agent_handles: ["support", "billing"],
+      expires_at: "2026-08-11T00:00:00Z",
+      agent_handoff_prompt: "Review and accept this invitation.",
+    });
+
+    const result = await Inkbox.previewA2AInvitation(
+      `https://inkbox.ai/console/a2a/invitations/accept#token=${TOKEN}`,
+    );
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("https://inkbox.ai/api/v1/a2a/invitations/preview");
+    expect((init!.headers as Record<string, string>)["X-API-Key"]).toBeUndefined();
+    expect(JSON.parse(init!.body as string)).toEqual({ invitation_token: TOKEN });
+    expect(result).toEqual({
+      inviterEmail: "owner@example.test",
+      peerAgentHandles: ["support", "billing"],
+      expiresAt: "2026-08-11T00:00:00Z",
+      agentHandoffPrompt: "Review and accept this invitation.",
+    });
+  });
+
   it("creates an invitation and preserves its one-time secret", async () => {
     respond({
       ...RAW,

@@ -292,9 +292,11 @@ and verification responses expose an optional invitation summary; the existing
 positional `signup` is unchanged.
 Raw and extracted tokens must match `a2ai_` followed by 43 URL-safe characters.
 Share links require HTTPS, except for configured `localhost`/`127.0.0.1` URLs.
-Rust currently supports invitation-assisted signup, while invitation creation,
-listing, inspection, revocation, and explicit acceptance are available through
-the Python SDK, TypeScript SDK, and CLI.
+Review an invitation before signup without an API key using
+`Inkbox::preview_a2a_invitation`. An existing claimed identity can accept it
+with `inkbox.a2a().accept_invitation(...)`. Invitation creation, listing,
+inspection, and revocation are available through the Python SDK, TypeScript SDK,
+and CLI.
 
 ### Agent-to-agent discovery and history
 
@@ -394,7 +396,8 @@ pure Rust.
 
 The Rust SDK implements the REST resources documented above, vault crypto +
 TOTP, webhook verification, and the tunnels control plane. Invitation-assisted
-signup is supported, but invitation management remains available through the
+signup, unauthenticated preview, and claimed-agent acceptance are supported.
+Invitation creation and issuer-side management remain available through the
 Python SDK, TypeScript SDK, and CLI. The tunnels **data-plane runtime**
 (`tunnels-runtime` feature) is implemented end-to-end:
 

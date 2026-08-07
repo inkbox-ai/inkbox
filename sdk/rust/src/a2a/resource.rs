@@ -8,17 +8,27 @@ use crate::a2a::types::{
     A2AHistoryDirection, A2AHistoryMessagePage, A2AMessageListOptions, A2ASentTaskListOptions,
     A2ATask, A2ATaskListOptions, A2ATaskPage,
 };
-use crate::error::Result;
+use crate::a2a::{extract_a2a_invitation_token_with_base_url, A2AInvitationAcceptResult};
+use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
 pub struct A2AResource {
     http: Arc<HttpTransport>,
     public_http: Arc<HttpTransport>,
+    base_url: String,
 }
 
 impl A2AResource {
-    pub(crate) fn new(http: Arc<HttpTransport>, public_http: Arc<HttpTransport>) -> Self {
-        Self { http, public_http }
+    pub(crate) fn new(
+        http: Arc<HttpTransport>,
+        public_http: Arc<HttpTransport>,
+        base_url: String,
+    ) -> Self {
+        Self {
+            http,
+            public_http,
+            base_url,
+        }
     }
 
     fn base(agent_handle: &str) -> String {
@@ -57,6 +67,19 @@ impl A2AResource {
         options: &A2ADirectoryListOptions,
     ) -> Result<A2ADirectoryPage> {
         self.directory(false, options)
+    }
+
+    /// Accept an invitation with the client's claimed agent-scoped API key.
+    pub fn accept_invitation(&self, invitation: &str) -> Result<A2AInvitationAcceptResult> {
+        let invitation_token =
+            extract_a2a_invitation_token_with_base_url(invitation, &self.base_url)
+                .map_err(|error| InkboxError::InvalidArgument(error.to_string()))?;
+        let data = self.http.post(
+            "/a2a/invitations/accept",
+            Some(&json!({"invitation_token": invitation_token})),
+            NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
     }
 
     pub fn tasks(&self, agent_handle: &str, options: &A2ATaskListOptions) -> Result<A2ATaskPage> {
@@ -354,6 +377,41 @@ mod tests {
         .unwrap();
 
         assert_eq!(page.items[0].visibility, A2ADirectoryVisibility::Unknown);
+    }
+
+    #[test]
+    fn accepts_an_invitation_with_the_configured_agent_key() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/a2a/invitations/accept")
+                .header("x-api-key", "ApiKey_claimed_agent")
+                .json_body(json!({
+                    "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                }));
+            then.status(200).json_body(json!({
+                "invitation_id": "inv_1",
+                "status": "accepted",
+                "invitee_identity_id": "identity_2",
+                "invitee_agent_handle": "buyer",
+                "peer_agent_handles": ["support"],
+                "accepted_at": "2026-08-04T01:00:00Z"
+            }));
+        });
+        let client = Inkbox::builder("ApiKey_claimed_agent")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let invitation_url = format!(
+            "{}/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            server.base_url()
+        );
+
+        let result = client.a2a().accept_invitation(&invitation_url).unwrap();
+
+        request.assert();
+        assert_eq!(result.status, "accepted");
+        assert_eq!(result.invitee_agent_handle, "buyer");
     }
 
     #[test]

@@ -2,6 +2,28 @@
 
 use url::{form_urlencoded, Url};
 
+use serde::Deserialize;
+
+/// Public invitation details returned without accepting the invitation.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct A2AInvitationPreview {
+    pub inviter_email: String,
+    pub peer_agent_handles: Vec<String>,
+    pub expires_at: String,
+    pub agent_handoff_prompt: String,
+}
+
+/// Result of accepting an invitation with a claimed agent identity.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct A2AInvitationAcceptResult {
+    pub invitation_id: String,
+    pub status: String,
+    pub invitee_identity_id: String,
+    pub invitee_agent_handle: String,
+    pub peer_agent_handles: Vec<String>,
+    pub accepted_at: String,
+}
+
 const DEFAULT_BASE_URL: &str = "https://inkbox.ai";
 const MAX_INVITATION_INPUT_BYTES: usize = 2048;
 

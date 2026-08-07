@@ -322,7 +322,7 @@ class TestRaiseForStatusOtherCodes:
             "a2a_invitation_issuer_rate_limited",
             "a2a_invitation_issuer_outstanding_limit",
             "a2a_invitation_recipient_unavailable",
-            "a2a_invitation_attempt_rate_limited",
+            "a2a_invitation_membership_verification_unavailable",
         ],
     )
     def test_invitation_429_preserves_retry_after(self, code: str):

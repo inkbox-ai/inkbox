@@ -78,7 +78,7 @@ for (const code of [
   "a2a_invitation_issuer_rate_limited",
   "a2a_invitation_issuer_outstanding_limit",
   "a2a_invitation_recipient_unavailable",
-  "a2a_invitation_attempt_rate_limited",
+  "a2a_invitation_membership_verification_unavailable",
 ]) {
   test(`withErrorHandler renders invitation Retry-After guidance for ${code}`, async () => {
     const { lines, exitCode } = await runAndCapture(

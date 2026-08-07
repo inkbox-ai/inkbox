@@ -15,6 +15,7 @@ import type {
 } from "@inkbox/sdk";
 import {
   AUTH_SUBTYPE_API_KEY_AGENT_SCOPED_CLAIMED,
+  Inkbox,
   extractA2AInvitationToken,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts, resolveBaseUrl } from "../client.js";
@@ -175,6 +176,32 @@ export function registerA2ACommands(program: Command): void {
     .action(withErrorHandler(async function (this: Command, invitationId: string) {
       const result = await createClient(getGlobalOpts(this)).a2aInvitations.revoke(invitationId);
       output(result, { json: !!getGlobalOpts(this).json });
+    }));
+
+  invites.command("preview")
+    .description("Preview an invitation without accepting it")
+    .option("--invitation-stdin", "Read the invitation link or token from stdin")
+    .option("--token-stdin", "Read the invitation token from stdin")
+    .action(withErrorHandler(async function (
+      this: Command,
+      options: { invitationStdin?: boolean; tokenStdin?: boolean },
+    ) {
+      if (options.invitationStdin && options.tokenStdin) {
+        throw new Error("Use only one invitation stdin option.");
+      }
+      const globalOpts = getGlobalOpts(this);
+      const baseUrl = resolveBaseUrl(globalOpts) ?? "https://inkbox.ai";
+      const invitation = await resolveA2AInvitationToken(
+        !!options.invitationStdin || !!options.tokenStdin,
+      );
+      let token: string | undefined;
+      try {
+        token = extractA2AInvitationToken(invitation, baseUrl);
+        const result = await Inkbox.previewA2AInvitation(token, { baseUrl });
+        output(result, { json: !!globalOpts.json });
+      } catch (error) {
+        throw redactSecretError(error, invitation, token ?? "");
+      }
     }));
 
   invites.command("accept")

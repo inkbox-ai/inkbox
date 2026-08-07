@@ -413,7 +413,7 @@ describe("HttpTransport 409 routing", () => {
     "a2a_invitation_issuer_rate_limited",
     "a2a_invitation_issuer_outstanding_limit",
     "a2a_invitation_recipient_unavailable",
-    "a2a_invitation_attempt_rate_limited",
+    "a2a_invitation_membership_verification_unavailable",
   ]) {
     it(`preserves Retry-After for ${code}`, async () => {
       const response = makeErrorResponse(429, {

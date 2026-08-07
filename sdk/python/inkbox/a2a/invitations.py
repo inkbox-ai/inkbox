@@ -69,6 +69,16 @@ class A2AInvitationAcceptResult:
     accepted_at: datetime
 
 
+@dataclass
+class A2AInvitationPreview:
+    """Public invitation details returned without accepting the invitation."""
+
+    inviter_email: str
+    peer_agent_handles: list[str]
+    expires_at: datetime
+    agent_handoff_prompt: str
+
+
 def _parse_invitation(data: dict[str, Any]) -> A2AInvitation:
     return A2AInvitation(
         id=data["id"],
@@ -88,6 +98,15 @@ def _parse_invitation(data: dict[str, Any]) -> A2AInvitation:
         revoked_at=parse_datetime(data.get("revoked_at")),
         created_at=parse_datetime(data["created_at"]),  # type: ignore[arg-type]
         updated_at=parse_datetime(data["updated_at"]),  # type: ignore[arg-type]
+    )
+
+
+def _parse_invitation_preview(data: dict[str, Any]) -> A2AInvitationPreview:
+    return A2AInvitationPreview(
+        inviter_email=data["inviter_email"],
+        peer_agent_handles=list(data["peer_agent_handles"]),
+        expires_at=parse_datetime(data["expires_at"]),  # type: ignore[arg-type]
+        agent_handoff_prompt=data["agent_handoff_prompt"],
     )
 
 

@@ -12,7 +12,7 @@ use std::sync::{Arc, Weak};
 use serde_json::Value;
 use url::Url;
 
-use crate::a2a::A2AResource;
+use crate::a2a::{A2AInvitationPreview, A2AResource};
 use crate::agent_identity::AgentIdentity;
 use crate::agent_signup::types::{
     AgentSignupResendResponse, AgentSignupResponse, AgentSignupStatusResponse,
@@ -295,7 +295,7 @@ impl Inkbox {
             api_keys: ApiKeysResource::new(api_http.clone()),
             identities: IdentitiesResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
-            a2a: A2AResource::new(api_http.clone(), public_http.clone()),
+            a2a: A2AResource::new(api_http.clone(), public_http.clone(), trimmed.to_string()),
 
             root_api_http: root_api_http.clone(),
             api_key: api_key.clone(),
@@ -613,11 +613,33 @@ impl Inkbox {
             .map_err(|error| InkboxError::InvalidArgument(error.to_string()))?;
             body.insert("invitation_token".into(), token.into());
         }
-        let data = signup_request(
+        let data = one_shot_request(
             "POST",
-            "",
+            "/api/v1/agent-signup",
             None,
             Some(Value::Object(body)),
+            base_url,
+            timeout_secs,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Review an A2A invitation without accepting it or supplying an API key.
+    pub fn preview_a2a_invitation(
+        invitation: &str,
+        base_url: Option<&str>,
+        timeout_secs: Option<f64>,
+    ) -> Result<A2AInvitationPreview> {
+        let token = crate::a2a::extract_a2a_invitation_token_with_base_url(
+            invitation,
+            base_url.unwrap_or(DEFAULT_BASE_URL),
+        )
+        .map_err(|error| InkboxError::InvalidArgument(error.to_string()))?;
+        let data = one_shot_request(
+            "POST",
+            "/api/v1/a2a/invitations/preview",
+            None,
+            Some(serde_json::json!({"invitation_token": token})),
             base_url,
             timeout_secs,
         )?;
@@ -632,9 +654,9 @@ impl Inkbox {
         timeout_secs: Option<f64>,
     ) -> Result<AgentSignupVerifyResponse> {
         let body = serde_json::json!({ "verification_code": verification_code });
-        let data = signup_request(
+        let data = one_shot_request(
             "POST",
-            "/verify",
+            "/api/v1/agent-signup/verify",
             Some(api_key),
             Some(body),
             base_url,
@@ -649,9 +671,9 @@ impl Inkbox {
         base_url: Option<&str>,
         timeout_secs: Option<f64>,
     ) -> Result<AgentSignupResendResponse> {
-        let data = signup_request(
+        let data = one_shot_request(
             "POST",
-            "/resend-verification",
+            "/api/v1/agent-signup/resend-verification",
             Some(api_key),
             None,
             base_url,
@@ -666,9 +688,9 @@ impl Inkbox {
         base_url: Option<&str>,
         timeout_secs: Option<f64>,
     ) -> Result<AgentSignupStatusResponse> {
-        let data = signup_request(
+        let data = one_shot_request(
             "GET",
-            "/status",
+            "/api/v1/agent-signup/status",
             Some(api_key),
             None,
             base_url,
@@ -713,9 +735,8 @@ fn validate_base_url(base_url: &str) -> Result<()> {
     }
 }
 
-/// One-shot HTTP request for the agent-signup endpoints (a standalone
-/// `reqwest::blocking::Client`, matching the Python classmethod helper).
-fn signup_request(
+/// One-shot HTTP request that does not require an [`Inkbox`] instance.
+fn one_shot_request(
     method: &str,
     path: &str,
     api_key: Option<&str>,
@@ -725,7 +746,7 @@ fn signup_request(
 ) -> Result<Value> {
     let base = base_url.unwrap_or(DEFAULT_BASE_URL);
     validate_base_url(base)?;
-    let url = format!("{}/api/v1/agent-signup{}", base.trim_end_matches('/'), path);
+    let url = format!("{}{}", base.trim_end_matches('/'), path);
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs_f64(
             timeout_secs.unwrap_or(default_timeout()),
@@ -859,6 +880,36 @@ mod agent_signup_invitation_tests {
         .unwrap();
         mock.assert();
         assert!(response.invitation.is_none());
+    }
+
+    #[test]
+    fn previews_an_invitation_without_a_client() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/a2a/invitations/preview")
+                .json_body(serde_json::json!({
+                    "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                }));
+            then.status(200).json_body(serde_json::json!({
+                "inviter_email": "owner@example.test",
+                "peer_agent_handles": ["support", "billing"],
+                "expires_at": "2026-08-11T00:00:00Z",
+                "agent_handoff_prompt": "Review and accept this invitation."
+            }));
+        });
+        let invitation_url = format!(
+            "{}/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            server.base_url()
+        );
+
+        let preview =
+            Inkbox::preview_a2a_invitation(&invitation_url, Some(&server.base_url()), None)
+                .unwrap();
+
+        mock.assert();
+        assert_eq!(preview.inviter_email, "owner@example.test");
+        assert_eq!(preview.peer_agent_handles, ["support", "billing"]);
     }
 
     #[test]
