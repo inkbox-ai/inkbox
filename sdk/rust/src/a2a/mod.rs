@@ -5,8 +5,10 @@ mod resource;
 mod types;
 
 pub use invitations::{
-    extract_a2a_invitation_token, extract_a2a_invitation_token_with_base_url,
-    A2AInvitationAcceptResult, A2AInvitationParseError, A2AInvitationPreview,
+    extract_a2a_invitation_token, extract_a2a_invitation_token_with_base_url, A2AInvitation,
+    A2AInvitationAcceptResult, A2AInvitationCreateOptions, A2AInvitationCreateResult,
+    A2AInvitationEmailStatus, A2AInvitationListOptions, A2AInvitationPage, A2AInvitationParseError,
+    A2AInvitationPreview, A2AInvitationStatus,
 };
 pub use resource::A2AResource;
 pub use types::{

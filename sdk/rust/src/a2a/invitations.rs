@@ -2,7 +2,104 @@
 
 use url::{form_urlencoded, Url};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+/// Lifecycle state of an A2A connection invitation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum A2AInvitationStatus {
+    Pending,
+    AwaitingVerification,
+    Accepted,
+    Declined,
+    Revoked,
+    Expired,
+}
+
+impl A2AInvitationStatus {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::AwaitingVerification => "awaiting_verification",
+            Self::Accepted => "accepted",
+            Self::Declined => "declined",
+            Self::Revoked => "revoked",
+            Self::Expired => "expired",
+        }
+    }
+}
+
+/// Delivery state for an email-bound invitation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum A2AInvitationEmailStatus {
+    NotRequested,
+    Pending,
+    Sent,
+    Failed,
+    Indeterminate,
+}
+
+/// An organization-managed A2A connection invitation.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct A2AInvitation {
+    pub id: Uuid,
+    pub issuer_organization_id: String,
+    pub inviter_email: Option<String>,
+    pub peer_agent_handles: Vec<String>,
+    pub recipient_email: Option<String>,
+    pub status: A2AInvitationStatus,
+    pub email_status: A2AInvitationEmailStatus,
+    pub email_sent_at: Option<String>,
+    pub invitee_identity_id: Option<Uuid>,
+    pub invitee_agent_handle: Option<String>,
+    pub invitee_organization_id: Option<String>,
+    pub expires_at: String,
+    pub accepted_at: Option<String>,
+    pub declined_at: Option<String>,
+    pub revoked_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Options for creating an A2A connection invitation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct A2AInvitationCreateOptions {
+    pub peer_agent_handles: Vec<String>,
+    pub recipient_email: Option<String>,
+    pub expires_in_seconds: Option<u32>,
+}
+
+/// A created invitation, including one-time share material when unbound.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct A2AInvitationCreateResult {
+    #[serde(flatten)]
+    pub invitation: A2AInvitation,
+    #[serde(default)]
+    pub invitation_token: Option<String>,
+    #[serde(default)]
+    pub invitation_url: Option<String>,
+    #[serde(default)]
+    pub agent_handoff_prompt: Option<String>,
+}
+
+/// Options for listing invitations created by the current organization.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct A2AInvitationListOptions {
+    pub status: Option<A2AInvitationStatus>,
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+}
+
+/// One cursor-paginated page of organization-managed invitations.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct A2AInvitationPage {
+    pub items: Vec<A2AInvitation>,
+    pub next_cursor: Option<String>,
+}
 
 /// Public invitation details returned without accepting the invitation.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

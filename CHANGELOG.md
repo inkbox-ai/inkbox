@@ -18,11 +18,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Python and TypeScript expose organization-managed A2A invitation create,
-  list, get, revoke, and agent-only accept operations. Agent signup can carry
-  an invitation token and returns the invitation acceptance summary.
-- All SDKs can preview an invitation without an API key. Rust also supports
-  accepting an invitation with an existing claimed identity.
+- Python, TypeScript, and Rust expose organization-managed A2A invitation
+  create, list, get, and revoke operations plus agent-only acceptance. Agent
+  signup can carry an invitation token and returns the invitation acceptance
+  summary.
+- All SDKs can preview an invitation without an API key and accept it with an
+  existing claimed identity.
 - Rust adds `signup_with` options for invitation-assisted signup and returns
   the same optional summary without changing the existing positional signup.
 - The CLI adds `a2a invites create|list|show|revoke|preview|accept`; accept
