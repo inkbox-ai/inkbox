@@ -95,7 +95,7 @@ test("signup extracts a neutral-environment invitation URL without printing it",
     }));
   });
   const secret = invitationToken("S");
-  const invitationUrl = `${baseUrl}/a2a/invitations/accept#token=${secret}`;
+  const invitationUrl = `${baseUrl}/console/a2a/invitations/accept#token=${secret}`;
   const result = await execFileAsync(process.execPath, [
     cli,
     "--json",
@@ -352,7 +352,7 @@ test("accept extracts a neutral-environment share URL and never prints either se
     }));
   });
   const secret = invitationToken("T");
-  const invitationUrl = `${baseUrl}/a2a/invitations/accept#token=${secret}`;
+  const invitationUrl = `${baseUrl}/console/a2a/invitations/accept#token=${secret}`;
   const result = await execFileAsync(process.execPath, [cli, "--json", "a2a", "invites", "accept"], {
     env: { ...process.env, INKBOX_API_KEY: "ApiKey_agent", INKBOX_A2A_INVITATION: invitationUrl, INKBOX_A2A_INVITATION_TOKEN: "", INKBOX_BASE_URL: baseUrl, NODE_USE_ENV_PROXY: "0" },
   });
@@ -361,6 +361,25 @@ test("accept extracts a neutral-environment share URL and never prints either se
   assert.deepEqual(JSON.parse(requests[1].body), { invitation_token: secret });
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secret));
   assert.doesNotMatch(result.stdout + result.stderr, new RegExp(baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("accept rejects the legacy public invitation path before submitting the secret", async (t) => {
+  const urls = [];
+  const baseUrl = await withServer(t, (request, response) => {
+    urls.push(request.url);
+    response.setHeader("Content-Type", "application/json");
+    response.end(JSON.stringify(claimedWhoami()));
+  });
+  const secret = invitationToken("O");
+  const legacyUrl = `${baseUrl}/a2a/invitations/accept#token=${secret}`;
+  await assert.rejects(execFileAsync(process.execPath, [cli, "a2a", "invites", "accept"], {
+    env: { ...process.env, INKBOX_API_KEY: "ApiKey_agent", INKBOX_A2A_INVITATION: legacyUrl, INKBOX_A2A_INVITATION_TOKEN: "", INKBOX_BASE_URL: baseUrl, NODE_USE_ENV_PROXY: "0" },
+  }), (error) => {
+    assert.doesNotMatch(error.stderr, new RegExp(secret));
+    assert.doesNotMatch(error.stderr, new RegExp(baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    return true;
+  });
+  assert.deepEqual(urls, ["/api/whoami"]);
 });
 
 test("accept rejects admin auth before submitting the invitation token", async (t) => {

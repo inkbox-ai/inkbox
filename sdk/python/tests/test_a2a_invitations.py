@@ -37,7 +37,7 @@ def test_create_preserves_one_time_unbound_secret() -> None:
     http.post.return_value = {
         **RAW,
         "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "invitation_url": "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "invitation_url": "https://inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "agent_handoff_prompt": "Ask your agent to accept this invitation.",
     }
     result = A2AInvitationsResource(http).create(["support"], expires_in_seconds=7200)
@@ -47,7 +47,7 @@ def test_create_preserves_one_time_unbound_secret() -> None:
     )
     assert result.invitation_token == "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     assert result.invitation_url == (
-        "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        "https://inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     )
     assert result.peer_agent_handles == ["support"]
     assert result.inviter_email == "owner@example.com"
@@ -117,7 +117,7 @@ def test_accept_extracts_url_token_before_transport() -> None:
     }
     resource = A2AInvitationsResource(http, "https://tenant.example.test")
     resource.accept(
-        "https://tenant.example.test/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        "https://tenant.example.test/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     )
     assert http.post.call_args.kwargs["json"] == {
         "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"

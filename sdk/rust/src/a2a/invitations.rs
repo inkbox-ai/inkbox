@@ -72,7 +72,7 @@ pub fn extract_a2a_invitation_token_with_base_url(
         || !invitation.username().is_empty()
         || invitation.password().is_some()
         || invitation.origin() != configured.origin()
-        || invitation.path() != "/a2a/invitations/accept"
+        || invitation.path() != "/console/a2a/invitations/accept"
         || invitation.query().is_some()
     {
         return Err(A2AInvitationParseError);
@@ -123,7 +123,7 @@ mod tests {
         );
         assert_eq!(
             extract_a2a_invitation_token_with_base_url(
-                "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "https://inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
                 "https://inkbox.ai/api/v1",
             )
             .unwrap(),
@@ -134,10 +134,11 @@ mod tests {
     #[test]
     fn rejects_untrusted_or_ambiguous_links_without_echoing_them() {
         for value in [
-            "https://evil.example/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "https://inkbox.ai/a2a/invitations/accept?token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "https://inkbox.ai/a2a/invitations/accept#token=a&token=b",
-            "https://inkbox.ai/a2a/invitations/accept#token=%ZZ",
+            "https://evil.example/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "https://inkbox.ai/console/a2a/invitations/accept?token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "https://inkbox.ai/console/a2a/invitations/accept#token=a&token=b",
+            "https://inkbox.ai/console/a2a/invitations/accept#token=%ZZ",
+            "https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         ] {
             let error = extract_a2a_invitation_token_with_base_url(value, "https://inkbox.ai")
                 .unwrap_err();

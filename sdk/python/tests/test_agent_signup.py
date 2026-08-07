@@ -145,7 +145,7 @@ class TestSignup:
         result = Inkbox.signup(
             human_email="human@example.com",
             note_to_human="Please approve me",
-            invitation_token="https://inkbox.ai/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            invitation_token="https://inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         )
         assert client.request.call_args.kwargs["json"]["invitation_token"] == (
             "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"

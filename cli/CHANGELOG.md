@@ -5,7 +5,8 @@
 - Accept invitation links or raw tokens through the neutral
   `INKBOX_A2A_INVITATION`, `--invitation-stdin`, and `--invitation-prompt`
   sources. Token-named sources remain aliases; capability argv remains
-  unsupported, and reflected links/tokens are redacted from failures.
+  unsupported, reflected links/tokens are redacted from failures, and share
+  links must use the exact-origin `/console/a2a/invitations/accept` path.
 
 - Added `a2a invites create|list|show|revoke|accept` and invitation-assisted
   `signup create`, including explicit hidden-prompt and stdin token input.

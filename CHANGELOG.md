@@ -8,8 +8,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - A2A invitation creates now preserve the server's optional share URL. Python
   and TypeScript accept that exact-origin URL anywhere a raw invitation token
-  was accepted. Rust signup exposes the same strict extraction helpers. Raw
-  tokens remain compatible, and only the extracted token is sent to the API.
+  was accepted when it uses the canonical
+  `/console/a2a/invitations/accept` handoff path. Rust signup exposes the same
+  strict extraction helpers. Raw tokens remain compatible, and only the
+  extracted token is sent to the API.
 - The CLI prefers `INKBOX_A2A_INVITATION`, `--invitation-stdin`, and
   `--invitation-prompt`, while retaining the token-named environment and flag
   aliases. Invitation capabilities are never accepted as argv values.

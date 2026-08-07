@@ -144,7 +144,7 @@ export function extractA2AInvitationToken(
     fragmentStart < 0 ? undefined : fragmentStart,
   );
   if (
-    invitationUrl.pathname !== "/a2a/invitations/accept"
+    invitationUrl.pathname !== "/console/a2a/invitations/accept"
     || beforeFragment.includes("?")
   ) {
     throw new A2AInvitationParseError("The A2A invitation link is invalid.");

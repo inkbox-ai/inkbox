@@ -815,7 +815,7 @@ mod agent_signup_invitation_tests {
                 }))));
         });
         let invitation_url = format!(
-            "{}/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "{}/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             server.base_url()
         );
         let response = Inkbox::signup_with(

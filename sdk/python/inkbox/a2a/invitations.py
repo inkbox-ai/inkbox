@@ -148,7 +148,7 @@ def extract_a2a_invitation_token(
             "The A2A invitation link does not match the configured site."
         )
     before_fragment = candidate.partition("#")[0]
-    if parsed.path != "/a2a/invitations/accept" or "?" in before_fragment:
+    if parsed.path != "/console/a2a/invitations/accept" or "?" in before_fragment:
         raise A2AInvitationParseError("The A2A invitation link is invalid.")
     fragment = parsed.fragment
     if re.search(r"%(?![0-9A-Fa-f]{2})", fragment):

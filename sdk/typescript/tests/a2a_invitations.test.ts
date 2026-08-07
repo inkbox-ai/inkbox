@@ -42,7 +42,7 @@ describe("A2AInvitationsResource", () => {
     respond({
       ...RAW,
       invitation_token: TOKEN,
-      invitation_url: `https://inkbox.ai/a2a/invitations/accept#token=${TOKEN}`,
+      invitation_url: `https://inkbox.ai/console/a2a/invitations/accept#token=${TOKEN}`,
       agent_handoff_prompt: "handoff",
     });
     const client = new Inkbox({ apiKey: "ApiKey_admin" });
@@ -53,7 +53,7 @@ describe("A2AInvitationsResource", () => {
       peer_agent_handles: ["support"], expires_in_seconds: 7200,
     });
     expect(result.invitationToken).toBe(TOKEN);
-    expect(result.invitationUrl).toContain("/a2a/invitations/accept#token=");
+    expect(result.invitationUrl).toContain("/console/a2a/invitations/accept#token=");
     expect(result.inviterEmail).toBe("owner@example.com");
   });
 
@@ -80,7 +80,7 @@ describe("A2AInvitationsResource", () => {
   it("extracts a share URL before sending accept", async () => {
     const client = new Inkbox({ apiKey: "ApiKey_test", baseUrl: "https://tenant.example.test" });
     respond({ invitation_id: "inv_1", status: "accepted", invitee_identity_id: "identity_2", invitee_agent_handle: "buyer", peer_agent_handles: ["support"], accepted_at: "2026-08-04T01:00:00Z" });
-    await client.a2aInvitations.accept(`https://tenant.example.test/a2a/invitations/accept#token=${TOKEN}`);
+    await client.a2aInvitations.accept(`https://tenant.example.test/console/a2a/invitations/accept#token=${TOKEN}`);
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ invitation_token: TOKEN });
   });
 
