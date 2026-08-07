@@ -97,6 +97,15 @@ class A2AInvitationParseError(ValueError):
 
 _TOKEN_PATTERN = re.compile(r"^a2ai_[A-Za-z0-9_-]{43}$")
 _MAX_INVITATION_INPUT_BYTES = 2048
+_OFFICIAL_INVITATION_ORIGINS_BY_API_ORIGIN = {
+    ("https", "api.inkbox.ai", 443): ("https", "inkbox.ai", 443),
+    ("https", "api.beta.inkbox.ai", 443): ("https", "beta.inkbox.ai", 443),
+    ("https", "api.development.inkbox.ai", 443): (
+        "https",
+        "development.inkbox.ai",
+        443,
+    ),
+}
 
 
 def _origin(value: str) -> tuple[str, str, int]:
@@ -110,14 +119,25 @@ def _origin(value: str) -> tuple[str, str, int]:
     return parsed.scheme, parsed.hostname.lower(), port
 
 
+def _invitation_origin_allowed(
+    actual_origin: tuple[str, str, int],
+    configured_origin: tuple[str, str, int],
+) -> bool:
+    return actual_origin == configured_origin or (
+        _OFFICIAL_INVITATION_ORIGINS_BY_API_ORIGIN.get(configured_origin)
+        == actual_origin
+    )
+
+
 def extract_a2a_invitation_token(
     value: str, *, base_url: str = "https://inkbox.ai"
 ) -> str:
     """Return the raw token from an A2A invitation link or raw token.
 
     Links must use HTTPS (HTTP only for localhost/127.0.0.1), the configured
-    site's exact origin, and the public invitation acceptance path. Error
-    messages never include the capability value.
+    site's origin or its corresponding official Inkbox public-site origin,
+    and the public invitation acceptance path. Error messages never include
+    the capability value.
     """
 
     if not value or len(value.encode("utf-8")) > _MAX_INVITATION_INPUT_BYTES:
@@ -143,7 +163,7 @@ def extract_a2a_invitation_token(
         raise A2AInvitationParseError("The configured site URL is invalid.")
     if parsed.username is not None or parsed.password is not None:
         raise A2AInvitationParseError("The A2A invitation link is invalid.")
-    if actual_origin != expected_origin:
+    if not _invitation_origin_allowed(actual_origin, expected_origin):
         raise A2AInvitationParseError(
             "The A2A invitation link does not match the configured site."
         )

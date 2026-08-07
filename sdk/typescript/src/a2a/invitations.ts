@@ -85,6 +85,17 @@ export class A2AInvitationParseError extends Error {
 const malformedEscape = /%(?![0-9A-Fa-f]{2})/;
 const invitationTokenPattern = /^a2ai_[A-Za-z0-9_-]{43}$/;
 const maxInvitationInputBytes = 2048;
+const officialInvitationOriginsByApiOrigin = new Map([
+  ["https://api.inkbox.ai", "https://inkbox.ai"],
+  ["https://api.beta.inkbox.ai", "https://beta.inkbox.ai"],
+  ["https://api.development.inkbox.ai", "https://development.inkbox.ai"],
+]);
+
+function invitationOriginAllowed(invitationUrl: URL, configuredUrl: URL): boolean {
+  return invitationUrl.origin === configuredUrl.origin
+    || officialInvitationOriginsByApiOrigin.get(configuredUrl.origin)
+      === invitationUrl.origin;
+}
 
 /**
  * Return the raw token from an A2A invitation link or raw token.
@@ -133,7 +144,7 @@ export function extractA2AInvitationToken(
   ) {
     throw new A2AInvitationParseError("The configured site URL is invalid.");
   }
-  if (invitationUrl.origin !== configuredUrl.origin) {
+  if (!invitationOriginAllowed(invitationUrl, configuredUrl)) {
     throw new A2AInvitationParseError(
       "The A2A invitation link does not match the configured site.",
     );

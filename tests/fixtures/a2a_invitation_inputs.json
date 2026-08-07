@@ -21,6 +21,21 @@
       "token": "a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
     },
     {
+      "base_url": "https://api.inkbox.ai/api/v1",
+      "input": "https://inkbox.ai/console/a2a/invitations/accept#token=a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+      "token": "a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    },
+    {
+      "base_url": "https://api.beta.inkbox.ai/api/v1",
+      "input": "https://beta.inkbox.ai/console/a2a/invitations/accept#token=a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+      "token": "a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    },
+    {
+      "base_url": "https://api.development.inkbox.ai/api/v1",
+      "input": "https://development.inkbox.ai/console/a2a/invitations/accept#token=a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+      "token": "a2ai_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    },
+    {
       "base_url": "http://127.0.0.1:8765",
       "input": "http://127.0.0.1:8765/console/a2a/invitations/accept#token=a2ai_%43CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
       "token": "a2ai_CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
@@ -35,6 +50,9 @@
     { "base_url": "https://inkbox.ai", "input": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
     { "base_url": "https://inkbox.ai", "input": "https:/inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
     { "base_url": "https://inkbox.ai", "input": "https://example.test/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://api.customer.example/api/v1", "input": "https://customer.example/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://api.development.inkbox.ai/api/v1", "input": "https://beta.inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
+    { "base_url": "https://api.development.inkbox.ai:444/api/v1", "input": "https://development.inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
     { "base_url": "http://example.test", "input": "http://example.test/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
     { "base_url": "http://localhost.example.test", "input": "http://localhost.example.test/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },
     { "base_url": "http://[::1]:8765", "input": "http://[::1]:8765/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },

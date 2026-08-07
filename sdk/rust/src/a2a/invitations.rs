@@ -29,11 +29,34 @@ fn malformed_percent_encoding(value: &str) -> bool {
     false
 }
 
+fn invitation_origin_allowed(invitation: &Url, configured: &Url) -> bool {
+    if invitation.origin() == configured.origin() {
+        return true;
+    }
+    if invitation.scheme() != "https"
+        || configured.scheme() != "https"
+        || invitation.port_or_known_default() != Some(443)
+        || configured.port_or_known_default() != Some(443)
+    {
+        return false;
+    }
+    matches!(
+        (configured.host_str(), invitation.host_str()),
+        (Some("api.inkbox.ai"), Some("inkbox.ai"))
+            | (Some("api.beta.inkbox.ai"), Some("beta.inkbox.ai"))
+            | (
+                Some("api.development.inkbox.ai"),
+                Some("development.inkbox.ai")
+            )
+    )
+}
+
 /// Return the raw token from an A2A invitation link or raw token.
 ///
 /// Links must use HTTPS (HTTP only for localhost/127.0.0.1), the configured
-/// site's exact origin, and the public invitation acceptance path. Errors
-/// never include the capability value.
+/// site's origin or its corresponding official Inkbox public-site origin,
+/// and the public invitation acceptance path. Errors never include the
+/// capability value.
 pub fn extract_a2a_invitation_token(value: &str) -> Result<String, A2AInvitationParseError> {
     extract_a2a_invitation_token_with_base_url(value, DEFAULT_BASE_URL)
 }
@@ -71,7 +94,7 @@ pub fn extract_a2a_invitation_token_with_base_url(
         || !configured_http_allowed
         || !invitation.username().is_empty()
         || invitation.password().is_some()
-        || invitation.origin() != configured.origin()
+        || !invitation_origin_allowed(&invitation, &configured)
         || invitation.path() != "/console/a2a/invitations/accept"
         || invitation.query().is_some()
     {
