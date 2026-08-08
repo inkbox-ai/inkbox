@@ -21,7 +21,9 @@ Or in `Cargo.toml`:
 inkbox = "0.5"
 ```
 
-Requires Rust ≥ 1.74. The public surface is **blocking** (built on `reqwest::blocking`), matching the synchronous Python/TS APIs — there is no async runtime to set up and nothing to `.await`:
+**Toolchain:** the crate's manifest declares `rust-version = "1.74"`, but that is not achievable with a fresh dependency resolution today — the transitive graph pulls edition-2024 manifests (which cargo < 1.85 cannot even parse) and `icu_*` 2.2, which needs 1.86. **Build with Rust ≥ 1.86**, or commit a `Cargo.lock` pinned to older releases if you must support an earlier toolchain. Verify an MSRV claim with `cargo +<version> build` after deleting `Cargo.lock`; a green build on current stable proves nothing about it.
+
+The public surface is **blocking** (built on `reqwest::blocking`), matching the synchronous Python/TS APIs — there is no async runtime to set up and nothing to `.await`:
 
 ```rust
 use inkbox::Inkbox;

@@ -115,3 +115,63 @@ jobs:
 
       - name: Format check
         run: cargo fmt --check
+
+  rust-example:
+    name: Rust Example (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/use-inkbox-rust
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep the first entry in sync with `rust-version` in
+        # examples/use-inkbox-rust/Cargo.toml. The committed Cargo.lock is what
+        # makes that minimum reproducible, so every step below uses --locked.
+        toolchain: ["1.86.0", "stable"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: examples/use-inkbox-rust
+
+      - name: Build all example binaries
+        run: cargo build --locked --bins
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --check
+
+  rust-example-fresh-resolution:
+    name: Rust Example (unpinned dependency drift)
+    runs-on: ubuntu-latest
+    # Advisory: warns when the latest dependency graph outgrows the documented
+    # minimum toolchain, without blocking PRs that did not cause the drift.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: examples/use-inkbox-rust
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Rust (documented minimum)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.86.0"
+
+      - name: Build against a freshly resolved dependency graph
+        run: |
+          rm -f Cargo.lock
+          cargo build --bins

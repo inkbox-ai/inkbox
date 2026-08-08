@@ -2,7 +2,12 @@
 name = "use-inkbox-rust"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.74"
+# The `inkbox` crate itself declares rust-version = "1.74", but a fresh
+# dependency resolution today pulls transitive crates that need newer
+# compilers (edition-2024 manifests, and icu_* 2.2 requiring 1.86). 1.86 is
+# the lowest toolchain that resolves and builds this example; Cargo.lock is
+# committed so that stays reproducible, and CI checks it.
+rust-version = "1.86"
 publish = false
 # Plain `cargo run` runs example 01; the rest go through `cargo run --bin <name>`.
 default-run = "01-identity-and-email"

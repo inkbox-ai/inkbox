@@ -13,7 +13,7 @@ API-first communication infrastructure for AI agents — email (with custom send
 |---|---|---|
 | [`inkbox`](./sdk/python/) | Python ≥ 3.11 | `pip install inkbox` |
 | [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 22 | `npm install @inkbox/sdk` |
-| [`inkbox`](./sdk/rust/) ([crates.io](https://crates.io/crates/inkbox)) | Rust ≥ 1.74 | `cargo add inkbox` |
+| [`inkbox`](./sdk/rust/) ([crates.io](https://crates.io/crates/inkbox)) | Rust ≥ 1.86 | `cargo add inkbox` |
 | [`@inkbox/cli`](./cli/) | CLI / Node ≥ 22 | `npm install -g @inkbox/cli` |
 
 ---

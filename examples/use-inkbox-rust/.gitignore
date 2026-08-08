@@ -1,2 +1,4 @@
 /target
-Cargo.lock
+
+# Cargo.lock IS committed: this is a binary crate, and pinning the graph is
+# what makes the documented rust-version reproducible (see Cargo.toml).

@@ -17,7 +17,7 @@ use std::time::Duration;
 use inkbox::vault::{parse_totp_uri, LoginPayload, SecretPayload};
 use inkbox::{AgentIdentity, Inkbox};
 
-const HANDLE: &str = "rust-vault-demo";
+const DEFAULT_HANDLE: &str = "rust-vault-demo";
 const TOTP_URI: &str = "otpauth://totp/totp@authenticationtest.com?secret=I65VU7K5ZQL7WB4E";
 
 fn main() -> inkbox::Result<()> {
@@ -39,15 +39,28 @@ fn main() -> inkbox::Result<()> {
         }
     }
 
-    println!("\n=> Creating identity: {HANDLE}");
-    let identity = inkbox.create_identity(HANDLE)?;
+    // Handles stay reserved for a while after deletion, so allow an override
+    // when re-running this example.
+    let handle = env::var("INKBOX_AGENT_HANDLE").unwrap_or_else(|_| DEFAULT_HANDLE.to_string());
+    println!("\n=> Creating identity: {handle}");
+    let identity = inkbox.create_identity(&handle)?;
 
-    let outcome = run(&inkbox, &identity, &vault_key);
-    cleanup(&identity);
+    // The secret id lives outside the fallible workflow: a vault secret is an
+    // organization-level row that does NOT cascade when the identity is
+    // deleted, so teardown has to remove it explicitly no matter where `run`
+    // returns.
+    let mut secret_id: Option<String> = None;
+    let outcome = run(&inkbox, &identity, &vault_key, &mut secret_id);
+    cleanup(&identity, secret_id.as_deref());
     outcome
 }
 
-fn run(inkbox: &Inkbox, identity: &AgentIdentity, vault_key: &str) -> inkbox::Result<()> {
+fn run(
+    inkbox: &Inkbox,
+    identity: &AgentIdentity,
+    vault_key: &str,
+    created_secret_id: &mut Option<String>,
+) -> inkbox::Result<()> {
     println!("\n=> Creating login secret with TOTP");
     // create_secret stores the secret AND grants this identity access to it.
     let secret = identity.create_secret(
@@ -63,6 +76,8 @@ fn run(inkbox: &Inkbox, identity: &AgentIdentity, vault_key: &str) -> inkbox::Re
         None,
     )?;
     let secret_id = secret.id.to_string();
+    // Record it immediately — every `?` below is now safe to unwind through.
+    *created_secret_id = Some(secret_id.clone());
     println!("   Created secret: {secret_id}");
 
     // `credentials()` is a view over the snapshot taken at unlock time, so a
@@ -106,18 +121,28 @@ fn run(inkbox: &Inkbox, identity: &AgentIdentity, vault_key: &str) -> inkbox::Re
         Err(e) => println!("   as expected: {e}"),
     }
 
-    println!("\n=> Deleting the secret");
-    identity.delete_secret(&secret_id)?;
+    // The secret is deleted by `cleanup`, not here, so there is exactly one
+    // teardown path whether this function succeeds or returns early.
     Ok(())
 }
 
-/// Delete the identity (cascades to mailbox + tunnel). Best-effort.
-fn cleanup(identity: &AgentIdentity) {
+/// Best-effort teardown, run on every exit.
+///
+/// Order matters: the vault secret is an organization-level row that does not
+/// cascade with the identity, so it is deleted first. Failures are reported
+/// but never mask the error that triggered the teardown.
+fn cleanup(identity: &AgentIdentity, secret_id: Option<&str>) {
     if env::var("INKBOX_KEEP_IDENTITY").is_ok() {
-        println!("\n=> INKBOX_KEEP_IDENTITY set — leaving the identity in place.");
+        println!("\n=> INKBOX_KEEP_IDENTITY set — leaving the identity and secret in place.");
         return;
     }
     println!("\n=> Cleaning up...");
+    if let Some(id) = secret_id {
+        match identity.delete_secret(id) {
+            Ok(()) => println!("   Deleted secret {id}"),
+            Err(e) => eprintln!("   could not delete secret {id}: {e}"),
+        }
+    }
     if let Err(e) = identity.delete() {
         eprintln!("   could not delete the identity: {e}");
         return;

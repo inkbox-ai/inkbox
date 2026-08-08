@@ -6,7 +6,7 @@ The Inkbox Rust SDK is **blocking** (built on `reqwest::blocking`), so there is 
 
 ## Prerequisites
 
-1. Rust ≥ 1.74
+1. Rust ≥ 1.86 — see "Toolchain" below
 2. An Inkbox API key (`INKBOX_API_KEY`) — get one at [inkbox.ai/console](https://inkbox.ai/console)
 3. A vault key (`INKBOX_VAULT_KEY`) — only for `02-vault-totp`; initialize the vault from the console first
 4. A human email (`INKBOX_HUMAN_EMAIL`) — only for `07-signup`
@@ -18,6 +18,20 @@ cargo add inkbox
 ```
 
 `Cargo.toml` already depends on the published `inkbox` crate. To build against a local checkout of `sdk/rust` instead, uncomment the `[patch.crates-io]` block at the bottom of that file.
+
+## Toolchain
+
+**Rust ≥ 1.86.** The `inkbox` crate's own manifest declares `rust-version = "1.74"`, but that is not achievable with a fresh dependency resolution today: the transitive graph includes edition-2024 manifests (cargo < 1.85 cannot parse them at all) and `icu_*` 2.2, which requires 1.86. 1.86.0 is the lowest toolchain on which this example resolves and builds.
+
+`Cargo.lock` is **committed** so that number stays reproducible rather than drifting with upstream releases. Build with `--locked` to hold the pinned graph:
+
+```bash
+cargo +1.86.0 build --locked --bins
+```
+
+CI enforces this: `rust-example` builds, clippies, and format-checks on both `1.86.0` and `stable` with `--locked`, and a separate advisory `rust-example-fresh-resolution` job deletes the lockfile and rebuilds on 1.86.0 so dependency drift past the documented minimum shows up as a warning instead of a surprise.
+
+If you bump the minimum, update `rust-version` in `Cargo.toml`, the matrix in `.github/workflows/tests.yml`, this section, and the tables in the root `README.md` and `skills/README.md` together.
 
 ## Examples
 
@@ -87,12 +101,12 @@ Other subcommands: `resend` (5-minute cooldown). See [`skills/inkbox-agent-self-
 | `INKBOX_API_KEY` | all but `07-signup register` | Also read from `~/.inkbox/config` by `Inkbox::from_env()` |
 | `INKBOX_BASE_URL` | all | Override the API host |
 | `INKBOX_VAULT_KEY` | 02 | Unlocks the vault; `from_env()` picks it up automatically |
-| `INKBOX_AGENT_HANDLE` | 01, 04, 07 | Identity handle (07 appends a unique suffix) |
+| `INKBOX_AGENT_HANDLE` | 01, 02, 04, 07 | Identity handle (07 appends a unique suffix) |
 | `INKBOX_DEMO_EMAIL` | 01 | Where the test email is sent (default: the agent's own address) |
 | `INKBOX_DEMO_PHONE` | 01 | Destination for the call; unset skips provisioning and calling |
 | `INKBOX_DEMO_STATE` | 01 | US state abbreviation (e.g. `NY`) for the provisioned number |
 | `INKBOX_DEMO_WEBSOCKET` | 01 | `wss://` URL to stream call audio to |
-| `INKBOX_KEEP_IDENTITY` | 01, 02 | Set to anything to skip teardown and keep the identity |
+| `INKBOX_KEEP_IDENTITY` | 01, 02 | Set to anything to skip teardown (02 also keeps the vault secret) |
 | `INKBOX_HUMAN_EMAIL` | 07 | Human who owns or approves the agent |
 | `INKBOX_NOTE_TO_HUMAN` | 07 | Message included in the verification email |
 | `INKBOX_A2A_INVITATION` | 07 | Optional A2A invitation link or raw token |
@@ -106,6 +120,7 @@ Other subcommands: `resend` (5-minute cooldown). See [`skills/inkbox-agent-self-
 - There are no keyword arguments in Rust: options are positional, and `None` means "server default". Tri-state fields use `Unset<T>` (`Omit` / `Value(None)` / `Value(Some(v))`).
 - `iter_emails` drains every page eagerly and returns a `Vec<Message>`, unlike the Python/TypeScript generators.
 - `identity.credentials()` is a view over the snapshot taken at unlock time — a secret you just created is not in it until you re-unlock. `02-vault-totp` demonstrates this.
+- **Vault secrets do not cascade.** `identity.delete()` removes the mailbox and tunnel, but a secret created via `identity.create_secret` is an organization-level vault row and survives. Delete it explicitly, and do it from teardown rather than the success path so a mid-workflow failure cannot orphan it — `02-vault-totp` is structured that way.
 - On the Free plan a footer is appended to the **stored** body of outgoing mail, so a fetched message is not byte-for-byte what you sent.
 - The client is an `Arc<Inkbox>`; clone the `Arc` to share it. If you call the SDK from an async context, wrap the calls in `tokio::task::spawn_blocking`.
 
