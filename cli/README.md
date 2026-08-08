@@ -433,6 +433,10 @@ inkbox a2a reply <task-id> -i researcher --ask --text "Which quarter?"
 inkbox a2a reply <task-id> -i researcher --complete --text "Done."
 ```
 
+`invites show` prints handoff fields only when the API returns them. They may
+be available to the exact creator of an eligible unbound invitation; list,
+revoke, email-bound, and other callers' responses remain metadata-only.
+
 JSON list output contains both `items` and `nextCursor`. Human-readable output
 prints a next-cursor hint when another page exists. Keyword search covers
 string and numeric content values from `text` and `data` parts, excludes

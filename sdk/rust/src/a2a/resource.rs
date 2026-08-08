@@ -10,8 +10,8 @@ use crate::a2a::types::{
 };
 use crate::a2a::{
     extract_a2a_invitation_token_with_base_url, A2AInvitation, A2AInvitationAcceptResult,
-    A2AInvitationCreateOptions, A2AInvitationCreateResult, A2AInvitationListOptions,
-    A2AInvitationPage,
+    A2AInvitationCreateOptions, A2AInvitationCreateResult, A2AInvitationDetail,
+    A2AInvitationListOptions, A2AInvitationPage,
 };
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
@@ -107,7 +107,7 @@ impl A2AResource {
     }
 
     /// Get one invitation created by the current organization.
-    pub fn get_invitation(&self, invitation_id: Uuid) -> Result<A2AInvitation> {
+    pub fn get_invitation(&self, invitation_id: Uuid) -> Result<A2AInvitationDetail> {
         let data = self
             .http
             .get(&format!("/a2a/invitations/{invitation_id}"), NO_QUERY)?;
@@ -526,8 +526,15 @@ mod tests {
         let get_request = server.mock(|when, then| {
             when.method(GET)
                 .path(format!("/api/v1/a2a/invitations/{invitation_id}"));
-            then.status(200)
-                .json_body(invitation_json(invitation_id, "pending"));
+            let mut detail = invitation_json(invitation_id, "pending");
+            detail["invitation_token"] =
+                json!("a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+            detail["invitation_url"] = json!(format!(
+                "{}/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                server.base_url()
+            ));
+            detail["agent_handoff_prompt"] = json!("Ask your agent to accept this invitation.");
+            then.status(200).json_body(detail);
         });
         let revoke_request = server.mock(|when, then| {
             when.method(POST)
@@ -564,7 +571,16 @@ mod tests {
         get_request.assert();
         revoke_request.assert();
         assert_eq!(created.invitation.id, invitation_id);
-        assert_eq!(page.items, vec![fetched]);
+        assert_eq!(page.items, vec![fetched.invitation]);
+        assert_eq!(
+            fetched.invitation_token.as_deref(),
+            Some("a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        );
+        assert!(fetched.invitation_url.is_some());
+        assert_eq!(
+            fetched.agent_handoff_prompt.as_deref(),
+            Some("Ask your agent to accept this invitation.")
+        );
         assert_eq!(revoked.status, A2AInvitationStatus::Revoked);
     }
 

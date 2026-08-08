@@ -357,7 +357,12 @@ test("management commands use the create, list, show, and revoke routes", async 
     } else if (request.method === "POST") {
       response.end(JSON.stringify({ ...managementInvitation, invitation_token: invitationToken("M"), agent_handoff_prompt: "handoff" }));
     } else {
-      response.end(JSON.stringify(managementInvitation));
+      response.end(JSON.stringify({
+        ...managementInvitation,
+        invitation_token: invitationToken("S"),
+        invitation_url: `${baseUrl}/console/a2a/invitations/accept#token=${invitationToken("S")}`,
+        agent_handoff_prompt: "Share this exact handoff.",
+      }));
     }
   });
   const env = { ...process.env, INKBOX_API_KEY: "ApiKey_admin", INKBOX_BASE_URL: baseUrl, NODE_USE_ENV_PROXY: "0" };
@@ -365,7 +370,7 @@ test("management commands use the create, list, show, and revoke routes", async 
 
   await run("create", "--peer-agent-handle", "support", "billing", "--expires-in-seconds", "7200");
   await run("list", "--status", "pending", "--limit", "10");
-  await run("show", "inv_1");
+  const shown = await run("show", "inv_1");
   await run("revoke", "inv_1");
 
   assert.deepEqual(JSON.parse(requests[0].body), {
@@ -375,6 +380,28 @@ test("management commands use the create, list, show, and revoke routes", async 
   assert.match(requests[1].url, /status=pending/);
   assert.equal(requests[2].url, "/api/v1/a2a/invitations/inv_1");
   assert.equal(requests[3].url, "/api/v1/a2a/invitations/inv_1/revoke");
+  assert.deepEqual(JSON.parse(shown.stdout), {
+    id: "inv_1",
+    issuerOrganizationId: "org_1",
+    inviterEmail: "owner@example.com",
+    peerAgentHandles: ["support", "billing"],
+    recipientEmail: null,
+    status: "pending",
+    emailStatus: "not_requested",
+    emailSentAt: null,
+    inviteeIdentityId: null,
+    inviteeAgentHandle: null,
+    inviteeOrganizationId: null,
+    expiresAt: "2026-08-11T00:00:00Z",
+    acceptedAt: null,
+    declinedAt: null,
+    revokedAt: null,
+    createdAt: "2026-08-04T00:00:00Z",
+    updatedAt: "2026-08-04T00:00:00Z",
+    invitationToken: invitationToken("S"),
+    invitationUrl: `${baseUrl}/console/a2a/invitations/accept#token=${invitationToken("S")}`,
+    agentHandoffPrompt: "Share this exact handoff.",
+  });
 });
 
 test("accept extracts a neutral-environment share URL and never prints either secret form", async (t) => {

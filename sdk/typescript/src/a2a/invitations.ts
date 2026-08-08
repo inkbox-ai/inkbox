@@ -52,6 +52,15 @@ export interface A2AInvitationCreateResult extends A2AInvitation {
   agentHandoffPrompt?: string;
 }
 
+export interface A2AInvitationDetail extends A2AInvitation {
+  /** Returned only when the server makes the invitation credential retrievable. */
+  invitationToken?: string;
+  /** Shareable acceptance link, when returned by the server. */
+  invitationUrl?: string;
+  /** Agent handoff instructions, when returned by the server. */
+  agentHandoffPrompt?: string;
+}
+
 export interface A2AInvitationListOptions {
   status?: A2AInvitationStatus;
   cursor?: string;
@@ -204,6 +213,21 @@ function parseInvitation(raw: Raw): A2AInvitation {
   };
 }
 
+function parseInvitationDetail(raw: Raw): A2AInvitationDetail {
+  return {
+    ...parseInvitation(raw),
+    ...(typeof raw.invitation_token === "string"
+      ? { invitationToken: raw.invitation_token }
+      : {}),
+    ...(typeof raw.invitation_url === "string"
+      ? { invitationUrl: raw.invitation_url }
+      : {}),
+    ...(typeof raw.agent_handoff_prompt === "string"
+      ? { agentHandoffPrompt: raw.agent_handoff_prompt }
+      : {}),
+  };
+}
+
 export class A2AInvitationsResource {
   constructor(
     private readonly http: HttpTransport,
@@ -246,8 +270,8 @@ export class A2AInvitationsResource {
     };
   }
 
-  async get(invitationId: string): Promise<A2AInvitation> {
-    return parseInvitation(
+  async get(invitationId: string): Promise<A2AInvitationDetail> {
+    return parseInvitationDetail(
       await this.http.get<Raw>(`/a2a/invitations/${encodeURIComponent(invitationId)}`),
     );
   }

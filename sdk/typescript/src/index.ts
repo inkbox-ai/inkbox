@@ -12,6 +12,7 @@ export type {
   A2AInvitationAcceptResult,
   A2AInvitationCreateOptions,
   A2AInvitationCreateResult,
+  A2AInvitationDetail,
   A2AInvitationEmailStatus,
   A2AInvitationListOptions,
   A2AInvitationPage,

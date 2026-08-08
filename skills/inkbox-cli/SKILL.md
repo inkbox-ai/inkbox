@@ -361,6 +361,9 @@ never falls back to admin auth. It reads an exact-origin share URL or raw token
 from a hidden prompt, `INKBOX_A2A_INVITATION`, or deliberate
 `--invitation-stdin`. Token-named sources remain aliases; there is no
 capability argument, decline, resend, or automatic retry command.
+`invites show` exposes handoff fields only when the API returns them for the
+exact creator of an eligible unbound invitation. Never invent a token, link,
+or prompt when the fields are absent.
 For invitation-assisted `signup create`, use the explicit
 `--invitation-prompt`, `--invitation-stdin`, or `INKBOX_A2A_INVITATION`;
 ordinary signup never prompts for an invitation.

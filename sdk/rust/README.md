@@ -297,6 +297,10 @@ Review an invitation before signup without an API key using
 with `inkbox.a2a().accept_invitation(...)`. Organization credentials can manage
 the issuer lifecycle with `create_invitation`, `list_invitations`,
 `get_invitation`, and `revoke_invitation` on the same A2A resource.
+For an eligible unbound invitation, `get_invitation` may include optional
+handoff material only for the exact user or API key that created it. List and
+revoke responses remain metadata-only, and detail callers must handle absent
+handoff fields.
 
 ### Agent-to-agent discovery and history
 

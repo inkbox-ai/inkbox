@@ -78,9 +78,22 @@ pub struct A2AInvitationCreateOptions {
     pub expires_in_seconds: Option<u32>,
 }
 
-/// A created invitation, including one-time share material when unbound.
+/// A created invitation, including share material when unbound.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct A2AInvitationCreateResult {
+    #[serde(flatten)]
+    pub invitation: A2AInvitation,
+    #[serde(default)]
+    pub invitation_token: Option<String>,
+    #[serde(default)]
+    pub invitation_url: Option<String>,
+    #[serde(default)]
+    pub agent_handoff_prompt: Option<String>,
+}
+
+/// Invitation detail, including handoff material when returned by the server.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct A2AInvitationDetail {
     #[serde(flatten)]
     pub invitation: A2AInvitation,
     #[serde(default)]
@@ -346,5 +359,46 @@ mod tests {
 
         assert_eq!(invitation.status, A2AInvitationStatus::Unknown);
         assert_eq!(invitation.email_status, A2AInvitationEmailStatus::Unknown);
+    }
+
+    #[test]
+    fn invitation_detail_tolerates_absent_handoff_material() {
+        let raw = serde_json::json!({
+            "id": "00000000-0000-0000-0000-000000000001",
+            "issuer_organization_id": "org_example",
+            "inviter_email": "owner@example.com",
+            "peer_agent_handles": ["peer-agent"],
+            "recipient_email": null,
+            "status": "pending",
+            "email_status": "not_requested",
+            "email_sent_at": null,
+            "invitee_identity_id": null,
+            "invitee_agent_handle": null,
+            "invitee_organization_id": null,
+            "expires_at": "2026-08-14T00:00:00Z",
+            "accepted_at": null,
+            "declined_at": null,
+            "revoked_at": null,
+            "created_at": "2026-08-07T00:00:00Z",
+            "updated_at": "2026-08-07T00:00:00Z"
+        });
+
+        let legacy: A2AInvitationDetail = serde_json::from_value(raw.clone()).unwrap();
+        assert_eq!(legacy.invitation_token, None);
+        assert_eq!(legacy.invitation_url, None);
+        assert_eq!(legacy.agent_handoff_prompt, None);
+
+        let mut retrievable = raw;
+        retrievable["invitation_token"] =
+            serde_json::json!("a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+        retrievable["invitation_url"] = serde_json::json!(
+            "https://inkbox.ai/console/a2a/invitations/accept#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        );
+        retrievable["agent_handoff_prompt"] =
+            serde_json::json!("Ask your agent to accept this invitation.");
+        let detail: A2AInvitationDetail = serde_json::from_value(retrievable).unwrap();
+        assert!(detail.invitation_token.is_some());
+        assert!(detail.invitation_url.is_some());
+        assert!(detail.agent_handoff_prompt.is_some());
     }
 }

@@ -54,6 +54,15 @@ class A2AInvitationCreateResult(A2AInvitation):
 
 
 @dataclass
+class A2AInvitationDetail(A2AInvitation):
+    """Invitation detail, with handoff material when returned by the server."""
+
+    invitation_token: str | None = None
+    invitation_url: str | None = None
+    agent_handoff_prompt: str | None = None
+
+
+@dataclass
 class A2AInvitationPage:
     items: list[A2AInvitation]
     next_cursor: str | None
@@ -253,8 +262,15 @@ class A2AInvitationsResource:
             next_cursor=data.get("next_cursor"),
         )
 
-    def get(self, invitation_id: str) -> A2AInvitation:
-        return _parse_invitation(self._http.get(f"{self._BASE}/{invitation_id}"))
+    def get(self, invitation_id: str) -> A2AInvitationDetail:
+        data = self._http.get(f"{self._BASE}/{invitation_id}")
+        invitation = _parse_invitation(data)
+        return A2AInvitationDetail(
+            **invitation.__dict__,
+            invitation_token=data.get("invitation_token"),
+            invitation_url=data.get("invitation_url"),
+            agent_handoff_prompt=data.get("agent_handoff_prompt"),
+        )
 
     def revoke(self, invitation_id: str) -> A2AInvitation:
         return _parse_invitation(

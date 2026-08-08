@@ -653,7 +653,11 @@ inkbox.a2a_invitations.accept(os.environ["INKBOX_A2A_INVITATION"])
 ```
 
 An unbound create returns `invitation_token`, `invitation_url`, and
-`agent_handoff_prompt` when available. `accept()` and signup accept either the
+`agent_handoff_prompt` when available. The exact user or API key that created
+an eligible unbound invitation may also receive those optional fields from
+`get()`; list and revoke responses remain metadata-only. Email-bound,
+unavailable, and other callers' detail responses omit them. `accept()` and
+signup accept either the
 exact-origin share URL or a raw token; `extract_a2a_invitation_token()` is
 exported for local normalization. Only the raw token is sent to the API.
 A recipient-email-bound create emails the recipient and omits capability fields.

@@ -32,7 +32,7 @@ RAW = {
 }
 
 
-def test_create_preserves_one_time_unbound_secret() -> None:
+def test_create_preserves_unbound_secret() -> None:
     http = MagicMock()
     http.post.return_value = {
         **RAW,
@@ -81,9 +81,12 @@ def test_list_get_revoke_and_accept_use_canonical_routes() -> None:
     http.get.side_effect = [{"items": [RAW], "next_cursor": "next"}, RAW]
     page = resource.list(status="pending", cursor="cursor", limit=10)
     assert page.next_cursor == "next"
-    resource.get("inv_1")
+    detail = resource.get("inv_1")
     assert http.get.call_args_list[0].args == ("/a2a/invitations",)
     assert http.get.call_args_list[1].args == ("/a2a/invitations/inv_1",)
+    assert detail.invitation_token is None
+    assert detail.invitation_url is None
+    assert detail.agent_handoff_prompt is None
 
     http.post.side_effect = [
         {**RAW, "status": "revoked", "revoked_at": "2026-08-04T01:00:00Z"},
@@ -103,6 +106,25 @@ def test_list_get_revoke_and_accept_use_canonical_routes() -> None:
         "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     }
     assert accepted.invitee_agent_handle == "buyer"
+
+
+def test_get_preserves_only_server_returned_handoff_material() -> None:
+    http = MagicMock()
+    http.get.return_value = {
+        **RAW,
+        "invitation_token": "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "invitation_url": (
+            "https://inkbox.ai/console/a2a/invitations/accept"
+            "#token=a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        ),
+        "agent_handoff_prompt": "Ask your agent to accept this invitation.",
+    }
+
+    result = A2AInvitationsResource(http).get("inv_1")
+
+    assert result.invitation_token == "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    assert result.invitation_url == http.get.return_value["invitation_url"]
+    assert result.agent_handoff_prompt == "Ask your agent to accept this invitation."
 
 
 def test_accept_extracts_url_token_before_transport() -> None:

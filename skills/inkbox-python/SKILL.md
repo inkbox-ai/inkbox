@@ -554,7 +554,9 @@ agent-scoped key uses `.accept(invitation)`. The value may be an exact-origin
 share URL or raw token; `extract_a2a_invitation_token()` performs the same strict local
 normalization. Unbound create responses may reveal `invitation_token`,
 `invitation_url`, and `agent_handoff_prompt`; email-bound creates omit
-capability fields. Signup accepts the same input and returns the optional
+capability fields. For an eligible unbound invitation, `.get(id)` may return
+the same optional fields only to the exact creating principal; callers must
+handle their absence. List and revoke remain metadata-only. Signup accepts the same input and returns the optional
 `invitation` summary. Do not retry create or accept automatically.
 
 An identity can inspect work it received, work it requested, or both. Omit

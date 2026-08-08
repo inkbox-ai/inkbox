@@ -62,7 +62,7 @@ describe("A2AInvitationsResource", () => {
     });
   });
 
-  it("creates an invitation and preserves its one-time secret", async () => {
+  it("creates an invitation and preserves its unbound secret", async () => {
     respond({
       ...RAW,
       invitation_token: TOKEN,
@@ -88,8 +88,11 @@ describe("A2AInvitationsResource", () => {
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain("/api/v1/a2a/invitations?");
 
     respond(RAW);
-    await client.a2aInvitations.get("inv_1");
+    const detail = await client.a2aInvitations.get("inv_1");
     expect(vi.mocked(fetch).mock.calls[1][0]).toBe("https://inkbox.ai/api/v1/a2a/invitations/inv_1");
+    expect(detail.invitationToken).toBeUndefined();
+    expect(detail.invitationUrl).toBeUndefined();
+    expect(detail.agentHandoffPrompt).toBeUndefined();
 
     respond({ ...RAW, status: "revoked" });
     await client.a2aInvitations.revoke("inv_1");
@@ -99,6 +102,22 @@ describe("A2AInvitationsResource", () => {
     const result = await client.a2aInvitations.accept(TOKEN);
     expect(result.inviteeAgentHandle).toBe("buyer");
     expect(JSON.parse(vi.mocked(fetch).mock.calls[3][1]!.body as string)).toEqual({ invitation_token: TOKEN });
+  });
+
+  it("preserves handoff material returned by invitation detail", async () => {
+    respond({
+      ...RAW,
+      invitation_token: TOKEN,
+      invitation_url: `https://inkbox.ai/console/a2a/invitations/accept#token=${TOKEN}`,
+      agent_handoff_prompt: "Ask your agent to accept this invitation.",
+    });
+    const client = new Inkbox({ apiKey: "ApiKey_admin" });
+
+    const result = await client.a2aInvitations.get("inv_1");
+
+    expect(result.invitationToken).toBe(TOKEN);
+    expect(result.invitationUrl).toContain("#token=");
+    expect(result.agentHandoffPrompt).toBe("Ask your agent to accept this invitation.");
   });
 
   it("extracts a share URL before sending accept", async () => {

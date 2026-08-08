@@ -6,6 +6,18 @@ export {
   extractA2AInvitationToken,
 } from "./invitations.js";
 export type {
+  A2AInvitation,
+  A2AInvitationAcceptResult,
+  A2AInvitationCreateOptions,
+  A2AInvitationCreateResult,
+  A2AInvitationDetail,
+  A2AInvitationEmailStatus,
+  A2AInvitationListOptions,
+  A2AInvitationPage,
+  A2AInvitationPreview,
+  A2AInvitationStatus,
+} from "./invitations.js";
+export type {
   A2ACard,
   A2ACaller,
   A2AContactRule,

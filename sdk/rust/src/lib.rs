@@ -57,8 +57,8 @@ pub mod whoami;
 pub use a2a::{
     extract_a2a_invitation_token, extract_a2a_invitation_token_with_base_url, A2AInvitation,
     A2AInvitationAcceptResult, A2AInvitationCreateOptions, A2AInvitationCreateResult,
-    A2AInvitationEmailStatus, A2AInvitationListOptions, A2AInvitationPage, A2AInvitationParseError,
-    A2AInvitationPreview, A2AInvitationStatus,
+    A2AInvitationDetail, A2AInvitationEmailStatus, A2AInvitationListOptions, A2AInvitationPage,
+    A2AInvitationParseError, A2AInvitationPreview, A2AInvitationStatus,
 };
 pub use agent_identity::AgentIdentity;
 pub use client::{Inkbox, InkboxBuilder, DEFAULT_BASE_URL};
