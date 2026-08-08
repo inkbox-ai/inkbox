@@ -69,6 +69,19 @@ from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
 _DEFAULT_BASE_URL = "https://inkbox.ai"
 
+
+def _normalize_base_url(base_url: str) -> str:
+    """Return the bare origin, tolerating a trailing ``/api`` or ``/api/v1``.
+
+    The SDK appends ``/api`` and ``/api/v1`` itself, so a caller who passes a
+    full API base (e.g. ``https://inkbox.ai/api``) would otherwise double it up.
+    """
+    trimmed = base_url.rstrip("/")
+    for suffix in ("/api/v1", "/api"):
+        if trimmed.endswith(suffix):
+            return trimmed[: -len(suffix)]
+    return trimmed
+
 # `_UNSET` is imported from inkbox.identities.types above. Identity-based
 # `is not _UNSET` checks must compare against the SAME object across all
 # layers; a module-local `object()` here would leak the sentinel through
@@ -157,6 +170,7 @@ class Inkbox:
             )
         if base_url is None:
             base_url = _DEFAULT_BASE_URL
+        base_url = _normalize_base_url(base_url)
         if not base_url.startswith("https://"):
             _parsed = urlparse(base_url)
             if _parsed.hostname not in ("localhost", "127.0.0.1"):

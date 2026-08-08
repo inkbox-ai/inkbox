@@ -95,6 +95,18 @@ describe("Inkbox constructor", () => {
     expect(ink.mailboxes).toBeInstanceOf(MailboxesResource);
   });
 
+  it("normalizes a baseUrl that already includes /api or /api/v1", () => {
+    for (const baseUrl of [
+      "https://test.inkbox.ai/api",
+      "https://test.inkbox.ai/api/",
+      "https://test.inkbox.ai/api/v1",
+      "https://test.inkbox.ai/api/v1/",
+    ]) {
+      const ink = new Inkbox({ apiKey: "key", baseUrl });
+      expect((ink as unknown as { _baseUrl: string })._baseUrl).toBe("https://test.inkbox.ai");
+    }
+  });
+
   it("uses default baseUrl when not provided", () => {
     const ink = new Inkbox({ apiKey: "key" });
     expect(ink.mailboxes).toBeInstanceOf(MailboxesResource);

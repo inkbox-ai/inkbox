@@ -185,3 +185,31 @@ class TestPerRequestHeaders:
 
         assert seen == ["stable-logical-operation"]
         client.close()
+
+
+class TestBaseUrlNormalization:
+    @pytest.mark.parametrize(
+        "base_url",
+        [
+            "https://localhost:8000",
+            "https://localhost:8000/",
+            "https://localhost:8000/api",
+            "https://localhost:8000/api/",
+            "https://localhost:8000/api/v1",
+            "https://localhost:8000/api/v1/",
+        ],
+    )
+    def test_trailing_api_suffix_is_stripped(self, base_url):
+        # A caller may pass either the bare origin or a full API base; the SDK
+        # appends /api and /api/v1 itself, so all of these must resolve alike.
+        client = Inkbox(api_key="sk-test", base_url=base_url)
+        assert client._base_url == "https://localhost:8000"
+        assert (
+            str(client._phone_http._client.base_url)
+            == "https://localhost:8000/api/v1/phone/"
+        )
+        assert (
+            str(client._root_api_http._client.base_url).rstrip("/")
+            == "https://localhost:8000/api"
+        )
+        client.close()

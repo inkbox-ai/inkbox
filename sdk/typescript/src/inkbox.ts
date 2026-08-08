@@ -72,6 +72,20 @@ import {
 const DEFAULT_BASE_URL = "https://inkbox.ai";
 
 /**
+ * Return the bare origin, tolerating a trailing `/api` or `/api/v1`.
+ *
+ * The SDK appends `/api` and `/api/v1` itself, so a caller who passes a full
+ * API base (e.g. `https://inkbox.ai/api`) would otherwise double it up.
+ */
+function normalizeBaseUrl(url: string): string {
+  const trimmed = url.replace(/\/+$/, "");
+  for (const suffix of ["/api/v1", "/api"]) {
+    if (trimmed.endsWith(suffix)) return trimmed.slice(0, -suffix.length);
+  }
+  return trimmed;
+}
+
+/**
  * `User-Agent` announcing the SDK (e.g. `inkbox-typescript/0.4.17`); an
  * optional caller token goes first (`inkbox-cli/1.2.3 inkbox-typescript/...`).
  */
@@ -204,8 +218,8 @@ export class Inkbox {
     const apiKey = resolved.apiKey;
     const vaultKey = resolved.vaultKey;
     this._apiKey = apiKey;
-    const baseUrl = resolved.baseUrl ?? DEFAULT_BASE_URL;
-    this._baseUrl = baseUrl.replace(/\/$/, "");
+    const baseUrl = normalizeBaseUrl(resolved.baseUrl ?? DEFAULT_BASE_URL);
+    this._baseUrl = baseUrl;
     if (!baseUrl.startsWith("https://")) {
       const parsed = new URL(baseUrl);
       if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
@@ -216,7 +230,7 @@ export class Inkbox {
         );
       }
     }
-    const apiRoot = `${baseUrl.replace(/\/$/, "")}/api/v1`;
+    const apiRoot = `${baseUrl}/api/v1`;
     const ms = options.timeoutMs ?? 30_000;
     this._timeoutMs = ms;
     const userAgent = sdkUserAgent(options.userAgentPrefix);
@@ -228,7 +242,7 @@ export class Inkbox {
     const idsHttp      = new HttpTransport(apiKey, `${apiRoot}/identities`, ms, cookieJar, userAgent);
     const vaultHttp    = new HttpTransport(apiKey, `${apiRoot}/vault`, ms, cookieJar, userAgent);
     const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar, userAgent);
-    const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar, userAgent);
+    const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl}/api`, ms, cookieJar, userAgent);
     const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar, userAgent);
     const publicHttp   = new HttpTransport(apiKey, this._baseUrl, ms, cookieJar, userAgent);
 
