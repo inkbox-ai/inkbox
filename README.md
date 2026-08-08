@@ -4,6 +4,7 @@ https://inkbox.ai
 
 [![PyPI](https://img.shields.io/pypi/v/inkbox)](https://pypi.org/project/inkbox/)
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
+[![crates.io](https://img.shields.io/crates/v/inkbox)](https://crates.io/crates/inkbox)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 API-first communication infrastructure for AI agents — email (with custom sending domains), phone, identities, encrypted vault (login credentials, API keys, key pairs, SSH keys, OTP, etc.), and tunnels (expose a local server at a public URL via outbound HTTP/2).
@@ -12,6 +13,7 @@ API-first communication infrastructure for AI agents — email (with custom send
 |---|---|---|
 | [`inkbox`](./sdk/python/) | Python ≥ 3.11 | `pip install inkbox` |
 | [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 22 | `npm install @inkbox/sdk` |
+| [`inkbox`](./sdk/rust/) ([crates.io](https://crates.io/crates/inkbox)) | Rust ≥ 1.74 | `cargo add inkbox` |
 | [`@inkbox/cli`](./cli/) | CLI / Node ≥ 22 | `npm install -g @inkbox/cli` |
 
 ---
@@ -372,13 +374,16 @@ bilateral A2A contact rules needed for the invited peer bundle.
 |---|---|
 | [`sdk/python/`](./sdk/python/) | Python SDK (`inkbox`) |
 | [`sdk/typescript/`](./sdk/typescript/) | TypeScript SDK (`@inkbox/sdk`) |
+| [`sdk/rust/`](./sdk/rust/) | Rust SDK (`inkbox`) |
 | [`cli/`](./cli/) | CLI (`@inkbox/cli`) |
 | [`skills/inkbox-python/`](./skills/inkbox-python/) | Python agent skill for Claude Code and other coding agents |
 | [`skills/inkbox-ts/`](./skills/inkbox-ts/) | TypeScript agent skill for Claude Code and other coding agents |
+| [`skills/inkbox-rust/`](./skills/inkbox-rust/) | Rust agent skill for Claude Code and other coding agents |
 | [`skills/inkbox-tunnels/`](./skills/inkbox-tunnels/) | Tunnels skill — bring a local server online at a public Inkbox URL |
 | [`examples/use-inkbox-browser-use/`](./examples/use-inkbox-browser-use/) | Inkbox + Browser Use — give your agent an email, phone, and vault |
 | [`examples/use-inkbox-kernel/`](./examples/use-inkbox-kernel/) | Inkbox + Kernel — give your agent an email and browser |
 | [`examples/use-inkbox-cli/`](./examples/use-inkbox-cli/) | Shell script examples for CLI automation and CI pipelines |
+| [`examples/use-inkbox-rust/`](./examples/use-inkbox-rust/) | Rust examples — identity + email, vault TOTP, inbox monitor, agent self-signup |
 | [`examples/use-inkbox-vault/`](./examples/use-inkbox-vault/) | Vault TOTP example — create credentials with one-time codes |
 | [`examples/use-inkbox-signup/`](./examples/use-inkbox-signup/) | Agent self-signup — register without an API key, verify, send welcome email |
 | [`examples/use-inkbox-webhook/`](./examples/use-inkbox-webhook/) | Inbound email webhook — tunnel + signature verification + auto-reply |

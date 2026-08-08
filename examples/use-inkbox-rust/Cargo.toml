@@ -1,0 +1,16 @@
+[package]
+name = "use-inkbox-rust"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+publish = false
+# Plain `cargo run` runs example 01; the rest go through `cargo run --bin <name>`.
+default-run = "01-identity-and-email"
+
+[dependencies]
+inkbox = "0.5"
+
+# To run against a local checkout of the SDK instead of the published crate,
+# uncomment:
+# [patch.crates-io]
+# inkbox = { path = "../../sdk/rust" }
