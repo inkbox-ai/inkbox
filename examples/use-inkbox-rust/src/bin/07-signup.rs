@@ -109,7 +109,7 @@ fn verify(argv: &[String]) -> inkbox::Result<()> {
     let api_key = require_env("INKBOX_API_KEY");
     let code = flag(argv, "--code")
         .or_else(|| env::var("INKBOX_VERIFICATION_CODE").ok())
-        .unwrap_or_else(|| fail_str("Pass --code or set INKBOX_VERIFICATION_CODE."));
+        .unwrap_or_else(|| fail("Pass --code or set INKBOX_VERIFICATION_CODE."));
 
     let result = Inkbox::verify_signup(&api_key, &code, None, None)?;
     println!("\nVerification successful!");
@@ -211,9 +211,10 @@ fn print_status(status: &AgentSignupStatusResponse) {
 fn unique_suffix() -> String {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.subsec_nanos() as u64 + d.as_secs())
+        .map(|d| d.as_nanos() as u64)
         .unwrap_or(0);
-    format!("{nanos:08x}")
+    // Low 32 bits keep the suffix to exactly 8 hex characters.
+    format!("{:08x}", nanos & 0xffff_ffff)
 }
 
 fn flag(argv: &[String], name: &str) -> Option<String> {
@@ -226,15 +227,11 @@ fn flag(argv: &[String], name: &str) -> Option<String> {
 fn require_env(name: &str) -> String {
     match env::var(name) {
         Ok(v) if !v.trim().is_empty() => v,
-        _ => fail_str(&format!("ERROR: {name} is required.")),
+        _ => fail(&format!("ERROR: {name} is required.")),
     }
 }
 
 fn fail(msg: &str) -> ! {
     eprintln!("{msg}");
     exit(1);
-}
-
-fn fail_str(msg: &str) -> ! {
-    fail(msg)
 }
