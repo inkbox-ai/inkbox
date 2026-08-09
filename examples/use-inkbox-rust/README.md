@@ -21,7 +21,7 @@ cargo add inkbox
 
 ## Toolchain
 
-**Rust ≥ 1.86.** The `inkbox` crate's own manifest declares `rust-version = "1.74"`, but that is not achievable with a fresh dependency resolution today: the transitive graph includes edition-2024 manifests (cargo < 1.85 cannot parse them at all) and `icu_*` 2.2, which requires 1.86. 1.86.0 is the lowest toolchain on which this example resolves and builds.
+**Rust ≥ 1.86**, matching the `inkbox` crate's own `rust-version`. Nothing in this example or the crate needs a modern compiler; the floor comes from the transitive graph — `base64ct` 1.8 and `rand_pcg` 0.10 ship edition-2024 manifests that cargo < 1.85 cannot parse, and `icu_*` 2.2 requires 1.86. 1.86.0 is the lowest toolchain on which this example resolves and builds.
 
 `Cargo.lock` is **committed** so that number stays reproducible rather than drifting with upstream releases. Build with `--locked` to hold the pinned graph:
 

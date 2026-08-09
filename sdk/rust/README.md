@@ -16,6 +16,12 @@ match the other SDKs exactly — they all speak to the same server.
 inkbox = "0.5"
 ```
 
+Requires **Rust ≥ 1.86**. Nothing in this crate's own source needs a modern
+compiler; the floor comes from the transitive dependency graph (`base64ct` 1.8
+and `rand_pcg` 0.10 ship edition-2024 manifests that cargo < 1.85 cannot parse,
+and `icu_*` 2.2 requires 1.86). A library's `Cargo.lock` does not apply to its
+consumers, so `cargo add inkbox` always resolves fresh and always needs 1.86.
+
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml

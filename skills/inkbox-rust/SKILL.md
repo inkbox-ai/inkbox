@@ -21,7 +21,7 @@ Or in `Cargo.toml`:
 inkbox = "0.5"
 ```
 
-**Toolchain:** the crate's manifest declares `rust-version = "1.74"`, but that is not achievable with a fresh dependency resolution today — the transitive graph pulls edition-2024 manifests (which cargo < 1.85 cannot even parse) and `icu_*` 2.2, which needs 1.86. **Build with Rust ≥ 1.86**, or commit a `Cargo.lock` pinned to older releases if you must support an earlier toolchain. Verify an MSRV claim with `cargo +<version> build` after deleting `Cargo.lock`; a green build on current stable proves nothing about it.
+**Requires Rust ≥ 1.86** (`rust-version = "1.86"`). Nothing in the crate's own source needs a modern compiler — the floor comes from the transitive graph: `base64ct` 1.8 and `rand_pcg` 0.10 ship edition-2024 manifests that cargo < 1.85 cannot parse, and `icu_*` 2.2 requires 1.86. A library's `Cargo.lock` does not apply to its consumers, so `cargo add inkbox` always resolves fresh and always needs 1.86.
 
 The public surface is **blocking** (built on `reqwest::blocking`), matching the synchronous Python/TS APIs — there is no async runtime to set up and nothing to `.await`:
 

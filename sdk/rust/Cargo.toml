@@ -10,7 +10,14 @@
 name = "inkbox"
 version = "0.5.14"
 edition = "2021"
-rust-version = "1.74"
+# Metadata only — no source in this crate needs a modern compiler. The floor is
+# set by the transitive graph: `base64ct` 1.8 (and, on a fresh resolution,
+# `rand_pcg` 0.10) ship edition-2024 manifests that cargo < 1.85 cannot parse,
+# and `icu_*` 2.2 requires 1.86. A library's Cargo.lock does not apply to its
+# consumers, so `cargo add inkbox` always resolves fresh and always needs 1.86.
+# The previously declared 1.74 was not achievable with or without the lockfile.
+# Verify with: cargo +<version> build (see the MSRV job in tests.yml).
+rust-version = "1.86"
 description = "Rust SDK for the Inkbox API"
 readme = "README.md"
 license = "MIT"
