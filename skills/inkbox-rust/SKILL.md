@@ -23,6 +23,8 @@ inkbox = "0.5"
 
 **Requires Rust ≥ 1.86** (`rust-version = "1.86"`). Nothing in the crate's own source needs a modern compiler — the floor comes from the transitive graph: `base64ct` 1.8 and `rand_pcg` 0.10 ship edition-2024 manifests that cargo < 1.85 cannot parse, and `icu_*` 2.2 requires 1.86. A library's `Cargo.lock` does not apply to its consumers, so `cargo add inkbox` always resolves fresh and always needs 1.86.
 
+**`cargo add inkbox` covers almost everything here.** The crate does not re-export its own dependencies, so two snippets need one added separately: `serde_json` to deserialize a webhook payload and to build tunnel metadata. You only need `uuid` if you name or construct a `Uuid` yourself — ids on response models are already `Uuid` values, so most code never names the type.
+
 The public surface is **blocking** (built on `reqwest::blocking`), matching the synchronous Python/TS APIs — there is no async runtime to set up and nothing to `.await`:
 
 ```rust
@@ -1296,11 +1298,9 @@ println!("{}", batch.vcard);
 
 ## Notes
 
-Admin-only free-form notes with per-identity access grants. There is no wildcard for notes — grant identities explicitly. Note and identity ids are `Uuid`, not strings.
+Admin-only free-form notes with per-identity access grants. There is no wildcard for notes — grant identities explicitly. Note and identity ids are `Uuid`, not strings; the snippet below never has to name the type because `note.id` and `identity.id()` already hand one back.
 
 ```rust
-use uuid::Uuid;
-
 let note = inkbox.notes().create("Customer prefers email follow-up.", Some("Ada"))?;
 inkbox.notes().get(note.id)?;
 inkbox.notes().list(Some("email"), Some(identity.id()), Some(50), None, Some("recent"))?;
@@ -1370,6 +1370,7 @@ Reads + edit:
 ```rust
 inkbox.tunnels().list()?;
 inkbox.tunnels().get("tunnel-uuid")?;
+// metadata is a serde_json::Map<String, Value> — add `serde_json` yourself.
 inkbox.tunnels().update("tunnel-uuid", Some(Some(metadata_map)))?;
 // Passthrough only:
 inkbox.tunnels().sign_csr("tunnel-uuid", &csr_pem)?;
@@ -1406,6 +1407,8 @@ let valid = verify_webhook(&raw_body, &headers, "whsec_...")?;
 if !valid {
     return Ok(Response::forbidden());
 }
+// Deserializing the payload needs `serde_json` in your own Cargo.toml —
+// `inkbox` depends on it but does not re-export it.
 let payload: TextWebhookPayload = serde_json::from_slice(&raw_body)?;
 if payload.event_type == TextWebhookEventType::TextDeliveryFailed {
     eprintln!("{:?} {:?}", payload.data.text_message.error_code, payload.data.text_message.error_detail);
