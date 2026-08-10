@@ -86,6 +86,9 @@ const HELLO_REASON_SUPERSEDED: &str = "hello-superseded";
 /// Status strings passed to the `on_status` callback. Mirrors the Python
 /// status vocabulary (`"connecting"`, `"connected"`, `"reconnecting"`,
 /// `"closed"`, `"superseded"`).
+///
+/// Callbacks run inline on the runtime task and must return promptly. Panics
+/// are isolated, but blocking work delays lifecycle progress on that worker.
 pub type StatusCallback = Box<dyn Fn(&str) + Send + Sync>;
 
 /// Where inbound third-party traffic is forwarded.
@@ -265,6 +268,7 @@ struct RuntimeTestHooks {
     connector: Option<TestConnector>,
     sleeper: Option<TestSleeper>,
     random: Option<Arc<dyn Fn() -> f64 + Send + Sync>>,
+    intake_started: Option<Arc<AtomicU64>>,
 }
 
 /// The data-plane runtime.
@@ -331,6 +335,10 @@ impl TunnelRuntime {
     pub async fn serve_forever(self: &Arc<Self>) -> Result<()> {
         let mut backoff = self.timings.initial_backoff.as_secs_f64();
         let mut attempt = 0u64;
+        if self.is_stopped() {
+            self.notify_status("closed");
+            return Ok(());
+        }
         self.notify_status("connecting");
         loop {
             if self.is_stopped() {
@@ -386,6 +394,7 @@ impl TunnelRuntime {
         self.stopped.store(true, Ordering::SeqCst);
         self.generation.fetch_add(1, Ordering::SeqCst);
         self.stop.send_replace(true);
+        self.notify_status("closed");
         *self.active.lock().await = None;
         let mut lingering = std::mem::take(&mut *self.lingering());
         shutdown_owned_tasks(&mut lingering, self.timings.teardown).await;
@@ -705,6 +714,10 @@ impl TunnelRuntime {
         dispatch_handles: Arc<StdMutex<Vec<OwnedTask>>>,
         started: oneshot::Sender<()>,
     ) {
+        #[cfg(test)]
+        if let Some(started_count) = &self.test_hooks.intake_started {
+            started_count.fetch_add(1, Ordering::SeqCst);
+        }
         let _ = started.send(());
         while !self.is_stopped() {
             match self.park_one_intake(&conn, slot).await {
@@ -714,10 +727,11 @@ impl TunnelRuntime {
                     let handle = tokio::spawn(async move {
                         let _ = me.dispatch(env, c).await;
                     });
-                    dispatch_handles
-                        .lock()
-                        .unwrap_or_else(|err| err.into_inner())
-                        .push(OwnedTask::new("request dispatch", handle));
+                    push_dispatch_task(
+                        &dispatch_handles,
+                        OwnedTask::new("request dispatch", handle),
+                    )
+                    .await;
                 }
                 Ok(None) => continue,
                 // Another client took over: record it (force_down is
@@ -1078,6 +1092,9 @@ impl TunnelRuntime {
             if last.as_deref() == Some(status) {
                 return;
             }
+            if last.as_deref() == Some("superseded") && status == "closed" {
+                return;
+            }
             *last = Some(status.to_string());
         }
         if let Some(cb) = &self.cfg.on_status {
@@ -1085,6 +1102,31 @@ impl TunnelRuntime {
                 log::error!(
                     "tunnel status callback panicked for status {status}; continuing runtime"
                 );
+            }
+        }
+    }
+}
+
+async fn push_dispatch_task(tasks: &StdMutex<Vec<OwnedTask>>, task: OwnedTask) {
+    let finished = {
+        let mut tasks = tasks.lock().unwrap_or_else(|err| err.into_inner());
+        let mut finished = Vec::new();
+        let mut index = 0;
+        while index < tasks.len() {
+            if tasks[index].handle.is_finished() {
+                finished.push(tasks.swap_remove(index));
+            } else {
+                index += 1;
+            }
+        }
+        tasks.push(task);
+        finished
+    };
+
+    for mut task in finished {
+        if let Err(err) = (&mut task.handle).await {
+            if err.is_panic() {
+                log::error!("tunnel {} task panicked", task.name);
             }
         }
     }

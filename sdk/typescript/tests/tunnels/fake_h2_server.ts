@@ -119,6 +119,7 @@ export interface FakeH2Server {
     body: Buffer;
     sessionIdx: number;
   }>;
+  responsePostCount(requestId: string): number;
   awaitNextIntakePost(timeoutMs?: number): Promise<{ slot: number; ownerToken: string }>;
   /**
    * Resolve when an extended-CONNECT stream arrives at the given path
@@ -196,6 +197,7 @@ export async function startFakeH2Server(
   let receivedHello: http2.IncomingHttpHeaders | null = null;
   const intakePosts: Array<{ slot: number; ownerToken: string }> = [];
   const pendingResponses = new Map<string, PendingResponsePost>();
+  const responsePostCounts = new Map<string, number>();
   const intakeWaiters: PendingIntakePost[] = [];
   let nextUnclaimedIntakeIdx = 0;
   const sessions = new Set<http2.ServerHttp2Session>();
@@ -339,6 +341,10 @@ export async function startFakeH2Server(
       });
       stream.on("end", () => {
         const body = Buffer.concat(chunks);
+        responsePostCounts.set(
+          requestId,
+          (responsePostCounts.get(requestId) ?? 0) + 1,
+        );
         const pending = pendingResponses.get(requestId);
         if (pending !== undefined) {
           clearTimeout(pending.timer);
@@ -530,6 +536,9 @@ export async function startFakeH2Server(
         }, timeoutMs);
         pendingResponses.set(requestId, { resolve, reject, timer });
       });
+    },
+    responsePostCount(requestId) {
+      return responsePostCounts.get(requestId) ?? 0;
     },
     awaitNextIntakePost(timeoutMs = 5000) {
       return new Promise<{ slot: number; ownerToken: string }>(

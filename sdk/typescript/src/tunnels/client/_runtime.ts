@@ -19,6 +19,7 @@
 
 import * as http2 from "node:http2";
 import * as net from "node:net";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
 import type { ClientHttp2Session, ClientHttp2Stream } from "node:http2";
 
@@ -72,6 +73,7 @@ import {
 } from "./_wsframe.js";
 import {
   dispatchWsUpgradeInProcess,
+  WsConnectionLost,
   WsServerDraining,
   type InkboxWsHandler,
   type WsBridgeIO,
@@ -369,6 +371,8 @@ export class TunnelRuntime {
   private coldAttempt = 0;
   private terminalError: TunnelAuthError | null = null;
   private pendingConnection: Connection | null = null;
+  private coldGeneration = 0;
+  private readonly dispatchGeneration = new AsyncLocalStorage<number>();
 
   constructor(opts: TunnelRuntimeOpts) {
     this.tunnelId = opts.tunnelId;
@@ -443,6 +447,10 @@ export class TunnelRuntime {
         if (this.superseded) {
           this.stopSuperseded();
         }
+        if (this.stop) {
+          if (this.runtimeStatus !== "superseded") this.notifyStatus("closed");
+          return;
+        }
         consecutiveFailures += 1;
         if (err instanceof TunnelPhaseTimeoutError) {
           // eslint-disable-next-line no-console
@@ -489,6 +497,7 @@ export class TunnelRuntime {
   /** Graceful shutdown. Signals all loops to exit; closes every conn. */
   async aclose(): Promise<void> {
     this.stop = true;
+    this.coldGeneration += 1;
     if (this.runtimeStatus !== "superseded") this.notifyStatus("closed");
     this.shutdownAbort.abort();
     if (this.passthroughDispatch !== null) {
@@ -683,6 +692,7 @@ export class TunnelRuntime {
         this.notifyStatus("reconnecting");
       }
     } finally {
+      if (!this.stop) this.coldGeneration += 1;
       this.stopPingLoop(conn);
       conn.streams.clear();
       conn.bridgeStreamIds.clear();
@@ -1310,10 +1320,13 @@ export class TunnelRuntime {
       // Fire-and-forget dispatch; tracked on the runtime (not the conn) so
       // an in-flight handler survives this conn draining and can post its
       // reply on the new active conn during a handoff.
-      const task = this.dispatchEnvelope(conn, envelope).catch((err) => {
-        // eslint-disable-next-line no-console
-        console.warn(`dispatch failed request_id=${envelope!.requestId}`, err);
-      });
+      const generation = this.coldGeneration;
+      const task = this.dispatchGeneration
+        .run(generation, () => this.dispatchEnvelope(conn, envelope))
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.warn(`dispatch failed request_id=${envelope!.requestId}`, err);
+        });
       this.tasks.add(task);
       task.finally(() => this.tasks.delete(task));
     }
@@ -1952,23 +1965,23 @@ export class TunnelRuntime {
           const id = sid();
           if (id === null) {
             if (conn.draining) throw new WsServerDraining();
-            return;
+            throw new WsConnectionLost();
           }
           const ev = await self.nextEvent(conn, id);
           if (ev === null) {
             if (conn.draining) throw new WsServerDraining();
-            return;
+            throw new WsConnectionLost();
           }
           if (ev.kind === "data") {
             yield ev.data;
           } else if (ev.kind === "end") {
             if (conn.draining) throw new WsServerDraining();
-            return;
+            throw new WsConnectionLost();
           } else if (ev.kind === "reset") {
             // A reset while the conn is draining is the redeploy drain, not
             // a peer error — surface it typed so the handler can reconnect.
             if (conn.draining) throw new WsServerDraining();
-            throw new Error(`bridge stream reset code=${ev.code}`);
+            throw new WsConnectionLost(`bridge stream reset code=${ev.code}`);
           }
         }
       })();
@@ -2424,6 +2437,7 @@ export class TunnelRuntime {
         setTimeoutPromise(POST_ACTIVE_WAIT_MS),
       ]);
     }
+    if (!this.dispatchIsCurrent()) return;
     const target = this.pickReplyConnection(origin);
     if (target === null) {
       // eslint-disable-next-line no-console
@@ -2455,6 +2469,7 @@ export class TunnelRuntime {
     userHeaders: Array<[string, string]>,
     body: Buffer,
   ): Promise<void> {
+    if (!this.dispatchIsCurrent()) return;
     const reqHeaders: http2.OutgoingHttpHeaders = {
       [HTTP2_HEADER_METHOD]: "POST",
       [HTTP2_HEADER_SCHEME]: "https",
@@ -2515,6 +2530,11 @@ export class TunnelRuntime {
   }
 
   // --- utilities ---------------------------------------------------------
+
+  private dispatchIsCurrent(): boolean {
+    const generation = this.dispatchGeneration.getStore();
+    return generation === undefined || generation === this.coldGeneration;
+  }
 
   private notifyStatus(status: Exclude<TunnelRuntimeStatus, "idle">): void {
     if (this.runtimeStatus === status) return;

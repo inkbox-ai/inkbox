@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::future::pending;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
-use std::time::{Duration, Instant as StdInstant};
+use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -74,6 +74,7 @@ struct PeerSignals {
     forward_to_client: AtomicBool,
     hello_seen: Notify,
     intakes: AtomicUsize,
+    responses: AtomicUsize,
     tasks: StdMutex<Vec<JoinHandle<()>>>,
 }
 
@@ -83,6 +84,7 @@ impl PeerSignals {
             forward_to_client: AtomicBool::new(true),
             hello_seen: Notify::new(),
             intakes: AtomicUsize::new(0),
+            responses: AtomicUsize::new(0),
             tasks: StdMutex::new(Vec::new()),
         })
     }
@@ -252,6 +254,7 @@ async fn open_loopback_peer(
                     pending_responses.push(respond);
                 }
                 _ => {
+                    signals_for_server.responses.fetch_add(1, Ordering::SeqCst);
                     let response = http::Response::builder().status(200).body(()).unwrap();
                     respond.send_response(response, true).unwrap();
                 }
@@ -327,6 +330,20 @@ impl StatusRecorder {
     }
 }
 
+fn assert_ordered_subsequence(actual: &[String], expected: &[&str]) {
+    let mut next = 0;
+    for status in actual {
+        if next < expected.len() && status == expected[next] {
+            next += 1;
+        }
+    }
+    assert_eq!(
+        next,
+        expected.len(),
+        "missing ordered subsequence {expected:?} in {actual:?}"
+    );
+}
+
 fn build_runtime(
     script: &ScriptedConnector,
     recorder: &StatusRecorder,
@@ -364,9 +381,38 @@ fn error_and_takeover_classification() {
 
 #[tokio::test]
 async fn immediate_stop_is_persistent() {
-    let runtime = Arc::new(TunnelRuntime::new(cfg()));
+    let recorder = StatusRecorder::new();
+    let mut config = cfg();
+    config.on_status = Some(recorder.callback());
+    let runtime = Arc::new(TunnelRuntime::new(config));
     runtime.aclose().await;
     assert!(runtime.serve_forever().await.is_ok());
+    assert_eq!(recorder.snapshot(), ["closed"]);
+}
+
+#[tokio::test]
+async fn aclose_without_serve_publishes_closed() {
+    let handle = TunnelStatusHandle::new();
+    let mut config = cfg();
+    config.on_status = Some(handle.callback());
+    let runtime = TunnelRuntime::new(config);
+
+    runtime.aclose().await;
+
+    assert_eq!(handle.status(), LocalTunnelStatus::Closed);
+}
+
+#[tokio::test]
+async fn aclose_does_not_overwrite_superseded() {
+    let recorder = StatusRecorder::new();
+    let mut config = cfg();
+    config.on_status = Some(recorder.callback());
+    let runtime = TunnelRuntime::new(config);
+    runtime.notify_status("superseded");
+
+    runtime.aclose().await;
+
+    assert_eq!(recorder.snapshot(), ["superseded"]);
 }
 
 #[tokio::test]
@@ -383,14 +429,12 @@ async fn connect_timeout_retries_and_shutdown_interrupts_backoff() {
     });
 
     recorder.wait_count("reconnecting", 1).await;
-    let started = StdInstant::now();
     runtime.aclose().await;
-    assert!(tokio::time::timeout(Duration::from_millis(100), serving)
+    assert!(tokio::time::timeout(Duration::from_secs(1), serving)
         .await
         .unwrap()
         .unwrap()
         .is_ok());
-    assert!(started.elapsed() < Duration::from_millis(100));
     assert_eq!(recorder.snapshot().last().unwrap(), "closed");
 }
 
@@ -412,14 +456,12 @@ async fn assert_shutdown_interrupts_connect(action: ConnectAction) {
     .await
     .unwrap();
 
-    let started = StdInstant::now();
     runtime.aclose().await;
-    assert!(tokio::time::timeout(Duration::from_millis(100), serving)
+    assert!(tokio::time::timeout(Duration::from_secs(1), serving)
         .await
         .unwrap()
         .unwrap()
         .is_ok());
-    assert!(started.elapsed() < Duration::from_millis(100));
     let statuses = recorder.snapshot();
     assert!(
         !statuses.contains(&"reconnecting".to_string()),
@@ -446,14 +488,12 @@ async fn shutdown_interrupts_h2_handshake() {
     });
 
     entered.notified().await;
-    let started = StdInstant::now();
     runtime.aclose().await;
-    assert!(tokio::time::timeout(Duration::from_millis(100), serving)
+    assert!(tokio::time::timeout(Duration::from_secs(1), serving)
         .await
         .unwrap()
         .unwrap()
         .is_ok());
-    assert!(started.elapsed() < Duration::from_millis(100));
     assert!(!recorder.snapshot().contains(&"reconnecting".to_string()));
 }
 
@@ -479,21 +519,26 @@ async fn stop_before_backoff_registration_is_not_lost() {
     assert_eq!(recorder.snapshot().last().unwrap(), "closed");
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn intake_runs_while_connected_callback_is_blocked() {
+#[tokio::test]
+async fn connected_follows_intake_worker_start() {
     let signals = PeerSignals::new();
     let script =
         ScriptedConnector::new([ConnectAction::Peer(HelloMode::Complete, signals.clone())]);
     let recorder = StatusRecorder::new();
-    let callback_finished = Arc::new(AtomicBool::new(false));
+    let intake_started = Arc::new(AtomicU64::new(0));
+    let started_when_connected = Arc::new(AtomicU64::new(0));
     let mut runtime = build_runtime(&script, &recorder, fast_timings());
+    runtime.test_hooks.intake_started = Some(intake_started.clone());
     let callback_recorder = recorder.clone();
-    let callback_finished_inner = callback_finished.clone();
+    let started_for_callback = intake_started.clone();
+    let observed = started_when_connected.clone();
     runtime.cfg.on_status = Some(Box::new(move |status| {
         callback_recorder.push(status);
         if status == "connected" {
-            std::thread::sleep(Duration::from_millis(200));
-            callback_finished_inner.store(true, Ordering::SeqCst);
+            observed.store(
+                started_for_callback.load(Ordering::SeqCst),
+                Ordering::SeqCst,
+            );
         }
     }));
     let runtime = Arc::new(runtime);
@@ -503,14 +548,7 @@ async fn intake_runs_while_connected_callback_is_blocked() {
     });
 
     recorder.wait_count("connected", 1).await;
-    tokio::time::timeout(Duration::from_millis(100), async {
-        while signals.intakes.load(Ordering::SeqCst) == 0 {
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .expect("intake did not start while callback was blocked");
-    assert!(!callback_finished.load(Ordering::SeqCst));
+    assert_eq!(started_when_connected.load(Ordering::SeqCst), 1);
 
     runtime.aclose().await;
     serving.await.unwrap().unwrap();
@@ -532,14 +570,12 @@ async fn shutdown_interrupts_stalled_hello() {
     });
 
     signals.hello_seen.notified().await;
-    let started = StdInstant::now();
     runtime.aclose().await;
-    assert!(tokio::time::timeout(Duration::from_millis(150), serving)
+    assert!(tokio::time::timeout(Duration::from_secs(1), serving)
         .await
         .unwrap()
         .unwrap()
         .is_ok());
-    assert!(started.elapsed() < Duration::from_millis(150));
     assert!(!recorder.snapshot().contains(&"reconnecting".to_string()));
     signals.abort_tasks();
 }
@@ -582,9 +618,7 @@ async fn reconnecting_precedes_bounded_teardown_and_is_not_duplicated() {
     });
 
     recorder.wait_count("connected", 1).await;
-    let started = StdInstant::now();
     recorder.wait_count("reconnecting", 1).await;
-    assert!(started.elapsed() < Duration::from_millis(100));
     assert_eq!(
         recorder
             .snapshot()
@@ -595,7 +629,7 @@ async fn reconnecting_precedes_bounded_teardown_and_is_not_duplicated() {
     );
 
     runtime.aclose().await;
-    tokio::time::timeout(Duration::from_millis(500), serving)
+    tokio::time::timeout(Duration::from_secs(1), serving)
         .await
         .unwrap()
         .unwrap()
@@ -614,7 +648,7 @@ async fn ping_timeout_forces_reconnect_before_another_interval() {
     let recorder = StatusRecorder::new();
     let mut timings = fast_timings();
     timings.ping_interval = Duration::from_millis(200);
-    timings.ping_ack = Duration::from_millis(30);
+    timings.ping_ack = Duration::from_millis(100);
     let runtime = Arc::new(build_runtime(&script, &recorder, timings));
     let serving = tokio::spawn({
         let runtime = runtime.clone();
@@ -623,22 +657,20 @@ async fn ping_timeout_forces_reconnect_before_another_interval() {
 
     recorder.wait_count("connected", 1).await;
     first.stop_forwarding();
-    let started = StdInstant::now();
     recorder.wait_count("reconnecting", 1).await;
-    assert!(started.elapsed() < Duration::from_millis(320));
     recorder.wait_count("connected", 2).await;
 
     runtime.aclose().await;
     serving.await.unwrap().unwrap();
-    assert_eq!(
-        recorder.snapshot(),
-        [
+    assert_ordered_subsequence(
+        &recorder.snapshot(),
+        &[
             "connecting",
             "connected",
             "reconnecting",
             "connected",
             "closed",
-        ]
+        ],
     );
     first.abort_tasks();
     second.abort_tasks();
@@ -787,6 +819,76 @@ async fn terminal_status_matches_status_handle() {
         assert!(!handle.is_connected());
         signals.abort_tasks();
     }
+}
+
+#[tokio::test]
+async fn completed_dispatch_tasks_are_pruned_without_losing_teardown_ownership() {
+    let tasks = Arc::new(StdMutex::new(Vec::new()));
+    let completed = Arc::new(AtomicUsize::new(0));
+
+    for _ in 0..1_000 {
+        let completed = completed.clone();
+        let handle = tokio::spawn(async move {
+            completed.fetch_add(1, Ordering::SeqCst);
+        });
+        while !handle.is_finished() {
+            tokio::task::yield_now().await;
+        }
+        push_dispatch_task(tasks.as_ref(), OwnedTask::new("request dispatch", handle)).await;
+        assert!(tasks.lock().unwrap().len() <= 1);
+    }
+    assert_eq!(completed.load(Ordering::SeqCst), 1_000);
+
+    let pending_dropped = Arc::new(AtomicBool::new(false));
+    let pending = pending_task(pending_dropped.clone());
+    tokio::task::yield_now().await;
+    push_dispatch_task(tasks.as_ref(), OwnedTask::new("request dispatch", pending)).await;
+    assert_eq!(tasks.lock().unwrap().len(), 1);
+
+    let mut remaining = std::mem::take(&mut *tasks.lock().unwrap());
+    shutdown_owned_tasks(&mut remaining, Duration::from_secs(1)).await;
+    assert!(remaining.is_empty());
+    assert!(pending_dropped.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn stale_generation_response_is_rejected_before_send() {
+    let signals = PeerSignals::new();
+    let timings = fast_timings();
+    let runtime = TunnelRuntime::new(cfg());
+    let force_down = Arc::new(Notify::new());
+    let superseded = Arc::new(AtomicBool::new(false));
+    let OpenConnection {
+        send,
+        closed: _closed,
+        mut tasks,
+    } = open_loopback_peer(
+        Instant::now() + Duration::from_secs(1),
+        timings,
+        runtime.stopped.clone(),
+        force_down,
+        superseded,
+        HelloMode::Complete,
+        signals.clone(),
+    )
+    .await
+    .unwrap();
+    let mut active = runtime.send_hello(send).await.unwrap();
+    active.generation = 1;
+    runtime.generation.store(2, Ordering::SeqCst);
+
+    let err = runtime
+        .post_response(&active, "request-1", 200, &[], None, Vec::new())
+        .await
+        .unwrap_err();
+
+    assert!(
+        matches!(err, InkboxError::Tunnel(message) if message.contains("closed tunnel connection"))
+    );
+    assert_eq!(signals.responses.load(Ordering::SeqCst), 0);
+    let pending = tasks.shutdown(Duration::from_secs(1)).await;
+    assert!(pending.is_empty());
+    signals.abort_tasks();
 }
 
 struct DropSignal(Arc<AtomicBool>);

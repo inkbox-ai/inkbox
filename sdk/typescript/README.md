@@ -1245,6 +1245,11 @@ takeover, and unexpected fatal failures reject both `serveForever()` and
 `wait()`. Attach a rejection handler when calling `serveForever()` without
 awaiting it.
 
+For in-process WebSocket handlers, planned drain throws `WsServerDraining`
+(`4500`) and unplanned tunnel connection loss throws `WsConnectionLost`
+(`1011`). Both extend `WsClosed` and advise the peer to reconnect. URL-forwarded
+WebSockets receive the matching CLOSE code on their local upstream connection.
+
 ---
 
 ## Webhooks

@@ -19,6 +19,7 @@
 
 import {
   SERVER_DRAINING_WS_CLOSE_CODE,
+  WsConnectionLost,
   WsServerDraining,
   type WsBridgeIO,
 } from "./_ws.js";
@@ -275,14 +276,16 @@ export async function pumpWsUrlEdgeBridge(
       if (bridgeClosed) break;
     }
   } catch (err) {
-    // On a server-drain close, give the SDK-owned upstream leg a clean,
-    // typed WS CLOSE (server_draining) instead of the abrupt RST the
-    // caller's socket.destroy() would otherwise send. `end(frame)` flushes
-    // the frame before the FIN so the upstream sees the code.
-    if (err instanceof WsServerDraining) {
+    // Give the upstream leg a typed CLOSE for planned drain or cold loss.
+    if (err instanceof WsServerDraining || err instanceof WsConnectionLost) {
       try {
         const codeBuf = Buffer.alloc(2);
-        codeBuf.writeUInt16BE(SERVER_DRAINING_WS_CLOSE_CODE, 0);
+        codeBuf.writeUInt16BE(
+          err instanceof WsServerDraining
+            ? SERVER_DRAINING_WS_CLOSE_CODE
+            : err.code,
+          0,
+        );
         socket.end(encodeWsFrame(WS_OPCODE_CLOSE, codeBuf, { mask: true }));
       } catch {
         /* swallow */

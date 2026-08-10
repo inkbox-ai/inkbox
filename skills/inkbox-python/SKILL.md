@@ -1147,6 +1147,8 @@ async with ...:
 `closed`, or `superseded`. `listener.is_connected` is local runtime liveness;
 `listener.last_connected_at` is an aware UTC timestamp retained while
 reconnecting. `listener.tunnel` remains the bootstrap resource snapshot.
+`listener.close()` raises `TimeoutError` if its runtime thread cannot stop within
+30 seconds.
 
 Tunnels are provisioned atomically by `inkbox.create_identity(...)`; there is no standalone `create` / `delete` / `restore` / `rotate_secret` surface. For passthrough, opt in at create time: `inkbox.create_identity("my-app", tunnel={"tls_mode": "passthrough"})` — `tls_mode` is fixed at create.
 

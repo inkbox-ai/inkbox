@@ -185,6 +185,8 @@ impl TunnelsResource {
     /// [`TunnelStatusHandle`](crate::tunnels::client::TunnelStatusHandle), pass
     /// `handle.callback()` here on a caller-owned thread, and retain a clone.
     /// Compose that callback with any additional monitoring in your closure.
+    /// Callbacks run inline on the runtime and must return promptly; move
+    /// blocking monitoring work onto a caller-owned thread or queue.
     #[cfg(feature = "tunnels-runtime")]
     pub fn connect_with_status(
         &self,

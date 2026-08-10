@@ -180,7 +180,10 @@ class _StreamEvent:
 TunnelRuntimeStatus = Literal[
     "idle", "connecting", "connected", "reconnecting", "closed", "superseded",
 ]
-StatusCallback = Callable[[TunnelRuntimeStatus], None]
+TunnelCallbackStatus = Literal[
+    "connecting", "connected", "reconnecting", "closed", "superseded",
+]
+StatusCallback = Callable[[TunnelCallbackStatus], None]
 
 _DISPATCH_GENERATION: ContextVar[int] = ContextVar(
     "inkbox_tunnel_dispatch_generation", default=-1,
@@ -649,7 +652,11 @@ class TunnelRuntime:
                 if conn.read_task is None or conn.read_task.done():
                     break
             if conn.read_task is not None and conn.read_task.done():
-                conn.read_task.result()
+                try:
+                    conn.read_task.result()
+                except asyncio.CancelledError:
+                    if not self._stop.is_set() and not conn.aborted:
+                        raise
             # Another client took over this tunnel: stop, do not reconnect.
             if self._superseded:
                 raise _TunnelSupersededError(
@@ -808,6 +815,7 @@ class TunnelRuntime:
         self._handoff_task = asyncio.create_task(self._run_handoff(old_conn))
 
     async def _run_handoff(self, old_conn: _Connection) -> None:
+        owner = asyncio.current_task()
         try:
             new_conn = await self._make_replacement_connection()
             self._active = new_conn
@@ -836,11 +844,13 @@ class TunnelRuntime:
             self._force_reconnect_conn(old_conn)
             self._supervisor_wake.set()
         finally:
-            self._handoff_in_flight = False
+            if self._handoff_task is owner:
+                self._handoff_in_flight = False
             try:
                 await self._drain_old_connection(old_conn)
             finally:
-                self._handoff_task = None
+                if self._handoff_task is owner:
+                    self._handoff_task = None
 
     async def _make_replacement_connection(self) -> _Connection:
         """Dial + hello + park a replacement, retrying transient hello
@@ -3255,7 +3265,7 @@ class TunnelRuntime:
         if emit:
             self._invoke_status_callback("connected")
 
-    def _notify_status(self, status: TunnelRuntimeStatus) -> None:
+    def _notify_status(self, status: TunnelCallbackStatus) -> None:
         with self._status_lock:
             if self._status == status:
                 return
@@ -3273,7 +3283,7 @@ class TunnelRuntime:
             logger.warning("tunnel runtime: connected session lost; reconnecting")
             self._notify_status("reconnecting")
 
-    def _invoke_status_callback(self, status: TunnelRuntimeStatus) -> None:
+    def _invoke_status_callback(self, status: TunnelCallbackStatus) -> None:
         if self._on_status is not None:
             try:
                 self._on_status(status)

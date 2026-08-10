@@ -149,6 +149,35 @@ describe("TunnelListener — terminal runtime results", () => {
     setTimeout(() => listener.aclose(), 10);
     await listener.wait();
   });
+
+  it("handles a serve rejection before awaiting runtime cleanup", async () => {
+    const error = new TunnelAuthError("rejected during cleanup");
+    class RejectDuringCloseRuntime extends FakeRuntime {
+      override async aclose(): Promise<void> {
+        this.failWith(error);
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    }
+    const runtime = new RejectDuringCloseRuntime();
+    const { listener } = makeListener({
+      installSignalHandlers: false,
+      fakeRuntime: runtime,
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      void listener.serveForever();
+      await listener.aclose();
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(unhandled).toEqual([]);
+      await expect(listener.wait()).rejects.toBe(error);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+    }
+  });
 });
 
 describe("TunnelListener — local liveness", () => {

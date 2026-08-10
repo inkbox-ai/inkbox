@@ -271,6 +271,11 @@ await inkbox.tunnels.signCsr("tunnel-uuid", { csrPem });
 
 Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `forceDelete` / `rotateSecret` surface.
 
+For in-process WebSockets, catch `WsServerDraining` (`4500`) for planned handoff
+and `WsConnectionLost` (`1011`) for cold connection loss. Both extend
+`WsClosed` and set `reconnectAdvised = true`. URL-forwarded WebSockets receive
+the same close codes on the local upstream leg.
+
 ### Common `connect()` options
 
 | option | default | notes |
@@ -297,7 +302,7 @@ use inkbox::tunnels::client::TunnelStatusHandle;
 let status = TunnelStatusHandle::new();
 let runtime_status = status.clone();
 let client = inkbox.clone();
-std::thread::spawn(move || {
+let tunnel_thread = std::thread::spawn(move || {
     client.tunnels().connect_with_status(
         "my-app",
         "http://127.0.0.1:8080",
@@ -307,11 +312,18 @@ std::thread::spawn(move || {
 
 let snapshot = status.snapshot();
 println!("{:?} {:?}", snapshot.status, snapshot.last_connected_at);
+
+// Join when shutdown is expected so bootstrap/runtime errors are surfaced.
+if let Err(error) = tunnel_thread.join().expect("tunnel thread panicked") {
+    eprintln!("tunnel stopped: {error}");
+}
 ```
 
 Rust bounds establishment and retries transient failures with cold reconnect.
 It does not implement the make-before-break drain behavior described below for
-Python and TypeScript. Its status callback is edge-triggered like the other SDKs.
+Python and TypeScript. Its status callback is edge-triggered like the other SDKs
+and must return promptly. The handle remains `Idle` if bootstrap fails before
+the runtime starts, so retain and inspect the thread result.
 
 ---
 

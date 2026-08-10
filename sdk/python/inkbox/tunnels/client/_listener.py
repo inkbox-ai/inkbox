@@ -150,7 +150,11 @@ class TunnelListener:
             raise err
 
     def close(self) -> None:
-        """Sync graceful shutdown."""
+        """Sync graceful shutdown.
+
+        Raises:
+            TimeoutError: If the runtime thread does not stop within 30 seconds.
+        """
         self._close(raise_on_timeout=True)
 
     def _close(self, *, raise_on_timeout: bool) -> None:

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import * as net from "node:net";
 import { pumpWsUrlEdgeBridge } from "../../src/tunnels/client/_ws_url_edge_bridge.js";
 import {
+  WsConnectionLost,
   WsServerDraining,
   type WsBridgeIO,
 } from "../../src/tunnels/client/_ws.js";
@@ -61,5 +62,48 @@ describe("pumpWsUrlEdgeBridge — server drain", () => {
     }
     expect(closeCode).toBe(4500);
     server.close();
+  });
+
+  it("sends an abnormal 1011 CLOSE to the upstream leg on cold loss", async () => {
+    const received: Buffer[] = [];
+    const server = net.createServer((s) => {
+      s.on("data", (c: Buffer) => received.push(c));
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    const port = (server.address() as net.AddressInfo).port;
+    const sock = net.connect(port, "127.0.0.1");
+    await new Promise<void>((resolve) => sock.once("connect", resolve));
+    const bridge: WsBridgeIO = {
+      async sendFrame() {},
+      recv() {
+        return (async function* () {
+          throw new WsConnectionLost();
+        })();
+      },
+      async closeStream() {},
+      async postUpgradeReply() {},
+      async rejectUpgrade() {},
+    };
+
+    await pumpWsUrlEdgeBridge({
+      upstream: {
+        socket: sock,
+        leftover: Buffer.alloc(0),
+        headers: [],
+        subprotocol: null,
+      },
+      bridge,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const decoded = decodeClientFrame(received, { requireMask: true });
+    expect(decoded.kind).toBe("frame");
+    if (decoded.kind === "frame") {
+      expect(decoded.opcode).toBe(WS_OPCODE_CLOSE);
+      expect(decoded.payload.readUInt16BE(0)).toBe(1011);
+    }
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 });

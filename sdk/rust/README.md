@@ -401,7 +401,7 @@ use inkbox::tunnels::client::TunnelStatusHandle;
 let status = TunnelStatusHandle::new();
 let runtime_status = status.clone();
 let client = inkbox.clone();
-std::thread::spawn(move || {
+let tunnel_thread = std::thread::spawn(move || {
     client.tunnels().connect_with_status(
         "my-app",
         "http://127.0.0.1:8080",
@@ -411,6 +411,11 @@ std::thread::spawn(move || {
 
 let snapshot = status.snapshot();
 println!("{:?} {:?}", snapshot.status, snapshot.last_connected_at);
+
+// Join when shutdown is expected so bootstrap/runtime errors are not lost.
+if let Err(error) = tunnel_thread.join().expect("tunnel thread panicked") {
+    eprintln!("tunnel stopped: {error}");
+}
 ```
 
 The handle records `Idle`, `Connecting`, `Connected`, `Reconnecting`, `Closed`,
@@ -419,6 +424,10 @@ reconnecting. It is local runtime state, distinct from fields returned by
 `inkbox.tunnels().get(...)`. Establishment is bounded and transient failures use
 cold reconnect with exponential backoff; Rust does not use make-before-break
 handoff. The SDK does not create an OS thread or take ownership of joining it.
+The status remains `Idle` until runtime startup reaches its first lifecycle
+transition, so inspect the thread result for validation or bootstrap failures.
+Status callbacks run inline and must return promptly; send blocking monitoring
+work to a caller-owned thread or queue.
 
 ## Status
 

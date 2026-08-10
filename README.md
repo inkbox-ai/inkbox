@@ -272,7 +272,7 @@ use inkbox::tunnels::client::TunnelStatusHandle;
 let status = TunnelStatusHandle::new();
 let runtime_status = status.clone();
 let client = inkbox.clone();
-std::thread::spawn(move || {
+let tunnel_thread = std::thread::spawn(move || {
     client.tunnels().connect_with_status(
         "my-app",
         "http://127.0.0.1:8080",
@@ -280,6 +280,11 @@ std::thread::spawn(move || {
     )
 });
 println!("{:?} {}", status.status(), status.is_connected());
+
+// Join when shutdown is expected so startup/runtime errors are surfaced.
+if let Err(error) = tunnel_thread.join().expect("tunnel thread panicked") {
+    eprintln!("tunnel stopped: {error}");
+}
 ```
 
 Python and TypeScript also accept an in-process callable (Fetch handler in TS,

@@ -5,6 +5,7 @@ import * as tls from "node:tls";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  TunnelAuthError,
   TunnelRuntime,
   type TunnelRuntimeOpts,
 } from "../../src/tunnels/client/_runtime.js";
@@ -231,6 +232,39 @@ describe("TunnelRuntime reconnect establishment", () => {
     await servePromise;
   });
 
+  it("closes during a stalled dial without emitting reconnecting", async () => {
+    const stalled = new StalledSession();
+    const statuses: string[] = [];
+    const runtime = makeRuntime({
+      connectTimeoutMs: 1_000,
+      onStatus: (status) => statuses.push(status),
+      http2Connect: () => stalled as unknown as http2.ClientHttp2Session,
+    });
+    const servePromise = runtime.serveForever();
+    await waitFor(() => stalled.listenerCount("connect") > 0);
+
+    await runtime.aclose();
+    await servePromise;
+
+    expect(statuses).toEqual(["connecting", "closed"]);
+  });
+
+  it("closes during a pending HELLO without emitting reconnecting", async () => {
+    fakeServer.deferNextHello();
+    const statuses: string[] = [];
+    const runtime = makeRuntime({
+      helloTimeoutMs: 1_000,
+      onStatus: (status) => statuses.push(status),
+    });
+    const servePromise = runtime.serveForever();
+    await waitFor(() => fakeServer.pendingHelloCount() === 1);
+
+    await runtime.aclose();
+    await servePromise;
+
+    expect(statuses).toEqual(["connecting", "closed"]);
+  });
+
   it.each(["timeout", "early close"] as const)(
     "recovers after HELLO %s without retaining the failed session",
     async (failure) => {
@@ -428,6 +462,112 @@ describe("TunnelRuntime integrated recovery", () => {
   }, 10_000);
 });
 
+describe("TunnelRuntime cold-generation fencing", () => {
+  it("drops a handler reply released after cold recovery", async () => {
+    let releaseHandler: () => void = () => undefined;
+    let markStarted: () => void = () => undefined;
+    const handlerStarted = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const handlerGate = new Promise<void>((resolve) => {
+      releaseHandler = resolve;
+    });
+    fakeServer.setIntakeResponse({
+      status: 200,
+      headers: [
+        ["inkbox-request-id", "req-stale-cold"],
+        ["inkbox-method", "GET"],
+        ["inkbox-path", "/slow"],
+        ["inkbox-route-kind", "webhook"],
+      ],
+      body: Buffer.alloc(0),
+    });
+    const runtime = makeRuntime({
+      dispatch: {
+        httpHandler: async () => {
+          markStarted();
+          await handlerGate;
+          return new Response("stale");
+        },
+      },
+    });
+    const servePromise = runtime.serveForever();
+    await handlerStarted;
+
+    destroyActiveClientSession(runtime);
+    await waitFor(() => fakeServer.helloCount() >= 2 && runtime.isConnected);
+    releaseHandler();
+    await waitFor(
+      () => (runtime as unknown as { tasks: Set<unknown> }).tasks.size === 0,
+    );
+
+    expect(fakeServer.responsePostCount("req-stale-cold")).toBe(0);
+    await runtime.aclose();
+    await servePromise;
+  });
+
+  it("drops a reply waiting on a handoff that falls back cold", async () => {
+    let releaseHandler: () => void = () => undefined;
+    let markStarted: () => void = () => undefined;
+    let releaseColdSleep: () => void = () => undefined;
+    const handlerStarted = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const handlerGate = new Promise<void>((resolve) => {
+      releaseHandler = resolve;
+    });
+    const coldSleep = new Promise<void>((resolve) => {
+      releaseColdSleep = resolve;
+    });
+    fakeServer.setIntakeResponse({
+      status: 200,
+      headers: [
+        ["inkbox-request-id", "req-stale-handoff"],
+        ["inkbox-method", "GET"],
+        ["inkbox-path", "/slow"],
+        ["inkbox-route-kind", "webhook"],
+      ],
+      body: Buffer.alloc(0),
+    });
+    const runtime = makeRuntime({
+      helloTimeoutMs: 25,
+      handoffRedialBudgetMs: 80,
+      dispatch: {
+        httpHandler: async () => {
+          markStarted();
+          await handlerGate;
+          return new Response("stale");
+        },
+      },
+      sleep: async (delayMs) => {
+        if (delayMs >= 500) await coldSleep;
+        else await Promise.resolve();
+      },
+    });
+    const servePromise = runtime.serveForever();
+    await handlerStarted;
+    fakeServer.setDeferHellos(true);
+    fakeServer.injectGoaway(http2.constants.NGHTTP2_NO_ERROR);
+    await waitFor(
+      () => (runtime as unknown as { handoffInFlight: boolean }).handoffInFlight,
+    );
+    await waitFor(() => fakeServer.helloCount() >= 2);
+    releaseHandler();
+    await waitFor(() => runtime.status === "reconnecting");
+
+    fakeServer.setDeferHellos(false);
+    releaseColdSleep();
+    await waitFor(() => runtime.status === "connected");
+    await waitFor(
+      () => (runtime as unknown as { tasks: Set<unknown> }).tasks.size === 0,
+    );
+
+    expect(fakeServer.responsePostCount("req-stale-handoff")).toBe(0);
+    await runtime.aclose();
+    await servePromise;
+  }, 10_000);
+});
+
 describe("TunnelRuntime bounded handoff", () => {
   it("bounds a stalled replacement HELLO by the handoff budget", async () => {
     const sessions: StalledSession[] = [];
@@ -454,6 +594,22 @@ describe("TunnelRuntime bounded handoff", () => {
     expect(performance.now() - started).toBeLessThan(300);
     expect(sessions.length).toBeGreaterThan(0);
     expect(sessions.every((session) => session.destroyCount === 1)).toBe(true);
+  });
+
+  it("treats authentication rejection during handoff as terminal", async () => {
+    const statuses: string[] = [];
+    const runtime = makeRuntime({
+      onStatus: (status) => statuses.push(status),
+    });
+    const servePromise = runtime.serveForever();
+    await fakeServer.awaitNextIntakePost(2_000);
+    fakeServer.setHelloResponse(401, {});
+    fakeServer.injectGoaway(http2.constants.NGHTTP2_NO_ERROR);
+
+    await expect(servePromise).rejects.toBeInstanceOf(TunnelAuthError);
+    expect(statuses).toEqual(["connecting", "connected", "closed"]);
+    expect(fakeServer.helloCount()).toBe(2);
+    await runtime.aclose();
   });
 });
 

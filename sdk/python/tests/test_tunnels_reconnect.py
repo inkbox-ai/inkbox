@@ -17,8 +17,8 @@ from inkbox.tunnels.client._listener import TunnelListener
 from inkbox.tunnels.client._runtime import (
     _DISPATCH_GENERATION,
     StatusCallback,
+    TunnelCallbackStatus,
     TunnelRuntime,
-    TunnelRuntimeStatus,
     _ConnectTimeoutError,
     _Connection,
     _HelloTimeoutError,
@@ -354,6 +354,175 @@ async def test_auth_failure_during_handoff_is_terminal(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_failed_handoff_canceled_reader_reaches_cold_retry(monkeypatch) -> None:
+    import inkbox.tunnels.client._runtime as runtime_module
+
+    runtime = _runtime()
+    attempts = 0
+    recovered = asyncio.Event()
+
+    async def open_connection(_conn: _Connection) -> None:
+        nonlocal attempts
+        attempts += 1
+
+    async def read_loop(_conn: _Connection) -> None:
+        await asyncio.Event().wait()
+
+    async def hello(_conn: _Connection) -> None:
+        return None
+
+    async def failed_replacement() -> _Connection:
+        raise RuntimeError("replacement failed")
+
+    def start_serving(conn: _Connection) -> None:
+        if attempts == 1:
+            runtime._begin_handoff(conn, reason="drain")
+        else:
+            recovered.set()
+            runtime._stop.set()
+            runtime._publish_connection_closed(conn)
+
+    monkeypatch.setattr(runtime, "_open_connection", open_connection)
+    monkeypatch.setattr(runtime, "_read_loop", read_loop)
+    monkeypatch.setattr(runtime, "_send_hello", hello)
+    monkeypatch.setattr(runtime, "_start_serving", start_serving)
+    monkeypatch.setattr(
+        runtime, "_make_replacement_connection", failed_replacement,
+    )
+    monkeypatch.setattr(runtime_module, "INITIAL_BACKOFF_SEC", 0.01)
+    monkeypatch.setattr(runtime_module, "BACKOFF_JITTER", 0.0)
+
+    await asyncio.wait_for(runtime.serve_forever(), timeout=0.5)
+
+    assert recovered.is_set()
+    assert attempts == 2
+    assert runtime.status == "closed"
+
+
+@pytest.mark.asyncio
+async def test_normal_shutdown_canceled_reader_is_not_fatal(monkeypatch) -> None:
+    runtime = _runtime()
+    serving = asyncio.Event()
+
+    async def open_connection(_conn: _Connection) -> None:
+        return None
+
+    async def read_loop(_conn: _Connection) -> None:
+        await asyncio.Event().wait()
+
+    async def hello(_conn: _Connection) -> None:
+        return None
+
+    monkeypatch.setattr(runtime, "_open_connection", open_connection)
+    monkeypatch.setattr(runtime, "_read_loop", read_loop)
+    monkeypatch.setattr(runtime, "_send_hello", hello)
+    monkeypatch.setattr(runtime, "_start_serving", lambda _conn: serving.set())
+
+    run_task = asyncio.create_task(runtime._run_once())
+    await asyncio.wait_for(serving.wait(), timeout=0.1)
+    await runtime.aclose()
+    await asyncio.wait_for(run_task, timeout=0.1)
+
+
+@pytest.mark.asyncio
+async def test_unexpected_read_exception_still_propagates(monkeypatch) -> None:
+    runtime = _runtime()
+
+    async def open_connection(_conn: _Connection) -> None:
+        return None
+
+    async def read_loop(_conn: _Connection) -> None:
+        raise RuntimeError("unexpected read failure")
+
+    async def hello(_conn: _Connection) -> None:
+        return None
+
+    monkeypatch.setattr(runtime, "_open_connection", open_connection)
+    monkeypatch.setattr(runtime, "_read_loop", read_loop)
+    monkeypatch.setattr(runtime, "_send_hello", hello)
+    monkeypatch.setattr(runtime, "_start_serving", lambda _conn: None)
+
+    with pytest.raises(RuntimeError, match="unexpected read failure"):
+        await asyncio.wait_for(runtime._run_once(), timeout=0.1)
+
+
+async def _start_second_handoff_during_first_drain(runtime, monkeypatch):
+    first = _connection(1)
+    second = _connection(2)
+    third = _connection(3)
+    runtime._active = first
+    release_second = asyncio.Event()
+    second_started = asyncio.Event()
+    replacement_count = 0
+    second_tasks: list[asyncio.Task[None]] = []
+
+    async def replacement() -> _Connection:
+        nonlocal replacement_count
+        replacement_count += 1
+        if replacement_count == 1:
+            return second
+        second_started.set()
+        await release_second.wait()
+        return third
+
+    async def drain(conn: _Connection) -> None:
+        if conn is not first:
+            return
+        runtime._last_handoff_at = 0.0
+        runtime._begin_handoff(second, reason="second-drain")
+        task = runtime._handoff_task
+        assert task is not None
+        second_tasks.append(task)
+        await second_started.wait()
+
+    monkeypatch.setattr(runtime, "_make_replacement_connection", replacement)
+    monkeypatch.setattr(runtime, "_drain_old_connection", drain)
+    runtime._begin_handoff(first, reason="first-drain")
+    first_task = runtime._handoff_task
+    assert first_task is not None
+    await asyncio.wait_for(second_started.wait(), timeout=0.1)
+    await asyncio.wait_for(first_task, timeout=0.1)
+    return second_tasks[0], release_second, third
+
+
+@pytest.mark.asyncio
+async def test_first_handoff_cannot_clear_second_handoff(monkeypatch) -> None:
+    runtime = _runtime()
+
+    second_task, release_second, third = await _start_second_handoff_during_first_drain(
+        runtime, monkeypatch,
+    )
+
+    assert runtime._handoff_task is second_task
+    assert runtime._handoff_in_flight
+    release_second.set()
+    await asyncio.wait_for(second_task, timeout=0.1)
+    assert runtime._active is third
+    assert runtime._handoff_task is None
+    assert not runtime._handoff_in_flight
+
+
+@pytest.mark.asyncio
+async def test_aclose_retains_second_handoff_ownership(monkeypatch) -> None:
+    runtime = _runtime()
+
+    second_task, release_second, _third = await _start_second_handoff_during_first_drain(
+        runtime, monkeypatch,
+    )
+
+    try:
+        await asyncio.wait_for(runtime.aclose(), timeout=0.1)
+        assert second_task.done()
+        assert runtime._handoff_task is None
+        assert not runtime._handoff_in_flight
+    finally:
+        release_second.set()
+        if not second_task.done():
+            second_task.cancel()
+            await asyncio.gather(second_task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
 async def test_ping_timeout_is_independent_of_next_interval(monkeypatch) -> None:
     import inkbox.tunnels.client._runtime as runtime_module
 
@@ -611,7 +780,61 @@ def test_listener_exposes_thread_safe_local_liveness() -> None:
 
 
 def test_status_callback_uses_runtime_status_type() -> None:
-    assert StatusCallback == Callable[[TunnelRuntimeStatus], None]
+    assert StatusCallback == Callable[[TunnelCallbackStatus], None]
+    assert "idle" not in TunnelCallbackStatus.__args__
+
+
+def test_status_callback_exception_is_isolated_and_state_is_deduplicated(
+    caplog,
+) -> None:
+    callbacks: list[str] = []
+
+    def callback(status: TunnelCallbackStatus) -> None:
+        callbacks.append(status)
+        raise RuntimeError("callback failed")
+
+    runtime = _runtime(on_status=callback)
+    with caplog.at_level(logging.ERROR, logger="inkbox.tunnels"):
+        runtime._notify_status("connecting")
+        runtime._notify_status("connecting")
+        runtime._notify_status("reconnecting")
+        runtime._notify_status("reconnecting")
+
+    assert callbacks == ["connecting", "reconnecting"]
+    assert runtime.status == "reconnecting"
+    assert caplog.text.count("on_status callback raised") == 2
+
+
+@pytest.mark.asyncio
+async def test_failed_attempts_back_off_and_dedupe_reconnecting(monkeypatch) -> None:
+    import inkbox.tunnels.client._runtime as runtime_module
+
+    statuses: list[TunnelCallbackStatus] = []
+    runtime = _runtime(on_status=statuses.append)
+    attempts = 0
+    delays: list[float] = []
+    real_sleep = asyncio.sleep
+
+    async def fail() -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 3:
+            runtime._stop.set()
+        raise RuntimeError("dial failed")
+
+    async def record_sleep(delay: float) -> None:
+        delays.append(delay)
+        await real_sleep(0)
+
+    monkeypatch.setattr(runtime, "_run_once", fail)
+    monkeypatch.setattr(runtime_module.random, "random", lambda: 0.5)
+    monkeypatch.setattr(runtime_module.asyncio, "sleep", record_sleep)
+
+    await runtime.serve_forever()
+
+    assert attempts == 3
+    assert delays == [1.0, 2.0]
+    assert statuses == ["connecting", "reconnecting", "closed"]
 
 
 def test_sync_close_reports_runtime_thread_timeout() -> None:

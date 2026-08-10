@@ -1162,6 +1162,10 @@ remains the bootstrap resource snapshot. `serveForever()` and `wait()` both
 reject on terminal failures, so attach a rejection handler to a fire-and-forget
 `serveForever()` call.
 
+In-process WebSocket handlers receive `WsServerDraining` (`4500`) for planned
+drain and `WsConnectionLost` (`1011`) for cold connection loss. Both extend
+`WsClosed` and advise reconnection.
+
 Reads + edit:
 
 ```typescript

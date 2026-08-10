@@ -66,6 +66,7 @@ export {
   SERVER_DRAINING_WS_CLOSE_CODE,
   WsAcceptDeadlineExceeded,
   WsClosed,
+  WsConnectionLost,
   WsProtocolMismatch,
   WsServerDraining,
 } from "./_ws.js";

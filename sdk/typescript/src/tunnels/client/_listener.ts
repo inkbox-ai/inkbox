@@ -149,6 +149,7 @@ export class TunnelListenerImpl implements TunnelListener {
   async aclose(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    const settledServe = this.servePromise?.catch(() => undefined);
     await this.runtime.aclose();
     if (this.installedSigtermHandler !== null) {
       process.off("SIGTERM", this.installedSigtermHandler);
@@ -158,12 +159,6 @@ export class TunnelListenerImpl implements TunnelListener {
       process.off("SIGINT", this.installedSigintHandler);
       this.installedSigintHandler = null;
     }
-    if (this.servePromise !== null) {
-      try {
-        await this.servePromise;
-      } catch {
-        /* shutdown remains non-throwing after a terminal runtime result */
-      }
-    }
+    await settledServe;
   }
 }
