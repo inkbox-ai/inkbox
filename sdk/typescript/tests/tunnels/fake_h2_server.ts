@@ -37,6 +37,13 @@ interface PendingIntakePost {
   timer: NodeJS.Timeout;
 }
 
+interface DeferredHello {
+  stream: http2.ServerHttp2Stream;
+  status: number;
+  body: Record<string, unknown>;
+  onClose: () => void;
+}
+
 export interface FakeH2ServerOpts {
   /** Override the helloResponse JSON (default: status=200 owner_token=ok). */
   helloBody?: Record<string, unknown>;
@@ -57,6 +64,13 @@ export interface FakeH2Server {
   setHelloResponseFn(
     fn: () => { status: number; body: Record<string, unknown> },
   ): void;
+  /** Leave the next HELLO stream open until releaseDeferredHellos(). */
+  deferNextHello(): void;
+  /** Destroy the next HELLO's session before sending a response. */
+  closeNextHello(): void;
+  /** Defer every HELLO while enabled. */
+  setDeferHellos(enabled: boolean): void;
+  releaseDeferredHellos(): void;
   /**
    * Queue an intake response (one-shot). The next `/_system/intake`
    * POST consumes one queued response. Pass `null` to leave a stream
@@ -76,6 +90,23 @@ export interface FakeH2Server {
   sessionCount(): number;
   /** Total `/_system/hello` POSTs seen since start. */
   helloCount(): number;
+  /** Total HELLO responses completed by the fixture. */
+  helloResponseCount(): number;
+  /** HELLO streams currently deferred without a response. */
+  pendingHelloCount(): number;
+  /** HELLO streams closed before a response completed. */
+  incompleteHelloCloseCount(): number;
+  /** Total accepted client sessions since start. */
+  acceptedSessionCount(): number;
+  /** Total client sessions that have closed since start. */
+  sessionCloseCount(): number;
+  /** Total GOAWAY frames received from clients. */
+  goawayCount(): number;
+  /** Total PING frames received from clients. */
+  pingCount(): number;
+  awaitNextPing(timeoutMs?: number): Promise<void>;
+  /** Destroy all currently live client sessions. */
+  closeActiveSessions(): void;
   injectGoaway(errorCode?: number, opaqueData?: Buffer): void;
   injectRstStream(streamId: number, errorCode: number): void;
   receivedHelloHeaders(): http2.IncomingHttpHeaders | null;
@@ -173,6 +204,21 @@ export async function startFakeH2Server(
   const sessionIndex = new Map<http2.ServerHttp2Session, number>();
   let nextSessionIndex = 0;
   let helloCounter = 0;
+  let helloResponseCounter = 0;
+  let incompleteHelloCloseCounter = 0;
+  let acceptedSessionCounter = 0;
+  let sessionCloseCounter = 0;
+  let goawayCounter = 0;
+  let pingCounter = 0;
+  let claimedPingCounter = 0;
+  let deferHellos = false;
+  const helloActions: Array<"defer" | "close"> = [];
+  const deferredHellos: DeferredHello[] = [];
+  const pingWaiters: Array<{
+    resolve: () => void;
+    reject: (err: Error) => void;
+    timer: NodeJS.Timeout;
+  }> = [];
   // Bridge-stream waiters. The map is keyed by exact path string.
   const bridgeWaiters = new Map<
     string,
@@ -184,12 +230,24 @@ export async function startFakeH2Server(
   >();
 
   server.on("session", (session) => {
+    acceptedSessionCounter += 1;
     sessions.add(session);
     sessionIndex.set(session, nextSessionIndex++);
     session.on("goaway", () => {
+      goawayCounter += 1;
       for (const cb of sessionEventListeners) cb("goaway");
     });
+    session.on("ping", () => {
+      pingCounter += 1;
+      const waiter = pingWaiters.shift();
+      if (waiter !== undefined) {
+        clearTimeout(waiter.timer);
+        claimedPingCounter = pingCounter;
+        waiter.resolve();
+      }
+    });
     session.on("close", () => {
+      sessionCloseCounter += 1;
       for (const cb of sessionEventListeners) cb("close");
       sessions.delete(session);
     });
@@ -208,12 +266,36 @@ export async function startFakeH2Server(
       const computed = helloFn !== null
         ? helloFn()
         : { status: helloStatus, body: helloBody };
+      const action = helloActions.shift();
+      if (action === "defer" || deferHellos) {
+        const pending: DeferredHello = {
+          stream,
+          status: computed.status,
+          body: computed.body,
+          onClose: () => {
+            const idx = deferredHellos.indexOf(pending);
+            if (idx >= 0) {
+              deferredHellos.splice(idx, 1);
+              incompleteHelloCloseCounter += 1;
+            }
+          },
+        };
+        deferredHellos.push(pending);
+        stream.once("close", pending.onClose);
+        return;
+      }
+      if (action === "close") {
+        incompleteHelloCloseCounter += 1;
+        stream.session?.destroy();
+        return;
+      }
       stream.respond({
         ":status": computed.status,
         "content-type": "application/json",
       });
       // Write the body on every status so non-200 responses (e.g. a
       // terminal hello with a reason) carry their JSON payload.
+      helloResponseCounter += 1;
       stream.end(JSON.stringify(computed.body));
       return;
     }
@@ -315,6 +397,30 @@ export async function startFakeH2Server(
     setHelloResponseFn(fn) {
       helloFn = fn;
     },
+    deferNextHello() {
+      helloActions.push("defer");
+    },
+    closeNextHello() {
+      helloActions.push("close");
+    },
+    setDeferHellos(enabled) {
+      deferHellos = enabled;
+    },
+    releaseDeferredHellos() {
+      for (const pending of deferredHellos.splice(0)) {
+        pending.stream.off("close", pending.onClose);
+        try {
+          pending.stream.respond({
+            ":status": pending.status,
+            "content-type": "application/json",
+          });
+          helloResponseCounter += 1;
+          pending.stream.end(JSON.stringify(pending.body));
+        } catch {
+          /* stream may already be closed */
+        }
+      }
+    },
     setIntakeResponse(response) {
       // One-shot: the next intake POST consumes this response. Tests
       // that need "respond the same way to every intake" should call
@@ -341,6 +447,51 @@ export async function startFakeH2Server(
     },
     helloCount() {
       return helloCounter;
+    },
+    helloResponseCount() {
+      return helloResponseCounter;
+    },
+    pendingHelloCount() {
+      return deferredHellos.length;
+    },
+    incompleteHelloCloseCount() {
+      return incompleteHelloCloseCounter;
+    },
+    acceptedSessionCount() {
+      return acceptedSessionCounter;
+    },
+    sessionCloseCount() {
+      return sessionCloseCounter;
+    },
+    goawayCount() {
+      return goawayCounter;
+    },
+    pingCount() {
+      return pingCounter;
+    },
+    awaitNextPing(timeoutMs = 5000) {
+      return new Promise<void>((resolve, reject) => {
+        if (claimedPingCounter < pingCounter) {
+          claimedPingCounter += 1;
+          resolve();
+          return;
+        }
+        const waiter = {
+          resolve,
+          reject,
+          timer: setTimeout(() => {
+            const idx = pingWaiters.indexOf(waiter);
+            if (idx >= 0) pingWaiters.splice(idx, 1);
+            reject(new Error("awaitNextPing timed out"));
+          }, timeoutMs),
+        };
+        pingWaiters.push(waiter);
+      });
+    },
+    closeActiveSessions() {
+      for (const session of sessions) {
+        try { session.destroy(); } catch { /* swallow */ }
+      }
     },
     injectGoaway(
       errorCode = http2.constants.NGHTTP2_NO_ERROR,
@@ -423,6 +574,12 @@ export async function startFakeH2Server(
       });
     },
     async close() {
+      deferHellos = false;
+      fake.releaseDeferredHellos();
+      for (const waiter of pingWaiters.splice(0)) {
+        clearTimeout(waiter.timer);
+        waiter.reject(new Error("fake server closed"));
+      }
       // Destroy (not graceful close) so a session with a parked, never-
       // ending intake stream can't wedge server.close() on teardown.
       for (const session of sessions) {

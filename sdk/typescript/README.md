@@ -1216,6 +1216,37 @@ await inkbox.phoneNumbers.release(num.id);
 
 ---
 
+## Tunnels
+
+The Node-only data-plane runtime is exported separately so the main SDK remains
+browser-safe:
+
+```ts
+import { connect } from "@inkbox/sdk/tunnels/connect";
+
+const listener = await connect(inkbox, {
+  name: "my-app",
+  forwardTo: "http://127.0.0.1:8080",
+});
+
+console.log(listener.publicUrl);
+console.log(listener.status);          // idle, connecting, connected, ...
+console.log(listener.isConnected);     // local runtime liveness
+console.log(listener.lastConnectedAt); // latest successful HELLO, or null
+await listener.wait();
+```
+
+Transient connect, HELLO, transport, and PING failures retry with bounded
+establishment and exponential backoff. `status` is `idle`, `connecting`,
+`connected`, `reconnecting`, `closed`, or `superseded`; the timestamp remains
+available while reconnecting. These values describe the local listener, while
+`listener.tunnel` remains the bootstrap resource snapshot. Authentication,
+takeover, and unexpected fatal failures reject both `serveForever()` and
+`wait()`. Attach a rejection handler when calling `serveForever()` without
+awaiting it.
+
+---
+
 ## Webhooks
 
 Webhook delivery uses a dedicated subscription resource. Each

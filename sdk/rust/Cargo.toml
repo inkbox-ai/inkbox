@@ -8,7 +8,7 @@
 
 [package]
 name = "inkbox"
-version = "0.5.14"
+version = "0.5.15"
 edition = "2021"
 rust-version = "1.74"
 description = "Rust SDK for the Inkbox API"
@@ -32,6 +32,7 @@ default = []
 tunnels-runtime = [
     "dep:tokio", "dep:rustls", "dep:rustls-pemfile", "dep:h2", "dep:http", "dep:bytes",
     "dep:tokio-rustls", "dep:webpki-roots", "dep:p256", "dep:x509-cert", "dep:der", "dep:spki",
+    "dep:log",
     # `sha2/oid` exposes the SHA-256 AssociatedOid impl that x509-cert's ECDSA
     # DynSignatureAlgorithmIdentifier needs to emit `ecdsa-with-SHA256` in CSRs.
     "sha2/oid",
@@ -41,6 +42,7 @@ tunnels-runtime = [
 # Local HTTP mock server for the phone resource tests (query/body/error-shape
 # assertions against the blocking transport).
 httpmock = "0.7"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }
 
 [dependencies]
 # HTTP — blocking client mirrors the synchronous Python SDK surface.
@@ -86,3 +88,4 @@ p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"], optional = true
 x509-cert = { version = "0.2", features = ["pem", "builder"], optional = true }
 der = { version = "0.7", optional = true }
 spki = { version = "0.7", optional = true }
+log = { version = "0.4", optional = true }

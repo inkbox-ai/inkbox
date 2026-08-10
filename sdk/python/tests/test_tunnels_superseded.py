@@ -347,7 +347,7 @@ async def test_make_replacement_reraises_superseded_no_retry(monkeypatch):
         attempts["n"] += 1
         raise _TunnelSupersededError("taken over during handoff")
 
-    async def _close(conn):
+    async def _close(conn, **_kwargs):
         return None
 
     monkeypatch.setattr(runtime, "_open_connection", _open)
@@ -381,7 +381,7 @@ async def test_make_replacement_terminal_on_flag_set_plain_error(monkeypatch):
         runtime._superseded = True  # set by the read loop's GOAWAY handler
         raise RuntimeError("connection reset during hello")  # plain, not typed
 
-    async def _close(conn):
+    async def _close(conn, **_kwargs):
         return None
 
     monkeypatch.setattr(runtime, "_open_connection", _open)

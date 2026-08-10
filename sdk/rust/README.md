@@ -388,9 +388,37 @@ pure Rust.
   for inbound tunnels (pulls in `tokio`, `rustls` (ring), `h2`). Bring a tunnel
   online with `inkbox.tunnels().connect(name, forward_to)`, or
   `connect_with_status(name, forward_to, on_status)` to observe `"connecting"` /
-  `"connected"` / `"reconnecting"` / `"closed"`. The control-plane tunnels surface
+  `"connected"` / `"reconnecting"` / `"closed"` / `"superseded"`. The control-plane tunnels surface
   (`inkbox.tunnels()`: list / get / update / sign_csr) is always available
   without this feature.
+
+The connect methods remain blocking. Run them on a caller-owned thread and use
+`TunnelStatusHandle` to sample local liveness elsewhere:
+
+```rust
+use inkbox::tunnels::client::TunnelStatusHandle;
+
+let status = TunnelStatusHandle::new();
+let runtime_status = status.clone();
+let client = inkbox.clone();
+std::thread::spawn(move || {
+    client.tunnels().connect_with_status(
+        "my-app",
+        "http://127.0.0.1:8080",
+        runtime_status.callback(),
+    )
+});
+
+let snapshot = status.snapshot();
+println!("{:?} {:?}", snapshot.status, snapshot.last_connected_at);
+```
+
+The handle records `Idle`, `Connecting`, `Connected`, `Reconnecting`, `Closed`,
+or `Superseded` and retains the latest successful connection time while
+reconnecting. It is local runtime state, distinct from fields returned by
+`inkbox.tunnels().get(...)`. Establishment is bounded and transient failures use
+cold reconnect with exponential backoff; Rust does not use make-before-break
+handoff. The SDK does not create an OS thread or take ownership of joining it.
 
 ## Status
 

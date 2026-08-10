@@ -46,7 +46,7 @@ directly in argv.
 
 - `inkbox-tunnels`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-tunnels/SKILL.md
-  Tunnels reference for both SDKs — bring a local server online behind a public Inkbox URL via `inkbox.tunnels.connect(...)`. Tunnels are an identity property (provisioned atomically by `createIdentity`); covers edge vs passthrough TLS, the same-API-key data-plane auth, URL forwarding, and in-process Fetch/ASGI/WebSocket handlers.
+  Tunnels reference for Python, TypeScript, and Rust — bring a local process online behind a public Inkbox URL, observe local runtime liveness, and recover from transient failures. Tunnels are an identity property (provisioned atomically by identity creation); Python and TypeScript also cover in-process HTTP/WebSocket handlers and make-before-break drain.
 
 ## Example Skills
 

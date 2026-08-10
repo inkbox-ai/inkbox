@@ -13,6 +13,8 @@ import {
 import {
   TunnelAuthError,
   TunnelRuntime,
+  TunnelSupersededError,
+  type TunnelRuntimeStatus,
 } from "../../src/tunnels/client/_runtime.js";
 import type { Tunnel } from "../../src/tunnels/types.js";
 import { TLSMode, TunnelStatus } from "../../src/tunnels/types.js";
@@ -44,6 +46,9 @@ class FakeRuntime {
   private rejectServe: ((err: unknown) => void) | null = null;
   private servePromise: Promise<void>;
   closed = false;
+  status: TunnelRuntimeStatus = "idle";
+  isConnected = false;
+  private connectedAt: Date | null = null;
 
   constructor() {
     this.servePromise = new Promise<void>((resolve, reject) => {
@@ -58,7 +63,19 @@ class FakeRuntime {
 
   async aclose(): Promise<void> {
     this.closed = true;
+    this.status = "closed";
+    this.isConnected = false;
     this.resolveServe?.();
+  }
+
+  get lastConnectedAt(): Date | null {
+    return this.connectedAt === null ? null : new Date(this.connectedAt);
+  }
+
+  setConnected(at: Date): void {
+    this.status = "connected";
+    this.isConnected = true;
+    this.connectedAt = new Date(at);
   }
 
   failWith(err: unknown): void {
@@ -99,23 +116,63 @@ afterEach(() => {
   for (const l of preTestSigint) process.on("SIGINT", l);
 });
 
-describe("TunnelListener — wait() captures and re-raises runtime errors", () => {
-  it("re-raises captured runtime errors on wait()", async () => {
+describe("TunnelListener — terminal runtime results", () => {
+  it("rejects serveForever() and every wait() with the same runtime error", async () => {
     const runtime = new FakeRuntime();
     const { listener } = makeListener({
       installSignalHandlers: false,
       fakeRuntime: runtime,
     });
-    runtime.failWith(new TunnelAuthError("invalid secret"));
-    await expect(listener.wait()).rejects.toBeInstanceOf(TunnelAuthError);
-    // Subsequent wait() returns clean (the error is consumed once).
-    await listener.wait();
+    const error = new TunnelAuthError("invalid key");
+    const servePromise = listener.serveForever();
+    runtime.failWith(error);
+    await expect(servePromise).rejects.toBe(error);
+    await expect(listener.wait()).rejects.toBe(error);
+    await expect(listener.wait()).rejects.toBe(error);
+  });
+
+  it("preserves a takeover error across serveForever() and wait()", async () => {
+    const runtime = new FakeRuntime();
+    const { listener } = makeListener({
+      installSignalHandlers: false,
+      fakeRuntime: runtime,
+    });
+    const error = new TunnelSupersededError("taken over");
+    const servePromise = listener.serveForever();
+    runtime.failWith(error);
+    await expect(servePromise).rejects.toBe(error);
+    await expect(listener.wait()).rejects.toBe(error);
   });
 
   it("clean shutdown returns without error", async () => {
     const { listener } = makeListener({ installSignalHandlers: false });
     setTimeout(() => listener.aclose(), 10);
     await listener.wait();
+  });
+});
+
+describe("TunnelListener — local liveness", () => {
+  it("samples status and returns defensive Date values", async () => {
+    const runtime = new FakeRuntime();
+    const { listener } = makeListener({
+      installSignalHandlers: false,
+      fakeRuntime: runtime,
+    });
+    expect(listener.status).toBe("idle");
+    expect(listener.isConnected).toBe(false);
+    expect(listener.lastConnectedAt).toBeNull();
+
+    const connectedAt = new Date("2026-08-10T12:00:00.000Z");
+    runtime.setConnected(connectedAt);
+    const sampled = listener.lastConnectedAt!;
+    sampled.setTime(0);
+    expect(listener.status).toBe("connected");
+    expect(listener.isConnected).toBe(true);
+    expect(listener.lastConnectedAt?.getTime()).toBe(connectedAt.getTime());
+
+    await listener.aclose();
+    expect(listener.status).toBe("closed");
+    expect(listener.isConnected).toBe(false);
   });
 });
 

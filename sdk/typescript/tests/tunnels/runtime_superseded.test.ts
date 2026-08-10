@@ -15,6 +15,9 @@ import {
   TunnelRuntime,
   TunnelSupersededError,
 } from "../../src/tunnels/client/_runtime.js";
+import { TunnelListenerImpl } from "../../src/tunnels/client/_listener.js";
+import type { Tunnel } from "../../src/tunnels/types.js";
+import { TLSMode, TunnelStatus } from "../../src/tunnels/types.js";
 import { startFakeH2Server, type FakeH2Server } from "./fake_h2_server.js";
 
 let fakeServer: FakeH2Server;
@@ -56,6 +59,28 @@ function helloOk(): void {
 
 const SUPERSEDED_DEBUG = Buffer.from('{"reason":"superseded"}');
 
+function tunnelResource(): Tunnel {
+  return {
+    id: "11111111-1111-1111-1111-111111111111",
+    organizationId: "org_test",
+    tunnelName: "my-agent",
+    tlsMode: TLSMode.EDGE,
+    certPem: null,
+    certFingerprintSha256: null,
+    certExpiresAt: null,
+    status: TunnelStatus.ACTIVE,
+    lastConnectedAt: null,
+    lastConnectedIpAddr: null,
+    lastDisconnectedAt: null,
+    currentlyConnected: false,
+    publicHost: "my-agent.example.com",
+    zone: fakeServer.authority,
+    metadata: {},
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
 describe("TunnelRuntime — superseded (takeover) is terminal", () => {
   it("stops and does not reconnect on a superseded GOAWAY (code + reason)", async () => {
     helloOk();
@@ -72,6 +97,27 @@ describe("TunnelRuntime — superseded (takeover) is terminal", () => {
     expect(statuses).toContain("superseded");
     // No cold redial after a takeover.
     expect(fakeServer.helloCount()).toBe(1);
+  }, 15_000);
+
+  it("listener close preserves superseded after a real takeover", async () => {
+    helloOk();
+    const runtime = makeRuntime();
+    const listener = new TunnelListenerImpl({
+      publicHost: "my-agent.example.com",
+      tunnel: tunnelResource(),
+      runtime,
+      listenerOpts: { installSignalHandlers: false },
+    });
+    const servePromise = listener.serveForever();
+    await fakeServer.awaitNextIntakePost(3_000);
+    fakeServer.injectGoaway(SUPERSEDED_GOAWAY_ERROR_CODE, SUPERSEDED_DEBUG);
+
+    await expect(servePromise).rejects.toBeInstanceOf(TunnelSupersededError);
+    expect(listener.status).toBe("superseded");
+    expect(listener.isConnected).toBe(false);
+    await listener.aclose();
+    expect(listener.status).toBe("superseded");
+    expect(listener.isConnected).toBe(false);
   }, 15_000);
 
   it("is terminal on the dedicated code alone (debug blob lost)", async () => {

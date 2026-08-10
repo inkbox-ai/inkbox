@@ -1116,6 +1116,7 @@ listener = inkbox.tunnels.connect(
     forward_to="http://127.0.0.1:8080",
 )
 print(listener.public_url)        # https://my-app.inkboxwire.com
+print(listener.status, listener.is_connected, listener.last_connected_at)
 listener.wait()                   # blocks until close()/Ctrl-C
 
 # Forward to an in-process ASGI app (FastAPI / Starlette / your own)
@@ -1141,6 +1142,11 @@ async with ...:
 ```
 
 `wait()`/`close()` and `serve_forever()`/`aclose()` are mutually exclusive — pick one pair.
+
+`listener.status` is `idle`, `connecting`, `connected`, `reconnecting`,
+`closed`, or `superseded`. `listener.is_connected` is local runtime liveness;
+`listener.last_connected_at` is an aware UTC timestamp retained while
+reconnecting. `listener.tunnel` remains the bootstrap resource snapshot.
 
 Tunnels are provisioned atomically by `inkbox.create_identity(...)`; there is no standalone `create` / `delete` / `restore` / `rotate_secret` surface. For passthrough, opt in at create time: `inkbox.create_identity("my-app", tunnel={"tls_mode": "passthrough"})` — `tls_mode` is fixed at create.
 

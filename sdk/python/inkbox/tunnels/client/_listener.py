@@ -17,6 +17,7 @@ import logging
 import signal
 import sys
 import threading
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -30,6 +31,7 @@ from inkbox.tunnels.client._runtime import (
     DEFAULT_OUTBOUND_BODY_BYTES,
     StatusCallback,
     TunnelRuntime,
+    TunnelRuntimeStatus,
 )
 from inkbox.tunnels.client._url_forward import validate_forward_target
 from inkbox.tunnels.types import Tunnel
@@ -62,6 +64,9 @@ class TunnelListener:
         tunnel: A snapshot of the :class:`Tunnel` resource record taken
             at bootstrap. Not refreshed; call ``inkbox.tunnels.get(id)``
             for live state.
+        status: Current local runtime state.
+        is_connected: Whether the local runtime is currently connected.
+        last_connected_at: UTC time of the latest successful connection.
     """
 
     def __init__(
@@ -91,6 +96,18 @@ class TunnelListener:
     def tunnel(self) -> Tunnel:
         return self._bundle.tunnel
 
+    @property
+    def status(self) -> TunnelRuntimeStatus:
+        return self._runtime.status
+
+    @property
+    def is_connected(self) -> bool:
+        return self._runtime.is_connected
+
+    @property
+    def last_connected_at(self) -> datetime | None:
+        return self._runtime.last_connected_at
+
     # --- sync API -----------------------------------------------------------
 
     def wait(self) -> None:
@@ -115,7 +132,7 @@ class TunnelListener:
                 while not self._stopped.wait(timeout=1.0):
                     pass
             except KeyboardInterrupt:
-                self.close()
+                self._close(raise_on_timeout=False)
                 raise
         finally:
             if sigterm_handler_installed:
@@ -134,11 +151,22 @@ class TunnelListener:
 
     def close(self) -> None:
         """Sync graceful shutdown."""
+        self._close(raise_on_timeout=True)
+
+    def _close(self, *, raise_on_timeout: bool) -> None:
         loop = self._loop
         if loop is not None and not loop.is_closed():
             loop.call_soon_threadsafe(self._schedule_async_close)
         if self._thread is not None:
             self._thread.join(timeout=30.0)
+            if self._thread.is_alive():
+                message = "tunnel runtime thread did not stop within 30 seconds"
+                if raise_on_timeout:
+                    raise TimeoutError(message)
+                logger.error(message)
+        elif self._runtime.status != "closed":
+            self._runtime._stop.set()
+            self._runtime._notify_status("closed")
 
     # --- async API ----------------------------------------------------------
 
@@ -173,7 +201,7 @@ class TunnelListener:
 
     def _signal_handler(self, signum: int, frame: object) -> None:
         logger.info("received signal %s; shutting down listener", signum)
-        self.close()
+        self._close(raise_on_timeout=False)
 
     def _start_thread_if_needed(self) -> None:
         if self._thread is not None:
@@ -256,7 +284,7 @@ def connect(
             (1-32). Omit to let the server decide.
         on_status: Callback invoked with status strings
             (``"connecting"``, ``"connected"``, ``"reconnecting"``,
-            ``"closed"``).
+            ``"closed"``, ``"superseded"``).
         max_inbound_body_bytes: Cap on materialized inbound bodies;
             oversize requests get a 413 to the third party.
         max_outbound_body_bytes: Cap on materialized outbound bodies;

@@ -59,7 +59,7 @@ Once the skills are installed, your coding agent will automatically know how to 
 | **inkbox-cli** | TypeScript / Node ≥ 22 | CLI reference for `inkbox` / `@inkbox/cli` commands covering signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, mailboxes, numbers, webhooks, and signing keys |
 | **inkbox-all** | Language-agnostic | Index of all Inkbox skills in this repository, including example skills and links for choosing the right one |
 | **inkbox-agent-self-signup** | Language-agnostic | Shared reference for the agent self-signup flow — SDK examples (Python & TS) and direct API (curl) |
-| **inkbox-tunnels** | Python and TypeScript | Connect local HTTP and WebSocket handlers to an identity's public tunnel |
+| **inkbox-tunnels** | Python, TypeScript, and Rust | Connect a local process to an identity's public tunnel and observe runtime liveness |
 
 ## Documentation
 

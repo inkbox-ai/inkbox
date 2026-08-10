@@ -217,6 +217,7 @@ Task detail includes current state and message history.
 # Outbound HTTP/2 only — no inbound port to open. POSIX only.
 listener = inkbox.tunnels.connect(name="my-app", forward_to="http://127.0.0.1:8080")
 print(listener.public_url)
+print(listener.status, listener.is_connected, listener.last_connected_at)
 listener.wait()
 ```
 
@@ -256,10 +257,35 @@ const listener = await connect(inkbox, {
   forwardTo: "http://127.0.0.1:8080",
 });
 console.log(listener.publicUrl);
+console.log(listener.status, listener.isConnected, listener.lastConnectedAt);
 await listener.wait();
 ```
 
-Both SDKs also accept an in-process callable (Fetch handler in TS, ASGI app in Python) instead of a `forward_to` URL, and a `tls_mode: "passthrough"` option for end-to-end TLS termination in your process. See [`skills/inkbox-tunnels/`](./skills/inkbox-tunnels/) for the full reference.
+### Tunnels (Rust)
+
+The blocking Rust runtime is behind the `tunnels-runtime` feature. Run it on a
+caller-owned thread and retain a cloneable local status handle:
+
+```rust
+use inkbox::tunnels::client::TunnelStatusHandle;
+
+let status = TunnelStatusHandle::new();
+let runtime_status = status.clone();
+let client = inkbox.clone();
+std::thread::spawn(move || {
+    client.tunnels().connect_with_status(
+        "my-app",
+        "http://127.0.0.1:8080",
+        runtime_status.callback(),
+    )
+});
+println!("{:?} {}", status.status(), status.is_connected());
+```
+
+Python and TypeScript also accept an in-process callable (Fetch handler in TS,
+ASGI app in Python) instead of a `forward_to` URL. All three runtimes reconnect
+after transient connection failures. See [`skills/inkbox-tunnels/`](./skills/inkbox-tunnels/)
+for the full reference.
 
 **Redeploys are graceful.** When the tunnel service redeploys, a long-running listener reconnects make-before-break: it stands up a fresh connection before closing the draining one, so short HTTP requests see no gap. In-progress WebSocket and passthrough-TCP sessions cannot migrate across a redeploy — they end with a typed `server_draining` close and the third-party peer reconnects onto the new task. Write handlers to reconnect idempotently.
 
