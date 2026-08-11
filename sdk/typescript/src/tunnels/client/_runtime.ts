@@ -19,6 +19,7 @@
 
 import * as http2 from "node:http2";
 import * as net from "node:net";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { setTimeout as setTimeoutPromise } from "node:timers/promises";
 import type { ClientHttp2Session, ClientHttp2Stream } from "node:http2";
 
@@ -72,6 +73,7 @@ import {
 } from "./_wsframe.js";
 import {
   dispatchWsUpgradeInProcess,
+  WsConnectionLost,
   WsServerDraining,
   type InkboxWsHandler,
   type WsBridgeIO,
@@ -90,6 +92,9 @@ export const PING_INTERVAL_MS = 20_000;
  * a dead TCP doesn't strand the runtime past the next intake.
  */
 export const PING_ACK_TIMEOUT_MS = 10_000;
+export const CONNECT_TIMEOUT_MS = 10_000;
+export const HELLO_TIMEOUT_MS = 15_000;
+export const INITIAL_BACKOFF_MS = 1_000;
 export const BACKOFF_CAP_SEC = 30.0;
 export const BACKOFF_JITTER = 0.25;
 // On drain, keep a post-GOAWAY connection alive for its in-flight bridges
@@ -131,6 +136,13 @@ export class TunnelSupersededError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "TunnelSupersededError";
+  }
+}
+
+class TunnelPhaseTimeoutError extends Error {
+  constructor(readonly phase: "connect" | "hello", timeoutMs: number) {
+    super(`tunnel ${phase} timed out after ${timeoutMs}ms`);
+    this.name = "TunnelPhaseTimeoutError";
   }
 }
 
@@ -183,8 +195,16 @@ function parseReasonJson(buf: Buffer | undefined | null): string | null {
   return null;
 }
 
+export type TunnelRuntimeStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "closed"
+  | "superseded";
+
 export type StatusCallback = (
-  status: "connecting" | "connected" | "reconnecting" | "closed" | "superseded",
+  status: Exclude<TunnelRuntimeStatus, "idle">,
 ) => void;
 
 /**
@@ -229,6 +249,13 @@ export interface TunnelRuntimeOpts {
     authority: string,
     options: http2.ClientSessionOptions | http2.SecureClientSessionOptions,
   ) => ClientHttp2Session;
+  /** Internal timeout and scheduler injection points for tests. */
+  connectTimeoutMs?: number;
+  helloTimeoutMs?: number;
+  pingIntervalMs?: number;
+  pingAckTimeoutMs?: number;
+  handoffRedialBudgetMs?: number;
+  sleep?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
 }
 
 interface StreamBus {
@@ -262,9 +289,18 @@ class Connection {
   readonly streams = new Map<number, StreamBus>();
   readonly bridgeStreamIds = new Set<number>();
   pingHandle: NodeJS.Timeout | null = null;
-  pingAbort: AbortController | null = null;
+  readonly pingAckHandles = new Set<NodeJS.Timeout>();
+  readonly closed: Promise<void>;
+  resolveClosed!: () => void;
+  closePublished = false;
+  detachTransportListeners: (() => void) | null = null;
+  cancelConnectWait: (() => void) | null = null;
 
-  constructor(readonly id: number) {}
+  constructor(readonly id: number) {
+    this.closed = new Promise<void>((resolve) => {
+      this.resolveClosed = resolve;
+    });
+  }
 
   /** Live WS/TCP bridge count — drives the drain-quiescent check. */
   get liveBridges(): number {
@@ -292,6 +328,12 @@ export class TunnelRuntime {
   private readonly onStatus?: StatusCallback;
   private readonly rng: () => number;
   private readonly http2Connect: NonNullable<TunnelRuntimeOpts["http2Connect"]>;
+  private readonly connectTimeoutMs: number;
+  private readonly helloTimeoutMs: number;
+  private readonly pingIntervalMs: number;
+  private readonly pingAckTimeoutMs: number;
+  private readonly handoffRedialBudgetMs: number;
+  private readonly sleep: NonNullable<TunnelRuntimeOpts["sleep"]>;
 
   // The pool that parks new intakes. Swapped atomically on handoff.
   private active: Connection | null = null;
@@ -323,6 +365,14 @@ export class TunnelRuntime {
   // in aclose().
   private readonly undiciAgentCache: UndiciAgentCache = createUndiciAgentCache();
   private shutdownAbort: AbortController = new AbortController();
+  private runtimeStatus: TunnelRuntimeStatus = "idle";
+  private lastConnectedAtMs: number | null = null;
+  private hasConnected = false;
+  private coldAttempt = 0;
+  private terminalError: TunnelAuthError | null = null;
+  private pendingConnection: Connection | null = null;
+  private coldGeneration = 0;
+  private readonly dispatchGeneration = new AsyncLocalStorage<number>();
 
   constructor(opts: TunnelRuntimeOpts) {
     this.tunnelId = opts.tunnelId;
@@ -339,9 +389,31 @@ export class TunnelRuntime {
     this.onStatus = opts.onStatus;
     this.rng = opts.rng ?? Math.random;
     this.http2Connect = opts.http2Connect ?? http2.connect.bind(http2);
+    this.connectTimeoutMs = opts.connectTimeoutMs ?? CONNECT_TIMEOUT_MS;
+    this.helloTimeoutMs = opts.helloTimeoutMs ?? HELLO_TIMEOUT_MS;
+    this.pingIntervalMs = opts.pingIntervalMs ?? PING_INTERVAL_MS;
+    this.pingAckTimeoutMs = opts.pingAckTimeoutMs ?? PING_ACK_TIMEOUT_MS;
+    this.handoffRedialBudgetMs =
+      opts.handoffRedialBudgetMs ?? HANDOFF_REDIAL_BUDGET_MS;
+    this.sleep = opts.sleep ?? ((delayMs, signal) =>
+      setTimeoutPromise(delayMs, undefined, { signal }));
   }
 
   // --- public lifecycle ---------------------------------------------------
+
+  get status(): TunnelRuntimeStatus {
+    return this.runtimeStatus;
+  }
+
+  get isConnected(): boolean {
+    return this.runtimeStatus === "connected";
+  }
+
+  get lastConnectedAt(): Date | null {
+    return this.lastConnectedAtMs === null
+      ? null
+      : new Date(this.lastConnectedAtMs);
+  }
 
   /**
    * Drive the runtime forever. Reconnects with jittered exponential
@@ -349,13 +421,17 @@ export class TunnelRuntime {
    * secret) or after `aclose()`.
    */
   async serveForever(): Promise<void> {
-    let backoff = 1.0;
+    let backoff = INITIAL_BACKOFF_MS / 1000;
     let consecutiveFailures = 0;
-    this.notifyStatus("connecting");
     while (!this.stop) {
+      this.coldAttempt += 1;
+      const attempt = this.coldAttempt;
+      if (attempt === 1) this.notifyStatus("connecting");
+      // eslint-disable-next-line no-console
+      console.info(`tunnel runtime: connection attempt #${attempt}`);
       try {
         await this.runOnce();
-        backoff = 1.0;
+        backoff = INITIAL_BACKOFF_MS / 1000;
         consecutiveFailures = 0;
       } catch (err) {
         if (err instanceof TunnelAuthError) {
@@ -371,12 +447,24 @@ export class TunnelRuntime {
         if (this.superseded) {
           this.stopSuperseded();
         }
+        if (this.stop) {
+          if (this.runtimeStatus !== "superseded") this.notifyStatus("closed");
+          return;
+        }
         consecutiveFailures += 1;
-        // eslint-disable-next-line no-console
-        console.warn(
-          `tunnel runtime: connection error (#${consecutiveFailures}); reconnecting`,
-          err,
-        );
+        if (err instanceof TunnelPhaseTimeoutError) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `tunnel runtime: ${err.phase} timeout on attempt #${attempt}; reconnecting`,
+          );
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(
+            `tunnel runtime: connection error on attempt #${attempt} ` +
+              `(consecutive failure #${consecutiveFailures}); reconnecting`,
+            err,
+          );
+        }
         this.notifyStatus("reconnecting");
       }
       if (this.stop) {
@@ -389,10 +477,13 @@ export class TunnelRuntime {
       //   backoff = min(backoff * 2, 30.0)
       const jitter = backoff * BACKOFF_JITTER * (2 * this.rng() - 1);
       const sleepFor = Math.max(0.1, backoff + jitter);
+      const delayMs = sleepFor * 1000;
+      // eslint-disable-next-line no-console
+      console.info(
+        `tunnel runtime: retrying with attempt #${attempt + 1} in ${delayMs}ms`,
+      );
       try {
-        await setTimeoutPromise(sleepFor * 1000, undefined, {
-          signal: this.shutdownAbort.signal,
-        });
+        await this.sleep(delayMs, this.shutdownAbort.signal);
       } catch {
         // aborted by aclose()
         this.notifyStatus("closed");
@@ -406,6 +497,8 @@ export class TunnelRuntime {
   /** Graceful shutdown. Signals all loops to exit; closes every conn. */
   async aclose(): Promise<void> {
     this.stop = true;
+    this.coldGeneration += 1;
+    if (this.runtimeStatus !== "superseded") this.notifyStatus("closed");
     this.shutdownAbort.abort();
     if (this.passthroughDispatch !== null) {
       try {
@@ -422,12 +515,14 @@ export class TunnelRuntime {
     }
     // Close active + every draining conn; stop each one's ping loop so no
     // ping loop leaks across the handoff set.
-    const conns = [this.active, ...this.draining].filter(
+    const conns = [this.active, this.pendingConnection, ...this.draining].filter(
       (c): c is Connection => c !== null,
     );
-    for (const conn of conns) {
+    for (const conn of new Set(conns)) {
       this.stopPingLoop(conn);
       await this.closeConnection(conn);
+      this.publishConnectionClosed(conn);
+      conn.session = null;
     }
   }
 
@@ -436,52 +531,132 @@ export class TunnelRuntime {
    * short grace. The intake pool parks streams indefinitely, so a plain
    * `close()` would never resolve; we GOAWAY then destroy after 250ms.
    */
-  private async closeConnection(conn: Connection): Promise<void> {
+  private async closeConnection(conn: Connection, graceMs = 250): Promise<void> {
     const session = conn.session;
-    conn.session = null;
-    if (session === null || session.closed) return;
+    if (session === null || session.closed || session.destroyed) {
+      this.publishConnectionClosed(conn);
+      return;
+    }
     try {
       session.goaway();
     } catch {
       /* swallow */
     }
+    if (graceMs <= 0) {
+      this.destroyConnection(conn);
+      return;
+    }
     await new Promise<void>((resolve) => {
       const t = setTimeout(() => {
-        try {
-          session.destroy();
-        } catch {
-          /* swallow */
-        }
-        resolve();
-      }, 250);
-      session.once("close", () => {
+        try { session.destroy(); } catch { /* swallow */ }
+        setImmediate(() => {
+          this.publishConnectionClosed(conn);
+        });
+      }, graceMs);
+      void conn.closed.then(() => {
         clearTimeout(t);
-        resolve();
+        setTimeout(resolve, 10);
       });
       try {
         session.close();
       } catch {
         clearTimeout(t);
-        try {
-          session.destroy();
-        } catch {
-          /* swallow */
-        }
-        resolve();
+        this.destroyConnection(conn);
       }
     });
   }
 
+  private publishConnectionClosed(conn: Connection): void {
+    if (!conn.closePublished) {
+      conn.closePublished = true;
+      for (const [, bus] of conn.streams) {
+        if (!bus.ended) {
+          bus.events.push({ kind: "reset", code: 0 });
+          bus.ended = true;
+          this.wake(bus);
+        }
+      }
+      conn.resolveClosed();
+    }
+    conn.detachTransportListeners?.();
+    conn.detachTransportListeners = null;
+    conn.cancelConnectWait?.();
+    conn.cancelConnectWait = null;
+  }
+
+  private destroyConnection(conn: Connection): void {
+    const session = conn.session;
+    this.publishConnectionClosed(conn);
+    try { session?.destroy(); } catch { /* swallow */ }
+  }
+
   // --- per-connection lifecycle -----------------------------------------
+
+  private async withPhaseTimeout<T>(
+    conn: Connection,
+    phase: "connect" | "hello",
+    timeoutMs: number,
+    operation: Promise<T>,
+  ): Promise<T> {
+    let timer: NodeJS.Timeout | null = null;
+    let timeoutError: TunnelPhaseTimeoutError | null = null;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        timeoutError = new TunnelPhaseTimeoutError(phase, timeoutMs);
+        this.destroyConnection(conn);
+        reject(timeoutError);
+      }, Math.max(1, timeoutMs));
+    });
+    void operation.catch(() => undefined);
+    try {
+      return await Promise.race([operation, timeout]);
+    } catch (err) {
+      if (
+        timeoutError !== null &&
+        !(err instanceof TunnelAuthError) &&
+        !(err instanceof TunnelSupersededError)
+      ) {
+        throw timeoutError;
+      }
+      throw err;
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
+  }
+
+  private markConnected(emitStatus: boolean): void {
+    const recovered = this.hasConnected;
+    this.hasConnected = true;
+    this.lastConnectedAtMs = Date.now();
+    if (emitStatus) {
+      this.notifyStatus("connected");
+      // eslint-disable-next-line no-console
+      console.info(
+        recovered
+          ? "tunnel runtime: connection recovered"
+          : "tunnel runtime: initial connection established",
+      );
+    }
+  }
 
   private async runOnce(): Promise<void> {
     const first = new Connection(this.nextConnId++);
     let conn = first;
     this.active = first;
     try {
-      await this.openConnection(first);
-      await this.sendHello(first);
-      this.notifyStatus("connected");
+      await this.withPhaseTimeout(
+        first,
+        "connect",
+        this.connectTimeoutMs,
+        this.openConnection(first),
+      );
+      await this.withPhaseTimeout(
+        first,
+        "hello",
+        this.helloTimeoutMs,
+        this.sendHello(first),
+      );
+      this.markConnected(true);
       this.startServing(first);
       // Supervise the active connection. A GOAWAY handoff swaps in a new
       // active conn out-of-band; follow it without going through the
@@ -496,6 +671,7 @@ export class TunnelRuntime {
         if (this.handoffInFlight && this.handoffPromise !== null) {
           await this.handoffPromise;
         }
+        if (this.terminalError !== null) throw this.terminalError;
         const next = this.active;
         if (next !== null && next !== conn && !next.draining) {
           conn = next;
@@ -510,10 +686,18 @@ export class TunnelRuntime {
           "another client connected to this tunnel; not reconnecting",
         );
       }
+      if (!this.stop) {
+        // eslint-disable-next-line no-console
+        console.warn("tunnel runtime: connected session lost; reconnecting");
+        this.notifyStatus("reconnecting");
+      }
     } finally {
+      if (!this.stop) this.coldGeneration += 1;
       this.stopPingLoop(conn);
       conn.streams.clear();
       conn.bridgeStreamIds.clear();
+      await this.closeConnection(conn);
+      this.publishConnectionClosed(conn);
       conn.session = null;
       if (this.active === conn) this.active = null;
     }
@@ -532,18 +716,10 @@ export class TunnelRuntime {
 
   /** Resolve once the supervised conn closes OR a handoff swaps active. */
   private waitCloseOrHandoff(conn: Connection): Promise<void> {
-    const closed = new Promise<void>((resolve) => {
-      const session = conn.session;
-      if (session === null || session.closed) {
-        resolve();
-        return;
-      }
-      session.once("close", () => resolve());
-    });
     const woken = new Promise<void>((resolve) => {
       this.wakeSupervisor = resolve;
     });
-    return Promise.race([closed, woken]).finally(() => {
+    return Promise.race([conn.closed, woken]).finally(() => {
       this.wakeSupervisor = null;
     });
   }
@@ -651,6 +827,7 @@ export class TunnelRuntime {
     try {
       const newConn = await this.makeReplacementConnection();
       this.active = newConn;
+      this.markConnected(false);
       // Supervisor was watching oldConn; wake it to follow newConn.
       this.signalSupervisor();
     } catch (err) {
@@ -658,7 +835,11 @@ export class TunnelRuntime {
         // External takeover during the handoff hello: `superseded` is set, so
         // end the old conn and wake the supervisor to stop terminally (no cold
         // redial, which would boot the client that replaced us).
-        try { oldConn.session?.destroy(); } catch { /* swallow */ }
+        this.destroyConnection(oldConn);
+        this.signalSupervisor();
+      } else if (err instanceof TunnelAuthError) {
+        this.terminalError = err;
+        this.destroyConnection(oldConn);
         this.signalSupervisor();
       } else {
         // Redial budget exhausted (or auth failure): give up on
@@ -666,7 +847,7 @@ export class TunnelRuntime {
         // the old session closed so the supervisor returns.
         // eslint-disable-next-line no-console
         console.warn("tunnel runtime: handoff failed; reconnecting cold", err);
-        try { oldConn.session?.destroy(); } catch { /* swallow */ }
+        this.destroyConnection(oldConn);
         this.signalSupervisor();
       }
     } finally {
@@ -680,16 +861,38 @@ export class TunnelRuntime {
   /** Dial + hello + park a replacement, retrying transient hello failures. */
   private async makeReplacementConnection(): Promise<Connection> {
     let backoff = 0.1;
-    const start = Date.now();
+    const deadline = performance.now() + this.handoffRedialBudgetMs;
     while (!this.stop) {
+      let remaining = deadline - performance.now();
+      if (remaining <= 0) throw new Error("handoff redial budget exhausted");
       const conn = new Connection(this.nextConnId++);
+      this.pendingConnection = conn;
       try {
-        await this.openConnection(conn);
-        await this.sendHello(conn);
+        await this.withPhaseTimeout(
+          conn,
+          "connect",
+          Math.min(this.connectTimeoutMs, remaining),
+          this.openConnection(conn),
+        );
+        remaining = deadline - performance.now();
+        if (remaining <= 0) throw new Error("handoff redial budget exhausted");
+        await this.withPhaseTimeout(
+          conn,
+          "hello",
+          Math.min(this.helloTimeoutMs, remaining),
+          this.sendHello(conn),
+        );
         this.startServing(conn);
+        this.pendingConnection = null;
         return conn;
       } catch (err) {
-        try { await this.closeConnection(conn); } catch { /* swallow */ }
+        remaining = deadline - performance.now();
+        try {
+          await this.closeConnection(conn, Math.min(250, Math.max(0, remaining)));
+        } catch { /* swallow */ }
+        this.publishConnectionClosed(conn);
+        conn.session = null;
+        if (this.pendingConnection === conn) this.pendingConnection = null;
         // A rejected key or a takeover is terminal; never retry either
         // (retrying a takeover would boot the client that replaced us).
         if (err instanceof TunnelAuthError || err instanceof TunnelSupersededError) {
@@ -703,15 +906,18 @@ export class TunnelRuntime {
             "another client connected to this tunnel during handoff",
           );
         }
-        if (Date.now() - start > HANDOFF_REDIAL_BUDGET_MS) {
+        remaining = deadline - performance.now();
+        if (remaining <= 0) {
           throw new Error("handoff redial budget exhausted");
         }
         // A drain 503 on the new hello means the NLB landed us back on the
         // draining task; back off (jittered) so it re-routes us elsewhere.
         const jitter = backoff * BACKOFF_JITTER * (2 * this.rng() - 1);
-        await setTimeoutPromise(Math.max(50, (backoff + jitter) * 1000), undefined, {
-          signal: this.shutdownAbort.signal,
-        }).catch(() => undefined);
+        const delayMs = Math.min(
+          Math.max(50, (backoff + jitter) * 1000),
+          remaining,
+        );
+        await this.sleep(delayMs, this.shutdownAbort.signal).catch(() => undefined);
         backoff = Math.min(backoff * 2, 5.0);
       }
     }
@@ -727,6 +933,8 @@ export class TunnelRuntime {
       await setTimeoutPromise(250).catch(() => undefined);
     }
     await this.closeConnection(oldConn);
+    this.publishConnectionClosed(oldConn);
+    oldConn.session = null;
     oldConn.streams.clear();
     oldConn.bridgeStreamIds.clear();
     this.draining.delete(oldConn);
@@ -743,89 +951,111 @@ export class TunnelRuntime {
       // (Spike 1) — the setting line doesn't translate.
     });
     conn.session = session;
-    session.on("close", () => {
+    const socket = (() => {
+      try {
+        return (session as unknown as {
+          socket?: import("node:net").Socket;
+        }).socket ?? null;
+      } catch {
+        return null;
+      }
+    })();
+    const onSessionClose = (): void => {
       // eslint-disable-next-line no-console
       console.info("tunnel runtime: h2 session closed");
-      // Drain all open streams with a synthetic reset event so any
-      // awaiters wake up.
-      for (const [, bus] of conn.streams) {
-        if (!bus.ended) {
-          bus.events.push({ kind: "reset", code: 0 });
-          bus.ended = true;
-          this.wake(bus);
-        }
-      }
-    });
-    session.on("error", (err: Error) => {
+      this.publishConnectionClosed(conn);
+    };
+    const onSessionError = (err: Error): void => {
       // Visibility into session-fatal errors. Stream-level errors
       // surface separately via stream events; this is genuinely
       // session-terminal.
       // eslint-disable-next-line no-console
       console.warn("tunnel runtime: h2 session error", err);
-    });
-    session.on(
-      "goaway",
-      (errorCode: number, lastStreamId: number, opaqueData?: Buffer) => {
+    };
+    const onGoaway = (
+      errorCode: number,
+      lastStreamId: number,
+      opaqueData?: Buffer,
+    ): void => {
+      // eslint-disable-next-line no-console
+      console.info(
+        `tunnel runtime: GOAWAY received error_code=${errorCode} last_stream_id=${lastStreamId}`,
+      );
+      // NO_ERROR GOAWAY = drain (make-before-break handoff). A non-zero code
+      // is a takeover (stop) or a real fault (reconnect cold), classified
+      // below; setting the takeover flag here wins over the 'error'/'close'
+      // reconnect path that the same GOAWAY also drives.
+      if (errorCode === 0) {
+        this.beginHandoff(conn);
+      } else {
+        this.maybeMarkSupersededGoaway(conn, errorCode, opaqueData);
+      }
+    };
+    const onSocketClose = (hadError: boolean): void => {
+      onSocketDeath(`closed hadError=${hadError}`);
+    };
+    const onSocketError = (err: Error): void => {
+      onSocketDeath("error", err);
+    };
+    const onSocketDeath = (label: string, err?: Error): void => {
+      // eslint-disable-next-line no-console
+      console.info(
+        `tunnel runtime: underlying socket ${label}` +
+          (err !== undefined ? ` err=${err.message}` : ""),
+      );
+      if (!session.closed && !session.destroyed) {
         // eslint-disable-next-line no-console
-        console.info(
-          `tunnel runtime: GOAWAY received error_code=${errorCode} last_stream_id=${lastStreamId}`,
-        );
-        // NO_ERROR GOAWAY = drain (make-before-break handoff). A non-zero code
-        // is a takeover (stop) or a real fault (reconnect cold), classified
-        // below; setting the takeover flag here wins over the 'error'/'close'
-        // reconnect path that the same GOAWAY also drives.
-        if (errorCode === 0) {
-          this.beginHandoff(conn);
-        } else {
-          this.maybeMarkSupersededGoaway(conn, errorCode, opaqueData);
-        }
-      },
-    );
-    // Watch the underlying TCP/TLS socket directly. Node's h2 client
-    // sometimes loses the connection without emitting ``error`` or
-    // ``close`` on the session itself — the underlying socket reliably
-    // emits them. Force-destroy the session on either so
-    // ``waitForSessionClose`` resolves promptly and ``serveForever``
-    // reconnects without waiting for the ``PING_ACK_TIMEOUT_MS`` window.
-    try {
-      const sock = (session as unknown as { socket?: import("node:net").Socket }).socket;
-      const onSocketDeath = (label: string, err?: Error): void => {
-        // eslint-disable-next-line no-console
-        console.info(
-          `tunnel runtime: underlying socket ${label}` +
-            (err !== undefined ? ` err=${err.message}` : ""),
-        );
-        if (!session.closed && !session.destroyed) {
-          // Forensic — log the stack so we can see which path
-          // triggered this destroy in production.
-          // eslint-disable-next-line no-console
-          console.warn(
-            "tunnel runtime: forcing session.destroy() from socket-death",
-            new Error("trace").stack,
-          );
-          try { session.destroy(); } catch { /* swallow */ }
-        }
-      };
-      sock?.once?.("close", (hadError: boolean) => {
-        onSocketDeath(`closed hadError=${hadError}`);
-      });
-      sock?.once?.("error", (err: Error) => {
-        onSocketDeath("error", err);
-      });
-    } catch {
-      /* swallow */
-    }
+        console.warn("tunnel runtime: forcing session.destroy() from socket-death");
+        this.destroyConnection(conn);
+      }
+    };
+    session.on("close", onSessionClose);
+    session.on("error", onSessionError);
+    session.on("goaway", onGoaway);
+    socket?.once("close", onSocketClose);
+    socket?.once("error", onSocketError);
+    conn.detachTransportListeners = () => {
+      session.off("close", onSessionClose);
+      session.off("error", onSessionError);
+      session.off("goaway", onGoaway);
+      try {
+        socket?.off("close", onSocketClose);
+        socket?.off("error", onSocketError);
+      } catch {
+        /* the HTTP/2 socket proxy becomes inaccessible after disconnect */
+      }
+    };
     await new Promise<void>((resolve, reject) => {
-      const onConnect = () => {
+      let settled = false;
+      const cleanup = () => {
+        session.off("connect", onConnect);
         session.off("error", onError);
+        session.off("close", onClose);
+        conn.cancelConnectWait = null;
+      };
+      const succeed = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
         resolve();
       };
-      const onError = (err: Error) => {
-        session.off("connect", onConnect);
+      const fail = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
         reject(err);
       };
+      const onConnect = () => succeed();
+      const onError = (err: Error) => fail(err);
+      const onClose = () => fail(
+        new Error("h2 session closed before connect completed"),
+      );
+      conn.cancelConnectWait = () => fail(
+        new Error("h2 session closed before connect completed"),
+      );
       session.once("connect", onConnect);
       session.once("error", onError);
+      session.once("close", onClose);
     });
     // OS-level keepalive on the underlying TCP socket so a silently-
     // dropped connection (NAT timeout, NLB idle eviction, peer power-
@@ -834,23 +1064,10 @@ export class TunnelRuntime {
     // tracking (see startPingLoop) is the load-bearing detector;
     // this is defense-in-depth.
     try {
-      const sock = (session as unknown as { socket?: import("node:net").Socket }).socket;
-      sock?.setKeepAlive?.(true, 30_000);
+      socket?.setKeepAlive?.(true, 30_000);
     } catch {
       /* swallow */
     }
-  }
-
-  private waitForSessionClose(conn: Connection): Promise<void> {
-    const session = conn.session;
-    if (session === null) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      if (session.closed) {
-        resolve();
-        return;
-      }
-      session.once("close", () => resolve());
-    });
   }
 
   // --- handshake ---------------------------------------------------------
@@ -874,7 +1091,13 @@ export class TunnelRuntime {
       helloHeaders[ControlHeaders.POOL_SIZE] = String(this.poolSize);
     }
     const stream = this.openStream(conn, helloHeaders, { endStream: true });
-    const { status, body } = await this.awaitResponse(conn, stream.streamId);
+    let status: number;
+    let body: Buffer;
+    try {
+      ({ status, body } = await this.awaitResponse(conn, stream.streamId));
+    } finally {
+      conn.streams.delete(stream.streamId);
+    }
     if (status === 401 || status === 403) {
       throw new TunnelAuthError(
         `${ControlPaths.HELLO} returned ${status}; the API key was rejected (check the key matches the tunnel's identity scope, or use an admin-scoped key in the tunnel's org)`,
@@ -1047,7 +1270,8 @@ export class TunnelRuntime {
       !this.stop &&
       !conn.draining &&
       conn.session !== null &&
-      !conn.session.closed
+      !conn.session.closed &&
+      !conn.session.destroyed
     ) {
       let envelope: Envelope | null;
       try {
@@ -1057,7 +1281,7 @@ export class TunnelRuntime {
           // Another client took over: force this conn down so the supervisor
           // observes the terminal flag and stops (no reconnect).
           this.markSuperseded();
-          try { conn.session?.destroy(); } catch { /* swallow */ }
+          this.destroyConnection(conn);
           return;
         }
         if (err instanceof OwnerTokenInvalidError) {
@@ -1066,7 +1290,7 @@ export class TunnelRuntime {
             `intake slot ${slot}: owner_token rejected; ` +
               `forcing session.destroy() and reconnecting`,
           );
-          conn.session?.destroy();
+          this.destroyConnection(conn);
           return;
         }
         if (isSessionTerminalError(err) || conn.session?.destroyed) {
@@ -1084,7 +1308,7 @@ export class TunnelRuntime {
               `exiting slot`,
             err,
           );
-          try { conn.session?.destroy(); } catch { /* swallow */ }
+          this.destroyConnection(conn);
           return;
         }
         // eslint-disable-next-line no-console
@@ -1096,10 +1320,13 @@ export class TunnelRuntime {
       // Fire-and-forget dispatch; tracked on the runtime (not the conn) so
       // an in-flight handler survives this conn draining and can post its
       // reply on the new active conn during a handoff.
-      const task = this.dispatchEnvelope(conn, envelope).catch((err) => {
-        // eslint-disable-next-line no-console
-        console.warn(`dispatch failed request_id=${envelope!.requestId}`, err);
-      });
+      const generation = this.coldGeneration;
+      const task = this.dispatchGeneration
+        .run(generation, () => this.dispatchEnvelope(conn, envelope))
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.warn(`dispatch failed request_id=${envelope!.requestId}`, err);
+        });
       this.tasks.add(task);
       task.finally(() => this.tasks.delete(task));
     }
@@ -1179,10 +1406,9 @@ export class TunnelRuntime {
   // --- ping loop ---------------------------------------------------------
 
   private startPingLoop(conn: Connection): void {
-    conn.pingAbort = new AbortController();
     conn.pingHandle = setInterval(() => {
       const session = conn.session;
-      if (session === null || session.closed) return;
+      if (session === null || session.closed || session.destroyed) return;
       let ackTimer: NodeJS.Timeout | null = null;
       let acked = false;
       try {
@@ -1190,6 +1416,7 @@ export class TunnelRuntime {
           acked = true;
           if (ackTimer !== null) {
             clearTimeout(ackTimer);
+            conn.pingAckHandles.delete(ackTimer);
             ackTimer = null;
           }
           if (err !== null && err !== undefined) {
@@ -1198,7 +1425,7 @@ export class TunnelRuntime {
               "tunnel runtime: PING errored; forcing session.destroy()",
               err,
             );
-            try { session.destroy(); } catch { /* swallow */ }
+            this.destroyConnection(conn);
           }
         });
       } catch (err) {
@@ -1207,9 +1434,10 @@ export class TunnelRuntime {
           "tunnel runtime: session.ping() threw synchronously; forcing destroy",
           err,
         );
-        try { session.destroy(); } catch { /* swallow */ }
+        this.destroyConnection(conn);
         return;
       }
+      if (acked) return;
       // Application-level liveness check: if the ack doesn't come
       // back within PING_ACK_TIMEOUT_MS, the underlying TCP is gone
       // (kernel send buffer absorbing writes silently is the typical
@@ -1217,16 +1445,18 @@ export class TunnelRuntime {
       // without our help). Force-destroy the session; serveForever
       // observes the close and reconnects.
       ackTimer = setTimeout(() => {
+        if (ackTimer !== null) conn.pingAckHandles.delete(ackTimer);
         if (acked) return;
         // eslint-disable-next-line no-console
         console.warn(
           `tunnel runtime: PING ack not received within ` +
-            `${PING_ACK_TIMEOUT_MS}ms; assuming dead connection, ` +
+            `${this.pingAckTimeoutMs}ms; assuming dead connection, ` +
             `forcing reconnect`,
         );
-        try { session.destroy(); } catch { /* swallow */ }
-      }, PING_ACK_TIMEOUT_MS);
-    }, PING_INTERVAL_MS);
+        this.destroyConnection(conn);
+      }, this.pingAckTimeoutMs);
+      conn.pingAckHandles.add(ackTimer);
+    }, this.pingIntervalMs);
     // Do NOT unref(): explicit cancellation in stopPingLoop().
   }
 
@@ -1235,8 +1465,8 @@ export class TunnelRuntime {
       clearInterval(conn.pingHandle);
       conn.pingHandle = null;
     }
-    conn.pingAbort?.abort();
-    conn.pingAbort = null;
+    for (const handle of conn.pingAckHandles) clearTimeout(handle);
+    conn.pingAckHandles.clear();
   }
 
   // --- envelope dispatch -------------------------------------------------
@@ -1735,23 +1965,23 @@ export class TunnelRuntime {
           const id = sid();
           if (id === null) {
             if (conn.draining) throw new WsServerDraining();
-            return;
+            throw new WsConnectionLost();
           }
           const ev = await self.nextEvent(conn, id);
           if (ev === null) {
             if (conn.draining) throw new WsServerDraining();
-            return;
+            throw new WsConnectionLost();
           }
           if (ev.kind === "data") {
             yield ev.data;
           } else if (ev.kind === "end") {
             if (conn.draining) throw new WsServerDraining();
-            return;
+            throw new WsConnectionLost();
           } else if (ev.kind === "reset") {
             // A reset while the conn is draining is the redeploy drain, not
             // a peer error — surface it typed so the handler can reconnect.
             if (conn.draining) throw new WsServerDraining();
-            throw new Error(`bridge stream reset code=${ev.code}`);
+            throw new WsConnectionLost(`bridge stream reset code=${ev.code}`);
           }
         }
       })();
@@ -2207,6 +2437,7 @@ export class TunnelRuntime {
         setTimeoutPromise(POST_ACTIVE_WAIT_MS),
       ]);
     }
+    if (!this.dispatchIsCurrent()) return;
     const target = this.pickReplyConnection(origin);
     if (target === null) {
       // eslint-disable-next-line no-console
@@ -2221,7 +2452,11 @@ export class TunnelRuntime {
   /** The active conn if it can take new streams, else the origin if it can. */
   private pickReplyConnection(origin: Connection): Connection | null {
     const usable = (c: Connection | null): c is Connection =>
-      c !== null && !c.draining && c.session !== null && !c.session.closed;
+      c !== null &&
+      !c.draining &&
+      c.session !== null &&
+      !c.session.closed &&
+      !c.session.destroyed;
     if (usable(this.active)) return this.active;
     if (usable(origin)) return origin;
     return null;
@@ -2234,6 +2469,7 @@ export class TunnelRuntime {
     userHeaders: Array<[string, string]>,
     body: Buffer,
   ): Promise<void> {
+    if (!this.dispatchIsCurrent()) return;
     const reqHeaders: http2.OutgoingHttpHeaders = {
       [HTTP2_HEADER_METHOD]: "POST",
       [HTTP2_HEADER_SCHEME]: "https",
@@ -2295,12 +2531,14 @@ export class TunnelRuntime {
 
   // --- utilities ---------------------------------------------------------
 
-  private notifyStatus(status:
-    | "connecting"
-    | "connected"
-    | "reconnecting"
-    | "closed"
-    | "superseded"): void {
+  private dispatchIsCurrent(): boolean {
+    const generation = this.dispatchGeneration.getStore();
+    return generation === undefined || generation === this.coldGeneration;
+  }
+
+  private notifyStatus(status: Exclude<TunnelRuntimeStatus, "idle">): void {
+    if (this.runtimeStatus === status) return;
+    this.runtimeStatus = status;
     if (this.onStatus !== undefined) {
       try {
         this.onStatus(status);

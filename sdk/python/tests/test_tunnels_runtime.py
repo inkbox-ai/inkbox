@@ -1515,6 +1515,8 @@ async def test_aclose_cancels_ping_loops_on_every_conn():
     draining_ping = asyncio.create_task(_idle())
     active.ping_task = active_ping
     draining.ping_task = draining_ping
+    active_writer = active.writer
+    draining_writer = draining.writer
 
     await runtime.aclose()
 
@@ -1527,8 +1529,8 @@ async def test_aclose_cancels_ping_loops_on_every_conn():
             await t
         assert t.cancelled() or t.done()
     # Both writers were closed.
-    active.writer.close.assert_called()
-    draining.writer.close.assert_called()
+    active_writer.close.assert_called()
+    draining_writer.close.assert_called()
 
 
 @pytest.mark.asyncio

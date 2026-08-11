@@ -52,6 +52,16 @@ export class WsClosed extends Error {
   }
 }
 
+/** Abnormal close surfaced when the tunnel connection is lost. */
+export class WsConnectionLost extends WsClosed {
+  readonly code = 1011;
+  readonly reconnectAdvised = true;
+  constructor(message = "tunnel connection lost; reconnect advised") {
+    super(message);
+    this.name = "WsConnectionLost";
+  }
+}
+
 /** Application close code surfaced when the server is draining for a redeploy. */
 export const SERVER_DRAINING_WS_CLOSE_CODE = 4500;
 

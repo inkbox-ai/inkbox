@@ -178,8 +178,15 @@ impl TunnelsResource {
     }
 
     /// Like [`connect`](Self::connect), but reports data-plane state changes to
-    /// `on_status` — invoked with `"connecting"`, `"connected"`,
-    /// `"reconnecting"`, and `"closed"`. Mirrors the Python `on_status` kwarg.
+    /// `on_status`: `"connecting"`, `"connected"`, `"reconnecting"`,
+    /// `"closed"`, or `"superseded"`.
+    ///
+    /// The call remains blocking. To sample liveness elsewhere, create a
+    /// [`TunnelStatusHandle`](crate::tunnels::client::TunnelStatusHandle), pass
+    /// `handle.callback()` here on a caller-owned thread, and retain a clone.
+    /// Compose that callback with any additional monitoring in your closure.
+    /// Callbacks run inline on the runtime and must return promptly; move
+    /// blocking monitoring work onto a caller-owned thread or queue.
     #[cfg(feature = "tunnels-runtime")]
     pub fn connect_with_status(
         &self,

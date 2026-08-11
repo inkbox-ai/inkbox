@@ -4,6 +4,47 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.5.15 — Resilient tunnel runtimes
+
+### Added
+
+- Python and TypeScript tunnel listeners expose sampleable local `status`,
+  connection state, and latest successful connection time. Rust adds a
+  cloneable, thread-safe `TunnelStatusHandle` behind `tunnels-runtime`.
+
+### Changed
+
+- Python, TypeScript, and Rust bound tunnel connection establishment and HELLO,
+  clean partial connections and owned runtime tasks, and report cold reconnect
+  attempts and recovery. Missed PING acknowledgements force recovery at their
+  acknowledgement deadline.
+- Tunnel status callbacks are edge-triggered in all three SDKs: repeated failed
+  attempts within one outage retain `reconnecting` without emitting duplicate
+  callbacks. Attempt-level detail remains available in lifecycle logs.
+- Python and TypeScript preserve make-before-break planned handoff and typed
+  bridge drain while making cold connection loss release blocked work promptly.
+  Rust retains its blocking, caller-owned thread model and cold reconnect path.
+- TypeScript in-process WebSocket handlers now receive typed
+  `WsConnectionLost` (`1011`) on cold tunnel loss; URL-forwarded WebSockets send
+  the same CLOSE code to their local upstream. Planned drain remains
+  `WsServerDraining` (`4500`).
+- TypeScript `serveForever()` now rejects on terminal runtime failures, matching
+  `wait()`. Fire-and-forget callers must attach a rejection handler.
+- Python `close()` raises `TimeoutError` rather than reporting success if its
+  runtime thread cannot stop within the shutdown bound. Signal and
+  `KeyboardInterrupt` cleanup remain non-raising.
+- Package and plugin versions moved in lockstep to 0.5.15; the CLI now depends
+  on `@inkbox/sdk` `^0.5.15`.
+
+### Compatibility
+
+- **Behavior change:** TypeScript callers that start `serveForever()` without
+  awaiting it must attach a rejection handler. Terminal failures no longer wait
+  for a later `wait()` call to surface.
+- **Behavior change:** Python `close()` can raise `TimeoutError` after 30 seconds.
+  A `finally` block should preserve any earlier exception if shutdown also times
+  out. Signal and `KeyboardInterrupt` cleanup remain non-raising.
+
 ## 0.5.14 — A2A invitations
 
 - A2A invitation creates now preserve the server's optional share URL. Python

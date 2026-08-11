@@ -1122,6 +1122,7 @@ const listener = await connect(inkbox, {
   forwardTo: "http://127.0.0.1:8080",
 });
 console.log(listener.publicUrl);    // https://my-app.inkboxwire.com
+console.log(listener.status, listener.isConnected, listener.lastConnectedAt);
 await listener.wait();              // until SIGINT/SIGTERM
 
 // In-process Fetch-API HTTP handler
@@ -1153,6 +1154,17 @@ await connect(inkbox, {
 ```
 
 Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `rotateSecret` surface.
+
+`listener.status` is `idle`, `connecting`, `connected`, `reconnecting`,
+`closed`, or `superseded`. `listener.isConnected` is local runtime liveness;
+`listener.lastConnectedAt` remains set while reconnecting. `listener.tunnel`
+remains the bootstrap resource snapshot. `serveForever()` and `wait()` both
+reject on terminal failures, so attach a rejection handler to a fire-and-forget
+`serveForever()` call.
+
+In-process WebSocket handlers receive `WsServerDraining` (`4500`) for planned
+drain and `WsConnectionLost` (`1011`) for cold connection loss. Both extend
+`WsClosed` and advise reconnection.
 
 Reads + edit:
 

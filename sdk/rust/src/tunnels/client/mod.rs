@@ -27,6 +27,7 @@ pub mod envelope;
 pub mod protocol;
 pub mod runtime;
 pub mod state;
+pub mod status;
 pub mod url_forward;
 pub mod wsframe;
 
@@ -35,6 +36,7 @@ pub use bootstrap::{resolve_zone_and_host, validate_pool_size, TunnelBundle};
 pub use envelope::{filter_response_headers, parse_envelope, Envelope};
 pub use runtime::{ForwardTo, StatusCallback, TunnelRuntime, TunnelRuntimeConfig};
 pub use state::{load_state, save_state, StateEntry};
+pub use status::{LocalTunnelStatus, TunnelStatusHandle, TunnelStatusSnapshot};
 pub use url_forward::{
     build_forward_headers, forward_envelope_to_url, join_forward_path, validate_envelope_path,
     validate_forward_target, ForwardResult,

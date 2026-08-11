@@ -93,6 +93,8 @@ describe("TunnelRuntime — make-before-break on NO_ERROR GOAWAY", () => {
     const first = await fakeServer.awaitNextIntakePost(3000);
     expect(first.ownerToken).toBe("tok-1");
     expect(fakeServer.helloCount()).toBe(1);
+    const firstConnectedAt = runtime.lastConnectedAt!;
+    await new Promise((resolve) => setTimeout(resolve, 5));
 
     // Drain signal: NO_ERROR GOAWAY on the live session.
     fakeServer.injectGoaway(http2.constants.NGHTTP2_NO_ERROR);
@@ -111,6 +113,11 @@ describe("TunnelRuntime — make-before-break on NO_ERROR GOAWAY", () => {
     // Make-before-break is NOT a reconnect: the status never regressed to
     // "reconnecting" across the handoff.
     expect(statuses).not.toContain("reconnecting");
+    expect(runtime.status).toBe("connected");
+    expect(runtime.isConnected).toBe(true);
+    expect(runtime.lastConnectedAt!.getTime()).toBeGreaterThan(
+      firstConnectedAt.getTime(),
+    );
 
     await runtime.aclose();
     await servePromise;

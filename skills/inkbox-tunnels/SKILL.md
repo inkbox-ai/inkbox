@@ -1,6 +1,6 @@
 ---
 name: inkbox-tunnels
-description: Use when bringing a local server online behind a public Inkbox URL via `inkbox.tunnels.connect(...)` — covers edge vs passthrough TLS, URL forwarding, and in-process Fetch/ASGI/WebSocket handlers in both Python and TypeScript SDKs.
+description: Use when bringing a local server online behind a public Inkbox URL — covers Python, TypeScript, and Rust tunnel runtimes, edge vs passthrough TLS, forwarding, handlers, and local liveness.
 user-invocable: false
 ---
 
@@ -67,7 +67,7 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
     listener = inkbox.tunnels.connect(
         name="my-app",
         forward_to="http://127.0.0.1:8080",
-        # on_status fires "connecting" -> "connected" -> "reconnecting" -> "closed"
+        # on_status may also report "superseded" after a newer client takes over.
         on_status=lambda s: print("tunnel:", s),
     )
     print(listener.public_url)   # https://my-app.inkboxwire.com
@@ -130,6 +130,14 @@ asyncio.run(main())
 
 `wait()`/`close()` and `serve_forever()`/`aclose()` are mutually exclusive — pick one pair.
 
+Sample local liveness at any time with `listener.status`,
+`listener.is_connected`, and `listener.last_connected_at`. Status is `idle`,
+`connecting`, `connected`, `reconnecting`, `closed`, or `superseded`. The
+timestamp is an aware UTC `datetime` and remains available while reconnecting.
+These are local observations; `listener.tunnel` is the bootstrap resource
+snapshot. Status callbacks are edge-triggered and do not repeat
+`reconnecting` for each failed attempt in the same outage.
+
 ### Control-plane reads + edit
 
 ```python
@@ -151,7 +159,7 @@ There is no `create`, `delete`, `restore`, `force_delete`, or `rotate_secret` he
 |---|---|---|
 | `pool_size` | server-decided | parked-intake pool, 1–32 |
 | `state_dir` | `~/.inkbox/tunnels/{name}` | where state + passthrough cert live |
-| `on_status` | `None` | callback for `"connecting"` / `"connected"` / `"reconnecting"` / `"closed"` |
+| `on_status` | `None` | callback for `"connecting"` / `"connected"` / `"reconnecting"` / `"closed"` / `"superseded"` |
 | `allow_remote_forwarding` | `False` | bypass loopback-only allowlist for `forward_to` (review SSRF first) |
 | `forward_to_verify_tls` | `True` | for `https://` upstream forwards |
 
@@ -183,6 +191,13 @@ const listener = await connect(inkbox, {
 console.log(listener.publicUrl);   // https://my-app.inkboxwire.com
 await listener.wait();              // until Ctrl-C / SIGTERM
 ```
+
+Sample local liveness with `listener.status`, `listener.isConnected`, and
+`listener.lastConnectedAt`. The same six states as Python are exposed. The
+timestamp remains set while reconnecting, and `listener.tunnel` remains the
+bootstrap resource snapshot. `serveForever()` and `wait()` both reject on
+terminal authentication, takeover, or unexpected fatal errors. Status callbacks
+are edge-triggered and do not repeat a state until it changes.
 
 ### In-process Fetch-API handler
 
@@ -256,17 +271,59 @@ await inkbox.tunnels.signCsr("tunnel-uuid", { csrPem });
 
 Tunnels are provisioned atomically by `inkbox.createIdentity(...)`; there is no standalone `create` / `delete` / `restore` / `forceDelete` / `rotateSecret` surface.
 
+For in-process WebSockets, catch `WsServerDraining` (`4500`) for planned handoff
+and `WsConnectionLost` (`1011`) for cold connection loss. Both extend
+`WsClosed` and set `reconnectAdvised = true`. URL-forwarded WebSockets receive
+the same close codes on the local upstream leg.
+
 ### Common `connect()` options
 
 | option | default | notes |
 |---|---|---|
 | `poolSize` | server-decided | 1–32 |
 | `stateDir` | `~/.inkbox/tunnels/{name}` | state.json + passthrough cert |
-| `onStatus` | — | `"connecting"` / `"connected"` / `"reconnecting"` / `"closed"` |
+| `onStatus` | — | `"connecting"` / `"connected"` / `"reconnecting"` / `"closed"` / `"superseded"` |
 | `allowRemoteForwarding` | `false` | bypass loopback-only allowlist |
 | `forwardToVerifyTls` | `true` | for `https://` upstream forwards |
 | `forwardToCaBundle` | — | extra CA(s) for upstream TLS verification |
 | `installSignalHandlers` | `true` on main | clean shutdown on SIGINT/SIGTERM |
+
+---
+
+## Rust
+
+Enable the `tunnels-runtime` feature. Rust keeps a blocking connect API and does
+not create an OS thread; run it on a caller-owned thread. A cloneable
+`TunnelStatusHandle` provides the same local states:
+
+```rust
+use inkbox::tunnels::client::TunnelStatusHandle;
+
+let status = TunnelStatusHandle::new();
+let runtime_status = status.clone();
+let client = inkbox.clone();
+let tunnel_thread = std::thread::spawn(move || {
+    client.tunnels().connect_with_status(
+        "my-app",
+        "http://127.0.0.1:8080",
+        runtime_status.callback(),
+    )
+});
+
+let snapshot = status.snapshot();
+println!("{:?} {:?}", snapshot.status, snapshot.last_connected_at);
+
+// Join when shutdown is expected so bootstrap/runtime errors are surfaced.
+if let Err(error) = tunnel_thread.join().expect("tunnel thread panicked") {
+    eprintln!("tunnel stopped: {error}");
+}
+```
+
+Rust bounds establishment and retries transient failures with cold reconnect.
+It does not implement the make-before-break drain behavior described below for
+Python and TypeScript. Its status callback is edge-triggered like the other SDKs
+and must return promptly. The handle remains `Idle` if bootstrap fails before
+the runtime starts, so retain and inspect the thread result.
 
 ---
 

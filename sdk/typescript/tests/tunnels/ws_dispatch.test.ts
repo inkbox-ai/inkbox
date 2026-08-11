@@ -9,6 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as http2 from "node:http2";
 import { TunnelRuntime } from "../../src/tunnels/client/_runtime.js";
+import { WsConnectionLost } from "../../src/tunnels/client/_ws.js";
 import {
   WS_OPCODE_BINARY,
   WS_OPCODE_CLOSE,
@@ -199,6 +200,66 @@ describe("WS dispatch — peer-initiated CLOSE", () => {
       await new Promise((r) => setTimeout(r, 25));
     }
     expect(iteratorDone).toBe(true);
+
+    await runtime.aclose();
+    await servePromise;
+  }, 10_000);
+});
+
+describe("WS dispatch — cold connection loss", () => {
+  it("surfaces a typed 1011 outcome to a callable handler", async () => {
+    let resolveObserved: (err: unknown) => void = () => undefined;
+    let resolveAccepted: () => void = () => undefined;
+    const observed = new Promise<unknown>((resolve) => {
+      resolveObserved = resolve;
+    });
+    const accepted = new Promise<void>((resolve) => {
+      resolveAccepted = resolve;
+    });
+    const wsHandler = async (
+      ws: import("../../src/tunnels/client/_ws.js").InkboxWebSocket,
+    ): Promise<void> => {
+      await ws.accept();
+      resolveAccepted();
+      try {
+        await ws[Symbol.asyncIterator]().next();
+      } catch (err) {
+        resolveObserved(err);
+      }
+    };
+    fakeServer.setIntakeResponse({
+      status: 200,
+      headers: [
+        ["inkbox-request-id", "req-ws-cold"],
+        ["inkbox-method", "GET"],
+        ["inkbox-path", "/ws"],
+        ["inkbox-route-kind", "ws-upgrade"],
+        ["inkbox-ws-id", "ws-cold"],
+      ],
+      body: Buffer.alloc(0),
+    });
+    const runtime = makeRuntime({ wsHandler });
+    const servePromise = runtime.serveForever();
+    await fakeServer.awaitResponsePost("req-ws-cold", 5_000);
+    const bridgeStream = await fakeServer.awaitNextBridgeStream(
+      "/_system/ws/ws-cold",
+      5_000,
+    );
+    bridgeStream.respond({ ":status": 200 });
+    await accepted;
+    const active = (runtime as unknown as {
+      active: { session: http2.ClientHttp2Session | null } | null;
+    }).active;
+    active?.session?.destroy();
+
+    const err = await Promise.race([
+      observed,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("cold WS close timed out")), 2_000),
+      ),
+    ]);
+    expect(err).toBeInstanceOf(WsConnectionLost);
+    expect((err as WsConnectionLost).code).toBe(1011);
 
     await runtime.aclose();
     await servePromise;

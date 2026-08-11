@@ -1150,6 +1150,9 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
         forward_to="http://127.0.0.1:8080",
     )
     print(listener.public_url)        # https://my-app.inkboxwire.com
+    print(listener.status)            # idle, connecting, connected, ...
+    print(listener.is_connected)      # local runtime liveness
+    print(listener.last_connected_at) # aware UTC datetime, or None
     listener.wait()                   # blocks until close()/Ctrl-C
 
     # Or forward to an in-process ASGI app (FastAPI / Starlette / yours)
@@ -1164,6 +1167,18 @@ with Inkbox(api_key="ApiKey_...") as inkbox:
 ```
 
 Async variant (`serve_forever()` / `aclose()`) is available for callers already inside an event loop. Pick one pair; don't mix `wait`/`close` with the async APIs.
+
+The listener retries transient connect, HELLO, transport, and PING failures with
+bounded establishment and exponential backoff. `status` is one of `idle`,
+`connecting`, `connected`, `reconnecting`, `closed`, or `superseded`;
+`last_connected_at` retains the latest successful connection time while the
+runtime reconnects. These properties describe this local listener. The
+`listener.tunnel` object is the bootstrap resource snapshot; fetch the tunnel
+again when you need current control-plane fields. Authentication rejection and
+takeover remain terminal and surface from `wait()` / `serve_forever()`.
+Synchronous `close()` raises `TimeoutError` if the runtime thread does not stop
+within 30 seconds; avoid calling it from a `finally` block if that exception
+would mask another error.
 
 Tunnels are provisioned atomically by `inkbox.create_identity(...)`;
 there is no standalone `create` / `delete` / `restore` /

@@ -7,11 +7,13 @@
  */
 
 import type { Tunnel } from "../types.js";
-import type { TunnelRuntime } from "./_runtime.js";
+import type { TunnelRuntime, TunnelRuntimeStatus } from "./_runtime.js";
 
 export type TunnelStatusCallback = (
-  status: "connecting" | "connected" | "reconnecting" | "closed" | "superseded",
+  status: Exclude<TunnelRuntimeStatus, "idle">,
 ) => void;
+
+export type { TunnelRuntimeStatus } from "./_runtime.js";
 
 /**
  * Options that affect how the listener behaves around process signals.
@@ -37,6 +39,12 @@ export interface TunnelListener {
   readonly publicUrl: string;
   /** Snapshot of the resource record taken at bootstrap. Not refreshed. */
   readonly tunnel: Tunnel;
+  /** Current local runtime lifecycle state. */
+  readonly status: TunnelRuntimeStatus;
+  /** Whether the local runtime currently has an active connection. */
+  readonly isConnected: boolean;
+  /** Time of the latest successful hello, retained while reconnecting. */
+  readonly lastConnectedAt: Date | null;
   /** Block until shutdown. Resolves on clean close; throws on fatal. */
   wait(): Promise<void>;
   /** Drive a graceful shutdown. Idempotent. */
@@ -53,7 +61,6 @@ export class TunnelListenerImpl implements TunnelListener {
   private readonly runtime: TunnelRuntime;
   private servePromise: Promise<void> | null = null;
   private closed = false;
-  private capturedError: unknown = null;
   private installedSigintHandler: (() => void) | null = null;
   private installedSigtermHandler: (() => void) | null = null;
   private willExitOnSignal = false;
@@ -113,25 +120,26 @@ export class TunnelListenerImpl implements TunnelListener {
     }
   }
 
-  async serveForever(): Promise<void> {
+  get status(): TunnelRuntimeStatus {
+    return this.runtime.status;
+  }
+
+  get isConnected(): boolean {
+    return this.runtime.isConnected;
+  }
+
+  get lastConnectedAt(): Date | null {
+    return this.runtime.lastConnectedAt;
+  }
+
+  serveForever(): Promise<void> {
     if (this.servePromise !== null) return this.servePromise;
-    this.servePromise = (async () => {
-      try {
-        await this.runtime.serveForever();
-      } catch (err) {
-        this.capturedError = err;
-      }
-    })();
+    this.servePromise = this.runtime.serveForever();
     return this.servePromise;
   }
 
   async wait(): Promise<void> {
     await this.serveForever();
-    if (this.capturedError !== null) {
-      const err = this.capturedError;
-      this.capturedError = null;
-      throw err;
-    }
   }
 
   async close(): Promise<void> {
@@ -141,6 +149,7 @@ export class TunnelListenerImpl implements TunnelListener {
   async aclose(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    const settledServe = this.servePromise?.catch(() => undefined);
     await this.runtime.aclose();
     if (this.installedSigtermHandler !== null) {
       process.off("SIGTERM", this.installedSigtermHandler);
@@ -150,12 +159,6 @@ export class TunnelListenerImpl implements TunnelListener {
       process.off("SIGINT", this.installedSigintHandler);
       this.installedSigintHandler = null;
     }
-    if (this.servePromise !== null) {
-      try {
-        await this.servePromise;
-      } catch {
-        /* swallow — captured in capturedError if relevant */
-      }
-    }
+    await settledServe;
   }
 }

@@ -12,14 +12,20 @@
 //! implemented. WebSocket and TCP-passthrough bridges are dispatched through
 //! [`bridge`](super::bridge) (see [`TunnelRuntime::dispatch`]).
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::future::Future;
+use std::panic::{catch_unwind, AssertUnwindSafe};
+#[cfg(test)]
+use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use bytes::Bytes;
 use h2::client::SendRequest;
 use http::{Method, Request};
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::{oneshot, watch, Mutex, Notify};
+use tokio::task::JoinHandle;
+use tokio::time::Instant;
 
 use crate::error::{InkboxError, Result};
 
@@ -38,6 +44,14 @@ pub const PING_INTERVAL: Duration = Duration::from_secs(20);
 /// Hard ceiling on an unacked PING before we force a reconnect. Guards
 /// against a silently-dead TCP the kernel hasn't reported yet.
 pub const PING_ACK_TIMEOUT: Duration = Duration::from_secs(10);
+/// Aggregate budget for TCP, TLS, and HTTP/2 establishment.
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+/// Budget for sending HELLO and reading its complete response.
+pub const HELLO_TIMEOUT: Duration = Duration::from_secs(15);
+/// Group budget for stopping connection-owned background tasks.
+pub const TASK_TEARDOWN_TIMEOUT: Duration = Duration::from_secs(5);
+/// Initial cold reconnect delay before jitter.
+pub const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 /// OS TCP keepalive cadence applied to the underlying socket.
 pub const TCP_KEEPALIVE_IDLE_SECONDS: u64 = 30;
 pub const TCP_KEEPALIVE_INTERVAL_SECONDS: u64 = 10;
@@ -72,6 +86,9 @@ const HELLO_REASON_SUPERSEDED: &str = "hello-superseded";
 /// Status strings passed to the `on_status` callback. Mirrors the Python
 /// status vocabulary (`"connecting"`, `"connected"`, `"reconnecting"`,
 /// `"closed"`, `"superseded"`).
+///
+/// Callbacks run inline on the runtime task and must return promptly. Panics
+/// are isolated, but blocking work delays lifecycle progress on that worker.
 pub type StatusCallback = Box<dyn Fn(&str) + Send + Sync>;
 
 /// Where inbound third-party traffic is forwarded.
@@ -138,11 +155,120 @@ fn transient(msg: impl Into<String>) -> InkboxError {
 /// server-advertised parameters from the hello response.
 struct ActiveConn {
     send: SendRequest<Bytes>,
+    generation: u64,
     owner_token: String,
     server_pool_size: Option<i64>,
     #[allow(dead_code)]
     intake_idle_seconds: Option<f64>,
     response_deadline_seconds: Option<f64>,
+}
+
+struct ConnectionTasks {
+    driver: Option<JoinHandle<()>>,
+    ping: Option<JoinHandle<()>>,
+}
+
+impl ConnectionTasks {
+    fn take_owned(&mut self) -> Vec<OwnedTask> {
+        let mut tasks = Vec::with_capacity(2);
+        if let Some(driver) = self.driver.take() {
+            tasks.push(OwnedTask::new("connection driver", driver));
+        }
+        if let Some(ping) = self.ping.take() {
+            tasks.push(OwnedTask::new("PING monitor", ping));
+        }
+        tasks
+    }
+
+    async fn shutdown(&mut self, timeout: Duration) -> Vec<OwnedTask> {
+        let mut tasks = self.take_owned();
+        shutdown_owned_tasks(&mut tasks, timeout).await;
+        tasks
+    }
+}
+
+impl Drop for ConnectionTasks {
+    fn drop(&mut self) {
+        if let Some(driver) = &self.driver {
+            driver.abort();
+        }
+        if let Some(ping) = &self.ping {
+            ping.abort();
+        }
+    }
+}
+
+struct OpenConnection {
+    send: SendRequest<Bytes>,
+    closed: oneshot::Receiver<()>,
+    tasks: ConnectionTasks,
+}
+
+struct OwnedTask {
+    name: &'static str,
+    handle: JoinHandle<()>,
+}
+
+impl OwnedTask {
+    fn new(name: &'static str, handle: JoinHandle<()>) -> Self {
+        Self { name, handle }
+    }
+}
+
+impl Drop for OwnedTask {
+    fn drop(&mut self) {
+        self.handle.abort();
+    }
+}
+
+#[derive(Clone, Copy)]
+struct RuntimeTimings {
+    connect: Duration,
+    hello: Duration,
+    teardown: Duration,
+    ping_interval: Duration,
+    ping_ack: Duration,
+    initial_backoff: Duration,
+    backoff_cap: f64,
+    backoff_jitter: f64,
+}
+
+impl Default for RuntimeTimings {
+    fn default() -> Self {
+        Self {
+            connect: CONNECT_TIMEOUT,
+            hello: HELLO_TIMEOUT,
+            teardown: TASK_TEARDOWN_TIMEOUT,
+            ping_interval: PING_INTERVAL,
+            ping_ack: PING_ACK_TIMEOUT,
+            initial_backoff: INITIAL_BACKOFF,
+            backoff_cap: BACKOFF_CAP,
+            backoff_jitter: BACKOFF_JITTER,
+        }
+    }
+}
+
+#[cfg(test)]
+type TestOpenFuture = Pin<Box<dyn Future<Output = Result<OpenConnection>> + Send>>;
+#[cfg(test)]
+type TestConnector = Arc<
+    dyn Fn(Instant, RuntimeTimings, Arc<AtomicBool>, Arc<Notify>, Arc<AtomicBool>) -> TestOpenFuture
+        + Send
+        + Sync
+        + 'static,
+>;
+#[cfg(test)]
+type TestSleepFuture = Pin<Box<dyn Future<Output = ()> + Send>>;
+#[cfg(test)]
+type TestSleeper = Arc<dyn Fn(Duration) -> TestSleepFuture + Send + Sync + 'static>;
+
+#[cfg(test)]
+#[derive(Default)]
+struct RuntimeTestHooks {
+    connector: Option<TestConnector>,
+    sleeper: Option<TestSleeper>,
+    random: Option<Arc<dyn Fn() -> f64 + Send + Sync>>,
+    intake_started: Option<Arc<AtomicU64>>,
 }
 
 /// The data-plane runtime.
@@ -155,8 +281,15 @@ pub struct TunnelRuntime {
     http: reqwest::Client,
     /// The connection that parks new intakes (published once hello succeeds).
     active: Arc<Mutex<Option<Arc<ActiveConn>>>>,
-    stop: Arc<Notify>,
+    stop: watch::Sender<bool>,
     stopped: Arc<AtomicBool>,
+    successful_connections: AtomicU64,
+    generation: AtomicU64,
+    last_notified_status: StdMutex<Option<String>>,
+    lingering_tasks: StdMutex<Vec<OwnedTask>>,
+    timings: RuntimeTimings,
+    #[cfg(test)]
+    test_hooks: RuntimeTestHooks,
 }
 
 impl TunnelRuntime {
@@ -177,8 +310,15 @@ impl TunnelRuntime {
             cfg,
             http,
             active: Arc::new(Mutex::new(None)),
-            stop: Arc::new(Notify::new()),
+            stop: watch::channel(false).0,
             stopped: Arc::new(AtomicBool::new(false)),
+            successful_connections: AtomicU64::new(0),
+            generation: AtomicU64::new(0),
+            last_notified_status: StdMutex::new(None),
+            lingering_tasks: StdMutex::new(Vec::new()),
+            timings: RuntimeTimings::default(),
+            #[cfg(test)]
+            test_hooks: RuntimeTestHooks::default(),
         }
     }
 
@@ -193,15 +333,23 @@ impl TunnelRuntime {
     /// transient failures. Returns `Err` on a permanent auth failure (the
     /// Python `_TunnelAuthError` path), or `Ok(())` on a clean shutdown.
     pub async fn serve_forever(self: &Arc<Self>) -> Result<()> {
-        let mut backoff = 1.0f64;
+        let mut backoff = self.timings.initial_backoff.as_secs_f64();
+        let mut attempt = 0u64;
+        if self.is_stopped() {
+            self.notify_status("closed");
+            return Ok(());
+        }
         self.notify_status("connecting");
         loop {
             if self.is_stopped() {
                 self.notify_status("closed");
                 return Ok(());
             }
+            attempt += 1;
+            log::info!("tunnel connection attempt {attempt} starting");
+            let connected_before = self.successful_connections.load(Ordering::SeqCst);
             match self.run_once().await {
-                Ok(()) => backoff = 1.0,
+                Ok(()) => backoff = self.timings.initial_backoff.as_secs_f64(),
                 Err(err) if is_auth_error(&err) => {
                     self.notify_status("closed");
                     return Err(err);
@@ -213,22 +361,29 @@ impl TunnelRuntime {
                     self.notify_status("superseded");
                     return Err(err);
                 }
-                Err(_) => self.notify_status("reconnecting"),
+                Err(err) => {
+                    if let Some(phase) = timeout_phase(&err) {
+                        log::warn!("tunnel connection attempt {attempt} timed out during {phase}");
+                    } else {
+                        log::warn!("tunnel connection attempt {attempt} failed: {err}");
+                    }
+                }
+            }
+            if self.successful_connections.load(Ordering::SeqCst) > connected_before {
+                backoff = self.timings.initial_backoff.as_secs_f64();
             }
             if self.is_stopped() {
                 self.notify_status("closed");
                 return Ok(());
             }
-            let jitter = backoff * BACKOFF_JITTER * (2.0 * pseudo_rand() - 1.0);
+            let jitter =
+                backoff * self.timings.backoff_jitter * (2.0 * self.random_fraction() - 1.0);
             let sleep_for = (backoff + jitter).max(0.1);
-            tokio::select! {
-                _ = tokio::time::sleep(Duration::from_secs_f64(sleep_for)) => {}
-                _ = self.stop.notified() => {
-                    self.notify_status("closed");
-                    return Ok(());
-                }
+            if !self.sleep_or_stop(Duration::from_secs_f64(sleep_for)).await {
+                self.notify_status("closed");
+                return Ok(());
             }
-            backoff = (backoff * 2.0).min(BACKOFF_CAP);
+            backoff = (backoff * 2.0).min(self.timings.backoff_cap);
         }
     }
 
@@ -237,8 +392,13 @@ impl TunnelRuntime {
     /// `SendRequest` handles closes the h2 connection.
     pub async fn aclose(&self) {
         self.stopped.store(true, Ordering::SeqCst);
-        self.stop.notify_waiters();
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        self.stop.send_replace(true);
+        self.notify_status("closed");
         *self.active.lock().await = None;
+        let mut lingering = std::mem::take(&mut *self.lingering());
+        shutdown_owned_tasks(&mut lingering, self.timings.teardown).await;
+        self.retain_tasks(&mut lingering);
     }
 
     // --- connection lifecycle --------------------------------------------
@@ -259,15 +419,68 @@ impl TunnelRuntime {
 
         // Dial + h2 handshake. The driver runs as a background task; when it
         // ends (GOAWAY / reset / TCP close) `conn_closed` fires.
-        let (send, conn_closed) = self
-            .open_connection(force_down.clone(), superseded.clone())
-            .await?;
+        let connect_deadline = Instant::now() + self.timings.connect;
+        let open = self
+            .wait_for_stop(self.establish_connection(
+                connect_deadline,
+                force_down.clone(),
+                superseded.clone(),
+            ))
+            .await;
+        let OpenConnection {
+            send,
+            mut closed,
+            mut tasks,
+        } = match open {
+            None => return Ok(()),
+            Some(Ok(open)) => open,
+            Some(Err(err)) => {
+                self.notify_reconnecting();
+                return Err(err);
+            }
+        };
 
         // Hello handshake — establishes the owner_token used to park intakes.
         // A displaced-during-hello loser returns the superseded tag here.
-        let active = match self.send_hello(send).await {
-            Ok(active) => active,
-            Err(e) => {
+        let hello_deadline = Instant::now() + self.timings.hello;
+        let mut stop_rx = self.stop.subscribe();
+        let hello = if *stop_rx.borrow() {
+            None
+        } else {
+            tokio::select! {
+                biased;
+                _ = stop_rx.changed() => None,
+                _ = &mut closed => {
+                    Some(Err(if superseded.load(Ordering::SeqCst) {
+                        superseded_error("another client connected to this tunnel")
+                    } else {
+                        transient("tunnel connection closed during hello")
+                    }))
+                }
+                result = with_phase_timeout(
+                    hello_deadline,
+                    "hello",
+                    self.send_hello(send),
+                ) => Some(result),
+            }
+        };
+        let active = match hello {
+            None => {
+                self.shutdown_connection_tasks(&mut tasks).await;
+                return Ok(());
+            }
+            Some(Ok(active)) => active,
+            Some(Err(e)) => {
+                if !superseded.load(Ordering::SeqCst)
+                    && !is_auth_error(&e)
+                    && !is_superseded_error(&e)
+                {
+                    self.notify_reconnecting();
+                }
+                self.shutdown_connection_tasks(&mut tasks).await;
+                if self.is_stopped() {
+                    return Ok(());
+                }
                 // A takeover GOAWAY can land mid-hello: the driver sets the
                 // flag while the hello itself fails as a plain transient error.
                 // Honor the flag so we stop instead of redialing and booting
@@ -278,47 +491,83 @@ impl TunnelRuntime {
                 return Err(e);
             }
         };
-        let active = Arc::new(active);
-        *self.active.lock().await = Some(active.clone());
-        self.notify_status("connected");
 
-        // Park the intake pool. effective_pool = server default or our
-        // requested size or 1.
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let dispatch_handles = Arc::new(StdMutex::new(Vec::new()));
+
+        // Park the intake pool before publishing connected state. A status
+        // callback may block without delaying intake task creation.
+        let mut active = active;
+        active.generation = generation;
+        let active = Arc::new(active);
         let effective_pool = active
             .server_pool_size
             .or(self.cfg.pool_size)
             .unwrap_or(1)
             .max(1) as usize;
-        let mut handles = Vec::with_capacity(effective_pool);
+        let mut intake_tasks = Vec::with_capacity(effective_pool);
+        let mut intake_started = Vec::with_capacity(effective_pool);
         for slot in 0..effective_pool {
             let me = self.clone();
             let conn = active.clone();
             let fd = force_down.clone();
             let sup = superseded.clone();
-            handles.push(tokio::spawn(async move {
-                me.intake_loop(conn, slot, fd, sup).await
-            }));
+            let dispatches = dispatch_handles.clone();
+            let (started_tx, started_rx) = oneshot::channel();
+            intake_started.push(started_rx);
+            intake_tasks.push(OwnedTask::new(
+                "intake worker",
+                tokio::spawn(async move {
+                    me.intake_loop(conn, slot, fd, sup, dispatches, started_tx)
+                        .await
+                }),
+            ));
+        }
+        for started in intake_started {
+            let _ = started.await;
         }
 
-        // Supervise: return when the connection dies, a keepalive/owner-token
-        // failure forces it down, or stop is requested.
-        tokio::select! {
-            _ = conn_closed => {}
-            _ = force_down.notified() => {}
-            _ = self.stop.notified() => {}
-            _ = wait_until_stopped(self.stopped.clone()) => {}
+        *self.active.lock().await = Some(active.clone());
+        let connection_number = self.successful_connections.fetch_add(1, Ordering::SeqCst);
+        if connection_number == 0 {
+            log::info!("tunnel connection established");
+        } else {
+            log::info!("tunnel connection recovered");
+        }
+        self.notify_status("connected");
+
+        let mut stop_rx = self.stop.subscribe();
+        if !*stop_rx.borrow() {
+            tokio::select! {
+                _ = &mut closed => {}
+                _ = force_down.notified() => {}
+                _ = stop_rx.changed() => {}
+            }
         }
 
-        // Tear the pool down; dropping `active`/its `SendRequest` closes h2.
-        for h in handles {
-            h.abort();
+        let terminal_superseded = superseded.load(Ordering::SeqCst);
+        let stopping = self.is_stopped();
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        if !terminal_superseded && !stopping {
+            self.notify_reconnecting();
         }
+
         *self.active.lock().await = None;
-        // Another client took over this tunnel: stop, do not reconnect.
-        if superseded.load(Ordering::SeqCst) {
-            return Err(superseded_error("another client connected to this tunnel"));
-        }
-        if self.is_stopped() {
+        let dispatch_tasks = {
+            let mut handles = dispatch_handles
+                .lock()
+                .unwrap_or_else(|err| err.into_inner());
+            handles.drain(..).collect::<Vec<_>>()
+        };
+        intake_tasks.extend(dispatch_tasks);
+        intake_tasks.extend(tasks.take_owned());
+        shutdown_owned_tasks(&mut intake_tasks, self.timings.teardown).await;
+        self.retain_tasks(&mut intake_tasks);
+        drop(active);
+
+        if terminal_superseded {
+            Err(superseded_error("another client connected to this tunnel"))
+        } else if stopping {
             Ok(())
         } else {
             Err(transient("tunnel connection closed; reconnecting"))
@@ -331,9 +580,10 @@ impl TunnelRuntime {
     /// connection dies.
     async fn open_connection(
         self: &Arc<Self>,
+        deadline: Instant,
         force_down: Arc<Notify>,
         superseded: Arc<AtomicBool>,
-    ) -> Result<(SendRequest<Bytes>, tokio::sync::oneshot::Receiver<()>)> {
+    ) -> Result<OpenConnection> {
         use tokio::net::TcpStream;
         use tokio_rustls::TlsConnector;
 
@@ -349,64 +599,30 @@ impl TunnelRuntime {
 
         let server_name = rustls::pki_types::ServerName::try_from(self.cfg.zone.clone())
             .map_err(|_| transient(format!("invalid zone host {:?}", self.cfg.zone)))?;
-        let tcp = TcpStream::connect((self.cfg.zone.as_str(), 443))
-            .await
-            .map_err(|e| transient(format!("tcp connect {}: {e}", self.cfg.zone)))?;
+        let tcp = with_phase_timeout(deadline, "tcp", async {
+            TcpStream::connect((self.cfg.zone.as_str(), 443))
+                .await
+                .map_err(|e| transient(format!("tcp connect {}: {e}", self.cfg.zone)))
+        })
+        .await?;
         let _ = tcp.set_nodelay(true);
-        let tls_stream = TlsConnector::from(Arc::new(tls))
-            .connect(server_name, tcp)
-            .await
-            .map_err(|e| transient(format!("tls handshake {}: {e}", self.cfg.zone)))?;
+        let tls_stream = with_phase_timeout(deadline, "tls", async {
+            TlsConnector::from(Arc::new(tls))
+                .connect(server_name, tcp)
+                .await
+                .map_err(|e| transient(format!("tls handshake {}: {e}", self.cfg.zone)))
+        })
+        .await?;
 
-        let (send, connection) = h2::client::Builder::new()
-            .enable_push(false)
-            .handshake(tls_stream)
-            .await
-            .map_err(|e| transient(format!("h2 handshake: {e}")))?;
-
-        let (closed_tx, closed_rx) = tokio::sync::oneshot::channel();
-
-        // Take the PingPong before the driver consumes the connection. Mirrors
-        // Python `_ping_loop`: ping every PING_INTERVAL, give up (→ reconnect)
-        // if a ping isn't acked within PING_ACK_TIMEOUT.
-        let mut connection = connection;
-        let ping_pong = connection.ping_pong();
-        tokio::spawn(async move {
-            // Classify the close: a GOAWAY carrying the dedicated superseded
-            // code is a takeover (stop, don't reconnect). Rust reads only the
-            // code, so this is the reliable channel; any other close reconnects.
-            if let Err(e) = connection.await {
-                if is_superseded_goaway(&e) {
-                    superseded.store(true, Ordering::SeqCst);
-                }
-            }
-            let _ = closed_tx.send(());
-        });
-        if let Some(mut pp) = ping_pong {
-            let stopped_ping = self.stopped.clone();
-            let force_down_ping = force_down.clone();
-            tokio::spawn(async move {
-                loop {
-                    tokio::time::sleep(PING_INTERVAL).await;
-                    if stopped_ping.load(Ordering::SeqCst) {
-                        return;
-                    }
-                    match tokio::time::timeout(PING_ACK_TIMEOUT, pp.ping(h2::Ping::opaque())).await
-                    {
-                        Ok(Ok(_pong)) => {}
-                        // Ack timed out or the connection errored. The socket may
-                        // still look open to the driver (no `conn_closed`), so
-                        // force the supervisor to tear it down and reconnect.
-                        _ => {
-                            force_down_ping.notify_one();
-                            return;
-                        }
-                    }
-                }
-            });
-        }
-
-        Ok((send, closed_rx))
+        start_h2_connection(
+            tls_stream,
+            deadline,
+            self.timings,
+            self.stopped.clone(),
+            force_down,
+            superseded,
+        )
+        .await
     }
 
     /// Perform the `/_system/hello` handshake (Python `_send_hello`).
@@ -474,6 +690,7 @@ impl TunnelRuntime {
             .to_string();
         Ok(ActiveConn {
             send,
+            generation: 0,
             owner_token,
             server_pool_size: payload.get("default_pool_size").and_then(|v| v.as_i64()),
             intake_idle_seconds: payload.get("intake_idle_seconds").and_then(|v| v.as_f64()),
@@ -494,15 +711,27 @@ impl TunnelRuntime {
         slot: usize,
         force_down: Arc<Notify>,
         superseded: Arc<AtomicBool>,
+        dispatch_handles: Arc<StdMutex<Vec<OwnedTask>>>,
+        started: oneshot::Sender<()>,
     ) {
+        #[cfg(test)]
+        if let Some(started_count) = &self.test_hooks.intake_started {
+            started_count.fetch_add(1, Ordering::SeqCst);
+        }
+        let _ = started.send(());
         while !self.is_stopped() {
             match self.park_one_intake(&conn, slot).await {
                 Ok(Some(env)) => {
                     let me = self.clone();
                     let c = conn.clone();
-                    tokio::spawn(async move {
+                    let handle = tokio::spawn(async move {
                         let _ = me.dispatch(env, c).await;
                     });
+                    push_dispatch_task(
+                        &dispatch_handles,
+                        OwnedTask::new("request dispatch", handle),
+                    )
+                    .await;
                 }
                 Ok(None) => continue,
                 // Another client took over: record it (force_down is
@@ -710,6 +939,9 @@ impl TunnelRuntime {
         inkbox_reason: Option<&str>,
         body: Vec<u8>,
     ) -> Result<()> {
+        if self.generation.load(Ordering::SeqCst) != conn.generation {
+            return Err(transient("response belongs to a closed tunnel connection"));
+        }
         let path = format!("{PATH_RESPONSE_PREFIX}{request_id}");
         let mut builder = Request::builder()
             .method(Method::POST)
@@ -768,11 +1000,243 @@ impl TunnelRuntime {
         self.stopped.load(Ordering::SeqCst)
     }
 
-    fn notify_status(&self, status: &str) {
-        if let Some(cb) = &self.cfg.on_status {
-            cb(status);
+    async fn establish_connection(
+        self: &Arc<Self>,
+        deadline: Instant,
+        force_down: Arc<Notify>,
+        superseded: Arc<AtomicBool>,
+    ) -> Result<OpenConnection> {
+        #[cfg(test)]
+        if let Some(connector) = &self.test_hooks.connector {
+            return with_phase_timeout(
+                deadline,
+                "tcp",
+                connector(
+                    deadline,
+                    self.timings,
+                    self.stopped.clone(),
+                    force_down,
+                    superseded,
+                ),
+            )
+            .await;
+        }
+        self.open_connection(deadline, force_down, superseded).await
+    }
+
+    async fn wait_for_stop<T, F>(&self, future: F) -> Option<T>
+    where
+        F: Future<Output = T>,
+    {
+        let mut stop_rx = self.stop.subscribe();
+        if *stop_rx.borrow() {
+            return None;
+        }
+        tokio::select! {
+            biased;
+            _ = stop_rx.changed() => None,
+            result = future => Some(result),
         }
     }
+
+    async fn sleep_or_stop(&self, duration: Duration) -> bool {
+        #[cfg(test)]
+        let sleep = if let Some(sleeper) = &self.test_hooks.sleeper {
+            sleeper(duration)
+        } else {
+            Box::pin(tokio::time::sleep(duration)) as TestSleepFuture
+        };
+        #[cfg(not(test))]
+        let sleep = tokio::time::sleep(duration);
+        self.wait_for_stop(sleep).await.is_some()
+    }
+
+    fn random_fraction(&self) -> f64 {
+        #[cfg(test)]
+        if let Some(random) = &self.test_hooks.random {
+            return random();
+        }
+        pseudo_rand()
+    }
+
+    fn notify_reconnecting(&self) {
+        if !self.is_stopped() {
+            self.notify_status("reconnecting");
+        }
+    }
+
+    async fn shutdown_connection_tasks(&self, tasks: &mut ConnectionTasks) {
+        let mut pending = tasks.shutdown(self.timings.teardown).await;
+        self.retain_tasks(&mut pending);
+    }
+
+    fn retain_tasks(&self, tasks: &mut Vec<OwnedTask>) {
+        if tasks.is_empty() {
+            return;
+        }
+        self.lingering().append(tasks);
+    }
+
+    fn lingering(&self) -> std::sync::MutexGuard<'_, Vec<OwnedTask>> {
+        self.lingering_tasks
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+    }
+
+    fn notify_status(&self, status: &str) {
+        {
+            let mut last = self
+                .last_notified_status
+                .lock()
+                .unwrap_or_else(|err| err.into_inner());
+            if last.as_deref() == Some(status) {
+                return;
+            }
+            if last.as_deref() == Some("superseded") && status == "closed" {
+                return;
+            }
+            *last = Some(status.to_string());
+        }
+        if let Some(cb) = &self.cfg.on_status {
+            if catch_unwind(AssertUnwindSafe(|| cb(status))).is_err() {
+                log::error!(
+                    "tunnel status callback panicked for status {status}; continuing runtime"
+                );
+            }
+        }
+    }
+}
+
+async fn push_dispatch_task(tasks: &StdMutex<Vec<OwnedTask>>, task: OwnedTask) {
+    let finished = {
+        let mut tasks = tasks.lock().unwrap_or_else(|err| err.into_inner());
+        let mut finished = Vec::new();
+        let mut index = 0;
+        while index < tasks.len() {
+            if tasks[index].handle.is_finished() {
+                finished.push(tasks.swap_remove(index));
+            } else {
+                index += 1;
+            }
+        }
+        tasks.push(task);
+        finished
+    };
+
+    for mut task in finished {
+        if let Err(err) = (&mut task.handle).await {
+            if err.is_panic() {
+                log::error!("tunnel {} task panicked", task.name);
+            }
+        }
+    }
+}
+
+async fn start_h2_connection<T>(
+    io: T,
+    deadline: Instant,
+    timings: RuntimeTimings,
+    stopped: Arc<AtomicBool>,
+    force_down: Arc<Notify>,
+    superseded: Arc<AtomicBool>,
+) -> Result<OpenConnection>
+where
+    T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let (send, connection) = with_phase_timeout(deadline, "h2", async {
+        h2::client::Builder::new()
+            .enable_push(false)
+            .handshake(io)
+            .await
+            .map_err(|e| transient(format!("h2 handshake: {e}")))
+    })
+    .await?;
+    let mut connection = connection;
+    let send = with_phase_timeout(deadline, "h2", async {
+        tokio::select! {
+            ready = send.ready() => ready
+                .map_err(|e| transient(format!("h2 connection readiness: {e}"))),
+            result = &mut connection => match result {
+                Ok(()) => Err(transient("h2 connection closed before readiness")),
+                Err(err) => Err(transient(format!("h2 connection before readiness: {err}"))),
+            },
+        }
+    })
+    .await?;
+
+    let (closed_tx, closed_rx) = oneshot::channel();
+    let ping_pong = connection.ping_pong();
+    let driver = tokio::spawn(async move {
+        if let Err(err) = connection.await {
+            if is_superseded_goaway(&err) {
+                superseded.store(true, Ordering::SeqCst);
+            }
+        }
+        let _ = closed_tx.send(());
+    });
+    let ping = ping_pong.map(|mut ping_pong| {
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(timings.ping_interval).await;
+                if stopped.load(Ordering::SeqCst) {
+                    return;
+                }
+                if !matches!(
+                    tokio::time::timeout(timings.ping_ack, ping_pong.ping(h2::Ping::opaque()))
+                        .await,
+                    Ok(Ok(_))
+                ) {
+                    force_down.notify_one();
+                    return;
+                }
+            }
+        })
+    });
+    Ok(OpenConnection {
+        send,
+        closed: closed_rx,
+        tasks: ConnectionTasks {
+            driver: Some(driver),
+            ping,
+        },
+    })
+}
+
+async fn shutdown_owned_tasks(tasks: &mut Vec<OwnedTask>, timeout: Duration) {
+    for task in tasks.iter() {
+        task.handle.abort();
+    }
+    let completed = tokio::time::timeout(timeout, async {
+        while tasks.iter().any(|task| !task.handle.is_finished()) {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .is_ok();
+
+    let mut remaining = Vec::new();
+    for mut task in tasks.drain(..) {
+        if task.handle.is_finished() {
+            let _ = (&mut task.handle).await;
+        } else {
+            remaining.push(task);
+        }
+    }
+    if !completed {
+        for task in &remaining {
+            log::warn!("tunnel {} task did not stop during teardown", task.name);
+        }
+    }
+    *tasks = remaining;
+}
+
+async fn with_phase_timeout<T, F>(deadline: Instant, phase: &'static str, future: F) -> Result<T>
+where
+    F: Future<Output = Result<T>>,
+{
+    tokio::time::timeout_at(deadline, future)
+        .await
+        .map_err(|_| transient(format!("tunnel connect timeout during {phase}")))?
 }
 
 /// Read an h2 response body fully, releasing flow-control capacity as data
@@ -804,15 +1268,6 @@ fn http_headers_to_pairs(headers: &http::HeaderMap) -> Vec<(String, String)> {
         .collect()
 }
 
-async fn wait_until_stopped(stopped: Arc<AtomicBool>) {
-    loop {
-        if stopped.load(Ordering::SeqCst) {
-            return;
-        }
-        tokio::time::sleep(Duration::from_millis(200)).await;
-    }
-}
-
 /// True iff `err` is the permanent auth-failure tag from `/_system/hello`.
 fn is_auth_error(err: &InkboxError) -> bool {
     matches!(err, InkboxError::Tunnel(m) if m.starts_with("tunnel-auth:"))
@@ -836,6 +1291,13 @@ fn is_superseded_error(err: &InkboxError) -> bool {
     err.is_tunnel_superseded()
 }
 
+fn timeout_phase(err: &InkboxError) -> Option<&str> {
+    let InkboxError::Tunnel(message) = err else {
+        return None;
+    };
+    message.strip_prefix("tunnel connect timeout during ")
+}
+
 /// True iff a connection-driver `h2::Error` carries the dedicated superseded
 /// GOAWAY code. Rust reads only the code (no debug bytes), so this is the
 /// reliable takeover channel on the connection itself.
@@ -854,99 +1316,5 @@ fn pseudo_rand() -> f64 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn cfg() -> TunnelRuntimeConfig {
-        TunnelRuntimeConfig {
-            tunnel_id: "11111111-1111-1111-1111-111111111111".into(),
-            api_key: "sk-test".into(),
-            zone: "inkboxwire.com".into(),
-            public_host: "my-agent.inkboxwire.com".into(),
-            pool_size: None,
-            forward_to: ForwardTo::Url("http://localhost:8080".into()),
-            tls_material: None,
-            max_inbound_body_bytes: DEFAULT_INBOUND_BODY_BYTES,
-            max_outbound_body_bytes: DEFAULT_OUTBOUND_BODY_BYTES,
-            on_status: None,
-            forward_to_verify_tls: true,
-            forward_to_ca_bundle: None,
-        }
-    }
-
-    #[test]
-    fn public_url_shape() {
-        let rt = TunnelRuntime::new(cfg());
-        assert_eq!(rt.public_url(), "https://my-agent.inkboxwire.com");
-        assert_eq!(rt.url(PATH_HELLO), "https://inkboxwire.com/_system/hello");
-    }
-
-    #[test]
-    fn error_classification() {
-        assert!(is_auth_error(&tunnel_auth_error("nope")));
-        assert!(!is_auth_error(&transient("transient")));
-        assert!(is_owner_token_invalid(&owner_token_invalid("x")));
-    }
-
-    #[test]
-    fn superseded_error_classification() {
-        // A takeover is its own terminal reason, distinct from auth / transient
-        // / owner-token so the supervisor stops without reconnecting.
-        assert!(is_superseded_error(&superseded_error("x")));
-        assert!(!is_superseded_error(&transient("x")));
-        assert!(!is_superseded_error(&tunnel_auth_error("x")));
-        assert!(!is_superseded_error(&owner_token_invalid("x")));
-        assert!(!is_auth_error(&superseded_error("x")));
-        assert!(!is_owner_token_invalid(&superseded_error("x")));
-    }
-
-    #[test]
-    fn is_tunnel_superseded_is_public_and_structural() {
-        // Callers can distinguish a terminal takeover from a transient error
-        // structurally (no string matching on their side).
-        assert!(superseded_error("x").is_tunnel_superseded());
-        assert!(!transient("x").is_tunnel_superseded());
-        assert!(!tunnel_auth_error("x").is_tunnel_superseded());
-    }
-
-    #[test]
-    fn superseded_goaway_reads_the_dedicated_code() {
-        // Rust reads only the GOAWAY code, so the dedicated code is the reliable
-        // takeover channel. h2::Error::from(Reason) mirrors a received GOAWAY:
-        // reason() surfaces the code (the GOAWAY-then-close survival property).
-        let takeover = h2::Error::from(h2::Reason::from(SUPERSEDED_GOAWAY_ERROR_CODE));
-        assert!(is_superseded_goaway(&takeover));
-
-        // Drain (NO_ERROR) and a generic backpressure code are NOT takeovers.
-        assert!(!is_superseded_goaway(&h2::Error::from(
-            h2::Reason::NO_ERROR
-        )));
-        assert!(!is_superseded_goaway(&h2::Error::from(
-            h2::Reason::ENHANCE_YOUR_CALM
-        )));
-    }
-
-    #[tokio::test]
-    async fn serve_forever_returns_on_immediate_stop() {
-        let rt = Arc::new(TunnelRuntime::new(cfg()));
-        rt.aclose().await;
-        assert!(rt.serve_forever().await.is_ok());
-    }
-
-    #[tokio::test]
-    async fn status_callback_receives_connecting_then_closed() {
-        use std::sync::Mutex as StdMutex;
-        let seen = Arc::new(StdMutex::new(Vec::<String>::new()));
-        let seen2 = seen.clone();
-        let mut c = cfg();
-        c.on_status = Some(Box::new(move |s: &str| {
-            seen2.lock().unwrap().push(s.to_string())
-        }));
-        let rt = Arc::new(TunnelRuntime::new(c));
-        rt.aclose().await;
-        let _ = rt.serve_forever().await;
-        let got = seen.lock().unwrap().clone();
-        assert!(got.contains(&"connecting".to_string()));
-        assert!(got.contains(&"closed".to_string()));
-    }
-}
+#[path = "runtime_tests.rs"]
+mod tests;

@@ -1187,7 +1187,7 @@ dependencies = [
 
 [[package]]
 name = "inkbox"
-version = "0.5.14"
+version = "0.5.15"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -1201,6 +1201,7 @@ dependencies = [
  "hmac",
  "http 1.4.2",
  "httpmock",
+ "log",
  "p256",
  "rand 0.8.6",
  "reqwest",

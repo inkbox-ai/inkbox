@@ -46,7 +46,11 @@ import {
 import type { InkboxHandler } from "./_handler.js";
 import type { InkboxWsHandler } from "./_ws.js";
 
-export type { TunnelListener, TunnelStatusCallback } from "./_listener.js";
+export type {
+  TunnelListener,
+  TunnelRuntimeStatus,
+  TunnelStatusCallback,
+} from "./_listener.js";
 export {
   ForwardTargetRefused,
   validateEnvelopePath,
@@ -62,6 +66,7 @@ export {
   SERVER_DRAINING_WS_CLOSE_CODE,
   WsAcceptDeadlineExceeded,
   WsClosed,
+  WsConnectionLost,
   WsProtocolMismatch,
   WsServerDraining,
 } from "./_ws.js";
