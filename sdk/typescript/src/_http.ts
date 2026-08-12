@@ -5,7 +5,7 @@
  */
 
 import type { IMessageDedicatedNumberType } from "./imessage/types.js";
-import { parseAgentSupport, type AgentSupport } from "./error-guidance.js";
+import { parseAgentSupport } from "./error-guidance.js";
 
 export class InkboxError extends Error {
   constructor(message: string) {
@@ -63,13 +63,13 @@ export class InkboxAPIError extends InkboxError {
   readonly detail: InkboxAPIErrorDetail;
   /** Parsed delta-seconds value from `Retry-After`, when supplied. */
   readonly retryAfterSeconds: number | null;
-  agentSupport: AgentSupport | null;
+  agentSupport: string | null;
 
   constructor(
     statusCode: number,
     detail: InkboxAPIErrorDetail,
     retryAfter: string | number | null = null,
-    agentSupport: AgentSupport | null = null,
+    agentSupport: string | null = null,
   ) {
     super(`HTTP ${statusCode}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
     this.name = "InkboxAPIError";
@@ -233,7 +233,7 @@ function raiseForErrorResponse(
   status: number,
   rawDetail: InkboxAPIErrorDetail,
   headers?: Headers,
-  agentSupport: AgentSupport | null = null,
+  agentSupport: string | null = null,
 ): never {
   const guided = <T extends InkboxAPIError>(error: T): T => {
     error.agentSupport = agentSupport;
@@ -348,7 +348,7 @@ function proxyHint(): string {
 
 async function readErrorEnvelope(resp: Response): Promise<{
   detail: InkboxAPIErrorDetail;
-  agentSupport: AgentSupport | null;
+  agentSupport: string | null;
 }> {
   try {
     const parsed = (await resp.json()) as { detail?: unknown; agent_support?: unknown };

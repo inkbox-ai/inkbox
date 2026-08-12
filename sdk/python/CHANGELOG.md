@@ -2,12 +2,11 @@
 
 ## 0.5.16 — Support Agent discovery on API errors
 
-- `InkboxAPIError.agent_support` exposes typed Support Agent discovery,
-  eligibility, A2A settings checks, and contact-rule checks when supplied by the
-  API.
+- `InkboxAPIError.agent_support` exposes the Support Agent instructions string
+  supplied by the API.
 - Specialized errors, identity/tunnel remappers, and one-shot requests preserve
   the metadata without changing existing exception strings.
-- Missing or malformed metadata is ignored for compatibility with older
+- Missing or malformed instructions are ignored for compatibility with older
   deployments.
 
 ## 0.5.14 — A2A invitations

@@ -41,32 +41,7 @@ function respond(body: unknown): void {
 function supportEnvelope(detail: string): Record<string, unknown> {
   return {
     detail,
-    agent_support: {
-      message: "If you cannot resolve this issue, contact the Inkbox Support Agent over A2A.",
-      agent_card_url: "https://inkbox.ai/a2a/support/card",
-      agent_card_authentication_required: false,
-      conversation_requirements: {
-        authentication: "agent_scoped_api_key",
-        claimed_identity: true,
-        a2a_enabled: true,
-        support_contact_allowed: true,
-      },
-      verification: {
-        a2a_settings: {
-          method: "GET",
-          url_template: "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
-          required_values: { enabled: true },
-          policy_fields: ["allow_public_egress", "filter_mode"],
-        },
-        contact_rules: {
-          method: "GET",
-          url_template: "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
-          peer_handle: "support",
-          relevant_directions: ["outbound", "both"],
-          blocking_action: "block",
-        },
-      },
-    },
+    agent_support: "Contact support using https://inkbox.ai/a2a/support/card.",
   };
 }
 
@@ -106,9 +81,7 @@ describe("A2AInvitationsResource", () => {
 
     await expect(Inkbox.previewA2AInvitation(TOKEN)).rejects.toMatchObject({
       message: "HTTP 400: invalid invitation",
-      agentSupport: {
-        agentCardUrl: "https://inkbox.ai/a2a/support/card",
-      },
+      agentSupport: "Contact support using https://inkbox.ai/a2a/support/card.",
     } satisfies Partial<InkboxAPIError>);
   });
 

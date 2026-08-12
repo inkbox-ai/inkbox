@@ -9,9 +9,6 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from inkbox.error_guidance import AgentSupport
-
-
 class InkboxError(Exception):
     """
     Base exception for all Inkbox SDK errors.
@@ -53,7 +50,7 @@ class InkboxAPIError(InkboxError):
         detail: str | dict[str, Any],
         *,
         retry_after: str | int | None = None,
-        agent_support: AgentSupport | None = None,
+        agent_support: str | None = None,
     ) -> None:
         super().__init__(f"HTTP {status_code}: {detail}")
         self.status_code = status_code

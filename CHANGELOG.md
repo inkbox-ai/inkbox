@@ -8,16 +8,14 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Python and TypeScript API errors expose optional typed Support Agent metadata,
-  including the environment-specific Agent Card URL, conversation eligibility,
-  and endpoints for checking A2A settings and contact rules.
-- The CLI prints the Support Agent escalation message, Agent Card, requirements,
-  and verification endpoints after the existing API error.
+- Python and TypeScript API errors expose the optional Support Agent instructions
+  string supplied by the API.
+- The CLI prints those instructions after the existing API error.
 
 ### Changed
 
 - Error strings and structured `detail` values remain unchanged. Missing or
-  malformed Support Agent metadata is ignored for compatibility with older
+  malformed Support Agent instructions are ignored for compatibility with older
   deployments.
 - Package and plugin versions moved in lockstep to 0.5.16; the CLI now depends
   on `@inkbox/sdk` `^0.5.16`.

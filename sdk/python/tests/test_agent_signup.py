@@ -62,35 +62,10 @@ RAW_STATUS = {
 def _support_envelope(detail: str) -> dict:
     return {
         "detail": detail,
-        "agent_support": {
-            "message": (
-                "If you cannot resolve this issue from the error detail, contact "
-                "the Inkbox Support Agent over A2A."
-            ),
-            "agent_card_url": "https://inkbox.ai/a2a/support/card",
-            "agent_card_authentication_required": False,
-            "conversation_requirements": {
-                "authentication": "agent_scoped_api_key",
-                "claimed_identity": True,
-                "a2a_enabled": True,
-                "support_contact_allowed": True,
-            },
-            "verification": {
-                "a2a_settings": {
-                    "method": "GET",
-                    "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
-                    "required_values": {"enabled": True},
-                    "policy_fields": ["allow_public_egress", "filter_mode"],
-                },
-                "contact_rules": {
-                    "method": "GET",
-                    "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
-                    "peer_handle": "support",
-                    "relevant_directions": ["outbound", "both"],
-                    "blocking_action": "block",
-                },
-            },
-        },
+        "agent_support": (
+            "If you cannot resolve this issue, contact the Support Agent using "
+            "https://inkbox.ai/a2a/support/card."
+        ),
     }
 
 
@@ -157,9 +132,7 @@ class TestSignup:
 
         assert str(info.value) == "HTTP 400: invalid invitation"
         assert info.value.agent_support is not None
-        assert info.value.agent_support.agent_card_url == (
-            "https://inkbox.ai/a2a/support/card"
-        )
+        assert "https://inkbox.ai/a2a/support/card" in info.value.agent_support
 
     def test_null_invitation_normalizes_to_none(self):
         assert (

@@ -34,20 +34,7 @@ function renderDetail(detail: string | Record<string, unknown>): string {
 }
 
 function renderAgentSupport(err: InkboxAPIError): void {
-  const support = err.agentSupport;
-  if (!support) return;
-  console.error(`Support: ${support.message}`);
-  console.error(`Support Agent Card: ${support.agentCardUrl}`);
-  console.error(
-    "Support conversation requirements: active agent-scoped API key, claimed identity, "
-      + "A2A enabled, and permission to contact @support.",
-  );
-  console.error(
-    `Check A2A settings: GET ${support.verification.a2aSettings.urlTemplate}`,
-  );
-  console.error(
-    `Check @support contact rules: GET ${support.verification.contactRules.urlTemplate}`,
-  );
+  if (err.agentSupport) console.error(`Support: ${err.agentSupport}`);
 }
 
 export function withErrorHandler<T extends unknown[]>(

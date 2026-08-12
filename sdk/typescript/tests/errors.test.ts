@@ -146,35 +146,7 @@ describe("HttpTransport 409 routing", () => {
     vi.mocked(fetch).mockResolvedValue(
       makeErrorResponse(401, {
         detail: "missing key",
-        agent_support: {
-          message:
-            "If you cannot resolve this issue from the error detail, contact the Inkbox Support Agent over A2A.",
-          agent_card_url: "https://inkbox.ai/a2a/support/card",
-          agent_card_authentication_required: false,
-          conversation_requirements: {
-            authentication: "agent_scoped_api_key",
-            claimed_identity: true,
-            a2a_enabled: true,
-            support_contact_allowed: true,
-          },
-          verification: {
-            a2a_settings: {
-              method: "GET",
-              url_template:
-                "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
-              required_values: { enabled: true },
-              policy_fields: ["allow_public_egress", "filter_mode"],
-            },
-            contact_rules: {
-              method: "GET",
-              url_template:
-                "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
-              peer_handle: "support",
-              relevant_directions: ["outbound", "both"],
-              blocking_action: "block",
-            },
-          },
-        },
+        agent_support: "Contact support using https://inkbox.ai/a2a/support/card.",
       }),
     );
     const http = new HttpTransport(API_KEY, BASE);
@@ -185,12 +157,9 @@ describe("HttpTransport 409 routing", () => {
       expect(err).toBeInstanceOf(InkboxAPIError);
       const apiError = err as InkboxAPIError;
       expect(apiError.message).toBe("HTTP 401: missing key");
-      expect(apiError.agentSupport?.agentCardUrl).toBe(
-        "https://inkbox.ai/a2a/support/card",
+      expect(apiError.agentSupport).toBe(
+        "Contact support using https://inkbox.ai/a2a/support/card.",
       );
-      expect(apiError.agentSupport?.verification.a2aSettings.requiredValues).toEqual({
-        enabled: true,
-      });
     }
   });
 

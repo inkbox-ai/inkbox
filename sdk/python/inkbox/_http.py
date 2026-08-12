@@ -23,7 +23,7 @@ from inkbox.exceptions import (
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
 )
-from inkbox.error_guidance import AgentSupport, parse_agent_support
+from inkbox.error_guidance import parse_agent_support
 
 _DEFAULT_TIMEOUT = 30.0
 
@@ -236,7 +236,7 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code < 400:
         return
     raw_detail: Any
-    agent_support: AgentSupport | None = None
+    agent_support: str | None = None
     try:
         envelope = resp.json()
         raw_detail = envelope.get("detail", resp.text)

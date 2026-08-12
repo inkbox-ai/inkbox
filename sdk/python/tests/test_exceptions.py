@@ -319,50 +319,20 @@ class TestIdentityConflictMapping:
 
 
 class TestRaiseForStatusOtherCodes:
-    def test_agent_support_is_typed_without_changing_message(self):
+    def test_agent_support_string_is_preserved_without_changing_message(self):
         resp = _resp(
             401,
             {
                 "detail": "missing key",
-                "agent_support": {
-                    "message": (
-                        "If you cannot resolve this issue from the error detail, "
-                        "contact the Inkbox Support Agent over A2A."
-                    ),
-                    "agent_card_url": "https://inkbox.ai/a2a/support/card",
-                    "agent_card_authentication_required": False,
-                    "conversation_requirements": {
-                        "authentication": "agent_scoped_api_key",
-                        "claimed_identity": True,
-                        "a2a_enabled": True,
-                        "support_contact_allowed": True,
-                    },
-                    "verification": {
-                        "a2a_settings": {
-                            "method": "GET",
-                            "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
-                            "required_values": {"enabled": True},
-                            "policy_fields": ["allow_public_egress", "filter_mode"],
-                        },
-                        "contact_rules": {
-                            "method": "GET",
-                            "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
-                            "peer_handle": "support",
-                            "relevant_directions": ["outbound", "both"],
-                            "blocking_action": "block",
-                        },
-                    },
-                },
+                "agent_support": "Contact support using https://inkbox.ai/a2a/support/card.",
             },
         )
         with pytest.raises(InkboxAPIError) as info:
             _raise_for_status(resp)
         assert str(info.value) == "HTTP 401: missing key"
-        assert info.value.agent_support is not None
-        assert info.value.agent_support.agent_card_url.endswith("/support/card")
-        assert info.value.agent_support.verification.a2a_settings.required_values == {
-            "enabled": True,
-        }
+        assert info.value.agent_support == (
+            "Contact support using https://inkbox.ai/a2a/support/card."
+        )
 
     def test_malformed_guidance_does_not_hide_error(self):
         resp = _resp(400, {"detail": "bad request", "agent_support": {"message": 3}})

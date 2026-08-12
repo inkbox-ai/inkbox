@@ -568,7 +568,7 @@ export class Inkbox {
 
     if (!resp.ok) {
       let detail: InkboxAPIErrorDetail;
-      let agentSupport = null;
+      let agentSupport: string | null = null;
       try {
         const parsed = await resp.json() as unknown;
         const envelope = (
