@@ -56,7 +56,7 @@ def _map_sign_csr_error(err: InkboxAPIError) -> Exception:
         mapped = TunnelTLSModeMismatch(status_code=err.status_code, detail=err.detail)
     else:
         mapped = TunnelCSRStateConflict(status_code=err.status_code, detail=err.detail)
-    mapped.agent_guidance = err.agent_guidance
+    mapped.agent_support = err.agent_support
     return mapped
 
 

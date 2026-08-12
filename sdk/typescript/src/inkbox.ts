@@ -6,7 +6,7 @@
 
 import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
 import type { InkboxAPIErrorDetail } from "./_http.js";
-import { parseAgentErrorGuidance } from "./error-guidance.js";
+import { parseAgentSupport } from "./error-guidance.js";
 import { VERSION } from "./version.js";
 import { resolveClientSettings } from "./_config.js";
 import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
@@ -568,24 +568,24 @@ export class Inkbox {
 
     if (!resp.ok) {
       let detail: InkboxAPIErrorDetail;
-      let agentGuidance = null;
+      let agentSupport = null;
       try {
         const parsed = await resp.json() as unknown;
-        const envelope = parsed as Record<string, unknown>;
-        const rawDetail = (
+        const envelope = (
           typeof parsed === "object"
           && parsed !== null
           && !Array.isArray(parsed)
         )
-          ? envelope["detail"]
-          : undefined;
+          ? parsed as Record<string, unknown>
+          : null;
+        const rawDetail = envelope?.["detail"];
         detail = (
           typeof rawDetail === "string"
           || (typeof rawDetail === "object" && rawDetail !== null && !Array.isArray(rawDetail))
         )
           ? rawDetail as InkboxAPIErrorDetail
           : resp.statusText;
-        agentGuidance = parseAgentErrorGuidance(envelope["agent_guidance"]);
+        agentSupport = parseAgentSupport(envelope?.["agent_support"]);
       } catch {
         detail = resp.statusText;
       }
@@ -593,7 +593,7 @@ export class Inkbox {
         resp.status,
         detail,
         resp.headers.get("Retry-After"),
-        agentGuidance,
+        agentSupport,
       );
     }
 

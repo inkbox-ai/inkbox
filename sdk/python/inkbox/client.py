@@ -45,7 +45,9 @@ from inkbox.imessage.resources.contact_rules import IMessageContactRulesResource
 from inkbox.imessage.resources.imessages import IMessagesResource
 from inkbox.imessage.types import IMessageNumberType
 from inkbox.mail.resources.contact_rules import MailContactRulesResource
-from inkbox.mail.resources.identity_contact_rules import MailIdentityContactRulesResource
+from inkbox.mail.resources.identity_contact_rules import (
+    MailIdentityContactRulesResource,
+)
 from inkbox.mail.resources.domains import DomainsResource
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
@@ -81,6 +83,7 @@ class _WebhooksNamespace:
     Single allocation per ``Inkbox`` instance so identity checks
     (``client.webhooks is client.webhooks``) hold.
     """
+
     __slots__ = ("subscriptions", "deliveries")
 
     def __init__(
@@ -148,7 +151,9 @@ class Inkbox:
                 identifies itself ahead of the SDK's own token.
         """
         api_key, base_url, vault_key = resolve_client_settings(
-            api_key=api_key, base_url=base_url, vault_key=vault_key,
+            api_key=api_key,
+            base_url=base_url,
+            vault_key=vault_key,
         )
         if not api_key:
             raise ValueError(
@@ -274,7 +279,9 @@ class Inkbox:
         self._imessages = IMessagesResource(self._imessage_http)
         self._imessage_contact_rules = IMessageContactRulesResource(self._imessage_http)
 
-        self._vault_resource = VaultResource(self._vault_http, api_http=self._root_api_http)
+        self._vault_resource = VaultResource(
+            self._vault_http, api_http=self._root_api_http
+        )
 
         self._signing_keys = SigningKeysResource(self._api_http)
         self._webhook_subscriptions = WebhookSubscriptionsResource(self._api_http)
@@ -484,7 +491,11 @@ class Inkbox:
         sending_domain: str | None = _UNSET,  # type: ignore[assignment]
         tunnel: "IdentityTunnelCreateOptions | None" = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
-        vault_secret_ids: UUID | str | list[UUID | str] | Literal["*", "all"] | None = None,
+        vault_secret_ids: UUID
+        | str
+        | list[UUID | str]
+        | Literal["*", "all"]
+        | None = None,
     ) -> AgentIdentity:
         """
         Create a new agent identity. Atomically provisions the linked
@@ -617,13 +628,13 @@ class Inkbox:
             resp = client.request(method, url, headers=headers, json=json)
 
         if resp.status_code >= 400:
-            from inkbox.error_guidance import parse_agent_error_guidance
+            from inkbox.error_guidance import parse_agent_support
 
-            guidance = None
+            agent_support = None
             try:
                 envelope = resp.json()
                 detail = envelope.get("detail", resp.text)
-                guidance = parse_agent_error_guidance(envelope.get("agent_guidance"))
+                agent_support = parse_agent_support(envelope.get("agent_support"))
             except Exception:
                 detail = resp.text
             if not isinstance(detail, (str, dict)):
@@ -632,7 +643,7 @@ class Inkbox:
                 status_code=resp.status_code,
                 detail=detail,
                 retry_after=resp.headers.get("Retry-After"),
-                agent_guidance=guidance,
+                agent_support=agent_support,
             )
         return resp.json()
 
@@ -645,9 +656,7 @@ class Inkbox:
         timeout: float = 30.0,
     ) -> A2AInvitationPreview:
         """Review an A2A invitation without accepting it or supplying an API key."""
-        invitation_token = extract_a2a_invitation_token(
-            invitation, base_url=base_url
-        )
+        invitation_token = extract_a2a_invitation_token(invitation, base_url=base_url)
         data = cls._one_shot_request(
             "POST",
             "/api/v1/a2a/invitations/preview",
@@ -738,7 +747,8 @@ class Inkbox:
             timeout: Request timeout in seconds.
         """
         data = cls._one_shot_request(
-            "POST", "/api/v1/agent-signup/verify",
+            "POST",
+            "/api/v1/agent-signup/verify",
             api_key=api_key,
             json={"verification_code": verification_code},
             base_url=base_url,
@@ -763,7 +773,8 @@ class Inkbox:
             timeout: Request timeout in seconds.
         """
         data = cls._one_shot_request(
-            "POST", "/api/v1/agent-signup/resend-verification",
+            "POST",
+            "/api/v1/agent-signup/resend-verification",
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
@@ -787,7 +798,8 @@ class Inkbox:
             timeout: Request timeout in seconds.
         """
         data = cls._one_shot_request(
-            "GET", "/api/v1/agent-signup/status",
+            "GET",
+            "/api/v1/agent-signup/status",
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,

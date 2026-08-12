@@ -110,7 +110,7 @@ export function redactSecretError(error: unknown, ...secrets: string[]): Error {
       error.statusCode,
       redactValue(error.detail, secrets) as typeof error.detail,
       error.retryAfterSeconds,
-      redactValue(error.agentGuidance, secrets) as typeof error.agentGuidance,
+      redactValue(error.agentSupport, secrets) as typeof error.agentSupport,
     );
   }
   const message = error instanceof Error ? error.message : String(error);

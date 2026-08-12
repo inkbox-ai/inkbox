@@ -23,7 +23,7 @@ from inkbox.exceptions import (
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
 )
-from inkbox.error_guidance import AgentErrorGuidance, parse_agent_error_guidance
+from inkbox.error_guidance import AgentSupport, parse_agent_support
 
 _DEFAULT_TIMEOUT = 30.0
 
@@ -236,26 +236,28 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code < 400:
         return
     raw_detail: Any
-    guidance: AgentErrorGuidance | None = None
+    agent_support: AgentSupport | None = None
     try:
         envelope = resp.json()
         raw_detail = envelope.get("detail", resp.text)
-        guidance = parse_agent_error_guidance(envelope.get("agent_guidance"))
+        agent_support = parse_agent_support(envelope.get("agent_support"))
     except Exception:
         raw_detail = resp.text
 
     if resp.status_code == 409 and isinstance(raw_detail, dict):
         if "existing_rule_id" in raw_detail:
             error = DuplicateContactRuleError(
-                status_code=resp.status_code, detail=raw_detail,
+                status_code=resp.status_code,
+                detail=raw_detail,
             )
-            error.agent_guidance = guidance
+            error.agent_support = agent_support
             raise error
         if raw_detail.get("error") == "redundant_grant":
             error = RedundantContactAccessGrantError(
-                status_code=resp.status_code, detail=raw_detail,
+                status_code=resp.status_code,
+                detail=raw_detail,
             )
-            error.agent_guidance = guidance
+            error.agent_support = agent_support
             raise error
 
     if (
@@ -264,9 +266,10 @@ def _raise_for_status(resp: httpx.Response) -> None:
         and raw_detail.get("error") == "recipient_blocked"
     ):
         error = RecipientBlockedError(
-            status_code=resp.status_code, detail=raw_detail,
+            status_code=resp.status_code,
+            detail=raw_detail,
         )
-        error.agent_guidance = guidance
+        error.agent_support = agent_support
         raise error
 
     # Older servers send a plain-string 402 detail; those fall through to the
@@ -277,9 +280,10 @@ def _raise_for_status(resp: httpx.Response) -> None:
         and raw_detail.get("error") == "storage_limit_exceeded"
     ):
         error = StorageLimitExceededError(
-            status_code=resp.status_code, detail=raw_detail,
+            status_code=resp.status_code,
+            detail=raw_detail,
         )
-        error.agent_guidance = guidance
+        error.agent_support = agent_support
         raise error
 
     if (
@@ -288,9 +292,10 @@ def _raise_for_status(resp: httpx.Response) -> None:
         and raw_detail.get("error") == "dedicated_imessage_number_quota_exceeded"
     ):
         error = DedicatedIMessageNumberQuotaExceededError(
-            status_code=resp.status_code, detail=raw_detail,
+            status_code=resp.status_code,
+            detail=raw_detail,
         )
-        error.agent_guidance = guidance
+        error.agent_support = agent_support
         raise error
 
     if (
@@ -303,7 +308,7 @@ def _raise_for_status(resp: httpx.Response) -> None:
             detail=raw_detail,
             retry_after=resp.headers.get("Retry-After"),
         )
-        error.agent_guidance = guidance
+        error.agent_support = agent_support
         raise error
 
     if (
@@ -315,7 +320,7 @@ def _raise_for_status(resp: httpx.Response) -> None:
             status_code=resp.status_code,
             detail=raw_detail,
         )
-        error.agent_guidance = guidance
+        error.agent_support = agent_support
         raise error
 
     if (
@@ -328,12 +333,12 @@ def _raise_for_status(resp: httpx.Response) -> None:
             detail=raw_detail,
             retry_after=resp.headers.get("Retry-After"),
         )
-        error.agent_guidance = guidance
+        error.agent_support = agent_support
         raise error
 
     raise InkboxAPIError(
         status_code=resp.status_code,
         detail=raw_detail,
         retry_after=resp.headers.get("Retry-After"),
-        agent_guidance=guidance,
+        agent_support=agent_support,
     )

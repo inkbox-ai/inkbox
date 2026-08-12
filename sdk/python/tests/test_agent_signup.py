@@ -59,7 +59,44 @@ RAW_STATUS = {
 }
 
 
-def _mock_httpx_client(mock_client_cls: MagicMock, status_code: int, json_data: dict) -> MagicMock:
+def _support_envelope(detail: str) -> dict:
+    return {
+        "detail": detail,
+        "agent_support": {
+            "message": (
+                "If you cannot resolve this issue from the error detail, contact "
+                "the Inkbox Support Agent over A2A."
+            ),
+            "agent_card_url": "https://inkbox.ai/a2a/support/card",
+            "agent_card_authentication_required": False,
+            "conversation_requirements": {
+                "authentication": "agent_scoped_api_key",
+                "claimed_identity": True,
+                "a2a_enabled": True,
+                "support_contact_allowed": True,
+            },
+            "verification": {
+                "a2a_settings": {
+                    "method": "GET",
+                    "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
+                    "required_values": {"enabled": True},
+                    "policy_fields": ["allow_public_egress", "filter_mode"],
+                },
+                "contact_rules": {
+                    "method": "GET",
+                    "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
+                    "peer_handle": "support",
+                    "relevant_directions": ["outbound", "both"],
+                    "blocking_action": "block",
+                },
+            },
+        },
+    }
+
+
+def _mock_httpx_client(
+    mock_client_cls: MagicMock, status_code: int, json_data: dict
+) -> MagicMock:
     """Configure the mocked httpx.Client context manager to return a response."""
     mock_response = MagicMock()
     mock_response.status_code = status_code
@@ -101,21 +138,41 @@ class TestSignup:
             "https://inkbox.ai/api/v1/a2a/invitations/preview",
             headers={"Accept": "application/json", "User-Agent": sdk_user_agent()},
             json={
-                "invitation_token": (
-                    "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-                )
+                "invitation_token": ("a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             },
         )
         assert result.inviter_email == "owner@example.test"
         assert result.peer_agent_handles == ["support", "billing"]
 
+    @patch("httpx.Client")
+    def test_preview_error_preserves_agent_support(self, mock_client_cls: MagicMock):
+        _mock_httpx_client(
+            mock_client_cls, 400, _support_envelope("invalid invitation")
+        )
+
+        with pytest.raises(InkboxAPIError) as info:
+            Inkbox.preview_a2a_invitation(
+                "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            )
+
+        assert str(info.value) == "HTTP 400: invalid invitation"
+        assert info.value.agent_support is not None
+        assert info.value.agent_support.agent_card_url == (
+            "https://inkbox.ai/a2a/support/card"
+        )
+
     def test_null_invitation_normalizes_to_none(self):
-        assert AgentSignupResponse._from_dict(
-            {**RAW_SIGNUP, "invitation": None}
-        ).invitation is None
+        assert (
+            AgentSignupResponse._from_dict(
+                {**RAW_SIGNUP, "invitation": None}
+            ).invitation
+            is None
+        )
 
     @patch("httpx.Client")
-    def test_signup_sends_correct_request_and_parses_response(self, mock_client_cls: MagicMock):
+    def test_signup_sends_correct_request_and_parses_response(
+        self, mock_client_cls: MagicMock
+    ):
         client = _mock_httpx_client(mock_client_cls, 200, RAW_SIGNUP)
 
         result = Inkbox.signup(
@@ -162,8 +219,11 @@ class TestSignup:
                 "note_to_human": "Please approve me",
             },
         )
+
     @patch("httpx.Client")
-    def test_signup_sends_invitation_and_parses_summary(self, mock_client_cls: MagicMock):
+    def test_signup_sends_invitation_and_parses_summary(
+        self, mock_client_cls: MagicMock
+    ):
         summary = {
             "invitation_id": "inv_1",
             "status": "awaiting_verification",
@@ -187,7 +247,9 @@ class TestSignup:
         assert result.invitation.invitation_id == "inv_1"
 
     @patch("httpx.Client")
-    def test_signup_sends_optional_handle_and_email_local_part(self, mock_client_cls: MagicMock):
+    def test_signup_sends_optional_handle_and_email_local_part(
+        self, mock_client_cls: MagicMock
+    ):
         client = _mock_httpx_client(mock_client_cls, 200, RAW_SIGNUP)
 
         Inkbox.signup(
@@ -250,18 +312,24 @@ class TestVerifySignup:
         assert result.invitation is None
 
     @patch("httpx.Client")
-    def test_verify_parses_accepted_invitation_summary(self, mock_client_cls: MagicMock):
-        _mock_httpx_client(mock_client_cls, 200, {
-            **RAW_VERIFY,
-            "invitation": {
-                "invitation_id": "inv_1",
-                "status": "accepted",
-                "invitee_identity_id": "identity_2",
-                "invitee_agent_handle": "buyer",
-                "peer_agent_handles": ["support"],
-                "accepted_at": "2026-08-04T02:00:00Z",
+    def test_verify_parses_accepted_invitation_summary(
+        self, mock_client_cls: MagicMock
+    ):
+        _mock_httpx_client(
+            mock_client_cls,
+            200,
+            {
+                **RAW_VERIFY,
+                "invitation": {
+                    "invitation_id": "inv_1",
+                    "status": "accepted",
+                    "invitee_identity_id": "identity_2",
+                    "invitee_agent_handle": "buyer",
+                    "peer_agent_handles": ["support"],
+                    "accepted_at": "2026-08-04T02:00:00Z",
+                },
             },
-        })
+        )
         result = Inkbox.verify_signup("ApiKey_abc", "123456")
         assert result.invitation is not None
         assert result.invitation.status == "accepted"
@@ -293,7 +361,9 @@ class TestResendSignupVerification:
 
 class TestGetSignupStatus:
     @patch("httpx.Client")
-    def test_status_sends_get_with_auth_and_parses_restrictions(self, mock_client_cls: MagicMock):
+    def test_status_sends_get_with_auth_and_parses_restrictions(
+        self, mock_client_cls: MagicMock
+    ):
         client = _mock_httpx_client(mock_client_cls, 200, RAW_STATUS)
 
         result = Inkbox.get_signup_status(api_key="ApiKey_abc")

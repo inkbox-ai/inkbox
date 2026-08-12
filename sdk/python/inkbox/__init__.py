@@ -64,8 +64,10 @@ from inkbox.exceptions import (
     StorageLimitExceededError,
 )
 from inkbox.error_guidance import (
-    AgentErrorGuidance,
-    AgentErrorSupport,
+    A2AContactRulesVerification,
+    A2ASettingsVerification,
+    AgentSupport,
+    AgentSupportVerification,
     SupportConversationRequirements,
 )
 
@@ -394,8 +396,10 @@ from inkbox.webhook_deliveries import (
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
 __all__ = [
-    "AgentErrorGuidance",
-    "AgentErrorSupport",
+    "A2AContactRulesVerification",
+    "A2ASettingsVerification",
+    "AgentSupport",
+    "AgentSupportVerification",
     "SupportConversationRequirements",
     # A2A
     "A2ACard",

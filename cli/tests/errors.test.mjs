@@ -74,6 +74,48 @@ test("withErrorHandler renders the message from structured API details", async (
   assert.deepEqual(lines, ["Error: HTTP 400: The import request is invalid."]);
 });
 
+test("withErrorHandler renders the Support Agent escalation and checks", async () => {
+  const agentSupport = {
+    message:
+      "If you cannot resolve this issue from the error detail, contact the Inkbox Support Agent over A2A.",
+    agentCardUrl: "https://inkbox.ai/a2a/support/card",
+    agentCardAuthenticationRequired: false,
+    conversationRequirements: {
+      authentication: "agent_scoped_api_key",
+      claimedIdentity: true,
+      a2aEnabled: true,
+      supportContactAllowed: true,
+    },
+    verification: {
+      a2aSettings: {
+        method: "GET",
+        urlTemplate:
+          "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
+        requiredValues: { enabled: true },
+        policyFields: ["allow_public_egress", "filter_mode"],
+      },
+      contactRules: {
+        method: "GET",
+        urlTemplate:
+          "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
+        peerHandle: "support",
+        relevantDirections: ["outbound", "both"],
+        blockingAction: "block",
+      },
+    },
+  };
+  const { lines, exitCode } = await runAndCapture(
+    new InkboxAPIError(400, "bad request", null, agentSupport),
+  );
+
+  assert.equal(exitCode, 1);
+  assert.match(lines[1], /^Support: If you cannot resolve/);
+  assert.equal(lines[2], "Support Agent Card: https://inkbox.ai/a2a/support/card");
+  assert.match(lines[3], /active agent-scoped API key/);
+  assert.match(lines[4], /\/a2a\/settings$/);
+  assert.match(lines[5], /\/a2a\/contact-rules$/);
+});
+
 for (const code of [
   "a2a_invitation_issuer_rate_limited",
   "a2a_invitation_issuer_outstanding_limit",

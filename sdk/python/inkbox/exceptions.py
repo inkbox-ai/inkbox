@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from inkbox.error_guidance import AgentErrorGuidance
+from inkbox.error_guidance import AgentSupport
 
 
 class InkboxError(Exception):
@@ -53,16 +53,14 @@ class InkboxAPIError(InkboxError):
         detail: str | dict[str, Any],
         *,
         retry_after: str | int | None = None,
-        agent_guidance: AgentErrorGuidance | None = None,
+        agent_support: AgentSupport | None = None,
     ) -> None:
         super().__init__(f"HTTP {status_code}: {detail}")
         self.status_code = status_code
         self.detail: str | dict[str, Any] = detail
-        self.agent_guidance = agent_guidance
+        self.agent_support = agent_support
         try:
-            parsed_retry_after = (
-                int(retry_after) if retry_after is not None else None
-            )
+            parsed_retry_after = int(retry_after) if retry_after is not None else None
         except (TypeError, ValueError):
             parsed_retry_after = None
         self.retry_after_seconds: int | None = (

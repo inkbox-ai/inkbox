@@ -67,7 +67,7 @@ export function mapIdentityConflictError(err: InkboxAPIError): Error {
       err.detail,
       readBlockingNamespace(err.detail),
     );
-    mapped.agentGuidance = err.agentGuidance;
+    mapped.agentSupport = err.agentSupport;
     return mapped;
   }
   return err;

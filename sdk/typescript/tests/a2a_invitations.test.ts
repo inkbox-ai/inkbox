@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { Inkbox } from "../src/inkbox.js";
 import { A2AInvitationParseError, extractA2AInvitationToken } from "../src/a2a/invitations.js";
+import { InkboxAPIError } from "../src/_http.js";
 
 const TOKEN = "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
@@ -37,6 +38,38 @@ function respond(body: unknown): void {
   } as Response);
 }
 
+function supportEnvelope(detail: string): Record<string, unknown> {
+  return {
+    detail,
+    agent_support: {
+      message: "If you cannot resolve this issue, contact the Inkbox Support Agent over A2A.",
+      agent_card_url: "https://inkbox.ai/a2a/support/card",
+      agent_card_authentication_required: false,
+      conversation_requirements: {
+        authentication: "agent_scoped_api_key",
+        claimed_identity: true,
+        a2a_enabled: true,
+        support_contact_allowed: true,
+      },
+      verification: {
+        a2a_settings: {
+          method: "GET",
+          url_template: "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
+          required_values: { enabled: true },
+          policy_fields: ["allow_public_egress", "filter_mode"],
+        },
+        contact_rules: {
+          method: "GET",
+          url_template: "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
+          peer_handle: "support",
+          relevant_directions: ["outbound", "both"],
+          blocking_action: "block",
+        },
+      },
+    },
+  };
+}
+
 describe("A2AInvitationsResource", () => {
   it("previews an invitation without constructing a client or sending a key", async () => {
     respond({
@@ -60,6 +93,23 @@ describe("A2AInvitationsResource", () => {
       expiresAt: "2026-08-11T00:00:00Z",
       agentHandoffPrompt: "Review and accept this invitation.",
     });
+  });
+
+  it("preserves Support Agent metadata on one-shot preview errors", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: "Bad Request",
+      json: async () => supportEnvelope("invalid invitation"),
+      headers: new Headers(),
+    } as Response);
+
+    await expect(Inkbox.previewA2AInvitation(TOKEN)).rejects.toMatchObject({
+      message: "HTTP 400: invalid invitation",
+      agentSupport: {
+        agentCardUrl: "https://inkbox.ai/a2a/support/card",
+      },
+    } satisfies Partial<InkboxAPIError>);
   });
 
   it("creates an invitation and preserves its one-time secret", async () => {

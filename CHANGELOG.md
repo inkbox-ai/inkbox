@@ -4,6 +4,24 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.5.16 — Support Agent discovery on API errors
+
+### Added
+
+- Python and TypeScript API errors expose optional typed Support Agent metadata,
+  including the environment-specific Agent Card URL, conversation eligibility,
+  and endpoints for checking A2A settings and contact rules.
+- The CLI prints the Support Agent escalation message, Agent Card, requirements,
+  and verification endpoints after the existing API error.
+
+### Changed
+
+- Error strings and structured `detail` values remain unchanged. Missing or
+  malformed Support Agent metadata is ignored for compatibility with older
+  deployments.
+- Package and plugin versions moved in lockstep to 0.5.16; the CLI now depends
+  on `@inkbox/sdk` `^0.5.16`.
+
 ## 0.5.15 — Resilient tunnel runtimes
 
 ### Added

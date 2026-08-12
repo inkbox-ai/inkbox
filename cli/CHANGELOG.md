@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.16 — Support Agent discovery on API errors
+
+- API failures retain their existing first line and now print the server's
+  Support Agent escalation message, environment-specific Agent Card,
+  conversation requirements, and A2A verification endpoints when available.
+- Secret redaction also covers the optional Support Agent metadata.
+- CLI and SDK dependency versions moved in lockstep to 0.5.16.
+
 ## 0.5.14 — A2A invitations
 
 - Accept invitation links or raw tokens through the neutral

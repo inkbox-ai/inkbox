@@ -5,7 +5,7 @@
  */
 
 import type { IMessageDedicatedNumberType } from "./imessage/types.js";
-import { parseAgentErrorGuidance, type AgentErrorGuidance } from "./error-guidance.js";
+import { parseAgentSupport, type AgentSupport } from "./error-guidance.js";
 
 export class InkboxError extends Error {
   constructor(message: string) {
@@ -63,19 +63,19 @@ export class InkboxAPIError extends InkboxError {
   readonly detail: InkboxAPIErrorDetail;
   /** Parsed delta-seconds value from `Retry-After`, when supplied. */
   readonly retryAfterSeconds: number | null;
-  agentGuidance: AgentErrorGuidance | null;
+  agentSupport: AgentSupport | null;
 
   constructor(
     statusCode: number,
     detail: InkboxAPIErrorDetail,
     retryAfter: string | number | null = null,
-    agentGuidance: AgentErrorGuidance | null = null,
+    agentSupport: AgentSupport | null = null,
   ) {
     super(`HTTP ${statusCode}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
     this.name = "InkboxAPIError";
     this.statusCode = statusCode;
     this.detail = detail;
-    this.agentGuidance = agentGuidance;
+    this.agentSupport = agentSupport;
     const parsed = retryAfter === null ? Number.NaN : Number(retryAfter);
     this.retryAfterSeconds = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
   }
@@ -233,10 +233,10 @@ function raiseForErrorResponse(
   status: number,
   rawDetail: InkboxAPIErrorDetail,
   headers?: Headers,
-  agentGuidance: AgentErrorGuidance | null = null,
+  agentSupport: AgentSupport | null = null,
 ): never {
   const guided = <T extends InkboxAPIError>(error: T): T => {
-    error.agentGuidance = agentGuidance;
+    error.agentSupport = agentSupport;
     return error;
   };
   if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
@@ -304,7 +304,7 @@ function raiseForErrorResponse(
     status,
     rawDetail,
     headers?.get("Retry-After") ?? null,
-    agentGuidance,
+    agentSupport,
   );
 }
 
@@ -348,18 +348,18 @@ function proxyHint(): string {
 
 async function readErrorEnvelope(resp: Response): Promise<{
   detail: InkboxAPIErrorDetail;
-  agentGuidance: AgentErrorGuidance | null;
+  agentSupport: AgentSupport | null;
 }> {
   try {
-    const parsed = (await resp.json()) as { detail?: unknown; agent_guidance?: unknown };
+    const parsed = (await resp.json()) as { detail?: unknown; agent_support?: unknown };
     const d = parsed?.detail;
-    const agentGuidance = parseAgentErrorGuidance(parsed?.agent_guidance);
-    if (d === undefined || d === null) return { detail: resp.statusText, agentGuidance };
-    if (typeof d === "string") return { detail: d, agentGuidance };
-    if (typeof d === "object") return { detail: d as Record<string, unknown>, agentGuidance };
-    return { detail: String(d), agentGuidance };
+    const agentSupport = parseAgentSupport(parsed?.agent_support);
+    if (d === undefined || d === null) return { detail: resp.statusText, agentSupport };
+    if (typeof d === "string") return { detail: d, agentSupport };
+    if (typeof d === "object") return { detail: d as Record<string, unknown>, agentSupport };
+    return { detail: String(d), agentSupport };
   } catch {
-    return { detail: resp.statusText, agentGuidance: null };
+    return { detail: resp.statusText, agentSupport: null };
   }
 }
 
@@ -717,7 +717,7 @@ export class HttpTransport {
 
     if (!resp.ok) {
       const envelope = await readErrorEnvelope(resp);
-      raiseForErrorResponse(resp.status, envelope.detail, resp.headers, envelope.agentGuidance);
+      raiseForErrorResponse(resp.status, envelope.detail, resp.headers, envelope.agentSupport);
     }
 
     if (resp.status === 204) {

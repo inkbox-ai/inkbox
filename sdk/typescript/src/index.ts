@@ -83,8 +83,10 @@ export {
 } from "./_http.js";
 export type { InkboxAPIErrorDetail } from "./_http.js";
 export type {
-  AgentErrorGuidance,
-  AgentErrorSupport,
+  A2AContactRulesVerification,
+  A2ASettingsVerification,
+  AgentSupport,
+  AgentSupportVerification,
   SupportConversationRequirements,
 } from "./error-guidance.js";
 export type {

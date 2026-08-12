@@ -64,7 +64,7 @@ def map_identity_conflict_error(err: InkboxAPIError) -> Exception:
             detail,
             _read_blocking_namespace(detail),
         )
-        mapped.agent_guidance = err.agent_guidance
+        mapped.agent_support = err.agent_support
         return mapped
     return err
 

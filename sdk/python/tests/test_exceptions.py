@@ -73,9 +73,10 @@ class TestDetailUnion:
         assert InkboxAPIError(429, "slow down").retry_after_seconds is None
 
     def test_retry_after_parses_delta_seconds(self):
-        assert InkboxAPIError(
-            429, "slow down", retry_after="120"
-        ).retry_after_seconds == 120
+        assert (
+            InkboxAPIError(429, "slow down", retry_after="120").retry_after_seconds
+            == 120
+        )
 
 
 class TestRaiseForStatusPlainString:
@@ -220,7 +221,9 @@ class TestRaiseForStatusStorageLimitExceeded:
 
     def test_unrelated_402_stays_base_class(self):
         # Sibling plan-limit 402s (identities/phone/iMessage) are not this error.
-        resp = _resp(402, {"detail": "You've reached your plan's limit of 3 identities."})
+        resp = _resp(
+            402, {"detail": "You've reached your plan's limit of 3 identities."}
+        )
         with pytest.raises(InkboxAPIError) as info:
             _raise_for_status(resp)
         assert type(info.value) is InkboxAPIError
@@ -316,15 +319,17 @@ class TestIdentityConflictMapping:
 
 
 class TestRaiseForStatusOtherCodes:
-    def test_agent_guidance_is_typed_without_changing_message(self):
-        resp = _resp(401, {
-            "detail": "missing key",
-            "agent_guidance": {
-                "reason": "Authentication is required.",
-                "next_steps": ["Provide an agent API key."],
-                "support": {
-                    "message": "Contact support over A2A.",
-                    "agent_card_url": "https://api.inkbox.ai/a2a/support/card",
+    def test_agent_support_is_typed_without_changing_message(self):
+        resp = _resp(
+            401,
+            {
+                "detail": "missing key",
+                "agent_support": {
+                    "message": (
+                        "If you cannot resolve this issue from the error detail, "
+                        "contact the Inkbox Support Agent over A2A."
+                    ),
+                    "agent_card_url": "https://inkbox.ai/a2a/support/card",
                     "agent_card_authentication_required": False,
                     "conversation_requirements": {
                         "authentication": "agent_scoped_api_key",
@@ -332,21 +337,39 @@ class TestRaiseForStatusOtherCodes:
                         "a2a_enabled": True,
                         "support_contact_allowed": True,
                     },
+                    "verification": {
+                        "a2a_settings": {
+                            "method": "GET",
+                            "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings",
+                            "required_values": {"enabled": True},
+                            "policy_fields": ["allow_public_egress", "filter_mode"],
+                        },
+                        "contact_rules": {
+                            "method": "GET",
+                            "url_template": "https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/contact-rules",
+                            "peer_handle": "support",
+                            "relevant_directions": ["outbound", "both"],
+                            "blocking_action": "block",
+                        },
+                    },
                 },
             },
-        })
+        )
         with pytest.raises(InkboxAPIError) as info:
             _raise_for_status(resp)
         assert str(info.value) == "HTTP 401: missing key"
-        assert info.value.agent_guidance is not None
-        assert info.value.agent_guidance.support.agent_card_url.endswith("/support/card")
+        assert info.value.agent_support is not None
+        assert info.value.agent_support.agent_card_url.endswith("/support/card")
+        assert info.value.agent_support.verification.a2a_settings.required_values == {
+            "enabled": True,
+        }
 
     def test_malformed_guidance_does_not_hide_error(self):
-        resp = _resp(400, {"detail": "bad request", "agent_guidance": {"reason": 3}})
+        resp = _resp(400, {"detail": "bad request", "agent_support": {"message": 3}})
         with pytest.raises(InkboxAPIError) as info:
             _raise_for_status(resp)
         assert info.value.detail == "bad request"
-        assert info.value.agent_guidance is None
+        assert info.value.agent_support is None
 
     @pytest.mark.parametrize(
         "code",
