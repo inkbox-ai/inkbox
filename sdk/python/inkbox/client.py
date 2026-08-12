@@ -617,8 +617,13 @@ class Inkbox:
             resp = client.request(method, url, headers=headers, json=json)
 
         if resp.status_code >= 400:
+            from inkbox.error_guidance import parse_agent_error_guidance
+
+            guidance = None
             try:
-                detail = resp.json().get("detail", resp.text)
+                envelope = resp.json()
+                detail = envelope.get("detail", resp.text)
+                guidance = parse_agent_error_guidance(envelope.get("agent_guidance"))
             except Exception:
                 detail = resp.text
             if not isinstance(detail, (str, dict)):
@@ -627,6 +632,7 @@ class Inkbox:
                 status_code=resp.status_code,
                 detail=detail,
                 retry_after=resp.headers.get("Retry-After"),
+                agent_guidance=guidance,
             )
         return resp.json()
 

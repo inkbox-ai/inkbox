@@ -63,6 +63,11 @@ from inkbox.exceptions import (
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
 )
+from inkbox.error_guidance import (
+    AgentErrorGuidance,
+    AgentErrorSupport,
+    SupportConversationRequirements,
+)
 
 # Mail types
 from inkbox.mail.types import (
@@ -389,6 +394,9 @@ from inkbox.webhook_deliveries import (
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
 __all__ = [
+    "AgentErrorGuidance",
+    "AgentErrorSupport",
+    "SupportConversationRequirements",
     # A2A
     "A2ACard",
     "A2ACaller",

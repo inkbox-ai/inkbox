@@ -59,11 +59,13 @@ def map_identity_conflict_error(err: InkboxAPIError) -> Exception:
         )
 
     if err.status_code == 409 and is_handle_conflict:
-        return HandleUnavailableError(
+        mapped = HandleUnavailableError(
             err.status_code,
             detail,
             _read_blocking_namespace(detail),
         )
+        mapped.agent_guidance = err.agent_guidance
+        return mapped
     return err
 
 

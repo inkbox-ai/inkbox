@@ -33,6 +33,22 @@ function renderDetail(detail: string | Record<string, unknown>): string {
   return typeof message === "string" && message ? message : JSON.stringify(detail);
 }
 
+function renderAgentGuidance(err: InkboxAPIError): void {
+  const guidance = err.agentGuidance;
+  if (!guidance) return;
+  if (guidance.reason !== renderDetail(err.detail)) {
+    console.error(`Reason: ${guidance.reason}`);
+  }
+  guidance.nextSteps.forEach((step, index) => {
+    console.error(`Next step ${index + 1}: ${step}`);
+  });
+  console.error(`Support Agent Card: ${guidance.support.agentCardUrl}`);
+  console.error(
+    "Support conversation requirements: active agent-scoped API key, claimed identity, "
+      + "A2A enabled, and permission to contact @support.",
+  );
+}
+
 export function withErrorHandler<T extends unknown[]>(
   fn: (...args: T) => Promise<void>,
 ): (...args: T) => Promise<void> {
@@ -65,14 +81,14 @@ export function withErrorHandler<T extends unknown[]>(
         }
       } else if (err instanceof InkboxAPIError) {
         console.error(`Error: HTTP ${err.statusCode}: ${renderDetail(err.detail)}`);
-        if (
+        if (!err.agentGuidance && (
           err.statusCode === 429
           && isA2AInvitationError(err)
           && err.retryAfterSeconds !== null
-        ) {
+        )) {
           console.error(`Hint: Retry in ${err.retryAfterSeconds} seconds.`);
         }
-        if (err.statusCode === 401) {
+        if (err.statusCode === 401 && !err.agentGuidance) {
           console.error("Hint: Check your API key.");
         }
         if (importAlreadyInFlight(err)) {
@@ -93,6 +109,7 @@ export function withErrorHandler<T extends unknown[]>(
       } else {
         console.error("An unknown error occurred.");
       }
+      if (err instanceof InkboxAPIError) renderAgentGuidance(err);
       process.exit(1);
     }
   };
