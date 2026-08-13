@@ -8,8 +8,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Python and TypeScript API errors expose the optional Support Agent instructions
-  string supplied by the API.
+- Python, TypeScript, and Rust API errors expose the optional Support Agent
+  instructions string supplied by the API.
 - The CLI prints those instructions after the existing API error.
 
 ### Changed
@@ -17,6 +17,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Error strings and structured `detail` values remain unchanged. Missing or
   malformed Support Agent instructions are ignored for compatibility with older
   deployments.
+- Rust exposes the instructions through `InkboxError::agent_support()` and
+  preserves them on generic, specialized, remapped, and one-shot API errors.
 - Package and plugin versions moved in lockstep to 0.5.16; the CLI now depends
   on `@inkbox/sdk` `^0.5.16`.
 

@@ -15,7 +15,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::cookies::CookieJar;
-use crate::error::{ApiErrorDetail, InkboxError, Result};
+use crate::error::{parse_agent_support, ApiErrorDetail, InkboxError, Result};
 
 const DEFAULT_TIMEOUT_SECS: f64 = 30.0;
 
@@ -346,6 +346,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
     // `detail` is the `detail` field if the body is a JSON object, else the
     // raw text (matching `resp.json().get("detail", resp.text)`).
     let parsed: Option<Value> = serde_json::from_str(&body).ok();
+    let agent_support = parse_agent_support(parsed.as_ref());
     let raw_detail: Value = match &parsed {
         Some(Value::Object(map)) => map
             .get("detail")
@@ -366,6 +367,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                     status_code: status,
                     existing_rule_id: id,
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
             if map.get("error").and_then(|e| e.as_str()) == Some("redundant_grant") {
@@ -378,6 +380,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .unwrap_or("")
                         .to_string(),
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
             if map.get("error").and_then(|e| e.as_str()) == Some("idempotency_key_reused") {
@@ -389,6 +392,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .unwrap_or("")
                         .into(),
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
         }
@@ -413,6 +417,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .to_string(),
                     limit_bytes: map.get("limit_bytes").and_then(Value::as_u64),
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
             if map.get("error").and_then(|e| e.as_str())
@@ -443,6 +448,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .unwrap_or("")
                         .into(),
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
         }
@@ -472,6 +478,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                     retry_after_seconds: retry_after_header.unwrap_or(detail_retry_after),
                     retry_after_header,
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
         }
@@ -498,6 +505,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .unwrap_or("")
                         .to_string(),
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
         }
@@ -515,6 +523,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
                         .into(),
                     retry_after_header,
                     detail: Box::new(raw_detail),
+                    agent_support,
                 });
             }
         }
@@ -527,6 +536,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
     Err(InkboxError::Api {
         status_code: status,
         detail,
+        agent_support,
     })
 }
 
@@ -534,4 +544,127 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
 /// parity stay in one place.
 pub const fn default_timeout() -> f64 {
     DEFAULT_TIMEOUT_SECS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use httpmock::prelude::*;
+    use serde_json::json;
+
+    const SUPPORT: &str = "Contact the Support Agent using its Agent Card.";
+
+    fn transport(server: &MockServer) -> HttpTransport {
+        HttpTransport::new(
+            "test-key",
+            server.base_url(),
+            5.0,
+            Arc::new(CookieJar::new()),
+            "inkbox-rust-test",
+        )
+        .unwrap()
+    }
+
+    fn variant_name(error: &InkboxError) -> &'static str {
+        match error {
+            InkboxError::Api { .. } => "api",
+            InkboxError::DuplicateContactRule { .. } => "duplicate_contact_rule",
+            InkboxError::RedundantContactAccessGrant { .. } => "redundant_contact_access_grant",
+            InkboxError::RecipientBlocked { .. } => "recipient_blocked",
+            InkboxError::StorageLimitExceeded { .. } => "storage_limit_exceeded",
+            InkboxError::DedicatedIMessageNumberQuotaExceeded { .. } => {
+                "dedicated_imessage_number_quota_exceeded"
+            }
+            InkboxError::DedicatedIMessageNumberInventoryPending { .. } => {
+                "dedicated_imessage_number_inventory_pending"
+            }
+            InkboxError::IdempotencyKeyReused { .. } => "idempotency_key_reused",
+            InkboxError::MailImportQuotaExceeded { .. } => "mail_import_quota_exceeded",
+            other => panic!("expected API error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn every_api_error_variant_preserves_agent_support() {
+        let cases = [
+            (400, json!("bad request"), "api"),
+            (
+                409,
+                json!({"existing_rule_id": "11111111-1111-1111-1111-111111111111"}),
+                "duplicate_contact_rule",
+            ),
+            (
+                409,
+                json!({"error": "redundant_grant", "detail": "redundant"}),
+                "redundant_contact_access_grant",
+            ),
+            (
+                403,
+                json!({"error": "recipient_blocked", "address": "+15555550100", "reason": "blocked"}),
+                "recipient_blocked",
+            ),
+            (
+                402,
+                json!({"error": "storage_limit_exceeded", "message": "full", "upgrade_url": "https://inkbox.ai"}),
+                "storage_limit_exceeded",
+            ),
+            (
+                402,
+                json!({"error": "dedicated_imessage_number_quota_exceeded", "message": "quota", "number_type": "dedicated_inbound", "limit": 1, "current": 1, "upgrade_url": "https://inkbox.ai", "contact_email": "support@example.com"}),
+                "dedicated_imessage_number_quota_exceeded",
+            ),
+            (
+                503,
+                json!({"error": "dedicated_imessage_number_inventory_pending", "message": "pending", "number_type": "dedicated_outbound", "retry_after_seconds": 60}),
+                "dedicated_imessage_number_inventory_pending",
+            ),
+            (
+                409,
+                json!({"error": "idempotency_key_reused", "message": "reused"}),
+                "idempotency_key_reused",
+            ),
+            (
+                429,
+                json!({"error": "mail_import_quota_exceeded", "message": "quota"}),
+                "mail_import_quota_exceeded",
+            ),
+        ];
+
+        for (index, (status, detail, expected_variant)) in cases.into_iter().enumerate() {
+            let server = MockServer::start();
+            let path = format!("/error-{index}");
+            let request = server.mock(|when, then| {
+                when.method(GET).path(path.as_str());
+                then.status(status).json_body(json!({
+                    "detail": detail,
+                    "agent_support": SUPPORT
+                }));
+            });
+
+            let error = transport(&server).get(&path, NO_QUERY).unwrap_err();
+
+            request.assert();
+            assert_eq!(variant_name(&error), expected_variant);
+            assert_eq!(error.agent_support(), Some(SUPPORT));
+        }
+    }
+
+    #[test]
+    fn malformed_agent_support_does_not_hide_api_error() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(GET).path("/error");
+            then.status(400).json_body(json!({
+                "detail": "bad request",
+                "agent_support": {"message": "wrong shape"}
+            }));
+        });
+
+        let error = transport(&server).get("/error", NO_QUERY).unwrap_err();
+
+        request.assert();
+        assert_eq!(variant_name(&error), "api");
+        assert_eq!(error.agent_support(), None);
+        assert_eq!(error.to_string(), "HTTP 400: bad request");
+    }
 }

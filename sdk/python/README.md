@@ -1448,6 +1448,24 @@ Wire shapes are intentionally **snake_case** (the raw JSON body, not the SDK's p
 
 ---
 
+## API errors
+
+All REST endpoint failures raised as `InkboxAPIError` retain the optional
+Support Agent instructions returned by the API. This also applies to specialized
+subclasses and remapped identity or tunnel errors; existing exception text and
+`detail` remain unchanged.
+
+```python
+from inkbox import InkboxAPIError
+
+try:
+    inkbox.get_identity("unknown")
+except InkboxAPIError as error:
+    print(error.detail)
+    if error.agent_support:
+        print(f"Support: {error.agent_support}")
+```
+
 ## Whoami
 
 ```python

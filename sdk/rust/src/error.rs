@@ -11,6 +11,15 @@ use uuid::Uuid;
 /// Result alias used throughout the SDK.
 pub type Result<T> = std::result::Result<T, InkboxError>;
 
+pub(crate) fn parse_agent_support(envelope: Option<&Value>) -> Option<Box<str>> {
+    envelope
+        .and_then(Value::as_object)
+        .and_then(|map| map.get("agent_support"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .map(Into::into)
+}
+
 /// Base error for all Inkbox SDK failures.
 #[derive(Debug, thiserror::Error)]
 pub enum InkboxError {
@@ -23,6 +32,8 @@ pub enum InkboxError {
         status_code: u16,
         /// Error detail from the response body.
         detail: ApiErrorDetail,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// 409 when creating a mail/phone/iMessage contact rule that duplicates an
@@ -35,6 +46,8 @@ pub enum InkboxError {
         /// Full structured detail from the server. Boxed to keep `InkboxError`
         /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// 409 when posting a contact-access grant that is redundant under the
@@ -49,6 +62,8 @@ pub enum InkboxError {
         /// Full structured detail from the server. Boxed to keep `InkboxError`
         /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// 403 when an SMS, call, or iMessage destination is blocked by an outbound
@@ -66,6 +81,8 @@ pub enum InkboxError {
         /// Full structured detail from the server. Boxed to keep `InkboxError`
         /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// 402 when an outbound mail send would push the mailbox past its plan's
@@ -84,6 +101,8 @@ pub enum InkboxError {
         /// Full structured detail from the server. Boxed to keep `InkboxError`
         /// small (this variant is rare; `serde_json::Value` is ~72 bytes).
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// 402 when the organization has reached its dedicated iMessage number
@@ -99,6 +118,8 @@ pub enum InkboxError {
         upgrade_url: Box<str>,
         contact_email: Box<str>,
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// 503 when no dedicated iMessage number is currently available to claim.
@@ -112,6 +133,8 @@ pub enum InkboxError {
         /// Parsed delta-seconds value from the HTTP `Retry-After` header.
         retry_after_header: Option<u64>,
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// 409 when an idempotency key is reused with an incompatible request.
@@ -120,6 +143,8 @@ pub enum InkboxError {
         status_code: u16,
         message: Box<str>,
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// A vault key did not meet requirements, or a vault crypto operation failed.
@@ -149,6 +174,8 @@ pub enum InkboxError {
         /// Parsed delta-seconds value from the HTTP `Retry-After` header.
         retry_after_header: Option<u64>,
         detail: Box<Value>,
+        /// Support Agent escalation instructions supplied by the API.
+        agent_support: Option<Box<str>>,
     },
 
     /// A local wait exceeded its wall-clock budget. The remote job is
@@ -170,6 +197,45 @@ pub enum InkboxError {
 }
 
 impl InkboxError {
+    pub(crate) fn with_agent_support(mut self, support: Option<Box<str>>) -> Self {
+        match &mut self {
+            InkboxError::Api { agent_support, .. }
+            | InkboxError::DuplicateContactRule { agent_support, .. }
+            | InkboxError::RedundantContactAccessGrant { agent_support, .. }
+            | InkboxError::RecipientBlocked { agent_support, .. }
+            | InkboxError::StorageLimitExceeded { agent_support, .. }
+            | InkboxError::DedicatedIMessageNumberQuotaExceeded { agent_support, .. }
+            | InkboxError::DedicatedIMessageNumberInventoryPending { agent_support, .. }
+            | InkboxError::IdempotencyKeyReused { agent_support, .. }
+            | InkboxError::MailImportQuotaExceeded { agent_support, .. } => {
+                *agent_support = support;
+            }
+            _ => {}
+        }
+        self
+    }
+
+    /// Support Agent escalation instructions supplied with an API error.
+    ///
+    /// Returns `None` for local validation, transport, decoding, and other
+    /// errors that were not created from an API error response.
+    pub fn agent_support(&self) -> Option<&str> {
+        match self {
+            InkboxError::Api { agent_support, .. }
+            | InkboxError::DuplicateContactRule { agent_support, .. }
+            | InkboxError::RedundantContactAccessGrant { agent_support, .. }
+            | InkboxError::RecipientBlocked { agent_support, .. }
+            | InkboxError::StorageLimitExceeded { agent_support, .. }
+            | InkboxError::DedicatedIMessageNumberQuotaExceeded { agent_support, .. }
+            | InkboxError::DedicatedIMessageNumberInventoryPending { agent_support, .. }
+            | InkboxError::IdempotencyKeyReused { agent_support, .. }
+            | InkboxError::MailImportQuotaExceeded { agent_support, .. } => {
+                agent_support.as_deref()
+            }
+            _ => None,
+        }
+    }
+
     /// True iff this is the terminal "another client took over this tunnel"
     /// error surfaced by a tunnel client's `serve_forever`. Terminal by
     /// design: the client has stopped and will not reconnect. Lets callers

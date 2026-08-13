@@ -677,6 +677,7 @@ mod tests {
             InkboxError::Api {
                 status_code,
                 detail,
+                ..
             } => {
                 assert_eq!(status_code, 402);
                 match detail {

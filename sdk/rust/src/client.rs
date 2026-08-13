@@ -21,7 +21,7 @@ use crate::agent_signup::types::{
 use crate::api_keys::resources::api_keys::ApiKeysResource;
 use crate::contacts::resources::contacts::ContactsResource;
 use crate::cookies::CookieJar;
-use crate::error::{ApiErrorDetail, InkboxError, Result};
+use crate::error::{parse_agent_support, ApiErrorDetail, InkboxError, Result};
 use crate::http::{default_timeout, HttpTransport, NO_QUERY};
 use crate::identities::resources::identities::IdentitiesResource;
 use crate::identities::types::{
@@ -769,6 +769,7 @@ fn one_shot_request(
     let text = resp.text().unwrap_or_default();
     if status >= 400 {
         let parsed = serde_json::from_str::<Value>(&text).ok();
+        let agent_support = parse_agent_support(parsed.as_ref());
         let raw_detail = match parsed {
             Some(Value::Object(map)) => map
                 .get("detail")
@@ -784,6 +785,7 @@ fn one_shot_request(
         return Err(InkboxError::Api {
             status_code: status,
             detail,
+            agent_support,
         });
     }
     if text.is_empty() {
@@ -940,7 +942,8 @@ mod agent_signup_invitation_tests {
                 "detail": {
                     "code": "a2a_invitation_recipient_unavailable",
                     "message": "The recipient is temporarily unavailable."
-                }
+                },
+                "agent_support": "Contact the Support Agent using its Agent Card."
             }));
         });
 
@@ -961,11 +964,16 @@ mod agent_signup_invitation_tests {
             InkboxError::Api {
                 status_code,
                 detail: ApiErrorDetail::Structured(detail),
+                agent_support,
             } => {
                 assert_eq!(status_code, 429);
                 assert_eq!(
                     detail.get("code").and_then(Value::as_str),
                     Some("a2a_invitation_recipient_unavailable")
+                );
+                assert_eq!(
+                    agent_support.as_deref(),
+                    Some("Contact the Support Agent using its Agent Card.")
                 );
             }
             other => panic!("expected structured API error, got {other:?}"),

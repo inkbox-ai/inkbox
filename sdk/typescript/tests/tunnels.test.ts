@@ -212,12 +212,13 @@ describe("TunnelsResource", () => {
     vi.mocked(fetch).mockResolvedValue(
       makeResponse(409, {
         detail: "tunnel is in edge tls_mode; CSR signing is passthrough-only",
+        agent_support: "Contact the Support Agent using its Agent Card.",
       }),
     );
     const t = tunnels();
-    await expect(
-      t.signCsr("abc", { csrPem: "pem" }),
-    ).rejects.toBeInstanceOf(TunnelTLSModeMismatch);
+    const error = await t.signCsr("abc", { csrPem: "pem" }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(TunnelTLSModeMismatch);
+    expect(error.agentSupport).toBe("Contact the Support Agent using its Agent Card.");
   });
 
   it("sign_csr 409 state conflict -> TunnelCSRStateConflict", async () => {

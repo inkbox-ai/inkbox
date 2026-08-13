@@ -280,6 +280,7 @@ impl TunnelsResource {
                 detail: crate::error::ApiErrorDetail::Message(format!(
                     "tunnel {name:?} is not active; expected active before opening the data plane"
                 )),
+                agent_support: None,
             });
         }
 
@@ -317,6 +318,7 @@ impl TunnelsResource {
                     detail: crate::error::ApiErrorDetail::Message(format!(
                         "tunnel {name:?} is not active after CSR sign"
                     )),
+                    agent_support: None,
                 });
             }
             tls_material = Some((chain_bytes, key_pem_bytes(&key)?));

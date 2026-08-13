@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+
 class InkboxError(Exception):
     """
     Base exception for all Inkbox SDK errors.
@@ -42,6 +43,8 @@ class InkboxAPIError(InkboxError):
             machine-readable fields (e.g. ``{"existing_rule_id": ..., ...}``).
         retry_after_seconds: Parsed delta-seconds value from ``Retry-After``,
             or ``None`` when the response did not provide one.
+        agent_support: Support Agent escalation instructions supplied by the
+            API, or ``None`` when unavailable.
     """
 
     def __init__(

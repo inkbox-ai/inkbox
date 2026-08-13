@@ -4,7 +4,7 @@
 
 - `InkboxAPIError.agentSupport` exposes the Support Agent instructions string
   supplied by the API.
-- Specialized errors, identity remappers, and one-shot requests preserve the
+- Specialized errors, identity/tunnel remappers, and one-shot requests preserve the
   metadata without changing existing error messages.
 - Missing or malformed instructions are ignored for compatibility with older
   deployments.

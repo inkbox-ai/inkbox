@@ -1494,6 +1494,25 @@ On inbound `message.received`, `data.message` carries the plain-text `body`: the
 
 ---
 
+## API errors
+
+All REST endpoint failures raised as `InkboxAPIError` retain the optional
+Support Agent instructions returned by the API. This also applies to specialized
+and remapped errors; existing error messages and `detail` remain unchanged.
+
+```typescript
+import { InkboxAPIError } from "@inkbox/sdk";
+
+try {
+  await inkbox.getIdentity("unknown");
+} catch (error) {
+  if (error instanceof InkboxAPIError) {
+    console.error(error.detail);
+    if (error.agentSupport) console.error(`Support: ${error.agentSupport}`);
+  }
+}
+```
+
 ## Whoami
 
 ```ts

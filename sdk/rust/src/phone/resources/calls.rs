@@ -600,6 +600,7 @@ mod tests {
             InkboxError::Api {
                 status_code,
                 detail,
+                ..
             } => {
                 assert_eq!(status_code, 409);
                 let obj = detail.as_object().expect("structured detail");
@@ -983,6 +984,7 @@ mod tests {
             InkboxError::Api {
                 status_code,
                 detail,
+                ..
             } => {
                 assert_eq!(status_code, 503);
                 let obj = detail.as_object().expect("structured detail");
@@ -1077,6 +1079,7 @@ mod tests {
             InkboxError::Api {
                 status_code,
                 detail,
+                ..
             } => {
                 assert_eq!(status_code, 409);
                 // Structured detail keeps the machine-readable error field.
@@ -1110,6 +1113,7 @@ mod tests {
             InkboxError::Api {
                 status_code,
                 detail,
+                ..
             } => {
                 assert_eq!(status_code, 422);
                 match detail {

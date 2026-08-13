@@ -104,6 +104,7 @@ impl TunnelError {
             } => InkboxError::Api {
                 status_code,
                 detail,
+                agent_support: None,
             },
         }
     }
@@ -148,11 +149,12 @@ fn detail_text(detail: &ApiErrorDetail) -> String {
 pub fn map_sign_csr_error(err: InkboxError) -> InkboxError {
     // Only API 409s are reclassified; everything else (transport, decode,
     // other status codes) passes through verbatim.
-    let (status_code, detail) = match &err {
+    let (status_code, detail, agent_support) = match &err {
         InkboxError::Api {
             status_code,
             detail,
-        } if *status_code == 409 => (*status_code, detail.clone()),
+            agent_support,
+        } if *status_code == 409 => (*status_code, detail.clone(), agent_support.clone()),
         _ => return err,
     };
 
@@ -162,12 +164,33 @@ pub fn map_sign_csr_error(err: InkboxError) -> InkboxError {
             status_code,
             detail,
         }
-        .into()
+        .into_inkbox()
+        .with_agent_support(agent_support)
     } else {
         TunnelError::CSRStateConflict {
             status_code,
             detail,
         }
-        .into()
+        .into_inkbox()
+        .with_agent_support(agent_support)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sign_csr_remapping_preserves_agent_support() {
+        let error = InkboxError::Api {
+            status_code: 409,
+            detail: ApiErrorDetail::Message("tls_mode must be passthrough".into()),
+            agent_support: Some("Contact the Support Agent.".into()),
+        };
+
+        let mapped = map_sign_csr_error(error);
+
+        assert_eq!(mapped.agent_support(), Some("Contact the Support Agent."));
+        assert_eq!(mapped.to_string(), "HTTP 409: tls_mode must be passthrough");
     }
 }

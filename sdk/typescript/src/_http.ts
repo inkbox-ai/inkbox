@@ -63,6 +63,7 @@ export class InkboxAPIError extends InkboxError {
   readonly detail: InkboxAPIErrorDetail;
   /** Parsed delta-seconds value from `Retry-After`, when supplied. */
   readonly retryAfterSeconds: number | null;
+  /** Support Agent escalation instructions supplied by the API. */
   agentSupport: string | null;
 
   constructor(

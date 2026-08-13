@@ -18,6 +18,7 @@ fn describe(e: &InkboxError) -> String {
         InkboxError::Api {
             status_code,
             detail,
+            ..
         } => {
             format!("Api status={status_code} detail={detail:?}")
         }
@@ -152,6 +153,7 @@ fn main() {
         Err(InkboxError::Api {
             status_code: 422,
             detail,
+            ..
         }) => {
             println!("[4c] auto_accept-without-ws rejected 422 OK: {detail:?}")
         }
@@ -168,6 +170,7 @@ fn main() {
         Err(InkboxError::Api {
             status_code: 422,
             detail,
+            ..
         }) => {
             println!("[4d] http-webhook rejected 422 OK: {detail:?}")
         }
@@ -187,6 +190,7 @@ fn main() {
         Err(InkboxError::Api {
             status_code: 409,
             detail,
+            ..
         }) => {
             println!("[5a] shared place-call rejected 409 OK (no_shared_connection): {detail:?}")
         }

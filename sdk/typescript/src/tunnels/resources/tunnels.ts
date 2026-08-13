@@ -40,10 +40,13 @@ function detailText(detail: unknown): string {
 function mapSignCsrError(err: InkboxAPIError): Error {
   if (err.statusCode !== 409) return err;
   const text = detailText(err.detail).toLowerCase();
-  if (text.includes("edge") || text.includes("tls_mode") || text.includes("passthrough")) {
-    return new TunnelTLSModeMismatch(err.statusCode, err.detail);
-  }
-  return new TunnelCSRStateConflict(err.statusCode, err.detail);
+  const mapped = (
+    text.includes("edge") || text.includes("tls_mode") || text.includes("passthrough")
+  )
+    ? new TunnelTLSModeMismatch(err.statusCode, err.detail)
+    : new TunnelCSRStateConflict(err.statusCode, err.detail);
+  mapped.agentSupport = err.agentSupport;
+  return mapped;
 }
 
 export interface UpdateTunnelOptions {
@@ -117,4 +120,3 @@ export class TunnelsResource {
     }
   }
 }
-
