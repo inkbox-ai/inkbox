@@ -161,6 +161,14 @@ pub enum InkboxError {
     #[error("tunnel error: {0}")]
     Tunnel(String),
 
+    /// A stored tunnel id returned 404 while opening the data plane.
+    #[error("tunnel error: TunnelRemoved: {message}")]
+    TunnelRemoved {
+        message: String,
+        /// Support Agent escalation instructions supplied with the originating 404.
+        agent_support: Option<Box<str>>,
+    },
+
     /// Transport-level failure (connection, timeout, TLS) — Python's `httpx`
     /// errors.
     #[error("transport error: {0}")]
@@ -207,7 +215,8 @@ impl InkboxError {
             | InkboxError::DedicatedIMessageNumberQuotaExceeded { agent_support, .. }
             | InkboxError::DedicatedIMessageNumberInventoryPending { agent_support, .. }
             | InkboxError::IdempotencyKeyReused { agent_support, .. }
-            | InkboxError::MailImportQuotaExceeded { agent_support, .. } => {
+            | InkboxError::MailImportQuotaExceeded { agent_support, .. }
+            | InkboxError::TunnelRemoved { agent_support, .. } => {
                 *agent_support = support;
             }
             _ => {}
@@ -229,9 +238,8 @@ impl InkboxError {
             | InkboxError::DedicatedIMessageNumberQuotaExceeded { agent_support, .. }
             | InkboxError::DedicatedIMessageNumberInventoryPending { agent_support, .. }
             | InkboxError::IdempotencyKeyReused { agent_support, .. }
-            | InkboxError::MailImportQuotaExceeded { agent_support, .. } => {
-                agent_support.as_deref()
-            }
+            | InkboxError::MailImportQuotaExceeded { agent_support, .. }
+            | InkboxError::TunnelRemoved { agent_support, .. } => agent_support.as_deref(),
             _ => None,
         }
     }
@@ -271,5 +279,24 @@ impl ApiErrorDetail {
             ApiErrorDetail::Structured(v) => Some(v),
             ApiErrorDetail::Message(_) => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InkboxError;
+
+    #[test]
+    fn stale_tunnel_error_exposes_agent_support() {
+        let error = InkboxError::TunnelRemoved {
+            message: "stored tunnel was removed".into(),
+            agent_support: Some("Contact the Support Agent.".into()),
+        };
+
+        assert_eq!(error.agent_support(), Some("Contact the Support Agent."));
+        assert_eq!(
+            error.to_string(),
+            "tunnel error: TunnelRemoved: stored tunnel was removed"
+        );
     }
 }

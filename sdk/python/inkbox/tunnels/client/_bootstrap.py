@@ -147,6 +147,7 @@ def bootstrap(
                     f"tunnel {name!r} (id={state_tunnel_id}) has been removed; "
                     f"clear {state_dir} and call inkbox.create_identity({name!r}) "
                     "to start fresh",
+                    agent_support=err.agent_support,
                 ) from err
             raise
 
@@ -166,10 +167,7 @@ def bootstrap(
 
     # Edge tunnels must be ACTIVE before we open the data plane.
     # Passthrough has its own AWAITING_CERT branch below.
-    if (
-        tunnel.tls_mode == TLSMode.EDGE
-        and tunnel.status != TunnelStatus.ACTIVE
-    ):
+    if tunnel.tls_mode == TLSMode.EDGE and tunnel.status != TunnelStatus.ACTIVE:
         raise TunnelStateConflict(
             status_code=409,
             detail=(
@@ -189,15 +187,16 @@ def bootstrap(
             data_plane_zone_override=data_plane_zone_override,
         )
         key = load_or_create_keypair(state_dir)
-        if (
-            tunnel.status == TunnelStatus.AWAITING_CERT
-            or cert_needs_sign(state_dir, key)
+        if tunnel.status == TunnelStatus.AWAITING_CERT or cert_needs_sign(
+            state_dir, key
         ):
             csr_pem = build_csr(key, public_host)
             logger.info("POST /tunnels/%s/sign-csr", tunnel.id)
             signed = tunnels.sign_csr(tunnel.id, csr_pem=csr_pem)
             chain_bytes = write_cert_chain(
-                state_dir, signed.cert_pem, signed.chain_pem,
+                state_dir,
+                signed.cert_pem,
+                signed.chain_pem,
             )
             # Refresh tunnel record to pick up the new active status.
             tunnel = tunnels.get(tunnel.id)
@@ -228,13 +227,16 @@ def bootstrap(
     )
 
     # Persist final state (zone/public_host learned from server).
-    save_state(state_dir, StateEntry(
-        tunnel_id=str(tunnel.id),
-        name=name,
-        mode=tunnel.tls_mode.value,
-        zone=zone,
-        public_host=public_host,
-    ))
+    save_state(
+        state_dir,
+        StateEntry(
+            tunnel_id=str(tunnel.id),
+            name=name,
+            mode=tunnel.tls_mode.value,
+            zone=zone,
+            public_host=public_host,
+        ),
+    )
 
     return TunnelBundle(
         tunnel=tunnel,

@@ -228,11 +228,12 @@ export async function connect(
     try {
       tunnel = await inkbox.tunnels.get(state.tunnelId);
     } catch (err: unknown) {
-      const apiErr = err as { statusCode?: number };
+      const apiErr = err as { statusCode?: number; agentSupport?: unknown };
       if (apiErr?.statusCode === 404) {
         throw new TunnelRemoved(
           `tunnel ${options.name} (id=${state.tunnelId}) has been removed; ` +
             `clear ${stateDirPath} and call inkbox.createIdentity(${JSON.stringify(options.name)}) to start fresh`,
+          typeof apiErr.agentSupport === "string" ? apiErr.agentSupport : null,
         );
       }
       throw err;

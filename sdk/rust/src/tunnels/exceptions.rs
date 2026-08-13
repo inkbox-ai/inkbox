@@ -18,9 +18,10 @@
 //! tag / constructor set** that records *which* Python subclass a given
 //! failure corresponds to, and converts into the canonical [`InkboxError`]:
 //!
-//! - Local errors become [`InkboxError::Tunnel`] (the `TunnelError` base, which
-//!   the contract maps to `InkboxError::Tunnel(String)`). The message is
-//!   prefixed with the Python class name so callers can still discriminate.
+//! - Local errors become [`InkboxError::Tunnel`] (the `TunnelError` base),
+//!   except `TunnelRemoved`, which has a dedicated variant so a REST 404 can
+//!   retain its Support Agent instructions. Messages keep the Python class name
+//!   so callers can still discriminate.
 //! - Wire 409 errors become [`InkboxError::Api`] with `status_code = 409` and
 //!   the server's `detail`, preserving the exact wire surface. The
 //!   classification (state-conflict vs TLS-mode-mismatch vs CSR-state-conflict)
@@ -81,12 +82,16 @@ impl TunnelError {
     /// Convert into the canonical [`InkboxError`].
     ///
     /// Local subclasses become [`InkboxError::Tunnel`] (message prefixed with
-    /// the Python class name); 409 subclasses become [`InkboxError::Api`] with
-    /// the original status code and detail.
+    /// the Python class name), except `Removed`, which becomes
+    /// [`InkboxError::TunnelRemoved`]; 409 subclasses become
+    /// [`InkboxError::Api`] with the original status code and detail.
     pub fn into_inkbox(self) -> InkboxError {
         match self {
             TunnelError::NameInvalid(m) => InkboxError::Tunnel(format!("TunnelNameInvalid: {m}")),
-            TunnelError::Removed(m) => InkboxError::Tunnel(format!("TunnelRemoved: {m}")),
+            TunnelError::Removed(message) => InkboxError::TunnelRemoved {
+                message,
+                agent_support: None,
+            },
             TunnelError::NotProvisioned(m) => {
                 InkboxError::Tunnel(format!("TunnelNotProvisioned: {m}"))
             }

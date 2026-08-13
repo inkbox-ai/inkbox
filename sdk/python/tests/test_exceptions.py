@@ -302,9 +302,12 @@ class TestIdentityConflictMapping:
                 "code": "agent_handle_unavailable",
                 "message": "Handle unavailable",
             },
+            agent_support="Contact the Support Agent using its Agent Card.",
         )
 
-        assert isinstance(map_identity_conflict_error(err), HandleUnavailableError)
+        mapped = map_identity_conflict_error(err)
+        assert isinstance(mapped, HandleUnavailableError)
+        assert mapped.agent_support == "Contact the Support Agent using its Agent Card."
 
     def test_preserves_unrelated_line_conflict(self):
         err = InkboxAPIError(

@@ -19,6 +19,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   deployments.
 - Rust exposes the instructions through `InkboxError::agent_support()` and
   preserves them on generic, specialized, remapped, and one-shot API errors.
+- Rust source compatibility: API-origin `InkboxError` struct variants now have
+  an `agent_support` field, and stale-tunnel 404s use `TunnelRemoved`. Consumers
+  that construct these variants must provide the field; consumers that pattern
+  match them should include `..`, then read guidance with
+  `InkboxError::agent_support()`. Exhaustive matches must also add a
+  `TunnelRemoved` arm or a wildcard arm.
 - Package and plugin versions moved in lockstep to 0.5.16; the CLI now depends
   on `@inkbox/sdk` `^0.5.16`.
 

@@ -25,9 +25,13 @@ export class TunnelNameInvalid extends TunnelError {
 }
 
 export class TunnelRemoved extends TunnelError {
-  constructor(message: string) {
+  /** Support Agent escalation instructions from the originating API 404. */
+  readonly agentSupport: string | null;
+
+  constructor(message: string, agentSupport: string | null = null) {
     super(message);
     this.name = "TunnelRemoved";
+    this.agentSupport = agentSupport;
   }
 }
 

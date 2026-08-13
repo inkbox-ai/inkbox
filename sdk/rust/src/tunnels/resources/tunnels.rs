@@ -87,6 +87,31 @@ impl TunnelsResource {
         Tunnel::from_value(&data)
     }
 
+    #[cfg(feature = "tunnels-runtime")]
+    fn get_persisted_tunnel(
+        &self,
+        name: &str,
+        tunnel_id: &str,
+        state_dir: &std::path::Path,
+    ) -> Result<Tunnel> {
+        match self.get(tunnel_id) {
+            Ok(tunnel) => Ok(tunnel),
+            Err(InkboxError::Api {
+                status_code: 404,
+                agent_support,
+                ..
+            }) => Err(InkboxError::TunnelRemoved {
+                message: format!(
+                    "tunnel {name:?} (id={tunnel_id}) has been removed; clear {} and call \
+                     create_identity({name:?}) to start fresh",
+                    state_dir.display()
+                ),
+                agent_support,
+            }),
+            Err(error) => Err(error),
+        }
+    }
+
     // --- Writes ----------------------------------------------------------
 
     /// Update a tunnel's metadata.
@@ -243,19 +268,7 @@ impl TunnelsResource {
         // Resolve the tunnel: prefer the state's tunnel_id (a `get`), else look
         // it up by name (the server lists only live tunnels). Mirrors `bootstrap`.
         let mut tunnel = match state.as_ref().map(|s| s.tunnel_id.clone()) {
-            Some(id) if !id.is_empty() => match self.get(&id) {
-                Ok(t) => t,
-                Err(InkboxError::Api {
-                    status_code: 404, ..
-                }) => {
-                    return Err(InkboxError::Tunnel(format!(
-                        "TunnelRemoved: tunnel {name:?} (id={id}) has been removed; clear \
-                         {} and call create_identity({name:?}) to start fresh",
-                        state_dir.display()
-                    )));
-                }
-                Err(e) => return Err(e),
-            },
+            Some(id) if !id.is_empty() => self.get_persisted_tunnel(name, &id, &state_dir)?,
             _ => self
                 .list()?
                 .into_iter()
@@ -400,5 +413,47 @@ impl TunnelsResource {
         Err(InkboxError::Tunnel(
             "the tunnels data-plane runtime requires the `tunnels-runtime` cargo feature".into(),
         ))
+    }
+}
+
+#[cfg(all(test, feature = "tunnels-runtime"))]
+mod tests {
+    use httpmock::prelude::*;
+
+    use crate::client::Inkbox;
+
+    #[test]
+    fn persisted_tunnel_404_preserves_agent_support() {
+        let server = MockServer::start();
+        let tunnel_id = "11111111-1111-1111-1111-111111111111";
+        let support = "Contact the Support Agent using its Agent Card.";
+        let response = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!("/api/v1/tunnels/{tunnel_id}"));
+            then.status(404).json_body(serde_json::json!({
+                "detail": "not found",
+                "agent_support": support,
+            }));
+        });
+        let client = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+
+        let error = client
+            .tunnels()
+            .get_persisted_tunnel(
+                "my-agent",
+                tunnel_id,
+                std::path::Path::new("/tmp/inkbox-test-state"),
+            )
+            .unwrap_err();
+
+        response.assert();
+        assert!(matches!(
+            error,
+            crate::error::InkboxError::TunnelRemoved { .. }
+        ));
+        assert_eq!(error.agent_support(), Some(support));
     }
 }
