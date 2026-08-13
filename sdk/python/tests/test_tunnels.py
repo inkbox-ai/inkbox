@@ -253,15 +253,19 @@ def test_update_metadata_invalid_type_rejected(tunnels, http):
 
 def test_sign_csr_409_edge_maps_to_tls_mode_mismatch(tunnels, http):
     http.post.side_effect = InkboxAPIError(
-        409, "tunnel is in edge tls_mode; CSR signing is passthrough-only",
+        409,
+        "tunnel is in edge tls_mode; CSR signing is passthrough-only",
+        agent_support="Contact the Support Agent using its Agent Card.",
     )
-    with pytest.raises(TunnelTLSModeMismatch):
+    with pytest.raises(TunnelTLSModeMismatch) as info:
         tunnels.sign_csr("abc", csr_pem="pem")
+    assert info.value.agent_support == "Contact the Support Agent using its Agent Card."
 
 
 def test_sign_csr_409_state_maps_to_csr_state_conflict(tunnels, http):
     http.post.side_effect = InkboxAPIError(
-        409, "tunnel is in unexpected state",
+        409,
+        "tunnel is in unexpected state",
     )
     with pytest.raises(TunnelCSRStateConflict):
         tunnels.sign_csr("abc", csr_pem="pem")

@@ -62,11 +62,13 @@ export function mapIdentityConflictError(err: InkboxAPIError): Error {
         )
       : "";
   if (err.statusCode === 409 && discriminator === "agent_handle_unavailable") {
-    return new HandleUnavailableError(
+    const mapped = new HandleUnavailableError(
       err.statusCode,
       err.detail,
       readBlockingNamespace(err.detail),
     );
+    mapped.agentSupport = err.agentSupport;
+    return mapped;
   }
   return err;
 }

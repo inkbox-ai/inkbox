@@ -74,6 +74,22 @@ test("withErrorHandler renders the message from structured API details", async (
   assert.deepEqual(lines, ["Error: HTTP 400: The import request is invalid."]);
 });
 
+test("withErrorHandler renders the Support Agent escalation and checks", async () => {
+  const agentSupport =
+    "If you cannot resolve this issue, contact the Support Agent. " +
+    "Agent Card: https://inkbox.ai/a2a/support/card. " +
+    "Check GET https://inkbox.ai/api/v1/identities/{agent_handle}/a2a/settings.";
+  const { lines, exitCode } = await runAndCapture(
+    new InkboxAPIError(400, "bad request", null, agentSupport),
+  );
+
+  assert.equal(exitCode, 1);
+  assert.deepEqual(lines, [
+    "Error: HTTP 400: bad request",
+    `Support: ${agentSupport}`,
+  ]);
+});
+
 for (const code of [
   "a2a_invitation_issuer_rate_limited",
   "a2a_invitation_issuer_outstanding_limit",

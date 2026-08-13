@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from inkbox.tunnels.client._envelope import parse_envelope
+from inkbox.tunnels.client._bootstrap import bootstrap
 from inkbox.tunnels.client._state import (
     StateEntry,
     ensure_private_state_dir,
@@ -28,6 +29,8 @@ from inkbox.tunnels.client._wsframe import (
     decode_ws_frames,
     encode_ws_frame,
 )
+from inkbox.exceptions import InkboxAPIError
+from inkbox.tunnels.exceptions import TunnelRemoved
 
 
 # --- Envelope parsing ----------------------------------------------------
@@ -76,31 +79,37 @@ def test_parse_envelope_missing_request_id_returns_none():
 # --- Path validation -----------------------------------------------------
 
 
-@pytest.mark.parametrize("path,reason", [
-    ("/foo/../bar", "invalid-path"),
-    ("/foo/./bar", "invalid-path"),
-    ("/foo/%2e%2e/bar", "invalid-path"),
-    ("/foo/%2E%2E/bar", "invalid-path"),
-    ("/foo/%252e%252e/bar", "invalid-path"),  # double-encoded
-    ("/foo/%2f/bar", "invalid-path"),  # encoded slash
-    ("/foo/%5cbar", "invalid-path"),  # encoded backslash
-    # Raw backslash: some upstream frameworks (IIS, Tomcat, a few Node
-    # static-file libs) treat `\` as a path separator. Accepting it
-    # would let `/static\..\secret` slip past the split-on-/ check.
-    ("/foo\\..\\bar", "invalid-path"),
-    ("/static\\secret", "invalid-path"),
-    ("/\\evil", "invalid-path"),
-])
+@pytest.mark.parametrize(
+    "path,reason",
+    [
+        ("/foo/../bar", "invalid-path"),
+        ("/foo/./bar", "invalid-path"),
+        ("/foo/%2e%2e/bar", "invalid-path"),
+        ("/foo/%2E%2E/bar", "invalid-path"),
+        ("/foo/%252e%252e/bar", "invalid-path"),  # double-encoded
+        ("/foo/%2f/bar", "invalid-path"),  # encoded slash
+        ("/foo/%5cbar", "invalid-path"),  # encoded backslash
+        # Raw backslash: some upstream frameworks (IIS, Tomcat, a few Node
+        # static-file libs) treat `\` as a path separator. Accepting it
+        # would let `/static\..\secret` slip past the split-on-/ check.
+        ("/foo\\..\\bar", "invalid-path"),
+        ("/static\\secret", "invalid-path"),
+        ("/\\evil", "invalid-path"),
+    ],
+)
 def test_path_validation_rejects_traversal(path: str, reason: str):
     assert validate_envelope_path(path) == reason
 
 
-@pytest.mark.parametrize("path", [
-    "/webhook",
-    "/api/v1/users",
-    "/path/with%20space",
-    "/with-query?x=1&y=2",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/webhook",
+        "/api/v1/users",
+        "/path/with%20space",
+        "/with-query?x=1&y=2",
+    ],
+)
 def test_path_validation_accepts_legitimate_paths(path: str):
     assert validate_envelope_path(path) is None
 
@@ -108,23 +117,29 @@ def test_path_validation_accepts_legitimate_paths(path: str):
 # --- Forward target validation -------------------------------------------
 
 
-@pytest.mark.parametrize("target", [
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "http://127.0.0.5:9000",
-    "http://[::1]:8080",
-])
+@pytest.mark.parametrize(
+    "target",
+    [
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://127.0.0.5:9000",
+        "http://[::1]:8080",
+    ],
+)
 def test_forward_target_accepts_loopback(target: str):
     validate_forward_target(target, allow_remote_forwarding=False)
 
 
-@pytest.mark.parametrize("target", [
-    "http://example.com",
-    "http://10.0.0.5",
-    "http://192.168.1.1",
-    "http://internal.example.com",
-    "http://1.2.3.4",
-])
+@pytest.mark.parametrize(
+    "target",
+    [
+        "http://example.com",
+        "http://10.0.0.5",
+        "http://192.168.1.1",
+        "http://internal.example.com",
+        "http://1.2.3.4",
+    ],
+)
 def test_forward_target_refuses_non_loopback(target: str):
     with pytest.raises(ForwardTargetRefused):
         validate_forward_target(target, allow_remote_forwarding=False)
@@ -132,7 +147,8 @@ def test_forward_target_refuses_non_loopback(target: str):
 
 def test_forward_target_allow_remote_bypass():
     validate_forward_target(
-        "http://example.com", allow_remote_forwarding=True,
+        "http://example.com",
+        allow_remote_forwarding=True,
     )
 
 
@@ -209,7 +225,10 @@ def test_ws_frame_preserves_fin_false_for_fragmentation():
     BINARY message can be re-encoded as fragments instead of being
     silently coalesced into a single FIN=1 frame on the bridge."""
     part1 = encode_ws_frame(
-        WS_OPCODE_TEXT, b"ab", mask=False, fin=False,
+        WS_OPCODE_TEXT,
+        b"ab",
+        mask=False,
+        fin=False,
     )
     part2 = encode_ws_frame(0x0, b"cd", mask=False, fin=True)
     buf = bytearray(part1 + part2)
@@ -236,10 +255,47 @@ def test_save_and_load_state_roundtrip(tmp_path: Path):
     assert loaded == entry
 
 
+def test_bootstrap_stale_tunnel_preserves_agent_support(tmp_path: Path):
+    state_dir = tmp_path / "tunnel"
+    tunnel_id = "11111111-1111-1111-1111-111111111111"
+    save_state(
+        state_dir,
+        StateEntry(
+            tunnel_id=tunnel_id,
+            name="my-agent",
+            mode="edge",
+            zone=None,
+            public_host=None,
+        ),
+    )
+    support = "Contact the Support Agent using its Agent Card."
+
+    class Tunnels:
+        def get(self, requested_id: object) -> None:
+            assert str(requested_id) == tunnel_id
+            raise InkboxAPIError(404, "not found", agent_support=support)
+
+    class Client:
+        tunnels = Tunnels()
+
+    with pytest.raises(TunnelRemoved) as info:
+        bootstrap(
+            inkbox=Client(),
+            name="my-agent",
+            state_dir=state_dir,
+            data_plane_zone_override=None,
+        )
+
+    assert info.value.agent_support == support
+
+
 def test_state_file_is_chmod_0600(tmp_path: Path):
     entry = StateEntry(
-        tunnel_id="abc", name="my-agent",
-        mode="edge", zone=None, public_host=None,
+        tunnel_id="abc",
+        name="my-agent",
+        mode="edge",
+        zone=None,
+        public_host=None,
     )
     state_dir = tmp_path / "tunnel"
     save_state(state_dir, entry)
@@ -273,6 +329,7 @@ def test_symlinked_state_dir_is_refused(tmp_path: Path):
     link = tmp_path / "link"
     os.symlink(real, link)
     from inkbox.tunnels.client._state import TunnelStateError
+
     with pytest.raises(TunnelStateError):
         ensure_private_state_dir(link)
 

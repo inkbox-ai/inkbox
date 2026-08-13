@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.16 — Support Agent discovery on API errors
+
+- `InkboxAPIError.agent_support` exposes the Support Agent instructions string
+  supplied by the API.
+- Specialized errors, identity/tunnel remappers, and one-shot requests preserve
+  the metadata without changing existing exception strings.
+- Missing or malformed instructions are ignored for compatibility with older
+  deployments.
+
 ## 0.5.14 — A2A invitations
 
 - Added `inkbox.a2a_invitations` create, list, get, revoke, and accept methods.

@@ -183,6 +183,30 @@ upload that never landed. Other limits: 1 GiB per upload, 50 MiB per message,
 import jobs per organization per 24 hours (`InkboxError::MailImportQuotaExceeded`
 carries the `Retry-After` value), and one in-flight import per mailbox.
 
+### API errors
+
+Every API-origin `InkboxError` retains the optional Support Agent instructions
+returned by the API. Existing error display text and structured detail remain
+unchanged.
+
+In 0.5.16, API-origin `InkboxError` struct variants gained an
+`agent_support` field, and stale-tunnel 404s gained the `TunnelRemoved` variant.
+When matching these variants, include `..` and read the value through
+`InkboxError::agent_support()`. Exhaustive matches must also add a
+`TunnelRemoved` arm or a wildcard arm.
+
+```rust
+match inkbox.get_identity("unknown") {
+    Err(error) => {
+        eprintln!("{error}");
+        if let Some(instructions) = error.agent_support() {
+            eprintln!("Support: {instructions}");
+        }
+    }
+    Ok(identity) => println!("{}", identity.agent_handle),
+}
+```
+
 ### Dedicated iMessage numbers
 
 List or claim organization-owned dedicated numbers through the iMessage resource:

@@ -47,6 +47,10 @@ class TunnelRemoved(TunnelError):
     to start fresh.
     """
 
+    def __init__(self, message: str, *, agent_support: str | None = None) -> None:
+        super().__init__(message)
+        self.agent_support = agent_support
+
 
 class TunnelNotProvisioned(TunnelError):
     """Raised by :func:`connect` when no tunnel exists for the supplied

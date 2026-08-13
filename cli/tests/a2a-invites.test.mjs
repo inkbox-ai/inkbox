@@ -4,11 +4,31 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
-import { resolveOptionalA2AInvitationToken } from "../dist/invitation-token.js";
+import { InkboxAPIError } from "@inkbox/sdk";
+import {
+  redactSecretError,
+  resolveOptionalA2AInvitationToken,
+} from "../dist/invitation-token.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const execFileAsync = promisify(execFile);
 const invitationToken = (character) => `a2ai_${character.repeat(43)}`;
+
+test("redacts invitation secrets from Support Agent instructions", () => {
+  const secret = invitationToken("S");
+  const error = new InkboxAPIError(
+    401,
+    "invalid invitation",
+    null,
+    `Share ${secret} with the Support Agent.`,
+  );
+
+  const redacted = redactSecretError(error, secret);
+
+  assert.ok(redacted instanceof InkboxAPIError);
+  assert.equal(redacted.agentSupport, "Share [REDACTED] with the Support Agent.");
+  assert.doesNotMatch(redacted.agentSupport, new RegExp(secret));
+});
 
 function help(...args) {
   return execFileSync(process.execPath, [cli, ...args, "--help"], { encoding: "utf8" });

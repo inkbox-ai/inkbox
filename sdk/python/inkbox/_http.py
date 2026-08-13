@@ -23,6 +23,7 @@ from inkbox.exceptions import (
     RedundantContactAccessGrantError,
     StorageLimitExceededError,
 )
+from inkbox.error_guidance import parse_agent_support
 
 _DEFAULT_TIMEOUT = 30.0
 
@@ -235,29 +236,41 @@ def _raise_for_status(resp: httpx.Response) -> None:
     if resp.status_code < 400:
         return
     raw_detail: Any
+    agent_support: str | None = None
     try:
-        raw_detail = resp.json().get("detail", resp.text)
+        envelope = resp.json()
+        raw_detail = envelope.get("detail", resp.text)
+        agent_support = parse_agent_support(envelope.get("agent_support"))
     except Exception:
         raw_detail = resp.text
 
     if resp.status_code == 409 and isinstance(raw_detail, dict):
         if "existing_rule_id" in raw_detail:
-            raise DuplicateContactRuleError(
-                status_code=resp.status_code, detail=raw_detail,
+            error = DuplicateContactRuleError(
+                status_code=resp.status_code,
+                detail=raw_detail,
             )
+            error.agent_support = agent_support
+            raise error
         if raw_detail.get("error") == "redundant_grant":
-            raise RedundantContactAccessGrantError(
-                status_code=resp.status_code, detail=raw_detail,
+            error = RedundantContactAccessGrantError(
+                status_code=resp.status_code,
+                detail=raw_detail,
             )
+            error.agent_support = agent_support
+            raise error
 
     if (
         resp.status_code == 403
         and isinstance(raw_detail, dict)
         and raw_detail.get("error") == "recipient_blocked"
     ):
-        raise RecipientBlockedError(
-            status_code=resp.status_code, detail=raw_detail,
+        error = RecipientBlockedError(
+            status_code=resp.status_code,
+            detail=raw_detail,
         )
+        error.agent_support = agent_support
+        raise error
 
     # Older servers send a plain-string 402 detail; those fall through to the
     # generic error rather than being mistyped.
@@ -266,53 +279,66 @@ def _raise_for_status(resp: httpx.Response) -> None:
         and isinstance(raw_detail, dict)
         and raw_detail.get("error") == "storage_limit_exceeded"
     ):
-        raise StorageLimitExceededError(
-            status_code=resp.status_code, detail=raw_detail,
+        error = StorageLimitExceededError(
+            status_code=resp.status_code,
+            detail=raw_detail,
         )
+        error.agent_support = agent_support
+        raise error
 
     if (
         resp.status_code == 402
         and isinstance(raw_detail, dict)
         and raw_detail.get("error") == "dedicated_imessage_number_quota_exceeded"
     ):
-        raise DedicatedIMessageNumberQuotaExceededError(
-            status_code=resp.status_code, detail=raw_detail,
+        error = DedicatedIMessageNumberQuotaExceededError(
+            status_code=resp.status_code,
+            detail=raw_detail,
         )
+        error.agent_support = agent_support
+        raise error
 
     if (
         resp.status_code == 503
         and isinstance(raw_detail, dict)
         and raw_detail.get("error") == "dedicated_imessage_number_inventory_pending"
     ):
-        raise DedicatedIMessageNumberInventoryPendingError(
+        error = DedicatedIMessageNumberInventoryPendingError(
             status_code=resp.status_code,
             detail=raw_detail,
             retry_after=resp.headers.get("Retry-After"),
         )
+        error.agent_support = agent_support
+        raise error
 
     if (
         resp.status_code == 409
         and isinstance(raw_detail, dict)
         and raw_detail.get("error") == "idempotency_key_reused"
     ):
-        raise IdempotencyKeyReusedError(
+        error = IdempotencyKeyReusedError(
             status_code=resp.status_code,
             detail=raw_detail,
         )
+        error.agent_support = agent_support
+        raise error
 
     if (
         resp.status_code == 429
         and isinstance(raw_detail, dict)
         and raw_detail.get("error") == "mail_import_quota_exceeded"
     ):
-        raise MailImportQuotaExceededError(
+        error = MailImportQuotaExceededError(
             status_code=resp.status_code,
             detail=raw_detail,
             retry_after=resp.headers.get("Retry-After"),
         )
+        error.agent_support = agent_support
+        raise error
 
     raise InkboxAPIError(
         status_code=resp.status_code,
         detail=raw_detail,
         retry_after=resp.headers.get("Retry-After"),
+        agent_support=agent_support,
     )

@@ -1255,6 +1255,7 @@ try:
 except InkboxAPIError as e:
     print(e.status_code)   # HTTP status (e.g. 404)
     print(e.detail)        # str for legacy errors, dict for structured ones
+    print(e.agent_support) # Support Agent instructions, or None
 ```
 
 `InkboxAPIError.detail` can now be a `dict` for structured responses (e.g. contact-rule / access conflicts). Catch the narrower subclasses when you need the parsed fields:

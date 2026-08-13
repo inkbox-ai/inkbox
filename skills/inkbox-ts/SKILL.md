@@ -1271,6 +1271,7 @@ try {
   if (e instanceof InkboxAPIError) {
     console.log(e.statusCode);   // HTTP status (e.g. 404)
     console.log(e.detail);       // string for legacy errors, object for structured ones
+    console.log(e.agentSupport); // Support Agent instructions, or null
   }
 }
 ```

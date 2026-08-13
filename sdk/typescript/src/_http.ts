@@ -5,6 +5,7 @@
  */
 
 import type { IMessageDedicatedNumberType } from "./imessage/types.js";
+import { parseAgentSupport } from "./error-guidance.js";
 
 export class InkboxError extends Error {
   constructor(message: string) {
@@ -62,16 +63,20 @@ export class InkboxAPIError extends InkboxError {
   readonly detail: InkboxAPIErrorDetail;
   /** Parsed delta-seconds value from `Retry-After`, when supplied. */
   readonly retryAfterSeconds: number | null;
+  /** Support Agent escalation instructions supplied by the API. */
+  agentSupport: string | null;
 
   constructor(
     statusCode: number,
     detail: InkboxAPIErrorDetail,
     retryAfter: string | number | null = null,
+    agentSupport: string | null = null,
   ) {
     super(`HTTP ${statusCode}: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
     this.name = "InkboxAPIError";
     this.statusCode = statusCode;
     this.detail = detail;
+    this.agentSupport = agentSupport;
     const parsed = retryAfter === null ? Number.NaN : Number(retryAfter);
     this.retryAfterSeconds = Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
   }
@@ -229,16 +234,21 @@ function raiseForErrorResponse(
   status: number,
   rawDetail: InkboxAPIErrorDetail,
   headers?: Headers,
+  agentSupport: string | null = null,
 ): never {
+  const guided = <T extends InkboxAPIError>(error: T): T => {
+    error.agentSupport = agentSupport;
+    return error;
+  };
   if (status === 409 && typeof rawDetail === "object" && rawDetail !== null) {
     if (rawDetail["error"] === "idempotency_key_reused") {
-      throw new IdempotencyKeyReusedError(status, rawDetail);
+      throw guided(new IdempotencyKeyReusedError(status, rawDetail));
     }
     if ("existing_rule_id" in rawDetail) {
-      throw new DuplicateContactRuleError(status, rawDetail);
+      throw guided(new DuplicateContactRuleError(status, rawDetail));
     }
     if (rawDetail["error"] === "redundant_grant") {
-      throw new RedundantContactAccessGrantError(status, rawDetail);
+      throw guided(new RedundantContactAccessGrantError(status, rawDetail));
     }
   }
   if (
@@ -247,7 +257,7 @@ function raiseForErrorResponse(
     && rawDetail !== null
     && rawDetail["error"] === "recipient_blocked"
   ) {
-    throw new RecipientBlockedError(status, rawDetail);
+    throw guided(new RecipientBlockedError(status, rawDetail));
   }
   // Older servers send a plain-string 402 detail; those fall through to the
   // generic error rather than being mistyped.
@@ -257,7 +267,7 @@ function raiseForErrorResponse(
     && rawDetail !== null
     && rawDetail["error"] === "storage_limit_exceeded"
   ) {
-    throw new StorageLimitExceededError(status, rawDetail);
+    throw guided(new StorageLimitExceededError(status, rawDetail));
   }
   if (
     status === 402
@@ -265,7 +275,7 @@ function raiseForErrorResponse(
     && rawDetail !== null
     && rawDetail["error"] === "dedicated_imessage_number_quota_exceeded"
   ) {
-    throw new DedicatedIMessageNumberQuotaExceededError(status, rawDetail);
+    throw guided(new DedicatedIMessageNumberQuotaExceededError(status, rawDetail));
   }
   if (
     status === 503
@@ -273,11 +283,11 @@ function raiseForErrorResponse(
     && rawDetail !== null
     && rawDetail["error"] === "dedicated_imessage_number_inventory_pending"
   ) {
-    throw new DedicatedIMessageNumberInventoryPendingError(
+    throw guided(new DedicatedIMessageNumberInventoryPendingError(
       status,
       rawDetail,
       headers?.get("Retry-After") ?? null,
-    );
+    ));
   }
   if (
     status === 429
@@ -285,16 +295,17 @@ function raiseForErrorResponse(
     && rawDetail !== null
     && rawDetail["error"] === "mail_import_quota_exceeded"
   ) {
-    throw new MailImportQuotaExceededError(
+    throw guided(new MailImportQuotaExceededError(
       status,
       rawDetail,
       headers?.get("Retry-After") ?? null,
-    );
+    ));
   }
   throw new InkboxAPIError(
     status,
     rawDetail,
     headers?.get("Retry-After") ?? null,
+    agentSupport,
   );
 }
 
@@ -336,16 +347,20 @@ function proxyHint(): string {
   );
 }
 
-async function readErrorDetail(resp: Response): Promise<InkboxAPIErrorDetail> {
+async function readErrorEnvelope(resp: Response): Promise<{
+  detail: InkboxAPIErrorDetail;
+  agentSupport: string | null;
+}> {
   try {
-    const parsed = (await resp.json()) as { detail?: unknown };
+    const parsed = (await resp.json()) as { detail?: unknown; agent_support?: unknown };
     const d = parsed?.detail;
-    if (d === undefined || d === null) return resp.statusText;
-    if (typeof d === "string") return d;
-    if (typeof d === "object") return d as Record<string, unknown>;
-    return String(d);
+    const agentSupport = parseAgentSupport(parsed?.agent_support);
+    if (d === undefined || d === null) return { detail: resp.statusText, agentSupport };
+    if (typeof d === "string") return { detail: d, agentSupport };
+    if (typeof d === "object") return { detail: d as Record<string, unknown>, agentSupport };
+    return { detail: String(d), agentSupport };
   } catch {
-    return resp.statusText;
+    return { detail: resp.statusText, agentSupport: null };
   }
 }
 
@@ -702,8 +717,8 @@ export class HttpTransport {
     this.cookieJar.storeFromResponse(url, resp);
 
     if (!resp.ok) {
-      const detail = await readErrorDetail(resp);
-      raiseForErrorResponse(resp.status, detail, resp.headers);
+      const envelope = await readErrorEnvelope(resp);
+      raiseForErrorResponse(resp.status, envelope.detail, resp.headers, envelope.agentSupport);
     }
 
     if (resp.status === 204) {

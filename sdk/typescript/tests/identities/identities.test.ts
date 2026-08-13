@@ -314,11 +314,19 @@ describe("IdentitiesResource.update", () => {
     const http = mockHttp();
     const { InkboxAPIError } = await import("../../src/_http.js");
     const { HandleUnavailableError } = await import("../../src/identities/exceptions.js");
-    vi.mocked(http.patch).mockRejectedValue(new InkboxAPIError(409, {
-      code: "agent_handle_unavailable",
-      message: "That handle is unavailable.",
-      blocking_namespace: "identities",
-    }));
+    const support = "Contact the Support Agent using its Agent Card.";
+    vi.mocked(http.patch).mockRejectedValue(
+      new InkboxAPIError(
+        409,
+        {
+          code: "agent_handle_unavailable",
+          message: "That handle is unavailable.",
+          blocking_namespace: "identities",
+        },
+        null,
+        support,
+      ),
+    );
     const res = new IdentitiesResource(http);
 
     const err = await res.update(HANDLE, {
@@ -326,7 +334,10 @@ describe("IdentitiesResource.update", () => {
     }).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(HandleUnavailableError);
-    expect(err).toMatchObject({ blockingNamespace: "identities" });
+    expect(err).toMatchObject({
+      blockingNamespace: "identities",
+      agentSupport: support,
+    });
   });
 });
 

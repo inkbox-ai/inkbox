@@ -58,6 +58,7 @@ impl HandleUnavailableError {
         if let InkboxError::Api {
             status_code,
             detail,
+            ..
         } = err
         {
             let is_handle_conflict = detail.as_object().is_some_and(|obj| {
@@ -119,6 +120,7 @@ mod tests {
                 "code": "agent_handle_unavailable",
                 "blocking_namespace": "identities"
             })),
+            agent_support: None,
         };
         assert!(HandleUnavailableError::from_error(&handle).is_some());
 
@@ -127,6 +129,7 @@ mod tests {
             detail: ApiErrorDetail::Structured(json!({
                 "error": "line_already_attached"
             })),
+            agent_support: None,
         };
         assert!(HandleUnavailableError::from_error(&line).is_none());
     }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { Inkbox } from "../src/inkbox.js";
 import { A2AInvitationParseError, extractA2AInvitationToken } from "../src/a2a/invitations.js";
+import { InkboxAPIError } from "../src/_http.js";
 
 const TOKEN = "a2ai_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
@@ -37,6 +38,13 @@ function respond(body: unknown): void {
   } as Response);
 }
 
+function supportEnvelope(detail: string): Record<string, unknown> {
+  return {
+    detail,
+    agent_support: "Contact support using https://inkbox.ai/a2a/support/card.",
+  };
+}
+
 describe("A2AInvitationsResource", () => {
   it("previews an invitation without constructing a client or sending a key", async () => {
     respond({
@@ -60,6 +68,21 @@ describe("A2AInvitationsResource", () => {
       expiresAt: "2026-08-11T00:00:00Z",
       agentHandoffPrompt: "Review and accept this invitation.",
     });
+  });
+
+  it("preserves Support Agent metadata on one-shot preview errors", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: "Bad Request",
+      json: async () => supportEnvelope("invalid invitation"),
+      headers: new Headers(),
+    } as Response);
+
+    await expect(Inkbox.previewA2AInvitation(TOKEN)).rejects.toMatchObject({
+      message: "HTTP 400: invalid invitation",
+      agentSupport: "Contact support using https://inkbox.ai/a2a/support/card.",
+    } satisfies Partial<InkboxAPIError>);
   });
 
   it("creates an invitation and preserves its one-time secret", async () => {

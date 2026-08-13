@@ -7,18 +7,50 @@
  * any Inkbox-client method is invoked.
  */
 
-import { describe, expect, it } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { describe, expect, it, vi } from "vitest";
+import { InkboxAPIError } from "../../src/_http.js";
 import {
   InvalidConnectOptions,
   connect,
 } from "../../src/tunnels/client/index.js";
 import { ForwardTargetRefused } from "../../src/tunnels/client/_validation.js";
-import { TunnelNameInvalid } from "../../src/tunnels/exceptions.js";
+import { TunnelNameInvalid, TunnelRemoved } from "../../src/tunnels/exceptions.js";
+import { saveState } from "../../src/tunnels/client/_state.js";
 import type { Inkbox } from "../../src/inkbox.js";
 
 // Stub Inkbox client. None of these tests should reach a method on it
 // — every assertion lives upstream of the bootstrap.
 const stubInkbox = {} as unknown as Inkbox;
+
+it("preserves Support Agent instructions when a stored tunnel was removed", async () => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "inkbox-connect-test-"));
+  const support = "Contact the Support Agent using its Agent Card.";
+  saveState(stateDir, {
+    tunnelId: "11111111-1111-1111-1111-111111111111",
+    name: "my-agent",
+  });
+  const inkbox = {
+    tunnels: {
+      get: vi.fn().mockRejectedValue(new InkboxAPIError(404, "not found", null, support)),
+    },
+  } as unknown as Inkbox;
+
+  try {
+    const error = await connect(inkbox, {
+      name: "my-agent",
+      stateDir,
+      forwardTo: "http://127.0.0.1:8080",
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(TunnelRemoved);
+    expect(error).toMatchObject({ agentSupport: support });
+  } finally {
+    fs.rmSync(stateDir, { recursive: true, force: true });
+  }
+});
 
 describe("connect() — synchronous validation failures", () => {
   it("rejects an invalid tunnel name", async () => {

@@ -915,6 +915,7 @@ mod tests {
             crate::error::InkboxError::Api {
                 status_code,
                 detail,
+                ..
             } => {
                 assert_eq!(status_code, 422);
                 assert_eq!(

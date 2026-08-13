@@ -142,6 +142,27 @@ describe("HttpTransport 409 routing", () => {
     }
   });
 
+  it("parses Support Agent discovery without changing the error message", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeErrorResponse(401, {
+        detail: "missing key",
+        agent_support: "Contact support using https://inkbox.ai/a2a/support/card.",
+      }),
+    );
+    const http = new HttpTransport(API_KEY, BASE);
+    try {
+      await http.get("/bad");
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(InkboxAPIError);
+      const apiError = err as InkboxAPIError;
+      expect(apiError.message).toBe("HTTP 401: missing key");
+      expect(apiError.agentSupport).toBe(
+        "Contact support using https://inkbox.ai/a2a/support/card.",
+      );
+    }
+  });
+
   it("routes recipient_blocked 403 to RecipientBlockedError", async () => {
     vi.mocked(fetch).mockResolvedValue(
       makeErrorResponse(403, {

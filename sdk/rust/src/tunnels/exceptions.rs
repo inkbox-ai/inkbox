@@ -18,9 +18,10 @@
 //! tag / constructor set** that records *which* Python subclass a given
 //! failure corresponds to, and converts into the canonical [`InkboxError`]:
 //!
-//! - Local errors become [`InkboxError::Tunnel`] (the `TunnelError` base, which
-//!   the contract maps to `InkboxError::Tunnel(String)`). The message is
-//!   prefixed with the Python class name so callers can still discriminate.
+//! - Local errors become [`InkboxError::Tunnel`] (the `TunnelError` base),
+//!   except `TunnelRemoved`, which has a dedicated variant so a REST 404 can
+//!   retain its Support Agent instructions. Messages keep the Python class name
+//!   so callers can still discriminate.
 //! - Wire 409 errors become [`InkboxError::Api`] with `status_code = 409` and
 //!   the server's `detail`, preserving the exact wire surface. The
 //!   classification (state-conflict vs TLS-mode-mismatch vs CSR-state-conflict)
@@ -81,12 +82,16 @@ impl TunnelError {
     /// Convert into the canonical [`InkboxError`].
     ///
     /// Local subclasses become [`InkboxError::Tunnel`] (message prefixed with
-    /// the Python class name); 409 subclasses become [`InkboxError::Api`] with
-    /// the original status code and detail.
+    /// the Python class name), except `Removed`, which becomes
+    /// [`InkboxError::TunnelRemoved`]; 409 subclasses become
+    /// [`InkboxError::Api`] with the original status code and detail.
     pub fn into_inkbox(self) -> InkboxError {
         match self {
             TunnelError::NameInvalid(m) => InkboxError::Tunnel(format!("TunnelNameInvalid: {m}")),
-            TunnelError::Removed(m) => InkboxError::Tunnel(format!("TunnelRemoved: {m}")),
+            TunnelError::Removed(message) => InkboxError::TunnelRemoved {
+                message,
+                agent_support: None,
+            },
             TunnelError::NotProvisioned(m) => {
                 InkboxError::Tunnel(format!("TunnelNotProvisioned: {m}"))
             }
@@ -104,6 +109,7 @@ impl TunnelError {
             } => InkboxError::Api {
                 status_code,
                 detail,
+                agent_support: None,
             },
         }
     }
@@ -148,11 +154,12 @@ fn detail_text(detail: &ApiErrorDetail) -> String {
 pub fn map_sign_csr_error(err: InkboxError) -> InkboxError {
     // Only API 409s are reclassified; everything else (transport, decode,
     // other status codes) passes through verbatim.
-    let (status_code, detail) = match &err {
+    let (status_code, detail, agent_support) = match &err {
         InkboxError::Api {
             status_code,
             detail,
-        } if *status_code == 409 => (*status_code, detail.clone()),
+            agent_support,
+        } if *status_code == 409 => (*status_code, detail.clone(), agent_support.clone()),
         _ => return err,
     };
 
@@ -162,12 +169,33 @@ pub fn map_sign_csr_error(err: InkboxError) -> InkboxError {
             status_code,
             detail,
         }
-        .into()
+        .into_inkbox()
+        .with_agent_support(agent_support)
     } else {
         TunnelError::CSRStateConflict {
             status_code,
             detail,
         }
-        .into()
+        .into_inkbox()
+        .with_agent_support(agent_support)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sign_csr_remapping_preserves_agent_support() {
+        let error = InkboxError::Api {
+            status_code: 409,
+            detail: ApiErrorDetail::Message("tls_mode must be passthrough".into()),
+            agent_support: Some("Contact the Support Agent.".into()),
+        };
+
+        let mapped = map_sign_csr_error(error);
+
+        assert_eq!(mapped.agent_support(), Some("Contact the Support Agent."));
+        assert_eq!(mapped.to_string(), "HTTP 409: tls_mode must be passthrough");
     }
 }

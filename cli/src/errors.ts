@@ -33,6 +33,10 @@ function renderDetail(detail: string | Record<string, unknown>): string {
   return typeof message === "string" && message ? message : JSON.stringify(detail);
 }
 
+function renderAgentSupport(err: InkboxAPIError): void {
+  if (err.agentSupport) console.error(`Support: ${err.agentSupport}`);
+}
+
 export function withErrorHandler<T extends unknown[]>(
   fn: (...args: T) => Promise<void>,
 ): (...args: T) => Promise<void> {
@@ -93,6 +97,7 @@ export function withErrorHandler<T extends unknown[]>(
       } else {
         console.error("An unknown error occurred.");
       }
+      if (err instanceof InkboxAPIError) renderAgentSupport(err);
       process.exit(1);
     }
   };

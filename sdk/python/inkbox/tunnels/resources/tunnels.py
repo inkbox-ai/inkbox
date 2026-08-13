@@ -53,8 +53,11 @@ def _map_sign_csr_error(err: InkboxAPIError) -> Exception:
         return err
     text = _detail_text(err.detail).lower()
     if "edge" in text or "tls_mode" in text or "passthrough" in text:
-        return TunnelTLSModeMismatch(status_code=err.status_code, detail=err.detail)
-    return TunnelCSRStateConflict(status_code=err.status_code, detail=err.detail)
+        mapped = TunnelTLSModeMismatch(status_code=err.status_code, detail=err.detail)
+    else:
+        mapped = TunnelCSRStateConflict(status_code=err.status_code, detail=err.detail)
+    mapped.agent_support = err.agent_support
+    return mapped
 
 
 class TunnelsResource:
