@@ -4,6 +4,36 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.5.17 — Typed contact memory and hand-written facts
+
+### Added
+
+- Contact facts carry two optional fields: `kind` (`profile`, `preference`, or
+  `context`) and `expires_at`, the time a fact stops applying. Both are absent
+  against deployments that do not send them yet.
+- Create and edit facts by hand from Python, TypeScript, Rust, and the CLI:
+  `contacts.facts.create()` / `update()`, and `inkbox contacts facts create` /
+  `update`. Both require an admin-scoped API key; an agent-scoped key is
+  rejected with 403. Hand-written facts never expire, and the create call
+  returns 409 once a contact is at its limit for that kind.
+- `inkbox contacts facts list` shows `kind` and `expiresAt`.
+
+### Changed
+
+- Listing a contact's facts no longer returns context facts whose `expires_at`
+  has passed. Pass `include_expired=True` (Python), `{ includeExpired: true }`
+  (TypeScript), `--include-expired` (CLI), or call `list_including_expired()`
+  (Rust) to get them back.
+- Editing a fact's content drops the confidence and citations recorded for the
+  previous wording; editing only its kind leaves them in place.
+- A contact's active-memory limit applies per kind rather than as one flat total
+  across all memories, and untyped memories recorded before kinds existed carry
+  their own allowance. A merge is rejected atomically when a single kind on the
+  survivor would go over, and only deleting facts of the kinds named in the
+  error frees room. SDK, CLI, and skill documentation now say so.
+- Package and plugin versions moved in lockstep to 0.5.17; the CLI now depends
+  on `@inkbox/sdk` `^0.5.17`.
+
 ## 0.5.16 — Support Agent discovery on API errors
 
 ### Added

@@ -615,8 +615,10 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
-Merging requires an admin-scoped API key. The merge is rejected atomically if
-the survivor would exceed 25 active memories; delete unwanted facts and retry.
+Merging requires an admin-scoped API key. Active memories are budgeted per kind,
+so a merge is rejected atomically when a single kind on the survivor would go
+over. The error names the kinds that are over; delete facts of those kinds and
+retry. Untyped memories recorded before kinds existed carry their own allowance.
 
 ```bash
 inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]  # offset max 10000
@@ -629,10 +631,12 @@ inkbox contacts lookup (--email <email> | --email-contains <s> | --email-domain 
 inkbox contacts import <file.vcf>
 inkbox contacts export <contact-id> [--out <file>] # vCard 4.0 to stdout or file
 inkbox contacts export-many <contact-id...> [--out <file>]
-inkbox contacts facts list <contact-id>
+inkbox contacts facts list <contact-id> [--include-expired]
 inkbox contacts facts get <contact-id> <fact-id>
 inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
 inkbox contacts facts citation-url <source-url>
+inkbox contacts facts create <contact-id> --content <text> --kind <profile|preference|context>  # admin only
+inkbox contacts facts update <contact-id> <fact-id> [--content <text>] [--kind <kind>]  # admin only
 inkbox contacts facts delete <contact-id> <fact-id>  # admin only
 inkbox contacts correspondence <contact-id> [--identity <uuid>] [--channels <channel>]
 inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <json>]  # admin-scoped API key required

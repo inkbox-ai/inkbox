@@ -573,10 +573,12 @@ Organization-wide contacts, correspondence, and memory facts.
 ```bash
 inkbox contacts list [--review-status <status>] [--offset <n>]  # Offset max: 10000
 inkbox contacts get <contact-id>
-inkbox contacts facts list <contact-id>
+inkbox contacts facts list <contact-id> [--include-expired]
 inkbox contacts facts get <contact-id> <fact-id>
 inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
 inkbox contacts facts citation-url <source-url>
+inkbox contacts facts create <contact-id> --content <text> --kind <kind>  # Admin-scoped API key required
+inkbox contacts facts update <contact-id> <fact-id> [--content <text>] [--kind <kind>]  # Admin-scoped API key required
 inkbox contacts facts delete <contact-id> <fact-id>  # Admin-scoped API key required
 inkbox contacts correspondence <contact-id> [-i <identity-id>]
   [--channels <channel>] [--after <datetime>] [--before <datetime>]
@@ -592,8 +594,15 @@ inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts access list <contact-id>              # Compatibility read only
 ```
 
-Merges are rejected atomically if the survivor would exceed 25 active memories.
-Delete unwanted facts, then retry the merge.
+Active memories are budgeted per kind, so a merge is rejected atomically when a
+single kind on the survivor would go over. The error names the kinds that are
+over; delete facts of those kinds, then retry the merge. Untyped memories
+recorded before kinds existed carry their own allowance.
+
+A fact's `kind` is `profile` (who the contact is), `preference` (a standing
+instruction), or `context` (a live situation). Context facts recorded by
+extraction carry an `expiresAt` and drop out of `facts list` once it passes;
+pass `--include-expired` to see them. Hand-written facts never expire.
 
 ### tunnel
 

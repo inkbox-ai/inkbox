@@ -1002,8 +1002,10 @@ inkbox.phone_contact_rules.create(
 
 Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
-Merging requires an admin-scoped API key. The merge is rejected atomically if
-the survivor would exceed 25 active memories; delete unwanted facts and retry.
+Merging requires an admin-scoped API key. Active memories are budgeted per kind,
+so a merge is rejected atomically when a single kind on the survivor would go
+over. The error names the kinds that are over; delete facts of those kinds and
+retry. Untyped memories recorded before kinds existed carry their own allowance.
 
 ```python
 from inkbox import (
@@ -1037,9 +1039,17 @@ inkbox.contacts.lookup(phone_contains="555")
 inkbox.contacts.access.list(str(contact.id))
 
 # Facts, citations, correspondence, and duplicate merging
+# fact.kind is "profile", "preference", or "context"; extracted context facts
+# carry fact.expires_at and drop out of list() once it passes.
 facts = inkbox.contacts.facts.list(str(contact.id))
+inkbox.contacts.facts.list(str(contact.id), include_expired=True)
 if facts and facts[0].citations and facts[0].citations[0].source_url:
     source = inkbox.contacts.facts.resolve_citation_url(facts[0].citations[0].source_url)
+# Hand-written facts never expire; create/update/delete are admin only
+fact = inkbox.contacts.facts.create(
+    str(contact.id), content="Prefers email over calls", kind="preference"
+)
+inkbox.contacts.facts.update(str(contact.id), str(fact.id), kind="profile")
 if facts:
     inkbox.contacts.facts.delete(str(contact.id), str(facts[0].id))  # admin only
 history = inkbox.contacts.correspondence.get(

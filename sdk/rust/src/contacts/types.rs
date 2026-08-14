@@ -327,6 +327,27 @@ pub enum ContactFactOrigin {
     User,
 }
 
+/// Which memory bucket a fact belongs to: who the contact is (`Profile`), a
+/// standing instruction (`Preference`), or a live situation that stops
+/// applying on its own (`Context`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactFactKind {
+    Profile,
+    Preference,
+    Context,
+}
+
+impl ContactFactKind {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Profile => "profile",
+            Self::Preference => "preference",
+            Self::Context => "context",
+        }
+    }
+}
+
 /// A fact remembered about a contact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactFact {
@@ -336,6 +357,12 @@ pub struct ContactFact {
     #[serde(default, deserialize_with = "f64_from_number_or_string")]
     pub confidence: Option<f64>,
     pub origin: ContactFactOrigin,
+    /// Memory bucket the fact belongs to, when it has been classified.
+    #[serde(default)]
+    pub kind: Option<ContactFactKind>,
+    /// When the fact stops applying; only extracted `Context` facts carry one.
+    #[serde(default)]
+    pub expires_at: Option<String>,
     #[serde(default)]
     pub locked_at: Option<String>,
     pub created_at: String,

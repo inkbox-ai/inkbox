@@ -24,7 +24,7 @@ pub use types::{
     Contact, ContactAccess, ContactAddress, ContactBulkDeleteResult, ContactBulkDeleteResultItem,
     ContactBulkDeleteStatus, ContactCreationSource, ContactCustomField, ContactDate, ContactEmail,
     ContactFact, ContactFactCitation, ContactFactCitationAvailability, ContactFactCitationDetail,
-    ContactFactDeleteResult, ContactFactOrigin, ContactImportResult, ContactImportResultItem,
-    ContactImportStatus, ContactMemorySummary, ContactNameSource, ContactPhone,
-    ContactReviewStatus, ContactVCardExportResult, ContactWebsite,
+    ContactFactDeleteResult, ContactFactKind, ContactFactOrigin, ContactImportResult,
+    ContactImportResultItem, ContactImportStatus, ContactMemorySummary, ContactNameSource,
+    ContactPhone, ContactReviewStatus, ContactVCardExportResult, ContactWebsite,
 };
