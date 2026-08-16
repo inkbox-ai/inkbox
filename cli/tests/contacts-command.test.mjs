@@ -63,6 +63,8 @@ test("contact facts exposes hand-written memory commands", () => {
   assert.match(help("contacts", "facts", "create"), /--kind <kind>/);
   assert.match(help("contacts", "facts", "create"), /admin-scoped API key required/);
   assert.match(help("contacts", "facts", "update"), /admin-scoped API key required/);
+  assert.match(help("contacts", "facts", "update"), /manually\s+maintained and revives it/);
+  assert.match(help("contacts", "facts", "list"), /locked facts remain\s+active/);
 });
 
 test("contact fact creation posts content and kind", async () => {
@@ -161,8 +163,8 @@ test("contact correspondence and merge expose their request options", () => {
   assert.match(merge, /--losing <contact-id\.\.\.>/);
   assert.match(merge, /--field-sources <json>/);
   assert.match(merge, /admin-scoped key required/);
-  assert.match(merge, /rejected\s+atomically\s+when\s+one\s+fact\s+kind\s+goes\s+over/);
-  assert.match(merge, /delete\s+facts\s+of\s+that\s+kind\s+and\s+retry/);
+  assert.match(merge, /rejected\s+when\s+a\s+memory\s+kind\s+or\s+total\s+goes\s+over/);
+  assert.match(merge, /any\s+active\s+fact\s+for\s+total/);
 });
 
 test("contact fact deletion calls the API and prints remaining memory", async () => {

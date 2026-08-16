@@ -68,7 +68,10 @@ function registerContactFactsCommands(parent: Command): void {
   facts
     .command("list <contact-id>")
     .description("List a contact's facts")
-    .option("--include-expired", "Also list context facts that have expired")
+    .option(
+      "--include-expired",
+      "Also list expired context facts (locked facts remain active)",
+    )
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -153,7 +156,7 @@ function registerContactFactsCommands(parent: Command): void {
   facts
     .command("update <contact-id> <fact-id>")
     .description(
-      "Edit a fact's content or kind (admin-scoped API key required; editing content drops its citations)",
+      "Edit a fact (admin-scoped API key required; any edit makes it manually maintained and revives it; content changes remove citations)",
     )
     .option("--content <text>", "Replacement content")
     .option("--kind <kind>", "profile, preference, or context")
@@ -303,7 +306,7 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("merge <contact-id>")
     .description(
-      "Merge contacts (admin-scoped key required; rejected atomically when one fact kind goes over its memory limit; delete facts of that kind and retry)",
+      "Merge contacts (admin-scoped key required; rejected when a memory kind or total goes over; delete from named kinds, or any active fact for total)",
     )
     .requiredOption("--losing <contact-id...>", "Contact IDs to merge into the survivor")
     .option("--field-sources <json>", "JSON object mapping profile fields to source contact IDs")

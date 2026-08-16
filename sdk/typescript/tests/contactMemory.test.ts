@@ -109,6 +109,8 @@ describe("contact memory", () => {
     expect(created.kind).toBe("preference");
     expect(created.expiresAt).toBeNull();
     expect(retyped.kind).toBe("profile");
+    expect(retyped.origin).toBe("user");
+    expect(retyped.expiresAt).toBeNull();
     expect(listed[0].expiresAt).toEqual(new Date("2026-08-19T10:00:00Z"));
     expect(vi.mocked(fetch).mock.calls.map(([url, init]) => [
       (init as RequestInit).method,

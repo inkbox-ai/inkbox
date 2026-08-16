@@ -32,7 +32,8 @@ class ContactFactsResource:
         Args:
             contact_id: Contact whose facts to list.
             include_expired: Also return context facts whose ``expires_at``
-                has passed. They are left out by default.
+                has passed. They are left out by default; locked facts remain
+                active and stay in the default list.
         """
         params: dict[str, Any] = {}
         if include_expired:
@@ -75,9 +76,10 @@ class ContactFactsResource:
         """Edit a fact's content or kind. Requires an admin-scoped API key; an
         agent-scoped key is rejected with 403.
 
-        At least one of ``content`` and ``kind`` is required. Editing the
-        content drops the citations and confidence recorded for the old
-        wording; editing only the kind leaves them in place.
+        At least one of ``content`` and ``kind`` is required. Any edit makes the
+        fact user-authored, clears its expiry, and revives it if it had expired.
+        Editing content also drops the citations and confidence recorded for
+        the old wording; editing only the kind leaves them in place.
         """
         body: dict[str, Any] = {}
         if content is not None:

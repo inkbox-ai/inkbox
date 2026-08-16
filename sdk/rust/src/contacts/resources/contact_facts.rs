@@ -21,7 +21,8 @@ impl ContactFactsResource {
         Self { http }
     }
 
-    /// List a contact's facts, leaving out context facts that have expired.
+    /// List a contact's facts, leaving out expired context facts. Locked facts
+    /// remain active and are returned.
     pub fn list(&self, contact_id: &str) -> Result<Vec<ContactFact>> {
         let data = self
             .http
@@ -29,8 +30,7 @@ impl ContactFactsResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// List a contact's facts, including context facts whose `expires_at` has
-    /// passed.
+    /// List a contact's facts, including expired context facts.
     pub fn list_including_expired(&self, contact_id: &str) -> Result<Vec<ContactFact>> {
         let data = self.http.get(
             &format!("{BASE}/{contact_id}/facts"),
@@ -64,9 +64,10 @@ impl ContactFactsResource {
     /// Edit a fact's content or kind. Requires an admin-scoped API key; an
     /// agent-scoped key is rejected with 403.
     ///
-    /// At least one of `content` and `kind` is required. Editing the content
-    /// drops the citations and confidence recorded for the old wording;
-    /// editing only the kind leaves them in place.
+    /// At least one of `content` and `kind` is required. Any edit makes the fact
+    /// user-authored, clears its expiry, and revives it if it had expired.
+    /// Editing content also drops the citations and confidence recorded for the
+    /// old wording; editing only the kind leaves them in place.
     pub fn update(
         &self,
         contact_id: &str,
@@ -152,7 +153,7 @@ mod tests {
     use serde_json::json;
 
     use crate::client::Inkbox;
-    use crate::contacts::{ContactFactCitationAvailability, ContactFactKind};
+    use crate::contacts::{ContactFactCitationAvailability, ContactFactKind, ContactFactOrigin};
 
     #[test]
     fn lists_facts_and_parses_citation_availability() {
@@ -265,6 +266,7 @@ mod tests {
         update.assert();
         list.assert();
         assert_eq!(created.kind, Some(ContactFactKind::Preference));
+        assert_eq!(retyped.origin, ContactFactOrigin::User);
         assert_eq!(retyped.expires_at, None);
         assert_eq!(expired[0].kind, Some(ContactFactKind::Context));
         assert_eq!(

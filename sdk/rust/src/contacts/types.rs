@@ -328,8 +328,8 @@ pub enum ContactFactOrigin {
 }
 
 /// Which memory bucket a fact belongs to: who the contact is (`Profile`), a
-/// standing instruction (`Preference`), or a live situation that stops
-/// applying on its own (`Context`).
+/// standing instruction (`Preference`), or a live situation that can expire
+/// unless the fact is locked (`Context`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ContactFactKind {
@@ -360,7 +360,7 @@ pub struct ContactFact {
     /// Memory bucket the fact belongs to, when it has been classified.
     #[serde(default)]
     pub kind: Option<ContactFactKind>,
-    /// When the fact stops applying; only extracted `Context` facts carry one.
+    /// When an unlocked generated `Context` fact stops applying. Locked facts remain active.
     #[serde(default)]
     pub expires_at: Option<String>,
     #[serde(default)]

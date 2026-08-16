@@ -7,8 +7,8 @@ export type ContactFactOrigin = "generated" | "user";
 
 /**
  * Which memory bucket a fact belongs to: who the contact is (`profile`), a
- * standing instruction (`preference`), or a live situation that stops applying
- * on its own (`context`).
+ * standing instruction (`preference`), or a live situation that can expire
+ * unless the fact is locked (`context`).
  */
 export type ContactFactKind = "profile" | "preference" | "context";
 
@@ -32,7 +32,7 @@ export interface ContactFact {
   citations: ContactFactCitation[];
   /** Memory bucket the fact belongs to, when it has been classified. */
   kind?: ContactFactKind | null;
-  /** When the fact stops applying; only extracted `context` facts carry one. */
+  /** When an unlocked generated `context` fact stops applying. Locked facts remain active. */
   expiresAt?: Date | null;
 }
 

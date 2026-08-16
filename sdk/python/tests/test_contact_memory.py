@@ -211,6 +211,8 @@ def test_fact_create_and_update():
 
     updated = resource.facts.update(CONTACT_ID, SOURCE_ID, content="Prefers SMS")
     assert updated.content == "Prefers SMS"
+    assert updated.origin.value == "user"
+    assert updated.expires_at is None
     assert transport.patch.call_args.args[0] == (
         f"/contacts/{CONTACT_ID}/facts/{SOURCE_ID}"
     )

@@ -15,7 +15,7 @@ import {
 const BASE = "/contacts";
 
 export interface ListContactFactsOptions {
-  /** Also return context facts whose `expiresAt` has passed. */
+  /** Also return expired context facts. Locked facts remain active and are returned by default. */
   includeExpired?: boolean;
 }
 
@@ -65,9 +65,10 @@ export class ContactFactsResource {
    * Edit a fact's content or kind. Requires an admin-scoped API key; an
    * agent-scoped key is rejected with 403.
    *
-   * At least one of `content` and `kind` is required. Editing the content
-   * drops the citations and confidence recorded for the old wording; editing
-   * only the kind leaves them in place.
+   * At least one of `content` and `kind` is required. Any edit makes the fact
+   * user-authored, clears its expiry, and revives it if it had expired. Editing
+   * content also drops the citations and confidence recorded for the old
+   * wording; editing only the kind leaves them in place.
    */
   async update(
     contactId: string,

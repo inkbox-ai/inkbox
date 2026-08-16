@@ -615,10 +615,10 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
-Merging requires an admin-scoped API key. Active memories are budgeted per kind,
-so a merge is rejected atomically when a single kind on the survivor would go
-over. The error names the kinds that are over; delete facts of those kinds and
-retry. Untyped memories recorded before kinds existed carry their own allowance.
+Merging requires an admin-scoped API key. Active memories have per-kind and
+contact-wide limits. Delete a fact from each kind named by a merge error, or any
+active fact when it names `total`, then retry. Untyped memories count toward the
+total.
 
 ```bash
 inkbox contacts list [--q <query>] [--order name|recent] [--review-status <status>] [--limit <n>] [--offset <n>]  # offset max 10000
@@ -642,6 +642,11 @@ inkbox contacts correspondence <contact-id> [--identity <uuid>] [--channels <cha
 inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <json>]  # admin-scoped API key required
 inkbox contacts access list <contact-id>             # compatibility read only
 ```
+
+Unlocked generated context facts leave the default facts list at `expiresAt`;
+locked facts remain active. `--include-expired` returns expired facts. Any facts
+update makes the fact manually maintained, clears its expiry, and revives it;
+changing content also removes confidence and source links.
 
 `contacts lookup` requires exactly one filter flag. For `create` / `update`, construct the payload carefully — fields include `preferredName`, `givenName`, `familyName`, `companyName`, `jobTitle`, `birthday`, `notes`, and lists `emails` / `phones` / `websites` / `dates` / `addresses` / `customFields` (each list item has `label` / `value`).
 

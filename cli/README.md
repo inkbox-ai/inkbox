@@ -594,15 +594,18 @@ inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts access list <contact-id>              # Compatibility read only
 ```
 
-Active memories are budgeted per kind, so a merge is rejected atomically when a
-single kind on the survivor would go over. The error names the kinds that are
-over; delete facts of those kinds, then retry the merge. Untyped memories
-recorded before kinds existed carry their own allowance.
+Active memories have per-kind and contact-wide limits. A merge is rejected
+atomically when either would be exceeded. Delete a fact from each kind named by
+the error, or any active fact when it names `total`, then retry. Untyped memories
+recorded before kinds existed count toward the total.
 
 A fact's `kind` is `profile` (who the contact is), `preference` (a standing
-instruction), or `context` (a live situation). Context facts recorded by
-extraction carry an `expiresAt` and drop out of `facts list` once it passes;
-pass `--include-expired` to see them. Hand-written facts never expire.
+instruction), or `context` (a live situation). Unlocked context facts recorded
+by extraction carry an `expiresAt` and drop out of `facts list` once it passes;
+locked facts remain active. Pass `--include-expired` to see expired facts.
+Hand-written facts never expire. Any update makes a fact manually maintained,
+clears its expiry, and revives it if needed. Changing content also removes its
+confidence and source links; changing only the kind preserves them.
 
 ### tunnel
 

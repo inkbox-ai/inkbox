@@ -355,8 +355,8 @@ class ContactFactKind(StrEnum):
     """Which memory bucket a fact belongs to.
 
     ``PROFILE`` is who the contact is, ``PREFERENCE`` is a standing
-    instruction, and ``CONTEXT`` is a live situation that stops applying on
-    its own.
+    instruction, and ``CONTEXT`` is a live situation that can expire unless
+    the fact is locked.
     """
 
     PROFILE = "profile"
@@ -389,8 +389,8 @@ class ContactFact:
 
     Attributes:
         kind: Memory bucket the fact belongs to, when it has been classified.
-        expires_at: Time the fact stops applying; only ``CONTEXT`` facts
-            recorded by extraction carry one.
+        expires_at: Time an unlocked generated ``CONTEXT`` fact stops applying.
+            Locked facts remain active after this timestamp.
     """
 
     id: UUID
