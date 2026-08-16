@@ -30,11 +30,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   revives it if it had expired. Editing content also drops the confidence and
   citations recorded for the previous wording; editing only its kind leaves
   them in place.
-- A contact can hold up to 10 active memories of each kind and 30 active memories
-  total. Untyped memories recorded before kinds existed count only toward the
-  total. A merge is rejected atomically when either limit would be exceeded.
-  Delete a fact from each named kind, or any active fact when the error names
-  `total`, then retry.
+- Manual fact creation and edits allow up to 10 active memories of each named
+  kind. Extraction additionally stops at 30 active memories total, with untyped
+  memories counting toward that total. A merge is rejected atomically when
+  either a named kind would exceed 10 or the total would exceed 30. Delete a fact
+  from each named kind, or any active fact when the error names `total`, then
+  retry.
 - Rust source compatibility: `ContactFact` gains public `kind` and `expires_at`
   fields. Existing struct literals must provide both fields, usually as `None`;
   `serde(default)` preserves response compatibility but not literal construction.
