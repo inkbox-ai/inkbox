@@ -33,6 +33,7 @@ use crate::imessage::resources::imessages::IMessagesResource;
 use crate::imessage::types::IMessageNumberType;
 use crate::mail::resources::contact_rules::MailContactRulesResource;
 use crate::mail::resources::domains::DomainsResource;
+use crate::mail::resources::drafts::DraftsResource;
 use crate::mail::resources::identity_contact_rules::MailIdentityContactRulesResource;
 use crate::mail::resources::mailboxes::MailboxesResource;
 use crate::mail::resources::messages::MessagesResource;
@@ -135,6 +136,7 @@ pub struct Inkbox {
     // Mail
     mailboxes: MailboxesResource,
     messages: MessagesResource,
+    drafts: DraftsResource,
     threads: ThreadsResource,
     mail_contact_rules: MailContactRulesResource,
     domains: DomainsResource,
@@ -264,6 +266,7 @@ impl Inkbox {
         let inkbox = Arc::new_cyclic(|weak: &Weak<Inkbox>| Inkbox {
             mailboxes: MailboxesResource::new(mail_http.clone()),
             messages: MessagesResource::new(mail_http.clone()),
+            drafts: DraftsResource::new(mail_http.clone()),
             threads: ThreadsResource::new(mail_http.clone()),
             mail_contact_rules: MailContactRulesResource::new(mail_http.clone()),
             domains: DomainsResource::new(domains_http.clone()),
@@ -322,6 +325,9 @@ impl Inkbox {
     }
     pub fn messages(&self) -> &MessagesResource {
         &self.messages
+    }
+    pub fn drafts(&self) -> &DraftsResource {
+        &self.drafts
     }
     pub fn threads(&self) -> &ThreadsResource {
         &self.threads

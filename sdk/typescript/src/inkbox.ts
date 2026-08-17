@@ -13,6 +13,7 @@ import type { RawWhoamiResponse, WhoamiResponse } from "./whoami/types.js";
 import { parseWhoamiResponse } from "./whoami/types.js";
 import { MailboxesResource } from "./mail/resources/mailboxes.js";
 import { MessagesResource } from "./mail/resources/messages.js";
+import { DraftsResource } from "./mail/resources/drafts.js";
 import { ThreadsResource } from "./mail/resources/threads.js";
 import { MailContactRulesResource } from "./mail/resources/contactRules.js";
 import { MailIdentityContactRulesResource } from "./mail/resources/identityContactRules.js";
@@ -151,6 +152,7 @@ export interface InkboxOptions {
 export class Inkbox {
   readonly _mailboxes: MailboxesResource;
   readonly _messages: MessagesResource;
+  readonly _drafts: DraftsResource;
   readonly _threads: ThreadsResource;
   readonly _mailContactRules: MailContactRulesResource;
   readonly _mailIdentityContactRules: MailIdentityContactRulesResource;
@@ -235,6 +237,7 @@ export class Inkbox {
 
     this._mailboxes        = new MailboxesResource(mailHttp);
     this._messages         = new MessagesResource(mailHttp);
+    this._drafts           = new DraftsResource(mailHttp);
     this._threads          = new ThreadsResource(mailHttp);
     this._mailContactRules = new MailContactRulesResource(mailHttp);
     this._domains          = new DomainsResource(domainsHttp);
@@ -315,6 +318,9 @@ export class Inkbox {
 
   /** Message operations (list, get, send, delete, star/unstar). */
   get messages(): MessagesResource { return this._messages; }
+
+  /** Email draft operations. */
+  get drafts(): DraftsResource { return this._drafts; }
 
   /** Thread operations (list, get, delete). */
   get threads(): ThreadsResource { return this._threads; }

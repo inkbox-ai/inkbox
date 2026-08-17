@@ -119,6 +119,41 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     await alphaFetched.update({ description: null });
     expect((await inkbox.getIdentity(alphaHandle)).description).toBeNull();
 
+    // ── email draft lifecycle ──────────────────────────────────
+    logStep(config, "create, list, get, update, and delete an email draft");
+    const draft = await alpha.createEmailDraft({ subject: `draft-${runSuffix}` });
+    expect(draft.generation).toBe(1);
+    const drafts = [];
+    for await (const item of alpha.iterEmailDrafts()) drafts.push(item);
+    expect(drafts.some((item) => item.id === draft.id)).toBe(true);
+    expect((await alpha.getEmailDraft(draft.id)).id).toBe(draft.id);
+    const updatedDraft = await alpha.updateEmailDraft(draft.id, {
+      generation: draft.generation,
+      recipients: { to: [bravo.emailAddress!] },
+      bodyText: "Updated draft body",
+    });
+    expect(updatedDraft.generation).toBeGreaterThan(draft.generation);
+    expect(updatedDraft.bodyText).toBe("Updated draft body");
+    await alpha.deleteEmailDraft(updatedDraft.id, updatedDraft.generation);
+
+    logStep(config, "create and send a draft with an attachment");
+    const sendDraft = await alpha.createEmailDraft({
+      to: [bravo.emailAddress!],
+      subject: `draft-send-${runSuffix}`,
+      bodyText: "Sent from a draft.",
+      attachments: [{
+        filename: "hello.txt",
+        contentType: "text/plain",
+        contentBase64: "aGVsbG8=",
+      }],
+    });
+    expect(sendDraft.attachmentCount).toBe(1);
+    const sentDraftMessage = await alpha.sendEmailDraft(
+      sendDraft.id,
+      sendDraft.generation,
+    );
+    expect(sentDraftMessage.subject).toBe(`draft-send-${runSuffix}`);
+
     // ── send email alpha → bravo ──────────────────────────────
     const subject = `sdk-integration-ts-${config.environment}`;
     logStep(config, `send email from alpha to bravo: ${subject}`);

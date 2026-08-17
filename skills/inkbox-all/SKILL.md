@@ -24,15 +24,15 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 - `inkbox-cli`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-cli/SKILL.md
-  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email, mailbox imports, phone, text, iMessage, A2A task/message history, vault, mailbox storage and mail-client settings, number, signing key, and webhook operations.
+  Reference for running the Inkbox CLI (`inkbox` / `@inkbox/cli`) for identities, email and drafts, mailbox imports, phone, text, iMessage, A2A task/message history, vault, mailbox storage and mail-client settings, number, signing key, and webhook operations.
 
 - `inkbox-python`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
-  Python SDK reference for `inkbox`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
+  Python SDK reference for `inkbox`, including identities, email drafts, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
 - `inkbox-ts`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-ts/SKILL.md
-  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
+  TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email drafts, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
 For A2A history, search covers string and numeric content values from `text`
 and `data` parts, not metadata, with newest-first results. Message `role` is
@@ -98,6 +98,22 @@ addresses per job, 65,000 entries per ZIP, 20 import jobs per organization per
 24 hours, and one in-flight import per mailbox. Upload targets expire after 5
 minutes; re-issue one and upload again, or cancel the job. An abandoned job
 holds the mailbox for 24 hours.
+
+## Email Drafts
+
+Python, TypeScript, Rust, and the CLI expose the same saved draft lifecycle:
+create, list, get, update, duplicate, delete, attachments, and send. Drafts
+share the mailbox's standard Drafts folder with connected mail clients. Every
+mutation requires the latest returned generation; attachment part indexes are
+coupled to that generation.
+
+Successful send returns the sent message and removes the draft. Retrying with
+the same draft ID and exact generation may return that message again. Structured
+HTTP 409 codes distinguish stale generation (`draft_generation_conflict`), a
+send still in progress (`draft_send_in_progress`), and an uncertain delivery
+outcome (`draft_delivery_uncertain`). Refresh stale drafts and retry in-progress
+sends with the same generation. Never resend an uncertain draft; after checking
+sent mail, duplicate or delete it instead.
 
 ## How To Choose
 

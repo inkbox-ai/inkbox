@@ -120,7 +120,7 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 
 | Domain | Accessor |
 |---|---|
-| Mail | `mailboxes()`, `messages()`, `threads()`, `mail_identity_contact_rules()`, `mail_contact_rules()` *(deprecated)*, `domains()` |
+| Mail | `mailboxes()`, `messages()`, `drafts()`, `threads()`, `mail_identity_contact_rules()`, `mail_contact_rules()` *(deprecated)*, `domains()` |
 | Phone | `calls()`, `phone_numbers()`, `texts()`, `incoming_call_action()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
 | iMessage | `imessages()`, `imessage_contact_rules()` |
 | Vault / data | `vault()`, `contacts()`, `notes()` |
@@ -142,6 +142,79 @@ exposes channel-scoped convenience methods: `send_email`, `forward_email`,
 `create_secret`, `set_totp`, the identity-keyed contact-rule helpers
 (`list_mail_contact_rules`, `create_phone_contact_rule`, ...), `create_signing_key`,
 and more.
+
+### Email drafts
+
+```rust
+use inkbox::mail::{Attachment, CreateDraftOptions, DraftRecipients, UpdateDraftOptions};
+
+let draft = identity.create_email_draft(&CreateDraftOptions {
+    recipients: DraftRecipients {
+        to: Some(vec!["reader@example.com".into()]),
+        ..Default::default()
+    },
+    subject: Some("Draft subject".into()),
+    body_text: Some("Draft body".into()),
+    ..Default::default()
+})?;
+
+for saved in identity.iter_email_drafts(None)? {
+    println!("{} {}", saved.id, saved.generation);
+}
+let current = identity.get_email_draft(&draft.summary.id)?;
+let mut current = identity.update_email_draft(
+    &current.summary.id,
+    current.summary.generation,
+    &UpdateDraftOptions {
+        subject: Some(None), // Explicitly clear; `None` leaves it unchanged.
+        ..Default::default()
+    },
+)?;
+let email = identity.email_address().unwrap();
+
+current = inkbox.drafts().add_attachments(
+    &email,
+    &current.summary.id,
+    current.summary.generation,
+    &[Attachment {
+        filename: "report.txt".into(),
+        content_type: "text/plain".into(),
+        content_base64: "cmVwb3J0".into(),
+        content_id: None,
+    }],
+)?;
+let part = &current.attachment_metadata[0];
+let downloaded = inkbox.drafts().download_attachment(
+    &email,
+    &current.summary.id,
+    part.part_index,
+    current.summary.generation,
+)?;
+current = inkbox.drafts().remove_attachment(
+    &email,
+    &current.summary.id,
+    part.part_index,
+    current.summary.generation,
+)?;
+
+let copy = identity.duplicate_email_draft(&current.summary.id, current.summary.generation)?;
+identity.delete_email_draft(&copy.summary.id, copy.summary.generation)?;
+let sent = identity.send_email_draft(&current.summary.id, current.summary.generation)?;
+```
+
+`drafts().list` auto-paginates. Update, duplicate, delete, attachment changes,
+attachment downloads, and send require the generation returned by the latest
+read or mutation. Attachment `part_index` values belong to the generation that
+returned them; refresh attachment metadata after an edit.
+
+Drafts use the same Drafts folder as a connected mail client, so edits are
+visible in both directions. A successful send returns a `Message` and removes
+the draft; an exact-generation retry may return the same sent message. Draft
+conflicts are `InkboxError::Api` with status `409` and
+`ApiErrorDetail::Structured` detail.
+Refresh on `draft_generation_conflict` and retry the same draft ID and generation
+on `draft_send_in_progress`. Do not resend `draft_delivery_uncertain`; after
+checking sent mail, duplicate or delete that draft instead.
 
 ### Mailbox imports
 

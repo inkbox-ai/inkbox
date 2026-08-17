@@ -166,6 +166,49 @@ const sent = await identity.sendEmail({
 // (402) when the mailbox is at its storage cap — see "Storage cap (402)" below.
 ```
 
+### Drafts
+
+```typescript
+const draft = await identity.createEmailDraft({ subject: "Work in progress" });
+for await (const saved of identity.iterEmailDrafts()) {
+  console.log(saved.id, saved.generation);
+}
+let current = await identity.getEmailDraft(draft.id);
+current = await identity.updateEmailDraft(current.id, {
+  generation: current.generation,
+  recipients: { to: ["user@example.com"] },
+  subject: null, // explicit null clears; omission leaves unchanged
+});
+
+current = await inkbox.drafts.addAttachments(identity.emailAddress!, current.id,
+  current.generation, [{
+    filename: "notes.txt",
+    contentType: "text/plain",
+    contentBase64: "bm90ZXM=",
+  }]);
+const part = current.attachmentMetadata[0];
+const content = await inkbox.drafts.downloadAttachment(
+  identity.emailAddress!, current.id, part.partIndex, current.generation,
+);
+current = await inkbox.drafts.removeAttachment(
+  identity.emailAddress!, current.id, part.partIndex, current.generation,
+);
+
+const copy = await identity.duplicateEmailDraft(current.id, current.generation);
+await identity.deleteEmailDraft(copy.id, copy.generation);
+const sent = await identity.sendEmailDraft(current.id, current.generation);
+```
+
+Drafts share the mailbox's standard Drafts folder with connected mail clients.
+Use the latest returned `generation` for every mutation. A `partIndex` belongs
+to the generation that returned it, so refresh attachment metadata after edits.
+
+Successful send returns a `Message` and removes the draft; an exact-generation
+retry may return the same sent message. HTTP 409 errors remain structured on
+`InkboxAPIError.detail.error`: refresh on `draft_generation_conflict` and retry
+the same ID and generation on `draft_send_in_progress`. Never resend
+`draft_delivery_uncertain`; after checking sent mail, duplicate or delete it instead.
+
 ### Read
 
 ```typescript

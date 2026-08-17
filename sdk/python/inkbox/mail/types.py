@@ -41,6 +41,14 @@ class ForwardMode(StrEnum):
     WRAPPED = "wrapped"
 
 
+class DraftSendState(StrEnum):
+    """Current send state of an email draft."""
+
+    DRAFT = "draft"
+    SENDING = "sending"
+    UNCERTAIN = "uncertain"
+
+
 class FilterMode(StrEnum):
     """
     Contact-rule filter mode on a mailbox or phone number.
@@ -324,6 +332,134 @@ class Message:
             open_count=d.get("open_count") or 0,
             import_job_id=UUID(d["import_job_id"]) if d.get("import_job_id") else None,
         )
+
+
+@dataclass
+class DraftRecipients:
+    """Optional recipient groups for an email draft."""
+
+    to: list[str] | None = None
+    cc: list[str] | None = None
+    bcc: list[str] | None = None
+
+    def to_wire(self) -> dict[str, list[str] | None]:
+        """Return recipient groups matching the draft API schema."""
+        return {"to": self.to, "cc": self.cc, "bcc": self.bcc}
+
+
+@dataclass
+class DraftAttachment:
+    """Attachment metadata for the current draft generation."""
+
+    part_index: int
+    filename: str
+    content_type: str
+    size: int
+    content_id: str | None = None
+    is_inline: bool = False
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> DraftAttachment:
+        return cls(
+            part_index=int(d["part_index"]),
+            filename=d["filename"],
+            content_type=d["content_type"],
+            size=int(d["size"]),
+            content_id=d.get("content_id"),
+            is_inline=bool(d.get("is_inline", False)),
+        )
+
+
+@dataclass
+class DraftSummary:
+    """Email draft metadata returned by list operations."""
+
+    id: UUID
+    mailbox_id: UUID
+    from_address: str
+    to_addresses: list[str]
+    cc_addresses: list[str]
+    bcc_addresses: list[str]
+    subject: str | None
+    snippet: str | None
+    has_attachments: bool
+    attachment_count: int
+    generation: int
+    send_state: DraftSendState
+    track_opens: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> DraftSummary:
+        return cls(
+            id=UUID(d["id"]),
+            mailbox_id=UUID(d["mailbox_id"]),
+            from_address=d["from_address"],
+            to_addresses=d.get("to_addresses") or [],
+            cc_addresses=d.get("cc_addresses") or [],
+            bcc_addresses=d.get("bcc_addresses") or [],
+            subject=d.get("subject"),
+            snippet=d.get("snippet"),
+            has_attachments=bool(d.get("has_attachments", False)),
+            attachment_count=int(d.get("attachment_count", 0)),
+            generation=int(d["generation"]),
+            send_state=DraftSendState(d["send_state"]),
+            track_opens=bool(d.get("track_opens", False)),
+            created_at=datetime.fromisoformat(d["created_at"]),
+            updated_at=datetime.fromisoformat(d["updated_at"]),
+        )
+
+
+@dataclass
+class DraftDetail(DraftSummary):
+    """Complete parsed representation of an email draft."""
+
+    body_text: str | None = None
+    body_html: str | None = None
+    reply_to: str | None = None
+    thread_id: UUID | None = None
+    message_id: str | None = None
+    in_reply_to: str | None = None
+    references: list[str] = field(default_factory=list)
+    forward_source_message_id: UUID | None = None
+    forward_note_text: str | None = None
+    forward_note_html: str | None = None
+    attachment_metadata: list[DraftAttachment] = field(default_factory=list)
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> DraftDetail:  # type: ignore[override]
+        base = DraftSummary._from_dict(d)
+        return cls(
+            **base.__dict__,
+            body_text=d.get("body_text"),
+            body_html=d.get("body_html"),
+            reply_to=d.get("reply_to"),
+            thread_id=UUID(d["thread_id"]) if d.get("thread_id") else None,
+            message_id=d.get("message_id"),
+            in_reply_to=d.get("in_reply_to"),
+            references=d.get("references") or [],
+            forward_source_message_id=(
+                UUID(d["forward_source_message_id"])
+                if d.get("forward_source_message_id")
+                else None
+            ),
+            forward_note_text=d.get("forward_note_text"),
+            forward_note_html=d.get("forward_note_html"),
+            attachment_metadata=[
+                DraftAttachment._from_dict(item)
+                for item in d.get("attachment_metadata") or []
+            ],
+        )
+
+
+@dataclass
+class DraftAttachmentContent:
+    """Downloaded draft attachment content and response metadata."""
+
+    content: bytes
+    filename: str
+    content_type: str
 
 
 @dataclass

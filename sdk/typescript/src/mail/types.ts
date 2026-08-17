@@ -23,6 +23,73 @@ export enum ForwardMode {
   WRAPPED = "wrapped",
 }
 
+export enum DraftSendState {
+  DRAFT = "draft",
+  SENDING = "sending",
+  UNCERTAIN = "uncertain",
+}
+
+export interface MailAttachmentInput {
+  filename: string;
+  contentType: string;
+  contentBase64: string;
+  /** Render inline in HTML using `cid:<contentId>`. */
+  contentId?: string;
+}
+
+export interface DraftRecipients {
+  to?: string[] | null;
+  cc?: string[] | null;
+  bcc?: string[] | null;
+}
+
+export interface DraftAttachment {
+  partIndex: number;
+  filename: string;
+  contentType: string;
+  size: number;
+  contentId: string | null;
+  isInline: boolean;
+}
+
+export interface DraftSummary {
+  id: string;
+  mailboxId: string;
+  fromAddress: string;
+  toAddresses: string[];
+  ccAddresses: string[];
+  bccAddresses: string[];
+  subject: string | null;
+  snippet: string | null;
+  hasAttachments: boolean;
+  attachmentCount: number;
+  generation: number;
+  sendState: DraftSendState;
+  trackOpens: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DraftDetail extends DraftSummary {
+  bodyText: string | null;
+  bodyHtml: string | null;
+  replyTo: string | null;
+  threadId: string | null;
+  messageId: string | null;
+  inReplyTo: string | null;
+  references: string[];
+  forwardSourceMessageId: string | null;
+  forwardNoteText: string | null;
+  forwardNoteHtml: string | null;
+  attachmentMetadata: DraftAttachment[];
+}
+
+export interface DraftAttachmentContent {
+  content: Uint8Array;
+  filename: string;
+  contentType: string;
+}
+
 /**
  * Contact-rule filter mode on a mailbox or phone number.
  *
@@ -372,6 +439,47 @@ export interface RawMessage {
   reply_all_recipients?: { to: string[]; cc: string[] } | null;
 }
 
+export interface RawDraftAttachment {
+  part_index: number;
+  filename: string;
+  content_type: string;
+  size: number;
+  content_id: string | null;
+  is_inline: boolean;
+}
+
+export interface RawDraftSummary {
+  id: string;
+  mailbox_id: string;
+  from_address: string;
+  to_addresses: string[];
+  cc_addresses: string[];
+  bcc_addresses: string[];
+  subject: string | null;
+  snippet: string | null;
+  has_attachments: boolean;
+  attachment_count: number;
+  generation: number;
+  send_state: string;
+  track_opens: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RawDraftDetail extends RawDraftSummary {
+  body_text: string | null;
+  body_html: string | null;
+  reply_to: string | null;
+  thread_id: string | null;
+  message_id: string | null;
+  in_reply_to: string | null;
+  references: string[];
+  forward_source_message_id: string | null;
+  forward_note_text: string | null;
+  forward_note_html: string | null;
+  attachment_metadata: RawDraftAttachment[];
+}
+
 export interface RawMailImportUploadTarget {
   url: string;
   fields: Record<string, string>;
@@ -502,6 +610,54 @@ export function parseMessage(r: RawMessage): Message {
     firstOpenedAt: r.first_opened_at ? new Date(r.first_opened_at) : null,
     openCount: r.open_count ?? 0,
     importJobId: r.import_job_id ?? null,
+  };
+}
+
+export function parseDraftAttachment(r: RawDraftAttachment): DraftAttachment {
+  return {
+    partIndex: r.part_index,
+    filename: r.filename,
+    contentType: r.content_type,
+    size: r.size,
+    contentId: r.content_id,
+    isInline: r.is_inline,
+  };
+}
+
+export function parseDraftSummary(r: RawDraftSummary): DraftSummary {
+  return {
+    id: r.id,
+    mailboxId: r.mailbox_id,
+    fromAddress: r.from_address,
+    toAddresses: r.to_addresses,
+    ccAddresses: r.cc_addresses,
+    bccAddresses: r.bcc_addresses,
+    subject: r.subject,
+    snippet: r.snippet,
+    hasAttachments: r.has_attachments,
+    attachmentCount: r.attachment_count,
+    generation: r.generation,
+    sendState: r.send_state as DraftSendState,
+    trackOpens: r.track_opens,
+    createdAt: new Date(r.created_at),
+    updatedAt: new Date(r.updated_at),
+  };
+}
+
+export function parseDraftDetail(r: RawDraftDetail): DraftDetail {
+  return {
+    ...parseDraftSummary(r),
+    bodyText: r.body_text,
+    bodyHtml: r.body_html,
+    replyTo: r.reply_to,
+    threadId: r.thread_id,
+    messageId: r.message_id,
+    inReplyTo: r.in_reply_to,
+    references: r.references,
+    forwardSourceMessageId: r.forward_source_message_id,
+    forwardNoteText: r.forward_note_text,
+    forwardNoteHtml: r.forward_note_html,
+    attachmentMetadata: r.attachment_metadata.map(parseDraftAttachment),
   };
 }
 

@@ -15,12 +15,19 @@ import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
 import { ForwardMode, MessageDirection } from "./mail/types.js";
 import type {
+  DraftDetail,
+  DraftSummary,
   FilterMode,
+  MailAttachmentInput,
   MailIdentityContactRule,
   Message,
   MessageDetail,
   ThreadDetail,
 } from "./mail/types.js";
+import type {
+  CreateDraftOptions,
+  UpdateDraftOptions,
+} from "./mail/resources/drafts.js";
 import type {
   PhoneIdentityContactRule,
   IncomingCallActionConfig,
@@ -355,7 +362,7 @@ export class AgentIdentity {
     bcc?: string[];
     inReplyToMessageId?: string;
     /** `contentId` on an entry renders it inline in the HTML body (`cid:<contentId>`); requires `bodyHtml` + `image/*`. */
-    attachments?: Array<{ filename: string; contentType: string; contentBase64: string; contentId?: string }>;
+    attachments?: MailAttachmentInput[];
     /** Embed an open-tracking pixel when `bodyHtml` is present; opens surface as `firstOpenedAt`/`openCount`. */
     trackOpens?: boolean;
   }): Promise<Message> {
@@ -383,7 +390,7 @@ export class AgentIdentity {
       bodyText?: string;
       bodyHtml?: string;
       /** `contentId` on an entry renders it inline in the HTML body (`cid:<contentId>`); requires `bodyHtml` + `image/*`. */
-      attachments?: Array<{ filename: string; contentType: string; contentBase64: string; contentId?: string }>;
+      attachments?: MailAttachmentInput[];
       replyTo?: string;
     } = {},
   ): Promise<Message> {
@@ -446,6 +453,51 @@ export class AgentIdentity {
       messageId,
       options,
     );
+  }
+
+  /** Iterate over this identity's email drafts, newest first. */
+  iterEmailDrafts(options?: { pageSize?: number }): AsyncGenerator<DraftSummary> {
+    this._requireMailbox();
+    return this._inkbox._drafts.list(this._mailbox!.emailAddress, options);
+  }
+
+  /** Create an email draft in this identity's mailbox. */
+  async createEmailDraft(options: CreateDraftOptions = {}): Promise<DraftDetail> {
+    this._requireMailbox();
+    return this._inkbox._drafts.create(this._mailbox!.emailAddress, options);
+  }
+
+  /** Get one email draft. */
+  async getEmailDraft(draftId: string): Promise<DraftDetail> {
+    this._requireMailbox();
+    return this._inkbox._drafts.get(this._mailbox!.emailAddress, draftId);
+  }
+
+  /** Update an email draft using its current generation. */
+  async updateEmailDraft(
+    draftId: string,
+    options: UpdateDraftOptions,
+  ): Promise<DraftDetail> {
+    this._requireMailbox();
+    return this._inkbox._drafts.update(this._mailbox!.emailAddress, draftId, options);
+  }
+
+  /** Duplicate an email draft using its current generation. */
+  async duplicateEmailDraft(draftId: string, generation: number): Promise<DraftDetail> {
+    this._requireMailbox();
+    return this._inkbox._drafts.duplicate(this._mailbox!.emailAddress, draftId, generation);
+  }
+
+  /** Delete an email draft using its current generation. */
+  async deleteEmailDraft(draftId: string, generation: number): Promise<void> {
+    this._requireMailbox();
+    await this._inkbox._drafts.delete(this._mailbox!.emailAddress, draftId, generation);
+  }
+
+  /** Send an email draft using its current generation. */
+  async sendEmailDraft(draftId: string, generation: number): Promise<Message> {
+    this._requireMailbox();
+    return this._inkbox._drafts.send(this._mailbox!.emailAddress, draftId, generation);
   }
 
   /**

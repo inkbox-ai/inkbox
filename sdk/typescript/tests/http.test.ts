@@ -192,6 +192,53 @@ describe("HttpTransport", () => {
     expect(init!.method).toBe("DELETE");
   });
 
+  it("delete() and deleteWithResponse() append query params", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeResponse(204, null))
+      .mockResolvedValueOnce(makeResponse(200, { id: 1 }));
+    const http = makeTransport();
+
+    await http.delete("/items/1", { params: { generation: 2 } });
+    await http.deleteWithResponse("/items/1", { params: { generation: 3 } });
+
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${BASE}/items/1?generation=2`);
+    expect(vi.mocked(fetch).mock.calls[1][0]).toBe(`${BASE}/items/1?generation=3`);
+  });
+
+  it("getBytes() returns exact bytes and response headers", async () => {
+    const headers = new Headers({ "Content-Type": "application/octet-stream" });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      headers,
+      arrayBuffer: () => Promise.resolve(Uint8Array.from([0, 128, 255]).buffer),
+    } as Response);
+    const http = makeTransport();
+
+    const result = await http.getBytes("/file", { generation: 2 });
+
+    expect(result.data).toEqual(new Uint8Array([0, 128, 255]));
+    expect(result.headers).toBe(headers);
+    expect(fetch).toHaveBeenCalledWith(
+      `${BASE}/file?generation=2`,
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({ Accept: "*/*" }),
+      }),
+    );
+  });
+
+  it("getBytes() preserves JSON API errors", async () => {
+    mockFetch(409, { detail: { error: "draft_generation_conflict" } }, false);
+    const http = makeTransport();
+
+    const error = await http.getBytes("/file").catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(InkboxAPIError);
+    expect((error as InkboxAPIError).detail).toEqual({ error: "draft_generation_conflict" });
+  });
+
   // --- Error handling ---
 
   it("throws InkboxAPIError with detail from JSON on non-ok response", async () => {

@@ -1,4 +1,4 @@
-//! The Inkbox **mail** domain: mailboxes, messages, threads, contact rules,
+//! The Inkbox **mail** domain: mailboxes, messages, drafts, threads, contact rules,
 //! and custom sending domains.
 //!
 //! Ported from `inkbox/mail/` in the Python SDK. The wire shape (JSON field
@@ -11,15 +11,17 @@ pub mod types;
 
 // Re-export the public types.
 pub use types::{
-    ContactRuleStatus, Domain, FilterMode, FilterModeChangeNotice, ForwardMode, MailContactRule,
-    MailIdentityContactRule, MailImportCreateResult, MailImportFormat, MailImportJob,
-    MailImportJobPage, MailImportJobStatus, MailImportUploadTarget, MailRuleAction,
+    ContactRuleStatus, Domain, DraftAttachment, DraftAttachmentContent, DraftDetail,
+    DraftRecipients, DraftSendState, DraftSummary, FilterMode, FilterModeChangeNotice, ForwardMode,
+    MailContactRule, MailIdentityContactRule, MailImportCreateResult, MailImportFormat,
+    MailImportJob, MailImportJobPage, MailImportJobStatus, MailImportUploadTarget, MailRuleAction,
     MailRuleMatchType, Mailbox, Message, MessageDetail, MessageDirection, ReplyAllRecipients,
     SendingDomainStatus, Thread, ThreadDetail, ThreadFolder,
 };
 
 // Re-export the resources.
 pub use resources::{
-    Attachment, DomainsResource, MailContactRulesResource, MailIdentityContactRulesResource,
-    MailboxImportsResource, MailboxesResource, MessagesResource, ThreadsResource,
+    Attachment, CreateDraftOptions, DomainsResource, DraftsResource, MailContactRulesResource,
+    MailIdentityContactRulesResource, MailboxImportsResource, MailboxesResource, MessagesResource,
+    ThreadsResource, UpdateDraftOptions,
 };

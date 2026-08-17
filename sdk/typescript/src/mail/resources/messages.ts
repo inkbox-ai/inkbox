@@ -7,6 +7,7 @@
 import { HttpTransport } from "../../_http.js";
 import {
   ForwardMode,
+  MailAttachmentInput,
   Message,
   MessageDetail,
   MessageDirection,
@@ -125,18 +126,7 @@ export class MessagesResource {
       cc?: string[];
       bcc?: string[];
       inReplyToMessageId?: string;
-      attachments?: Array<{
-        filename: string;
-        contentType: string;
-        contentBase64: string;
-        /**
-         * Render this part inline in the HTML body (referenced as
-         * `cid:<contentId>`, e.g. `<img src="cid:chart1">`) instead of as a
-         * download. Requires `bodyHtml`, an `image/*` `contentType`, and a
-         * unique id per send.
-         */
-        contentId?: string;
-      }>;
+      attachments?: MailAttachmentInput[];
       trackOpens?: boolean;
     },
   ): Promise<Message> {
@@ -201,13 +191,7 @@ export class MessagesResource {
       subject?: string;
       bodyText?: string;
       bodyHtml?: string;
-      attachments?: Array<{
-        filename: string;
-        contentType: string;
-        contentBase64: string;
-        /** Render inline in the HTML body (`cid:<contentId>`); requires `bodyHtml`, `image/*`, unique per reply. */
-        contentId?: string;
-      }>;
+      attachments?: MailAttachmentInput[];
       replyTo?: string;
     } = {},
   ): Promise<Message> {

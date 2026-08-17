@@ -33,6 +33,15 @@ pub enum ForwardMode {
     Wrapped,
 }
 
+/// Delivery state of a saved email draft.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DraftSendState {
+    Draft,
+    Sending,
+    Uncertain,
+}
+
 /// Contact-rule filter mode on a mailbox or phone number.
 ///
 /// `Whitelist` delivers only contacts matching an `allow` rule; everything
@@ -360,6 +369,95 @@ pub struct Message {
     /// Import job that created this historical message, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub import_job_id: Option<Uuid>,
+}
+
+/// Optional recipient groups for an incomplete draft.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DraftRecipients {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cc: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bcc: Option<Vec<String>>,
+}
+
+/// Attachment metadata for the current draft generation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DraftAttachment {
+    pub part_index: usize,
+    pub filename: String,
+    pub content_type: String,
+    pub size: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_id: Option<String>,
+    #[serde(default)]
+    pub is_inline: bool,
+}
+
+/// Draft fields returned by list operations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DraftSummary {
+    pub id: Uuid,
+    pub mailbox_id: Uuid,
+    pub from_address: String,
+    #[serde(default)]
+    pub to_addresses: Vec<String>,
+    #[serde(default)]
+    pub cc_addresses: Vec<String>,
+    #[serde(default)]
+    pub bcc_addresses: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snippet: Option<String>,
+    #[serde(default)]
+    pub has_attachments: bool,
+    #[serde(default)]
+    pub attachment_count: usize,
+    pub generation: u64,
+    pub send_state: DraftSendState,
+    #[serde(default)]
+    pub track_opens: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Complete representation of one saved draft.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DraftDetail {
+    #[serde(flatten)]
+    pub summary: DraftSummary,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_html: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_to: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_reply_to: Option<String>,
+    #[serde(default)]
+    pub references: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forward_source_message_id: Option<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forward_note_text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forward_note_html: Option<String>,
+    #[serde(default)]
+    pub attachment_metadata: Vec<DraftAttachment>,
+}
+
+/// Downloaded draft attachment bytes and response metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DraftAttachmentContent {
+    pub content: Vec<u8>,
+    pub filename: String,
+    pub content_type: String,
 }
 
 /// Unauthenticated multipart upload destination for an import file.

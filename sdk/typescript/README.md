@@ -277,6 +277,38 @@ console.log(tracked.firstOpenedAt, tracked.openCount);
 // debounce collapses repeats — so it can read above or below the true
 // count); prefer firstOpenedAt. Pixels can also raise spam scores.
 
+// Drafts accept incomplete content. Each draft response includes its generation.
+const draft = await identity.createEmailDraft({
+  subject: "Review requested",
+});
+for await (const saved of identity.iterEmailDrafts()) {
+  console.log(saved.id, saved.generation);
+}
+let current = await identity.getEmailDraft(draft.id);
+current = await identity.updateEmailDraft(current.id, {
+  generation: current.generation,
+  recipients: { to: ["reviewer@example.com"] },
+  subject: null, // explicit null clears; omit the field to leave it unchanged
+});
+
+current = await inkbox.drafts.addAttachments(identity.emailAddress!, current.id,
+  current.generation, [{
+    filename: "report.txt",
+    contentType: "text/plain",
+    contentBase64: "cmVwb3J0",
+  }]);
+const part = current.attachmentMetadata[0];
+const downloaded = await inkbox.drafts.downloadAttachment(
+  identity.emailAddress!, current.id, part.partIndex, current.generation,
+);
+current = await inkbox.drafts.removeAttachment(
+  identity.emailAddress!, current.id, part.partIndex, current.generation,
+);
+
+const copy = await identity.duplicateEmailDraft(current.id, current.generation);
+await identity.deleteEmailDraft(copy.id, copy.generation);
+const sentDraft = await identity.sendEmailDraft(current.id, current.generation);
+
 // Iterate inbox (paginated automatically)
 for await (const msg of identity.iterEmails()) {
   console.log(msg.subject, msg.fromAddress, msg.isRead);
@@ -304,6 +336,18 @@ for (const m of thread.messages) {
   console.log(m.subject, m.fromAddress);
 }
 ```
+
+Drafts use the same Drafts folder as a connected mail client, so edits are
+visible in both directions. Always use the latest returned `generation`;
+attachment `partIndex` values belong to the generation that returned them, so
+refresh attachment metadata after an edit.
+
+A successful send returns a `Message` and removes the draft. An exact-generation
+retry may return the same sent message. Draft conflicts are `InkboxAPIError`
+responses with `statusCode === 409` and a structured `detail.error`. Refresh on
+`draft_generation_conflict` and retry the same draft ID and generation on
+`draft_send_in_progress`. Do not resend `draft_delivery_uncertain`; after
+checking sent mail, duplicate or delete that draft instead.
 
 Fetching a single inbound message by id (`inkbox.messages.get`, below)
 with an API key marks it read server-side (`isRead` becomes `true`);

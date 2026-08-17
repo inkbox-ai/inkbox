@@ -367,6 +367,11 @@ async function readErrorEnvelope(resp: Response): Promise<{
 type ParamValue = string | number | boolean;
 type Params = Record<string, ParamValue | readonly ParamValue[] | undefined | null>;
 
+export interface RawHttpResponse<T> {
+  data: T;
+  headers: Headers;
+}
+
 type StoredCookie = {
   name: string;
   value: string;
@@ -575,9 +580,10 @@ export class HttpTransport {
 
   async delete(
     path: string,
-    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+    opts?: { timeoutMs?: number; params?: Params; headers?: Record<string, string> },
   ): Promise<void> {
     await this.request<void>("DELETE", path, {
+      params: opts?.params,
       timeoutMs: opts?.timeoutMs,
       headers: opts?.headers,
     });
@@ -591,9 +597,10 @@ export class HttpTransport {
    */
   async deleteWithResponse<T>(
     path: string,
-    opts?: { timeoutMs?: number; headers?: Record<string, string> },
+    opts?: { timeoutMs?: number; params?: Params; headers?: Record<string, string> },
   ): Promise<T> {
     return this.request<T>("DELETE", path, {
+      params: opts?.params,
       timeoutMs: opts?.timeoutMs,
       headers: opts?.headers,
     });
@@ -624,6 +631,15 @@ export class HttpTransport {
    */
   async getText(path: string, accept: string, params?: Params): Promise<string> {
     return this.request<string>("GET", path, { params, accept, rawResponse: "text" });
+  }
+
+  /** GET a binary response together with its response headers. */
+  async getBytes(path: string, params?: Params): Promise<RawHttpResponse<Uint8Array>> {
+    return this.request<RawHttpResponse<Uint8Array>>("GET", path, {
+      params,
+      accept: "*/*",
+      rawResponse: "bytes",
+    });
   }
 
   private async request<T>(
@@ -727,6 +743,11 @@ export class HttpTransport {
 
     if (opts.rawResponse === "text") {
       return (await resp.text()) as unknown as T;
+    }
+
+    if (opts.rawResponse === "bytes") {
+      const data = new Uint8Array(await resp.arrayBuffer());
+      return { data, headers: resp.headers } as T;
     }
 
     return resp.json() as Promise<T>;

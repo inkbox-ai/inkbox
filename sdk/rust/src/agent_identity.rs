@@ -50,9 +50,10 @@ use crate::imessage::types::{
     IMessageReactionType, IMessageSendStyle, IdentityIMessageNumber,
 };
 use crate::mail::types::{
-    FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction, MailRuleMatchType, Message,
-    MessageDetail, MessageDirection, ThreadDetail,
+    DraftDetail, DraftSummary, FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction,
+    MailRuleMatchType, Message, MessageDetail, MessageDirection, ThreadDetail,
 };
+use crate::mail::{CreateDraftOptions, UpdateDraftOptions};
 use crate::phone::resources::texts::TextRecipients;
 use crate::phone::types::{
     CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedAgentConfig,
@@ -324,6 +325,55 @@ impl AgentIdentity {
             attachments,
             track_opens,
         )
+    }
+
+    /// Fetch all saved drafts for this identity's mailbox, newest first.
+    pub fn iter_email_drafts(&self, page_size: Option<u32>) -> Result<Vec<DraftSummary>> {
+        let email = self.require_mailbox()?;
+        self.inkbox.drafts().list(&email, page_size)
+    }
+
+    /// Create a saved draft in this identity's mailbox.
+    pub fn create_email_draft(&self, options: &CreateDraftOptions) -> Result<DraftDetail> {
+        let email = self.require_mailbox()?;
+        self.inkbox.drafts().create(&email, options)
+    }
+
+    /// Get one saved draft from this identity's mailbox.
+    pub fn get_email_draft(&self, draft_id: &Uuid) -> Result<DraftDetail> {
+        let email = self.require_mailbox()?;
+        self.inkbox.drafts().get(&email, draft_id)
+    }
+
+    /// Apply generation-checked changes to a saved draft.
+    pub fn update_email_draft(
+        &self,
+        draft_id: &Uuid,
+        generation: u64,
+        options: &UpdateDraftOptions,
+    ) -> Result<DraftDetail> {
+        let email = self.require_mailbox()?;
+        self.inkbox
+            .drafts()
+            .update(&email, draft_id, generation, options)
+    }
+
+    /// Duplicate a saved draft at the generation the caller read.
+    pub fn duplicate_email_draft(&self, draft_id: &Uuid, generation: u64) -> Result<DraftDetail> {
+        let email = self.require_mailbox()?;
+        self.inkbox.drafts().duplicate(&email, draft_id, generation)
+    }
+
+    /// Delete a saved draft at the generation the caller read.
+    pub fn delete_email_draft(&self, draft_id: &Uuid, generation: u64) -> Result<()> {
+        let email = self.require_mailbox()?;
+        self.inkbox.drafts().delete(&email, draft_id, generation)
+    }
+
+    /// Send a saved draft at the generation the caller read.
+    pub fn send_email_draft(&self, draft_id: &Uuid, generation: u64) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.drafts().send(&email, draft_id, generation)
     }
 
     /// Reply to everyone on a stored message from this identity's mailbox.

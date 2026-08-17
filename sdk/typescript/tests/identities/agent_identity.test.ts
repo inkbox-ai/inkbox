@@ -13,6 +13,15 @@ const MESSAGE_ID = RAW_MESSAGE_DETAIL.id;
 function mockInkbox() {
   return {
     _messages: { get: vi.fn() },
+    _drafts: {
+      list: vi.fn(),
+      create: vi.fn(),
+      get: vi.fn(),
+      update: vi.fn(),
+      duplicate: vi.fn(),
+      delete: vi.fn(),
+      send: vi.fn(),
+    },
     _threads: { get: vi.fn() },
     _mailboxes: { create: vi.fn() },
   } as unknown as Inkbox;
@@ -70,3 +79,51 @@ describe("AgentIdentity.getThread", () => {
   });
 });
 
+describe("AgentIdentity email draft wrappers", () => {
+  it("delegates every wrapper with the identity mailbox address", async () => {
+    const { identity, inkbox } = identityWithMailbox();
+    const draft = { id: "draft-id" } as never;
+    const message = { id: "message-id" } as never;
+    async function* listed() { yield draft; }
+    vi.mocked(inkbox._drafts.list).mockReturnValue(listed());
+    vi.mocked(inkbox._drafts.create).mockResolvedValue(draft);
+    vi.mocked(inkbox._drafts.get).mockResolvedValue(draft);
+    vi.mocked(inkbox._drafts.update).mockResolvedValue(draft);
+    vi.mocked(inkbox._drafts.duplicate).mockResolvedValue(draft);
+    vi.mocked(inkbox._drafts.delete).mockResolvedValue(undefined);
+    vi.mocked(inkbox._drafts.send).mockResolvedValue(message);
+
+    const listedDrafts = [];
+    for await (const item of identity.iterEmailDrafts({ pageSize: 10 })) listedDrafts.push(item);
+    await identity.createEmailDraft({ subject: "Subject" });
+    await identity.getEmailDraft("draft-id");
+    await identity.updateEmailDraft("draft-id", { generation: 2, subject: null });
+    await identity.duplicateEmailDraft("draft-id", 2);
+    await identity.deleteEmailDraft("draft-id", 2);
+    await identity.sendEmailDraft("draft-id", 2);
+
+    const address = "sales-agent@inkbox.ai";
+    expect(listedDrafts).toEqual([draft]);
+    expect(inkbox._drafts.list).toHaveBeenCalledWith(address, { pageSize: 10 });
+    expect(inkbox._drafts.create).toHaveBeenCalledWith(address, { subject: "Subject" });
+    expect(inkbox._drafts.get).toHaveBeenCalledWith(address, "draft-id");
+    expect(inkbox._drafts.update).toHaveBeenCalledWith(
+      address, "draft-id", { generation: 2, subject: null },
+    );
+    expect(inkbox._drafts.duplicate).toHaveBeenCalledWith(address, "draft-id", 2);
+    expect(inkbox._drafts.delete).toHaveBeenCalledWith(address, "draft-id", 2);
+    expect(inkbox._drafts.send).toHaveBeenCalledWith(address, "draft-id", 2);
+  });
+
+  it("rejects every wrapper when no mailbox is assigned", async () => {
+    const { identity } = identityWithoutMailbox();
+
+    expect(() => identity.iterEmailDrafts()).toThrow(InkboxError);
+    await expect(identity.createEmailDraft()).rejects.toThrow(InkboxError);
+    await expect(identity.getEmailDraft("draft-id")).rejects.toThrow(InkboxError);
+    await expect(identity.updateEmailDraft("draft-id", { generation: 1 })).rejects.toThrow(InkboxError);
+    await expect(identity.duplicateEmailDraft("draft-id", 1)).rejects.toThrow(InkboxError);
+    await expect(identity.deleteEmailDraft("draft-id", 1)).rejects.toThrow(InkboxError);
+    await expect(identity.sendEmailDraft("draft-id", 1)).rejects.toThrow(InkboxError);
+  });
+});

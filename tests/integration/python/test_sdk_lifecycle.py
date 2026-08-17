@@ -10,7 +10,7 @@ from uuid import uuid4
 from tempfile import NamedTemporaryFile
 
 import pytest
-from inkbox import Inkbox, MailImportFormat, MailImportJobStatus
+from inkbox import DraftRecipients, Inkbox, MailImportFormat, MailImportJobStatus
 from conftest import SdkIntegrationContext, log_step, poll_until
 
 
@@ -109,6 +109,46 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         log_step(ctx, "update alpha description (clear via explicit None)")
         alpha_fetched.update(description=None)
         assert inkbox.get_identity(alpha_handle).description is None
+
+        # ── email draft lifecycle ──────────────────────────────────
+        log_step(ctx, "create, list, get, update, and delete an email draft")
+        draft = alpha.create_email_draft(subject=f"draft-{run_suffix}")
+        assert draft.generation == 1
+        assert any(item.id == draft.id for item in alpha.iter_email_drafts())
+        fetched_draft = alpha.get_email_draft(draft.id)
+        assert fetched_draft.id == draft.id
+        updated_draft = alpha.update_email_draft(
+            draft.id,
+            generation=draft.generation,
+            recipients=DraftRecipients(to=[bravo.email_address]),
+            body_text="Updated draft body",
+        )
+        assert updated_draft.generation == draft.generation + 1
+        assert updated_draft.body_text == "Updated draft body"
+        alpha.delete_email_draft(
+            updated_draft.id, generation=updated_draft.generation
+        )
+        assert all(item.id != draft.id for item in alpha.iter_email_drafts())
+
+        log_step(ctx, "create and send a draft with an attachment")
+        send_draft = inkbox.drafts.create(
+            alpha.email_address,
+            to=[bravo.email_address],
+            subject=f"draft-send-{run_suffix}",
+            body_text="Sent from a draft.",
+            attachments=[
+                {
+                    "filename": "hello.txt",
+                    "content_type": "text/plain",
+                    "content_base64": "aGVsbG8=",
+                }
+            ],
+        )
+        assert send_draft.attachment_count == 1
+        sent_draft_message = alpha.send_email_draft(
+            send_draft.id, generation=send_draft.generation
+        )
+        assert sent_draft_message.subject == f"draft-send-{run_suffix}"
 
         # ── send email alpha → bravo ──────────────────────────────
         subject = f"sdk-integration-{cfg.environment}"

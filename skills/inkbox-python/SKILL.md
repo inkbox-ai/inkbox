@@ -169,6 +169,55 @@ sent = identity.send_email(
 # see "Storage cap (402)" below.
 ```
 
+### Drafts
+
+```python
+from inkbox import DraftRecipients
+
+draft = identity.create_email_draft(subject="Work in progress")
+for saved in identity.iter_email_drafts():
+    print(saved.id, saved.generation)
+current = identity.get_email_draft(draft.id)
+current = identity.update_email_draft(
+    current.id,
+    generation=current.generation,
+    recipients=DraftRecipients(to=["user@example.com"]),
+    subject=None,  # explicit null clears; omission leaves unchanged
+)
+
+current = inkbox.drafts.add_attachments(
+    identity.email_address,
+    current.id,
+    generation=current.generation,
+    attachments=[{
+        "filename": "notes.txt",
+        "content_type": "text/plain",
+        "content_base64": "bm90ZXM=",
+    }],
+)
+part = current.attachment_metadata[0]
+content = inkbox.drafts.download_attachment(
+    identity.email_address, current.id, part.part_index, generation=current.generation
+)
+current = inkbox.drafts.remove_attachment(
+    identity.email_address, current.id, part.part_index, generation=current.generation
+)
+
+copy = identity.duplicate_email_draft(current.id, generation=current.generation)
+identity.delete_email_draft(copy.id, generation=copy.generation)
+sent = identity.send_email_draft(current.id, generation=current.generation)
+```
+
+Drafts share the mailbox's standard Drafts folder with connected mail clients.
+Use the latest returned `generation` for every mutation. A `part_index` belongs
+to the generation that returned it, so refresh attachment metadata after edits.
+
+Successful send returns a `Message` and removes the draft; an exact-generation
+retry may return the same sent message. HTTP 409 errors remain structured on
+`InkboxAPIError.detail["error"]`: refresh on `draft_generation_conflict` and retry
+the same ID and generation on `draft_send_in_progress`. Never resend
+`draft_delivery_uncertain`; after checking sent mail, duplicate or delete it instead.
+
 ### Read
 
 ```python

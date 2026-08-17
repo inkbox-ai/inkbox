@@ -166,6 +166,24 @@ inkbox email forward <message-id> -i <handle>    # Forward a message
                                              #     original's HTML; server 422s
                                              #     if the forward has no HTML)
 
+inkbox email drafts create -i <handle>        # Create an incomplete draft; prints generation
+  --to <addresses>                            #   Optional comma-separated recipients
+  --subject <subject>                         #   Optional subject
+  --body-text <text>                          #   Optional plain text body
+  --attach <path>                             #   Attach a file (repeatable)
+inkbox email drafts list -i <handle>          # List drafts with current generations
+inkbox email drafts get <draft-id> -i <handle> # Get bodies and attachment metadata
+inkbox email drafts update <draft-id> -i <handle> --generation <n>
+  --subject <subject>                         #   Set a field
+  --clear-subject                             #   Send explicit null to clear it
+  --clear-recipients                          #   Clear To, CC, and BCC
+inkbox email drafts duplicate <draft-id> -i <handle> --generation <n>
+inkbox email drafts delete <draft-id> -i <handle> --generation <n>
+inkbox email drafts send <draft-id> -i <handle> --generation <n>
+inkbox email drafts attachment add <draft-id> -i <handle> --generation <n> --attach <path>
+inkbox email drafts attachment remove <draft-id> <part-index> -i <handle> --generation <n>
+inkbox email drafts attachment download <draft-id> <part-index> -i <handle> --generation <n> --output <path>
+
 inkbox email list -i <handle>                # List emails
   --direction <dir>                          #   Filter: inbound or outbound
   --limit <n>                                #   Max messages (default: 50)
@@ -191,6 +209,17 @@ inkbox email star <message-id> -i <handle>   # Star a message
 inkbox email unstar <message-id> -i <handle> # Unstar a message
 inkbox email thread <thread-id> -i <handle>  # Get thread with all messages
 ```
+
+Use the generation printed by the latest `create`, `list`, `get`, or mutation
+for the next mutation. Attachment part indexes belong to that same generation;
+refresh with `get` after an edit. Drafts share the standard mailbox Drafts
+folder, so connected mail clients and the CLI see each other's edits.
+
+A successful `drafts send` prints the sent message and removes the draft. An
+exact-generation retry may return the same sent message. On HTTP 409, refresh
+for `draft_generation_conflict` and retry the same draft ID and generation for
+`draft_send_in_progress`. Do not resend `draft_delivery_uncertain`; after
+checking sent mail, duplicate or delete that draft instead.
 
 ### phone
 

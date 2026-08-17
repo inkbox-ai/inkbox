@@ -4,6 +4,30 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.5.18 — Email drafts
+
+### Added
+
+- Python, TypeScript, and Rust expose a first-class drafts resource for creating,
+  listing, reading, updating, duplicating, deleting, and sending email drafts.
+  Draft attachment operations support generation-checked add, remove, and binary
+  download with filename and content-type metadata.
+- Identity helpers provide mailbox-scoped draft lifecycle methods. Successful
+  sends return the existing message type, and exact send retries can return the
+  same sent message without sending it again.
+- `inkbox email drafts` adds the complete draft lifecycle plus file attachment
+  add, remove, and download commands.
+
+### Changed
+
+- Draft mutations require the latest returned generation. Update methods preserve
+  omitted fields and send explicit null values when callers clear nullable fields.
+- Draft conflict details remain available through each SDK's existing API error
+  type, including generation conflicts, sends in progress, and delivery states
+  that require duplicating or deleting the draft instead of resending it.
+- Package and plugin versions moved in lockstep to 0.5.18; the CLI now depends
+  on `@inkbox/sdk` `^0.5.18`.
+
 ## 0.5.17 — Typed contact memory and hand-written facts
 
 ### Added

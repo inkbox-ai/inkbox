@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Inkbox } from "../src/inkbox.js";
 import { MailboxesResource } from "../src/mail/resources/mailboxes.js";
 import { MessagesResource } from "../src/mail/resources/messages.js";
+import { DraftsResource } from "../src/mail/resources/drafts.js";
 import { ThreadsResource } from "../src/mail/resources/threads.js";
 import { PhoneNumbersResource } from "../src/phone/resources/numbers.js";
 import { CallsResource } from "../src/phone/resources/calls.js";
@@ -62,6 +63,7 @@ describe("Inkbox constructor", () => {
     const ink = makeInkbox();
     expect(ink.messages).toBeInstanceOf(MessagesResource);
     expect(ink.threads).toBeInstanceOf(ThreadsResource);
+    expect(ink.drafts).toBeInstanceOf(DraftsResource);
   });
 
   it("exposes phoneNumbers accessor", () => {
