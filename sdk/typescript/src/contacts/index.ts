@@ -13,5 +13,10 @@ export type {
   ContactCorrespondenceOptions,
   GetContactCorrespondenceOptions,
 } from "./resources/correspondence.js";
-export type { ContactFactsResource } from "./resources/contactFacts.js";
+export type {
+  ContactFactsResource,
+  CreateContactFactOptions,
+  ListContactFactsOptions,
+  UpdateContactFactOptions,
+} from "./resources/contactFacts.js";
 export type { ContactCorrespondenceResource } from "./resources/correspondence.js";

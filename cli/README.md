@@ -573,10 +573,12 @@ Organization-wide contacts, correspondence, and memory facts.
 ```bash
 inkbox contacts list [--review-status <status>] [--offset <n>]  # Offset max: 10000
 inkbox contacts get <contact-id>
-inkbox contacts facts list <contact-id>
+inkbox contacts facts list <contact-id> [--include-expired]
 inkbox contacts facts get <contact-id> <fact-id>
 inkbox contacts facts citation <contact-id> <fact-id> <citation-id>
 inkbox contacts facts citation-url <source-url>
+inkbox contacts facts create <contact-id> --content <text> --kind <kind>  # Admin-scoped API key required
+inkbox contacts facts update <contact-id> <fact-id> [--content <text>] [--kind <kind>]  # Admin-scoped API key required
 inkbox contacts facts delete <contact-id> <fact-id>  # Admin-scoped API key required
 inkbox contacts correspondence <contact-id> [-i <identity-id>]
   [--channels <channel>] [--after <datetime>] [--before <datetime>]
@@ -592,8 +594,18 @@ inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts access list <contact-id>              # Compatibility read only
 ```
 
-Merges are rejected atomically if the survivor would exceed 25 active memories.
-Delete unwanted facts, then retry the merge.
+Active memories have per-kind and contact-wide limits. A merge is rejected
+atomically when either would be exceeded. Delete a fact from each kind named by
+the error, or any active fact when it names `total`, then retry. Untyped memories
+recorded before kinds existed count toward the total.
+
+A fact's `kind` is `profile` (who the contact is), `preference` (a standing
+instruction), or `context` (a live situation). Unlocked context facts recorded
+by extraction carry an `expiresAt` and drop out of `facts list` once it passes;
+locked facts remain active. Pass `--include-expired` to see expired facts.
+Hand-written facts never expire. Any update makes a fact manually maintained,
+clears its expiry, and revives it if needed. Changing content also removes its
+confidence and source links; changing only the kind preserves them.
 
 ### tunnel
 

@@ -1,12 +1,16 @@
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
+import pytest
+
 from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceOptions
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
     Contact,
     ContactBulkDeleteStatus,
+    ContactFact,
+    ContactFactKind,
     ContactImportResult,
     ContactReviewStatus,
     CorrespondenceChannel,
@@ -126,7 +130,9 @@ def test_facts_and_citation_parsing():
     facts = resource.facts.list(CONTACT_ID)
     assert str(facts[0].confidence) == "0.95"
     assert facts[0].citations[0].source_id is not None
-    transport.get.assert_called_with(f"/contacts/{CONTACT_ID}/facts")
+    assert facts[0].kind is None
+    assert facts[0].expires_at is None
+    transport.get.assert_called_with(f"/contacts/{CONTACT_ID}/facts", params={})
 
     transport.get.return_value = {
         "source_type": "email",
@@ -136,6 +142,87 @@ def test_facts_and_citation_parsing():
     }
     detail = resource.facts.resolve_citation(CONTACT_ID, SOURCE_ID, SOURCE_ID)
     assert detail.source_locator == {"part": "body"}
+
+
+def fact_payload(**overrides):
+    payload = {
+        "id": SOURCE_ID,
+        "contact_id": CONTACT_ID,
+        "content": "Prefers email",
+        "confidence": None,
+        "origin": "user",
+        "kind": "preference",
+        "expires_at": None,
+        "locked_at": None,
+        "created_at": NOW,
+        "updated_at": NOW,
+        "citations": [],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_fact_kind_and_expiry_parsing():
+    transport = MagicMock()
+    expires_at = "2026-08-19T12:00:00+00:00"
+    transport.get.return_value = [
+        fact_payload(origin="generated", kind="context", expires_at=expires_at)
+    ]
+    resource = ContactsResource(transport)
+
+    facts = resource.facts.list(CONTACT_ID, include_expired=True)
+
+    assert facts[0].kind is ContactFactKind.CONTEXT
+    assert facts[0].expires_at == datetime.fromisoformat(expires_at)
+    assert transport.get.call_args.kwargs["params"] == {"include_expired": True}
+
+
+def test_fact_fields_tolerate_servers_without_them():
+    fact = ContactFact._from_dict({
+        "id": SOURCE_ID,
+        "contact_id": CONTACT_ID,
+        "content": "Prefers email",
+        "confidence": None,
+        "origin": "generated",
+        "locked_at": None,
+        "created_at": NOW,
+        "updated_at": NOW,
+    })
+
+    assert fact.kind is None
+    assert fact.expires_at is None
+
+
+def test_fact_create_and_update():
+    transport = MagicMock()
+    transport.post.return_value = fact_payload()
+    transport.patch.return_value = fact_payload(content="Prefers SMS")
+    resource = ContactsResource(transport)
+
+    created = resource.facts.create(
+        CONTACT_ID, content="Prefers email", kind=ContactFactKind.PREFERENCE
+    )
+    assert created.kind is ContactFactKind.PREFERENCE
+    assert transport.post.call_args.args[0] == f"/contacts/{CONTACT_ID}/facts"
+    assert transport.post.call_args.kwargs["json"] == {
+        "content": "Prefers email",
+        "kind": "preference",
+    }
+
+    updated = resource.facts.update(CONTACT_ID, SOURCE_ID, content="Prefers SMS")
+    assert updated.content == "Prefers SMS"
+    assert updated.origin.value == "user"
+    assert updated.expires_at is None
+    assert transport.patch.call_args.args[0] == (
+        f"/contacts/{CONTACT_ID}/facts/{SOURCE_ID}"
+    )
+    assert transport.patch.call_args.kwargs["json"] == {"content": "Prefers SMS"}
+
+    resource.facts.update(CONTACT_ID, SOURCE_ID, kind="profile")
+    assert transport.patch.call_args.kwargs["json"] == {"kind": "profile"}
+
+    with pytest.raises(ValueError):
+        resource.facts.update(CONTACT_ID, SOURCE_ID)
 
 
 def test_correspondence_options_and_all_channels():

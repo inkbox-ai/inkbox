@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -10,6 +10,7 @@ from inkbox.contacts.types import (
     ContactFact,
     ContactFactCitationDetail,
     ContactFactDeleteResult,
+    ContactFactKind,
 )
 
 if TYPE_CHECKING:
@@ -20,13 +21,77 @@ class ContactFactsResource:
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
-    def list(self, contact_id: UUID | str) -> list[ContactFact]:
-        data = self._http.get(f"/contacts/{contact_id}/facts")
+    def list(
+        self,
+        contact_id: UUID | str,
+        *,
+        include_expired: bool = False,
+    ) -> list[ContactFact]:
+        """List a contact's facts.
+
+        Args:
+            contact_id: Contact whose facts to list.
+            include_expired: Also return context facts whose ``expires_at``
+                has passed. They are left out by default; locked facts remain
+                active and stay in the default list.
+        """
+        params: dict[str, Any] = {}
+        if include_expired:
+            params["include_expired"] = True
+        data = self._http.get(f"/contacts/{contact_id}/facts", params=params)
         items = data["items"] if isinstance(data, dict) and "items" in data else data
         return [ContactFact._from_dict(item) for item in items]
 
     def get(self, contact_id: UUID | str, fact_id: UUID | str) -> ContactFact:
         data = self._http.get(f"/contacts/{contact_id}/facts/{fact_id}")
+        return ContactFact._from_dict(data)
+
+    def create(
+        self,
+        contact_id: UUID | str,
+        *,
+        content: str,
+        kind: ContactFactKind | str,
+    ) -> ContactFact:
+        """Record a fact by hand. Requires an admin-scoped API key; an
+        agent-scoped key is rejected with 403.
+
+        Hand-written facts never expire, whatever their kind. The call fails
+        with 409 when the contact is already at its limit for that kind.
+        """
+        data = self._http.post(
+            f"/contacts/{contact_id}/facts",
+            json={"content": content, "kind": str(kind)},
+        )
+        return ContactFact._from_dict(data)
+
+    def update(
+        self,
+        contact_id: UUID | str,
+        fact_id: UUID | str,
+        *,
+        content: str | None = None,
+        kind: ContactFactKind | str | None = None,
+    ) -> ContactFact:
+        """Edit a fact's content or kind. Requires an admin-scoped API key; an
+        agent-scoped key is rejected with 403.
+
+        At least one of ``content`` and ``kind`` is required. Any edit makes the
+        fact user-authored, clears its expiry, and revives it if it had expired.
+        Editing content also drops the citations and confidence recorded for
+        the old wording; editing only the kind leaves them in place.
+        """
+        body: dict[str, Any] = {}
+        if content is not None:
+            body["content"] = content
+        if kind is not None:
+            body["kind"] = str(kind)
+        if not body:
+            raise ValueError("update() requires content or kind")
+        data = self._http.patch(
+            f"/contacts/{contact_id}/facts/{fact_id}",
+            json=body,
+        )
         return ContactFact._from_dict(data)
 
     def resolve_citation(

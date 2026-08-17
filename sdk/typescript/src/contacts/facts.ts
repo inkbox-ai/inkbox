@@ -5,6 +5,13 @@ export type ContactFactCitationAvailability =
 
 export type ContactFactOrigin = "generated" | "user";
 
+/**
+ * Which memory bucket a fact belongs to: who the contact is (`profile`), a
+ * standing instruction (`preference`), or a live situation that can expire
+ * unless the fact is locked (`context`).
+ */
+export type ContactFactKind = "profile" | "preference" | "context";
+
 export interface ContactFactCitation {
   sourceType: string;
   availability: ContactFactCitationAvailability;
@@ -23,6 +30,10 @@ export interface ContactFact {
   createdAt: Date;
   updatedAt: Date;
   citations: ContactFactCitation[];
+  /** Memory bucket the fact belongs to, when it has been classified. */
+  kind?: ContactFactKind | null;
+  /** When an unlocked generated `context` fact stops applying. Locked facts remain active. */
+  expiresAt?: Date | null;
 }
 
 export interface ContactFactCitationDetail {
@@ -60,6 +71,8 @@ export interface RawContactFact {
   created_at: string;
   updated_at: string;
   citations: RawContactFactCitation[];
+  kind?: ContactFactKind | null;
+  expires_at?: string | null;
 }
 
 export interface RawContactFactCitationDetail {
@@ -100,6 +113,8 @@ export function parseContactFact(r: RawContactFact): ContactFact {
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     citations: r.citations.map(parseContactFactCitation),
+    kind: r.kind ?? null,
+    expiresAt: r.expires_at ? new Date(r.expires_at) : null,
   };
 }
 

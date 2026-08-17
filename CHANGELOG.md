@@ -4,6 +4,44 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.5.17 — Typed contact memory and hand-written facts
+
+### Added
+
+- Contact facts carry two optional fields: `kind` (`profile`, `preference`, or
+  `context`) and `expires_at`, when an unlocked generated context fact stops
+  applying. Locked facts remain active. Both fields are absent against
+  deployments that do not send them yet.
+- Create and edit facts by hand from Python, TypeScript, Rust, and the CLI:
+  `contacts.facts.create()` / `update()`, and `inkbox contacts facts create` /
+  `update`. Both require an admin-scoped API key; an agent-scoped key is
+  rejected with 403. Hand-written facts never expire, and the create call
+  returns 409 once a contact is at its limit for that kind.
+- `inkbox contacts facts list` shows `kind` and `expiresAt`.
+
+### Changed
+
+- Listing a contact's facts no longer returns unlocked context facts whose
+  `expires_at` has passed. Locked facts remain active. Pass
+  `include_expired=True` (Python), `{ includeExpired: true }` (TypeScript),
+  `--include-expired` (CLI), or call `list_including_expired()` (Rust) to get
+  expired facts back.
+- Any fact edit makes the returned fact user-authored, clears its expiry, and
+  revives it if it had expired. Editing content also drops the confidence and
+  citations recorded for the previous wording; editing only its kind leaves
+  them in place.
+- Manual fact creation and edits allow up to 10 active memories of each named
+  kind. Extraction additionally stops at 30 active memories total, with untyped
+  memories counting toward that total. A merge is rejected atomically when
+  either a named kind would exceed 10 or the total would exceed 30. Delete a fact
+  from each named kind, or any active fact when the error names `total`, then
+  retry.
+- Rust source compatibility: `ContactFact` gains public `kind` and `expires_at`
+  fields. Existing struct literals must provide both fields, usually as `None`;
+  `serde(default)` preserves response compatibility but not literal construction.
+- Package and plugin versions moved in lockstep to 0.5.17; the CLI now depends
+  on `@inkbox/sdk` `^0.5.17`.
+
 ## 0.5.16 — Support Agent discovery on API errors
 
 ### Added

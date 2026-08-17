@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { readFileSync, writeFileSync } from "node:fs";
 import type {
+  ContactFactKind,
   ContactReviewStatus,
   CorrespondenceChannel,
   CorrespondenceContentMode,
@@ -52,19 +53,38 @@ function registerContactsAccessCommands(parent: Command): void {
 
 }
 
+const FACT_KINDS: ContactFactKind[] = ["profile", "preference", "context"];
+
+function parseFactKind(value: string): ContactFactKind {
+  if (!(FACT_KINDS as string[]).includes(value)) {
+    throw new Error(`--kind must be one of: ${FACT_KINDS.join(", ")}`);
+  }
+  return value as ContactFactKind;
+}
+
 function registerContactFactsCommands(parent: Command): void {
   const facts = parent.command("facts").description("Contact memory facts and citations");
 
   facts
     .command("list <contact-id>")
-    .description("List active facts for a contact")
+    .description("List a contact's facts")
+    .option(
+      "--include-expired",
+      "Also list expired context facts (locked facts remain active)",
+    )
     .action(
-      withErrorHandler(async function (this: Command, contactId: string) {
+      withErrorHandler(async function (
+        this: Command,
+        contactId: string,
+        cmdOpts: { includeExpired?: boolean },
+      ) {
         const opts = getGlobalOpts(this);
-        const rows = await createClient(opts).contacts.facts.list(contactId);
+        const rows = await createClient(opts).contacts.facts.list(contactId, {
+          includeExpired: !!cmdOpts.includeExpired,
+        });
         output(rows, {
           json: !!opts.json,
-          columns: ["id", "content", "origin", "confidence", "updatedAt"],
+          columns: ["id", "kind", "content", "origin", "confidence", "expiresAt", "updatedAt"],
         });
       }),
     );
@@ -108,6 +128,54 @@ function registerContactFactsCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const citation = await createClient(opts).contacts.facts.resolveCitationUrl(sourceUrl);
         output(citation as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  facts
+    .command("create <contact-id>")
+    .description(
+      "Record a fact by hand (admin-scoped API key required; hand-written facts never expire)",
+    )
+    .requiredOption("--content <text>", "What to remember about the contact")
+    .requiredOption("--kind <kind>", "profile, preference, or context")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        contactId: string,
+        cmdOpts: { content: string; kind: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const fact = await createClient(opts).contacts.facts.create(contactId, {
+          content: cmdOpts.content,
+          kind: parseFactKind(cmdOpts.kind),
+        });
+        output(fact as unknown as Record<string, unknown>, { json: !!opts.json });
+      }),
+    );
+
+  facts
+    .command("update <contact-id> <fact-id>")
+    .description(
+      "Edit a fact (admin-scoped API key required; any edit makes it manually maintained and revives it; content changes remove citations)",
+    )
+    .option("--content <text>", "Replacement content")
+    .option("--kind <kind>", "profile, preference, or context")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        contactId: string,
+        factId: string,
+        cmdOpts: { content?: string; kind?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        if (cmdOpts.content === undefined && cmdOpts.kind === undefined) {
+          throw new Error("Pass --content, --kind, or both");
+        }
+        const fact = await createClient(opts).contacts.facts.update(contactId, factId, {
+          content: cmdOpts.content,
+          kind: cmdOpts.kind === undefined ? undefined : parseFactKind(cmdOpts.kind),
+        });
+        output(fact as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
     );
 
@@ -238,7 +306,7 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("merge <contact-id>")
     .description(
-      "Merge contacts (admin-scoped key required; rejected atomically above 25 active memories; delete unwanted facts and retry)",
+      "Merge contacts (admin-scoped key required; rejected when a memory kind or total goes over; delete from named kinds, or any active fact for total)",
     )
     .requiredOption("--losing <contact-id...>", "Contact IDs to merge into the survivor")
     .option("--field-sources <json>", "JSON object mapping profile fields to source contact IDs")

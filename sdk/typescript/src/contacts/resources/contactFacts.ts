@@ -3,6 +3,7 @@ import {
   ContactFact,
   ContactFactCitationDetail,
   ContactFactDeleteResult,
+  ContactFactKind,
   RawContactFact,
   RawContactFactCitationDetail,
   RawContactFactDeleteResult,
@@ -13,12 +14,78 @@ import {
 
 const BASE = "/contacts";
 
+export interface ListContactFactsOptions {
+  /** Also return expired context facts. Locked facts remain active and are returned by default. */
+  includeExpired?: boolean;
+}
+
+export interface CreateContactFactOptions {
+  content: string;
+  kind: ContactFactKind;
+}
+
+export interface UpdateContactFactOptions {
+  content?: string;
+  kind?: ContactFactKind;
+}
+
 export class ContactFactsResource {
   constructor(private readonly http: HttpTransport) {}
 
-  async list(contactId: string): Promise<ContactFact[]> {
-    const data = await this.http.get<RawContactFact[]>(`${BASE}/${contactId}/facts`);
+  async list(
+    contactId: string,
+    options: ListContactFactsOptions = {},
+  ): Promise<ContactFact[]> {
+    const data = await this.http.get<RawContactFact[]>(
+      `${BASE}/${contactId}/facts`,
+      options.includeExpired ? { include_expired: true } : undefined,
+    );
     return data.map(parseContactFact);
+  }
+
+  /**
+   * Record a fact by hand. Requires an admin-scoped API key; an agent-scoped
+   * key is rejected with 403.
+   *
+   * Hand-written facts never expire, whatever their kind. The call fails with
+   * 409 when the contact is already at its limit for that kind.
+   */
+  async create(
+    contactId: string,
+    options: CreateContactFactOptions,
+  ): Promise<ContactFact> {
+    const data = await this.http.post<RawContactFact>(`${BASE}/${contactId}/facts`, {
+      content: options.content,
+      kind: options.kind,
+    });
+    return parseContactFact(data);
+  }
+
+  /**
+   * Edit a fact's content or kind. Requires an admin-scoped API key; an
+   * agent-scoped key is rejected with 403.
+   *
+   * At least one of `content` and `kind` is required. Any edit makes the fact
+   * user-authored, clears its expiry, and revives it if it had expired. Editing
+   * content also drops the citations and confidence recorded for the old
+   * wording; editing only the kind leaves them in place.
+   */
+  async update(
+    contactId: string,
+    factId: string,
+    options: UpdateContactFactOptions,
+  ): Promise<ContactFact> {
+    const body: Record<string, unknown> = {};
+    if (options.content !== undefined) body.content = options.content;
+    if (options.kind !== undefined) body.kind = options.kind;
+    if (Object.keys(body).length === 0) {
+      throw new Error("update() requires content or kind");
+    }
+    const data = await this.http.patch<RawContactFact>(
+      `${BASE}/${contactId}/facts/${factId}`,
+      body,
+    );
+    return parseContactFact(data);
   }
 
   async get(contactId: string, factId: string): Promise<ContactFact> {

@@ -2,7 +2,11 @@
 
 use std::sync::Arc;
 
-use crate::contacts::types::{ContactFact, ContactFactCitationDetail, ContactFactDeleteResult};
+use serde_json::{Map, Value};
+
+use crate::contacts::types::{
+    ContactFact, ContactFactCitationDetail, ContactFactDeleteResult, ContactFactKind,
+};
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
@@ -17,11 +21,76 @@ impl ContactFactsResource {
         Self { http }
     }
 
-    /// List active facts for a contact.
+    /// List a contact's facts, leaving out expired context facts. Locked facts
+    /// remain active and are returned.
     pub fn list(&self, contact_id: &str) -> Result<Vec<ContactFact>> {
         let data = self
             .http
             .get(&format!("{BASE}/{contact_id}/facts"), NO_QUERY)?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// List a contact's facts, including expired context facts.
+    pub fn list_including_expired(&self, contact_id: &str) -> Result<Vec<ContactFact>> {
+        let data = self.http.get(
+            &format!("{BASE}/{contact_id}/facts"),
+            &[("include_expired", "true".to_string())],
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Record a fact by hand. Requires an admin-scoped API key; an
+    /// agent-scoped key is rejected with 403.
+    ///
+    /// Hand-written facts never expire, whatever their kind. The call fails
+    /// with 409 when the contact is already at its limit for that kind.
+    pub fn create(
+        &self,
+        contact_id: &str,
+        content: &str,
+        kind: ContactFactKind,
+    ) -> Result<ContactFact> {
+        let mut body = Map::new();
+        body.insert("content".into(), Value::String(content.to_string()));
+        body.insert("kind".into(), Value::String(kind.as_str().to_string()));
+        let data = self.http.post(
+            &format!("{BASE}/{contact_id}/facts"),
+            Some(&Value::Object(body)),
+            NO_QUERY,
+        )?;
+        Ok(serde_json::from_value(data)?)
+    }
+
+    /// Edit a fact's content or kind. Requires an admin-scoped API key; an
+    /// agent-scoped key is rejected with 403.
+    ///
+    /// At least one of `content` and `kind` is required. Any edit makes the fact
+    /// user-authored, clears its expiry, and revives it if it had expired.
+    /// Editing content also drops the citations and confidence recorded for the
+    /// old wording; editing only the kind leaves them in place.
+    pub fn update(
+        &self,
+        contact_id: &str,
+        fact_id: &str,
+        content: Option<&str>,
+        kind: Option<ContactFactKind>,
+    ) -> Result<ContactFact> {
+        let mut body = Map::new();
+        if let Some(content) = content {
+            body.insert("content".into(), Value::String(content.to_string()));
+        }
+        if let Some(kind) = kind {
+            body.insert("kind".into(), Value::String(kind.as_str().to_string()));
+        }
+        if body.is_empty() {
+            return Err(InkboxError::InvalidArgument(
+                "update() requires content or kind".into(),
+            ));
+        }
+        let data = self.http.patch(
+            &format!("{BASE}/{contact_id}/facts/{fact_id}"),
+            &Value::Object(body),
+        )?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -84,7 +153,7 @@ mod tests {
     use serde_json::json;
 
     use crate::client::Inkbox;
-    use crate::contacts::ContactFactCitationAvailability;
+    use crate::contacts::{ContactFactCitationAvailability, ContactFactKind, ContactFactOrigin};
 
     #[test]
     fn lists_facts_and_parses_citation_availability() {
@@ -125,6 +194,86 @@ mod tests {
             facts[0].citations[0].availability,
             ContactFactCitationAvailability::SourceUnavailableToCaller
         );
+    }
+
+    #[test]
+    fn creates_updates_and_lists_expired_facts() {
+        let server = MockServer::start();
+        let fact = json!({
+            "id": "22222222-2222-2222-2222-222222222222",
+            "contact_id": "11111111-1111-1111-1111-111111111111",
+            "content": "Prefers morning meetings",
+            "confidence": null,
+            "origin": "user",
+            "kind": "preference",
+            "expires_at": null,
+            "locked_at": null,
+            "created_at": "2026-07-20T12:00:00Z",
+            "updated_at": "2026-07-20T12:00:00Z",
+            "citations": []
+        });
+        let create = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/contacts/contact-1/facts")
+                .json_body(json!({"content": "Prefers morning meetings", "kind": "preference"}));
+            then.status(201).json_body(fact.clone());
+        });
+        let update = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH)
+                .path("/api/v1/contacts/contact-1/facts/fact-1")
+                .json_body(json!({"kind": "profile"}));
+            then.status(200).json_body(fact.clone());
+        });
+        let list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/contacts/contact-1/facts")
+                .query_param("include_expired", "true");
+            then.status(200).json_body(json!([{
+                "id": "22222222-2222-2222-2222-222222222222",
+                "contact_id": "11111111-1111-1111-1111-111111111111",
+                "content": "Planning a product launch",
+                "confidence": "0.80",
+                "origin": "generated",
+                "kind": "context",
+                "expires_at": "2026-08-19T12:00:00Z",
+                "locked_at": null,
+                "created_at": "2026-07-20T12:00:00Z",
+                "updated_at": "2026-07-20T12:00:00Z",
+                "citations": []
+            }]));
+        });
+
+        let sdk = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let facts = sdk.contacts();
+        let facts = facts.facts();
+
+        let created = facts
+            .create(
+                "contact-1",
+                "Prefers morning meetings",
+                ContactFactKind::Preference,
+            )
+            .unwrap();
+        let retyped = facts
+            .update("contact-1", "fact-1", None, Some(ContactFactKind::Profile))
+            .unwrap();
+        let expired = facts.list_including_expired("contact-1").unwrap();
+
+        create.assert();
+        update.assert();
+        list.assert();
+        assert_eq!(created.kind, Some(ContactFactKind::Preference));
+        assert_eq!(retyped.origin, ContactFactOrigin::User);
+        assert_eq!(retyped.expires_at, None);
+        assert_eq!(expired[0].kind, Some(ContactFactKind::Context));
+        assert_eq!(
+            expired[0].expires_at.as_deref(),
+            Some("2026-08-19T12:00:00Z")
+        );
+        assert!(facts.update("contact-1", "fact-1", None, None).is_err());
     }
 
     #[test]

@@ -269,8 +269,10 @@ class ContactsResource:
     ) -> Contact:
         """Merge contacts into the contact identified by ``contact_id``.
 
-        Requires an admin-scoped API key. The server rejects the merge atomically
-        if the result would exceed 25 active memories; delete unwanted facts and retry.
+        Requires an admin-scoped API key. The merge is rejected atomically when
+        a memory kind or the contact-wide total would go over. Delete a fact
+        from each kind named by the error, or any active fact when it names
+        ``total``, then retry.
         """
         body = {
             "losing_contact_ids": [str(value) for value in losing_contact_ids],

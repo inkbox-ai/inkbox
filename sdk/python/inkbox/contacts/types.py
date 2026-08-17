@@ -351,6 +351,19 @@ class ContactFactOrigin(StrEnum):
     USER = "user"
 
 
+class ContactFactKind(StrEnum):
+    """Which memory bucket a fact belongs to.
+
+    ``PROFILE`` is who the contact is, ``PREFERENCE`` is a standing
+    instruction, and ``CONTEXT`` is a live situation that can expire unless
+    the fact is locked.
+    """
+
+    PROFILE = "profile"
+    PREFERENCE = "preference"
+    CONTEXT = "context"
+
+
 @dataclass
 class ContactFactCitation:
     source_type: str
@@ -372,6 +385,14 @@ class ContactFactCitation:
 
 @dataclass
 class ContactFact:
+    """A fact remembered about a contact.
+
+    Attributes:
+        kind: Memory bucket the fact belongs to, when it has been classified.
+        expires_at: Time an unlocked generated ``CONTEXT`` fact stops applying.
+            Locked facts remain active after this timestamp.
+    """
+
     id: UUID
     contact_id: UUID
     content: str
@@ -381,10 +402,13 @@ class ContactFact:
     created_at: datetime
     updated_at: datetime
     citations: list[ContactFactCitation] = field(default_factory=list)
+    kind: ContactFactKind | None = None
+    expires_at: datetime | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ContactFact:
         confidence = d.get("confidence")
+        kind = d.get("kind")
         return cls(
             id=UUID(d["id"]),
             contact_id=UUID(d["contact_id"]),
@@ -397,6 +421,8 @@ class ContactFact:
             citations=[
                 ContactFactCitation._from_dict(c) for c in d.get("citations") or []
             ],
+            kind=ContactFactKind(kind) if kind is not None else None,
+            expires_at=_opt_datetime(d.get("expires_at")),
         )
 
 

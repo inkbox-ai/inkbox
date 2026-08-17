@@ -55,6 +55,80 @@ test("contact facts exposes read and deletion commands", () => {
   assert.match(help("contacts", "facts", "delete"), /admin-scoped API key required/);
 });
 
+test("contact facts exposes hand-written memory commands", () => {
+  const text = help("contacts", "facts");
+  assert.match(text, /create (?:\[options\] )?<contact-id>/);
+  assert.match(text, /update (?:\[options\] )?<contact-id> <fact-id>/);
+  assert.match(help("contacts", "facts", "list"), /--include-expired/);
+  assert.match(help("contacts", "facts", "create"), /--kind <kind>/);
+  assert.match(help("contacts", "facts", "create"), /admin-scoped API key required/);
+  assert.match(help("contacts", "facts", "update"), /admin-scoped API key required/);
+  assert.match(help("contacts", "facts", "update"), /manually\s+maintained and revives it/);
+  assert.match(help("contacts", "facts", "list"), /locked facts remain\s+active/);
+});
+
+test("contact fact creation posts content and kind", async () => {
+  let request;
+  const mock = await listen((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      request = { method: req.method, url: req.url, body: JSON.parse(body) };
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        id: "fact-1",
+        contact_id: "contact-1",
+        content: "Prefers email",
+        confidence: null,
+        origin: "user",
+        kind: "preference",
+        expires_at: null,
+        locked_at: null,
+        created_at: "2026-07-21T12:00:00Z",
+        updated_at: "2026-07-21T12:00:00Z",
+        citations: [],
+      }));
+    });
+  });
+
+  try {
+    const result = await runCli([
+      "--api-key", "test-key",
+      "--base-url", `http://127.0.0.1:${mock.port}`,
+      "--json",
+      "contacts", "facts", "create", "contact-1",
+      "--content", "Prefers email",
+      "--kind", "preference",
+    ]);
+
+    assert.ifError(result.error);
+    assert.equal(request.method, "POST");
+    assert.equal(request.url, "/api/v1/contacts/contact-1/facts");
+    assert.deepEqual(request.body, { content: "Prefers email", kind: "preference" });
+    assert.equal(JSON.parse(result.stdout).kind, "preference");
+  } finally {
+    mock.server.close();
+  }
+});
+
+test("contact fact commands reject an unknown kind and an empty update", async () => {
+  const badKind = await runCli([
+    "--api-key", "test-key",
+    "contacts", "facts", "create", "contact-1",
+    "--content", "Prefers email",
+    "--kind", "nickname",
+  ]);
+  assert.ok(badKind.error);
+  assert.match(badKind.stderr, /--kind must be one of: profile, preference, context/);
+
+  const emptyUpdate = await runCli([
+    "--api-key", "test-key",
+    "contacts", "facts", "update", "contact-1", "fact-1",
+  ]);
+  assert.ok(emptyUpdate.error);
+  assert.match(emptyUpdate.stderr, /Pass --content, --kind, or both/);
+});
+
 test("contact lifecycle options are discoverable", () => {
   assert.match(help("contacts", "list"), /--review-status <status>/);
   assert.doesNotMatch(help("contacts", "get"), /--include-dismissed/);
@@ -89,8 +163,8 @@ test("contact correspondence and merge expose their request options", () => {
   assert.match(merge, /--losing <contact-id\.\.\.>/);
   assert.match(merge, /--field-sources <json>/);
   assert.match(merge, /admin-scoped key required/);
-  assert.match(merge, /rejected atomically above 25 active\s+memories/);
-  assert.match(merge, /delete unwanted facts and retry/);
+  assert.match(merge, /rejected\s+when\s+a\s+memory\s+kind\s+or\s+total\s+goes\s+over/);
+  assert.match(merge, /any\s+active\s+fact\s+for\s+total/);
 });
 
 test("contact fact deletion calls the API and prints remaining memory", async () => {

@@ -1005,8 +1005,10 @@ await inkbox.phoneContactRules.create(num.id, {
 
 Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
 
-Merging requires an admin-scoped API key. The merge is rejected atomically if
-the survivor would exceed 25 active memories; delete unwanted facts and retry.
+Merging requires an admin-scoped API key. Active memories have per-kind and
+contact-wide limits. Delete a fact from each kind named by a merge error, or any
+active fact when it names `total`, then retry. Untyped memories count toward the
+total.
 
 ```typescript
 import type { CreateContactOptions, ContactEmail, ContactPhone } from "@inkbox/sdk";
@@ -1035,9 +1037,20 @@ await inkbox.contacts.lookup({ phoneContains: "555" });
 await inkbox.contacts.access.list(contact.id);
 
 // Facts, citations, correspondence, and duplicate merging
+// fact.kind is "profile", "preference", or "context"; unlocked extracted
+// context facts drop out of list() at fact.expiresAt. Locked facts stay active.
 const facts = await inkbox.contacts.facts.list(contact.id);
+await inkbox.contacts.facts.list(contact.id, { includeExpired: true });
 const sourceUrl = facts[0]?.citations[0]?.sourceUrl;
 if (sourceUrl) await inkbox.contacts.facts.resolveCitationUrl(sourceUrl);
+// Hand-written facts never expire; create/update/delete are admin only.
+// Any update makes a fact user-authored, clears expiry, and revives it. Content
+// changes also remove confidence and citations; kind-only changes preserve them.
+const fact = await inkbox.contacts.facts.create(contact.id, {
+  content: "Prefers email over calls",
+  kind: "preference",
+});
+await inkbox.contacts.facts.update(contact.id, fact.id, { kind: "profile" });
 if (facts[0]) await inkbox.contacts.facts.delete(contact.id, facts[0].id);  // admin only
 const history = await inkbox.contacts.correspondence.get(contact.id, {
   identityId: "identity-uuid",

@@ -75,6 +75,56 @@ describe("contact memory", () => {
     expect(citation.sourceLocator).toEqual({ paragraph: 2 });
   });
 
+  it("creates, retypes, and lists facts with kind and expiry", async () => {
+    const fact = {
+      id: "fact-1",
+      contact_id: "contact-1",
+      content: "Prefers concise replies.",
+      confidence: null,
+      origin: "user",
+      kind: "preference",
+      expires_at: null,
+      locked_at: null,
+      created_at: "2026-07-20T10:00:00Z",
+      updated_at: "2026-07-20T10:00:00Z",
+      citations: [],
+    } as const;
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeOkResponse(fact))
+      .mockResolvedValueOnce(makeOkResponse({ ...fact, kind: "profile" }))
+      .mockResolvedValueOnce(makeOkResponse([
+        { ...fact, kind: "context", expires_at: "2026-08-19T10:00:00Z" },
+      ]));
+    const resource = new ContactsResource(new HttpTransport("k", BASE));
+
+    const created = await resource.facts.create("contact-1", {
+      content: "Prefers concise replies.",
+      kind: "preference",
+    });
+    const retyped = await resource.facts.update("contact-1", "fact-1", {
+      kind: "profile",
+    });
+    const listed = await resource.facts.list("contact-1", { includeExpired: true });
+
+    expect(created.kind).toBe("preference");
+    expect(created.expiresAt).toBeNull();
+    expect(retyped.kind).toBe("profile");
+    expect(retyped.origin).toBe("user");
+    expect(retyped.expiresAt).toBeNull();
+    expect(listed[0].expiresAt).toEqual(new Date("2026-08-19T10:00:00Z"));
+    expect(vi.mocked(fetch).mock.calls.map(([url, init]) => [
+      (init as RequestInit).method,
+      new URL(url as string).pathname + new URL(url as string).search,
+    ])).toEqual([
+      ["POST", "/api/v1/contacts/contact-1/facts"],
+      ["PATCH", "/api/v1/contacts/contact-1/facts/fact-1"],
+      ["GET", "/api/v1/contacts/contact-1/facts?include_expired=true"],
+    ]);
+    await expect(resource.facts.update("contact-1", "fact-1", {})).rejects.toThrow(
+      /content or kind/,
+    );
+  });
+
   it("queries and parses correspondence across all channels", async () => {
     const base = {
       direction: "inbound",

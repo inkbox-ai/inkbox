@@ -315,8 +315,9 @@ impl ContactsResource {
 
     /// Merge contacts into `contact_id` using an admin-scoped API key.
     ///
-    /// The server rejects the merge atomically if the result would exceed 25 active
-    /// memories. Delete unwanted facts and retry.
+    /// The merge is rejected atomically when a memory kind or the contact-wide
+    /// total would go over. Delete a fact from each kind named by the error, or
+    /// any active fact when it names `total`, then retry.
     pub fn merge(&self, contact_id: &str, params: &MergeContactsParams) -> Result<Contact> {
         let body = serde_json::json!({
             "losing_contact_ids": params.losing_contact_ids,

@@ -229,8 +229,9 @@ export class ContactsResource {
   /**
    * Merge contacts using an admin-scoped API key.
    *
-   * The server rejects the merge atomically if the result would exceed 25 active
-   * memories. Delete unwanted facts and retry.
+   * The merge is rejected atomically when a memory kind or the contact-wide
+   * total would go over. Delete a fact from each kind named by the error, or
+   * any active fact when it names `total`, then retry.
    */
   async merge(contactId: string, options: MergeContactsOptions): Promise<Contact> {
     const fieldSources = Object.fromEntries(
