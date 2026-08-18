@@ -265,7 +265,9 @@ export function registerDraftCommands(email: Command): void {
       const inkbox = createClient(global);
       const mailbox = await resolveMailbox(inkbox, options.identity);
       const items: DraftSummary[] = [];
-      for await (const draft of inkbox.drafts.list(mailbox, { pageSize: options.limit })) {
+      for await (const draft of inkbox.drafts.list(mailbox, {
+        pageSize: Math.min(options.limit, 100),
+      })) {
         items.push(draft);
         if (items.length >= options.limit) break;
       }

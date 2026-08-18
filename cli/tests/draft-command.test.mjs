@@ -376,6 +376,42 @@ test("list prints requested human columns and full JSON summaries", async () => 
   });
 });
 
+test("list caps page size while honoring a larger total limit", async () => {
+  const urls = [];
+  let page = 0;
+  await withMock(async (req, res) => {
+    urls.push(req.url);
+    page += 1;
+    if (page === 1) {
+      json(res, {
+        items: Array.from({ length: 100 }, (_, index) => ({
+          ...summary,
+          id: `draft-${index}`,
+        })),
+        next_cursor: "next-page",
+        has_more: true,
+      });
+      return;
+    }
+    json(res, {
+      items: [{ ...summary, id: "draft-100" }],
+      next_cursor: null,
+      has_more: false,
+    });
+  }, async (baseUrl) => {
+    const result = await runCli(args(
+      baseUrl,
+      "--json", "email", "drafts", "list", "-i", "writer", "--limit", "101",
+    ));
+    assert.ifError(result.error);
+    assert.equal(JSON.parse(result.stdout).length, 101);
+  });
+
+  assert.match(urls[0], /[?&]limit=100(?:&|$)/);
+  assert.match(urls[1], /[?&]limit=100(?:&|$)/);
+  assert.match(urls[1], /[?&]cursor=next-page(?:&|$)/);
+});
+
 test("get, duplicate, send, and delete use their SDK-owned generation placement", async () => {
   const requests = [];
   await withMock(async (req, res) => {
