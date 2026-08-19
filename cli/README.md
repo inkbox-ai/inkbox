@@ -332,9 +332,9 @@ inkbox text mark-conversation-read <conversation-key> -i <handle>  # Mark conver
 
 ### imessage
 
-iMessage over shared or dedicated service. Shared and dedicated inbound
-recipients connect first; dedicated outbound identities may initiate one-to-one
-or group conversations.
+iMessage over shared service or a dedicated line. Shared-service recipients
+connect first; dedicated identities may initiate one-to-one or group
+conversations.
 
 ```bash
 inkbox imessage triage-number                # Router number + the command humans text to connect

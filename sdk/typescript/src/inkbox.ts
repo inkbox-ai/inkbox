@@ -440,8 +440,8 @@ export class Inkbox {
    * @param options.imessageEnabled - Whether this identity can be reached
    *   over iMessage. Defaults server-side to `false`;
    *   pass `true` to opt in.
-   * @param options.imessageNumberType - Dedicated iMessage number role to claim
-   *   and attach atomically. Requires `imessageEnabled: true`.
+   * @param options.claimIMessageNumber - Claim and attach a dedicated iMessage
+   *   line atomically. Requires `imessageEnabled: true`.
    * @param options.emailLocalPart - Optional requested mailbox local part.
    *   On the platform domain the server forces it to the handle; only
    *   meaningful on a custom sending domain.
@@ -460,6 +460,9 @@ export class Inkbox {
     agentHandle: string,
     options: CreateIdentityOptions = {},
   ): Promise<AgentIdentity> {
+    if (options.claimIMessageNumber !== undefined && options.claimIMessageNumber !== true) {
+      throw new Error("claimIMessageNumber must be true when supplied");
+    }
     const mailbox: IdentityMailboxCreateOptions = {};
     if (options.emailLocalPart !== undefined) mailbox.emailLocalPart = options.emailLocalPart;
     if ("sendingDomain" in options) mailbox.sendingDomain = options.sendingDomain;
@@ -472,8 +475,8 @@ export class Inkbox {
     if (options.displayName !== undefined) createArgs.displayName = options.displayName;
     if (options.description !== undefined) createArgs.description = options.description;
     if (options.imessageEnabled !== undefined) createArgs.imessageEnabled = options.imessageEnabled;
-    if (options.imessageNumberType !== undefined) {
-      createArgs.imessageNumberType = options.imessageNumberType;
+    if (options.claimIMessageNumber === true) {
+      createArgs.claimIMessageNumber = true;
     }
     if (options.tunnel !== undefined) createArgs.tunnel = options.tunnel;
     const data = await this._idsResource.create(createArgs);

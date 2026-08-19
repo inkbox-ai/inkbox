@@ -1,11 +1,11 @@
 /**
  * inkbox-imessage/resources/imessages.ts
  *
- * iMessage operations: dedicated numbers, send, list, conversations,
+ * iMessage operations: dedicated lines, send, list, conversations,
  * reactions, read receipts, typing indicators, media upload.
  *
  * Conversation operations key off `conversationId` / `agentIdentityId`.
- * Dedicated number inventory is managed through `listNumbers` and
+ * Dedicated line inventory is managed through `listNumbers` and
  * `claimNumber`.
  */
 
@@ -15,7 +15,6 @@ import {
   IMessageAssignment,
   IMessageConversation,
   IMessageConversationSummary,
-  IMessageDedicatedNumberType,
   IMessageNumber,
   IMessageMarkReadResult,
   IMessageMediaUpload,
@@ -77,7 +76,7 @@ export class IMessagesResource {
   }
 
   /**
-   * List every non-released dedicated iMessage number owned by the
+   * List every non-released dedicated iMessage line owned by the
    * organization, including unattached numbers.
    */
   async listNumbers(): Promise<IMessageNumber[]> {
@@ -86,10 +85,10 @@ export class IMessagesResource {
   }
 
   /**
-   * Claim one dedicated iMessage number for the organization.
+   * Claim one dedicated iMessage line for the organization.
    *
    * Claiming does not attach the number to an identity. Pass
-   * `imessageNumberType` during identity creation or update to claim and
+   * `claimIMessageNumber` during identity creation or update to claim and
    * attach atomically, or pass an owned number's id as `imessageNumberId`
    * during identity update.
    *
@@ -97,20 +96,17 @@ export class IMessagesResource {
    * ambiguous request. A new key can claim another number.
    *
    * @throws {DedicatedIMessageNumberQuotaExceededError} 402 when the
-   *   organization has reached its quota for the requested number type.
+   *   organization has reached its dedicated-line quota.
    * @throws {DedicatedIMessageNumberInventoryPendingError} 503 when number
    *   inventory is pending; inspect `retryAfterSeconds` before retrying.
    * @throws {IdempotencyKeyReusedError} 409 when the key was already used
    *   for a different request.
    */
   async claimNumber(options: {
-    type: IMessageDedicatedNumberType;
     idempotencyKey: string;
   }): Promise<IMessageNumber> {
     validateIdempotencyKey(options.idempotencyKey);
-    const data = await this.http.post<RawIMessageNumber>("/numbers", {
-      type: options.type,
-    }, {
+    const data = await this.http.post<RawIMessageNumber>("/numbers", {}, {
       headers: { "Idempotency-Key": options.idempotencyKey },
     });
     return parseIMessageNumber(data);
@@ -119,15 +115,15 @@ export class IMessagesResource {
   /**
    * Send an outbound iMessage through an existing assignment.
    *
-   * Shared and dedicated-inbound numbers require the recipient to connect
-   * first. An identity attached to a dedicated-outbound number may initiate
-   * a conversation, subject to server-side consent and rate limits.
+   * Shared service requires the recipient to connect first. An identity
+   * attached to a dedicated line may initiate a conversation, subject to
+   * server-side consent and rate limits.
    * Inbound replies and reactions arrive via identity-owned webhook
    * subscriptions (`inkbox.webhooks.subscriptions.create({
    * agentIdentityId, url, eventTypes: ["imessage.received", ...] })`).
    *
    * @param options.to - One E.164 recipient or 1–8 distinct recipients. Two
-   *   or more recipients select or create a dedicated-outbound group.
+   *   or more recipients select or create a dedicated-line group.
    *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
    * @param options.text - Message body.

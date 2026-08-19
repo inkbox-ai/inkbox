@@ -8,7 +8,6 @@
  */
 
 import { HttpTransport, InkboxAPIError, validateIdempotencyKey } from "../../_http.js";
-import type { IMessageDedicatedNumberType } from "../../imessage/types.js";
 import { mapIdentityConflictError } from "../exceptions.js";
 import {
   AgentIdentitySummary,
@@ -44,7 +43,7 @@ export class IdentitiesResource {
    * @param options.imessageEnabled - Whether the identity can be reached
    *   over iMessage. Omit to defer to the server
    *   default (`false`).
-   * @param options.imessageNumberType - Dedicated number role to claim and
+   * @param options.claimIMessageNumber - Claim a dedicated iMessage line and
    *   attach atomically. Requires `imessageEnabled: true`.
    * @param options.mailbox - Optional nested mailbox spec. Mailbox is
    *   always provisioned; this just lets the caller customize.
@@ -58,21 +57,24 @@ export class IdentitiesResource {
     displayName?: string;
     description?: string | null;
     imessageEnabled?: boolean;
-    imessageNumberType?: IMessageDedicatedNumberType;
+    claimIMessageNumber?: true;
     mailbox?: IdentityMailboxCreateOptions;
     tunnel?: IdentityTunnelCreateOptions;
     phoneNumber?: IdentityPhoneNumberCreateOptions;
     vaultSecretIds?: string | string[] | "*" | "all";
   }): Promise<_AgentIdentityData> {
-    if (options.imessageNumberType !== undefined && options.imessageEnabled !== true) {
-      throw new Error("imessageNumberType requires imessageEnabled: true");
+    if (options.claimIMessageNumber !== undefined && options.claimIMessageNumber !== true) {
+      throw new Error("claimIMessageNumber must be true when supplied");
+    }
+    if (options.claimIMessageNumber === true && options.imessageEnabled !== true) {
+      throw new Error("claimIMessageNumber requires imessageEnabled: true");
     }
     const body: Record<string, unknown> = { agent_handle: options.agentHandle };
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
-    if (options.imessageNumberType !== undefined) {
-      body["imessage_number_type"] = options.imessageNumberType;
+    if (options.claimIMessageNumber === true) {
+      body["claim_imessage_number"] = true;
     }
     if (options.mailbox !== undefined) body["mailbox"] = identityMailboxCreateOptionsToWire(options.mailbox);
     if (options.tunnel !== undefined) body["tunnel"] = identityTunnelCreateOptionsToWire(options.tunnel);
@@ -115,12 +117,12 @@ export class IdentitiesResource {
    * @param options.newHandle - New handle value.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
-   * @param options.imessageEnabled - Toggle shared-iMessage reachability.
-   * @param options.imessageNumberId - Attach an owned dedicated number, or
+   * @param options.imessageEnabled - Toggle identity-level iMessage reachability.
+   * @param options.imessageNumberId - Attach an owned dedicated line, or
    *   pass `null` to return to shared service.
-   * @param options.imessageNumberType - Claim and attach a new dedicated number.
+   * @param options.claimIMessageNumber - Claim and attach a new dedicated line.
    * @param options.idempotencyKey - Stable caller-generated key required for
-   *   `imessageNumberType`. Reuse it after an ambiguous failure.
+   *   `claimIMessageNumber`. Reuse it after an ambiguous failure.
    * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
    *   for iMessage contact rules (admin-only).
    * @param options.mailFilterMode - `"whitelist"` or `"blacklist"` for this
@@ -133,22 +135,25 @@ export class IdentitiesResource {
     agentHandle: string,
     options: UpdateIdentityOptions,
   ): Promise<_AgentIdentityData> {
+    if (options.claimIMessageNumber !== undefined && options.claimIMessageNumber !== true) {
+      throw new Error("claimIMessageNumber must be true when supplied");
+    }
     const hasNumberId = "imessageNumberId" in options;
-    if (options.imessageNumberType !== undefined && hasNumberId) {
-      throw new Error("imessageNumberType and imessageNumberId cannot be set together");
+    if (options.claimIMessageNumber === true && hasNumberId) {
+      throw new Error("claimIMessageNumber and imessageNumberId cannot be set together");
     }
     if (
       options.imessageEnabled === false
       && (
-        options.imessageNumberType !== undefined
+        options.claimIMessageNumber === true
         || (hasNumberId && options.imessageNumberId !== null)
       )
     ) {
       throw new Error("iMessage number changes cannot be combined with disabling iMessage");
     }
-    if (options.imessageNumberType !== undefined) {
+    if (options.claimIMessageNumber === true) {
       if (options.idempotencyKey === undefined) {
-        throw new Error("idempotencyKey is required with imessageNumberType");
+        throw new Error("idempotencyKey is required with claimIMessageNumber");
       }
     }
     if (options.idempotencyKey !== undefined) {
@@ -160,8 +165,8 @@ export class IdentitiesResource {
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
     if ("imessageNumberId" in options) body["imessage_number_id"] = options.imessageNumberId;
-    if (options.imessageNumberType !== undefined) {
-      body["imessage_number_type"] = options.imessageNumberType;
+    if (options.claimIMessageNumber === true) {
+      body["claim_imessage_number"] = true;
     }
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;

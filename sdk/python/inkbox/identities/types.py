@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from inkbox.imessage.types import IMessageNumberType
+from inkbox.imessage.types import _compatibility_number_type
 from inkbox.mail.types import FilterMode, FilterModeChangeNotice
 from inkbox.phone.types import SmsStatus
 from inkbox.tunnels.types import TLSMode, TunnelSummary
@@ -235,29 +235,23 @@ class IdentityPhoneNumber:
 
 @dataclass
 class IdentityIMessageNumber:
-    """Dedicated iMessage number attached to an agent identity.
+    """Dedicated iMessage line attached to an agent identity.
 
     The identity-detail wire shape is intentionally smaller than the
-    organization-level dedicated-number response: it contains no lifecycle
+    organization-level dedicated-line response: it contains no lifecycle
     status or attachment fields because attachment is implied by nesting.
     """
 
     id: UUID
     number: str
-    type: IMessageNumberType
-
-    @property
-    def can_start_conversations(self) -> bool:
-        """Whether this number may initiate a conversation."""
-        return self.type is IMessageNumberType.DEDICATED_OUTBOUND
+    type: Literal["dedicated_outbound"]
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityIMessageNumber:
-        number_type = IMessageNumberType(d["type"])
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
-            type=number_type,
+            type=_compatibility_number_type(d["type"]),
         )
 
 

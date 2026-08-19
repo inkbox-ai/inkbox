@@ -268,9 +268,7 @@ describe("HttpTransport 409 routing", () => {
     );
     const http = new HttpTransport(API_KEY, BASE);
 
-    const err = await http.post("/imessage/numbers", {
-      type: "dedicated_inbound",
-    }).catch((e: unknown) => e);
+    const err = await http.post("/imessage/numbers", {}).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(DedicatedIMessageNumberQuotaExceededError);
     expect(err).toMatchObject({
@@ -302,9 +300,7 @@ describe("HttpTransport 409 routing", () => {
     vi.mocked(fetch).mockResolvedValue(response);
     const http = new HttpTransport(API_KEY, BASE);
 
-    const err = await http.post("/imessage/numbers", {
-      type: "dedicated_outbound",
-    }).catch((e: unknown) => e);
+    const err = await http.post("/imessage/numbers", {}).catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(DedicatedIMessageNumberInventoryPendingError);
     expect(err).toMatchObject({

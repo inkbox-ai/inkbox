@@ -4,8 +4,8 @@ inkbox/imessage/types.py
 Dataclasses mirroring the Inkbox iMessage API response models.
 
 iMessage records are keyed by ``conversation_id``. One-to-one rows also expose
-assignment and remote-number state; dedicated-outbound groups instead expose
-participant snapshots. Dedicated-number ownership and attachment are represented
+assignment and remote-number state; group conversations instead expose
+participant snapshots. Dedicated-line ownership and attachment are represented
 separately by ``IMessageNumber``.
 """
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from inkbox.mail.types import ContactRuleStatus
@@ -92,13 +92,6 @@ class IMessageGroupCreationStatus(StrEnum):
     READY = "ready"
 
 
-class IMessageNumberType(StrEnum):
-    """Type of an organization-owned dedicated iMessage number."""
-
-    DEDICATED_INBOUND = "dedicated_inbound"
-    DEDICATED_OUTBOUND = "dedicated_outbound"
-
-
 class IMessageNumberStatus(StrEnum):
     """Lifecycle status of an iMessage service number."""
 
@@ -106,9 +99,11 @@ class IMessageNumberStatus(StrEnum):
     PAUSED = "paused"
 
 
-def _dedicated_number_type(value: IMessageNumberType | str) -> IMessageNumberType:
-    """Validate a number role accepted by claim and identity provisioning."""
-    return IMessageNumberType(value)
+def _compatibility_number_type(value: str) -> Literal["dedicated_outbound"]:
+    """Validate the fixed compatibility value returned by the API."""
+    if value != "dedicated_outbound":
+        raise ValueError("iMessage number type must be 'dedicated_outbound'")
+    return "dedicated_outbound"
 
 
 def _validate_idempotency_key(value: str) -> str:
@@ -137,33 +132,27 @@ def _dt(value: str | None) -> datetime | None:
 
 @dataclass
 class IMessageNumber:
-    """An organization-owned dedicated iMessage number.
+    """An organization-owned dedicated iMessage line.
 
     ``agent_identity_id`` and ``agent_handle`` are both ``None`` while the
-    number is unattached. Only dedicated outbound numbers may start a new
-    conversation before the recipient messages first.
+    number is unattached. ``type`` is a fixed legacy wire field; it is not a
+    capability selector.
     """
 
     id: UUID
     number: str
-    type: IMessageNumberType
+    type: Literal["dedicated_outbound"]
     status: IMessageNumberStatus
     agent_identity_id: UUID | None
     agent_handle: str | None
 
-    @property
-    def can_start_conversations(self) -> bool:
-        """Whether this number may initiate a conversation."""
-        return self.type is IMessageNumberType.DEDICATED_OUTBOUND
-
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageNumber:
         raw_identity_id = d["agent_identity_id"]
-        number_type = IMessageNumberType(d["type"])
         return cls(
             id=UUID(d["id"]),
             number=d["number"],
-            type=number_type,
+            type=_compatibility_number_type(d["type"]),
             status=IMessageNumberStatus(d["status"]),
             agent_identity_id=(
                 UUID(raw_identity_id) if raw_identity_id is not None else None

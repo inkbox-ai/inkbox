@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.0 — Dedicated iMessage lines
+
+- iMessage help and bundled guidance now describe shared service and one
+  dedicated iMessage line with one-to-one and group initiation.
+- CLI and SDK dependency versions moved in lockstep to 0.6.0.
+
 ## 0.5.16 — Support Agent discovery on API errors
 
 - API failures retain their existing first line and now print the server's

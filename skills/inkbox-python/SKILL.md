@@ -435,7 +435,7 @@ inkbox.texts.update(phone.id, "text-uuid", status="deleted")
 
 ## iMessage
 
-iMessage can use the shared service or an organization-owned dedicated number. On shared service, recipients ask the triage number to connect them to `@agent_handle`; the shared local number is never exposed. Shared service and `dedicated_inbound` require the recipient to message first. A `dedicated_outbound` number may start a conversation, subject to consent, contact-rule, and rate-limit checks.
+iMessage can use the shared service or an organization-owned dedicated line. On shared service, recipients ask the triage number to connect them to `@agent_handle`; the shared local number is never exposed. Shared service requires the recipient to message first. A dedicated line may start a conversation, subject to consent, contact-rule, and rate-limit checks.
 
 Discover the router (triage) number at runtime — it can change, so never hardcode it:
 
@@ -456,20 +456,16 @@ identity.update(imessage_filter_mode="whitelist")
 print(identity.imessage_enabled, identity.imessage_filter_mode)
 ```
 
-Dedicated numbers follow the phone-number resource style: list or claim them on
+Dedicated lines follow the phone-number resource style: list or claim them on
 the org-level iMessage resource, then inspect the typed number model. Claims
 require admin credentials.
 
 ```python
-from inkbox import IMessageNumberType
-
 numbers = inkbox.imessages.list_numbers()  # attached and unattached
 number = inkbox.imessages.claim_number(
-    type=IMessageNumberType.DEDICATED_OUTBOUND,
-    idempotency_key="claim-outbound-agent-2026-07-18",
+    idempotency_key="claim-agent-2026-07-18",
 )
 print(number.number, number.status, number.agent_identity_id)
-print(number.can_start_conversations)  # True only for dedicated_outbound
 ```
 
 Claim and attach atomically during identity create/update. Do not make a
@@ -478,16 +474,16 @@ intentional wire data that moves an identity back to shared service; omitting
 the argument leaves its attachment unchanged.
 
 ```python
-identity = inkbox.create_identity(
-    "outbound-agent",
+dedicated_identity = inkbox.create_identity(
+    "dedicated-agent",
     imessage_enabled=True,
-    imessage_number_type="dedicated_outbound",
+    claim_imessage_number=True,
 )
-print(identity.imessage_number.number)
+print(dedicated_identity.imessage_number.number)
 
 identity.update(
-    imessage_number_type="dedicated_inbound",
-    idempotency_key="swap-my-agent-inbound-2026-07-18",
+    claim_imessage_number=True,
+    idempotency_key="swap-my-agent-2026-07-18",
 )                                                         # claim + swap
 identity.update(imessage_number_id=number.id)             # attach owned number
 identity.update(imessage_number_id=None)                  # return to shared
@@ -507,13 +503,13 @@ from inkbox import IMessageSendStyle
 
 # Send to a connected recipient, or reply into a conversation by UUID.
 sent = identity.send_imessage(to="+15551234567", text="Hello over iMessage")
-group = outbound_identity.send_imessage(
+group = dedicated_identity.send_imessage(
     to=["+15551234567", "+15557654321"],
     text="Hello group",
     media_urls=["https://example.com/group-photo.jpg"],
     send_style=IMessageSendStyle.CONFETTI,
-)  # dedicated_outbound only; 2–8 distinct recipients
-group_reply = outbound_identity.send_imessage(
+)  # dedicated line only; 2–8 distinct recipients
+group_reply = dedicated_identity.send_imessage(
     conversation_id=group.conversation_id,
     text="Group follow-up",
     media_urls=["https://example.com/follow-up.jpg"],
@@ -564,7 +560,7 @@ upload = identity.upload_imessage_media(
 identity.send_imessage(to="+15551234567", media_urls=[upload.media_url])
 ```
 
-Contact rules are scoped to the **identity**, including when it has a dedicated number:
+Contact rules are scoped to the **identity**, including when it has a dedicated line:
 
 ```python
 from inkbox import IMessageRuleAction

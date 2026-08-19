@@ -566,11 +566,10 @@ inkbox.sms_opt_ins.opt_out("+15551234567")
 
 ## iMessage
 
-Chat with humans over the shared iMessage router or a dedicated iMessage
-number. iMessage is **opt-in per identity** (`imessage_enabled`). Shared and
-`dedicated_inbound` service require the human to message first;
-`dedicated_outbound` numbers may start new conversations, subject to consent,
-contact-rule, and rate-limit checks.
+Chat with humans over the shared iMessage router or a dedicated iMessage line.
+iMessage is **opt-in per identity** (`imessage_enabled`). Shared service
+requires the human to message first. Dedicated lines may start new
+conversations, subject to consent, contact-rule, and rate-limit checks.
 
 ```python
 from inkbox import IMessageSendStyle
@@ -582,7 +581,7 @@ identity = inkbox.create_identity("my-agent", imessage_enabled=True)
 router = inkbox.imessages.get_triage_number()
 print(router.number, router.connect_command)  # e.g. 'connect @my-agent'
 
-# List every dedicated number owned by the organization, attached or not.
+# List every dedicated line owned by the organization, attached or not.
 numbers = inkbox.imessages.list_numbers()
 for number in numbers:
     print(number.number, number.type, number.agent_handle)
@@ -590,24 +589,24 @@ for number in numbers:
 # Claim an unattached organization-owned number. Keep the caller-generated
 # key stable if the request's outcome is ambiguous and you retry it.
 number = inkbox.imessages.claim_number(
-    type="dedicated_outbound",
-    idempotency_key="claim-outbound-agent-2026-07-18",
+    idempotency_key="claim-agent-2026-07-18",
 )
-print(number.can_start_conversations)  # True
+# `number.type` remains "dedicated_outbound" as a legacy response field. Do
+# not use it for capability detection.
 
 # Claim and attach atomically while creating an identity.
-outbound_identity = inkbox.create_identity(
-    "outbound-agent",
+dedicated_identity = inkbox.create_identity(
+    "dedicated-agent",
     imessage_enabled=True,
-    imessage_number_type="dedicated_outbound",
+    claim_imessage_number=True,
 )
-print(outbound_identity.imessage_number.number)
+print(dedicated_identity.imessage_number.number)
 
 # Existing identities can atomically claim/swap a new number, attach an already
 # owned number by UUID, or move back to the shared service with explicit None.
 identity.update(
-    imessage_number_type="dedicated_inbound",
-    idempotency_key="swap-my-agent-inbound-2026-07-18",
+    claim_imessage_number=True,
+    idempotency_key="swap-my-agent-2026-07-18",
 )
 identity.update(imessage_number_id=number.id)
 identity.update(imessage_number_id=None)
@@ -620,23 +619,23 @@ identity.send_imessage(
     text="On it — give me two minutes.",
 )
 
-# Dedicated outbound only: create or reuse an exact-participant group. Keep the
+# A dedicated line can create or reuse an exact-participant group. Keep the
 # returned conversation_id and use it for later replies. A best-known set that
 # matches multiple conversations returns 409 instead of choosing one.
-group = outbound_identity.send_imessage(
+group = dedicated_identity.send_imessage(
     to=["+15551234567", "+15557654321"],
     text="Welcome to the group!",
     media_urls=["https://example.com/group-photo.jpg"],
     send_style=IMessageSendStyle.CONFETTI,
 )
-outbound_identity.send_imessage(
+dedicated_identity.send_imessage(
     conversation_id=group.conversation_id,
     text="Following up in the same conversation.",
     media_urls=["https://example.com/follow-up.jpg"],
     send_style=IMessageSendStyle.LASERS,
 )
-group_convos = outbound_identity.list_imessage_conversations(include_groups=True)
-group_msgs = outbound_identity.list_imessages(include_groups=True)
+group_convos = dedicated_identity.list_imessage_conversations(include_groups=True)
+group_msgs = dedicated_identity.list_imessages(include_groups=True)
 print(group.is_group, group.participants, group.recipients)
 # group_creation_status is creating, not_created, or ready. A rejected initial
 # creation leaves this same local conversation at not_created; send again with

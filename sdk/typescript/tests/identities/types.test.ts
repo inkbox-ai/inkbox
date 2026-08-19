@@ -72,6 +72,18 @@ describe("parseAgentIdentityData", () => {
     expect(d.imessageNumber).toBeNull();
   });
 
+  it("rejects a retired embedded dedicated-line response type", () => {
+    expect(() =>
+      parseAgentIdentityData({
+        ...RAW_IDENTITY_DETAIL,
+        imessage_number: {
+          ...RAW_IDENTITY_IMESSAGE_NUMBER,
+          type: "dedicated_inbound",
+        },
+      }),
+    ).toThrow("dedicated_outbound");
+  });
+
 });
 
 describe("parseIdentityMailbox", () => {

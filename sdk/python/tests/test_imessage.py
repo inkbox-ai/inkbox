@@ -7,10 +7,10 @@ Tests for IMessagesResource and IMessageContactRulesResource.
 from uuid import UUID
 
 import pytest
+import inkbox
 
 from inkbox.imessage.types import (
     IMessageNumberStatus,
-    IMessageNumberType,
     IMessageDeliveryStatus,
     IMessageGroupCreationStatus,
     IMessageReactionType,
@@ -243,13 +243,15 @@ class TestIMessagesSend:
 
 
 class TestIMessageNumbers:
+    def test_number_type_selector_is_not_exported(self):
+        assert not hasattr(inkbox, "IMessageNumberType")
+
     def test_lists_attached_and_unattached_numbers(self, client, transport):
         transport.get.return_value = [
             IMESSAGE_NUMBER_DICT,
             {
                 **IMESSAGE_NUMBER_DICT,
                 "id": "99999999-0000-0000-0000-000000000002",
-                "type": "dedicated_inbound",
                 "status": "paused",
                 "agent_identity_id": None,
                 "agent_handle": None,
@@ -259,13 +261,11 @@ class TestIMessageNumbers:
         numbers = client.imessages.list_numbers()
 
         transport.get.assert_called_once_with("/numbers")
-        assert numbers[0].type is IMessageNumberType.DEDICATED_OUTBOUND
+        assert numbers[0].type == "dedicated_outbound"
         assert numbers[0].status is IMessageNumberStatus.ACTIVE
-        assert numbers[0].can_start_conversations is True
         assert numbers[0].agent_identity_id == UUID(IDENTITY_ID)
-        assert numbers[1].type is IMessageNumberType.DEDICATED_INBOUND
+        assert numbers[1].type == "dedicated_outbound"
         assert numbers[1].status is IMessageNumberStatus.PAUSED
-        assert numbers[1].can_start_conversations is False
         assert numbers[1].agent_identity_id is None
         assert numbers[1].agent_handle is None
 
@@ -278,53 +278,24 @@ class TestIMessageNumbers:
         with pytest.raises(KeyError, match=missing):
             client.imessages.list_numbers()
 
-    def test_claims_number_with_enum(self, client, transport):
+    def test_claims_number_with_type_less_body(self, client, transport):
         transport.post.return_value = IMESSAGE_NUMBER_DICT
 
         number = client.imessages.claim_number(
-            type=IMessageNumberType.DEDICATED_OUTBOUND,
-            idempotency_key="claim-outbound-1",
+            idempotency_key="claim-dedicated-1",
         )
 
         transport.post.assert_called_once_with(
             "/numbers",
-            json={"type": "dedicated_outbound"},
-            headers={"Idempotency-Key": "claim-outbound-1"},
+            json={},
+            headers={"Idempotency-Key": "claim-dedicated-1"},
         )
         assert number.number == "+15551230001"
-
-    def test_claims_number_with_string(self, client, transport):
-        transport.post.return_value = {
-            **IMESSAGE_NUMBER_DICT,
-            "type": "dedicated_inbound",
-        }
-
-        number = client.imessages.claim_number(
-            type="dedicated_inbound",
-            idempotency_key="claim-inbound-1",
-        )
-
-        transport.post.assert_called_once_with(
-            "/numbers",
-            json={"type": "dedicated_inbound"},
-            headers={"Idempotency-Key": "claim-inbound-1"},
-        )
-        assert number.can_start_conversations is False
-
-    def test_rejects_non_dedicated_type(self, client, transport):
-        with pytest.raises(ValueError):
-            client.imessages.claim_number(
-                type="shared_inbound",
-                idempotency_key="claim-shared-1",
-            )
-
-        transport.post.assert_not_called()
 
     @pytest.mark.parametrize("key", ["", "x" * 256])
     def test_rejects_invalid_idempotency_key(self, client, transport, key):
         with pytest.raises(ValueError, match="between 1 and 255"):
             client.imessages.claim_number(
-                type="dedicated_inbound",
                 idempotency_key=key,
             )
 
@@ -335,7 +306,6 @@ class TestIMessageNumbers:
 
         for _ in range(2):
             client.imessages.claim_number(
-                type="dedicated_outbound",
                 idempotency_key="stable-logical-operation",
             )
 
@@ -344,6 +314,7 @@ class TestIMessageNumbers:
             assert call.kwargs["headers"] == {
                 "Idempotency-Key": "stable-logical-operation"
             }
+            assert call.kwargs["json"] == {}
 
 
 class TestIMessagesList:

@@ -30,7 +30,6 @@ use crate::identities::types::{
 };
 use crate::imessage::resources::contact_rules::IMessageContactRulesResource;
 use crate::imessage::resources::imessages::IMessagesResource;
-use crate::imessage::types::IMessageNumberType;
 use crate::mail::resources::contact_rules::MailContactRulesResource;
 use crate::mail::resources::domains::DomainsResource;
 use crate::mail::resources::drafts::DraftsResource;
@@ -481,7 +480,7 @@ impl Inkbox {
         tunnel: Option<&IdentityTunnelCreateOptions>,
         phone_number: Option<&IdentityPhoneNumberCreateOptions>,
         vault_secret_ids: Option<&VaultSecretIds>,
-        imessage_number_type: Option<IMessageNumberType>,
+        claim_imessage_number: Option<bool>,
     ) -> Result<AgentIdentity> {
         // Assemble the nested mailbox spec only when a mailbox field was given,
         // matching the Python `mailbox_kwargs` construction.
@@ -502,7 +501,7 @@ impl Inkbox {
             tunnel,
             phone_number,
             vault_secret_ids,
-            imessage_number_type,
+            claim_imessage_number,
         )?;
         Ok(AgentIdentity::new(data, self.clone()))
     }

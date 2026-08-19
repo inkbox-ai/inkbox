@@ -160,7 +160,7 @@ export class AgentIdentity {
   /** The phone number currently assigned to this identity, or `null` if none. */
   get phoneNumber(): IdentityPhoneNumber | null { return this._phoneNumber; }
 
-  /** Dedicated iMessage number attached to this identity, or `null` on shared service. */
+  /** Dedicated iMessage line attached to this identity, or `null` on shared service. */
   get imessageNumber(): IdentityIMessageNumber | null { return this._imessageNumber; }
 
   /**
@@ -900,15 +900,15 @@ export class AgentIdentity {
   /**
    * Send an outbound iMessage as this identity.
    *
-   * Shared and dedicated-inbound numbers require the recipient to connect
-   * first. A dedicated-outbound number may initiate a conversation, subject
+   * Shared service requires the recipient to connect first. A dedicated
+   * iMessage line may initiate a conversation, subject
    * to server-side consent and rate limits. Inbound replies and reactions arrive via
    * identity-owned webhook subscriptions
    * (`inkbox.webhooks.subscriptions.create({ agentIdentityId, url,
    * eventTypes: ["imessage.received", ...] })`).
    *
    * @param options.to - One E.164 recipient or 1–8 distinct recipients. Two
-   *   or more recipients select or create a dedicated-outbound group.
+   *   or more recipients select or create a dedicated-line group.
    *   Mutually exclusive with `conversationId`.
    * @param options.conversationId - Existing conversation UUID to reply into.
    * @param options.text - Message body.
@@ -1203,13 +1203,13 @@ export class AgentIdentity {
    * @param options.newHandle - New agent handle.
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
-   * @param options.imessageEnabled - Toggle shared-iMessage reachability.
-   * @param options.imessageNumberId - Attach an already-owned dedicated number,
+   * @param options.imessageEnabled - Toggle identity-level iMessage reachability.
+   * @param options.imessageNumberId - Attach an already-owned dedicated line,
    *   or pass `null` to return to shared service.
-   * @param options.imessageNumberType - Claim and atomically attach or swap to
-   *   a new dedicated number.
+   * @param options.claimIMessageNumber - Claim and atomically attach or swap to
+   *   a new dedicated iMessage line.
    * @param options.idempotencyKey - Stable caller-generated key required with
-   *   `imessageNumberType`; reuse it for an ambiguous retry.
+   *   `claimIMessageNumber`; reuse it for an ambiguous retry.
    * @param options.imessageFilterMode - `"whitelist"` or `"blacklist"`
    *   for iMessage contact rules (admin-only).
    * @param options.mailFilterMode - `"whitelist"` or `"blacklist"` for this

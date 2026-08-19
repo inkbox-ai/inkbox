@@ -857,12 +857,12 @@ describe("AgentIdentity management", () => {
     const identity = new AgentIdentity(makeData({ imessageNumber: null }), ink);
 
     await identity.update({
-      imessageNumberType: "dedicated_outbound",
+      claimIMessageNumber: true,
       idempotencyKey: "identity-claim-123",
     });
 
     expect(ink._idsResource.update).toHaveBeenCalledWith("sales-agent", {
-      imessageNumberType: "dedicated_outbound",
+      claimIMessageNumber: true,
       idempotencyKey: "identity-claim-123",
     });
     expect(ink._idsResource.get).not.toHaveBeenCalled();

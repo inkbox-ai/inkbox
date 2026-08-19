@@ -599,18 +599,16 @@ await inkbox.smsOptIns.optOut("+15551234567");
 
 ## iMessage
 
-Chat with humans over the shared Inkbox router or a dedicated number.
-iMessage is **opt-in per identity** (`imessageEnabled`). On the shared
-service and dedicated inbound numbers, the human texts first. Dedicated
-outbound numbers may initiate conversations, subject to consent and rate
-limits.
+Chat with humans over the shared Inkbox router or a dedicated iMessage line.
+iMessage is **opt-in per identity** (`imessageEnabled`). On shared service, the
+human texts first. Dedicated lines may initiate conversations, subject to
+consent and rate limits.
 
 ```ts
 import {
   DedicatedIMessageNumberInventoryPendingError,
   DedicatedIMessageNumberQuotaExceededError,
   IdempotencyKeyReusedError,
-  IMessageNumberType,
   IMessageRuleAction,
   IMessageSendStyle,
 } from "@inkbox/sdk";
@@ -656,12 +654,11 @@ await inkbox.imessageContactRules.create("my-agent", {
   matchTarget: "+15555550999",
 });
 
-// List every dedicated number owned by the organization. Unattached numbers
+// List every dedicated line owned by the organization. Unattached lines
 // have null agentIdentityId and agentHandle fields.
 const numbers = await inkbox.imessages.listNumbers();
 for (const number of numbers) {
-  const canInitiate = number.type === IMessageNumberType.DEDICATED_OUTBOUND;
-  console.log(number.number, number.agentHandle, canInitiate);
+  console.log(number.number, number.agentHandle);
 }
 
 // Claim an unattached number for the organization. Generate the key once and
@@ -669,7 +666,6 @@ for (const number of numbers) {
 const claimKey = crypto.randomUUID();
 try {
   const claimed = await inkbox.imessages.claimNumber({
-    type: IMessageNumberType.DEDICATED_INBOUND,
     idempotencyKey: claimKey,
   });
   console.log(claimed.number);
@@ -686,29 +682,29 @@ try {
 }
 
 // Claim and attach atomically during identity creation.
-const outboundIdentity = await inkbox.createIdentity("outreach-agent", {
+const dedicatedIdentity = await inkbox.createIdentity("outreach-agent", {
   imessageEnabled: true,
-  imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
+  claimIMessageNumber: true,
 });
-console.log(outboundIdentity.imessageNumber?.number);
+console.log(dedicatedIdentity.imessageNumber?.number);
 
-// Dedicated outbound only: create or reuse an exact-participant group. Keep
+// A dedicated line can create or reuse an exact-participant group. Keep
 // the returned conversationId for later replies. An ambiguous best-known match
 // returns 409 instead of choosing a conversation.
-const group = await outboundIdentity.sendIMessage({
+const group = await dedicatedIdentity.sendIMessage({
   to: ["+15551234567", "+15557654321"],
   text: "Welcome to the group!",
   mediaUrls: ["https://example.com/group-photo.jpg"],
   sendStyle: IMessageSendStyle.CONFETTI,
 });
-await outboundIdentity.sendIMessage({
+await dedicatedIdentity.sendIMessage({
   conversationId: group.conversationId,
   text: "Following up in the same conversation.",
   mediaUrls: ["https://example.com/follow-up.jpg"],
   sendStyle: IMessageSendStyle.LASERS,
 });
-const groupConvos = await outboundIdentity.listIMessageConversations({ includeGroups: true });
-const groupMessages = await outboundIdentity.listIMessages({ includeGroups: true });
+const groupConvos = await dedicatedIdentity.listIMessageConversations({ includeGroups: true });
+const groupMessages = await dedicatedIdentity.listIMessages({ includeGroups: true });
 console.log(group.isGroup, group.participants, group.recipients);
 // groupCreationStatus is "creating", "not_created", or "ready". A rejected
 // initial creation leaves this same local conversation at "not_created"; send
@@ -720,10 +716,10 @@ console.log(groupConvos[0].groupCreationStatus);
 
 // Claim and atomically attach/swap during update. To attach an already-owned
 // number, pass imessageNumberId instead. Pass imessageNumberId: null to move
-// back to shared service. imessageNumberType and imessageNumberId cannot be
+// back to shared service. claimIMessageNumber and imessageNumberId cannot be
 // combined in one update.
 await identity.update({
-  imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+  claimIMessageNumber: true,
   idempotencyKey: crypto.randomUUID(),
 });
 ```

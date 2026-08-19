@@ -7,6 +7,8 @@ Tests for identities type parsing.
 from datetime import datetime, timezone
 from uuid import UUID
 
+import pytest
+
 from sample_data_identities import (
     IDENTITY_DICT,
     IDENTITY_DETAIL_DICT,
@@ -22,7 +24,6 @@ from inkbox.identities.types import (
     IdentityIMessageNumber,
     IdentityPhoneNumber,
 )
-from inkbox.imessage.types import IMessageNumberType
 
 
 class TestAgentIdentitySummaryParsing:
@@ -47,8 +48,7 @@ class TestAgentIdentityDataParsing:
         assert isinstance(d.phone_number, IdentityPhoneNumber)
         assert d.phone_number.number == "+18335794607"
         assert isinstance(d.imessage_number, IdentityIMessageNumber)
-        assert d.imessage_number.type is IMessageNumberType.DEDICATED_OUTBOUND
-        assert d.imessage_number.can_start_conversations is True
+        assert d.imessage_number.type == "dedicated_outbound"
 
     def test_no_channels(self):
         d = _AgentIdentityData._from_dict(IDENTITY_DICT)
@@ -64,18 +64,13 @@ class TestIdentityIMessageNumberParsing:
 
         assert isinstance(number.id, UUID)
         assert number.number == "+15551230001"
-        assert number.type is IMessageNumberType.DEDICATED_OUTBOUND
-        assert number.can_start_conversations is True
+        assert number.type == "dedicated_outbound"
 
-    def test_inbound_capability_is_derived_from_type(self):
-        number = IdentityIMessageNumber._from_dict(
-            {
-                **IDENTITY_IMESSAGE_NUMBER_DICT,
-                "type": "dedicated_inbound",
-            }
-        )
-
-        assert number.can_start_conversations is False
+    def test_rejects_non_compatibility_response_type(self):
+        with pytest.raises(ValueError, match="dedicated_outbound"):
+            IdentityIMessageNumber._from_dict(
+                {**IDENTITY_IMESSAGE_NUMBER_DICT, "type": "dedicated"}
+            )
 
 
 class TestIdentityMailboxParsing:

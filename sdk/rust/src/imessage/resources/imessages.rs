@@ -2,7 +2,7 @@
 //! receipts, typing indicators, media upload.
 //!
 //! Messages and conversations are identity-scoped. One-to-one conversations may
-//! carry assignment state; groups require a dedicated outbound number. Dedicated
+//! carry assignment state; groups require a dedicated line. Dedicated
 //! number ownership is managed through [`IMessagesResource::list_numbers`] and
 //! [`IMessagesResource::claim_number`].
 
@@ -16,8 +16,8 @@ use crate::filters::DateRangeFilter;
 use crate::http::{validate_idempotency_key, HttpTransport};
 use crate::imessage::types::{
     IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
-    IMessageMarkReadResult, IMessageMediaUpload, IMessageNumber, IMessageNumberType,
-    IMessageReaction, IMessageReactionType, IMessageSendStyle, IMessageTriageNumber,
+    IMessageMarkReadResult, IMessageMediaUpload, IMessageNumber, IMessageReaction,
+    IMessageReactionType, IMessageSendStyle, IMessageTriageNumber,
 };
 
 pub struct IMessagesResource {
@@ -42,14 +42,14 @@ impl IMessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
-    /// List the organization's dedicated iMessage numbers, including numbers that
+    /// List the organization's dedicated iMessage lines, including lines that
     /// are not currently attached to an identity.
     pub fn list_numbers(&self) -> Result<Vec<IMessageNumber>> {
         let data = self.http.get("/numbers", crate::http::NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Claim a dedicated iMessage number for the organization.
+    /// Claim a dedicated iMessage line for the organization.
     ///
     /// The returned number is initially unattached. Pass its id to a number-aware
     /// identity update to attach it, or claim and attach atomically through an
@@ -57,13 +57,9 @@ impl IMessagesResource {
     ///
     /// `idempotency_key` must contain 1–255 characters. Reuse the same key when
     /// retrying an ambiguous result so the original claim is replayed.
-    pub fn claim_number(
-        &self,
-        number_type: IMessageNumberType,
-        idempotency_key: &str,
-    ) -> Result<IMessageNumber> {
+    pub fn claim_number(&self, idempotency_key: &str) -> Result<IMessageNumber> {
         validate_idempotency_key(idempotency_key)?;
-        let body = json!({ "type": number_type.as_str() });
+        let body = json!({});
         let headers = [("Idempotency-Key", idempotency_key)];
         let data = self.http.post_with_headers(
             "/numbers",
@@ -76,9 +72,9 @@ impl IMessagesResource {
 
     /// Send an outbound iMessage through an existing assignment.
     ///
-    /// Shared and dedicated-inbound numbers require the recipient to connect
-    /// first. An identity attached to a dedicated-outbound number may initiate a
-    /// conversation, subject to server-side consent and rate limits.
+    /// Shared service requires the recipient to connect first. An identity
+    /// attached to a dedicated line may initiate a conversation, subject to
+    /// server-side consent and rate limits.
     ///
     /// # Arguments
     /// * `to` - E.164 recipient number. Mutually exclusive with
@@ -140,7 +136,7 @@ impl IMessagesResource {
         Ok(serde_json::from_value(message)?)
     }
 
-    /// Send to 2–8 distinct recipients from a dedicated-outbound number.
+    /// Send to 2–8 distinct recipients from a dedicated iMessage line.
     ///
     /// The server selects or creates a group from the exact best-known
     /// participant set. Use [`Self::send`] with `conversation_id` for later
@@ -552,9 +548,7 @@ mod tests {
 
     use crate::client::Inkbox;
     use crate::error::InkboxError;
-    use crate::imessage::types::{
-        IMessageNumberStatus, IMessageNumberType, IMessageReactionType, IMessageSendStyle,
-    };
+    use crate::imessage::types::{IMessageNumberStatus, IMessageReactionType, IMessageSendStyle};
 
     fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
         Inkbox::builder("test-key")
@@ -608,30 +602,29 @@ mod tests {
         let numbers = client(&server).imessages().list_numbers().unwrap();
         mock.assert();
         assert_eq!(numbers.len(), 1);
-        assert_eq!(numbers[0].r#type, IMessageNumberType::DedicatedOutbound);
+        assert_eq!(numbers[0].r#type, "dedicated_outbound");
         assert_eq!(numbers[0].status, IMessageNumberStatus::Active);
-        assert!(numbers[0].can_start_conversation());
         assert_eq!(numbers[0].agent_identity_id, None);
         assert_eq!(numbers[0].agent_handle, None);
     }
 
     #[test]
-    fn claim_number_sends_exact_number_type_and_key() {
+    fn claim_number_sends_type_less_body_and_key() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST)
                 .path("/api/v1/imessage/numbers")
                 .header("Idempotency-Key", "claim-123")
-                .json_body(json!({ "type": "dedicated_outbound" }));
+                .json_body(json!({}));
             then.status(201).json_body(number_json());
         });
 
         let number = client(&server)
             .imessages()
-            .claim_number(IMessageNumberType::DedicatedOutbound, "claim-123")
+            .claim_number("claim-123")
             .unwrap();
         mock.assert();
-        assert_eq!(number.r#type, IMessageNumberType::DedicatedOutbound);
+        assert_eq!(number.r#type, "dedicated_outbound");
     }
 
     #[test]
@@ -654,7 +647,7 @@ mod tests {
 
         let error = client(&server)
             .imessages()
-            .claim_number(IMessageNumberType::DedicatedInbound, "claim-quota")
+            .claim_number("claim-quota")
             .unwrap_err();
         mock.assert();
         match error {
@@ -691,7 +684,7 @@ mod tests {
 
         let error = client(&server)
             .imessages()
-            .claim_number(IMessageNumberType::DedicatedOutbound, "claim-inventory")
+            .claim_number("claim-inventory")
             .unwrap_err();
         mock.assert();
         match error {
@@ -710,16 +703,13 @@ mod tests {
     #[test]
     fn claim_number_rejects_invalid_idempotency_key() {
         let server = MockServer::start();
-        let error = client(&server)
-            .imessages()
-            .claim_number(IMessageNumberType::DedicatedInbound, "")
-            .unwrap_err();
+        let error = client(&server).imessages().claim_number("").unwrap_err();
         assert!(matches!(error, InkboxError::InvalidArgument(_)));
 
         let too_long = "x".repeat(256);
         let error = client(&server)
             .imessages()
-            .claim_number(IMessageNumberType::DedicatedInbound, &too_long)
+            .claim_number(&too_long)
             .unwrap_err();
         assert!(matches!(error, InkboxError::InvalidArgument(_)));
     }
@@ -741,7 +731,7 @@ mod tests {
 
         let error = client(&server)
             .imessages()
-            .claim_number(IMessageNumberType::DedicatedInbound, "claim-conflict")
+            .claim_number("claim-conflict")
             .unwrap_err();
         mock.assert();
         assert!(matches!(error, InkboxError::IdempotencyKeyReused { .. }));

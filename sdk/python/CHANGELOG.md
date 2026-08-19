@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.0 — Dedicated iMessage lines
+
+- `imessages.claim_number()` now takes only `idempotency_key` and sends a
+  type-less claim body.
+- Identity create/update use `claim_imessage_number=True` for atomic dedicated
+  line claims.
+- Removed `IMessageNumberType`, all line-type arguments and exports, and the
+  now-unconditional `can_start_conversations` properties.
+- Dedicated-line responses retain the fixed compatibility field
+  `type="dedicated_outbound"`; structured error contracts are unchanged.
+
 ## 0.5.16 — Support Agent discovery on API errors
 
 - `InkboxAPIError.agent_support` exposes the Support Agent instructions string

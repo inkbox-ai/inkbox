@@ -4,8 +4,8 @@
  * Types mirroring the Inkbox iMessage API response models.
  *
  * Conversations are keyed by `conversationId`. One-to-one rows also expose
- * assignment and remote-number state; dedicated-outbound groups instead expose
- * participant snapshots. Dedicated numbers are exposed through the numbers
+ * assignment and remote-number state; group conversations instead expose
+ * participant snapshots. Dedicated lines are exposed through the numbers
  * resource.
  */
 
@@ -81,19 +81,6 @@ export enum IMessageGroupCreationStatus {
   READY = "ready",
 }
 
-/** Role of an iMessage number. */
-export enum IMessageNumberType {
-  DEDICATED_INBOUND = "dedicated_inbound",
-  DEDICATED_OUTBOUND = "dedicated_outbound",
-}
-
-/** Dedicated variants accepted by self-serve number claiming. */
-export type IMessageDedicatedNumberType =
-  | IMessageNumberType.DEDICATED_INBOUND
-  | IMessageNumberType.DEDICATED_OUTBOUND
-  | "dedicated_inbound"
-  | "dedicated_outbound";
-
 /** Lifecycle state of an iMessage number. */
 export enum IMessageNumberStatus {
   ACTIVE = "active",
@@ -101,26 +88,25 @@ export enum IMessageNumberStatus {
 }
 
 /**
- * An organization-owned dedicated iMessage number.
+ * An organization-owned dedicated iMessage line.
  *
- * Unattached numbers have both attachment fields set to `null`. A dedicated
- * outbound number may initiate conversations; callers can test
- * `type === IMessageNumberType.DEDICATED_OUTBOUND`.
+ * Unattached numbers have both attachment fields set to `null`. `type` is a
+ * fixed legacy wire field and is not a capability selector.
  */
 export interface IMessageNumber {
   id: string;
   number: string;
-  type: IMessageNumberType;
+  type: "dedicated_outbound";
   status: IMessageNumberStatus;
   agentIdentityId: string | null;
   agentHandle: string | null;
 }
 
-/** Dedicated iMessage number embedded on a detailed identity response. */
+/** Dedicated iMessage line embedded on a detailed identity response. */
 export interface IdentityIMessageNumber {
   id: string;
   number: string;
-  type: IMessageNumberType;
+  type: "dedicated_outbound";
 }
 
 /** Whether a matching remote number is allowed through or blocked. */
@@ -429,6 +415,13 @@ export interface RawIdentityIMessageNumber {
   type: string;
 }
 
+function parseCompatibilityNumberType(value: string): "dedicated_outbound" {
+  if (value !== "dedicated_outbound") {
+    throw new Error("iMessage number type must be 'dedicated_outbound'");
+  }
+  return value;
+}
+
 export interface RawIMessageContactRule {
   id: string;
   agent_identity_id: string;
@@ -595,7 +588,7 @@ export function parseIMessageNumber(
   return {
     id: r.id,
     number: r.number,
-    type: r.type as IMessageNumberType,
+    type: parseCompatibilityNumberType(r.type),
     status: r.status as IMessageNumberStatus,
     agentIdentityId: r.agent_identity_id,
     agentHandle: r.agent_handle,
@@ -608,7 +601,7 @@ export function parseIdentityIMessageNumber(
   return {
     id: r.id,
     number: r.number,
-    type: r.type as IMessageNumberType,
+    type: parseCompatibilityNumberType(r.type),
   };
 }
 

@@ -1,11 +1,26 @@
 //! Types mirroring the Inkbox iMessage API response models.
 //!
 //! iMessage messages and conversations are keyed by `conversation_id`.
-//! One-to-one rows also expose assignment and remote-number state; dedicated-
-//! outbound groups instead expose participant snapshots. Dedicated number
+//! One-to-one rows also expose assignment and remote-number state; group
+//! conversations instead expose participant snapshots. Dedicated line
 //! ownership is exposed separately through [`IMessageNumber`].
 
 use uuid::Uuid;
+
+fn deserialize_compatibility_number_type<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error as _;
+
+    let value = <String as serde::Deserialize>::deserialize(deserializer)?;
+    if value != "dedicated_outbound" {
+        return Err(D::Error::custom(
+            "iMessage number type must be 'dedicated_outbound'",
+        ));
+    }
+    Ok(value)
+}
 
 fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
@@ -19,29 +34,6 @@ where
 // `inkbox.mail.types`, so we re-export the shared type rather than duplicate it.
 pub use crate::mail::types::ContactRuleStatus;
 
-/// Role of a dedicated iMessage number.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum IMessageNumberType {
-    DedicatedInbound,
-    DedicatedOutbound,
-}
-
-impl IMessageNumberType {
-    /// The value sent to the API.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            IMessageNumberType::DedicatedInbound => "dedicated_inbound",
-            IMessageNumberType::DedicatedOutbound => "dedicated_outbound",
-        }
-    }
-
-    /// Whether this number may start a new conversation.
-    pub fn can_start_conversation(&self) -> bool {
-        matches!(self, IMessageNumberType::DedicatedOutbound)
-    }
-}
-
 /// Lifecycle state of an iMessage service number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -50,13 +42,15 @@ pub enum IMessageNumberStatus {
     Paused,
 }
 
-/// An organization-owned dedicated iMessage number.
+/// An organization-owned dedicated iMessage line.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageNumber {
     pub id: Uuid,
     /// E.164 number.
     pub number: String,
-    pub r#type: IMessageNumberType,
+    /// Fixed legacy wire field. This is not a capability selector.
+    #[serde(deserialize_with = "deserialize_compatibility_number_type")]
+    pub r#type: String,
     pub status: IMessageNumberStatus,
     /// Attached identity, or `None` while the number is available to the org.
     #[serde(deserialize_with = "deserialize_required_nullable")]
@@ -66,14 +60,7 @@ pub struct IMessageNumber {
     pub agent_handle: Option<String>,
 }
 
-impl IMessageNumber {
-    /// Whether this number may start a new conversation.
-    pub fn can_start_conversation(&self) -> bool {
-        self.r#type.can_start_conversation()
-    }
-}
-
-/// Dedicated iMessage number embedded in a detailed identity response.
+/// Dedicated iMessage line embedded in a detailed identity response.
 ///
 /// This shape is intentionally slimmer than [`IMessageNumber`]: attachment
 /// and lifecycle fields are only present on the organization number endpoints.
@@ -82,7 +69,9 @@ pub struct IdentityIMessageNumber {
     pub id: Uuid,
     /// E.164 number.
     pub number: String,
-    pub r#type: IMessageNumberType,
+    /// Fixed legacy wire field. This is not a capability selector.
+    #[serde(deserialize_with = "deserialize_compatibility_number_type")]
+    pub r#type: String,
 }
 
 /// Transport a message actually went over (iMessage may downgrade).
@@ -485,29 +474,11 @@ mod tests {
     }
 
     #[test]
-    fn number_type_serializes_to_wire_value() {
-        assert_eq!(
-            serde_json::to_value(IMessageNumberType::DedicatedInbound).unwrap(),
-            json!("dedicated_inbound")
-        );
-        assert_eq!(
-            serde_json::to_value(IMessageNumberType::DedicatedOutbound).unwrap(),
-            json!("dedicated_outbound")
-        );
-    }
-
-    #[test]
-    fn outbound_capability_is_derived_from_number_type() {
-        assert!(!IMessageNumberType::DedicatedInbound.can_start_conversation());
-        assert!(IMessageNumberType::DedicatedOutbound.can_start_conversation());
-    }
-
-    #[test]
     fn number_attachment_fields_accept_null() {
         let number: IMessageNumber = serde_json::from_value(json!({
             "id": "11111111-1111-1111-1111-111111111111",
             "number": "+15550001111",
-            "type": "dedicated_inbound",
+            "type": "dedicated_outbound",
             "status": "paused",
             "agent_identity_id": null,
             "agent_handle": null
@@ -515,6 +486,27 @@ mod tests {
         .unwrap();
         assert_eq!(number.agent_identity_id, None);
         assert_eq!(number.agent_handle, None);
+        assert_eq!(number.r#type, "dedicated_outbound");
+    }
+
+    #[test]
+    fn dedicated_number_shapes_reject_non_compatibility_types() {
+        let organization_number = serde_json::from_value::<IMessageNumber>(json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "number": "+15550001111",
+            "type": "dedicated_inbound",
+            "status": "active",
+            "agent_identity_id": null,
+            "agent_handle": null
+        }));
+        let identity_number = serde_json::from_value::<IdentityIMessageNumber>(json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "number": "+15550001111",
+            "type": "dedicated_inbound"
+        }));
+
+        assert!(organization_number.is_err());
+        assert!(identity_number.is_err());
     }
 
     #[test]
@@ -522,7 +514,7 @@ mod tests {
         let result = serde_json::from_value::<IMessageNumber>(json!({
             "id": "11111111-1111-1111-1111-111111111111",
             "number": "+15550001111",
-            "type": "dedicated_inbound",
+            "type": "dedicated_outbound",
             "status": "active"
         }));
         assert!(result.is_err());

@@ -16,7 +16,6 @@ import type { RawTunnelSummary, TLSMode, TunnelSummary } from "../tunnels/types.
 import { parseTunnelSummary } from "../tunnels/types.js";
 import type {
   IdentityIMessageNumber,
-  IMessageDedicatedNumberType,
   RawIdentityIMessageNumber,
 } from "../imessage/types.js";
 import { parseIdentityIMessageNumber } from "../imessage/types.js";
@@ -58,10 +57,10 @@ export interface CreateIdentityOptions {
    */
   imessageEnabled?: boolean;
   /**
-   * Claim and attach a dedicated iMessage number atomically during identity
+   * Claim and attach a dedicated iMessage line atomically during identity
    * creation. Requires `imessageEnabled: true`.
    */
-  imessageNumberType?: IMessageDedicatedNumberType;
+  claimIMessageNumber?: true;
   emailLocalPart?: string;
   /**
    * Optional sending-domain selector by **bare domain name**. Presence
@@ -83,14 +82,14 @@ export interface UpdateIdentityOptions {
   description?: string | null;
   imessageEnabled?: boolean;
   /**
-   * Attach an already-owned dedicated number by id, atomically swap numbers,
+   * Attach an already-owned dedicated line by id, atomically swap lines,
    * or pass `null` to return to the shared iMessage service.
    */
   imessageNumberId?: string | null;
-  /** Claim and atomically attach or swap to a new dedicated number. */
-  imessageNumberType?: IMessageDedicatedNumberType;
+  /** Claim and atomically attach or swap to a new dedicated line. */
+  claimIMessageNumber?: true;
   /**
-   * Stable caller-generated key for an `imessageNumberType` claim.
+   * Stable caller-generated key for a `claimIMessageNumber` operation.
    * Reuse it when retrying an ambiguous update.
    */
   idempotencyKey?: string;
@@ -160,7 +159,7 @@ export interface AgentIdentitySummary {
   emailAddress: string | null;
   /**
    * Whether this identity can be reached over iMessage. A detailed identity
-   * may also carry an attached dedicated number.
+   * may also carry an attached dedicated line.
    */
   imessageEnabled: boolean;
   /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
@@ -187,7 +186,7 @@ export interface AgentIdentitySummary {
   mailbox?: IdentityMailbox | null;
   /** Linked phone number when included by the response. */
   phoneNumber?: IdentityPhoneNumber | null;
-  /** Attached dedicated iMessage number when included by the response. */
+  /** Attached dedicated iMessage line when included by the response. */
   imessageNumber?: IdentityIMessageNumber | null;
   /** Linked tunnel summary when included by the response. */
   tunnel?: TunnelSummary | null;
@@ -199,7 +198,7 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
   mailbox: IdentityMailbox | null;
   /** Phone number assigned to this identity, or null if unlinked. */
   phoneNumber: IdentityPhoneNumber | null;
-  /** Dedicated iMessage number attached to this identity, or null on shared service. */
+  /** Dedicated iMessage line attached to this identity, or null on shared service. */
   imessageNumber: IdentityIMessageNumber | null;
   /**
    * Summary of the tunnel assigned to this identity, or `null` when unavailable.

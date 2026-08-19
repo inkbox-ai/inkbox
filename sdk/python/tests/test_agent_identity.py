@@ -515,18 +515,17 @@ class TestAgentIdentityUpdate:
         )
 
         identity.update(
-            imessage_number_type="dedicated_outbound",
-            idempotency_key="claim-sales-outbound",
+            claim_imessage_number=True,
+            idempotency_key="claim-sales-line",
         )
 
         inkbox._ids_resource.update.assert_called_once_with(
             "sales-agent",
-            imessage_number_type="dedicated_outbound",
-            idempotency_key="claim-sales-outbound",
+            claim_imessage_number=True,
+            idempotency_key="claim-sales-line",
         )
         inkbox._ids_resource.get.assert_not_called()
         assert identity.imessage_number is not None
-        assert identity.imessage_number.can_start_conversations is True
 
     def test_explicit_null_detach_uses_detailed_response(self):
         identity, inkbox = _identity_with_mailbox()

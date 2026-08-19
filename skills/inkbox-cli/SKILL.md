@@ -341,12 +341,12 @@ inkbox text mark-conversation-read <conversation-key> -i <handle>
 
 ## iMessage
 
-All iMessage commands are identity-scoped and require `-i <handle>`. Shared service and dedicated inbound require the recipient to message first; dedicated outbound identities may initiate one-to-one and group conversations. The identity must be opted in (`inkbox identity update <handle> --imessage-enabled true`).
+All iMessage commands are identity-scoped and require `-i <handle>`. Shared service requires the recipient to message first; dedicated identities may initiate one-to-one and group conversations. The identity must be opted in (`inkbox identity update <handle> --imessage-enabled true`).
 
 ```bash
 inkbox imessage triage-number   # the router number + the connect command humans text to it
 inkbox imessage send -i <handle> --to +15551234567 --text "Hello over iMessage"
-inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello group" --media-url https://example.com/group-photo.jpg --send-style confetti # dedicated outbound only
+inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello group" --media-url https://example.com/group-photo.jpg --send-style confetti # dedicated line only
 inkbox imessage send -i <handle> --conversation-id <group-conversation-id> --text "Reply" --media-url https://example.com/follow-up.jpg --send-style lasers
 inkbox imessage list -i <handle> --limit 20 --unread-only --include-groups
 inkbox imessage assignments -i <handle> --limit 20   # active connections, newest first

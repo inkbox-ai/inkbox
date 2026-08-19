@@ -21,7 +21,6 @@ from inkbox.identities.types import (
     IdentityTunnelCreateOptions,
     _AgentIdentityData,
 )
-from inkbox.imessage.types import IMessageNumberType
 
 
 def _resource():
@@ -99,7 +98,7 @@ class TestIdentitiesCreate:
         identity = res.create(
             agent_handle=HANDLE,
             imessage_enabled=True,
-            imessage_number_type=IMessageNumberType.DEDICATED_OUTBOUND,
+            claim_imessage_number=True,
         )
 
         http.post.assert_called_once_with(
@@ -107,11 +106,10 @@ class TestIdentitiesCreate:
             json={
                 "agent_handle": HANDLE,
                 "imessage_enabled": True,
-                "imessage_number_type": "dedicated_outbound",
+                "claim_imessage_number": True,
             },
         )
         assert identity.imessage_number is not None
-        assert identity.imessage_number.can_start_conversations is True
 
     def test_number_claim_requires_imessage_enabled_true(self):
         res, http = _resource()
@@ -119,7 +117,18 @@ class TestIdentitiesCreate:
         with pytest.raises(ValueError, match="imessage_enabled=True"):
             res.create(
                 agent_handle=HANDLE,
-                imessage_number_type="dedicated_inbound",
+                claim_imessage_number=True,
+            )
+
+        http.post.assert_not_called()
+
+    def test_false_number_claim_is_rejected(self):
+        res, http = _resource()
+
+        with pytest.raises(ValueError, match="must be True when supplied"):
+            res.create(
+                agent_handle=HANDLE,
+                claim_imessage_number=False,  # type: ignore[arg-type]
             )
 
         http.post.assert_not_called()
@@ -213,15 +222,26 @@ class TestIdentitiesUpdate:
 
         res.update(
             HANDLE,
-            imessage_number_type=IMessageNumberType.DEDICATED_INBOUND,
+            claim_imessage_number=True,
             idempotency_key="identity-claim-1",
         )
 
         http.patch.assert_called_once_with(
             f"/{HANDLE}",
-            json={"imessage_number_type": "dedicated_inbound"},
+            json={"claim_imessage_number": True},
             headers={"Idempotency-Key": "identity-claim-1"},
         )
+
+    def test_false_number_claim_is_rejected(self):
+        res, http = _resource()
+
+        with pytest.raises(ValueError, match="must be True when supplied"):
+            res.update(
+                HANDLE,
+                claim_imessage_number=False,  # type: ignore[arg-type]
+            )
+
+        http.patch.assert_not_called()
 
     def test_attaches_owned_imessage_number(self):
         res, http = _resource()
@@ -252,13 +272,13 @@ class TestIdentitiesUpdate:
 
         assert "imessage_number_id" not in http.patch.call_args.kwargs["json"]
 
-    def test_rejects_number_type_with_number_id(self):
+    def test_rejects_number_claim_with_number_id(self):
         res, http = _resource()
 
         with pytest.raises(ValueError, match="cannot be set together"):
             res.update(
                 HANDLE,
-                imessage_number_type="dedicated_outbound",
+                claim_imessage_number=True,
                 imessage_number_id=None,
             )
 
@@ -270,7 +290,7 @@ class TestIdentitiesUpdate:
         with pytest.raises(ValueError, match="idempotency_key is required"):
             res.update(
                 HANDLE,
-                imessage_number_type="dedicated_outbound",
+                claim_imessage_number=True,
             )
 
         http.patch.assert_not_called()

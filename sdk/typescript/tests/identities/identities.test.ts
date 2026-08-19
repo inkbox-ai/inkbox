@@ -2,7 +2,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { IdentitiesResource } from "../../src/identities/resources/identities.js";
 import type { HttpTransport } from "../../src/_http.js";
-import { IMessageNumberType } from "../../src/imessage/types.js";
 import {
   RAW_IDENTITY,
   RAW_IDENTITY_DETAIL,
@@ -106,13 +105,13 @@ describe("IdentitiesResource.create", () => {
     const identity = await res.create({
       agentHandle: HANDLE,
       imessageEnabled: true,
-      imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
+      claimIMessageNumber: true,
     });
 
     expect(http.post).toHaveBeenCalledWith("/", {
       agent_handle: HANDLE,
       imessage_enabled: true,
-      imessage_number_type: "dedicated_outbound",
+      claim_imessage_number: true,
     });
     expect(identity.imessageNumber?.type).toBe("dedicated_outbound");
   });
@@ -123,8 +122,22 @@ describe("IdentitiesResource.create", () => {
 
     await expect(res.create({
       agentHandle: HANDLE,
-      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
-    })).rejects.toThrow("imessageNumberType requires imessageEnabled: true");
+      claimIMessageNumber: true,
+    })).rejects.toThrow("claimIMessageNumber requires imessageEnabled: true");
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it("rejects a false claim value from untyped JavaScript callers", async () => {
+    const http = mockHttp();
+    const res = new IdentitiesResource(http);
+
+    await expect(res.create({
+      agentHandle: HANDLE,
+      claimIMessageNumber: false,
+    } as unknown as Parameters<IdentitiesResource["create"]>[0])).rejects.toThrow(
+      "claimIMessageNumber must be true when supplied",
+    );
+
     expect(http.post).not.toHaveBeenCalled();
   });
 });
@@ -206,15 +219,28 @@ describe("IdentitiesResource.update", () => {
     const res = new IdentitiesResource(http);
 
     await res.update(HANDLE, {
-      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+      claimIMessageNumber: true,
       idempotencyKey: "identity-claim-123",
     });
 
     expect(http.patch).toHaveBeenCalledWith(
       `/${HANDLE}`,
-      { imessage_number_type: "dedicated_inbound" },
+      { claim_imessage_number: true },
       { headers: { "Idempotency-Key": "identity-claim-123" } },
     );
+  });
+
+  it("rejects a false update claim from untyped JavaScript callers", async () => {
+    const http = mockHttp();
+    const res = new IdentitiesResource(http);
+
+    await expect(res.update(HANDLE, {
+      claimIMessageNumber: false,
+    } as unknown as Parameters<IdentitiesResource["update"]>[1])).rejects.toThrow(
+      "claimIMessageNumber must be true when supplied",
+    );
+
+    expect(http.patch).not.toHaveBeenCalled();
   });
 
   it("forwards a caller-provided idempotency key on other updates", async () => {
@@ -239,10 +265,10 @@ describe("IdentitiesResource.update", () => {
     const res = new IdentitiesResource(http);
 
     await expect(res.update(HANDLE, {
-      imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
-    })).rejects.toThrow("idempotencyKey is required with imessageNumberType");
+      claimIMessageNumber: true,
+    })).rejects.toThrow("idempotencyKey is required with claimIMessageNumber");
     await expect(res.update(HANDLE, {
-      imessageNumberType: IMessageNumberType.DEDICATED_OUTBOUND,
+      claimIMessageNumber: true,
       idempotencyKey: "x".repeat(256),
     })).rejects.toThrow("between 1 and 255 characters");
     expect(http.patch).not.toHaveBeenCalled();
@@ -253,13 +279,13 @@ describe("IdentitiesResource.update", () => {
     const res = new IdentitiesResource(http);
 
     await expect(res.update(HANDLE, {
-      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+      claimIMessageNumber: true,
       imessageNumberId: "99999999-0000-0000-0000-000000000001",
       idempotencyKey: "identity-claim-123",
-    })).rejects.toThrow("imessageNumberType and imessageNumberId cannot be set together");
+    })).rejects.toThrow("claimIMessageNumber and imessageNumberId cannot be set together");
     await expect(res.update(HANDLE, {
       imessageEnabled: false,
-      imessageNumberType: IMessageNumberType.DEDICATED_INBOUND,
+      claimIMessageNumber: true,
       idempotencyKey: "identity-claim-456",
     })).rejects.toThrow("cannot be combined with disabling iMessage");
     expect(http.patch).not.toHaveBeenCalled();

@@ -4,7 +4,6 @@
  * Async HTTP transport (internal). Zero runtime dependencies — uses native fetch.
  */
 
-import type { IMessageDedicatedNumberType } from "./imessage/types.js";
 import { parseAgentSupport } from "./error-guidance.js";
 
 export class InkboxError extends Error {
@@ -152,7 +151,7 @@ export class StorageLimitExceededError extends InkboxAPIError {
 
 /** Thrown when an organization has reached its dedicated iMessage number quota. */
 export class DedicatedIMessageNumberQuotaExceededError extends InkboxAPIError {
-  readonly numberType: IMessageDedicatedNumberType;
+  readonly numberType: string;
   readonly limit: number;
   readonly current: number;
   readonly upgradeUrl: string;
@@ -162,7 +161,7 @@ export class DedicatedIMessageNumberQuotaExceededError extends InkboxAPIError {
   constructor(statusCode: number, detail: Record<string, unknown>) {
     super(statusCode, detail);
     this.name = "DedicatedIMessageNumberQuotaExceededError";
-    this.numberType = String(detail["number_type"] ?? "") as IMessageDedicatedNumberType;
+    this.numberType = String(detail["number_type"] ?? "");
     this.limit = Number(detail["limit"] ?? 0);
     this.current = Number(detail["current"] ?? 0);
     this.upgradeUrl = String(detail["upgrade_url"] ?? "");
@@ -174,7 +173,7 @@ export class DedicatedIMessageNumberQuotaExceededError extends InkboxAPIError {
 
 /** Thrown when a requested dedicated iMessage number is not yet available. */
 export class DedicatedIMessageNumberInventoryPendingError extends InkboxAPIError {
-  readonly numberType: IMessageDedicatedNumberType;
+  readonly numberType: string;
   readonly retryAfterSeconds: number;
   readonly detailMessage: string;
 
@@ -185,7 +184,7 @@ export class DedicatedIMessageNumberInventoryPendingError extends InkboxAPIError
   ) {
     super(statusCode, detail);
     this.name = "DedicatedIMessageNumberInventoryPendingError";
-    this.numberType = String(detail["number_type"] ?? "") as IMessageDedicatedNumberType;
+    this.numberType = String(detail["number_type"] ?? "");
     const headerSeconds = retryAfterHeader === null ? Number.NaN : Number(retryAfterHeader);
     const detailSeconds = Number(detail["retry_after_seconds"] ?? 0);
     this.retryAfterSeconds = Number.isFinite(headerSeconds) && headerSeconds >= 0
