@@ -175,7 +175,7 @@ inkbox email drafts create -i <handle>        # Create an incomplete draft; prin
   --subject <subject>                         #   Optional subject
   --body-text <text>                          #   Optional plain text body
   --attach <path>                             #   Attach a file (repeatable)
-  --idempotency-key <key>                     #   Reuse when retrying one logical create
+  --idempotency-key <key>                     #   Reuse with identical args for one logical create
 inkbox email drafts list -i <handle>          # List drafts with current generations
 inkbox email drafts get <draft-id> -i <handle> # Get bodies and attachment metadata
 inkbox email drafts update <draft-id> -i <handle> --generation <n>

@@ -21,7 +21,7 @@ use crate::agent_signup::types::{
 use crate::api_keys::resources::api_keys::ApiKeysResource;
 use crate::contacts::resources::contacts::ContactsResource;
 use crate::cookies::CookieJar;
-use crate::error::{parse_agent_support, ApiErrorDetail, InkboxError, Result};
+use crate::error::{parse_agent_support, InkboxError, Result};
 use crate::http::{default_timeout, HttpTransport, NO_QUERY};
 use crate::identities::resources::identities::IdentitiesResource;
 use crate::identities::types::{
@@ -789,14 +789,10 @@ fn one_shot_request(
             Some(other) => other,
             None => Value::String(text.clone()),
         };
-        let detail = match raw_detail {
-            Value::String(message) => ApiErrorDetail::Message(message),
-            structured => ApiErrorDetail::Structured(structured),
-        };
+        let detail = crate::error::api_error_detail_with_retry(raw_detail, retry_after_header);
         return Err(InkboxError::Api {
             status_code: status,
             detail,
-            retry_after_header,
             agent_support,
         });
     }
@@ -975,7 +971,7 @@ mod agent_signup_invitation_tests {
         match error {
             InkboxError::Api {
                 status_code,
-                detail: ApiErrorDetail::Structured(detail),
+                detail: crate::error::ApiErrorDetail::Structured(detail),
                 agent_support,
                 ..
             } => {

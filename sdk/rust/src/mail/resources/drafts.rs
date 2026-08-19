@@ -758,13 +758,16 @@ mod tests {
                 .drafts()
                 .send(MAILBOX, &draft_id(), 5)
                 .unwrap_err();
+            assert_eq!(error.retry_after_seconds(), Some(12));
             match error {
                 InkboxError::Api {
                     status_code: 409,
                     detail: ApiErrorDetail::Structured(detail),
-                    retry_after_header: Some(12),
                     ..
-                } => assert_eq!(detail["error"], code),
+                } => {
+                    assert_eq!(detail["error"], code);
+                    assert_eq!(detail["retry_after_seconds"], 12);
+                }
                 other => panic!("expected structured conflict, got {other:?}"),
             }
         }

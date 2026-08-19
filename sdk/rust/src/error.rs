@@ -32,8 +32,6 @@ pub enum InkboxError {
         status_code: u16,
         /// Error detail from the response body.
         detail: ApiErrorDetail,
-        /// Parsed delta-seconds value from the HTTP `Retry-After` header.
-        retry_after_header: Option<u64>,
         /// Support Agent escalation instructions supplied by the API.
         agent_support: Option<Box<str>>,
     },
@@ -246,6 +244,25 @@ impl InkboxError {
         }
     }
 
+    /// Server-supplied retry delay, when this error exposes one.
+    pub fn retry_after_seconds(&self) -> Option<u64> {
+        match self {
+            InkboxError::Api { detail, .. } => detail
+                .as_object()
+                .and_then(Value::as_object)
+                .and_then(|map| map.get("retry_after_seconds"))
+                .and_then(Value::as_u64),
+            InkboxError::DedicatedIMessageNumberInventoryPending {
+                retry_after_seconds,
+                ..
+            } => Some(*retry_after_seconds),
+            InkboxError::MailImportQuotaExceeded {
+                retry_after_header, ..
+            } => *retry_after_header,
+            _ => None,
+        }
+    }
+
     /// True iff this is the terminal "another client took over this tunnel"
     /// error surfaced by a tunnel client's `serve_forever`. Terminal by
     /// design: the client has stopped and will not reconnect. Lets callers
@@ -284,9 +301,34 @@ impl ApiErrorDetail {
     }
 }
 
+pub(crate) fn api_error_detail_with_retry(
+    raw_detail: Value,
+    retry_after_seconds: Option<u64>,
+) -> ApiErrorDetail {
+    match (raw_detail, retry_after_seconds) {
+        (Value::String(message), None) => ApiErrorDetail::Message(message),
+        (Value::String(message), Some(seconds)) => ApiErrorDetail::Structured(serde_json::json!({
+            "message": message,
+            "retry_after_seconds": seconds,
+        })),
+        (Value::Object(mut map), retry_after_seconds) => {
+            if let Some(seconds) = retry_after_seconds {
+                map.insert("retry_after_seconds".to_string(), Value::from(seconds));
+            }
+            ApiErrorDetail::Structured(Value::Object(map))
+        }
+        (structured, None) => ApiErrorDetail::Structured(structured),
+        (detail, Some(seconds)) => ApiErrorDetail::Structured(serde_json::json!({
+            "detail": detail,
+            "retry_after_seconds": seconds,
+        })),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::InkboxError;
+    use super::{api_error_detail_with_retry, ApiErrorDetail, InkboxError};
+    use serde_json::json;
 
     #[test]
     fn stale_tunnel_error_exposes_agent_support() {
@@ -300,5 +342,24 @@ mod tests {
             error.to_string(),
             "tunnel error: TunnelRemoved: stored tunnel was removed"
         );
+    }
+
+    #[test]
+    fn retry_header_enriches_string_detail_without_changing_the_api_variant() {
+        let detail = api_error_detail_with_retry(json!("try later"), Some(12));
+        let error = InkboxError::Api {
+            status_code: 429,
+            detail,
+            agent_support: None,
+        };
+
+        assert_eq!(error.retry_after_seconds(), Some(12));
+        assert!(matches!(
+            error,
+            InkboxError::Api {
+                detail: ApiErrorDetail::Structured(_),
+                ..
+            }
+        ));
     }
 }

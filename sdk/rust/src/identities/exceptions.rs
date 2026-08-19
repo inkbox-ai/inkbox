@@ -120,7 +120,6 @@ mod tests {
                 "code": "agent_handle_unavailable",
                 "blocking_namespace": "identities"
             })),
-            retry_after_header: None,
             agent_support: None,
         };
         assert!(HandleUnavailableError::from_error(&handle).is_some());
@@ -130,7 +129,6 @@ mod tests {
             detail: ApiErrorDetail::Structured(json!({
                 "error": "line_already_attached"
             })),
-            retry_after_header: None,
             agent_support: None,
         };
         assert!(HandleUnavailableError::from_error(&line).is_none());

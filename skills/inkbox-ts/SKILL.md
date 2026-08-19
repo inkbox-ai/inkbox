@@ -203,8 +203,9 @@ const sent = await identity.sendEmailDraft(current.id, current.generation);
 ```
 
 Drafts share the mailbox's standard Drafts folder with connected mail clients.
-Reuse one `idempotencyKey` when retrying the same logical create after an
-ambiguous result. Forward-only options require `forwardMessageId`.
+Reuse one `idempotencyKey` and the exact same request when retrying a logical
+create after an ambiguous result. Use a new key after the original draft is sent
+or deleted. Forward-only options require `forwardMessageId`.
 Use the latest returned `generation` for every mutation. A `partIndex` belongs
 to the generation that returned it, so refresh attachment metadata after edits.
 

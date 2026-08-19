@@ -18,7 +18,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - `inkbox email drafts` adds the complete draft lifecycle plus file attachment
   add, remove, and download commands.
 - Draft creation accepts an optional idempotency key in every SDK and the CLI.
-  Reuse the same key when retrying one logical create after an ambiguous result.
+  Reuse the same key and request when retrying one logical create after an
+  ambiguous result; use a new key after the original draft is sent or deleted.
 
 ### Changed
 
@@ -31,11 +32,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   being ignored. Omitted forward defaults remain omitted for compatibility.
 - CLI API errors retain structured detail and generic retry timing. With
   `--json`, one stable error object is written to stderr while stdout stays empty.
-- Rust generic `InkboxError::Api` now carries `retry_after_header`. This adds a
-  field to exhaustive struct patterns and constructors. Rust `CreateDraftOptions`
-  also changes `forward_mode` and `include_original_attachments` to `Option` and
-  adds `idempotency_key`; struct literals must use the optional forms or
-  `..Default::default()`.
+- Rust generic API errors expose structured retry timing through
+  `InkboxError::retry_after_seconds()` without changing the existing `Api`
+  variant shape. Rust `CreateDraftOptions` changes `forward_mode` and
+  `include_original_attachments` to `Option` and adds `idempotency_key`; struct
+  literals must use the optional forms or `..Default::default()`.
 - Package and plugin versions moved in lockstep to 0.5.18; the CLI now depends
   on `@inkbox/sdk` `^0.5.18`.
 

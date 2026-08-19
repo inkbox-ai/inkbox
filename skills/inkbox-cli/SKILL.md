@@ -246,8 +246,9 @@ flags; omission leaves a field unchanged. Use the generation printed by the
 latest read or mutation for every following mutation. Attachment part indexes
 belong to that generation, so run `get` again after an edit. Drafts share the
 mailbox's standard Drafts folder with connected mail clients.
-Reuse one `--idempotency-key` when retrying the same logical create after an
-ambiguous result. Forward-only flags require `--forward-message-id`.
+Reuse one `--idempotency-key` and the exact same arguments when retrying a
+logical create after an ambiguous result. Use a new key after the original draft
+is sent or deleted. Forward-only flags require `--forward-message-id`.
 
 Successful send prints the sent message and removes the draft; an
 exact-generation retry may return the same sent message. On HTTP 409, refresh

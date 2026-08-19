@@ -15,7 +15,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::cookies::CookieJar;
-use crate::error::{parse_agent_support, ApiErrorDetail, InkboxError, Result};
+use crate::error::{parse_agent_support, InkboxError, Result};
 
 const DEFAULT_TIMEOUT_SECS: f64 = 30.0;
 
@@ -627,14 +627,10 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
         }
     }
 
-    let detail = match raw_detail {
-        Value::String(s) => ApiErrorDetail::Message(s),
-        other => ApiErrorDetail::Structured(other),
-    };
+    let detail = crate::error::api_error_detail_with_retry(raw_detail, retry_after_header);
     Err(InkboxError::Api {
         status_code: status,
         detail,
-        retry_after_header,
         agent_support,
     })
 }

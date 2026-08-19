@@ -293,7 +293,6 @@ impl TunnelsResource {
                 detail: crate::error::ApiErrorDetail::Message(format!(
                     "tunnel {name:?} is not active; expected active before opening the data plane"
                 )),
-                retry_after_header: None,
                 agent_support: None,
             });
         }
@@ -332,7 +331,6 @@ impl TunnelsResource {
                     detail: crate::error::ApiErrorDetail::Message(format!(
                         "tunnel {name:?} is not active after CSR sign"
                     )),
-                    retry_after_header: None,
                     agent_support: None,
                 });
             }

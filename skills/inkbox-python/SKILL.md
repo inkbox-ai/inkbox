@@ -212,8 +212,9 @@ sent = identity.send_email_draft(current.id, generation=current.generation)
 ```
 
 Drafts share the mailbox's standard Drafts folder with connected mail clients.
-Reuse one `idempotency_key` when retrying the same logical create after an
-ambiguous result. Forward-only options require `forward_message_id`.
+Reuse one `idempotency_key` and the exact same request when retrying a logical
+create after an ambiguous result. Use a new key after the original draft is sent
+or deleted. Forward-only options require `forward_message_id`.
 Use the latest returned `generation` for every mutation. A `part_index` belongs
 to the generation that returned it, so refresh attachment metadata after edits.
 
