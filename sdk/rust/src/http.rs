@@ -15,7 +15,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::cookies::CookieJar;
-use crate::error::{parse_agent_support, ApiErrorDetail, InkboxError, Result};
+use crate::error::{parse_agent_support, InkboxError, Result};
 
 const DEFAULT_TIMEOUT_SECS: f64 = 30.0;
 
@@ -31,6 +31,14 @@ pub const NO_QUERY: Query<'static> = &[];
 
 /// Empty per-request header helper.
 pub const NO_HEADERS: Headers<'static> = &[];
+
+/// Raw response body with attachment metadata from HTTP headers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BinaryResponse {
+    pub bytes: Vec<u8>,
+    pub filename: Option<String>,
+    pub content_type: Option<String>,
+}
 
 /// Validate an idempotency key before building its HTTP header.
 pub(crate) fn validate_idempotency_key(key: &str) -> Result<()> {
@@ -186,9 +194,23 @@ impl HttpTransport {
         self.delete_with_headers(path, NO_HEADERS)
     }
 
+    /// `DELETE` with query parameters.
+    pub fn delete_with_params(&self, path: &str, params: Query) -> Result<()> {
+        self.delete_with_params_and_headers(path, params, NO_HEADERS)
+    }
+
     /// `DELETE` with caller-supplied per-request headers.
     pub fn delete_with_headers(&self, path: &str, headers: Headers) -> Result<()> {
-        let rb = self.client.delete(self.url(path));
+        self.delete_with_params_and_headers(path, NO_QUERY, headers)
+    }
+
+    fn delete_with_params_and_headers(
+        &self,
+        path: &str,
+        params: Query,
+        headers: Headers,
+    ) -> Result<()> {
+        let rb = self.client.delete(self.url(path)).query(params);
         let rb = headers
             .iter()
             .fold(rb, |request, (name, value)| request.header(*name, *value));
@@ -202,9 +224,23 @@ impl HttpTransport {
         self.delete_with_response_and_headers(path, NO_HEADERS)
     }
 
+    /// `DELETE` with query parameters that returns a parsed JSON body.
+    pub fn delete_with_response_and_params(&self, path: &str, params: Query) -> Result<Value> {
+        self.delete_with_response_params_and_headers(path, params, NO_HEADERS)
+    }
+
     /// `DELETE` with caller-supplied headers that returns a parsed JSON body.
     pub fn delete_with_response_and_headers(&self, path: &str, headers: Headers) -> Result<Value> {
-        let rb = self.client.delete(self.url(path));
+        self.delete_with_response_params_and_headers(path, NO_QUERY, headers)
+    }
+
+    fn delete_with_response_params_and_headers(
+        &self,
+        path: &str,
+        params: Query,
+        headers: Headers,
+    ) -> Result<Value> {
+        let rb = self.client.delete(self.url(path)).query(params);
         let rb = headers
             .iter()
             .fold(rb, |request, (name, value)| request.header(*name, *value));
@@ -273,6 +309,32 @@ impl HttpTransport {
         Ok(resp.0.bytes()?.to_vec())
     }
 
+    /// GET a binary response while preserving attachment response metadata.
+    pub fn get_binary(&self, path: &str, accept: &str, params: Query) -> Result<BinaryResponse> {
+        let rb = self
+            .client
+            .get(self.url(path))
+            .header(reqwest::header::ACCEPT, accept)
+            .query(params);
+        let resp = raise_for_status(self.send(rb, &self.url(path))?)?.0;
+        let filename = resp
+            .headers()
+            .get(reqwest::header::CONTENT_DISPOSITION)
+            .and_then(|value| value.to_str().ok())
+            .and_then(parse_content_disposition_filename);
+        let content_type = resp
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string);
+        let bytes = resp.bytes()?.to_vec();
+        Ok(BinaryResponse {
+            bytes,
+            filename,
+            content_type,
+        })
+    }
+
     /// Apply the shared cookie jar (request `Cookie` header in, `Set-Cookie`
     /// out), then execute. Mirrors `HttpTransport._send`.
     fn send(&self, rb: RequestBuilder, url: &str) -> Result<RawResponse> {
@@ -300,6 +362,42 @@ impl HttpTransport {
             Some(t) => rb.timeout(Duration::from_secs_f64(t)),
             None => rb,
         }
+    }
+}
+
+fn parse_content_disposition_filename(value: &str) -> Option<String> {
+    for part in value.split(';').map(str::trim) {
+        if let Some(encoded) = part.strip_prefix("filename*=UTF-8''") {
+            return percent_decode(encoded);
+        }
+        if let Some(filename) = part.strip_prefix("filename=") {
+            return Some(filename.trim_matches('"').to_string());
+        }
+    }
+    None
+}
+
+fn percent_decode(value: &str) -> Option<String> {
+    let mut bytes = Vec::with_capacity(value.len());
+    let mut input = value.as_bytes().iter().copied();
+    while let Some(byte) = input.next() {
+        if byte == b'%' {
+            let high = input.next()?;
+            let low = input.next()?;
+            bytes.push((hex_value(high)? << 4) | hex_value(low)?);
+        } else {
+            bytes.push(byte);
+        }
+    }
+    String::from_utf8(bytes).ok()
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -529,10 +627,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
         }
     }
 
-    let detail = match raw_detail {
-        Value::String(s) => ApiErrorDetail::Message(s),
-        other => ApiErrorDetail::Structured(other),
-    };
+    let detail = crate::error::api_error_detail_with_retry(raw_detail, retry_after_header);
     Err(InkboxError::Api {
         status_code: status,
         detail,

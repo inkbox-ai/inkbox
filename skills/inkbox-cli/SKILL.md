@@ -29,6 +29,8 @@ Global options:
 If `INKBOX_API_KEY` is missing and `--api-key` is not passed, the CLI exits with an error.
 
 Prefer `--json` when the result will be parsed or fed into another tool. Use the default table/record output when the user wants a quick human-readable summary.
+With `--json`, success stays on stdout and API failures write one structured error
+object to stderr, retaining `error.detail` and `error.retryAfterSeconds`.
 
 ## Install & Local Repo Usage
 
@@ -66,11 +68,13 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 - `signup create`
 - `a2a invites create`, `a2a invites revoke`, and `a2a invites accept`
 - `email send`
+- `email drafts send`
 - `text send`
 - `phone call`
 - `identity delete`
 - `email delete`
 - `email delete-thread`
+- `email drafts delete`
 - `vault delete`
 - `identity update --mail-filter-mode ... / --phone-filter-mode ...` (admin-only; flips allow/block semantics for that identity's channel)
 - `mailbox update --filter-mode ...` (DEPRECATED channel path; admin-only)
@@ -215,6 +219,42 @@ inkbox email unstar <message-id> -i <handle>
 inkbox email thread <thread-id> -i <handle>
 ```
 (`--inline-image` is send/reply-all only — forwards reject inline images.)
+
+### Drafts
+
+```bash
+inkbox email drafts create -i <handle> --subject "Work in progress" \
+  --idempotency-key draft-create-2026-08-19-1
+inkbox email drafts list -i <handle>
+inkbox email drafts get <draft-id> -i <handle>
+inkbox email drafts update <draft-id> -i <handle> --generation <n> \
+  --to user@example.com --clear-subject
+inkbox email drafts duplicate <draft-id> -i <handle> --generation <n>
+inkbox email drafts delete <draft-id> -i <handle> --generation <n>
+inkbox email drafts send <draft-id> -i <handle> --generation <n>
+
+inkbox email drafts attachment add <draft-id> -i <handle> \
+  --generation <n> --attach ./notes.txt
+inkbox email drafts attachment remove <draft-id> <part-index> -i <handle> \
+  --generation <n>
+inkbox email drafts attachment download <draft-id> <part-index> -i <handle> \
+  --generation <n> --output ./notes.txt
+```
+
+Create accepts incomplete content. Update supports explicit-null `--clear-*`
+flags; omission leaves a field unchanged. Use the generation printed by the
+latest read or mutation for every following mutation. Attachment part indexes
+belong to that generation, so run `get` again after an edit. Drafts share the
+mailbox's standard Drafts folder with connected mail clients.
+Reuse one `--idempotency-key` and the exact same arguments when retrying a
+logical create after an ambiguous result. Use a new key after the original draft
+is sent or deleted. Forward-only flags require `--forward-message-id`.
+
+Successful send prints the sent message and removes the draft; an
+exact-generation retry may return the same sent message. On HTTP 409, refresh
+for `draft_generation_conflict` and retry the same ID and generation for
+`draft_send_in_progress`. Never resend `draft_delivery_uncertain`; after checking
+sent mail, duplicate or delete it instead.
 
 Use `email search` only when the identity already has a mailbox assigned.
 

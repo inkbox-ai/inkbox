@@ -2,6 +2,7 @@
 
 pub mod contact_rules;
 pub mod domains;
+pub mod drafts;
 pub mod identity_contact_rules;
 pub mod imports;
 pub mod mailboxes;
@@ -10,6 +11,7 @@ pub mod threads;
 
 pub use contact_rules::MailContactRulesResource;
 pub use domains::DomainsResource;
+pub use drafts::{CreateDraftOptions, DraftsResource, UpdateDraftOptions};
 pub use identity_contact_rules::MailIdentityContactRulesResource;
 pub use imports::MailboxImportsResource;
 pub use mailboxes::MailboxesResource;

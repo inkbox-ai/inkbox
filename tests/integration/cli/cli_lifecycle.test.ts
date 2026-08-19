@@ -124,6 +124,54 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     expect(alphaGet.description).toBe("alpha cli-integration");
     expect(alphaGet.tunnel.publicHost).toBe(alphaCreate.tunnel.publicHost);
 
+    // ── email draft lifecycle ──────────────────────────────────
+    logStep(config, "create, list, get, update, and delete an email draft");
+    const draft = inkboxJson<{ id: string; generation: number }>(
+      `email drafts create -i ${alphaHandle} --subject "draft-${runSuffix}"`,
+      cliOpts,
+    );
+    const drafts = inkboxJson<Array<{ id: string }>>(
+      `email drafts list -i ${alphaHandle}`,
+      cliOpts,
+    );
+    expect(drafts.some((item) => item.id === draft.id)).toBe(true);
+    expect(inkboxJson<{ id: string }>(
+      `email drafts get ${draft.id} -i ${alphaHandle}`,
+      cliOpts,
+    ).id).toBe(draft.id);
+    const updatedDraft = inkboxJson<{ id: string; generation: number; bodyText: string }>(
+      `email drafts update ${draft.id} -i ${alphaHandle} `
+        + `--generation ${draft.generation} --to "${bravoMb.emailAddress}" `
+        + `--body-text "Updated draft body"`,
+      cliOpts,
+    );
+    expect(updatedDraft.generation).toBeGreaterThan(draft.generation);
+    expect(updatedDraft.bodyText).toBe("Updated draft body");
+    const deletedDraft = inkboxJson<{ deleted: boolean }>(
+      `email drafts delete ${draft.id} -i ${alphaHandle} `
+        + `--generation ${updatedDraft.generation}`,
+      cliOpts,
+    );
+    expect(deletedDraft.deleted).toBe(true);
+
+    logStep(config, "create and send a draft with an attachment");
+    const draftDir = mkdtempSync(join(tmpdir(), "inkbox-cli-draft-"));
+    const draftAttachment = join(draftDir, "hello.txt");
+    writeFileSync(draftAttachment, "hello");
+    const sendDraft = inkboxJson<{ id: string; generation: number; attachmentCount: number }>(
+      `email drafts create -i ${alphaHandle} --to "${bravoMb.emailAddress}" `
+        + `--subject "draft-send-${runSuffix}" --body-text "Sent from a draft." `
+        + `--attach "${draftAttachment}"`,
+      cliOpts,
+    );
+    expect(sendDraft.attachmentCount).toBe(1);
+    const sentDraftMessage = inkboxJson<{ subject: string }>(
+      `email drafts send ${sendDraft.id} -i ${alphaHandle} `
+        + `--generation ${sendDraft.generation}`,
+      cliOpts,
+    );
+    expect(sentDraftMessage.subject).toBe(`draft-send-${runSuffix}`);
+
     // ── send email alpha → bravo ──────────────────────────────
     const subject = `cli-integration-${config.environment}`;
     logStep(config, `send email from ${alphaHandle} to ${bravoHandle}: ${subject}`);

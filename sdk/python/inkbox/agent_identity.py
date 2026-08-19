@@ -58,6 +58,8 @@ from inkbox.imessage.types import (
     IMessageNumberType,
 )
 from inkbox.mail.types import (
+    DraftDetail,
+    DraftSummary,
     FilterMode,
     ForwardMode,
     MailIdentityContactRule,
@@ -383,6 +385,136 @@ class AgentIdentity:
         self._phone_number = None
 
     ## Mail helpers
+
+    def iter_email_drafts(self, *, page_size: int = 50) -> Iterator[DraftSummary]:
+        """Iterate over this identity's email drafts, newest first."""
+        self._require_mailbox()
+        return self._inkbox._drafts.list(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            page_size=page_size,
+        )
+
+    def create_email_draft(
+        self,
+        *,
+        to: list[str] | None = None,
+        cc: list[str] | None = None,
+        bcc: list[str] | None = None,
+        subject: str | None = None,
+        body_text: str | None = None,
+        body_html: str | None = None,
+        reply_to: str | None = None,
+        thread_id: UUID | str | None = None,
+        in_reply_to_message_id: str | None = None,
+        references: list[str] | None = None,
+        forward_message_id: UUID | str | None = None,
+        forward_mode: Any = _UNSET,
+        forward_note_text: Any = _UNSET,
+        forward_note_html: Any = _UNSET,
+        include_original_attachments: Any = _UNSET,
+        attachments: list[dict[str, str]] | None = None,
+        track_opens: bool = False,
+        idempotency_key: str | None = None,
+    ) -> DraftDetail:
+        """Create an email draft in this identity's mailbox."""
+        self._require_mailbox()
+        return self._inkbox._drafts.create(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            to=to,
+            cc=cc,
+            bcc=bcc,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            reply_to=reply_to,
+            thread_id=thread_id,
+            in_reply_to_message_id=in_reply_to_message_id,
+            references=references,
+            forward_message_id=forward_message_id,
+            forward_mode=forward_mode,
+            forward_note_text=forward_note_text,
+            forward_note_html=forward_note_html,
+            include_original_attachments=include_original_attachments,
+            attachments=attachments,
+            track_opens=track_opens,
+            idempotency_key=idempotency_key,
+        )
+
+    def get_email_draft(self, draft_id: UUID | str) -> DraftDetail:
+        """Get one email draft from this identity's mailbox."""
+        self._require_mailbox()
+        return self._inkbox._drafts.get(
+            self._mailbox.email_address, draft_id  # type: ignore[union-attr]
+        )
+
+    def update_email_draft(
+        self,
+        draft_id: UUID | str,
+        *,
+        generation: int,
+        recipients: Any = _UNSET,
+        subject: Any = _UNSET,
+        body_text: Any = _UNSET,
+        body_html: Any = _UNSET,
+        reply_to: Any = _UNSET,
+        thread_id: Any = _UNSET,
+        in_reply_to_message_id: Any = _UNSET,
+        references: Any = _UNSET,
+        track_opens: Any = _UNSET,
+        forward_note_text: Any = _UNSET,
+        forward_note_html: Any = _UNSET,
+    ) -> DraftDetail:
+        """Update supplied fields on an email draft."""
+        self._require_mailbox()
+        return self._inkbox._drafts.update(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            draft_id,
+            generation=generation,
+            recipients=recipients,
+            subject=subject,
+            body_text=body_text,
+            body_html=body_html,
+            reply_to=reply_to,
+            thread_id=thread_id,
+            in_reply_to_message_id=in_reply_to_message_id,
+            references=references,
+            track_opens=track_opens,
+            forward_note_text=forward_note_text,
+            forward_note_html=forward_note_html,
+        )
+
+    def duplicate_email_draft(
+        self, draft_id: UUID | str, *, generation: int
+    ) -> DraftDetail:
+        """Create an independent copy of an email draft."""
+        self._require_mailbox()
+        return self._inkbox._drafts.duplicate(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            draft_id,
+            generation=generation,
+        )
+
+    def delete_email_draft(
+        self, draft_id: UUID | str, *, generation: int
+    ) -> None:
+        """Delete an email draft."""
+        self._require_mailbox()
+        self._inkbox._drafts.delete(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            draft_id,
+            generation=generation,
+        )
+
+    def send_email_draft(
+        self, draft_id: UUID | str, *, generation: int
+    ) -> Message:
+        """Send an email draft."""
+        self._require_mailbox()
+        return self._inkbox._drafts.send(
+            self._mailbox.email_address,  # type: ignore[union-attr]
+            draft_id,
+            generation=generation,
+        )
 
     def send_email(
         self,

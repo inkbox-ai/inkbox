@@ -4,6 +4,42 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.5.18 — Email drafts
+
+### Added
+
+- Python, TypeScript, and Rust expose a first-class drafts resource for creating,
+  listing, reading, updating, duplicating, deleting, and sending email drafts.
+  Draft attachment operations support generation-checked add, remove, and binary
+  download with filename and content-type metadata.
+- Identity helpers provide mailbox-scoped draft lifecycle methods. Successful
+  sends return the existing message type, and exact send retries can return the
+  same sent message without sending it again.
+- `inkbox email drafts` adds the complete draft lifecycle plus file attachment
+  add, remove, and download commands.
+- Draft creation accepts an optional idempotency key in every SDK and the CLI.
+  Reuse the same key and request when retrying one logical create after an
+  ambiguous result; use a new key after the original draft is sent or deleted.
+
+### Changed
+
+- Draft mutations require the latest returned generation. Update methods preserve
+  omitted fields and send explicit null values when callers clear nullable fields.
+- Draft conflict details remain available through each SDK's existing API error
+  type, including generation conflicts, sends in progress, and delivery states
+  that require duplicating or deleting the draft instead of resending it.
+- Explicit forward-only create options now require a forward source instead of
+  being ignored. Omitted forward defaults remain omitted for compatibility.
+- CLI API errors retain structured detail and generic retry timing. With
+  `--json`, one stable error object is written to stderr while stdout stays empty.
+- Rust generic API errors expose structured retry timing through
+  `InkboxError::retry_after_seconds()` without changing the existing `Api`
+  variant shape. Rust `CreateDraftOptions` changes `forward_mode` and
+  `include_original_attachments` to `Option` and adds `idempotency_key`; struct
+  literals must use the optional forms or `..Default::default()`.
+- Package and plugin versions moved in lockstep to 0.5.18; the CLI now depends
+  on `@inkbox/sdk` `^0.5.18`.
+
 ## 0.5.17 — Typed contact memory and hand-written facts
 
 ### Added

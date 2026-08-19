@@ -183,6 +183,7 @@ export type {
 export {
   ContactRuleStatus,
   FilterMode,
+  DraftSendState,
   ForwardMode,
   MailRuleAction,
   MailRuleMatchType,
@@ -194,8 +195,14 @@ export {
 } from "./mail/types.js";
 export type {
   Domain,
+  DraftAttachment,
+  DraftAttachmentContent,
+  DraftDetail,
+  DraftRecipients,
+  DraftSummary,
   FilterModeChangeNotice,
   Mailbox,
+  MailAttachmentInput,
   MailImportCreateResult,
   MailImportJob,
   MailImportJobPage,
@@ -208,6 +215,11 @@ export type {
   Thread,
   ThreadDetail,
 } from "./mail/types.js";
+export type {
+  CreateDraftOptions,
+  UpdateDraftOptions,
+} from "./mail/resources/drafts.js";
+export { DraftsResource } from "./mail/resources/drafts.js";
 export type {
   MailboxImportsResource,
   CreateMailImportOptions,

@@ -270,6 +270,46 @@ print(tracked.first_opened_at, tracked.open_count)
 # debounce collapses repeats — so it can read above or below the true
 # count); prefer first_opened_at. Pixels can also raise spam scores.
 
+# Drafts may be incomplete. Every draft response includes its current generation.
+from inkbox import DraftRecipients
+
+draft = identity.create_email_draft(
+    subject="Review requested",
+    idempotency_key="draft-create-2026-08-19-1",
+)
+for saved in identity.iter_email_drafts():
+    print(saved.id, saved.generation)
+current = identity.get_email_draft(draft.id)
+current = identity.update_email_draft(
+    current.id,
+    generation=current.generation,
+    recipients=DraftRecipients(to=["reviewer@example.com"]),
+    subject=None,  # explicit null clears; omitting subject leaves it unchanged
+)
+
+# Attachment part_index values are valid only for the generation that returned them.
+current = inkbox.drafts.add_attachments(
+    identity.email_address,
+    current.id,
+    generation=current.generation,
+    attachments=[{
+        "filename": "report.txt",
+        "content_type": "text/plain",
+        "content_base64": "cmVwb3J0",
+    }],
+)
+part = current.attachment_metadata[0]
+downloaded = inkbox.drafts.download_attachment(
+    identity.email_address, current.id, part.part_index, generation=current.generation
+)
+current = inkbox.drafts.remove_attachment(
+    identity.email_address, current.id, part.part_index, generation=current.generation
+)
+
+copy = identity.duplicate_email_draft(current.id, generation=current.generation)
+identity.delete_email_draft(copy.id, generation=copy.generation)
+sent_draft = identity.send_email_draft(current.id, generation=current.generation)
+
 # Iterate inbox (paginated automatically)
 for msg in identity.iter_emails():
     print(msg.subject, msg.from_address, msg.is_read)
@@ -291,6 +331,17 @@ thread = identity.get_thread(msg.thread_id)
 for m in thread.messages:
     print(m.subject, m.from_address)
 ```
+
+Drafts use the same Drafts folder as a connected mail client, so edits are
+visible in both directions. Always use the latest returned `generation`; after
+any edit, refresh attachment metadata before reusing a `part_index`.
+
+A successful send returns a `Message` and removes the draft. An exact-generation
+retry may return the same sent message. Draft conflicts are structured
+`InkboxAPIError` responses with status `409`; inspect `error.detail["error"]`.
+Refresh on `draft_generation_conflict` and retry the same draft ID and generation
+on `draft_send_in_progress`. Do not resend `draft_delivery_uncertain`; after
+checking sent mail, duplicate or delete that draft instead.
 
 Fetching a single inbound message by id (`inkbox.messages.get`, below)
 with an API key marks it read server-side (`is_read` becomes `True`);

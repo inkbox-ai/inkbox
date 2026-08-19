@@ -164,21 +164,21 @@ pub fn map_sign_csr_error(err: InkboxError) -> InkboxError {
     };
 
     let text = detail_text(&detail).to_lowercase();
-    if text.contains("edge") || text.contains("tls_mode") || text.contains("passthrough") {
-        TunnelError::TLSModeMismatch {
-            status_code,
-            detail,
-        }
-        .into_inkbox()
-        .with_agent_support(agent_support)
-    } else {
-        TunnelError::CSRStateConflict {
-            status_code,
-            detail,
-        }
-        .into_inkbox()
-        .with_agent_support(agent_support)
-    }
+    let mapped =
+        if text.contains("edge") || text.contains("tls_mode") || text.contains("passthrough") {
+            TunnelError::TLSModeMismatch {
+                status_code,
+                detail,
+            }
+            .into_inkbox()
+        } else {
+            TunnelError::CSRStateConflict {
+                status_code,
+                detail,
+            }
+            .into_inkbox()
+        };
+    mapped.with_agent_support(agent_support)
 }
 
 #[cfg(test)]
@@ -189,13 +189,17 @@ mod tests {
     fn sign_csr_remapping_preserves_agent_support() {
         let error = InkboxError::Api {
             status_code: 409,
-            detail: ApiErrorDetail::Message("tls_mode must be passthrough".into()),
+            detail: ApiErrorDetail::Structured(serde_json::json!({
+                "detail": "tls_mode must be passthrough",
+                "retry_after_seconds": 12,
+            })),
             agent_support: Some("Contact the Support Agent.".into()),
         };
 
         let mapped = map_sign_csr_error(error);
 
         assert_eq!(mapped.agent_support(), Some("Contact the Support Agent."));
-        assert_eq!(mapped.to_string(), "HTTP 409: tls_mode must be passthrough");
+        assert!(mapped.to_string().contains("tls_mode must be passthrough"));
+        assert_eq!(mapped.retry_after_seconds(), Some(12));
     }
 }

@@ -49,6 +49,7 @@ from inkbox.mail.resources.identity_contact_rules import (
     MailIdentityContactRulesResource,
 )
 from inkbox.mail.resources.domains import DomainsResource
+from inkbox.mail.resources.drafts import DraftsResource
 from inkbox.mail.resources.mailboxes import MailboxesResource
 from inkbox.mail.resources.messages import MessagesResource
 from inkbox.mail.resources.threads import ThreadsResource
@@ -254,6 +255,7 @@ class Inkbox:
 
         self._mailboxes = MailboxesResource(self._mail_http)
         self._messages = MessagesResource(self._mail_http)
+        self._drafts = DraftsResource(self._mail_http)
         self._threads = ThreadsResource(self._mail_http)
         self._mail_contact_rules = MailContactRulesResource(self._mail_http)
         self._domains = DomainsResource(self._domains_http)
@@ -335,6 +337,11 @@ class Inkbox:
     def messages(self) -> MessagesResource:
         """Access org-level message operations (list, get, send, delete, flags)."""
         return self._messages
+
+    @property
+    def drafts(self) -> DraftsResource:
+        """Access email draft lifecycle and attachment operations."""
+        return self._drafts
 
     @property
     def threads(self) -> ThreadsResource:

@@ -21,7 +21,7 @@ use crate::agent_signup::types::{
 use crate::api_keys::resources::api_keys::ApiKeysResource;
 use crate::contacts::resources::contacts::ContactsResource;
 use crate::cookies::CookieJar;
-use crate::error::{parse_agent_support, ApiErrorDetail, InkboxError, Result};
+use crate::error::{parse_agent_support, InkboxError, Result};
 use crate::http::{default_timeout, HttpTransport, NO_QUERY};
 use crate::identities::resources::identities::IdentitiesResource;
 use crate::identities::types::{
@@ -33,6 +33,7 @@ use crate::imessage::resources::imessages::IMessagesResource;
 use crate::imessage::types::IMessageNumberType;
 use crate::mail::resources::contact_rules::MailContactRulesResource;
 use crate::mail::resources::domains::DomainsResource;
+use crate::mail::resources::drafts::DraftsResource;
 use crate::mail::resources::identity_contact_rules::MailIdentityContactRulesResource;
 use crate::mail::resources::mailboxes::MailboxesResource;
 use crate::mail::resources::messages::MessagesResource;
@@ -135,6 +136,7 @@ pub struct Inkbox {
     // Mail
     mailboxes: MailboxesResource,
     messages: MessagesResource,
+    drafts: DraftsResource,
     threads: ThreadsResource,
     mail_contact_rules: MailContactRulesResource,
     domains: DomainsResource,
@@ -264,6 +266,7 @@ impl Inkbox {
         let inkbox = Arc::new_cyclic(|weak: &Weak<Inkbox>| Inkbox {
             mailboxes: MailboxesResource::new(mail_http.clone()),
             messages: MessagesResource::new(mail_http.clone()),
+            drafts: DraftsResource::new(mail_http.clone()),
             threads: ThreadsResource::new(mail_http.clone()),
             mail_contact_rules: MailContactRulesResource::new(mail_http.clone()),
             domains: DomainsResource::new(domains_http.clone()),
@@ -322,6 +325,9 @@ impl Inkbox {
     }
     pub fn messages(&self) -> &MessagesResource {
         &self.messages
+    }
+    pub fn drafts(&self) -> &DraftsResource {
+        &self.drafts
     }
     pub fn threads(&self) -> &ThreadsResource {
         &self.threads
@@ -766,6 +772,11 @@ fn one_shot_request(
     }
     let resp = rb.send()?;
     let status = resp.status().as_u16();
+    let retry_after_header = resp
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
     let text = resp.text().unwrap_or_default();
     if status >= 400 {
         let parsed = serde_json::from_str::<Value>(&text).ok();
@@ -778,10 +789,7 @@ fn one_shot_request(
             Some(other) => other,
             None => Value::String(text.clone()),
         };
-        let detail = match raw_detail {
-            Value::String(message) => ApiErrorDetail::Message(message),
-            structured => ApiErrorDetail::Structured(structured),
-        };
+        let detail = crate::error::api_error_detail_with_retry(raw_detail, retry_after_header);
         return Err(InkboxError::Api {
             status_code: status,
             detail,
@@ -963,8 +971,9 @@ mod agent_signup_invitation_tests {
         match error {
             InkboxError::Api {
                 status_code,
-                detail: ApiErrorDetail::Structured(detail),
+                detail: crate::error::ApiErrorDetail::Structured(detail),
                 agent_support,
+                ..
             } => {
                 assert_eq!(status_code, 429);
                 assert_eq!(

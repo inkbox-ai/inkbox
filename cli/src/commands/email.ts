@@ -1,105 +1,25 @@
-import { readFileSync } from "node:fs";
-import { basename, extname } from "node:path";
 import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import type { Message, MessageDirection, ThreadDetail } from "@inkbox/sdk";
 import { ForwardMode } from "@inkbox/sdk";
+import {
+  buildAttachments,
+  collect,
+  contentTypeForPath,
+  parseInlineImageSpec,
+} from "./email-attachments.js";
+import { registerDraftCommands } from "./drafts.js";
 
-type AttachmentInput = {
-  filename: string;
-  contentType: string;
-  contentBase64: string;
-  contentId?: string;
-};
-
-const MIME_BY_EXT: Record<string, string> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".svg": "image/svg+xml",
-  ".bmp": "image/bmp",
-  ".tif": "image/tiff",
-  ".tiff": "image/tiff",
-  ".ico": "image/x-icon",
-  ".avif": "image/avif",
-  ".heic": "image/heic",
-  ".heif": "image/heif",
-  ".pdf": "application/pdf",
-  ".txt": "text/plain",
-  ".csv": "text/csv",
-  ".html": "text/html",
-  ".json": "application/json",
-  ".zip": "application/zip",
-};
-
-/** Accumulate a repeatable Commander option into an array. */
-function collect(value: string, previous: string[]): string[] {
-  return previous.concat([value]);
-}
-
-/** MIME type inferred from a file extension, defaulting to octet-stream. */
-export function contentTypeForPath(path: string): string {
-  return MIME_BY_EXT[extname(path).toLowerCase()] ?? "application/octet-stream";
-}
-
-/** Split a "<cid>=<path>" inline-image spec. Throws on malformed input. */
-export function parseInlineImageSpec(spec: string): { cid: string; path: string } {
-  const eq = spec.indexOf("=");
-  if (eq <= 0 || eq === spec.length - 1) {
-    throw new Error(`--inline-image must be <cid>=<path>, got: ${spec}`);
-  }
-  return { cid: spec.slice(0, eq).trim(), path: spec.slice(eq + 1).trim() };
-}
-
-/** Read a file into an SDK attachment; set contentId to embed it inline (cid:). */
-function fileToAttachment(path: string, contentId?: string): AttachmentInput {
-  let buf: Buffer;
-  try {
-    buf = readFileSync(path);
-  } catch {
-    console.error(`Cannot read attachment file: ${path}`);
-    process.exit(1);
-  }
-  const att: AttachmentInput = {
-    filename: basename(path),
-    contentType: contentTypeForPath(path),
-    contentBase64: buf.toString("base64"),
-  };
-  if (contentId !== undefined) att.contentId = contentId;
-  return att;
-}
-
-/** Build the attachments array from --attach paths and --inline-image cid=path specs. */
-function buildAttachments(attach: string[], inlineImage: string[]): AttachmentInput[] | undefined {
-  const attachments = attach.map((p) => fileToAttachment(p));
-  for (const spec of inlineImage) {
-    let parsed: { cid: string; path: string };
-    try {
-      parsed = parseInlineImageSpec(spec);
-    } catch (e) {
-      console.error((e as Error).message);
-      process.exit(1);
-    }
-    const att = fileToAttachment(parsed.path, parsed.cid);
-    if (!att.contentType.startsWith("image/")) {
-      console.error(
-        `--inline-image ${parsed.cid} must be an image; got ${att.contentType} for ${parsed.path}.`,
-      );
-      process.exit(1);
-    }
-    attachments.push(att);
-  }
-  return attachments.length > 0 ? attachments : undefined;
-}
+export { contentTypeForPath, parseInlineImageSpec } from "./email-attachments.js";
 
 export function registerEmailCommands(program: Command): void {
   const email = program
     .command("email")
     .description("Email operations (identity-scoped)");
+
+  registerDraftCommands(email);
 
   email
     .command("send")

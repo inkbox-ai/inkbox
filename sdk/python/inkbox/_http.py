@@ -126,16 +126,22 @@ class HttpTransport:
         self,
         path: str,
         *,
+        params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> None:
-        resp = self._send("DELETE", path, headers=headers, timeout=timeout)
+        cleaned = {k: v for k, v in (params or {}).items() if v is not None}
+        kwargs: dict[str, Any] = {"headers": headers, "timeout": timeout}
+        if cleaned:
+            kwargs["params"] = cleaned
+        resp = self._send("DELETE", path, **kwargs)
         _raise_for_status(resp)
 
     def delete_with_response(
         self,
         path: str,
         *,
+        params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> Any:
@@ -144,7 +150,11 @@ class HttpTransport:
         Used by endpoints (e.g. tunnels) that respond with a representation
         of the deleted resource rather than 204 No Content.
         """
-        resp = self._send("DELETE", path, headers=headers, timeout=timeout)
+        cleaned = {k: v for k, v in (params or {}).items() if v is not None}
+        kwargs: dict[str, Any] = {"headers": headers, "timeout": timeout}
+        if cleaned:
+            kwargs["params"] = cleaned
+        resp = self._send("DELETE", path, **kwargs)
         _raise_for_status(resp)
         if resp.status_code == 204 or not resp.content:
             return None
@@ -203,11 +213,22 @@ class HttpTransport:
 
         Used for vCard export and any other binary/text endpoints.
         """
+        return self.get_raw(path, accept=accept, params=params).content
+
+    def get_raw(
+        self,
+        path: str,
+        *,
+        accept: str,
+        params: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        """GET a non-JSON response while preserving its headers."""
         cleaned = {k: v for k, v in (params or {}).items() if v is not None}
-        headers = {"Accept": accept}
-        resp = self._send("GET", path, params=cleaned, headers=headers)
+        resp = self._send(
+            "GET", path, params=cleaned, headers={"Accept": accept}
+        )
         _raise_for_status(resp)
-        return resp.content
+        return resp
 
     def _send(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         # Drop a None timeout so httpx falls back to the client-level default

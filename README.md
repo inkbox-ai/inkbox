@@ -111,6 +111,11 @@ inkbox email send -i my-agent \
 # List recent emails
 inkbox email list -i my-agent --limit 10
 
+# Save an incomplete draft, then list it with its current generation
+inkbox email drafts create -i my-agent --subject "Work in progress" \
+  --idempotency-key draft-create-2026-08-19-1
+inkbox email drafts list -i my-agent
+
 # Place a phone call
 inkbox phone call -i my-agent --to +15551234567
 
@@ -246,6 +251,25 @@ Limits: 1 GiB per upload, 50 MiB per message, 100,000 messages and 20
 `original_addresses` per job, 65,000 entries per ZIP, and 20 import jobs per
 organization per 24 hours. Upload targets expire after 5 minutes and can be
 re-issued; a job whose upload never arrives is cancelled after 24 hours.
+
+### Email Drafts
+
+Python, TypeScript, Rust, and the CLI support creating, listing, reading,
+updating, duplicating, deleting, and sending saved drafts. Drafts may be
+incomplete. Each draft response includes a `generation`; pass that exact value
+to the next mutation so edits from another client are not overwritten.
+
+Drafts share the mailbox's standard Drafts folder, so changes made through the
+SDK or CLI are visible in connected mail clients and vice versa. Attachment
+`part_index` / `partIndex` values belong to the generation that returned them;
+refresh the draft before using an index after any edit.
+
+A successful send returns the sent message and removes the draft. Retrying send
+with the same draft ID and exact generation may return that same sent message.
+HTTP 409 responses carry a structured `error`: refresh before retrying
+`draft_generation_conflict`, retry the same generation for
+`draft_send_in_progress`. Do not resend `draft_delivery_uncertain`; after
+checking sent mail, duplicate or delete that draft instead.
 
 ### Tunnels (TypeScript)
 
