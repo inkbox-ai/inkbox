@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use crate::error::Result;
-use crate::http::{HttpTransport, NO_QUERY};
+use crate::http::{validate_idempotency_key, HttpTransport, NO_QUERY};
 use crate::mail::resources::Attachment;
 use crate::mail::types::{
     DraftAttachmentContent, DraftDetail, DraftRecipients, DraftSummary, ForwardMode, Message,
@@ -15,7 +15,7 @@ use crate::mail::types::{
 const DEFAULT_PAGE_SIZE: u32 = 50;
 
 /// Fields accepted when creating a draft.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct CreateDraftOptions {
     pub recipients: DraftRecipients,
     pub subject: Option<String>,
@@ -28,36 +28,25 @@ pub struct CreateDraftOptions {
     pub attachments: Option<Vec<Attachment>>,
     pub track_opens: bool,
     pub forward_message_id: Option<Uuid>,
-    pub forward_mode: ForwardMode,
-    pub include_original_attachments: bool,
+    pub forward_mode: Option<ForwardMode>,
+    pub include_original_attachments: Option<bool>,
     pub forward_note_text: Option<String>,
     pub forward_note_html: Option<String>,
-}
-
-impl Default for CreateDraftOptions {
-    fn default() -> Self {
-        Self {
-            recipients: DraftRecipients::default(),
-            subject: None,
-            body_text: None,
-            body_html: None,
-            reply_to: None,
-            thread_id: None,
-            in_reply_to_message_id: None,
-            references: None,
-            attachments: None,
-            track_opens: false,
-            forward_message_id: None,
-            forward_mode: ForwardMode::Inline,
-            include_original_attachments: true,
-            forward_note_text: None,
-            forward_note_html: None,
-        }
-    }
+    pub idempotency_key: Option<String>,
 }
 
 impl CreateDraftOptions {
-    fn to_wire(&self) -> Value {
+    fn to_wire(&self) -> Result<Value> {
+        if self.forward_message_id.is_none()
+            && (self.forward_mode.is_some()
+                || self.include_original_attachments.is_some()
+                || self.forward_note_text.is_some()
+                || self.forward_note_html.is_some())
+        {
+            return Err(crate::error::InkboxError::InvalidArgument(
+                "forward options require forward_message_id".into(),
+            ));
+        }
         let mut body = Map::new();
         body.insert(
             "recipients".into(),
@@ -83,18 +72,19 @@ impl CreateDraftOptions {
                 "forward_message_id".into(),
                 Value::String(message_id.to_string()),
             );
-            body.insert(
-                "forward_mode".into(),
-                Value::String(self.forward_mode.as_str().to_string()),
-            );
-            body.insert(
-                "include_original_attachments".into(),
-                Value::Bool(self.include_original_attachments),
-            );
+            if let Some(mode) = self.forward_mode {
+                body.insert(
+                    "forward_mode".into(),
+                    Value::String(mode.as_str().to_string()),
+                );
+            }
+            if let Some(include) = self.include_original_attachments {
+                body.insert("include_original_attachments".into(), Value::Bool(include));
+            }
         }
         insert_optional(&mut body, "forward_note_text", &self.forward_note_text);
         insert_optional(&mut body, "forward_note_html", &self.forward_note_html);
-        Value::Object(body)
+        Ok(Value::Object(body))
     }
 }
 
@@ -183,11 +173,21 @@ impl DraftsResource {
     }
 
     pub fn create(&self, email_address: &str, options: &CreateDraftOptions) -> Result<DraftDetail> {
-        let value = self.http.post(
-            &Self::base(email_address),
-            Some(&options.to_wire()),
-            NO_QUERY,
-        )?;
+        let body = options.to_wire()?;
+        let value = match options.idempotency_key.as_deref() {
+            Some(key) => {
+                validate_idempotency_key(key)?;
+                self.http.post_with_headers(
+                    &Self::base(email_address),
+                    Some(&body),
+                    NO_QUERY,
+                    &[("Idempotency-Key", key)],
+                )
+            }
+            None => self
+                .http
+                .post(&Self::base(email_address), Some(&body), NO_QUERY),
+        }?;
         Ok(serde_json::from_value(value)?)
     }
 
@@ -526,6 +526,8 @@ mod tests {
         });
         let options = CreateDraftOptions {
             forward_message_id: Some(source_id),
+            forward_mode: Some(ForwardMode::Inline),
+            include_original_attachments: Some(true),
             forward_note_text: Some("For reference".into()),
             attachments: Some(vec![Attachment {
                 filename: "note.txt".into(),
@@ -538,6 +540,52 @@ mod tests {
 
         client(&server).drafts().create(MAILBOX, &options).unwrap();
         request.assert();
+    }
+
+    #[test]
+    fn create_rejects_forward_options_without_source() {
+        let server = MockServer::start();
+        let options = CreateDraftOptions {
+            forward_mode: Some(ForwardMode::Inline),
+            ..Default::default()
+        };
+
+        let error = client(&server)
+            .drafts()
+            .create(MAILBOX, &options)
+            .unwrap_err();
+
+        assert!(
+            matches!(error, InkboxError::InvalidArgument(message) if message.contains("forward_message_id"))
+        );
+    }
+
+    #[test]
+    fn create_sends_validated_idempotency_key_as_header() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/drafts"))
+                .header("Idempotency-Key", "draft-create-1")
+                .json_body(json!({"recipients": {}}));
+            then.status(201).json_body(draft(DRAFT_ID, 1));
+        });
+        let options = CreateDraftOptions {
+            idempotency_key: Some("draft-create-1".into()),
+            ..Default::default()
+        };
+
+        client(&server).drafts().create(MAILBOX, &options).unwrap();
+
+        request.assert();
+        let invalid = CreateDraftOptions {
+            idempotency_key: Some(String::new()),
+            ..Default::default()
+        };
+        assert!(matches!(
+            client(&server).drafts().create(MAILBOX, &invalid),
+            Err(InkboxError::InvalidArgument(_))
+        ));
     }
 
     #[test]
@@ -699,10 +747,12 @@ mod tests {
                 when.method(POST).path(format!(
                     "/api/v1/mail/mailboxes/{MAILBOX}/drafts/{DRAFT_ID}/send"
                 ));
-                then.status(409).json_body(json!({"detail": {
-                    "error": code,
-                    "message": "Draft conflict"
-                }}));
+                then.status(409)
+                    .header("Retry-After", "12")
+                    .json_body(json!({"detail": {
+                        "error": code,
+                        "message": "Draft conflict"
+                    }}));
             });
             let error = client(&conflict_server)
                 .drafts()
@@ -712,6 +762,7 @@ mod tests {
                 InkboxError::Api {
                     status_code: 409,
                     detail: ApiErrorDetail::Structured(detail),
+                    retry_after_header: Some(12),
                     ..
                 } => assert_eq!(detail["error"], code),
                 other => panic!("expected structured conflict, got {other:?}"),

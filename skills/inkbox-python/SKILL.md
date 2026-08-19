@@ -174,7 +174,10 @@ sent = identity.send_email(
 ```python
 from inkbox import DraftRecipients
 
-draft = identity.create_email_draft(subject="Work in progress")
+draft = identity.create_email_draft(
+    subject="Work in progress",
+    idempotency_key="draft-create-2026-08-19-1",
+)
 for saved in identity.iter_email_drafts():
     print(saved.id, saved.generation)
 current = identity.get_email_draft(draft.id)
@@ -209,6 +212,8 @@ sent = identity.send_email_draft(current.id, generation=current.generation)
 ```
 
 Drafts share the mailbox's standard Drafts folder with connected mail clients.
+Reuse one `idempotency_key` when retrying the same logical create after an
+ambiguous result. Forward-only options require `forward_message_id`.
 Use the latest returned `generation` for every mutation. A `part_index` belongs
 to the generation that returned it, so refresh attachment metadata after edits.
 

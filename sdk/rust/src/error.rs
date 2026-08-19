@@ -32,6 +32,8 @@ pub enum InkboxError {
         status_code: u16,
         /// Error detail from the response body.
         detail: ApiErrorDetail,
+        /// Parsed delta-seconds value from the HTTP `Retry-After` header.
+        retry_after_header: Option<u64>,
         /// Support Agent escalation instructions supplied by the API.
         agent_support: Option<Box<str>>,
     },

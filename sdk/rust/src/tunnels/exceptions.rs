@@ -109,6 +109,7 @@ impl TunnelError {
             } => InkboxError::Api {
                 status_code,
                 detail,
+                retry_after_header: None,
                 agent_support: None,
             },
         }
@@ -154,31 +155,44 @@ fn detail_text(detail: &ApiErrorDetail) -> String {
 pub fn map_sign_csr_error(err: InkboxError) -> InkboxError {
     // Only API 409s are reclassified; everything else (transport, decode,
     // other status codes) passes through verbatim.
-    let (status_code, detail, agent_support) = match &err {
+    let (status_code, detail, retry_after_header, agent_support) = match &err {
         InkboxError::Api {
             status_code,
             detail,
+            retry_after_header,
             agent_support,
-        } if *status_code == 409 => (*status_code, detail.clone(), agent_support.clone()),
+        } if *status_code == 409 => (
+            *status_code,
+            detail.clone(),
+            *retry_after_header,
+            agent_support.clone(),
+        ),
         _ => return err,
     };
 
     let text = detail_text(&detail).to_lowercase();
-    if text.contains("edge") || text.contains("tls_mode") || text.contains("passthrough") {
-        TunnelError::TLSModeMismatch {
-            status_code,
-            detail,
-        }
-        .into_inkbox()
-        .with_agent_support(agent_support)
-    } else {
-        TunnelError::CSRStateConflict {
-            status_code,
-            detail,
-        }
-        .into_inkbox()
-        .with_agent_support(agent_support)
+    let mut mapped =
+        if text.contains("edge") || text.contains("tls_mode") || text.contains("passthrough") {
+            TunnelError::TLSModeMismatch {
+                status_code,
+                detail,
+            }
+            .into_inkbox()
+        } else {
+            TunnelError::CSRStateConflict {
+                status_code,
+                detail,
+            }
+            .into_inkbox()
+        };
+    if let InkboxError::Api {
+        retry_after_header: mapped_retry,
+        ..
+    } = &mut mapped
+    {
+        *mapped_retry = retry_after_header;
     }
+    mapped.with_agent_support(agent_support)
 }
 
 #[cfg(test)]
@@ -190,6 +204,7 @@ mod tests {
         let error = InkboxError::Api {
             status_code: 409,
             detail: ApiErrorDetail::Message("tls_mode must be passthrough".into()),
+            retry_after_header: Some(12),
             agent_support: Some("Contact the Support Agent.".into()),
         };
 
@@ -197,5 +212,12 @@ mod tests {
 
         assert_eq!(mapped.agent_support(), Some("Contact the Support Agent."));
         assert_eq!(mapped.to_string(), "HTTP 409: tls_mode must be passthrough");
+        assert!(matches!(
+            mapped,
+            InkboxError::Api {
+                retry_after_header: Some(12),
+                ..
+            }
+        ));
     }
 }

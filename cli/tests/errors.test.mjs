@@ -6,7 +6,7 @@ import { withErrorHandler } from "../dist/errors.js";
 const BILLING_URL = "https://inkbox.ai/console/billing";
 
 // withErrorHandler writes to console.error and exits; capture both.
-async function runAndCapture(err) {
+async function runAndCapture(err, json = false) {
   const lines = [];
   const origError = console.error;
   const origExit = process.exit;
@@ -18,7 +18,7 @@ async function runAndCapture(err) {
   try {
     await withErrorHandler(async () => {
       throw err;
-    })();
+    }).call(json ? { opts: () => ({ json: true }), parent: null } : undefined);
   } finally {
     console.error = origError;
     process.exit = origExit;
@@ -71,7 +71,9 @@ test("withErrorHandler renders the message from structured API details", async (
   );
 
   assert.equal(exitCode, 1);
-  assert.deepEqual(lines, ["Error: HTTP 400: The import request is invalid."]);
+  assert.deepEqual(lines, [
+    "Error: HTTP 400: mail_import_invalid_request: The import request is invalid.",
+  ]);
 });
 
 test("withErrorHandler renders the Support Agent escalation and checks", async () => {
@@ -118,7 +120,46 @@ test("withErrorHandler explains how to release an in-flight mailbox import", asy
   );
 
   assert.equal(exitCode, 1);
-  assert.equal(lines[0], "Error: HTTP 409: An import is already in flight for this mailbox.");
+  assert.equal(
+    lines[0],
+    "Error: HTTP 409: mail_import_already_in_flight: An import is already in flight for this mailbox.",
+  );
   assert.match(lines[1], /inkbox mailbox imports list <email>/);
   assert.match(lines[1], /inkbox mailbox imports cancel <email> <job-id>/);
+});
+
+test("withErrorHandler renders Retry-After guidance for generic API errors", async () => {
+  const { lines } = await runAndCapture(
+    new InkboxAPIError(409, { error: "draft_busy", message: "Try later." }, 12),
+  );
+
+  assert.deepEqual(lines, [
+    "Error: HTTP 409: draft_busy: Try later.",
+    "Hint: Retry in 12 seconds.",
+  ]);
+});
+
+test("withErrorHandler emits one stable JSON error object to stderr", async () => {
+  const detail = {
+    error: "draft_generation_conflict",
+    message: "The draft changed.",
+    current_generation: 5,
+  };
+  const { lines, exitCode } = await runAndCapture(
+    new InkboxAPIError(409, detail, 12, "Contact support."),
+    true,
+  );
+
+  assert.equal(exitCode, 1);
+  assert.equal(lines.length, 1);
+  assert.deepEqual(JSON.parse(lines[0]), {
+    error: {
+      type: "InkboxAPIError",
+      message: "draft_generation_conflict: The draft changed.",
+      statusCode: 409,
+      detail,
+      retryAfterSeconds: 12,
+      agentSupport: "Contact support.",
+    },
+  });
 });

@@ -273,7 +273,10 @@ print(tracked.first_opened_at, tracked.open_count)
 # Drafts may be incomplete. Every draft response includes its current generation.
 from inkbox import DraftRecipients
 
-draft = identity.create_email_draft(subject="Review requested")
+draft = identity.create_email_draft(
+    subject="Review requested",
+    idempotency_key="draft-create-2026-08-19-1",
+)
 for saved in identity.iter_email_drafts():
     print(saved.id, saved.generation)
 current = identity.get_email_draft(draft.id)

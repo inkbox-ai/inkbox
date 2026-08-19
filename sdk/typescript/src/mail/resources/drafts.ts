@@ -1,4 +1,4 @@
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
 import {
   DraftAttachmentContent,
   DraftDetail,
@@ -33,6 +33,7 @@ export interface CreateDraftOptions extends DraftRecipients {
   includeOriginalAttachments?: boolean;
   forwardNoteText?: string | null;
   forwardNoteHtml?: string | null;
+  idempotencyKey?: string;
 }
 
 export interface UpdateDraftOptions {
@@ -113,6 +114,19 @@ export class DraftsResource {
   }
 
   async create(emailAddress: string, options: CreateDraftOptions = {}): Promise<DraftDetail> {
+    const forwardOnlyKeys = [
+      "forwardMode",
+      "includeOriginalAttachments",
+      "forwardNoteText",
+      "forwardNoteHtml",
+    ] as const;
+    if (
+      options.forwardMessageId == null
+      && forwardOnlyKeys.some((key) => options[key] !== undefined)
+    ) {
+      throw new Error("forward options require forwardMessageId");
+    }
+    if (options.idempotencyKey !== undefined) validateIdempotencyKey(options.idempotencyKey);
     const body: Record<string, unknown> = {};
     if (options.to !== undefined || options.cc !== undefined || options.bcc !== undefined) {
       body["recipients"] = recipientsToWire(options);
@@ -133,9 +147,13 @@ export class DraftsResource {
     setIfDefined(body, "include_original_attachments", options.includeOriginalAttachments);
     setIfDefined(body, "forward_note_text", options.forwardNoteText);
     setIfDefined(body, "forward_note_html", options.forwardNoteHtml);
-    return parseDraftDetail(await this.http.post<RawDraftDetail>(
-      `/mailboxes/${emailAddress}/drafts`, body,
-    ));
+    const path = `/mailboxes/${emailAddress}/drafts`;
+    const created = options.idempotencyKey === undefined
+      ? await this.http.post<RawDraftDetail>(path, body)
+      : await this.http.post<RawDraftDetail>(path, body, {
+        headers: { "Idempotency-Key": options.idempotencyKey },
+      });
+    return parseDraftDetail(created);
   }
 
   async get(emailAddress: string, draftId: string): Promise<DraftDetail> {

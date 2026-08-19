@@ -37,6 +37,7 @@ type CreateOptions = DraftFields & {
   forwardMessageId?: string;
   forwardMode?: string;
   includeOriginalAttachments?: boolean;
+  idempotencyKey?: string;
 };
 
 type UpdateOptions = DraftFields & {
@@ -114,7 +115,7 @@ function createOptions(options: CreateOptions): CreateDraftOptions {
   if (!isForward && options.inlineImage.length > 0 && options.bodyHtml === undefined) {
     throw new Error("--inline-image requires --body-html.");
   }
-  return {
+  const draft: CreateDraftOptions = {
     to: commaList(options.to),
     cc: commaList(options.cc),
     bcc: commaList(options.bcc),
@@ -128,11 +129,17 @@ function createOptions(options: CreateOptions): CreateDraftOptions {
     attachments: buildAttachments(options.attach, options.inlineImage),
     trackOpens: options.trackOpens,
     forwardMessageId: options.forwardMessageId,
-    forwardMode: validateForwardMode(options.forwardMode),
-    includeOriginalAttachments: options.includeOriginalAttachments,
-    forwardNoteText: options.forwardNoteText,
-    forwardNoteHtml: options.forwardNoteHtml,
+    idempotencyKey: options.idempotencyKey,
   };
+  if (options.forwardMode !== undefined) {
+    draft.forwardMode = validateForwardMode(options.forwardMode);
+  }
+  if (options.includeOriginalAttachments !== undefined) {
+    draft.includeOriginalAttachments = options.includeOriginalAttachments;
+  }
+  if (options.forwardNoteText !== undefined) draft.forwardNoteText = options.forwardNoteText;
+  if (options.forwardNoteHtml !== undefined) draft.forwardNoteHtml = options.forwardNoteHtml;
+  return draft;
 }
 
 function setNullable(
@@ -304,7 +311,8 @@ export function registerDraftCommands(email: Command): void {
     .option("--forward-message-id <message-id>", "Message ID to forward")
     .option("--forward-mode <mode>", "Forward mode: inline or wrapped")
     .option("--include-original-attachments", "Include original attachments")
-    .option("--no-include-original-attachments", "Exclude original attachments");
+    .option("--no-include-original-attachments", "Exclude original attachments")
+    .option("--idempotency-key <key>", "Stable key for safely retrying draft creation");
   create.action(withErrorHandler(async function (this: Command, options: CreateOptions) {
     const draftOptions = createOptions(options);
     const global = getGlobalOpts(this);

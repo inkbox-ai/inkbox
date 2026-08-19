@@ -408,12 +408,13 @@ class AgentIdentity:
         in_reply_to_message_id: str | None = None,
         references: list[str] | None = None,
         forward_message_id: UUID | str | None = None,
-        forward_mode: ForwardMode | str | None = None,
-        forward_note_text: str | None = None,
-        forward_note_html: str | None = None,
-        include_original_attachments: bool = True,
+        forward_mode: Any = _UNSET,
+        forward_note_text: Any = _UNSET,
+        forward_note_html: Any = _UNSET,
+        include_original_attachments: Any = _UNSET,
         attachments: list[dict[str, str]] | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> DraftDetail:
         """Create an email draft in this identity's mailbox."""
         self._require_mailbox()
@@ -436,6 +437,7 @@ class AgentIdentity:
             include_original_attachments=include_original_attachments,
             attachments=attachments,
             track_opens=track_opens,
+            idempotency_key=idempotency_key,
         )
 
     def get_email_draft(self, draft_id: UUID | str) -> DraftDetail:

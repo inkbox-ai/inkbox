@@ -169,7 +169,10 @@ const sent = await identity.sendEmail({
 ### Drafts
 
 ```typescript
-const draft = await identity.createEmailDraft({ subject: "Work in progress" });
+const draft = await identity.createEmailDraft({
+  subject: "Work in progress",
+  idempotencyKey: "draft-create-2026-08-19-1",
+});
 for await (const saved of identity.iterEmailDrafts()) {
   console.log(saved.id, saved.generation);
 }
@@ -200,6 +203,8 @@ const sent = await identity.sendEmailDraft(current.id, current.generation);
 ```
 
 Drafts share the mailbox's standard Drafts folder with connected mail clients.
+Reuse one `idempotencyKey` when retrying the same logical create after an
+ambiguous result. Forward-only options require `forwardMessageId`.
 Use the latest returned `generation` for every mutation. A `partIndex` belongs
 to the generation that returned it, so refresh attachment metadata after edits.
 

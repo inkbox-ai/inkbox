@@ -131,6 +131,52 @@ describe("DraftsResource", () => {
     });
   });
 
+  it("treats undefined forward options as omitted", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_DETAIL);
+
+    await new DraftsResource(http).create(ADDRESS, {
+      forwardMode: undefined,
+      includeOriginalAttachments: undefined,
+      forwardNoteText: undefined,
+      forwardNoteHtml: undefined,
+    });
+
+    expect(http.post).toHaveBeenCalledWith(`/mailboxes/${ADDRESS}/drafts`, {});
+  });
+
+  it.each([
+    { forwardMode: ForwardMode.INLINE },
+    { includeOriginalAttachments: true },
+    { forwardNoteText: "Not a forward" },
+    { forwardNoteHtml: null },
+  ])("rejects an explicitly supplied forward option without a source", async (option) => {
+    const http = mockHttp();
+
+    await expect(new DraftsResource(http).create(ADDRESS, option)).rejects.toThrow(
+      "forward options require forwardMessageId",
+    );
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it("sends a validated idempotency key as a header", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_DETAIL);
+
+    await new DraftsResource(http).create(ADDRESS, {
+      subject: "Retryable",
+      idempotencyKey: "draft-create-1",
+    });
+
+    expect(http.post).toHaveBeenCalledWith(
+      `/mailboxes/${ADDRESS}/drafts`,
+      { subject: "Retryable" },
+      { headers: { "Idempotency-Key": "draft-create-1" } },
+    );
+    await expect(new DraftsResource(http).create(ADDRESS, { idempotencyKey: "" }))
+      .rejects.toThrow("between 1 and 255 characters");
+  });
+
   it("serializes every create field and preserves null and false", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_DETAIL);

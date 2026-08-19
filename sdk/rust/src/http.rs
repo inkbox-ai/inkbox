@@ -634,6 +634,7 @@ fn raise_for_status(resp: RawResponse) -> Result<RawResponse> {
     Err(InkboxError::Api {
         status_code: status,
         detail,
+        retry_after_header,
         agent_support,
     })
 }

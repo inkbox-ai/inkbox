@@ -112,7 +112,8 @@ inkbox email send -i my-agent \
 inkbox email list -i my-agent --limit 10
 
 # Save an incomplete draft, then list it with its current generation
-inkbox email drafts create -i my-agent --subject "Work in progress"
+inkbox email drafts create -i my-agent --subject "Work in progress" \
+  --idempotency-key draft-create-2026-08-19-1
 inkbox email drafts list -i my-agent
 
 # Place a phone call

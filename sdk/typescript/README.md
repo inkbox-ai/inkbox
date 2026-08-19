@@ -280,6 +280,7 @@ console.log(tracked.firstOpenedAt, tracked.openCount);
 // Drafts accept incomplete content. Each draft response includes its generation.
 const draft = await identity.createEmailDraft({
   subject: "Review requested",
+  idempotencyKey: "draft-create-2026-08-19-1",
 });
 for await (const saved of identity.iterEmailDrafts()) {
   console.log(saved.id, saved.generation);

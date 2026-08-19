@@ -46,6 +46,10 @@ inkbox email list -i support-bot --limit 10
 inkbox --json identity list
 ```
 
+With `--json`, successful output is written to stdout. API errors are written as
+one JSON object to stderr with `error.type`, `error.message`, `error.statusCode`,
+`error.detail`, `error.retryAfterSeconds`, and `error.agentSupport`.
+
 ## Commands
 
 ### signup
@@ -171,6 +175,7 @@ inkbox email drafts create -i <handle>        # Create an incomplete draft; prin
   --subject <subject>                         #   Optional subject
   --body-text <text>                          #   Optional plain text body
   --attach <path>                             #   Attach a file (repeatable)
+  --idempotency-key <key>                     #   Reuse when retrying one logical create
 inkbox email drafts list -i <handle>          # List drafts with current generations
 inkbox email drafts get <draft-id> -i <handle> # Get bodies and attachment metadata
 inkbox email drafts update <draft-id> -i <handle> --generation <n>

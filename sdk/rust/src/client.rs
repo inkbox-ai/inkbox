@@ -772,6 +772,11 @@ fn one_shot_request(
     }
     let resp = rb.send()?;
     let status = resp.status().as_u16();
+    let retry_after_header = resp
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok());
     let text = resp.text().unwrap_or_default();
     if status >= 400 {
         let parsed = serde_json::from_str::<Value>(&text).ok();
@@ -791,6 +796,7 @@ fn one_shot_request(
         return Err(InkboxError::Api {
             status_code: status,
             detail,
+            retry_after_header,
             agent_support,
         });
     }
@@ -971,6 +977,7 @@ mod agent_signup_invitation_tests {
                 status_code,
                 detail: ApiErrorDetail::Structured(detail),
                 agent_support,
+                ..
             } => {
                 assert_eq!(status_code, 429);
                 assert_eq!(

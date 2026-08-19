@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
 from inkbox.identities.types import _UNSET
+from inkbox.imessage.types import _validate_idempotency_key
 from inkbox.mail.types import (
     DraftAttachmentContent,
     DraftDetail,
@@ -59,14 +60,25 @@ class DraftsResource:
         in_reply_to_message_id: str | None = None,
         references: list[str] | None = None,
         forward_message_id: UUID | str | None = None,
-        forward_mode: ForwardMode | str | None = None,
-        forward_note_text: str | None = None,
-        forward_note_html: str | None = None,
-        include_original_attachments: bool = True,
+        forward_mode: Any = _UNSET,
+        forward_note_text: Any = _UNSET,
+        forward_note_html: Any = _UNSET,
+        include_original_attachments: Any = _UNSET,
         attachments: list[dict[str, str]] | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> DraftDetail:
         """Create an email draft. All message fields may be incomplete."""
+        forward_options = {
+            "forward_mode": forward_mode,
+            "forward_note_text": forward_note_text,
+            "forward_note_html": forward_note_html,
+            "include_original_attachments": include_original_attachments,
+        }
+        if forward_message_id is None and any(
+            value is not _UNSET for value in forward_options.values()
+        ):
+            raise ValueError("forward options require forward_message_id")
         recipients: dict[str, list[str]] = {}
         if to is not None:
             recipients["to"] = to
@@ -96,14 +108,24 @@ class DraftsResource:
             body["track_opens"] = True
         if forward_message_id is not None:
             body["forward_message_id"] = str(forward_message_id)
-            body["include_original_attachments"] = include_original_attachments
-            if forward_mode is not None:
+            if include_original_attachments is not _UNSET:
+                body["include_original_attachments"] = include_original_attachments
+            if forward_mode is not _UNSET and forward_mode is not None:
                 body["forward_mode"] = ForwardMode(forward_mode).value
-            if forward_note_text is not None:
+            if forward_note_text is not _UNSET and forward_note_text is not None:
                 body["forward_note_text"] = forward_note_text
-            if forward_note_html is not None:
+            if forward_note_html is not _UNSET and forward_note_html is not None:
                 body["forward_note_html"] = forward_note_html
-        data = self._http.post(f"/mailboxes/{email_address}/drafts", json=body)
+        if idempotency_key is not None:
+            data = self._http.post(
+                f"/mailboxes/{email_address}/drafts",
+                json=body,
+                headers={
+                    "Idempotency-Key": _validate_idempotency_key(idempotency_key)
+                },
+            )
+        else:
+            data = self._http.post(f"/mailboxes/{email_address}/drafts", json=body)
         return DraftDetail._from_dict(data)
 
     def get(self, email_address: str, draft_id: UUID | str) -> DraftDetail:

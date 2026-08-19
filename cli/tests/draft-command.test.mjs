@@ -183,6 +183,32 @@ test("create supports an incomplete draft and uses the identity mailbox address"
   });
 });
 
+test("create sends an idempotency key header", async () => {
+  let request;
+  await withMock(async (req, res) => {
+    request = {
+      method: req.method,
+      url: req.url,
+      idempotencyKey: req.headers["idempotency-key"],
+      body: await requestBody(req),
+    };
+    json(res, detail, 201);
+  }, async (baseUrl) => {
+    const result = await runCli(args(
+      baseUrl,
+      "--json", "email", "drafts", "create", "-i", "writer",
+      "--subject", "Retryable", "--idempotency-key", "draft-create-1",
+    ));
+    assert.ifError(result.error);
+  });
+  assert.deepEqual(request, {
+    method: "POST",
+    url: `/api/v1/mail/mailboxes/${email}/drafts`,
+    idempotencyKey: "draft-create-1",
+    body: { subject: "Retryable" },
+  });
+});
+
 test("create serializes recipients, reply fields, files, inline images, and false booleans", async () => {
   const dir = mkdtempSync(join(tmpdir(), "inkbox-draft-files-"));
   const attachment = join(dir, "notes.txt");
@@ -353,6 +379,43 @@ test("create rejects incomplete forward combinations before making a request", a
   ]);
   assert.ok(inlineWithoutHtml.error);
   assert.match(inlineWithoutHtml.stderr, /--inline-image requires --body-html/);
+});
+
+test("JSON API errors preserve structured detail and retry metadata on stderr", async () => {
+  await withMock(async (_req, res) => {
+    res.writeHead(409, {
+      "Content-Type": "application/json",
+      "Retry-After": "12",
+    });
+    res.end(JSON.stringify({
+      detail: {
+        error: "draft_generation_conflict",
+        message: "The draft changed.",
+        current_generation: 5,
+      },
+    }));
+  }, async (baseUrl) => {
+    const result = await runCli(args(
+      baseUrl,
+      "--json", "email", "drafts", "get", draftId, "-i", "writer",
+    ));
+    assert.ok(result.error);
+    assert.equal(result.stdout, "");
+    assert.deepEqual(JSON.parse(result.stderr), {
+      error: {
+        type: "InkboxAPIError",
+        message: "draft_generation_conflict: The draft changed.",
+        statusCode: 409,
+        detail: {
+          error: "draft_generation_conflict",
+          message: "The draft changed.",
+          current_generation: 5,
+        },
+        retryAfterSeconds: 12,
+        agentSupport: null,
+      },
+    });
+  });
 });
 
 test("list prints requested human columns and full JSON summaries", async () => {

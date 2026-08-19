@@ -7,6 +7,8 @@ import {
   RedundantContactAccessGrantError,
   StorageLimitExceededError,
 } from "@inkbox/sdk";
+import type { Command } from "commander";
+import { getGlobalOpts } from "./client.js";
 
 function importAlreadyInFlight(err: InkboxAPIError): boolean {
   return (
@@ -17,24 +19,44 @@ function importAlreadyInFlight(err: InkboxAPIError): boolean {
   );
 }
 
-function isA2AInvitationError(err: InkboxAPIError): boolean {
-  return (
-    typeof err.detail === "object"
-    && err.detail !== null
-    && typeof err.detail["code"] === "string"
-    && err.detail["code"].startsWith("a2a_invitation_")
-  );
-}
-
-/** Structured details carry a human sentence; printing the raw JSON helps nobody. */
 function renderDetail(detail: string | Record<string, unknown>): string {
   if (typeof detail === "string") return detail;
   const message = detail?.message;
+  const code = detail?.error;
+  if (typeof code === "string" && code) {
+    return typeof message === "string" && message ? `${code}: ${message}` : code;
+  }
   return typeof message === "string" && message ? message : JSON.stringify(detail);
 }
 
 function renderAgentSupport(err: InkboxAPIError): void {
   if (err.agentSupport) console.error(`Support: ${err.agentSupport}`);
+}
+
+function wantsJson(command: unknown): boolean {
+  return !!command && typeof (command as Command).opts === "function"
+    && !!getGlobalOpts(command as Command).json;
+}
+
+function renderJsonError(err: unknown): void {
+  if (err instanceof InkboxAPIError) {
+    console.error(JSON.stringify({
+      error: {
+        type: err.name,
+        message: renderDetail(err.detail),
+        statusCode: err.statusCode,
+        detail: err.detail,
+        retryAfterSeconds: err.retryAfterSeconds,
+        agentSupport: err.agentSupport,
+      },
+    }));
+    return;
+  }
+  if (err instanceof Error) {
+    console.error(JSON.stringify({ error: { type: err.name, message: err.message } }));
+    return;
+  }
+  console.error(JSON.stringify({ error: { type: "UnknownError", message: "An unknown error occurred." } }));
 }
 
 export function withErrorHandler<T extends unknown[]>(
@@ -44,7 +66,9 @@ export function withErrorHandler<T extends unknown[]>(
     try {
       await fn.call(this, ...args);
     } catch (err) {
-      if (err instanceof DuplicateContactRuleError) {
+      if (wantsJson(this)) {
+        renderJsonError(err);
+      } else if (err instanceof DuplicateContactRuleError) {
         console.error(
           `Error: HTTP ${err.statusCode}: duplicate rule (existing_rule_id=${err.existingRuleId})`,
         );
@@ -69,11 +93,7 @@ export function withErrorHandler<T extends unknown[]>(
         }
       } else if (err instanceof InkboxAPIError) {
         console.error(`Error: HTTP ${err.statusCode}: ${renderDetail(err.detail)}`);
-        if (
-          err.statusCode === 429
-          && isA2AInvitationError(err)
-          && err.retryAfterSeconds !== null
-        ) {
+        if (err.retryAfterSeconds !== null) {
           console.error(`Hint: Retry in ${err.retryAfterSeconds} seconds.`);
         }
         if (err.statusCode === 401) {
@@ -97,7 +117,7 @@ export function withErrorHandler<T extends unknown[]>(
       } else {
         console.error("An unknown error occurred.");
       }
-      if (err instanceof InkboxAPIError) renderAgentSupport(err);
+      if (!wantsJson(this) && err instanceof InkboxAPIError) renderAgentSupport(err);
       process.exit(1);
     }
   };

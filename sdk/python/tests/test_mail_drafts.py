@@ -124,18 +124,22 @@ def test_create_omits_optional_and_forward_only_defaults():
     )
 
 
-def test_create_omits_forward_fields_without_forward_message():
+@pytest.mark.parametrize(
+    ("option", "value"),
+    [
+        ("forward_mode", "wrapped"),
+        ("forward_note_text", "Not a forward"),
+        ("forward_note_html", "<p>Not a forward</p>"),
+        ("include_original_attachments", False),
+    ],
+)
+def test_create_rejects_forward_options_without_forward_message(option, value):
     resource, http = _resource()
-    http.post.return_value = DRAFT_DETAIL
 
-    resource.create(
-        EMAIL,
-        forward_mode="wrapped",
-        forward_note_text="Not a forward",
-        include_original_attachments=False,
-    )
+    with pytest.raises(ValueError, match="forward options require forward_message_id"):
+        resource.create(EMAIL, **{option: value})
 
-    assert http.post.call_args.kwargs["json"] == {"recipients": {}}
+    http.post.assert_not_called()
 
 
 def test_create_forward_sends_forward_options_only_when_applicable():
@@ -176,6 +180,22 @@ def test_create_forward_sends_forward_options_only_when_applicable():
         "forward_mode": "wrapped",
         "forward_note_text": "FYI",
     }
+
+
+def test_create_sends_validated_idempotency_key_as_header():
+    resource, http = _resource()
+    http.post.return_value = DRAFT_DETAIL
+
+    resource.create(EMAIL, subject="Retryable", idempotency_key="draft-create-1")
+
+    http.post.assert_called_once_with(
+        f"/mailboxes/{EMAIL}/drafts",
+        json={"recipients": {}, "subject": "Retryable"},
+        headers={"Idempotency-Key": "draft-create-1"},
+    )
+
+    with pytest.raises(ValueError, match="between 1 and 255"):
+        resource.create(EMAIL, idempotency_key="")
 
 
 def test_get_uses_exact_path():

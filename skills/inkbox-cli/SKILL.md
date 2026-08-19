@@ -29,6 +29,8 @@ Global options:
 If `INKBOX_API_KEY` is missing and `--api-key` is not passed, the CLI exits with an error.
 
 Prefer `--json` when the result will be parsed or fed into another tool. Use the default table/record output when the user wants a quick human-readable summary.
+With `--json`, success stays on stdout and API failures write one structured error
+object to stderr, retaining `error.detail` and `error.retryAfterSeconds`.
 
 ## Install & Local Repo Usage
 
@@ -221,7 +223,8 @@ inkbox email thread <thread-id> -i <handle>
 ### Drafts
 
 ```bash
-inkbox email drafts create -i <handle> --subject "Work in progress"
+inkbox email drafts create -i <handle> --subject "Work in progress" \
+  --idempotency-key draft-create-2026-08-19-1
 inkbox email drafts list -i <handle>
 inkbox email drafts get <draft-id> -i <handle>
 inkbox email drafts update <draft-id> -i <handle> --generation <n> \
@@ -243,6 +246,8 @@ flags; omission leaves a field unchanged. Use the generation printed by the
 latest read or mutation for every following mutation. Attachment part indexes
 belong to that generation, so run `get` again after an edit. Drafts share the
 mailbox's standard Drafts folder with connected mail clients.
+Reuse one `--idempotency-key` when retrying the same logical create after an
+ambiguous result. Forward-only flags require `--forward-message-id`.
 
 Successful send prints the sent message and removes the draft; an
 exact-generation retry may return the same sent message. On HTTP 409, refresh

@@ -155,6 +155,7 @@ let draft = identity.create_email_draft(&CreateDraftOptions {
     },
     subject: Some("Draft subject".into()),
     body_text: Some("Draft body".into()),
+    idempotency_key: Some("draft-create-2026-08-19-1".into()),
     ..Default::default()
 })?;
 
@@ -215,6 +216,8 @@ conflicts are `InkboxError::Api` with status `409` and
 Refresh on `draft_generation_conflict` and retry the same draft ID and generation
 on `draft_send_in_progress`. Do not resend `draft_delivery_uncertain`; after
 checking sent mail, duplicate or delete that draft instead.
+Reuse one `idempotency_key` when retrying the same logical create after an
+ambiguous result. Forward-only options require `forward_message_id`.
 
 ### Mailbox imports
 
