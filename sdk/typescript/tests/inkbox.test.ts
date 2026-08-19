@@ -198,14 +198,24 @@ describe("Inkbox.createIdentity", () => {
 
     await ink.createIdentity("sales-agent", {
       imessageEnabled: true,
-      imessageNumberType: "dedicated_outbound",
+      claimIMessageNumber: true,
     });
 
     expect(vi.mocked(ink._idsResource.create).mock.calls[0][0]).toMatchObject({
       agentHandle: "sales-agent",
       imessageEnabled: true,
-      imessageNumberType: "dedicated_outbound",
+      claimIMessageNumber: true,
     });
+  });
+
+  it("rejects an explicit false dedicated iMessage claim before delegation", async () => {
+    const ink = makeInkbox();
+    const createSpy = vi.spyOn(ink._idsResource, "create");
+
+    await expect(ink.createIdentity("sales-agent", {
+      claimIMessageNumber: false,
+    } as never)).rejects.toThrow("claimIMessageNumber must be true when supplied");
+    expect(createSpy).not.toHaveBeenCalled();
   });
 });
 

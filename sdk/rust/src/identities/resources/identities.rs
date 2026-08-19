@@ -18,7 +18,6 @@ use crate::identities::types::{
     AgentIdentityData, AgentIdentitySummary, IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions, Unset, VaultSecretIds,
 };
-use crate::imessage::types::IMessageNumberType;
 use uuid::Uuid;
 
 pub struct IdentitiesResource {
@@ -77,7 +76,7 @@ impl IdentitiesResource {
     /// Create an identity and optionally claim and attach a dedicated iMessage
     /// number in the same operation.
     ///
-    /// `imessage_enabled` must be `Some(true)` when `imessage_number_type` is set.
+    /// `imessage_enabled` must be `Some(true)` when claiming a line.
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_imessage_number(
         &self,
@@ -89,11 +88,16 @@ impl IdentitiesResource {
         tunnel: Option<&IdentityTunnelCreateOptions>,
         phone_number: Option<&IdentityPhoneNumberCreateOptions>,
         vault_secret_ids: Option<&VaultSecretIds>,
-        imessage_number_type: Option<IMessageNumberType>,
+        claim_imessage_number: Option<bool>,
     ) -> Result<AgentIdentityData> {
-        if imessage_number_type.is_some() && imessage_enabled != Some(true) {
+        if claim_imessage_number == Some(false) {
             return Err(crate::error::InkboxError::InvalidArgument(
-                "imessage_number_type requires imessage_enabled=true".into(),
+                "claim_imessage_number only accepts true when supplied".into(),
+            ));
+        }
+        if claim_imessage_number == Some(true) && imessage_enabled != Some(true) {
+            return Err(crate::error::InkboxError::InvalidArgument(
+                "claim_imessage_number requires imessage_enabled=true".into(),
             ));
         }
         // Build the body conditionally, omitting any field left unset/None,
@@ -119,11 +123,8 @@ impl IdentitiesResource {
         if let Some(flag) = imessage_enabled {
             body.insert("imessage_enabled".into(), Value::Bool(flag));
         }
-        if let Some(number_type) = imessage_number_type {
-            body.insert(
-                "imessage_number_type".into(),
-                Value::String(number_type.as_str().to_string()),
-            );
+        if claim_imessage_number == Some(true) {
+            body.insert("claim_imessage_number".into(), Value::Bool(true));
         }
         if let Some(m) = mailbox {
             body.insert("mailbox".into(), m.to_wire());
@@ -181,7 +182,7 @@ impl IdentitiesResource {
     /// * `new_handle` - New handle value (`None` omits the key).
     /// * `display_name` - New display name, or `Unset::Value(None)` to clear.
     /// * `description` - New description, or `Unset::Value(None)` to clear.
-    /// * `imessage_enabled` - Toggle shared-iMessage reachability.
+    /// * `imessage_enabled` - Toggle identity-level iMessage reachability.
     /// * `imessage_filter_mode` - `"whitelist"` or `"blacklist"` (admin-only).
     /// * `mail_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
     ///   mail contact rules (admin-only).
@@ -216,12 +217,12 @@ impl IdentitiesResource {
         .map(|data| data.summary)
     }
 
-    /// Update an identity and optionally change its dedicated iMessage number.
+    /// Update an identity and optionally change its dedicated iMessage line.
     ///
     /// `imessage_number_id` distinguishes omission from explicit `null`:
     /// `Unset::Value(None)` moves the identity back to shared iMessage service,
     /// while `Unset::Value(Some(id))` attaches an already-owned number.
-    /// `imessage_number_type` atomically claims and attaches a new number and cannot
+    /// `claim_imessage_number` atomically claims and attaches a new line and cannot
     /// be combined with an explicit `imessage_number_id`.
     #[allow(clippy::too_many_arguments)]
     pub fn update_with_imessage_number(
@@ -235,25 +236,31 @@ impl IdentitiesResource {
         mail_filter_mode: Option<&str>,
         phone_filter_mode: Option<&str>,
         imessage_number_id: Unset<Uuid>,
-        imessage_number_type: Option<IMessageNumberType>,
+        claim_imessage_number: Option<bool>,
         idempotency_key: Option<&str>,
     ) -> Result<AgentIdentityData> {
-        let has_number_id = !imessage_number_id.is_omit();
-        let attaches_number_id = matches!(&imessage_number_id, Unset::Value(Some(_)));
-        if imessage_number_type.is_some() && has_number_id {
+        if claim_imessage_number == Some(false) {
             return Err(crate::error::InkboxError::InvalidArgument(
-                "imessage_number_type and imessage_number_id cannot be set together".into(),
+                "claim_imessage_number only accepts true when supplied".into(),
             ));
         }
-        if imessage_enabled == Some(false) && (imessage_number_type.is_some() || attaches_number_id)
+        let has_number_id = !imessage_number_id.is_omit();
+        let attaches_number_id = matches!(&imessage_number_id, Unset::Value(Some(_)));
+        if claim_imessage_number == Some(true) && has_number_id {
+            return Err(crate::error::InkboxError::InvalidArgument(
+                "claim_imessage_number and imessage_number_id cannot be set together".into(),
+            ));
+        }
+        if imessage_enabled == Some(false)
+            && (claim_imessage_number == Some(true) || attaches_number_id)
         {
             return Err(crate::error::InkboxError::InvalidArgument(
                 "iMessage number changes cannot be combined with disabling iMessage".into(),
             ));
         }
-        if imessage_number_type.is_some() && idempotency_key.is_none() {
+        if claim_imessage_number == Some(true) && idempotency_key.is_none() {
             return Err(crate::error::InkboxError::InvalidArgument(
-                "idempotency_key is required when imessage_number_type is set".into(),
+                "idempotency_key is required when claim_imessage_number is set".into(),
             ));
         }
         if let Some(key) = idempotency_key {
@@ -293,11 +300,8 @@ impl IdentitiesResource {
                     .unwrap_or(Value::Null),
             );
         }
-        if let Some(number_type) = imessage_number_type {
-            body.insert(
-                "imessage_number_type".into(),
-                Value::String(number_type.as_str().to_string()),
-            );
+        if claim_imessage_number == Some(true) {
+            body.insert("claim_imessage_number".into(), Value::Bool(true));
         }
         if let Some(mode) = imessage_filter_mode {
             body.insert(
@@ -349,7 +353,7 @@ mod tests {
 
     use super::*;
     use crate::client::Inkbox;
-    use crate::imessage::types::{IMessageNumberType, IdentityIMessageNumber};
+    use crate::imessage::types::IdentityIMessageNumber;
 
     fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
         Inkbox::builder("test-key")
@@ -369,7 +373,7 @@ mod tests {
             "imessage_number": {
                 "id": "22222222-2222-2222-2222-222222222222",
                 "number": "+15550001111",
-                "type": "dedicated_inbound",
+                "type": "dedicated_outbound",
             }
         })
     }
@@ -442,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn create_with_imessage_number_sends_type_and_parses_detail() {
+    fn create_with_imessage_number_sends_claim_and_parses_detail() {
         let server = MockServer::start();
         let mock = server.mock(|when, then| {
             when.method(POST)
@@ -450,7 +454,7 @@ mod tests {
                 .json_body(json!({
                     "agent_handle": "support-bot",
                     "imessage_enabled": true,
-                    "imessage_number_type": "dedicated_inbound"
+                    "claim_imessage_number": true
                 }));
             then.status(201).json_body(identity_json());
         });
@@ -466,12 +470,64 @@ mod tests {
                 None,
                 None,
                 None,
-                Some(IMessageNumberType::DedicatedInbound),
+                Some(true),
             )
             .unwrap();
         mock.assert();
         let number: IdentityIMessageNumber = data.imessage_number.clone().unwrap();
-        assert_eq!(number.r#type, IMessageNumberType::DedicatedInbound);
+        assert_eq!(number.r#type, "dedicated_outbound");
+    }
+
+    #[test]
+    fn create_with_false_claim_is_rejected() {
+        let server = MockServer::start();
+
+        let error = client(&server)
+            .identities()
+            .create_with_imessage_number(
+                "support-bot",
+                None,
+                Unset::Omit,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(false),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            crate::error::InkboxError::InvalidArgument(message)
+                if message.contains("only accepts true")
+        ));
+    }
+
+    #[test]
+    fn update_with_false_claim_is_rejected() {
+        let server = MockServer::start();
+
+        let error = client(&server)
+            .identities()
+            .update_with_imessage_number(
+                "support-bot",
+                None,
+                Unset::Omit,
+                Unset::Omit,
+                None,
+                None,
+                None,
+                None,
+                Unset::Omit,
+                Some(false),
+                None,
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            crate::error::InkboxError::InvalidArgument(message)
+                if message.contains("only accepts true")
+        ));
     }
 
     #[test]
@@ -512,7 +568,7 @@ mod tests {
                 .path("/api/v1/identities/support-bot")
                 .header("Idempotency-Key", "identity-claim-123")
                 .json_body(json!({
-                    "imessage_number_type": "dedicated_outbound"
+                    "claim_imessage_number": true
                 }));
             then.status(200).json_body(identity_json());
         });
@@ -528,7 +584,7 @@ mod tests {
                 None,
                 None,
                 Unset::Omit,
-                Some(IMessageNumberType::DedicatedOutbound),
+                Some(true),
                 Some("identity-claim-123"),
             )
             .unwrap();
@@ -577,7 +633,7 @@ mod tests {
                 None,
                 None,
                 Unset::Omit,
-                Some(IMessageNumberType::DedicatedInbound),
+                Some(true),
                 None,
             )
             .unwrap_err();

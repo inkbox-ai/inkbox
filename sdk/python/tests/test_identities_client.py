@@ -112,11 +112,11 @@ class TestCreateIdentitySendingDomain:
         identity = client.create_identity(
             "sales-agent",
             imessage_enabled=True,
-            imessage_number_type="dedicated_outbound",
+            claim_imessage_number=True,
         )
 
         _, kwargs = mock_ids.create.call_args
         assert kwargs["imessage_enabled"] is True
-        assert kwargs["imessage_number_type"] == "dedicated_outbound"
+        assert kwargs["claim_imessage_number"] is True
         assert identity.imessage_number is not None
         client.close()

@@ -282,7 +282,6 @@ export type {
 export {
   IMessageAssignmentStatus,
   IMessageNumberStatus,
-  IMessageNumberType,
   IMessageDeliveryStatus,
   IMessageGroupCreationStatus,
   IMessageReactionType,
@@ -292,7 +291,6 @@ export {
   IMessageService,
 } from "./imessage/types.js";
 export type {
-  IMessageDedicatedNumberType,
   IMessage,
   IMessageAssignment,
   IMessageContactRule,

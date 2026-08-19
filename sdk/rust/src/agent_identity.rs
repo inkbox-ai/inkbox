@@ -46,8 +46,8 @@ use crate::filters::DateRangeFilter;
 use crate::identities::types::{AgentIdentityData, IdentityMailbox, IdentityPhoneNumber, Unset};
 use crate::imessage::types::{
     IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
-    IMessageMarkReadResult, IMessageMediaUpload, IMessageNumberType, IMessageReaction,
-    IMessageReactionType, IMessageSendStyle, IdentityIMessageNumber,
+    IMessageMarkReadResult, IMessageMediaUpload, IMessageReaction, IMessageReactionType,
+    IMessageSendStyle, IdentityIMessageNumber,
 };
 use crate::mail::types::{
     DraftDetail, DraftSummary, FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction,
@@ -222,7 +222,7 @@ impl AgentIdentity {
         self.phone_number.borrow().clone()
     }
 
-    /// Dedicated iMessage number attached to this identity, if any.
+    /// Dedicated iMessage line attached to this identity, if any.
     pub fn imessage_number(&self) -> Option<IdentityIMessageNumber> {
         self.data.borrow().imessage_number.clone()
     }
@@ -1035,9 +1035,9 @@ impl AgentIdentity {
 
     /// Send an outbound iMessage as this identity.
     ///
-    /// Shared and dedicated-inbound numbers require the recipient to connect
-    /// first. A dedicated-outbound number may initiate a conversation, subject
-    /// to server-side consent and rate limits.
+    /// Shared service requires the recipient to connect first. A dedicated
+    /// iMessage line may initiate a conversation, subject to server-side consent
+    /// and rate limits.
     ///
     /// # Arguments
     /// * `to` - E.164 recipient number. Mutually exclusive with `conversation_id`.
@@ -1062,7 +1062,7 @@ impl AgentIdentity {
             .send(to, conversation_id, text, media_urls, send_style, Some(&id))
     }
 
-    /// Send to 2–8 distinct recipients as a dedicated-outbound iMessage group.
+    /// Send to 2–8 distinct recipients as a dedicated iMessage group.
     ///
     /// `send_style` accepts the same [`IMessageSendStyle`] values as one-to-one
     /// sends and may be combined with the single supported media URL.
@@ -1510,7 +1510,7 @@ impl AgentIdentity {
     /// * `new_handle` - New agent handle.
     /// * `display_name` - New display name, or `Unset::Value(None)` to clear.
     /// * `description` - New description, or `Unset::Value(None)` to clear.
-    /// * `imessage_enabled` - Toggle shared-iMessage reachability.
+    /// * `imessage_enabled` - Toggle identity-level iMessage reachability.
     /// * `imessage_filter_mode` - `"whitelist"` or `"blacklist"` (admin-only).
     /// * `mail_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
     ///   mail contact rules (admin-only).
@@ -1542,11 +1542,11 @@ impl AgentIdentity {
         )
     }
 
-    /// Update this identity and optionally change its dedicated iMessage number.
+    /// Update this identity and optionally change its dedicated iMessage line.
     ///
     /// Use `Unset::Value(Some(id))` to attach an already-owned number,
     /// `Unset::Value(None)` to move back to shared iMessage service, or
-    /// `imessage_number_type` to atomically claim and attach a new number.
+    /// `claim_imessage_number` to atomically claim and attach a new line.
     #[allow(clippy::too_many_arguments)]
     pub fn update_with_imessage_number(
         &self,
@@ -1558,7 +1558,7 @@ impl AgentIdentity {
         mail_filter_mode: Option<&str>,
         phone_filter_mode: Option<&str>,
         imessage_number_id: Unset<Uuid>,
-        imessage_number_type: Option<IMessageNumberType>,
+        claim_imessage_number: Option<bool>,
         idempotency_key: Option<&str>,
     ) -> Result<()> {
         let data = self.inkbox.identities().update_with_imessage_number(
@@ -1571,7 +1571,7 @@ impl AgentIdentity {
             mail_filter_mode,
             phone_filter_mode,
             imessage_number_id,
-            imessage_number_type,
+            claim_imessage_number,
             idempotency_key,
         )?;
         *self.mailbox.borrow_mut() = data.mailbox.clone();
@@ -2334,7 +2334,7 @@ mod tests {
                 .path("/api/v1/identities/support-bot")
                 .header("Idempotency-Key", "identity-claim-123")
                 .json_body(json!({
-                    "imessage_number_type": "dedicated_outbound"
+                    "claim_imessage_number": true
                 }));
             then.status(200).json_body(json!({
                 "id": IDENTITY_ID,
@@ -2362,14 +2362,14 @@ mod tests {
                 None,
                 None,
                 Unset::Omit,
-                Some(IMessageNumberType::DedicatedOutbound),
+                Some(true),
                 Some("identity-claim-123"),
             )
             .unwrap();
         patch.assert();
         let number = identity.imessage_number().unwrap();
         assert_eq!(number.number, "+15550006666");
-        assert_eq!(number.r#type, IMessageNumberType::DedicatedOutbound);
+        assert_eq!(number.r#type, "dedicated_outbound");
     }
 
     #[test]
@@ -2394,7 +2394,7 @@ mod tests {
         identity.data.borrow_mut().imessage_number = Some(IdentityIMessageNumber {
             id: Uuid::parse_str("66666666-6666-6666-6666-666666666666").unwrap(),
             number: "+15550006666".into(),
-            r#type: crate::imessage::types::IMessageNumberType::DedicatedOutbound,
+            r#type: "dedicated_outbound".into(),
         });
         identity
             .update(

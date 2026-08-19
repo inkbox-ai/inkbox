@@ -7,7 +7,7 @@ receipts, typing indicators, media upload.
 iMessage messaging operations are identity-scoped, so they key off
 ``conversation_id`` / ``agent_identity_id`` rather than a local number ID.
 One-to-one conversations may carry assignment state; groups require a dedicated
-outbound number. This resource also lists and claims dedicated numbers.
+line. This resource also lists and claims dedicated lines.
 """
 
 from __future__ import annotations
@@ -21,14 +21,12 @@ from inkbox.imessage.types import (
     IMessageConversation,
     IMessageConversationSummary,
     IMessageNumber,
-    IMessageNumberType,
     IMessageMarkReadResult,
     IMessageMediaUpload,
     IMessageReaction,
     IMessageReactionType,
     IMessageSendStyle,
     IMessageTriageNumber,
-    _dedicated_number_type,
     _validate_idempotency_key,
 )
 
@@ -75,7 +73,7 @@ class IMessagesResource:
         return IMessageTriageNumber._from_dict(data)
 
     def list_numbers(self) -> list[IMessageNumber]:
-        """List the organization's dedicated iMessage numbers.
+        """List the organization's dedicated iMessage lines.
 
         Attached and unattached numbers are both returned. Released numbers are
         excluded by the server.
@@ -86,29 +84,26 @@ class IMessagesResource:
     def claim_number(
         self,
         *,
-        type: IMessageNumberType | str,
         idempotency_key: str,
     ) -> IMessageNumber:
-        """Claim a new dedicated iMessage number for the organization.
+        """Claim a new dedicated iMessage line for the organization.
 
         ``idempotency_key`` must be stable across retries of the same logical
-        claim. Dedicated inbound numbers require the recipient to message first.
-        Dedicated outbound numbers may start new conversations, subject to
+        claim. Dedicated lines may start new conversations, subject to
         server-side consent, contact-rule, and rate-limit checks.
 
         Raises:
             DedicatedIMessageNumberQuotaExceededError: The organization has
-                reached its plan limit for the requested number type.
-            DedicatedIMessageNumberInventoryPendingError: No matching number is
+                reached its plan limit.
+            DedicatedIMessageNumberInventoryPendingError: No number is
                 currently available; retry after the reported interval.
             IdempotencyKeyReusedError: The key was previously used for
                 a different claim.
         """
-        number_type = _dedicated_number_type(type).value
         key = _validate_idempotency_key(idempotency_key)
         data = self._http.post(
             "/numbers",
-            json={"type": number_type},
+            json={},
             headers={"Idempotency-Key": key},
         )
         return IMessageNumber._from_dict(data)
@@ -125,13 +120,13 @@ class IMessagesResource:
     ) -> IMessage:
         """Send an outbound iMessage.
 
-        Shared and dedicated inbound service require an existing assignment.
-        An identity attached to a dedicated outbound number may start a new
-        conversation, subject to server-side policy checks.
+        Shared service requires an existing assignment. An identity attached to
+        a dedicated line may start a new conversation, subject to server-side
+        policy checks.
 
         Args:
             to: One E.164 recipient or 1–8 distinct recipients. Two or more
-                recipients select or create a dedicated-outbound group.
+                recipients select or create a dedicated-line group.
                 Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
             text: Message body.
@@ -155,8 +150,7 @@ class IMessagesResource:
         Raises:
             InkboxAPIError: 400 when the identity is not iMessage-enabled;
                 404 when no assignment exists (shared service includes the
-                connect command and router number, while dedicated inbound
-                directs the recipient to the attached number); 409 when an
+                connect command and router number); 409 when an
                 existing conversation is inactive or a recipient-first line
                 has not received a message yet, with setup-appropriate next
                 steps in the detail; 429 when the identity's rolling 24-hour

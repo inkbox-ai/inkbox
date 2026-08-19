@@ -7,7 +7,7 @@ Identity CRUD. Mailbox and tunnel are provisioned atomically by
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
 from inkbox.exceptions import InkboxAPIError
@@ -21,11 +21,7 @@ from inkbox.identities.types import (
     _AgentIdentityData,
     vault_secret_ids_to_wire,
 )
-from inkbox.imessage.types import (
-    IMessageNumberType,
-    _dedicated_number_type,
-    _validate_idempotency_key,
-)
+from inkbox.imessage.types import _validate_idempotency_key
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -42,7 +38,7 @@ class IdentitiesResource:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
-        imessage_number_type: IMessageNumberType | str | None = None,
+        claim_imessage_number: Literal[True] | None = None,
         mailbox: IdentityMailboxCreateOptions | None = None,
         tunnel: IdentityTunnelCreateOptions | None = None,
         phone_number: IdentityPhoneNumberCreateOptions | None = None,
@@ -63,8 +59,8 @@ class IdentitiesResource:
                 to the server default.
             imessage_enabled: Whether the identity can use iMessage. Omit to
                 defer to the server default (``False``).
-            imessage_number_type: Claim and attach a new dedicated inbound or
-                outbound iMessage number atomically. Requires
+            claim_imessage_number: Claim and attach a new dedicated iMessage
+                line atomically. Requires
                 ``imessage_enabled=True``.
             mailbox: Optional nested mailbox spec.
             tunnel: Optional nested tunnel spec (tls_mode only).
@@ -75,6 +71,8 @@ class IdentitiesResource:
             The created identity with ``mailbox`` and ``tunnel``
             populated from the atomic create response.
         """
+        if claim_imessage_number is not None and claim_imessage_number is not True:
+            raise ValueError("claim_imessage_number must be True when supplied")
         body: dict[str, Any] = {"agent_handle": agent_handle}
         if display_name is not None:
             body["display_name"] = display_name
@@ -82,14 +80,13 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
-        if imessage_number_type is not None:
+        if claim_imessage_number is True:
             if imessage_enabled is not True:
                 raise ValueError(
-                    "imessage_number_type requires imessage_enabled=True"
+                    "claim_imessage_number requires imessage_enabled=True"
                 )
-            body["imessage_number_type"] = _dedicated_number_type(
-                imessage_number_type
-            ).value
+        if claim_imessage_number is True:
+            body["claim_imessage_number"] = True
         if mailbox is not None:
             body["mailbox"] = mailbox.to_wire()
         if tunnel is not None:
@@ -124,7 +121,7 @@ class IdentitiesResource:
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
         imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
-        imessage_number_type: IMessageNumberType | str | None = None,
+        claim_imessage_number: Literal[True] | None = None,
         idempotency_key: str | None = None,
         imessage_filter_mode: str | None = None,
         mail_filter_mode: str | None = None,
@@ -144,13 +141,13 @@ class IdentitiesResource:
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
             imessage_enabled: Toggle iMessage reachability.
-            imessage_number_id: Attach an already-owned dedicated number by
+            imessage_number_id: Attach an already-owned dedicated line by
                 UUID, pass ``None`` to move back to the shared service, or
                 omit to leave the current attachment unchanged.
-            imessage_number_type: Claim and attach a new dedicated number of the
-                requested type. Cannot be combined with
+            claim_imessage_number: Claim and attach a new dedicated iMessage
+                line. Cannot be combined with
                 ``imessage_number_id`` and requires ``idempotency_key``.
-            idempotency_key: Stable caller-generated key for a dedicated-number
+            idempotency_key: Stable caller-generated key for a dedicated-line
                 claim. Reuse the same value when retrying the same update.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
@@ -160,6 +157,8 @@ class IdentitiesResource:
                 identity's phone contact rules (admin-only). The server
                 rejects this with 422 when the identity has no phone number.
         """
+        if claim_imessage_number is not None and claim_imessage_number is not True:
+            raise ValueError("claim_imessage_number must be True when supplied")
         body: dict[str, Any] = {}
         if new_handle is not None:
             body["agent_handle"] = new_handle
@@ -169,22 +168,21 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
-        if imessage_number_type is not None and imessage_number_id is not _UNSET:
+        if claim_imessage_number is True and imessage_number_id is not _UNSET:
             raise ValueError(
-                "imessage_number_type and imessage_number_id cannot be set together"
+                "claim_imessage_number and imessage_number_id cannot be set together"
             )
-        if imessage_number_type is not None:
+        if claim_imessage_number is True:
             if imessage_enabled is False:
                 raise ValueError(
-                    "imessage_number_type cannot be set while disabling iMessage"
+                    "claim_imessage_number cannot be set while disabling iMessage"
                 )
             if idempotency_key is None:
                 raise ValueError(
-                    "idempotency_key is required with imessage_number_type"
+                    "idempotency_key is required with claim_imessage_number"
                 )
-            body["imessage_number_type"] = _dedicated_number_type(
-                imessage_number_type
-            ).value
+        if claim_imessage_number is True:
+            body["claim_imessage_number"] = True
         if imessage_number_id is not _UNSET:
             if imessage_number_id is not None and imessage_enabled is False:
                 raise ValueError(

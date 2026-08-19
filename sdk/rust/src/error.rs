@@ -106,12 +106,12 @@ pub enum InkboxError {
     },
 
     /// 402 when the organization has reached its dedicated iMessage number
-    /// allowance for the requested role.
+    /// allowance. The response retains a fixed compatibility field.
     #[error("HTTP {status_code}: dedicated iMessage number quota exceeded ({message})")]
     DedicatedIMessageNumberQuotaExceeded {
         status_code: u16,
         message: Box<str>,
-        /// Requested number role.
+        /// Fixed response compatibility field.
         number_type: Box<str>,
         limit: i64,
         current: i64,
@@ -127,7 +127,7 @@ pub enum InkboxError {
     DedicatedIMessageNumberInventoryPending {
         status_code: u16,
         message: Box<str>,
-        /// Requested number role.
+        /// Fixed response compatibility field.
         number_type: Box<str>,
         retry_after_seconds: u64,
         /// Parsed delta-seconds value from the HTTP `Retry-After` header.

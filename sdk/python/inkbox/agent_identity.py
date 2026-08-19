@@ -11,7 +11,7 @@ or phone number ID explicitly.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
 
 from inkbox.credentials import Credentials
@@ -55,7 +55,6 @@ from inkbox.imessage.types import (
     IMessageReaction,
     IMessageReactionType,
     IMessageSendStyle,
-    IMessageNumberType,
 )
 from inkbox.mail.types import (
     DraftDetail,
@@ -202,7 +201,7 @@ class AgentIdentity:
 
     @property
     def imessage_number(self) -> IdentityIMessageNumber | None:
-        """Dedicated iMessage number attached to this identity, if any."""
+        """Dedicated iMessage line attached to this identity, if any."""
         return self._imessage_number
 
     @property
@@ -1206,13 +1205,13 @@ class AgentIdentity:
     ) -> IMessage:
         """Send an outbound iMessage as this identity.
 
-        Shared and dedicated inbound service require the recipient to connect
-        first. A dedicated outbound number may start a conversation, subject to
-        server-side policy checks.
+        Shared service requires the recipient to connect first. A dedicated
+        iMessage line may start a conversation, subject to server-side policy
+        checks.
 
         Args:
             to: One E.164 recipient or 1–8 distinct recipients. Two or more
-                recipients select or create a dedicated-outbound group.
+                recipients select or create a dedicated-line group.
                 Mutually exclusive with ``conversation_id``.
             conversation_id: Existing conversation UUID to reply into.
             text: Message body.
@@ -1917,7 +1916,7 @@ class AgentIdentity:
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
         imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
-        imessage_number_type: IMessageNumberType | str | None = None,
+        claim_imessage_number: Literal[True] | None = None,
         idempotency_key: str | None = None,
         imessage_filter_mode: FilterMode | str | None = None,
         mail_filter_mode: FilterMode | str | None = None,
@@ -1936,13 +1935,13 @@ class AgentIdentity:
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
             imessage_enabled: Toggle iMessage reachability.
-            imessage_number_id: Attach an already-owned dedicated number by
+            imessage_number_id: Attach an already-owned dedicated line by
                 UUID, pass ``None`` to move back to the shared service, or
                 omit to keep the current attachment.
-            imessage_number_type: Claim and attach a new dedicated inbound or
-                outbound number. Cannot be combined with
+            claim_imessage_number: Claim and attach a new dedicated iMessage
+                line. Cannot be combined with
                 ``imessage_number_id`` and requires ``idempotency_key``.
-            idempotency_key: Stable caller-generated key for a dedicated-number
+            idempotency_key: Stable caller-generated key for a dedicated-line
                 claim. Reuse it when retrying the same logical update.
             imessage_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
                 iMessage contact rules (admin-only).
@@ -1965,8 +1964,8 @@ class AgentIdentity:
             update_kwargs["imessage_enabled"] = imessage_enabled
         if imessage_number_id is not _UNSET:
             update_kwargs["imessage_number_id"] = imessage_number_id
-        if imessage_number_type is not None:
-            update_kwargs["imessage_number_type"] = imessage_number_type
+        if claim_imessage_number is not None:
+            update_kwargs["claim_imessage_number"] = claim_imessage_number
         if idempotency_key is not None:
             update_kwargs["idempotency_key"] = idempotency_key
         if imessage_filter_mode is not None:

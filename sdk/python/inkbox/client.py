@@ -43,7 +43,6 @@ from inkbox.identities.types import (  # noqa: I001
 )
 from inkbox.imessage.resources.contact_rules import IMessageContactRulesResource
 from inkbox.imessage.resources.imessages import IMessagesResource
-from inkbox.imessage.types import IMessageNumberType
 from inkbox.mail.resources.contact_rules import MailContactRulesResource
 from inkbox.mail.resources.identity_contact_rules import (
     MailIdentityContactRulesResource,
@@ -493,7 +492,7 @@ class Inkbox:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
-        imessage_number_type: IMessageNumberType | str | None = None,
+        claim_imessage_number: Literal[True] | None = None,
         email_local_part: str | None = None,
         sending_domain: str | None = _UNSET,  # type: ignore[assignment]
         tunnel: "IdentityTunnelCreateOptions | None" = None,
@@ -518,8 +517,8 @@ class Inkbox:
                 server default. Never surfaces in outbound mail.
             imessage_enabled: Whether this identity can use iMessage.
                 Defaults server-side to ``False``; pass ``True`` to opt in.
-            imessage_number_type: Claim and attach a dedicated inbound or
-                outbound iMessage number atomically. Requires
+            claim_imessage_number: Claim and attach a dedicated iMessage line
+                atomically. Requires
                 ``imessage_enabled=True``.
             email_local_part: Optional requested mailbox local part.
                 On the platform domain the server forces it to the
@@ -551,7 +550,7 @@ class Inkbox:
             display_name=display_name,
             description=description,
             imessage_enabled=imessage_enabled,
-            imessage_number_type=imessage_number_type,
+            claim_imessage_number=claim_imessage_number,
             mailbox=mailbox,
             tunnel=tunnel,
             phone_number=phone_number,

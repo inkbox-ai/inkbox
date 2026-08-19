@@ -4,6 +4,27 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.0 — Dedicated iMessage lines
+
+### Changed
+
+- iMessage number claims no longer take a line-type selector. Python and Rust
+  callers pass only an idempotency key; TypeScript callers pass only
+  `idempotencyKey`.
+- Atomic identity provisioning now uses `claim_imessage_number=True` in Python
+  and Rust and `claimIMessageNumber: true` in TypeScript.
+- Removed `IMessageNumberType`, its exports, and all dedicated-line type
+  arguments, plus the now-unconditional Python/Rust conversation-start
+  helpers. Applications upgrading to 0.6.0 must remove those obsolete
+  selector and capability accesses.
+- Dedicated-line responses retain `type: "dedicated_outbound"` as a fixed
+  compatibility field. It is not a capability selector. Existing structured
+  error codes, messages, and `number_type` details are unchanged.
+- Public SDK, CLI, and skill documentation now describes one dedicated
+  iMessage line that can initiate one-to-one and group conversations.
+- Package and plugin versions moved in lockstep to 0.6.0; the CLI now depends
+  on `@inkbox/sdk` `^0.6.0`.
+
 ## 0.5.18 — Email drafts
 
 ### Added

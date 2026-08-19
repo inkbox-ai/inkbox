@@ -8,7 +8,6 @@ import {
   IMessageDeliveryStatus,
   IMessageGroupCreationStatus,
   IMessageNumberStatus,
-  IMessageNumberType,
   IMessageReactionType,
   IMessageRuleAction,
   IMessageSendStyle,
@@ -16,6 +15,7 @@ import {
   parseIMessage,
 } from "../src/imessage/types.js";
 import { ContactRuleStatus } from "../src/mail/types.js";
+import * as InkboxExports from "../src/index.js";
 
 const BASE = "https://inkbox.ai/api/v1/imessage";
 
@@ -173,6 +173,10 @@ describe("IMessagesResource", () => {
     vi.restoreAllMocks();
   });
 
+  it("does not export a dedicated-line type selector", () => {
+    expect("IMessageNumberType" in InkboxExports).toBe(false);
+  });
+
   it("send posts style and media by conversation id", async () => {
     vi.mocked(fetch).mockResolvedValue(ok({ message: IMESSAGE_DICT }));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
@@ -204,7 +208,6 @@ describe("IMessagesResource", () => {
       {
         ...NUMBER_DICT,
         id: "99999999-0000-0000-0000-000000000002",
-        type: "dedicated_inbound",
         status: "paused",
         agent_identity_id: null,
         agent_handle: null,
@@ -220,7 +223,7 @@ describe("IMessagesResource", () => {
     expect(numbers[0]).toEqual({
       id: NUMBER_ID,
       number: "+15555550123",
-      type: IMessageNumberType.DEDICATED_OUTBOUND,
+      type: "dedicated_outbound",
       status: IMessageNumberStatus.ACTIVE,
       agentIdentityId: IDENTITY_ID,
       agentHandle: HANDLE,
@@ -228,22 +231,29 @@ describe("IMessagesResource", () => {
     expect(numbers[1]).toEqual({
       id: "99999999-0000-0000-0000-000000000002",
       number: "+15555550123",
-      type: IMessageNumberType.DEDICATED_INBOUND,
+      type: "dedicated_outbound",
       status: IMessageNumberStatus.PAUSED,
       agentIdentityId: null,
       agentHandle: null,
     });
-    expect(numbers.map((number) => (
-      number.type === IMessageNumberType.DEDICATED_OUTBOUND
-    ))).toEqual([true, false]);
+    expect(numbers.map((number) => number.type)).toEqual([
+      "dedicated_outbound",
+      "dedicated_outbound",
+    ]);
   });
 
-  it("claims a number with the exact type body and idempotency key", async () => {
+  it("rejects a retired dedicated-line response type", async () => {
+    vi.mocked(fetch).mockResolvedValue(ok([{ ...NUMBER_DICT, type: "dedicated_inbound" }]));
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    await expect(resource.listNumbers()).rejects.toThrow("dedicated_outbound");
+  });
+
+  it("claims a number with a type-less body and idempotency key", async () => {
     vi.mocked(fetch).mockResolvedValue(ok(NUMBER_DICT));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
 
     const number = await resource.claimNumber({
-      type: IMessageNumberType.DEDICATED_OUTBOUND,
       idempotencyKey: "claim-number-123",
     });
 
@@ -251,7 +261,7 @@ describe("IMessagesResource", () => {
     expect(url).toBe(`${BASE}/numbers`);
     expect(init.method).toBe("POST");
     expect(new Headers(init.headers).get("Idempotency-Key")).toBe("claim-number-123");
-    expect(JSON.parse(init.body as string)).toEqual({ type: "dedicated_outbound" });
+    expect(JSON.parse(init.body as string)).toEqual({});
     expect(number.id).toBe(NUMBER_ID);
   });
 
@@ -259,7 +269,6 @@ describe("IMessagesResource", () => {
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
 
     await expect(resource.claimNumber({
-      type: IMessageNumberType.DEDICATED_INBOUND,
       idempotencyKey: "",
     })).rejects.toThrow("between 1 and 255 characters");
     expect(fetch).not.toHaveBeenCalled();
@@ -269,7 +278,6 @@ describe("IMessagesResource", () => {
     vi.mocked(fetch).mockResolvedValue(ok(NUMBER_DICT));
     const resource = new IMessagesResource(new HttpTransport("k", BASE));
     const options = {
-      type: IMessageNumberType.DEDICATED_OUTBOUND,
       idempotencyKey: "stable-claim-key",
     } as const;
 
@@ -279,6 +287,7 @@ describe("IMessagesResource", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     for (const [, init] of vi.mocked(fetch).mock.calls) {
       expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("stable-claim-key");
+      expect(JSON.parse(init?.body as string)).toEqual({});
     }
   });
 

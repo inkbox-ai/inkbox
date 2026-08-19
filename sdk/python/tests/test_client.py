@@ -179,7 +179,7 @@ class TestPerRequestHeaders:
         mutate = getattr(transport, method)
         mutate(
             "/numbers",
-            json={"type": "dedicated_outbound"},
+            json={},
             headers={"Idempotency-Key": "stable-logical-operation"},
         )
 

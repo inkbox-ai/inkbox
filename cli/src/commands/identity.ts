@@ -394,7 +394,7 @@ export function registerIdentityCommands(program: Command): void {
     )
     .option(
       "--imessage-enabled",
-      "Opt the identity into the shared iMessage service.",
+      "Enable iMessage reachability for this identity.",
       false,
     )
     .option(
@@ -504,7 +504,7 @@ export function registerIdentityCommands(program: Command): void {
     .option("--display-name <name>", "New display name (pass '' to clear)")
     .option("--description <text>", "New description (pass '' to clear)")
     .option("--clear-description", "Explicitly clear the description (sends null)", false)
-    .option("--imessage-enabled <bool>", "Toggle shared-iMessage reachability: true or false")
+    .option("--imessage-enabled <bool>", "Toggle identity-level iMessage reachability: true or false")
     .option("--imessage-filter-mode <mode>", "iMessage contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--phone-filter-mode <mode>", "Phone contact-rule mode: whitelist or blacklist (admin-only; identity must have a phone number)")
