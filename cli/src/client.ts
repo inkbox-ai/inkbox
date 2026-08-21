@@ -5,7 +5,7 @@ import { Inkbox } from "@inkbox/sdk";
 import type { Command } from "commander";
 
 // Keep in sync with package.json "version".
-export const CLI_VERSION = "0.6.0";
+export const CLI_VERSION = "0.6.1";
 
 export interface GlobalOpts {
   apiKey?: string;

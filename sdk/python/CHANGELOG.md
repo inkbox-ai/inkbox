@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — Automatic iMessage contact sharing
+
+- Identity create and update accept `contact_sharing_enabled`; dedicated lines
+  share the identity's display name or handle and optional avatar by default.
+
 ## 0.6.0 — Dedicated iMessage lines
 
 - `imessages.claim_number()` now takes only `idempotency_key` and sends a

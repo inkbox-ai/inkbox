@@ -519,7 +519,7 @@ class Inkbox:
             imessage_enabled: Whether this identity can use iMessage.
             contact_sharing_enabled: Whether an attached dedicated iMessage
                 line automatically shares the identity's name and optional avatar.
-                Defaults server-side to ``False``; pass ``True`` to opt in.
+                Defaults server-side to ``True``; pass ``False`` to opt out.
             claim_imessage_number: Claim and attach a dedicated iMessage line
                 atomically. Requires
                 ``imessage_enabled=True``.

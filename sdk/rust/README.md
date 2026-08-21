@@ -300,11 +300,12 @@ A number can also be claimed and attached atomically while creating an identity:
 ```rust
 use inkbox::identities::Unset;
 
-let identity = inkbox.create_identity_with_imessage_number(
+let identity = inkbox.create_identity_with_contact_sharing_and_imessage_number(
     "support-bot",
     None,
     Unset::Omit,
     Some(true),
+    Some(false), // opt out of automatic contact sharing
     None,
     Unset::Omit,
     None,

@@ -90,6 +90,36 @@ impl IdentitiesResource {
         vault_secret_ids: Option<&VaultSecretIds>,
         claim_imessage_number: Option<bool>,
     ) -> Result<AgentIdentityData> {
+        self.create_with_contact_sharing_and_imessage_number(
+            agent_handle,
+            display_name,
+            description,
+            imessage_enabled,
+            None,
+            mailbox,
+            tunnel,
+            phone_number,
+            vault_secret_ids,
+            claim_imessage_number,
+        )
+    }
+
+    /// Create an identity while explicitly controlling automatic contact
+    /// sharing and optionally claiming a dedicated iMessage number atomically.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_contact_sharing_and_imessage_number(
+        &self,
+        agent_handle: &str,
+        display_name: Option<&str>,
+        description: Unset<String>,
+        imessage_enabled: Option<bool>,
+        contact_sharing_enabled: Option<bool>,
+        mailbox: Option<&IdentityMailboxCreateOptions>,
+        tunnel: Option<&IdentityTunnelCreateOptions>,
+        phone_number: Option<&IdentityPhoneNumberCreateOptions>,
+        vault_secret_ids: Option<&VaultSecretIds>,
+        claim_imessage_number: Option<bool>,
+    ) -> Result<AgentIdentityData> {
         if claim_imessage_number == Some(false) {
             return Err(crate::error::InkboxError::InvalidArgument(
                 "claim_imessage_number only accepts true when supplied".into(),
@@ -122,6 +152,9 @@ impl IdentitiesResource {
         }
         if let Some(flag) = imessage_enabled {
             body.insert("imessage_enabled".into(), Value::Bool(flag));
+        }
+        if let Some(flag) = contact_sharing_enabled {
+            body.insert("contact_sharing_enabled".into(), Value::Bool(flag));
         }
         if claim_imessage_number == Some(true) {
             body.insert("claim_imessage_number".into(), Value::Bool(true));
@@ -491,6 +524,7 @@ mod tests {
                 .json_body(json!({
                     "agent_handle": "support-bot",
                     "imessage_enabled": true,
+                    "contact_sharing_enabled": false,
                     "claim_imessage_number": true
                 }));
             then.status(201).json_body(identity_json());
@@ -498,11 +532,12 @@ mod tests {
 
         let data = client(&server)
             .identities()
-            .create_with_imessage_number(
+            .create_with_contact_sharing_and_imessage_number(
                 "support-bot",
                 None,
                 Unset::Omit,
                 Some(true),
+                Some(false),
                 None,
                 None,
                 None,
