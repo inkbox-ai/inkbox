@@ -270,7 +270,7 @@ inkbox phone incoming-action [action] -i <handle>  # Get (no action) or set the 
   --ws-url <url>                             #   WebSocket URL (wss://) for audio bridging
   --webhook-url <url>                        #   HTTPS receiver for the webhook action
   --forward-to-phone <number>                #   Complete E.164 forwarding target
-  --forward-to-sip <uri>                     #   Complete SIP forwarding target
+  --forward-to-sip <uri>                     #   SIP target with a public DNS hostname
 
 inkbox phone hosted-agent get -i <handle>    # Show the Inkbox Voice AI config
 inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitted flag

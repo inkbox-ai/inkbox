@@ -328,7 +328,7 @@ export function registerPhoneCommands(program: Command): void {
     .option("--ws-url <url>", "WebSocket URL (wss://) for audio bridging")
     .option("--webhook-url <url>", "HTTPS receiver for the webhook action")
     .option("--forward-to-phone <number>", "Forward to a complete E.164 number")
-    .option("--forward-to-sip <uri>", "Forward to a complete SIP URI")
+    .option("--forward-to-sip <uri>", "Forward to a SIP URI with a public DNS hostname")
     .action(
       withErrorHandler(async function (
         this: Command,

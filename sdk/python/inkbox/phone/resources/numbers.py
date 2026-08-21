@@ -48,16 +48,23 @@ class PhoneNumbersResource:
         """Update phone number settings.
 
         Pass only the fields you want to change; omitted fields are
-        left as-is. Pass a field as ``None`` to clear it. To attach a
+        left as-is. Pass a field as ``None`` to clear it. Clearing a
+        forwarding target requires switching ``incoming_call_action``
+        away from ``"forward"`` in the same update. To attach a
         text-webhook receiver, use
         ``inkbox.webhooks.subscriptions.create(phone_number_id=...,
         url=..., event_types=[...])``.
 
         Args:
             phone_number_id: UUID of the phone number.
-            incoming_call_action: ``"auto_accept"``, ``"auto_reject"``, or ``"webhook"``.
+            incoming_call_action: ``"auto_accept"``, ``"auto_reject"``,
+                ``"webhook"``, ``"hosted_agent"``, or ``"forward"``.
             client_websocket_url: WebSocket URL (wss://) for audio bridging.
             incoming_call_webhook_url: Webhook URL called for incoming calls when action is ``"webhook"``.
+            forwarding_target_type: ``"phone"`` or ``"sip"``. Pass
+                ``None`` to clear while switching away from ``"forward"``.
+            forwarding_phone_number: Complete E.164 destination.
+            forwarding_sip_uri: Complete SIP URI using a public DNS hostname.
             filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on
                 the server; agent-scoped keys receive 403. A single value
                 governs both inbound voice and SMS.

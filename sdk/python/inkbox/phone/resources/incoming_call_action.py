@@ -70,11 +70,12 @@ class IncomingCallActionResource:
             incoming_call_webhook_url: HTTPS receiver for the
                 ``webhook`` action.
             forwarding_target_type: ``phone`` or ``sip``; ``None`` clears
-                both saved forwarding targets. Omit to preserve it.
+                both saved forwarding targets when switching away from the
+                ``forward`` action. Omit to preserve it.
             forwarding_phone_number: Complete E.164 destination. Pass
                 ``None`` to clear or omit to preserve it.
-            forwarding_sip_uri: Complete SIP destination. Pass ``None`` to
-                clear or omit to preserve it.
+            forwarding_sip_uri: Complete SIP destination using a public DNS
+                hostname. Pass ``None`` to clear or omit to preserve it.
         """
         action_value = (
             incoming_call_action.value

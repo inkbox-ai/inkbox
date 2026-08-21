@@ -266,12 +266,12 @@ export function registerNumberCommands(program: Command): void {
     .description("Update phone number configuration")
     .option(
       "--incoming-call-action <action>",
-      "Incoming call action: auto_accept, auto_reject, webhook, or hosted_agent",
+      "Incoming call action: auto_accept, auto_reject, webhook, hosted_agent, or forward",
     )
     .option("--client-websocket-url <url>", "Client WebSocket URL for audio bridging")
     .option("--incoming-call-webhook-url <url>", "Webhook URL for incoming calls")
     .option("--forward-to-phone <number>", "Forward to a complete E.164 number")
-    .option("--forward-to-sip <uri>", "Forward to a complete SIP URI")
+    .option("--forward-to-sip <uri>", "Forward to a SIP URI with a public DNS hostname")
     .option("--filter-mode <mode>", "Contact-rule filter mode: whitelist or blacklist (admin-only)")
     .action(
       withErrorHandler(async function (

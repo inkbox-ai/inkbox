@@ -42,13 +42,17 @@ export class IncomingCallActionResource {
   /**
    * Set the incoming-call routing config.
    *
-   * @param options.incomingCallAction - `auto_accept`, `auto_reject`, or `webhook`.
+   * @param options.incomingCallAction - `auto_accept`, `auto_reject`, `webhook`, `hosted_agent`, or `forward`.
    * @param options.agentIdentityId - UUID of the agent identity. Optional
    *   for agent-scoped keys; required under admin/JWT.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) to bridge
    *   accepted calls to.
    * @param options.incomingCallWebhookUrl - HTTPS URL that decides call
    *   routing when the action is `webhook`.
+   * @param options.forwardingTargetType - `phone` or `sip`; use `null` only
+   *   while switching away from `forward`.
+   * @param options.forwardingPhoneNumber - Complete E.164 destination.
+   * @param options.forwardingSipUri - Complete SIP URI using a public DNS hostname.
    */
   async set(options: {
     incomingCallAction: IncomingCallAction;

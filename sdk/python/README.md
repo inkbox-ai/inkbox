@@ -1053,7 +1053,7 @@ inkbox.incoming_call_action.set(
     incoming_call_webhook_url="https://your-agent.example.com/incoming-call",
 )
 
-# Forward every incoming call for this identity to a complete SIP URI
+# Forward every incoming call for this identity to a SIP URI with a public DNS hostname
 inkbox.incoming_call_action.set(
     incoming_call_action=IncomingCallAction.FORWARD,
     forwarding_target_type=ForwardingTargetType.SIP,

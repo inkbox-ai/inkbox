@@ -37,12 +37,16 @@ export class PhoneNumbersResource {
 
   /**
    * Update phone number settings. Only provided fields are updated.
-   * Pass a field as `null` to clear it.
+   * Pass a field as `null` to clear it. Clearing a forwarding target requires
+   * switching `incomingCallAction` away from `"forward"` in the same update.
    *
    * @param phoneNumberId - UUID of the phone number.
-   * @param options.incomingCallAction - `"auto_accept"`, `"auto_reject"`, or `"webhook"`.
+   * @param options.incomingCallAction - `"auto_accept"`, `"auto_reject"`, `"webhook"`, `"hosted_agent"`, or `"forward"`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.incomingCallWebhookUrl - Webhook URL called for incoming calls when action is `"webhook"`.
+   * @param options.forwardingTargetType - `"phone"` or `"sip"`; use `null` only while switching away from `"forward"`.
+   * @param options.forwardingPhoneNumber - Complete E.164 destination.
+   * @param options.forwardingSipUri - Complete SIP URI using a public DNS hostname.
    */
   async update(
     phoneNumberId: string,

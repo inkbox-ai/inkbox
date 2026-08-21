@@ -123,7 +123,7 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 | Mail | `mailboxes()`, `messages()`, `drafts()`, `threads()`, `mail_identity_contact_rules()`, `mail_contact_rules()` *(deprecated)*, `domains()` |
 | Phone | `calls()`, `phone_numbers()`, `texts()`, `incoming_call_action()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
 
-Incoming calls can be forwarded to a complete E.164 number or SIP URI with
+Incoming calls can be forwarded to a complete E.164 number or a SIP URI with a public DNS hostname using
 `incoming_call_action().set_with_options(...)` and
 `IncomingCallActionSetOptions`. Call responses expose chronological
 `forwardings`; older responses deserialize to an empty vector.
