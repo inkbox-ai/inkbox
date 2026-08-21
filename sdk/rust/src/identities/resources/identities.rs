@@ -170,6 +170,21 @@ impl IdentitiesResource {
         AgentIdentityData::from_value(data)
     }
 
+    /// Toggle automatic name and optional photo sharing for an attached
+    /// dedicated iMessage line.
+    pub fn set_contact_sharing_enabled(
+        &self,
+        agent_handle: &str,
+        enabled: bool,
+    ) -> Result<AgentIdentityData> {
+        let body = serde_json::json!({ "contact_sharing_enabled": enabled });
+        let data = self
+            .http
+            .patch(&format!("/{agent_handle}"), &body)
+            .map_err(map_identity_conflict_error)?;
+        AgentIdentityData::from_value(data)
+    }
+
     /// Update an identity's handle, display name, description, iMessage
     /// reachability and contact-rule filter modes.
     ///
@@ -441,8 +456,30 @@ mod tests {
 
         mock.assert();
         assert_eq!(identities[0].agent_handle, "support-bot");
+        assert!(identities[0].contact_sharing_enabled);
         assert!(identities[0].mailbox.is_none());
         assert!(identities[0].tunnel.is_none());
+    }
+
+    #[test]
+    fn updates_contact_sharing_without_changing_existing_update_signatures() {
+        let server = MockServer::start();
+        let mut response = identity_list_detail_json();
+        response["contact_sharing_enabled"] = json!(false);
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH)
+                .path("/api/v1/identities/support-bot")
+                .json_body(json!({ "contact_sharing_enabled": false }));
+            then.status(200).json_body(response);
+        });
+
+        let data = client(&server)
+            .identities()
+            .set_contact_sharing_enabled("support-bot", false)
+            .unwrap();
+
+        mock.assert();
+        assert!(!data.contact_sharing_enabled);
     }
 
     #[test]

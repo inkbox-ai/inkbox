@@ -6,6 +6,15 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## 0.6.0 — Dedicated iMessage lines
 
+### Added
+
+- Agent identities expose `contact_sharing_enabled` for automatic name and
+  optional photo sharing on an attached dedicated iMessage line. It defaults to
+  enabled and remains configurable when no line is attached. Python and
+  TypeScript support it in identity create/update options; Rust exposes
+  `set_contact_sharing_enabled`; the CLI adds
+  `--contact-sharing-enabled true|false`.
+
 ### Changed
 
 - iMessage number claims no longer take a line-type selector. Python and Rust

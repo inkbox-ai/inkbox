@@ -116,6 +116,24 @@ describe("IdentitiesResource.create", () => {
     expect(identity.imessageNumber?.type).toBe("dedicated_outbound");
   });
 
+  it("sends the contact-sharing toggle on create and update", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY_DETAIL);
+    vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY_DETAIL);
+    const res = new IdentitiesResource(http);
+
+    await res.create({ agentHandle: HANDLE, contactSharingEnabled: false });
+    expect(http.post).toHaveBeenCalledWith("/", {
+      agent_handle: HANDLE,
+      contact_sharing_enabled: false,
+    });
+
+    await res.update(HANDLE, { contactSharingEnabled: true });
+    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
+      contact_sharing_enabled: true,
+    });
+  });
+
   it("requires iMessage to be enabled when claiming during create", async () => {
     const http = mockHttp();
     const res = new IdentitiesResource(http);

@@ -358,6 +358,7 @@ export function registerIdentityCommands(program: Command): void {
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
             imessageEnabled: id.imessageEnabled,
+            contactSharingEnabled: id.contactSharingEnabled,
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
@@ -398,6 +399,10 @@ export function registerIdentityCommands(program: Command): void {
       false,
     )
     .option(
+      "--contact-sharing-enabled <bool>",
+      "Share the identity's name and optional avatar from its dedicated iMessage line: true or false.",
+    )
+    .option(
       "--email-local-part <part>",
       "Requested mailbox local part. On the platform domain the server forces this to the handle.",
     )
@@ -422,6 +427,7 @@ export function registerIdentityCommands(program: Command): void {
           displayName?: string;
           description?: string;
           imessageEnabled?: boolean;
+          contactSharingEnabled?: string;
           emailLocalPart?: string;
           sendingDomain?: string;
           platformDomain?: boolean;
@@ -434,12 +440,16 @@ export function registerIdentityCommands(program: Command): void {
         if (cmdOpts.tlsMode !== undefined && cmdOpts.tlsMode !== "edge" && cmdOpts.tlsMode !== "passthrough") {
           throw new Error("--tls-mode must be 'edge' or 'passthrough'");
         }
+        if (cmdOpts.contactSharingEnabled !== undefined && cmdOpts.contactSharingEnabled !== "true" && cmdOpts.contactSharingEnabled !== "false") {
+          throw new Error("--contact-sharing-enabled must be 'true' or 'false'");
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const createOpts: {
           displayName?: string;
           description?: string | null;
           imessageEnabled?: boolean;
+          contactSharingEnabled?: boolean;
           emailLocalPart?: string;
           sendingDomain?: string | null;
           tunnel?: { tlsMode?: "edge" | "passthrough" };
@@ -447,6 +457,9 @@ export function registerIdentityCommands(program: Command): void {
         if (cmdOpts.displayName !== undefined) createOpts.displayName = cmdOpts.displayName;
         if (cmdOpts.description !== undefined) createOpts.description = cmdOpts.description;
         if (cmdOpts.imessageEnabled) createOpts.imessageEnabled = true;
+        if (cmdOpts.contactSharingEnabled !== undefined) {
+          createOpts.contactSharingEnabled = cmdOpts.contactSharingEnabled === "true";
+        }
         if (cmdOpts.emailLocalPart !== undefined) createOpts.emailLocalPart = cmdOpts.emailLocalPart;
         if (cmdOpts.sendingDomain !== undefined) {
           createOpts.sendingDomain = cmdOpts.sendingDomain;
@@ -465,6 +478,7 @@ export function registerIdentityCommands(program: Command): void {
             description: id.description,
             mailbox: id.mailbox?.emailAddress ?? null,
             imessageEnabled: id.imessageEnabled,
+            contactSharingEnabled: id.contactSharingEnabled,
             tunnel: id.tunnel
               ? {
                   id: id.tunnel.id,
@@ -505,6 +519,7 @@ export function registerIdentityCommands(program: Command): void {
     .option("--description <text>", "New description (pass '' to clear)")
     .option("--clear-description", "Explicitly clear the description (sends null)", false)
     .option("--imessage-enabled <bool>", "Toggle identity-level iMessage reachability: true or false")
+    .option("--contact-sharing-enabled <bool>", "Toggle automatic name and optional photo sharing on a dedicated iMessage line: true or false")
     .option("--imessage-filter-mode <mode>", "iMessage contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--phone-filter-mode <mode>", "Phone contact-rule mode: whitelist or blacklist (admin-only; identity must have a phone number)")
@@ -518,6 +533,7 @@ export function registerIdentityCommands(program: Command): void {
           description?: string;
           clearDescription?: boolean;
           imessageEnabled?: string;
+          contactSharingEnabled?: string;
           imessageFilterMode?: string;
           mailFilterMode?: string;
           phoneFilterMode?: string;
@@ -528,6 +544,9 @@ export function registerIdentityCommands(program: Command): void {
         }
         if (cmdOpts.imessageEnabled !== undefined && cmdOpts.imessageEnabled !== "true" && cmdOpts.imessageEnabled !== "false") {
           throw new Error("--imessage-enabled must be 'true' or 'false'");
+        }
+        if (cmdOpts.contactSharingEnabled !== undefined && cmdOpts.contactSharingEnabled !== "true" && cmdOpts.contactSharingEnabled !== "false") {
+          throw new Error("--contact-sharing-enabled must be 'true' or 'false'");
         }
         for (const [flag, value] of [
           ["--imessage-filter-mode", cmdOpts.imessageFilterMode],
@@ -546,6 +565,7 @@ export function registerIdentityCommands(program: Command): void {
           displayName?: string | null;
           description?: string | null;
           imessageEnabled?: boolean;
+          contactSharingEnabled?: boolean;
           imessageFilterMode?: "whitelist" | "blacklist";
           mailFilterMode?: "whitelist" | "blacklist";
           phoneFilterMode?: "whitelist" | "blacklist";
@@ -561,6 +581,9 @@ export function registerIdentityCommands(program: Command): void {
         }
         if (cmdOpts.imessageEnabled !== undefined) {
           updateOpts.imessageEnabled = cmdOpts.imessageEnabled === "true";
+        }
+        if (cmdOpts.contactSharingEnabled !== undefined) {
+          updateOpts.contactSharingEnabled = cmdOpts.contactSharingEnabled === "true";
         }
         if (cmdOpts.imessageFilterMode !== undefined) {
           updateOpts.imessageFilterMode = cmdOpts.imessageFilterMode as "whitelist" | "blacklist";
@@ -594,6 +617,7 @@ export function registerIdentityCommands(program: Command): void {
             mailbox: id.mailbox?.emailAddress ?? null,
             phoneNumber: id.phoneNumber?.number ?? null,
             imessageEnabled: id.imessageEnabled,
+            contactSharingEnabled: id.contactSharingEnabled,
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,

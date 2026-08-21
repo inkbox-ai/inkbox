@@ -43,6 +43,8 @@ export class IdentitiesResource {
    * @param options.imessageEnabled - Whether the identity can be reached
    *   over iMessage. Omit to defer to the server
    *   default (`false`).
+   * @param options.contactSharingEnabled - Whether an attached dedicated
+   *   iMessage line shares the identity's name and optional avatar.
    * @param options.claimIMessageNumber - Claim a dedicated iMessage line and
    *   attach atomically. Requires `imessageEnabled: true`.
    * @param options.mailbox - Optional nested mailbox spec. Mailbox is
@@ -57,6 +59,7 @@ export class IdentitiesResource {
     displayName?: string;
     description?: string | null;
     imessageEnabled?: boolean;
+    contactSharingEnabled?: boolean;
     claimIMessageNumber?: true;
     mailbox?: IdentityMailboxCreateOptions;
     tunnel?: IdentityTunnelCreateOptions;
@@ -73,6 +76,7 @@ export class IdentitiesResource {
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if (options.contactSharingEnabled !== undefined) body["contact_sharing_enabled"] = options.contactSharingEnabled;
     if (options.claimIMessageNumber === true) {
       body["claim_imessage_number"] = true;
     }
@@ -118,6 +122,8 @@ export class IdentitiesResource {
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
    * @param options.imessageEnabled - Toggle identity-level iMessage reachability.
+   * @param options.contactSharingEnabled - Toggle automatic name and optional
+   *   photo sharing for an attached dedicated iMessage line.
    * @param options.imessageNumberId - Attach an owned dedicated line, or
    *   pass `null` to return to shared service.
    * @param options.claimIMessageNumber - Claim and attach a new dedicated line.
@@ -164,6 +170,7 @@ export class IdentitiesResource {
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
     if (options.description !== undefined) body["description"] = options.description;
     if (options.imessageEnabled !== undefined) body["imessage_enabled"] = options.imessageEnabled;
+    if (options.contactSharingEnabled !== undefined) body["contact_sharing_enabled"] = options.contactSharingEnabled;
     if ("imessageNumberId" in options) body["imessage_number_id"] = options.imessageNumberId;
     if (options.claimIMessageNumber === true) {
       body["claim_imessage_number"] = true;

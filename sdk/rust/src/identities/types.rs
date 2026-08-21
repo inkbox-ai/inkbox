@@ -239,6 +239,10 @@ fn default_filter_mode_blacklist() -> FilterMode {
     FilterMode::Blacklist
 }
 
+fn default_contact_sharing_enabled() -> bool {
+    true
+}
+
 /// Mailbox channel linked to an agent identity.
 ///
 /// `agent_identity_id` mirrors the same field on [`crate::mail::types::Mailbox`];
@@ -359,6 +363,10 @@ pub struct AgentIdentitySummary {
     /// Defaults to `false` when the server omits the field.
     #[serde(default)]
     pub imessage_enabled: bool,
+    /// Whether an attached dedicated iMessage line automatically shares this
+    /// identity's name and optional avatar. Defaults to `true` when absent.
+    #[serde(default = "default_contact_sharing_enabled")]
+    pub contact_sharing_enabled: bool,
     /// Defaults to `blacklist` when absent.
     #[serde(default = "default_filter_mode_blacklist")]
     pub imessage_filter_mode: FilterMode,

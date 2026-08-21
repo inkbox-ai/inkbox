@@ -440,6 +440,8 @@ export class Inkbox {
    * @param options.imessageEnabled - Whether this identity can be reached
    *   over iMessage. Defaults server-side to `false`;
    *   pass `true` to opt in.
+   * @param options.contactSharingEnabled - Whether an attached dedicated
+   *   iMessage line shares the identity's name and optional avatar.
    * @param options.claimIMessageNumber - Claim and attach a dedicated iMessage
    *   line atomically. Requires `imessageEnabled: true`.
    * @param options.emailLocalPart - Optional requested mailbox local part.
@@ -475,6 +477,7 @@ export class Inkbox {
     if (options.displayName !== undefined) createArgs.displayName = options.displayName;
     if (options.description !== undefined) createArgs.description = options.description;
     if (options.imessageEnabled !== undefined) createArgs.imessageEnabled = options.imessageEnabled;
+    if (options.contactSharingEnabled !== undefined) createArgs.contactSharingEnabled = options.contactSharingEnabled;
     if (options.claimIMessageNumber === true) {
       createArgs.claimIMessageNumber = true;
     }

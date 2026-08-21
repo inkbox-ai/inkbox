@@ -278,6 +278,7 @@ class AgentIdentitySummary:
     created_at: datetime
     updated_at: datetime
     imessage_enabled: bool = False
+    contact_sharing_enabled: bool = True
     imessage_filter_mode: FilterMode = FilterMode.BLACKLIST
     mail_filter_mode: FilterMode = FilterMode.BLACKLIST
     phone_filter_mode: FilterMode = FilterMode.BLACKLIST
@@ -306,6 +307,7 @@ class AgentIdentitySummary:
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
             imessage_enabled=d.get("imessage_enabled", False),
+            contact_sharing_enabled=d.get("contact_sharing_enabled", True),
             imessage_filter_mode=FilterMode(d.get("imessage_filter_mode") or "blacklist"),
             mail_filter_mode=FilterMode(d.get("mail_filter_mode") or "blacklist"),
             phone_filter_mode=FilterMode(d.get("phone_filter_mode") or "blacklist"),

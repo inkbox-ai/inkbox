@@ -492,6 +492,7 @@ class Inkbox:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        contact_sharing_enabled: bool | None = None,
         claim_imessage_number: Literal[True] | None = None,
         email_local_part: str | None = None,
         sending_domain: str | None = _UNSET,  # type: ignore[assignment]
@@ -516,6 +517,8 @@ class Inkbox:
                 ``None`` to leave the column null; omit to defer to the
                 server default. Never surfaces in outbound mail.
             imessage_enabled: Whether this identity can use iMessage.
+            contact_sharing_enabled: Whether an attached dedicated iMessage
+                line automatically shares the identity's name and optional avatar.
                 Defaults server-side to ``False``; pass ``True`` to opt in.
             claim_imessage_number: Claim and attach a dedicated iMessage line
                 atomically. Requires
@@ -550,6 +553,7 @@ class Inkbox:
             display_name=display_name,
             description=description,
             imessage_enabled=imessage_enabled,
+            contact_sharing_enabled=contact_sharing_enabled,
             claim_imessage_number=claim_imessage_number,
             mailbox=mailbox,
             tunnel=tunnel,

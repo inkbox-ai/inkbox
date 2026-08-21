@@ -197,6 +197,25 @@ impl AgentIdentity {
         self.data.borrow().summary.imessage_enabled
     }
 
+    /// Whether an attached dedicated iMessage line automatically shares this profile.
+    pub fn contact_sharing_enabled(&self) -> bool {
+        self.data.borrow().summary.contact_sharing_enabled
+    }
+
+    /// Toggle automatic name and optional photo sharing for this identity's
+    /// attached dedicated iMessage line.
+    pub fn set_contact_sharing_enabled(&self, enabled: bool) -> Result<()> {
+        let data = self
+            .inkbox
+            .identities()
+            .set_contact_sharing_enabled(&self.agent_handle(), enabled)?;
+        *self.mailbox.borrow_mut() = data.mailbox.clone();
+        *self.phone_number.borrow_mut() = data.phone_number.clone();
+        *self.tunnel.borrow_mut() = data.tunnel.clone();
+        *self.data.borrow_mut() = data;
+        Ok(())
+    }
+
     /// Whitelist/blacklist mode for this identity's iMessage contact rules.
     pub fn imessage_filter_mode(&self) -> FilterMode {
         self.data.borrow().summary.imessage_filter_mode
