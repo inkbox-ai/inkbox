@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from inkbox.mail.types import FilterMode
-from inkbox.phone.types import PhoneNumber, PhoneTranscript
+from inkbox.phone.types import ForwardingTargetType, PhoneNumber, PhoneTranscript
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -20,7 +20,6 @@ _UNSET = object()
 
 
 class PhoneNumbersResource:
-
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
@@ -41,6 +40,9 @@ class PhoneNumbersResource:
         incoming_call_action: str | None = _UNSET,  # type: ignore[assignment]
         client_websocket_url: str | None = _UNSET,  # type: ignore[assignment]
         incoming_call_webhook_url: str | None = _UNSET,  # type: ignore[assignment]
+        forwarding_target_type: ForwardingTargetType | str | None = _UNSET,  # type: ignore[assignment]
+        forwarding_phone_number: str | None = _UNSET,  # type: ignore[assignment]
+        forwarding_sip_uri: str | None = _UNSET,  # type: ignore[assignment]
         filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> PhoneNumber:
         """Update phone number settings.
@@ -72,9 +74,21 @@ class PhoneNumbersResource:
             body["client_websocket_url"] = client_websocket_url
         if incoming_call_webhook_url is not _UNSET:
             body["incoming_call_webhook_url"] = incoming_call_webhook_url
+        if forwarding_target_type is not _UNSET:
+            body["forwarding_target_type"] = (
+                forwarding_target_type.value
+                if isinstance(forwarding_target_type, ForwardingTargetType)
+                else forwarding_target_type
+            )
+        if forwarding_phone_number is not _UNSET:
+            body["forwarding_phone_number"] = forwarding_phone_number
+        if forwarding_sip_uri is not _UNSET:
+            body["forwarding_sip_uri"] = forwarding_sip_uri
         if filter_mode is not _UNSET:
             body["filter_mode"] = (
-                filter_mode.value if isinstance(filter_mode, FilterMode) else filter_mode
+                filter_mode.value
+                if isinstance(filter_mode, FilterMode)
+                else filter_mode
             )
         data = self._http.patch(f"{_BASE}/{phone_number_id}", json=body)
         return PhoneNumber._from_dict(data)

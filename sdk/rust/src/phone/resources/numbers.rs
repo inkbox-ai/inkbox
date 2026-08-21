@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::phone::types::{FilterMode, PhoneNumber, PhoneTranscript};
+use crate::phone::types::{FilterMode, ForwardingTargetType, PhoneNumber, PhoneTranscript};
 
 const BASE: &str = "/numbers";
 
@@ -59,6 +59,30 @@ impl PhoneNumbersResource {
         incoming_call_webhook_url: Option<Option<&str>>,
         filter_mode: Option<FilterMode>,
     ) -> Result<PhoneNumber> {
+        self.update_with_forwarding(
+            phone_number_id,
+            incoming_call_action,
+            client_websocket_url,
+            incoming_call_webhook_url,
+            filter_mode,
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_with_forwarding(
+        &self,
+        phone_number_id: &str,
+        incoming_call_action: Option<Option<&str>>,
+        client_websocket_url: Option<Option<&str>>,
+        incoming_call_webhook_url: Option<Option<&str>>,
+        filter_mode: Option<FilterMode>,
+        forwarding_target_type: Option<Option<ForwardingTargetType>>,
+        forwarding_phone_number: Option<Option<&str>>,
+        forwarding_sip_uri: Option<Option<&str>>,
+    ) -> Result<PhoneNumber> {
         let mut body = Map::new();
         // Each nullable-string field: outer None omits, Some(None) -> JSON null,
         // Some(Some(v)) -> the value.
@@ -77,6 +101,20 @@ impl PhoneNumbersResource {
                 FilterMode::Blacklist => "blacklist",
             };
             body.insert("filter_mode".into(), mode.into());
+        }
+        if let Some(value) = forwarding_target_type {
+            body.insert(
+                "forwarding_target_type".into(),
+                value
+                    .map(|target| Value::String(target.as_str().to_owned()))
+                    .unwrap_or(Value::Null),
+            );
+        }
+        if let Some(value) = forwarding_phone_number {
+            body.insert("forwarding_phone_number".into(), str_or_null(value));
+        }
+        if let Some(value) = forwarding_sip_uri {
+            body.insert("forwarding_sip_uri".into(), str_or_null(value));
         }
         let data = self
             .http

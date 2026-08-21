@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import {
   FilterMode,
+  ForwardingTargetType,
   PhoneRuleAction,
   PhoneRuleMatchType,
 } from "@inkbox/sdk";
@@ -247,6 +248,9 @@ export function registerNumberCommands(program: Command): void {
             incomingCallAction: num.incomingCallAction ?? null,
             clientWebsocketUrl: num.clientWebsocketUrl ?? null,
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
+            forwardingTargetType: num.forwardingTargetType ?? null,
+            forwardingPhoneNumber: num.forwardingPhoneNumber ?? null,
+            forwardingSipUri: num.forwardingSipUri ?? null,
             filterMode: num.filterMode,
             state: num.state,
             agentIdentityId: num.agentIdentityId,
@@ -266,6 +270,8 @@ export function registerNumberCommands(program: Command): void {
     )
     .option("--client-websocket-url <url>", "Client WebSocket URL for audio bridging")
     .option("--incoming-call-webhook-url <url>", "Webhook URL for incoming calls")
+    .option("--forward-to-phone <number>", "Forward to a complete E.164 number")
+    .option("--forward-to-sip <uri>", "Forward to a complete SIP URI")
     .option("--filter-mode <mode>", "Contact-rule filter mode: whitelist or blacklist (admin-only)")
     .action(
       withErrorHandler(async function (
@@ -276,14 +282,32 @@ export function registerNumberCommands(program: Command): void {
           clientWebsocketUrl?: string;
           incomingCallWebhookUrl?: string;
           filterMode?: string;
+          forwardToPhone?: string;
+          forwardToSip?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
+        if (cmdOpts.forwardToPhone && cmdOpts.forwardToSip) {
+          throw new Error("--forward-to-phone and --forward-to-sip are mutually exclusive");
+        }
+        if (cmdOpts.incomingCallAction === "forward" && !cmdOpts.forwardToPhone && !cmdOpts.forwardToSip) {
+          throw new Error("forward requires --forward-to-phone or --forward-to-sip");
+        }
+        if (cmdOpts.incomingCallAction !== "forward" && (cmdOpts.forwardToPhone || cmdOpts.forwardToSip)) {
+          throw new Error("forwarding destination flags require --incoming-call-action forward");
+        }
         const num = await inkbox.phoneNumbers.update(id, {
           incomingCallAction: cmdOpts.incomingCallAction,
           clientWebsocketUrl: cmdOpts.clientWebsocketUrl,
           incomingCallWebhookUrl: cmdOpts.incomingCallWebhookUrl,
+          forwardingTargetType: cmdOpts.forwardToPhone
+            ? ForwardingTargetType.PHONE
+            : cmdOpts.forwardToSip
+              ? ForwardingTargetType.SIP
+              : undefined,
+          forwardingPhoneNumber: cmdOpts.forwardToPhone,
+          forwardingSipUri: cmdOpts.forwardToSip,
           filterMode:
             cmdOpts.filterMode !== undefined
               ? assertFilterMode(cmdOpts.filterMode)
@@ -298,6 +322,9 @@ export function registerNumberCommands(program: Command): void {
             incomingCallAction: num.incomingCallAction ?? null,
             clientWebsocketUrl: num.clientWebsocketUrl ?? null,
             incomingCallWebhookUrl: num.incomingCallWebhookUrl ?? null,
+            forwardingTargetType: num.forwardingTargetType ?? null,
+            forwardingPhoneNumber: num.forwardingPhoneNumber ?? null,
+            forwardingSipUri: num.forwardingSipUri ?? null,
             filterMode: num.filterMode,
             agentIdentityId: num.agentIdentityId,
           },

@@ -119,6 +119,29 @@ class IncomingCallAction(StrEnum):
     AUTO_REJECT = "auto_reject"
     WEBHOOK = "webhook"
     HOSTED_AGENT = "hosted_agent"
+    FORWARD = "forward"
+
+
+class ForwardingTargetType(StrEnum):
+    """Kind of destination used to forward a call."""
+
+    PHONE = "phone"
+    SIP = "sip"
+
+
+class CallForwardingTrigger(StrEnum):
+    """What initiated a call-forwarding attempt."""
+
+    INCOMING_ACTION = "incoming_action"
+
+
+class CallForwardingStatus(StrEnum):
+    """Lifecycle state of a call-forwarding attempt."""
+
+    REQUESTED = "requested"
+    DIALING = "dialing"
+    FORWARDED = "forwarded"
+    FAILED = "failed"
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -165,6 +188,9 @@ class PhoneNumber:
     incoming_call_action: str
     client_websocket_url: str | None
     incoming_call_webhook_url: str | None
+    forwarding_target_type: ForwardingTargetType | None
+    forwarding_phone_number: str | None
+    forwarding_sip_uri: str | None
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
@@ -192,6 +218,13 @@ class PhoneNumber:
             incoming_call_action=d["incoming_call_action"],
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
+            forwarding_target_type=(
+                ForwardingTargetType(d["forwarding_target_type"])
+                if d.get("forwarding_target_type")
+                else None
+            ),
+            forwarding_phone_number=d.get("forwarding_phone_number"),
+            forwarding_sip_uri=d.get("forwarding_sip_uri"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
@@ -256,6 +289,8 @@ class PhoneCall:
     # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
     post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
+    # Forwarding attempts in chronological order. Older responses omit this.
+    forwardings: list[PhoneCallForwarding] = field(default_factory=list)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -275,7 +310,9 @@ class PhoneCall:
             updated_at=datetime.fromisoformat(d["updated_at"]),
             is_blocked=bool(d.get("is_blocked", False)),
             # Coerce a null/missing origin to dedicated for back-compat.
-            origin=CallOrigin(d["origin"]) if d.get("origin") else CallOrigin.DEDICATED_NUMBER,
+            origin=CallOrigin(d["origin"])
+            if d.get("origin")
+            else CallOrigin.DEDICATED_NUMBER,
             # Coerce a null/missing mode to client_websocket for back-compat.
             mode=d.get("mode") or "client_websocket",
             reason=d.get("reason"),
@@ -287,7 +324,11 @@ class PhoneCall:
             ),
             # Open items only, seq-ascending; empty for client_websocket calls.
             post_call_action_items=[
-                PostCallActionItem._from_dict(a) for a in d.get("post_call_action_items", [])
+                PostCallActionItem._from_dict(a)
+                for a in d.get("post_call_action_items", [])
+            ],
+            forwardings=[
+                PhoneCallForwarding._from_dict(f) for f in d.get("forwardings", [])
             ],
         )
 
@@ -329,7 +370,9 @@ class PhoneCallWithRateLimit(PhoneCall):
         base = PhoneCall._from_dict(d)
         return cls(
             **base.__dict__,
-            rate_limit=RateLimitInfo._from_dict(d["rate_limit"]) if d.get("rate_limit") else None,
+            rate_limit=RateLimitInfo._from_dict(d["rate_limit"])
+            if d.get("rate_limit")
+            else None,
         )
 
 
@@ -609,6 +652,9 @@ class IncomingCallActionConfig:
     incoming_call_action: IncomingCallAction
     client_websocket_url: str | None
     incoming_call_webhook_url: str | None
+    forwarding_target_type: ForwardingTargetType | None = None
+    forwarding_phone_number: str | None = None
+    forwarding_sip_uri: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IncomingCallActionConfig:
@@ -617,6 +663,13 @@ class IncomingCallActionConfig:
             incoming_call_action=IncomingCallAction(d["incoming_call_action"]),
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
+            forwarding_target_type=(
+                ForwardingTargetType(d["forwarding_target_type"])
+                if d.get("forwarding_target_type")
+                else None
+            ),
+            forwarding_phone_number=d.get("forwarding_phone_number"),
+            forwarding_sip_uri=d.get("forwarding_sip_uri"),
         )
 
 
@@ -674,6 +727,37 @@ class PostCallActionItem:
             action=d["action"],
             details=d.get("details"),
             status=d["status"],
+        )
+
+
+@dataclass
+class PhoneCallForwarding:
+    """One attempt to forward a call, ordered oldest-first on a call."""
+
+    id: UUID
+    trigger: CallForwardingTrigger
+    status: CallForwardingStatus
+    target_type: ForwardingTargetType
+    target: str
+    requested_at: datetime
+    dialing_at: datetime | None
+    forwarded_at: datetime | None
+    ended_at: datetime | None
+    failure_code: str | None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> PhoneCallForwarding:
+        return cls(
+            id=UUID(d["id"]),
+            trigger=CallForwardingTrigger(d["trigger"]),
+            status=CallForwardingStatus(d["status"]),
+            target_type=ForwardingTargetType(d["target_type"]),
+            target=d["target"],
+            requested_at=datetime.fromisoformat(d["requested_at"]),
+            dialing_at=_dt(d.get("dialing_at")),
+            forwarded_at=_dt(d.get("forwarded_at")),
+            ended_at=_dt(d.get("ended_at")),
+            failure_code=d.get("failure_code"),
         )
 
 

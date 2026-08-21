@@ -1042,7 +1042,7 @@ for t in segments:
 ### Incoming-call routing
 
 ```python
-from inkbox import IncomingCallAction
+from inkbox import ForwardingTargetType, IncomingCallAction
 
 # Read the current incoming-call config
 config = inkbox.incoming_call_action.get()
@@ -1052,6 +1052,17 @@ inkbox.incoming_call_action.set(
     incoming_call_action=IncomingCallAction.WEBHOOK,
     incoming_call_webhook_url="https://your-agent.example.com/incoming-call",
 )
+
+# Forward every incoming call for this identity to a complete SIP URI
+inkbox.incoming_call_action.set(
+    incoming_call_action=IncomingCallAction.FORWARD,
+    forwarding_target_type=ForwardingTargetType.SIP,
+    forwarding_sip_uri="sip:+14155550100@voice.example.com",
+)
+
+# Forwarding attempts are chronological and separate from call.status
+for forwarding in inkbox.calls.get("call-uuid").forwardings:
+    print(forwarding.status, forwarding.target)
 ```
 
 ---

@@ -154,6 +154,9 @@ pub struct IdentityPhoneNumberCreateOptions {
     pub incoming_call_action: String,
     pub client_websocket_url: Option<String>,
     pub incoming_call_webhook_url: Option<String>,
+    pub forwarding_target_type: Option<crate::phone::ForwardingTargetType>,
+    pub forwarding_phone_number: Option<String>,
+    pub forwarding_sip_uri: Option<String>,
 }
 
 impl Default for IdentityPhoneNumberCreateOptions {
@@ -164,6 +167,9 @@ impl Default for IdentityPhoneNumberCreateOptions {
             incoming_call_action: "auto_reject".to_string(),
             client_websocket_url: None,
             incoming_call_webhook_url: None,
+            forwarding_target_type: None,
+            forwarding_phone_number: None,
+            forwarding_sip_uri: None,
         }
     }
 }
@@ -181,6 +187,11 @@ impl IdentityPhoneNumberCreateOptions {
         if self.incoming_call_action == "webhook" && self.incoming_call_webhook_url.is_none() {
             return Err(crate::error::InkboxError::InvalidArgument(
                 "incoming_call_webhook_url is required for webhook".into(),
+            ));
+        }
+        if self.incoming_call_action == "forward" && self.forwarding_target_type.is_none() {
+            return Err(crate::error::InkboxError::InvalidArgument(
+                "forwarding_target_type is required for forward".into(),
             ));
         }
 
@@ -201,6 +212,21 @@ impl IdentityPhoneNumberCreateOptions {
                 "incoming_call_webhook_url".into(),
                 Value::String(url.clone()),
             );
+        }
+        if let Some(target_type) = self.forwarding_target_type {
+            body.insert(
+                "forwarding_target_type".into(),
+                Value::String(target_type.as_str().to_string()),
+            );
+        }
+        if let Some(number) = &self.forwarding_phone_number {
+            body.insert(
+                "forwarding_phone_number".into(),
+                Value::String(number.clone()),
+            );
+        }
+        if let Some(uri) = &self.forwarding_sip_uri {
+            body.insert("forwarding_sip_uri".into(), Value::String(uri.clone()));
         }
         Ok(Value::Object(body))
     }
@@ -317,6 +343,12 @@ pub struct IdentityPhoneNumber {
     pub client_websocket_url: Option<String>,
     #[serde(default)]
     pub incoming_call_webhook_url: Option<String>,
+    #[serde(default)]
+    pub forwarding_target_type: Option<crate::phone::ForwardingTargetType>,
+    #[serde(default)]
+    pub forwarding_phone_number: Option<String>,
+    #[serde(default)]
+    pub forwarding_sip_uri: Option<String>,
     /// Defaults to `blacklist` when absent.
     #[serde(default = "default_filter_mode_blacklist")]
     pub filter_mode: FilterMode,

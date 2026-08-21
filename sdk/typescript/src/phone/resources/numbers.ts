@@ -8,6 +8,7 @@ import { HttpTransport } from "../../_http.js";
 import { FilterMode } from "../../mail/types.js";
 import {
   PhoneNumber,
+  ForwardingTargetType,
   PhoneTranscript,
   RawPhoneNumber,
   RawPhoneTranscript,
@@ -49,6 +50,9 @@ export class PhoneNumbersResource {
       incomingCallAction?: string;
       clientWebsocketUrl?: string | null;
       incomingCallWebhookUrl?: string | null;
+      forwardingTargetType?: ForwardingTargetType | null;
+      forwardingPhoneNumber?: string | null;
+      forwardingSipUri?: string | null;
       filterMode?: FilterMode;
     },
   ): Promise<PhoneNumber> {
@@ -61,6 +65,15 @@ export class PhoneNumbersResource {
     }
     if ("incomingCallWebhookUrl" in options) {
       body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
+    }
+    if (options.forwardingTargetType !== undefined) {
+      body["forwarding_target_type"] = options.forwardingTargetType;
+    }
+    if (options.forwardingPhoneNumber !== undefined) {
+      body["forwarding_phone_number"] = options.forwardingPhoneNumber;
+    }
+    if (options.forwardingSipUri !== undefined) {
+      body["forwarding_sip_uri"] = options.forwardingSipUri;
     }
     if (options.filterMode !== undefined) {
       body["filter_mode"] = options.filterMode;

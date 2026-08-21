@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Incoming call forwarding
+
+- Added `IncomingCallAction.FORWARD`, typed forwarding destinations, and
+  chronological `PhoneCall.forwardings` history.
+- `undefined` omits forwarding fields while `null` explicitly clears them;
+  phone-number updates expose the same fields.
+- Use this release for forwarding action typings, destination fields, and
+  forwarding history.
+
 ## 0.6.2 — Undo an iMessage tapback
 
 ### Added

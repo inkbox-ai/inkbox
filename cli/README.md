@@ -265,10 +265,12 @@ inkbox phone search-transcripts -i <handle>  # Search transcripts
 
 inkbox phone incoming-action [action] -i <handle>  # Get (no action) or set the identity's
                                              #   incoming-call action: auto_accept,
-                                             #   auto_reject, webhook, or hosted_agent
-                                             #   (hosted_agent needs no URL)
+                                             #   auto_reject, webhook, hosted_agent,
+                                             #   or forward
   --ws-url <url>                             #   WebSocket URL (wss://) for audio bridging
   --webhook-url <url>                        #   HTTPS receiver for the webhook action
+  --forward-to-phone <number>                #   Complete E.164 forwarding target
+  --forward-to-sip <uri>                     #   Complete SIP forwarding target
 
 inkbox phone hosted-agent get -i <handle>    # Show the Inkbox Voice AI config
 inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitted flag

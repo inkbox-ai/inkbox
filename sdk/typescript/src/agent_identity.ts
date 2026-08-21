@@ -38,6 +38,7 @@ import {
   CallOrigin,
   HostedAgentAuthorityMode,
   IncomingCallAction,
+  ForwardingTargetType,
   VoicemailDetection,
 } from "./phone/types.js";
 import type {
@@ -734,13 +735,34 @@ export class AgentIdentity {
     incomingCallAction: IncomingCallAction;
     clientWebsocketUrl?: string;
     incomingCallWebhookUrl?: string;
+    forwardingTargetType?: ForwardingTargetType | null;
+    forwardingPhoneNumber?: string | null;
+    forwardingSipUri?: string | null;
   }): Promise<IncomingCallActionConfig> {
-    return this._inkbox._incomingCallAction.set({
+    const request: {
+      incomingCallAction: IncomingCallAction;
+      agentIdentityId: string;
+      clientWebsocketUrl?: string;
+      incomingCallWebhookUrl?: string;
+      forwardingTargetType?: ForwardingTargetType | null;
+      forwardingPhoneNumber?: string | null;
+      forwardingSipUri?: string | null;
+    } = {
       incomingCallAction: options.incomingCallAction,
       agentIdentityId: this.id,
       clientWebsocketUrl: options.clientWebsocketUrl,
       incomingCallWebhookUrl: options.incomingCallWebhookUrl,
-    });
+    };
+    if (options.forwardingTargetType !== undefined) {
+      request.forwardingTargetType = options.forwardingTargetType;
+    }
+    if (options.forwardingPhoneNumber !== undefined) {
+      request.forwardingPhoneNumber = options.forwardingPhoneNumber;
+    }
+    if (options.forwardingSipUri !== undefined) {
+      request.forwardingSipUri = options.forwardingSipUri;
+    }
+    return this._inkbox._incomingCallAction.set(request);
   }
 
   // ------------------------------------------------------------------

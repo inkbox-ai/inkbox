@@ -4,6 +4,7 @@ import {
   CallOrigin,
   HostedAgentAuthorityMode,
   IncomingCallAction,
+  ForwardingTargetType,
   VoicemailDetection,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
@@ -320,17 +321,25 @@ export function registerPhoneCommands(program: Command): void {
   phone
     .command("incoming-action [action]")
     .description(
-      "Get, or set to auto_accept | auto_reject | webhook | hosted_agent, " +
-        "this identity's incoming-call action (hosted_agent needs no URL)",
+      "Get, or set this identity's incoming-call action: auto_accept | " +
+        "auto_reject | webhook | hosted_agent | forward",
     )
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--ws-url <url>", "WebSocket URL (wss://) for audio bridging")
     .option("--webhook-url <url>", "HTTPS receiver for the webhook action")
+    .option("--forward-to-phone <number>", "Forward to a complete E.164 number")
+    .option("--forward-to-sip <uri>", "Forward to a complete SIP URI")
     .action(
       withErrorHandler(async function (
         this: Command,
         action: string | undefined,
-        cmdOpts: { identity: string; wsUrl?: string; webhookUrl?: string },
+        cmdOpts: {
+          identity: string;
+          wsUrl?: string;
+          webhookUrl?: string;
+          forwardToPhone?: string;
+          forwardToSip?: string;
+        },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
@@ -338,11 +347,27 @@ export function registerPhoneCommands(program: Command): void {
         // Without an action, print the current config; with one, set it.
         // The action string is forwarded verbatim — the server rejects
         // unknown values.
+        if (cmdOpts.forwardToPhone && cmdOpts.forwardToSip) {
+          throw new Error("--forward-to-phone and --forward-to-sip are mutually exclusive");
+        }
+        if (action === IncomingCallAction.FORWARD && !cmdOpts.forwardToPhone && !cmdOpts.forwardToSip) {
+          throw new Error("forward requires --forward-to-phone or --forward-to-sip");
+        }
+        if (action !== IncomingCallAction.FORWARD && (cmdOpts.forwardToPhone || cmdOpts.forwardToSip)) {
+          throw new Error("forwarding destination flags require the 'forward' action");
+        }
         const config = action
           ? await identity.setIncomingCallAction({
               incomingCallAction: action as IncomingCallAction,
               clientWebsocketUrl: cmdOpts.wsUrl,
               incomingCallWebhookUrl: cmdOpts.webhookUrl,
+              forwardingTargetType: cmdOpts.forwardToPhone
+                ? ForwardingTargetType.PHONE
+                : cmdOpts.forwardToSip
+                  ? ForwardingTargetType.SIP
+                  : undefined,
+              forwardingPhoneNumber: cmdOpts.forwardToPhone,
+              forwardingSipUri: cmdOpts.forwardToSip,
             })
           : await identity.getIncomingCallAction();
         output(
@@ -351,6 +376,9 @@ export function registerPhoneCommands(program: Command): void {
             incomingCallAction: config.incomingCallAction,
             clientWebsocketUrl: config.clientWebsocketUrl,
             incomingCallWebhookUrl: config.incomingCallWebhookUrl,
+            forwardingTargetType: config.forwardingTargetType,
+            forwardingPhoneNumber: config.forwardingPhoneNumber,
+            forwardingSipUri: config.forwardingSipUri,
           },
           { json: !!opts.json },
         );

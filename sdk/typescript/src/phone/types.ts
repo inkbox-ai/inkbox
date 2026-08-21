@@ -111,6 +111,23 @@ export enum IncomingCallAction {
   AUTO_REJECT = "auto_reject",
   WEBHOOK = "webhook",
   HOSTED_AGENT = "hosted_agent",
+  FORWARD = "forward",
+}
+
+export enum ForwardingTargetType {
+  PHONE = "phone",
+  SIP = "sip",
+}
+
+export enum CallForwardingTrigger {
+  INCOMING_ACTION = "incoming_action",
+}
+
+export enum CallForwardingStatus {
+  REQUESTED = "requested",
+  DIALING = "dialing",
+  FORWARDED = "forwarded",
+  FAILED = "failed",
 }
 
 /**
@@ -146,6 +163,9 @@ export interface PhoneNumber {
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
+  forwardingTargetType: ForwardingTargetType | null;
+  forwardingPhoneNumber: string | null;
+  forwardingSipUri: string | null;
   filterMode: FilterMode;
   /**
    * 2-letter US state abbreviation (e.g. `"NY"`); `null` if not set.
@@ -275,6 +295,8 @@ export interface PhoneCall {
    * Empty for client_websocket calls and Voice AI calls with no open items.
    */
   postCallActionItems: PostCallActionItem[];
+  /** Forwarding attempts in chronological order. */
+  forwardings: PhoneCallForwarding[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -342,6 +364,23 @@ export interface IncomingCallActionConfig {
   incomingCallAction: IncomingCallAction;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
+  forwardingTargetType: ForwardingTargetType | null;
+  forwardingPhoneNumber: string | null;
+  forwardingSipUri: string | null;
+}
+
+/** One attempt to forward a call, returned oldest-first on the call. */
+export interface PhoneCallForwarding {
+  id: string;
+  trigger: CallForwardingTrigger;
+  status: CallForwardingStatus;
+  targetType: ForwardingTargetType;
+  target: string;
+  requestedAt: Date;
+  dialingAt: Date | null;
+  forwardedAt: Date | null;
+  endedAt: Date | null;
+  failureCode: string | null;
 }
 
 /**
@@ -462,6 +501,9 @@ export interface RawPhoneNumber {
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_call_webhook_url: string | null;
+  forwarding_target_type?: string | null;
+  forwarding_phone_number?: string | null;
+  forwarding_sip_uri?: string | null;
   filter_mode?: string;
   state?: string | null;
   agent_identity_id?: string | null;
@@ -533,6 +575,7 @@ export interface RawPhoneCall {
   voicemail_detection?: VoicemailDetection | string | null;
   // Absent/empty for client_websocket calls and Voice AI calls with no open items.
   post_call_action_items?: RawPostCallActionItem[];
+  forwardings?: RawPhoneCallForwarding[];
   created_at: string;
   updated_at: string;
 }
@@ -640,6 +683,22 @@ export interface RawIncomingCallActionConfig {
   incoming_call_action: string;
   client_websocket_url?: string | null;
   incoming_call_webhook_url?: string | null;
+  forwarding_target_type?: string | null;
+  forwarding_phone_number?: string | null;
+  forwarding_sip_uri?: string | null;
+}
+
+export interface RawPhoneCallForwarding {
+  id: string;
+  trigger: string;
+  status: string;
+  target_type: string;
+  target: string;
+  requested_at: string;
+  dialing_at?: string | null;
+  forwarded_at?: string | null;
+  ended_at?: string | null;
+  failure_code?: string | null;
 }
 
 export interface RawHostedAgentConfig {
@@ -677,6 +736,9 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url,
+    forwardingTargetType: (r.forwarding_target_type as ForwardingTargetType) ?? null,
+    forwardingPhoneNumber: r.forwarding_phone_number ?? null,
+    forwardingSipUri: r.forwarding_sip_uri ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     state: r.state ?? null,
     agentIdentityId: r.agent_identity_id ?? null,
@@ -755,6 +817,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
       (r.voicemail_detection as VoicemailDetection | null | undefined)
       ?? VoicemailDetection.ENABLED,
     postCallActionItems: (r.post_call_action_items ?? []).map(parsePostCallActionItem),
+    forwardings: (r.forwardings ?? []).map(parsePhoneCallForwarding),
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
@@ -825,6 +888,26 @@ export function parseIncomingCallActionConfig(
     incomingCallAction: r.incoming_call_action as IncomingCallAction,
     clientWebsocketUrl: r.client_websocket_url ?? null,
     incomingCallWebhookUrl: r.incoming_call_webhook_url ?? null,
+    forwardingTargetType: (r.forwarding_target_type as ForwardingTargetType) ?? null,
+    forwardingPhoneNumber: r.forwarding_phone_number ?? null,
+    forwardingSipUri: r.forwarding_sip_uri ?? null,
+  };
+}
+
+export function parsePhoneCallForwarding(
+  r: RawPhoneCallForwarding,
+): PhoneCallForwarding {
+  return {
+    id: r.id,
+    trigger: r.trigger as CallForwardingTrigger,
+    status: r.status as CallForwardingStatus,
+    targetType: r.target_type as ForwardingTargetType,
+    target: r.target,
+    requestedAt: new Date(r.requested_at),
+    dialingAt: r.dialing_at ? new Date(r.dialing_at) : null,
+    forwardedAt: r.forwarded_at ? new Date(r.forwarded_at) : null,
+    endedAt: r.ended_at ? new Date(r.ended_at) : null,
+    failureCode: r.failure_code ?? null,
   };
 }
 

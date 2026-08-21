@@ -1,5 +1,6 @@
 // sdk/typescript/tests/phone/types.test.ts
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   parsePhoneNumber,
   parsePhoneCall,
@@ -10,6 +11,9 @@ import {
   CallOrigin,
   VoicemailDetection,
   IncomingCallAction,
+  CallForwardingStatus,
+  CallForwardingTrigger,
+  ForwardingTargetType,
   SmsStatus,
 } from "../../src/phone/types.js";
 import {
@@ -89,6 +93,7 @@ describe("parsePhoneCall", () => {
     expect(c.isBlocked).toBe(false);
     expect(c.origin).toBe(CallOrigin.DEDICATED_NUMBER);
     expect(c.voicemailDetection).toBe(VoicemailDetection.ENABLED);
+    expect(c.forwardings).toEqual([]);
   });
 
   it("parses shared-pool origin and null localPhoneNumber", () => {
@@ -151,6 +156,28 @@ describe("parsePhoneCall", () => {
     const c = parsePhoneCall(legacyPayload);
     expect(c.isBlocked).toBe(false);
   });
+
+  it("parses forwarding history", () => {
+    const c = parsePhoneCall({
+      ...RAW_PHONE_CALL,
+      forwardings: [{
+        id: "bbbb2222-0000-0000-0000-000000000099",
+        trigger: "incoming_action",
+        status: "forwarded",
+        target_type: "phone",
+        target: "+14155550100",
+        requested_at: "2026-08-21T12:00:00Z",
+        dialing_at: "2026-08-21T12:00:01Z",
+        forwarded_at: "2026-08-21T12:00:03Z",
+        ended_at: null,
+        failure_code: null,
+      }],
+    });
+    expect(c.forwardings[0].trigger).toBe(CallForwardingTrigger.INCOMING_ACTION);
+    expect(c.forwardings[0].status).toBe(CallForwardingStatus.FORWARDED);
+    expect(c.forwardings[0].targetType).toBe(ForwardingTargetType.PHONE);
+    expect(c.forwardings[0].requestedAt).toBeInstanceOf(Date);
+  });
 });
 
 describe("parseRateLimitInfo", () => {
@@ -198,6 +225,16 @@ describe("parsePhoneTranscript", () => {
 });
 
 describe("parseIncomingCallActionConfig", () => {
+  it("parses the shared forwarding fixture", () => {
+    const fixture = JSON.parse(readFileSync(
+      new URL("../../../../tests/fixtures/incoming_call_forwarding.json", import.meta.url),
+      "utf8",
+    ));
+    const config = parseIncomingCallActionConfig(fixture.config);
+    expect(config.incomingCallAction).toBe(IncomingCallAction.FORWARD);
+    expect(config.forwardingTargetType).toBe(ForwardingTargetType.SIP);
+  });
+
   it("converts all fields", () => {
     const c = parseIncomingCallActionConfig(RAW_INCOMING_CALL_ACTION_CONFIG);
     expect(c.agentIdentityId).toBe(RAW_INCOMING_CALL_ACTION_CONFIG.agent_identity_id);

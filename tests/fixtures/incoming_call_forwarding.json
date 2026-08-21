@@ -1,0 +1,23 @@
+{
+  "config": {
+    "agent_identity_id": "eeee5555-0000-0000-0000-000000000001",
+    "incoming_call_action": "forward",
+    "client_websocket_url": null,
+    "incoming_call_webhook_url": null,
+    "forwarding_target_type": "sip",
+    "forwarding_phone_number": null,
+    "forwarding_sip_uri": "sip:+14155550100@voice.example.com"
+  },
+  "forwarding": {
+    "id": "bbbb2222-0000-0000-0000-000000000099",
+    "trigger": "incoming_action",
+    "status": "forwarded",
+    "target_type": "sip",
+    "target": "sip:+14155550100@voice.example.com",
+    "requested_at": "2026-08-21T12:00:00Z",
+    "dialing_at": "2026-08-21T12:00:01Z",
+    "forwarded_at": "2026-08-21T12:00:03Z",
+    "ended_at": null,
+    "failure_code": null
+  }
+}

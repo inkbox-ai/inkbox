@@ -4,6 +4,24 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## Unreleased — Incoming call forwarding
+
+### Added
+
+- Incoming-call actions can forward every inbound call for an identity to one
+  complete E.164 number or SIP URI across the Python, TypeScript, and Rust SDKs.
+- Phone-call responses expose chronological forwarding attempts separately
+  from the call lifecycle status and default to an empty list for older data.
+- The CLI accepts `--forward-to-phone` or `--forward-to-sip` on identity and
+  phone-number incoming-call action updates.
+
+### Compatibility
+
+- Forwarding fields preserve omission separately from explicit `null`, so a
+  caller can retain or clear saved destinations deliberately.
+- Older SDK versions should be upgraded for forwarding action types,
+  destination fields, and forwarding history.
+
 ## 0.6.2 — Undo an iMessage tapback
 
 ### Added

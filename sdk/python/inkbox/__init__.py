@@ -102,6 +102,9 @@ from inkbox.mail.types import (
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
+    CallForwardingStatus,
+    CallForwardingTrigger,
+    ForwardingTargetType,
     HostedAgentAuthorityMode,
     HostedAgentConfig,
     HostedAgentToolInvocation,
@@ -110,6 +113,7 @@ from inkbox.phone.types import (
     IncomingCallAction,
     IncomingCallActionConfig,
     PhoneCall,
+    PhoneCallForwarding,
     PhoneCallWithRateLimit,
     PhoneContactRule,
     PhoneIdentityContactRule,
@@ -369,6 +373,7 @@ from inkbox.webhooks import (
     WebhookMailAgentIdentity,
     WebhookMailContact,
     WebhookPhoneCall,
+    WebhookPhoneCallForwarding,
     WebhookPostCallActionItemWire,
     WebhookTranscriptEntryWire,
 )
@@ -487,6 +492,9 @@ __all__ = [
     # Phone types
     "CallMode",
     "CallOrigin",
+    "CallForwardingStatus",
+    "CallForwardingTrigger",
+    "ForwardingTargetType",
     "HostedAgentAuthorityMode",
     "HostedAgentConfig",
     "HostedAgentToolInvocation",
@@ -495,6 +503,7 @@ __all__ = [
     "IncomingCallAction",
     "IncomingCallActionConfig",
     "PhoneCall",
+    "PhoneCallForwarding",
     "PhoneCallWithRateLimit",
     "PhoneContactRule",
     "PhoneIdentityContactRule",
@@ -723,6 +732,7 @@ __all__ = [
     "WebhookMailAgentIdentity",
     "WebhookMailContact",
     "WebhookPhoneCall",
+    "WebhookPhoneCallForwarding",
     "WebhookPostCallActionItemWire",
     "WebhookTranscriptEntryWire",
     # Webhook subscriptions
