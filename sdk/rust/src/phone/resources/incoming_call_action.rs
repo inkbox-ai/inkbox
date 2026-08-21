@@ -50,7 +50,8 @@ impl IncomingCallActionResource {
     /// Set the incoming-call routing config.
     ///
     /// # Arguments
-    /// * `incoming_call_action` - `auto_accept`, `auto_reject`, or `webhook`.
+    /// * `incoming_call_action` - `auto_accept`, `auto_reject`, `webhook`,
+    ///   `hosted_agent`, or `forward`.
     /// * `agent_identity_id` - UUID (or string) of the agent identity. `None`
     ///   for agent-scoped keys; required under admin/JWT.
     /// * `client_websocket_url` - WebSocket URL (wss://) to bridge accepted
@@ -76,6 +77,11 @@ impl IncomingCallActionResource {
     }
 
     /// Set the action with forwarding fields and explicit-clear semantics.
+    ///
+    /// In `options.forwarding_*`, outer `None` omits a field and preserves its
+    /// saved value. `Some(None)` sends JSON `null`; clear the target while
+    /// switching away from `forward`. A phone target must be a complete E.164
+    /// number. A SIP target must be a complete URI with a public DNS hostname.
     pub fn set_with_options(
         &self,
         incoming_call_action: IncomingCallAction,

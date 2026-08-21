@@ -41,7 +41,8 @@ impl PhoneNumbersResource {
     /// mirroring the Python `_UNSET` sentinel vs an explicit `None` value.
     ///
     /// # Arguments
-    /// * `incoming_call_action` - `"auto_accept"`, `"auto_reject"`, or `"webhook"`.
+    /// * `incoming_call_action` - `"auto_accept"`, `"auto_reject"`,
+    ///   `"webhook"`, `"hosted_agent"`, or `"forward"`.
     /// * `client_websocket_url` - WebSocket URL (wss://) for audio bridging.
     /// * `incoming_call_webhook_url` - Webhook URL called for incoming calls when
     ///   action is `"webhook"`.
@@ -72,6 +73,11 @@ impl PhoneNumbersResource {
     }
 
     #[allow(clippy::too_many_arguments)]
+    /// Update phone-number settings, including an optional forwarding target.
+    ///
+    /// The three forwarding arguments use outer `None` to preserve a saved
+    /// field and `Some(None)` to clear it. Clear a target while switching the
+    /// incoming-call action away from `forward` in the same request.
     pub fn update_with_forwarding(
         &self,
         phone_number_id: &str,
