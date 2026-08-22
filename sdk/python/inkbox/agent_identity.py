@@ -166,6 +166,11 @@ class AgentIdentity:
         return self._data.imessage_enabled
 
     @property
+    def contact_sharing_enabled(self) -> bool:
+        """Whether an attached dedicated iMessage line shares this profile."""
+        return self._data.contact_sharing_enabled
+
+    @property
     def imessage_filter_mode(self) -> FilterMode:
         """Whitelist/blacklist mode for this identity's iMessage contact rules."""
         return self._data.imessage_filter_mode
@@ -1915,6 +1920,7 @@ class AgentIdentity:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        contact_sharing_enabled: bool | None = None,
         imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
         claim_imessage_number: Literal[True] | None = None,
         idempotency_key: str | None = None,
@@ -1935,6 +1941,8 @@ class AgentIdentity:
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
             imessage_enabled: Toggle iMessage reachability.
+            contact_sharing_enabled: Toggle automatic name and optional photo
+                sharing for an attached dedicated iMessage line.
             imessage_number_id: Attach an already-owned dedicated line by
                 UUID, pass ``None`` to move back to the shared service, or
                 omit to keep the current attachment.
@@ -1962,6 +1970,8 @@ class AgentIdentity:
             update_kwargs["description"] = description
         if imessage_enabled is not None:
             update_kwargs["imessage_enabled"] = imessage_enabled
+        if contact_sharing_enabled is not None:
+            update_kwargs["contact_sharing_enabled"] = contact_sharing_enabled
         if imessage_number_id is not _UNSET:
             update_kwargs["imessage_number_id"] = imessage_number_id
         if claim_imessage_number is not None:

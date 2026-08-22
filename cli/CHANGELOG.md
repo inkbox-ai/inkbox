@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — Automatic iMessage contact sharing
+
+- Identity create and update accept `--contact-sharing-enabled true|false`.
+- CLI and SDK dependency versions moved in lockstep to 0.6.1.
+
 ## 0.6.0 — Dedicated iMessage lines
 
 - iMessage help and bundled guidance now describe shared service and one

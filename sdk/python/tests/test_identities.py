@@ -362,3 +362,16 @@ class TestIdentitiesIMessageFields:
             f"/{HANDLE}",
             json={"imessage_enabled": True, "imessage_filter_mode": "whitelist"},
         )
+
+    def test_create_and_update_send_contact_sharing_toggle(self):
+        res, http = _resource()
+        http.post.return_value = IDENTITY_DICT
+        http.patch.return_value = IDENTITY_DICT
+
+        res.create(agent_handle=HANDLE, contact_sharing_enabled=False)
+        assert http.post.call_args.kwargs["json"]["contact_sharing_enabled"] is False
+
+        res.update(HANDLE, contact_sharing_enabled=True)
+        http.patch.assert_called_once_with(
+            f"/{HANDLE}", json={"contact_sharing_enabled": True}
+        )

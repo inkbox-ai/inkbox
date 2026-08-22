@@ -156,12 +156,14 @@ class TestIdentityIMessageFields:
             "description": None,
             "email_address": None,
             "imessage_enabled": True,
+            "contact_sharing_enabled": False,
             "imessage_filter_mode": "whitelist",
             "created_at": "2026-06-01T00:00:00+00:00",
             "updated_at": "2026-06-01T00:00:00+00:00",
         }
         summary = AgentIdentitySummary._from_dict(d)
         assert summary.imessage_enabled is True
+        assert summary.contact_sharing_enabled is False
         assert summary.imessage_filter_mode is FilterMode.WHITELIST
 
     def test_summary_defaults_imessage_fields_when_absent(self):
@@ -180,6 +182,7 @@ class TestIdentityIMessageFields:
         }
         summary = AgentIdentitySummary._from_dict(d)
         assert summary.imessage_enabled is False
+        assert summary.contact_sharing_enabled is True
         assert summary.imessage_filter_mode is FilterMode.BLACKLIST
 
 

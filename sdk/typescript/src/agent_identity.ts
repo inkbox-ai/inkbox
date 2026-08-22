@@ -139,6 +139,9 @@ export class AgentIdentity {
   /** Whether this identity can be reached over iMessage. */
   get imessageEnabled(): boolean { return this._data.imessageEnabled; }
 
+  /** Whether an attached dedicated iMessage line automatically shares this profile. */
+  get contactSharingEnabled(): boolean { return this._data.contactSharingEnabled; }
+
   /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
   get imessageFilterMode(): FilterMode { return this._data.imessageFilterMode; }
 
@@ -1204,6 +1207,8 @@ export class AgentIdentity {
    * @param options.displayName - New display name, or `null` to clear.
    * @param options.description - New description, or `null` to clear.
    * @param options.imessageEnabled - Toggle identity-level iMessage reachability.
+   * @param options.contactSharingEnabled - Toggle automatic name and optional
+   *   photo sharing for an attached dedicated iMessage line.
    * @param options.imessageNumberId - Attach an already-owned dedicated line,
    *   or pass `null` to return to shared service.
    * @param options.claimIMessageNumber - Claim and atomically attach or swap to

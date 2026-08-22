@@ -482,6 +482,38 @@ impl Inkbox {
         vault_secret_ids: Option<&VaultSecretIds>,
         claim_imessage_number: Option<bool>,
     ) -> Result<AgentIdentity> {
+        self.create_identity_with_contact_sharing_and_imessage_number(
+            agent_handle,
+            display_name,
+            description,
+            imessage_enabled,
+            None,
+            email_local_part,
+            sending_domain,
+            tunnel,
+            phone_number,
+            vault_secret_ids,
+            claim_imessage_number,
+        )
+    }
+
+    /// Create an identity while explicitly controlling automatic contact
+    /// sharing and optionally claiming a dedicated iMessage number atomically.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_identity_with_contact_sharing_and_imessage_number(
+        self: &Arc<Self>,
+        agent_handle: &str,
+        display_name: Option<&str>,
+        description: Unset<String>,
+        imessage_enabled: Option<bool>,
+        contact_sharing_enabled: Option<bool>,
+        email_local_part: Option<&str>,
+        sending_domain: Unset<String>,
+        tunnel: Option<&IdentityTunnelCreateOptions>,
+        phone_number: Option<&IdentityPhoneNumberCreateOptions>,
+        vault_secret_ids: Option<&VaultSecretIds>,
+        claim_imessage_number: Option<bool>,
+    ) -> Result<AgentIdentity> {
         // Assemble the nested mailbox spec only when a mailbox field was given,
         // matching the Python `mailbox_kwargs` construction.
         let mailbox = if email_local_part.is_some() || !sending_domain.is_omit() {
@@ -492,17 +524,20 @@ impl Inkbox {
         } else {
             None
         };
-        let data = self.identities.create_with_imessage_number(
-            agent_handle,
-            display_name,
-            description,
-            imessage_enabled,
-            mailbox.as_ref(),
-            tunnel,
-            phone_number,
-            vault_secret_ids,
-            claim_imessage_number,
-        )?;
+        let data = self
+            .identities
+            .create_with_contact_sharing_and_imessage_number(
+                agent_handle,
+                display_name,
+                description,
+                imessage_enabled,
+                contact_sharing_enabled,
+                mailbox.as_ref(),
+                tunnel,
+                phone_number,
+                vault_secret_ids,
+                claim_imessage_number,
+            )?;
         Ok(AgentIdentity::new(data, self.clone()))
     }
 

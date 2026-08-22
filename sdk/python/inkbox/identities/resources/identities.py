@@ -38,6 +38,7 @@ class IdentitiesResource:
         display_name: str | None = None,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        contact_sharing_enabled: bool | None = None,
         claim_imessage_number: Literal[True] | None = None,
         mailbox: IdentityMailboxCreateOptions | None = None,
         tunnel: IdentityTunnelCreateOptions | None = None,
@@ -59,6 +60,9 @@ class IdentitiesResource:
                 to the server default.
             imessage_enabled: Whether the identity can use iMessage. Omit to
                 defer to the server default (``False``).
+            contact_sharing_enabled: Whether an attached dedicated iMessage
+                line automatically shares this identity's name and optional
+                avatar. Omit to defer to the server default (``True``).
             claim_imessage_number: Claim and attach a new dedicated iMessage
                 line atomically. Requires
                 ``imessage_enabled=True``.
@@ -80,6 +84,8 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if contact_sharing_enabled is not None:
+            body["contact_sharing_enabled"] = contact_sharing_enabled
         if claim_imessage_number is True:
             if imessage_enabled is not True:
                 raise ValueError(
@@ -120,6 +126,7 @@ class IdentitiesResource:
         display_name: Any = _UNSET,
         description: Any = _UNSET,
         imessage_enabled: bool | None = None,
+        contact_sharing_enabled: bool | None = None,
         imessage_number_id: UUID | str | None = _UNSET,  # type: ignore[assignment]
         claim_imessage_number: Literal[True] | None = None,
         idempotency_key: str | None = None,
@@ -141,6 +148,8 @@ class IdentitiesResource:
             display_name: New display name, or ``None`` to clear.
             description: New description, or ``None`` to clear.
             imessage_enabled: Toggle iMessage reachability.
+            contact_sharing_enabled: Toggle automatic name and optional photo
+                sharing for an attached dedicated iMessage line.
             imessage_number_id: Attach an already-owned dedicated line by
                 UUID, pass ``None`` to move back to the shared service, or
                 omit to leave the current attachment unchanged.
@@ -168,6 +177,8 @@ class IdentitiesResource:
             body["description"] = description
         if imessage_enabled is not None:
             body["imessage_enabled"] = imessage_enabled
+        if contact_sharing_enabled is not None:
+            body["contact_sharing_enabled"] = contact_sharing_enabled
         if claim_imessage_number is True and imessage_number_id is not _UNSET:
             raise ValueError(
                 "claim_imessage_number and imessage_number_id cannot be set together"

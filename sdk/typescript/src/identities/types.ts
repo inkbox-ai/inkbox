@@ -56,6 +56,8 @@ export interface CreateIdentityOptions {
    * service. Defaults server-side to `false`; pass `true` to opt in.
    */
   imessageEnabled?: boolean;
+  /** Automatically share this identity's name and optional avatar on an attached dedicated iMessage line. */
+  contactSharingEnabled?: boolean;
   /**
    * Claim and attach a dedicated iMessage line atomically during identity
    * creation. Requires `imessageEnabled: true`.
@@ -81,6 +83,8 @@ export interface UpdateIdentityOptions {
   displayName?: string | null;
   description?: string | null;
   imessageEnabled?: boolean;
+  /** Toggle automatic name and optional photo sharing for an attached dedicated iMessage line. */
+  contactSharingEnabled?: boolean;
   /**
    * Attach an already-owned dedicated line by id, atomically swap lines,
    * or pass `null` to return to the shared iMessage service.
@@ -162,6 +166,7 @@ export interface AgentIdentitySummary {
    * may also carry an attached dedicated line.
    */
   imessageEnabled: boolean;
+  contactSharingEnabled: boolean;
   /** Whitelist/blacklist mode for this identity's iMessage contact rules. */
   imessageFilterMode: FilterMode;
   /**
@@ -249,6 +254,7 @@ export interface RawAgentIdentitySummary {
   description: string | null;
   email_address: string | null;
   imessage_enabled?: boolean;
+  contact_sharing_enabled?: boolean;
   imessage_filter_mode?: string | null;
   mail_filter_mode?: string | null;
   phone_filter_mode?: string | null;
@@ -319,6 +325,7 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     description: r.description ?? null,
     emailAddress: r.email_address,
     imessageEnabled: r.imessage_enabled ?? false,
+    contactSharingEnabled: r.contact_sharing_enabled ?? true,
     imessageFilterMode: (r.imessage_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     mailFilterMode: (r.mail_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     phoneFilterMode: (r.phone_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,

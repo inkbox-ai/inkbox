@@ -4,6 +4,18 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.1 — Automatic iMessage contact sharing
+
+### Added
+
+- Agent identities expose `contact_sharing_enabled` for automatic name and
+  optional photo sharing on an attached dedicated iMessage line. It defaults to
+  enabled and remains configurable when no line is attached. Python,
+  TypeScript, and Rust support it during identity creation and update. Rust also
+  exposes `set_contact_sharing_enabled` plus backward-compatible methods for
+  atomically opting out while creating or updating a dedicated-line claim. The CLI adds
+  `--contact-sharing-enabled true|false`.
+
 ## 0.6.0 — Dedicated iMessage lines
 
 ### Changed

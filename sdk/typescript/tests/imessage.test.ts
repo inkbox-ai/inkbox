@@ -720,11 +720,13 @@ describe("identity iMessage fields", () => {
       description: null,
       email_address: null,
       imessage_enabled: true,
+      contact_sharing_enabled: false,
       imessage_filter_mode: "whitelist",
       created_at: "2026-06-01T00:00:00Z",
       updated_at: "2026-06-01T00:00:00Z",
     });
     expect(summary.imessageEnabled).toBe(true);
+    expect(summary.contactSharingEnabled).toBe(false);
     expect(summary.imessageFilterMode).toBe("whitelist");
   });
 
@@ -741,6 +743,7 @@ describe("identity iMessage fields", () => {
       updated_at: "2026-06-01T00:00:00Z",
     });
     expect(summary.imessageEnabled).toBe(false);
+    expect(summary.contactSharingEnabled).toBe(true);
     expect(summary.imessageFilterMode).toBe("blacklist");
   });
 });
