@@ -111,12 +111,16 @@ inkbox signup status
 inkbox identity list
 inkbox identity get <handle>
 inkbox identity create <handle> [--display-name <name>] [--description <text>]
+                                 [--imessage-enabled]
+                                 [--contact-sharing-enabled true|false]
                                  [--email-local-part <part>]
                                  [--sending-domain <name> | --platform-domain]
                                  [--tls-mode edge|passthrough]
 inkbox identity delete <handle>
 inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
                                  [--description <text> | --clear-description]
+                                 [--imessage-enabled true|false]
+                                 [--contact-sharing-enabled true|false]
                                  [--mail-filter-mode whitelist|blacklist]
                                  [--phone-filter-mode whitelist|blacklist]
 inkbox identity refresh <handle>
@@ -125,6 +129,13 @@ inkbox identity refresh <handle>
 `--mail-filter-mode` / `--phone-filter-mode` set the identity's contact-rule mode (admin-only). Unlike the deprecated `mailbox update --filter-mode` / `number update --filter-mode`, the identity path does **not** print a change notice. `--phone-filter-mode` requires the identity to have a phone number (else a 422).
 
 `identity create` atomically provisions the mailbox AND the tunnel. The JSON output includes both (`mailbox`, `tunnel.publicHost`, `tunnel.tlsMode`).
+
+New identities default contact sharing to enabled. If a dedicated iMessage
+line is attached, it automatically offers the identity's display name (or
+handle as fallback) and optional avatar. Use
+`--contact-sharing-enabled false` during identity creation to opt out, or
+`inkbox identity update <handle> --contact-sharing-enabled false` to disable it
+later. Pass `true` to enable it again.
 
 `--sending-domain <name>` binds the agent's mailbox to a verified custom domain (bare name, e.g. `mail.acme.com`); `--platform-domain` forces the platform sending domain; the two are mutually exclusive. `--tls-mode` defaults to `edge` and is fixed at create time (changing it later requires deleting the identity + recreating).
 

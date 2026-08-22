@@ -472,6 +472,12 @@ console.log(identity.imessageEnabled, identity.imessageFilterMode);
 
 Messaging (identity convenience methods; `inkbox.imessages` is the org-level resource with the same operations plus `agentIdentityId` / `isBlocked` filters):
 
+New identities default `contactSharingEnabled: true`. When a dedicated line
+is attached, it automatically offers the identity's display name (or handle as
+fallback) and optional avatar. Set `contactSharingEnabled: false` in the same
+create request as `claimIMessageNumber: true` to opt out before the line is
+claimed. The identity can be updated later to enable or disable sharing.
+
 ```typescript
 import { IMessageSendStyle } from "@inkbox/sdk";
 
@@ -479,8 +485,10 @@ import { IMessageSendStyle } from "@inkbox/sdk";
 const sent = await identity.sendIMessage({ to: "+15551234567", text: "Hello over iMessage" });
 const dedicatedIdentity = await inkbox.createIdentity("dedicated-agent", {
   imessageEnabled: true,
+  contactSharingEnabled: false, // opt out before claiming the line
   claimIMessageNumber: true,
 });
+await dedicatedIdentity.update({ contactSharingEnabled: true }); // enable later
 const group = await dedicatedIdentity.sendIMessage({
   to: ["+15551234567", "+15557654321"],
   text: "Hello group",

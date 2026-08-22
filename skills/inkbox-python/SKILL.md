@@ -473,13 +473,22 @@ separate attach call after an atomic claim. `imessage_number_id=None` is
 intentional wire data that moves an identity back to shared service; omitting
 the argument leaves its attachment unchanged.
 
+New identities default `contact_sharing_enabled=True`. When a dedicated line
+is attached, it automatically offers the identity's display name (or handle as
+fallback) and optional avatar. Pass `contact_sharing_enabled=False` during
+creation to opt out before the line is claimed, or update the identity later
+to enable or disable sharing.
+
 ```python
 dedicated_identity = inkbox.create_identity(
     "dedicated-agent",
     imessage_enabled=True,
+    contact_sharing_enabled=False,  # opt out before claiming the line
     claim_imessage_number=True,
 )
 print(dedicated_identity.imessage_number.number)
+
+dedicated_identity.update(contact_sharing_enabled=True)  # enable later
 
 identity.update(
     claim_imessage_number=True,
