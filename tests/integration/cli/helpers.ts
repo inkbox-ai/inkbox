@@ -142,20 +142,43 @@ export async function cleanupTestOrg(
   return resp.json();
 }
 
+const CLI_MAX_ATTEMPTS = 3;
+const CLI_BACKOFF_MS = 1_000;
+
 const CLI_BIN = process.env.INKBOX_CLI_BIN
   ?? path.resolve(import.meta.dirname, "../../../cli/dist/index.js");
+
+// The CLI has no transport-level retry, so a TLS/TCP reset on the way out of a
+// hosted CI runner surfaces as a hard command failure. Only connection errors
+// qualify: the request never reached the app, so replaying it can't double-write.
+function isConnectionError(err: unknown): boolean {
+  const stderr = (err as { stderr?: string | Buffer } | null)?.stderr;
+  return stderr !== undefined && String(stderr).includes("InkboxConnectionError");
+}
 
 export function inkbox(
   args: string,
   opts: { apiKey: string; baseUrl: string },
 ): string {
   const cmd = `node ${CLI_BIN} --api-key "${opts.apiKey}" --base-url "${opts.baseUrl}" --json ${args}`;
-  const result = execSync(cmd, {
-    encoding: "utf-8",
-    timeout: 60_000,
-    env: { ...process.env, NODE_NO_WARNINGS: "1" },
-  });
-  return result.trim();
+
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return execSync(cmd, {
+        encoding: "utf-8",
+        timeout: 60_000,
+        env: { ...process.env, NODE_NO_WARNINGS: "1" },
+      }).trim();
+    } catch (err) {
+      if (attempt === CLI_MAX_ATTEMPTS || !isConnectionError(err)) throw err;
+      console.warn(
+        `[cli-integration] ⚠ \`${args}\` hit a connection error `
+          + `(attempt ${attempt}/${CLI_MAX_ATTEMPTS}) — retrying`,
+      );
+      // inkbox() is sync (execSync), so the pause has to block the thread too.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, CLI_BACKOFF_MS * attempt);
+    }
+  }
 }
 
 export function inkboxJson<T = unknown>(
