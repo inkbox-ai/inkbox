@@ -1,12 +1,16 @@
 # Inkbox
 
-https://inkbox.ai
+[inkbox.ai](https://inkbox.ai)
 
 [![PyPI](https://img.shields.io/pypi/v/inkbox)](https://pypi.org/project/inkbox/)
 [![npm](https://img.shields.io/npm/v/@inkbox/sdk)](https://www.npmjs.com/package/@inkbox/sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-API-first communication infrastructure for AI agents — email (with custom sending domains), phone, identities, encrypted vault (login credentials, API keys, key pairs, SSH keys, OTP, etc.), and tunnels (expose a local server at a public URL via outbound HTTP/2).
+API-first communication infrastructure for AI agents.
+
+Inkbox provides email (including custom sending domains), phone, identities, an encrypted vault for credentials and keys, and tunnels that expose a local server at a public URL over outbound HTTP/2.
+
+Choose a package:
 
 | Package | Language | Install |
 |---|---|---|
@@ -16,7 +20,7 @@ API-first communication infrastructure for AI agents — email (with custom send
 
 ---
 
-## Quick Start
+## Quick start
 
 Get an API key from the [Inkbox Console](https://inkbox.ai/console), then:
 
