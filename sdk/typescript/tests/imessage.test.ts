@@ -106,8 +106,9 @@ const GROUP_CONVERSATION_DICT = {
   group_creation_status: "creating",
 };
 
+const REACTION_ID = "aaaa7777-0000-0000-0000-000000000001";
 const REACTION_DICT = {
-  id: "aaaa7777-0000-0000-0000-000000000001",
+  id: REACTION_ID,
   conversation_id: CONVO_ID,
   assignment_id: "bbbb2222-0000-0000-0000-000000000001",
   target_message_id: MSG_ID,
@@ -472,6 +473,24 @@ describe("IMessagesResource", () => {
     });
     expect(reaction.assignmentId).toBeNull();
     expect(reaction.reaction).toBe(IMessageReactionType.EYES);
+  });
+
+  it("removeReaction deletes the reaction by id", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: { get() { return null; }, getSetCookie() { return []; } } as unknown as Headers,
+      json: () => Promise.resolve(undefined),
+    } as Response);
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+
+    await resource.removeReaction(REACTION_ID);
+
+    const { url, init } = lastCall();
+    expect(url).toBe(`${BASE}/reactions/${REACTION_ID}`);
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
   });
 
   it.each([IMessageReactionType.CUSTOM, "\u{1F440}"])(

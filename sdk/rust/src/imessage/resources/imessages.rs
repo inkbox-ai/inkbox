@@ -485,6 +485,20 @@ impl IMessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// Take back a tapback this agent sent.
+    ///
+    /// Only the sender can remove a tapback, so a reaction the other party
+    /// sent is rejected. Removing one that is already gone -- taken back
+    /// already, or replaced by a newer tapback -- succeeds and does nothing,
+    /// and a failed removal leaves the tapback in place, so retrying is
+    /// always safe.
+    ///
+    /// # Arguments
+    /// * `reaction_id` - UUID of the reaction to take back.
+    pub fn remove_reaction(&self, reaction_id: &Uuid) -> Result<()> {
+        self.http.delete(&format!("/reactions/{reaction_id}"))
+    }
+
     /// Send a one-to-one read receipt and mark inbound messages read locally.
     /// Group conversations return 409.
     ///
@@ -902,6 +916,24 @@ mod tests {
         mock.assert();
         assert_eq!(reaction.assignment_id, None);
         assert_eq!(reaction.reaction, IMessageReactionType::Eyes);
+    }
+
+    #[test]
+    fn remove_reaction_deletes_the_reaction_by_id() {
+        let server = MockServer::start();
+        let reaction_id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        let mock = server.mock(|when, then| {
+            when.method(DELETE)
+                .path(format!("/api/v1/imessage/reactions/{reaction_id}"));
+            then.status(204);
+        });
+
+        client(&server)
+            .imessages()
+            .remove_reaction(&reaction_id)
+            .unwrap();
+
+        mock.assert();
     }
 
     #[test]

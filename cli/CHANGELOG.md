@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.2 — Undo an iMessage tapback
+
+### Added
+
+- `inkbox imessage unreact <reaction-id> -i <handle>` takes back a tapback the
+  identity sent. Removing one that is already gone succeeds without doing
+  anything, so a retry after an error is always safe.
+- CLI and SDK dependency versions moved in lockstep to 0.6.2.
+
 ## 0.6.1 — Automatic iMessage contact sharing
 
 - Identity create and update accept `--contact-sharing-enabled true|false`.

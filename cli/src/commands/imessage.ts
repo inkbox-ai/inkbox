@@ -502,6 +502,24 @@ export function registerIMessageCommands(program: Command): void {
     );
 
   imessage
+    .command("unreact <reaction-id>")
+    .description("Take back a tapback this identity sent")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        reactionId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const identity = await inkbox.getIdentity(cmdOpts.identity);
+        await identity.removeIMessageReaction(reactionId);
+        output({ id: reactionId, removed: true }, { json: !!opts.json });
+      }),
+    );
+
+  imessage
     .command("mark-conversation-read <conversation-id>")
     .description("Send a one-to-one read receipt and mark inbound messages read")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

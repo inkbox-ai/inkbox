@@ -364,6 +364,7 @@ inkbox imessage assignments -i <handle> --limit 20   # active connections, newes
 inkbox imessage conversations -i <handle> --limit 20 --include-groups
 inkbox imessage conversation <conversation-id> -i <handle> --limit 50
 inkbox imessage react <message-id> -i <handle> --reaction like
+inkbox imessage unreact <reaction-id> -i <handle>   # take your own tapback back
 inkbox imessage mark-conversation-read <conversation-id> -i <handle>
 inkbox imessage typing <conversation-id> -i <handle>
 inkbox imessage upload-media ./photo.jpg -i <handle> --content-type image/jpeg
@@ -381,7 +382,11 @@ Group conversation output includes `groupCreationStatus` (`creating`,
 conversation; send again by conversation id to retry. `react` supports inbound
 one-to-one and group messages. Its named choices are `love`, `like`, `dislike`,
 `laugh`, `emphasize`, `question`, and `eyes`; arbitrary custom emoji are
-inbound-only. Read receipts and typing remain one-to-one only.
+inbound-only. `unreact` takes back a tapback this identity sent, addressed by
+the reaction id from `react` or from a message's live `reactions`; only the
+sender can, and removing one that is already gone succeeds without doing
+anything, so retrying after an error is safe. Read receipts and typing remain
+one-to-one only.
 Group creation and conversation-id replies accept the same 13 expressive styles
 as one-to-one sends, with or without `--media-url`.
 

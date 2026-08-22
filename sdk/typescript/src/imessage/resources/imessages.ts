@@ -362,6 +362,20 @@ export class IMessagesResource {
   }
 
   /**
+   * Take back a tapback this agent sent.
+   *
+   * Only the sender can remove a tapback, so a reaction the other party sent
+   * is rejected. Removing one that is already gone — taken back already, or
+   * replaced by a newer tapback — succeeds and does nothing, and a failed
+   * removal leaves the tapback in place, so retrying is always safe.
+   *
+   * @param reactionId - UUID of the reaction to take back.
+   */
+  async removeReaction(reactionId: string): Promise<void> {
+    await this.http.delete(`/reactions/${reactionId}`);
+  }
+
+  /**
    * Send a one-to-one read receipt and mark inbound messages read locally.
    * Group conversations return 409.
    *

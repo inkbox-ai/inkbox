@@ -1047,6 +1047,19 @@ export class AgentIdentity {
   }
 
   /**
+   * Take back a tapback this identity sent.
+   *
+   * Removing a tapback that is already gone does nothing, and a failed
+   * removal leaves it in place, so retrying is always safe.
+   *
+   * @param reactionId - UUID of the reaction to take back.
+   */
+  async removeIMessageReaction(reactionId: string): Promise<void> {
+    this._requireIMessage();
+    await this._inkbox._imessages.removeReaction(reactionId);
+  }
+
+  /**
    * Send a one-to-one read receipt and mark inbound messages read.
    * Group conversations return 409.
    *

@@ -1380,6 +1380,18 @@ class AgentIdentity:
             part_index=part_index,
         )
 
+    def remove_imessage_reaction(self, reaction_id: UUID | str) -> None:
+        """Take back a tapback this identity sent.
+
+        Removing a tapback that is already gone does nothing, and a failed
+        removal leaves it in place, so retrying is always safe.
+
+        Args:
+            reaction_id: UUID of the reaction to take back.
+        """
+        self._require_imessage()
+        self._inkbox._imessages.remove_reaction(reaction_id)
+
     def mark_imessage_conversation_read(
         self, conversation_id: UUID | str
     ) -> IMessageMarkReadResult:
