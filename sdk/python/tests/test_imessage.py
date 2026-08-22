@@ -26,6 +26,7 @@ CONVO_ID = "cccc1111-0000-0000-0000-000000000001"
 MSG_ID = "dddd4444-0000-0000-0000-000000000001"
 IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001"
 RULE_ID = "ffff6666-0000-0000-0000-000000000001"
+REACTION_ID = "aaaa7777-0000-0000-0000-000000000001"
 REMOTE = "+15551234567"
 GROUP_REMOTE = "+15557654321"
 HANDLE = "support-bot"
@@ -122,7 +123,7 @@ GROUP_CONVERSATION_DICT = {
 }
 
 IMESSAGE_REACTION_DICT = {
-    "id": "aaaa7777-0000-0000-0000-000000000001",
+    "id": REACTION_ID,
     "conversation_id": CONVO_ID,
     "assignment_id": "bbbb2222-0000-0000-0000-000000000001",
     "target_message_id": MSG_ID,
@@ -453,6 +454,16 @@ class TestIMessageActions:
             client._imessages.send_reaction(message_id=MSG_ID, reaction=reaction)
 
         transport.post.assert_not_called()
+
+    def test_remove_reaction(self, client, transport):
+        client._imessages.remove_reaction(REACTION_ID)
+
+        transport.delete.assert_called_once_with(f"/reactions/{REACTION_ID}")
+
+    def test_remove_reaction_accepts_a_uuid_object(self, client, transport):
+        client._imessages.remove_reaction(UUID(REACTION_ID))
+
+        transport.delete.assert_called_once_with(f"/reactions/{REACTION_ID}")
 
     def test_mark_conversation_read(self, client, transport):
         transport.post.return_value = {

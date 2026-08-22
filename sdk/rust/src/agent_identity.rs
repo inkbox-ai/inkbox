@@ -1322,6 +1322,20 @@ impl AgentIdentity {
             .send_reaction(message_id, reaction, part_index)
     }
 
+    /// Take back a tapback this identity sent.
+    ///
+    /// Only the sender can remove a tapback, so one the other party sent is
+    /// rejected. A tapback Inkbox already shows as gone succeeds without
+    /// contacting the messaging network, and a failed removal leaves it in
+    /// place rather than clearing it locally, so the call can be retried.
+    ///
+    /// # Arguments
+    /// * `reaction_id` - UUID of the reaction to take back.
+    pub fn remove_imessage_reaction(&self, reaction_id: &Uuid) -> Result<()> {
+        self.require_imessage()?;
+        self.inkbox.imessages().remove_reaction(reaction_id)
+    }
+
     /// Send a one-to-one read receipt and mark inbound messages read.
     /// Group conversations return 409.
     pub fn mark_imessage_conversation_read(

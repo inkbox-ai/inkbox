@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2 — Undo an iMessage tapback
+
+### Added
+
+- `AgentIdentity.removeIMessageReaction(reactionId)` takes back a tapback the
+  identity sent. A failed removal leaves the tapback in place rather than
+  clearing it locally, so the call can be retried.
+
 ## 0.6.1 — Automatic iMessage contact sharing
 
 - Identity create and update accept `contactSharingEnabled`; dedicated lines

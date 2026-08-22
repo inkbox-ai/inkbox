@@ -4,6 +4,19 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.2 — Undo an iMessage tapback
+
+### Added
+
+- Take back a tapback an agent sent, from every surface: Python
+  `remove_imessage_reaction(reaction_id)`, TypeScript
+  `removeIMessageReaction(reactionId)`, Rust `remove_imessage_reaction`, and
+  `inkbox imessage unreact <reaction-id> -i <handle>`. Pass the reaction id from
+  the send result or from a message's live `reactions`. Only the sender can take
+  a tapback back. A tapback Inkbox already shows as gone succeeds without contacting
+  the messaging network, and a failed removal leaves the tapback in place rather
+  than clearing it locally, so the call can be retried.
+
 ## 0.6.1 — Automatic iMessage contact sharing
 
 ### Added

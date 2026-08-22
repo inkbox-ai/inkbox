@@ -528,12 +528,16 @@ for (const a of connections) {
 // accept seven named reactions (love, like, dislike, laugh, emphasize,
 // question, eyes); inbound can also be "custom" with the literal emoji in
 // customEmoji. Arbitrary custom emoji are not sendable.
-await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+const sentReaction = await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
 
 // Live tapbacks come back on message reads, oldest first.
 for (const r of msgs[0].reactions ?? []) {
   console.log(r.direction, r.reaction, r.customEmoji);
 }
+
+// Take your own tapback back. Only the sender can. A failed removal leaves the
+// tapback in place rather than clearing it locally, so the call can be retried.
+await identity.removeIMessageReaction(sentReaction.id);
 
 // Read receipts + typing indicator are one-to-one only; groups return 409.
 await identity.markIMessageConversationRead(sent.conversationId);
