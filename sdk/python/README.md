@@ -653,7 +653,11 @@ connections = identity.list_imessage_assignments()
 # named reactions include "eyes" ("custom" is rejected locally on send), and a
 # new tapback replaces your previous one on the same message part. Group read
 # receipts and typing indicators remain unsupported and return 409.
-identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
+sent_reaction = identity.send_imessage_reaction(message_id=msgs[0].id, reaction="like")
+
+# Take your own tapback back. Only the sender can; a failed removal leaves it in
+# place rather than clearing it locally, so the call can be retried.
+identity.remove_imessage_reaction(sent_reaction.id)
 
 # Read receipts, typing indicator, media.
 identity.mark_imessage_conversation_read(convos[0].id)

@@ -636,7 +636,11 @@ const connections = await identity.listIMessageAssignments();
 // named reactions include "eyes" ("custom" is rejected locally on send), and a
 // new tapback replaces your previous one on the same message part. Group read
 // receipts and typing indicators remain unsupported and return 409.
-await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+const sentReaction = await identity.sendIMessageReaction({ messageId: msgs[0].id, reaction: "like" });
+
+// Take your own tapback back. Only the sender can; a failed removal leaves it in
+// place rather than clearing it locally, so the call can be retried.
+await identity.removeIMessageReaction(sentReaction.id);
 
 // Read receipts, typing indicator, media.
 await identity.markIMessageConversationRead(convos[0].id);

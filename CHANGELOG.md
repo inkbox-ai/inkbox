@@ -13,7 +13,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `removeIMessageReaction(reactionId)`, Rust `remove_imessage_reaction`, and
   `inkbox imessage unreact <reaction-id> -i <handle>`. Pass the reaction id from
   the send result or from a message's live `reactions`. Only the sender can take
-  a tapback back. One Inkbox already shows as gone succeeds without contacting
+  a tapback back. A tapback Inkbox already shows as gone succeeds without contacting
   the messaging network, and a failed removal leaves the tapback in place rather
   than clearing it locally, so the call can be retried.
 

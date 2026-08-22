@@ -29,6 +29,17 @@ test("iMessage reaction choices match the named outbound allowlist", () => {
   assert.equal(reactionOption?.mandatory, true);
 });
 
+test("iMessage unreact is registered and requires an identity", () => {
+  const program = new Command();
+  registerIMessageCommands(program);
+  const imessage = program.commands.find((command) => command.name() === "imessage");
+  const unreact = imessage?.commands.find((command) => command.name() === "unreact");
+  assert.ok(unreact, "unreact command is registered");
+  assert.equal(unreact?.registeredArguments?.[0]?.name(), "reaction-id");
+  const identity = unreact?.options.find((option) => option.long === "--identity");
+  assert.equal(identity?.mandatory, true);
+});
+
 test("buildIMessageSendOptions preserves a scalar recipient", () => {
   assert.deepEqual(buildIMessageSendOptions({
     identity: "support-bot",

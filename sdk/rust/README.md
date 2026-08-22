@@ -372,7 +372,10 @@ and changes the status to `Ready`.
 `send_imessage_reaction` supports inbound one-to-one and group messages by
 message id. The sendable named reactions are `love`, `like`, `dislike`,
 `laugh`, `emphasize`, `question`, and `eyes`; arbitrary custom emoji remain
-inbound-only. Group read receipts and typing indicators remain unsupported.
+inbound-only. `remove_imessage_reaction` takes back a tapback this identity
+sent, by reaction id; only the sender can, and a failed removal leaves it in
+place rather than clearing it locally, so the call can be retried. Group read
+receipts and typing indicators remain unsupported.
 
 Static (no-client) helpers for the public agent-signup flow live on `Inkbox`:
 `Inkbox::signup`, `verify_signup`, `resend_signup_verification`,
