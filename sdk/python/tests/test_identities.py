@@ -21,6 +21,7 @@ from inkbox.identities.types import (
     IdentityTunnelCreateOptions,
     _AgentIdentityData,
 )
+from inkbox.phone.types import ForwardingTargetType
 
 
 def _resource():
@@ -90,6 +91,32 @@ class TestIdentitiesCreate:
             },
         )
         assert identity.email_address == "sales.team@inkboxmail.com"
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            IdentityPhoneNumberCreateOptions(
+                incoming_call_action="forward",
+                forwarding_target_type=ForwardingTargetType.PHONE,
+            ),
+            IdentityPhoneNumberCreateOptions(
+                incoming_call_action="forward",
+                forwarding_target_type=ForwardingTargetType.SIP,
+            ),
+            IdentityPhoneNumberCreateOptions(
+                forwarding_phone_number="+14155550100",
+            ),
+            IdentityPhoneNumberCreateOptions(
+                incoming_call_action="forward",
+                forwarding_target_type=ForwardingTargetType.PHONE,
+                forwarding_phone_number="+14155550100",
+                forwarding_sip_uri="sip:line@voice.example.com",
+            ),
+        ],
+    )
+    def test_rejects_incoherent_forwarding_targets(self, options):
+        with pytest.raises(ValueError):
+            options.to_wire()
 
     def test_claims_imessage_number_atomically(self):
         res, http = _resource()

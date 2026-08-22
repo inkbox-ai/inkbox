@@ -313,7 +313,7 @@ Full walkthrough: https://inkbox.ai/docs/capabilities/email/mail-clients
 ## Phone
 
 ```typescript
-import { CallMode, IncomingCallAction } from "@inkbox/sdk";
+import { CallMode, ForwardingTargetType, IncomingCallAction } from "@inkbox/sdk";
 
 // Place outbound call — stream audio via WebSocket
 const call = await identity.placeCall({
@@ -363,10 +363,15 @@ const hungUp = await identity.hangupCall(calls[0].id);
 const cfg = await identity.getHostedAgentConfig();
 await identity.setHostedAgentConfig({ instructions: "Be brief and friendly." });
 
-// Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent.
-// hosted_agent is the only action needing no URL — Voice AI answers.
+// Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent | forward.
+// hosted_agent needs no URL; forward needs exactly one phone or SIP target.
 await identity.setIncomingCallAction({
   incomingCallAction: IncomingCallAction.HOSTED_AGENT,
+});
+await identity.setIncomingCallAction({
+  incomingCallAction: IncomingCallAction.FORWARD,
+  forwardingTargetType: ForwardingTargetType.PHONE,
+  forwardingPhoneNumber: "+15551234567",
 });
 console.log((await identity.getIncomingCallAction()).incomingCallAction);
 ```
@@ -946,7 +951,7 @@ const number  = await inkbox.phoneNumbers.get("phone-number-uuid");
 const num     = await inkbox.phoneNumbers.provision({ agentHandle: "my-agent", type: "local", state: "NY" });  // local only; toll_free is rejected (422)
 
 await inkbox.phoneNumbers.update(num.id, {
-  incomingCallAction: "webhook",               // "webhook", "auto_accept", "auto_reject", or "hosted_agent"
+  incomingCallAction: "webhook",               // also auto_accept, auto_reject, hosted_agent, or forward
   incomingCallWebhookUrl: "https://...",
 });
 await inkbox.phoneNumbers.update(num.id, {
@@ -955,6 +960,11 @@ await inkbox.phoneNumbers.update(num.id, {
 });
 await inkbox.phoneNumbers.update(num.id, {
   incomingCallAction: "hosted_agent",          // no URL — Voice AI answers
+});
+await inkbox.phoneNumbers.update(num.id, {
+  incomingCallAction: "forward",
+  forwardingTargetType: "sip",
+  forwardingSipUri: "sip:agent@voice.example.com",
 });
 
 const hits = await inkbox.phoneNumbers.searchTranscripts(num.id, { q: "refund", party: "remote", limit: 50 });

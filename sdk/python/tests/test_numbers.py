@@ -4,9 +4,35 @@ sdk/python/tests/test_numbers.py
 Tests for PhoneNumbersResource.
 """
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sample_data import PHONE_NUMBER_DICT, PHONE_TRANSCRIPT_DICT
+
+from inkbox.mail.types import FilterMode
+from inkbox.phone.types import PhoneNumber, SmsStatus
+
+
+def test_phone_number_preserves_existing_direct_constructor():
+    timestamp = datetime.now(UTC)
+
+    number = PhoneNumber(
+        id=UUID("aaaa1111-0000-0000-0000-000000000001"),
+        number="+18335794607",
+        type="local",
+        status="active",
+        sms_status=SmsStatus.READY,
+        incoming_call_action="auto_reject",
+        client_websocket_url=None,
+        incoming_call_webhook_url=None,
+        filter_mode=FilterMode.BLACKLIST,
+        created_at=timestamp,
+        updated_at=timestamp,
+    )
+
+    assert number.forwarding_target_type is None
+    assert number.forwarding_phone_number is None
+    assert number.forwarding_sip_uri is None
 
 
 class TestNumbersList:

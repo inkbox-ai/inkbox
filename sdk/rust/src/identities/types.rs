@@ -194,6 +194,37 @@ impl IdentityPhoneNumberCreateOptions {
                 "forwarding_target_type is required for forward".into(),
             ));
         }
+        match self.forwarding_target_type {
+            None => {
+                if self.forwarding_phone_number.is_some() || self.forwarding_sip_uri.is_some() {
+                    return Err(crate::error::InkboxError::InvalidArgument(
+                        "forwarding_target_type is required when a forwarding target is set".into(),
+                    ));
+                }
+            }
+            Some(crate::phone::ForwardingTargetType::Phone) => {
+                if self
+                    .forwarding_phone_number
+                    .as_deref()
+                    .unwrap_or("")
+                    .is_empty()
+                    || self.forwarding_sip_uri.is_some()
+                {
+                    return Err(crate::error::InkboxError::InvalidArgument(
+                        "phone forwarding requires only forwarding_phone_number".into(),
+                    ));
+                }
+            }
+            Some(crate::phone::ForwardingTargetType::Sip) => {
+                if self.forwarding_sip_uri.as_deref().unwrap_or("").is_empty()
+                    || self.forwarding_phone_number.is_some()
+                {
+                    return Err(crate::error::InkboxError::InvalidArgument(
+                        "SIP forwarding requires only forwarding_sip_uri".into(),
+                    ));
+                }
+            }
+        }
 
         let mut body = Map::new();
         body.insert("type".into(), Value::String(self.r#type.clone()));
@@ -480,7 +511,8 @@ impl std::ops::DerefMut for AgentIdentityData {
 mod tests {
     use serde_json::json;
 
-    use super::AgentIdentityData;
+    use super::{AgentIdentityData, IdentityPhoneNumberCreateOptions};
+    use crate::phone::ForwardingTargetType;
 
     fn identity_with_tunnel(public_host: &str) -> serde_json::Value {
         json!({
@@ -524,5 +556,36 @@ mod tests {
             data.tunnel.as_ref().unwrap().public_host,
             "sales-agent.inkboxwire.com"
         );
+    }
+
+    #[test]
+    fn identity_phone_create_rejects_incoherent_forwarding_targets() {
+        let cases = [
+            IdentityPhoneNumberCreateOptions {
+                incoming_call_action: "forward".into(),
+                forwarding_target_type: Some(ForwardingTargetType::Phone),
+                ..Default::default()
+            },
+            IdentityPhoneNumberCreateOptions {
+                incoming_call_action: "forward".into(),
+                forwarding_target_type: Some(ForwardingTargetType::Sip),
+                ..Default::default()
+            },
+            IdentityPhoneNumberCreateOptions {
+                forwarding_phone_number: Some("+14155550100".into()),
+                ..Default::default()
+            },
+            IdentityPhoneNumberCreateOptions {
+                incoming_call_action: "forward".into(),
+                forwarding_target_type: Some(ForwardingTargetType::Phone),
+                forwarding_phone_number: Some("+14155550100".into()),
+                forwarding_sip_uri: Some("sip:line@voice.example.com".into()),
+                ..Default::default()
+            },
+        ];
+
+        for options in cases {
+            assert!(options.to_wire().is_err());
+        }
     }
 }

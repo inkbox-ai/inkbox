@@ -395,6 +395,17 @@ export function identityPhoneNumberCreateOptionsToWire(
   if (options.incomingCallAction === "forward" && options.forwardingTargetType === undefined) {
     throw new Error("forwardingTargetType is required for forward");
   }
+  if (options.forwardingTargetType === undefined) {
+    if (options.forwardingPhoneNumber !== undefined || options.forwardingSipUri !== undefined) {
+      throw new Error("forwardingTargetType is required when a forwarding target is set");
+    }
+  } else if (options.forwardingTargetType === "phone") {
+    if (!options.forwardingPhoneNumber || options.forwardingSipUri !== undefined) {
+      throw new Error("phone forwarding requires only forwardingPhoneNumber");
+    }
+  } else if (!options.forwardingSipUri || options.forwardingPhoneNumber !== undefined) {
+    throw new Error("SIP forwarding requires only forwardingSipUri");
+  }
 
   const body: Record<string, unknown> = {};
   if (options.type !== undefined) body["type"] = options.type;

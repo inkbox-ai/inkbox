@@ -188,9 +188,6 @@ class PhoneNumber:
     incoming_call_action: str
     client_websocket_url: str | None
     incoming_call_webhook_url: str | None
-    forwarding_target_type: ForwardingTargetType | None
-    forwarding_phone_number: str | None
-    forwarding_sip_uri: str | None
     filter_mode: FilterMode
     created_at: datetime
     updated_at: datetime
@@ -201,6 +198,9 @@ class PhoneNumber:
     state: str | None = None
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
+    forwarding_target_type: ForwardingTargetType | None = None
+    forwarding_phone_number: str | None = None
+    forwarding_sip_uri: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneNumber:

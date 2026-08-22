@@ -117,6 +117,22 @@ class IdentityPhoneNumberCreateOptions:
             and self.forwarding_target_type is None
         ):
             raise ValueError("forwarding_target_type is required for forward")
+        target_type = (
+            self.forwarding_target_type.value
+            if isinstance(self.forwarding_target_type, ForwardingTargetType)
+            else self.forwarding_target_type
+        )
+        if target_type is None:
+            if self.forwarding_phone_number is not None or self.forwarding_sip_uri is not None:
+                raise ValueError("forwarding_target_type is required when a forwarding target is set")
+        elif target_type == "phone":
+            if not self.forwarding_phone_number or self.forwarding_sip_uri is not None:
+                raise ValueError("phone forwarding requires only forwarding_phone_number")
+        elif target_type == "sip":
+            if not self.forwarding_sip_uri or self.forwarding_phone_number is not None:
+                raise ValueError("SIP forwarding requires only forwarding_sip_uri")
+        else:
+            raise ValueError("forwarding_target_type must be 'phone' or 'sip'")
 
         body: dict[str, Any] = {
             "type": self.type,

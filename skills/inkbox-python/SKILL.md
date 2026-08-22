@@ -358,9 +358,14 @@ call = identity.hangup_call(calls[0].id)
 cfg = identity.get_hosted_agent_config()
 cfg = identity.set_hosted_agent_config(instructions="Be brief and friendly.")
 
-# Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent.
-# hosted_agent is the only action needing no URL — Voice AI answers.
+# Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent | forward.
+# hosted_agent needs no URL; forward needs exactly one phone or SIP target.
 identity.set_incoming_call_action(incoming_call_action="hosted_agent")
+identity.set_incoming_call_action(
+    incoming_call_action="forward",
+    forwarding_target_type="phone",
+    forwarding_phone_number="+15551234567",
+)
 print(identity.get_incoming_call_action().incoming_call_action)
 ```
 
@@ -964,7 +969,7 @@ number  = inkbox.phone_numbers.provision(agent_handle="my-agent", type="local", 
 
 inkbox.phone_numbers.update(
     number.id,
-    incoming_call_action="webhook",            # "webhook", "auto_accept", "auto_reject", or "hosted_agent"
+    incoming_call_action="webhook",            # also auto_accept, auto_reject, hosted_agent, or forward
     incoming_call_webhook_url="https://...",
 )
 inkbox.phone_numbers.update(
@@ -975,6 +980,12 @@ inkbox.phone_numbers.update(
 inkbox.phone_numbers.update(
     number.id,
     incoming_call_action="hosted_agent",       # no URL — Voice AI answers
+)
+inkbox.phone_numbers.update(
+    number.id,
+    incoming_call_action="forward",
+    forwarding_target_type="sip",
+    forwarding_sip_uri="sip:agent@voice.example.com",
 )
 
 hits = inkbox.phone_numbers.search_transcripts(number.id, q="refund", party="remote", limit=50)

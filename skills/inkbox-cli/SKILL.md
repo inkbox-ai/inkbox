@@ -287,6 +287,8 @@ inkbox phone transcripts <call-id> -i <handle>
 inkbox phone search-transcripts -i <handle> -q "refund" --party remote
 inkbox phone incoming-action -i <handle>                       # print the incoming-call config
 inkbox phone incoming-action hosted_agent -i <handle>          # or auto_accept | auto_reject | webhook
+inkbox phone incoming-action forward -i <handle> --forward-to-phone +15551234567
+inkbox phone incoming-action forward -i <handle> --forward-to-sip sip:agent@voice.example.com
 inkbox phone hosted-agent get -i <handle>
 inkbox phone hosted-agent set -i <handle> --voice <voice> --model <model> --instructions <text>
 ```
@@ -311,9 +313,9 @@ object — read them with `--json` on `phone calls`; the default table
 does not show them.
 
 `inkbox phone incoming-action` gets or sets the identity's incoming-call
-action (`auto_accept` | `auto_reject` | `webhook` | `hosted_agent`, with
-`--ws-url` / `--webhook-url` where applicable). `hosted_agent` is the
-only action needing no URL — Voice AI answers.
+action (`auto_accept` | `auto_reject` | `webhook` | `hosted_agent` | `forward`,
+with `--ws-url` / `--webhook-url` where applicable). `forward` requires exactly
+one of `--forward-to-phone` or `--forward-to-sip`. `hosted_agent` needs no URL.
 
 `inkbox phone hosted-agent set` is a **full replace**: an omitted flag
 resets that field to the server default.
@@ -648,7 +650,7 @@ inkbox mailbox rules delete <rule-id> --mailbox <email>                         
 inkbox number list
 inkbox number get <id>
 inkbox number provision --handle <handle> [--type local] [--state NY]   # local only; toll_free is rejected (422)
-inkbox number update <id> [--incoming-call-action auto_accept|auto_reject|webhook|hosted_agent] [--filter-mode whitelist|blacklist] ...
+inkbox number update <id> [--incoming-call-action auto_accept|auto_reject|webhook|hosted_agent|forward] [--forward-to-phone <number> | --forward-to-sip <uri>] [--filter-mode whitelist|blacklist] ...
 inkbox number release <number-id>
 ```
 
