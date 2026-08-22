@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Incoming call forwarding
+## 0.6.3 — Incoming call forwarding
 
 - Added `IncomingCallAction.FORWARD`, typed forwarding destinations, and
   chronological `PhoneCall.forwardings` history.

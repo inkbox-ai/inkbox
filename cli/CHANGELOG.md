@@ -1,10 +1,11 @@
 # Changelog
 
-## Unreleased — Incoming call forwarding
+## 0.6.3 — Incoming call forwarding
 
 - `phone incoming-action forward` and `number update
   --incoming-call-action forward` accept one of `--forward-to-phone` or
   `--forward-to-sip` and display the saved destination.
+- CLI and SDK dependency versions moved in lockstep to 0.6.3.
 
 ## 0.6.2 — Undo an iMessage tapback
 
