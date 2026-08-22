@@ -488,10 +488,10 @@ impl IMessagesResource {
     /// Take back a tapback this agent sent.
     ///
     /// Only the sender can remove a tapback, so a reaction the other party
-    /// sent is rejected. Removing one that is already gone -- taken back
-    /// already, or replaced by a newer tapback -- succeeds and does nothing,
-    /// and a failed removal leaves the tapback in place, so retrying is
-    /// always safe.
+    /// sent is rejected. A tapback Inkbox already shows as gone -- taken back
+    /// already, or replaced by a newer one -- succeeds without contacting the
+    /// messaging network. A failed removal leaves the tapback in place rather
+    /// than clearing it locally, so the call can be retried.
     ///
     /// # Arguments
     /// * `reaction_id` - UUID of the reaction to take back.

@@ -556,8 +556,8 @@ sent_reaction = identity.send_imessage_reaction(message_id=msgs[0].id, reaction=
 for r in msgs[0].reactions or []:
     print(r.direction, r.reaction, r.custom_emoji)
 
-# Take your own tapback back. Only the sender can; removing one that is already
-# gone does nothing, so retrying after an error is safe.
+# Take your own tapback back. Only the sender can. A failed removal leaves the
+# tapback in place rather than clearing it locally, so the call can be retried.
 identity.remove_imessage_reaction(sent_reaction.id)
 
 # Read receipts + typing indicator are one-to-one only; groups return 409.

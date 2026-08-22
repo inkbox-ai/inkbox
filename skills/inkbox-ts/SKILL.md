@@ -535,8 +535,8 @@ for (const r of msgs[0].reactions ?? []) {
   console.log(r.direction, r.reaction, r.customEmoji);
 }
 
-// Take your own tapback back. Only the sender can; removing one that is already
-// gone does nothing, so retrying after an error is safe.
+// Take your own tapback back. Only the sender can. A failed removal leaves the
+// tapback in place rather than clearing it locally, so the call can be retried.
 await identity.removeIMessageReaction(sentReaction.id);
 
 // Read receipts + typing indicator are one-to-one only; groups return 409.

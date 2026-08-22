@@ -5,8 +5,8 @@
 ### Added
 
 - `AgentIdentity.remove_imessage_reaction(reaction_id)` takes back a tapback the
-  identity sent. Removing one that is already gone succeeds without doing
-  anything, so a retry after an error is always safe.
+  identity sent. A failed removal leaves the tapback in place rather than
+  clearing it locally, so the call can be retried.
 
 ## 0.6.1 — Automatic iMessage contact sharing
 

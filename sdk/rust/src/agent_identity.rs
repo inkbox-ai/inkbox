@@ -1324,8 +1324,9 @@ impl AgentIdentity {
 
     /// Take back a tapback this identity sent.
     ///
-    /// Removing a tapback that is already gone does nothing, and a failed
-    /// removal leaves it in place, so retrying is always safe.
+    /// A tapback Inkbox already shows as gone succeeds without contacting the
+    /// messaging network, and a failed removal leaves it in place rather than
+    /// clearing it locally, so the call can be retried.
     ///
     /// # Arguments
     /// * `reaction_id` - UUID of the reaction to take back.

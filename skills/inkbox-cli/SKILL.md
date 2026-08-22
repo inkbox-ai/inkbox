@@ -384,8 +384,8 @@ one-to-one and group messages. Its named choices are `love`, `like`, `dislike`,
 `laugh`, `emphasize`, `question`, and `eyes`; arbitrary custom emoji are
 inbound-only. `unreact` takes back a tapback this identity sent, addressed by
 the reaction id from `react` or from a message's live `reactions`; only the
-sender can, and removing one that is already gone succeeds without doing
-anything, so retrying after an error is safe. Read receipts and typing remain
+sender can. A failed removal leaves the tapback in place rather than clearing it
+locally, so the call can be retried. Read receipts and typing remain
 one-to-one only.
 Group creation and conversation-id replies accept the same 13 expressive styles
 as one-to-one sends, with or without `--media-url`.

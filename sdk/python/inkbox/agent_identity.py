@@ -1383,8 +1383,9 @@ class AgentIdentity:
     def remove_imessage_reaction(self, reaction_id: UUID | str) -> None:
         """Take back a tapback this identity sent.
 
-        Removing a tapback that is already gone does nothing, and a failed
-        removal leaves it in place, so retrying is always safe.
+        A tapback Inkbox already shows as gone succeeds without contacting the
+        messaging network, and a failed removal leaves it in place rather than
+        clearing it locally, so the call can be retried.
 
         Args:
             reaction_id: UUID of the reaction to take back.
