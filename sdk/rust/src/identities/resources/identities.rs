@@ -287,6 +287,40 @@ impl IdentitiesResource {
         claim_imessage_number: Option<bool>,
         idempotency_key: Option<&str>,
     ) -> Result<AgentIdentityData> {
+        self.update_with_contact_sharing_and_imessage_number(
+            agent_handle,
+            new_handle,
+            display_name,
+            description,
+            imessage_enabled,
+            None,
+            imessage_filter_mode,
+            mail_filter_mode,
+            phone_filter_mode,
+            imessage_number_id,
+            claim_imessage_number,
+            idempotency_key,
+        )
+    }
+
+    /// Update an identity while explicitly controlling automatic contact
+    /// sharing and optionally changing its dedicated iMessage line atomically.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_with_contact_sharing_and_imessage_number(
+        &self,
+        agent_handle: &str,
+        new_handle: Option<&str>,
+        display_name: Unset<String>,
+        description: Unset<String>,
+        imessage_enabled: Option<bool>,
+        contact_sharing_enabled: Option<bool>,
+        imessage_filter_mode: Option<&str>,
+        mail_filter_mode: Option<&str>,
+        phone_filter_mode: Option<&str>,
+        imessage_number_id: Unset<Uuid>,
+        claim_imessage_number: Option<bool>,
+        idempotency_key: Option<&str>,
+    ) -> Result<AgentIdentityData> {
         if claim_imessage_number == Some(false) {
             return Err(crate::error::InkboxError::InvalidArgument(
                 "claim_imessage_number only accepts true when supplied".into(),
@@ -339,6 +373,9 @@ impl IdentitiesResource {
         }
         if let Some(flag) = imessage_enabled {
             body.insert("imessage_enabled".into(), Value::Bool(flag));
+        }
+        if let Some(flag) = contact_sharing_enabled {
+            body.insert("contact_sharing_enabled".into(), Value::Bool(flag));
         }
         if let Unset::Value(number_id) = imessage_number_id {
             body.insert(
@@ -688,6 +725,40 @@ mod tests {
             )
             .unwrap();
         clear.assert();
+    }
+
+    #[test]
+    fn update_can_atomically_claim_with_contact_sharing_disabled() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("PATCH")
+                .path("/api/v1/identities/support-bot")
+                .header("Idempotency-Key", "identity-claim-contact-sharing-123")
+                .json_body(json!({
+                    "contact_sharing_enabled": false,
+                    "claim_imessage_number": true
+                }));
+            then.status(200).json_body(identity_json());
+        });
+
+        client(&server)
+            .identities()
+            .update_with_contact_sharing_and_imessage_number(
+                "support-bot",
+                None,
+                Unset::Omit,
+                Unset::Omit,
+                None,
+                Some(false),
+                None,
+                None,
+                None,
+                Unset::Omit,
+                Some(true),
+                Some("identity-claim-contact-sharing-123"),
+            )
+            .unwrap();
+        mock.assert();
     }
 
     #[test]

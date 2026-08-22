@@ -517,6 +517,7 @@ class Inkbox:
                 ``None`` to leave the column null; omit to defer to the
                 server default. Never surfaces in outbound mail.
             imessage_enabled: Whether this identity can use iMessage.
+                Defaults server-side to ``False``; pass ``True`` to opt in.
             contact_sharing_enabled: Whether an attached dedicated iMessage
                 line automatically shares the identity's name and optional avatar.
                 Defaults server-side to ``True``; pass ``False`` to opt out.

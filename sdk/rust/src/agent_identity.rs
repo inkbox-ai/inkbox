@@ -1580,19 +1580,55 @@ impl AgentIdentity {
         claim_imessage_number: Option<bool>,
         idempotency_key: Option<&str>,
     ) -> Result<()> {
-        let data = self.inkbox.identities().update_with_imessage_number(
-            &self.agent_handle(),
+        self.update_with_contact_sharing_and_imessage_number(
             new_handle,
             display_name,
             description,
             imessage_enabled,
+            None,
             imessage_filter_mode,
             mail_filter_mode,
             phone_filter_mode,
             imessage_number_id,
             claim_imessage_number,
             idempotency_key,
-        )?;
+        )
+    }
+
+    /// Update this identity while explicitly controlling automatic contact
+    /// sharing and optionally changing its dedicated iMessage line atomically.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_with_contact_sharing_and_imessage_number(
+        &self,
+        new_handle: Option<&str>,
+        display_name: Unset<String>,
+        description: Unset<String>,
+        imessage_enabled: Option<bool>,
+        contact_sharing_enabled: Option<bool>,
+        imessage_filter_mode: Option<&str>,
+        mail_filter_mode: Option<&str>,
+        phone_filter_mode: Option<&str>,
+        imessage_number_id: Unset<Uuid>,
+        claim_imessage_number: Option<bool>,
+        idempotency_key: Option<&str>,
+    ) -> Result<()> {
+        let data = self
+            .inkbox
+            .identities()
+            .update_with_contact_sharing_and_imessage_number(
+                &self.agent_handle(),
+                new_handle,
+                display_name,
+                description,
+                imessage_enabled,
+                contact_sharing_enabled,
+                imessage_filter_mode,
+                mail_filter_mode,
+                phone_filter_mode,
+                imessage_number_id,
+                claim_imessage_number,
+                idempotency_key,
+            )?;
         *self.mailbox.borrow_mut() = data.mailbox.clone();
         *self.phone_number.borrow_mut() = data.phone_number.clone();
         *self.tunnel.borrow_mut() = data.tunnel.clone();
