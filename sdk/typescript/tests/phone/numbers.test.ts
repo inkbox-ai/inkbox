@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { PhoneNumbersResource } from "../../src/phone/resources/numbers.js";
 import type { HttpTransport } from "../../src/_http.js";
 import { RAW_PHONE_NUMBER, RAW_PHONE_TRANSCRIPT } from "../sampleData.js";
+import { ForwardingTargetType } from "../../src/phone/types.js";
 
 function mockHttp() {
   return {
@@ -77,6 +78,26 @@ describe("PhoneNumbersResource.update", () => {
     await res.update(NUM_ID, {});
 
     expect(http.patch).toHaveBeenCalledWith(`/numbers/${NUM_ID}`, {});
+  });
+
+  it("sends forwarding values and explicit null clears", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_PHONE_NUMBER);
+    const res = new PhoneNumbersResource(http);
+
+    await res.update(NUM_ID, {
+      incomingCallAction: "forward",
+      forwardingTargetType: ForwardingTargetType.PHONE,
+      forwardingPhoneNumber: "+14155550100",
+      forwardingSipUri: null,
+    });
+
+    expect(http.patch).toHaveBeenCalledWith(`/numbers/${NUM_ID}`, {
+      incoming_call_action: "forward",
+      forwarding_target_type: "phone",
+      forwarding_phone_number: "+14155550100",
+      forwarding_sip_uri: null,
+    });
   });
 
 });

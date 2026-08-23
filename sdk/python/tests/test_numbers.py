@@ -4,9 +4,35 @@ sdk/python/tests/test_numbers.py
 Tests for PhoneNumbersResource.
 """
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sample_data import PHONE_NUMBER_DICT, PHONE_TRANSCRIPT_DICT
+
+from inkbox.mail.types import FilterMode
+from inkbox.phone.types import PhoneNumber, SmsStatus
+
+
+def test_phone_number_preserves_existing_direct_constructor():
+    timestamp = datetime.now(UTC)
+
+    number = PhoneNumber(
+        id=UUID("aaaa1111-0000-0000-0000-000000000001"),
+        number="+18335794607",
+        type="local",
+        status="active",
+        sms_status=SmsStatus.READY,
+        incoming_call_action="auto_reject",
+        client_websocket_url=None,
+        incoming_call_webhook_url=None,
+        filter_mode=FilterMode.BLACKLIST,
+        created_at=timestamp,
+        updated_at=timestamp,
+    )
+
+    assert number.forwarding_target_type is None
+    assert number.forwarding_phone_number is None
+    assert number.forwarding_sip_uri is None
 
 
 class TestNumbersList:
@@ -56,6 +82,36 @@ class TestNumbersGet:
 
 
 class TestNumbersUpdate:
+    def test_update_forwarding_fields_with_explicit_clear(self, client, transport):
+        updated = {
+            **PHONE_NUMBER_DICT,
+            "incoming_call_action": "forward",
+            "forwarding_target_type": "phone",
+            "forwarding_phone_number": "+14155550100",
+            "forwarding_sip_uri": None,
+        }
+        transport.patch.return_value = updated
+        uid = "aaaa1111-0000-0000-0000-000000000001"
+
+        result = client._numbers.update(
+            uid,
+            incoming_call_action="forward",
+            forwarding_target_type="phone",
+            forwarding_phone_number="+14155550100",
+            forwarding_sip_uri=None,
+        )
+
+        transport.patch.assert_called_once_with(
+            f"/numbers/{uid}",
+            json={
+                "incoming_call_action": "forward",
+                "forwarding_target_type": "phone",
+                "forwarding_phone_number": "+14155550100",
+                "forwarding_sip_uri": None,
+            },
+        )
+        assert result.forwarding_phone_number == "+14155550100"
+
     def test_update_incoming_call_action(self, client, transport):
         updated = {**PHONE_NUMBER_DICT, "incoming_call_action": "webhook"}
         transport.patch.return_value = updated
@@ -124,7 +180,9 @@ class TestNumbersProvision:
         local = {**PHONE_NUMBER_DICT, "type": "local", "number": "+12125551234"}
         transport.post.return_value = local
 
-        number = client._numbers.provision(agent_handle="sales-bot", type="local", state="NY")
+        number = client._numbers.provision(
+            agent_handle="sales-bot", type="local", state="NY"
+        )
 
         transport.post.assert_called_once_with(
             "/numbers",
@@ -140,6 +198,7 @@ class TestNumbersProvision:
         _, kwargs = transport.post.call_args
         assert kwargs["json"]["type"] == "local"
         assert kwargs["json"]["agent_handle"] == "sales-bot"
+
 
 class TestNumbersRelease:
     def test_release_deletes_by_id(self, client, transport):

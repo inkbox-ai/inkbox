@@ -14,7 +14,9 @@ pub use resources::calls::CallsResource;
 pub use resources::contact_rules::PhoneContactRulesResource;
 pub use resources::hosted_agent::HostedAgentConfigResource;
 pub use resources::identity_contact_rules::PhoneIdentityContactRulesResource;
-pub use resources::incoming_call_action::IncomingCallActionResource;
+pub use resources::incoming_call_action::{
+    IncomingCallActionResource, IncomingCallActionSetOptions,
+};
 pub use resources::numbers::PhoneNumbersResource;
 pub use resources::sms_opt_ins::SmsOptInsResource;
 pub use resources::texts::TextsResource;

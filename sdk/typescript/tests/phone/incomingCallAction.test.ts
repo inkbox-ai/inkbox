@@ -1,7 +1,10 @@
 // sdk/typescript/tests/phone/incomingCallAction.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { IncomingCallActionResource } from "../../src/phone/resources/incomingCallAction.js";
-import { IncomingCallAction } from "../../src/phone/types.js";
+import {
+  ForwardingTargetType,
+  IncomingCallAction,
+} from "../../src/phone/types.js";
 import type { HttpTransport } from "../../src/_http.js";
 import { RAW_INCOMING_CALL_ACTION_CONFIG } from "../sampleData.js";
 
@@ -61,6 +64,9 @@ describe("IncomingCallActionResource.get", () => {
       incomingCallAction: IncomingCallAction.AUTO_ACCEPT,
       clientWebsocketUrl: "wss://agent.example.com/ws",
       incomingCallWebhookUrl: "https://agent.example.com/incoming-call",
+      forwardingTargetType: null,
+      forwardingPhoneNumber: null,
+      forwardingSipUri: null,
     });
   });
 });
@@ -110,6 +116,33 @@ describe("IncomingCallActionResource.set", () => {
     expect(config.clientWebsocketUrl).toBeNull();
     expect(config.incomingCallWebhookUrl).toBe("https://agent.example.com/incoming-call");
   });
+
+  it("sends complete SIP targets and explicit clears", async () => {
+    const http = mockHttp();
+    vi.mocked(http.put).mockResolvedValue({
+      ...RAW_INCOMING_CALL_ACTION_CONFIG,
+      incoming_call_action: "forward",
+      forwarding_target_type: "sip",
+      forwarding_phone_number: null,
+      forwarding_sip_uri: "sip:+14155550100@voice.example.com",
+    });
+    const res = new IncomingCallActionResource(http);
+
+    const config = await res.set({
+      incomingCallAction: IncomingCallAction.FORWARD,
+      forwardingTargetType: ForwardingTargetType.SIP,
+      forwardingPhoneNumber: null,
+      forwardingSipUri: "sip:+14155550100@voice.example.com",
+    });
+
+    expect(http.put).toHaveBeenCalledWith("/incoming-call-action", {
+      incoming_call_action: "forward",
+      forwarding_target_type: "sip",
+      forwarding_phone_number: null,
+      forwarding_sip_uri: "sip:+14155550100@voice.example.com",
+    });
+    expect(config.forwardingTargetType).toBe(ForwardingTargetType.SIP);
+  });
 });
 
 describe("IncomingCallActionResource hosted_agent", () => {
@@ -158,6 +191,7 @@ describe("IncomingCallActionResource hosted_agent", () => {
       "auto_reject",
       "webhook",
       "hosted_agent",
+      "forward",
     ]);
   });
 });

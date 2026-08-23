@@ -8,6 +8,7 @@ import { HttpTransport } from "../../_http.js";
 import { FilterMode } from "../../mail/types.js";
 import {
   PhoneNumber,
+  ForwardingTargetType,
   PhoneTranscript,
   RawPhoneNumber,
   RawPhoneTranscript,
@@ -36,12 +37,16 @@ export class PhoneNumbersResource {
 
   /**
    * Update phone number settings. Only provided fields are updated.
-   * Pass a field as `null` to clear it.
+   * Pass a field as `null` to clear it. Clearing a forwarding target requires
+   * switching `incomingCallAction` away from `"forward"` in the same update.
    *
    * @param phoneNumberId - UUID of the phone number.
-   * @param options.incomingCallAction - `"auto_accept"`, `"auto_reject"`, or `"webhook"`.
+   * @param options.incomingCallAction - `"auto_accept"`, `"auto_reject"`, `"webhook"`, `"hosted_agent"`, or `"forward"`.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) for audio bridging.
    * @param options.incomingCallWebhookUrl - Webhook URL called for incoming calls when action is `"webhook"`.
+   * @param options.forwardingTargetType - `"phone"` or `"sip"`; use `null` only while switching away from `"forward"`.
+   * @param options.forwardingPhoneNumber - Complete E.164 destination.
+   * @param options.forwardingSipUri - Complete SIP URI using a public DNS hostname.
    */
   async update(
     phoneNumberId: string,
@@ -49,6 +54,9 @@ export class PhoneNumbersResource {
       incomingCallAction?: string;
       clientWebsocketUrl?: string | null;
       incomingCallWebhookUrl?: string | null;
+      forwardingTargetType?: ForwardingTargetType | null;
+      forwardingPhoneNumber?: string | null;
+      forwardingSipUri?: string | null;
       filterMode?: FilterMode;
     },
   ): Promise<PhoneNumber> {
@@ -61,6 +69,15 @@ export class PhoneNumbersResource {
     }
     if ("incomingCallWebhookUrl" in options) {
       body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
+    }
+    if (options.forwardingTargetType !== undefined) {
+      body["forwarding_target_type"] = options.forwardingTargetType;
+    }
+    if (options.forwardingPhoneNumber !== undefined) {
+      body["forwarding_phone_number"] = options.forwardingPhoneNumber;
+    }
+    if (options.forwardingSipUri !== undefined) {
+      body["forwarding_sip_uri"] = options.forwardingSipUri;
     }
     if (options.filterMode !== undefined) {
       body["filter_mode"] = options.filterMode;

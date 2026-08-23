@@ -222,8 +222,9 @@ impl HostedAgentAuthorityMode {
 
 /// Routing decision applied to inbound calls for an agent identity.
 ///
-/// `hosted_agent` answers with Inkbox Voice AI and is the
-/// only action that requires neither a WebSocket nor a webhook URL.
+/// `auto_accept` requires a client WebSocket, `webhook` requires a webhook URL,
+/// and `forward` requires one phone or SIP destination. `auto_reject` and
+/// `hosted_agent` require neither URL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IncomingCallAction {
@@ -231,19 +232,52 @@ pub enum IncomingCallAction {
     AutoReject,
     Webhook,
     HostedAgent,
+    Forward,
 }
 
 impl IncomingCallAction {
     /// The wire string value (`"auto_accept"` / `"auto_reject"` / `"webhook"`
-    /// / `"hosted_agent"`).
+    /// / `"hosted_agent"` / `"forward"`).
     pub fn as_str(&self) -> &'static str {
         match self {
             IncomingCallAction::AutoAccept => "auto_accept",
             IncomingCallAction::AutoReject => "auto_reject",
             IncomingCallAction::Webhook => "webhook",
             IncomingCallAction::HostedAgent => "hosted_agent",
+            IncomingCallAction::Forward => "forward",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ForwardingTargetType {
+    Phone,
+    Sip,
+}
+
+impl ForwardingTargetType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Phone => "phone",
+            Self::Sip => "sip",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallForwardingTrigger {
+    IncomingAction,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallForwardingStatus {
+    Requested,
+    Dialing,
+    Forwarded,
+    Failed,
 }
 
 /// Consent state of a receiver number for the calling org.
@@ -358,6 +392,12 @@ pub struct PhoneNumber {
     pub client_websocket_url: Option<String>,
     #[serde(default)]
     pub incoming_call_webhook_url: Option<String>,
+    #[serde(default)]
+    pub forwarding_target_type: Option<ForwardingTargetType>,
+    #[serde(default)]
+    pub forwarding_phone_number: Option<String>,
+    #[serde(default)]
+    pub forwarding_sip_uri: Option<String>,
     /// A single value governs both inbound voice and SMS. Defaults to
     /// `blacklist` when absent.
     #[serde(default = "default_filter_mode_blacklist")]
@@ -441,6 +481,9 @@ pub struct PhoneCall {
     /// client-driven calls and Voice AI calls with no open items.
     #[serde(default)]
     pub post_call_action_items: Vec<PostCallActionItem>,
+    /// Forwarding attempts in chronological order.
+    #[serde(default)]
+    pub forwardings: Vec<PhoneCallForwarding>,
 }
 
 /// Rate limit snapshot for an organisation.
@@ -480,6 +523,31 @@ pub struct IncomingCallActionConfig {
     pub client_websocket_url: Option<String>,
     #[serde(default)]
     pub incoming_call_webhook_url: Option<String>,
+    #[serde(default)]
+    pub forwarding_target_type: Option<ForwardingTargetType>,
+    #[serde(default)]
+    pub forwarding_phone_number: Option<String>,
+    #[serde(default)]
+    pub forwarding_sip_uri: Option<String>,
+}
+
+/// One attempt to forward a call, returned oldest-first on the call.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhoneCallForwarding {
+    pub id: Uuid,
+    pub trigger: CallForwardingTrigger,
+    pub status: CallForwardingStatus,
+    pub target_type: ForwardingTargetType,
+    pub target: String,
+    pub requested_at: String,
+    #[serde(default)]
+    pub dialing_at: Option<String>,
+    #[serde(default)]
+    pub forwarded_at: Option<String>,
+    #[serde(default)]
+    pub ended_at: Option<String>,
+    #[serde(default)]
+    pub failure_code: Option<String>,
 }
 
 /// Per-identity Inkbox Voice AI configuration.
@@ -808,6 +876,34 @@ mod tests {
     }
 
     #[test]
+    fn phone_call_forwardings_default_empty_and_parse() {
+        let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
+        assert!(call.forwardings.is_empty());
+
+        let mut value = call_json();
+        value["forwardings"] = json!([{
+            "id": "22222222-2222-2222-2222-222222222299",
+            "trigger": "incoming_action",
+            "status": "forwarded",
+            "target_type": "sip",
+            "target": "sip:+14155550100@voice.example.com",
+            "requested_at": "2026-08-21T12:00:00Z",
+            "dialing_at": "2026-08-21T12:00:01Z",
+            "forwarded_at": "2026-08-21T12:00:03Z",
+            "ended_at": null,
+            "failure_code": null
+        }]);
+        let call: PhoneCall = serde_json::from_value(value).unwrap();
+        assert_eq!(call.forwardings.len(), 1);
+        assert_eq!(
+            call.forwardings[0].trigger,
+            CallForwardingTrigger::IncomingAction
+        );
+        assert_eq!(call.forwardings[0].status, CallForwardingStatus::Forwarded);
+        assert_eq!(call.forwardings[0].target_type, ForwardingTargetType::Sip);
+    }
+
+    #[test]
     fn phone_call_with_rate_limit_flatten_round_trip() {
         // The wire shape is one flat object: call fields + rate_limit.
         let mut v = call_json();
@@ -862,6 +958,7 @@ mod tests {
             (IncomingCallAction::AutoReject, "auto_reject"),
             (IncomingCallAction::Webhook, "webhook"),
             (IncomingCallAction::HostedAgent, "hosted_agent"),
+            (IncomingCallAction::Forward, "forward"),
         ];
         for (variant, wire) in cases {
             assert_eq!(variant.as_str(), wire);
@@ -869,6 +966,24 @@ mod tests {
             let parsed: IncomingCallAction = serde_json::from_value(json!(wire)).unwrap();
             assert_eq!(parsed, variant);
         }
+    }
+
+    #[test]
+    fn shared_forwarding_fixture_parses() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tests/fixtures/incoming_call_forwarding.json"
+        ))
+        .unwrap();
+        let config: IncomingCallActionConfig =
+            serde_json::from_value(fixture["config"].clone()).unwrap();
+        assert_eq!(config.incoming_call_action, IncomingCallAction::Forward);
+        assert_eq!(
+            config.forwarding_target_type,
+            Some(ForwardingTargetType::Sip)
+        );
+        let forwarding: PhoneCallForwarding =
+            serde_json::from_value(fixture["forwarding"].clone()).unwrap();
+        assert_eq!(forwarding.status, CallForwardingStatus::Forwarded);
     }
 
     #[test]

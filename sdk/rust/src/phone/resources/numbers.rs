@@ -6,7 +6,7 @@ use serde_json::{Map, Value};
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::phone::types::{FilterMode, PhoneNumber, PhoneTranscript};
+use crate::phone::types::{FilterMode, ForwardingTargetType, PhoneNumber, PhoneTranscript};
 
 const BASE: &str = "/numbers";
 
@@ -41,7 +41,8 @@ impl PhoneNumbersResource {
     /// mirroring the Python `_UNSET` sentinel vs an explicit `None` value.
     ///
     /// # Arguments
-    /// * `incoming_call_action` - `"auto_accept"`, `"auto_reject"`, or `"webhook"`.
+    /// * `incoming_call_action` - `"auto_accept"`, `"auto_reject"`,
+    ///   `"webhook"`, `"hosted_agent"`, or `"forward"`.
     /// * `client_websocket_url` - WebSocket URL (wss://) for audio bridging.
     /// * `incoming_call_webhook_url` - Webhook URL called for incoming calls when
     ///   action is `"webhook"`.
@@ -58,6 +59,35 @@ impl PhoneNumbersResource {
         client_websocket_url: Option<Option<&str>>,
         incoming_call_webhook_url: Option<Option<&str>>,
         filter_mode: Option<FilterMode>,
+    ) -> Result<PhoneNumber> {
+        self.update_with_forwarding(
+            phone_number_id,
+            incoming_call_action,
+            client_websocket_url,
+            incoming_call_webhook_url,
+            filter_mode,
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    /// Update phone-number settings, including an optional forwarding target.
+    ///
+    /// The three forwarding arguments use outer `None` to preserve a saved
+    /// field and `Some(None)` to clear it. Clear a target while switching the
+    /// incoming-call action away from `forward` in the same request.
+    pub fn update_with_forwarding(
+        &self,
+        phone_number_id: &str,
+        incoming_call_action: Option<Option<&str>>,
+        client_websocket_url: Option<Option<&str>>,
+        incoming_call_webhook_url: Option<Option<&str>>,
+        filter_mode: Option<FilterMode>,
+        forwarding_target_type: Option<Option<ForwardingTargetType>>,
+        forwarding_phone_number: Option<Option<&str>>,
+        forwarding_sip_uri: Option<Option<&str>>,
     ) -> Result<PhoneNumber> {
         let mut body = Map::new();
         // Each nullable-string field: outer None omits, Some(None) -> JSON null,
@@ -77,6 +107,20 @@ impl PhoneNumbersResource {
                 FilterMode::Blacklist => "blacklist",
             };
             body.insert("filter_mode".into(), mode.into());
+        }
+        if let Some(value) = forwarding_target_type {
+            body.insert(
+                "forwarding_target_type".into(),
+                value
+                    .map(|target| Value::String(target.as_str().to_owned()))
+                    .unwrap_or(Value::Null),
+            );
+        }
+        if let Some(value) = forwarding_phone_number {
+            body.insert("forwarding_phone_number".into(), str_or_null(value));
+        }
+        if let Some(value) = forwarding_sip_uri {
+            body.insert("forwarding_sip_uri".into(), str_or_null(value));
         }
         let data = self
             .http

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.3 — Incoming call forwarding
+
+- Added `IncomingCallAction.FORWARD`, forwarding destination configuration,
+  and chronological `PhoneCall.forwardings` history.
+- Forwarding configuration keywords distinguish omission from explicit
+  `None`; phone-number updates expose the same fields.
+- Older strict action parsing requires this release before reading identities
+  configured for forwarding.
+
 ## 0.6.2 — Undo an iMessage tapback
 
 ### Added

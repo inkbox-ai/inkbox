@@ -859,6 +859,9 @@ pub struct WebhookPhoneCall {
         deserialize_with = "deserialize_webhook_voicemail_detection_null_default"
     )]
     pub voicemail_detection: VoicemailDetection,
+    /// Chronological forwarding attempts; absent on older webhook replays.
+    #[serde(default)]
+    pub forwardings: Vec<crate::phone::PhoneCallForwarding>,
 }
 
 fn default_webhook_call_mode() -> String {

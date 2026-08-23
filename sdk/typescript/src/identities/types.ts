@@ -11,7 +11,7 @@ import {
   FilterMode as FilterModeEnum,
   parseFilterModeChangeNotice,
 } from "../mail/types.js";
-import { SmsStatus } from "../phone/types.js";
+import { ForwardingTargetType, SmsStatus } from "../phone/types.js";
 import type { RawTunnelSummary, TLSMode, TunnelSummary } from "../tunnels/types.js";
 import { parseTunnelSummary } from "../tunnels/types.js";
 import type {
@@ -37,6 +37,9 @@ export interface IdentityPhoneNumberCreateOptions {
   incomingCallAction?: string;
   clientWebsocketUrl?: string;
   incomingCallWebhookUrl?: string;
+  forwardingTargetType?: ForwardingTargetType;
+  forwardingPhoneNumber?: string;
+  forwardingSipUri?: string;
 }
 
 export interface IdentityTunnelCreateOptions {
@@ -133,10 +136,13 @@ export interface IdentityPhoneNumber {
   smsErrorCode: string | null;
   smsErrorDetail: string | null;
   smsReadyAt: Date | null;
-  /** "auto_accept" | "auto_reject" | "webhook" */
+  /** "auto_accept" | "auto_reject" | "webhook" | "hosted_agent" | "forward" */
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;
+  forwardingTargetType: ForwardingTargetType | null;
+  forwardingPhoneNumber: string | null;
+  forwardingSipUri: string | null;
   filterMode: FilterMode;
   /**
    * 2-letter US state abbreviation (e.g. `"NY"`); `null` if not set.
@@ -238,6 +244,9 @@ export interface RawIdentityPhoneNumber {
   incoming_call_action: string;
   client_websocket_url: string | null;
   incoming_call_webhook_url?: string | null;
+  forwarding_target_type?: string | null;
+  forwarding_phone_number?: string | null;
+  forwarding_sip_uri?: string | null;
   filter_mode?: string;
   state?: string | null;
   agent_identity_id?: string | null;
@@ -305,6 +314,9 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     incomingCallAction: r.incoming_call_action,
     clientWebsocketUrl: r.client_websocket_url,
     incomingCallWebhookUrl: r.incoming_call_webhook_url ?? null,
+    forwardingTargetType: (r.forwarding_target_type as ForwardingTargetType) ?? null,
+    forwardingPhoneNumber: r.forwarding_phone_number ?? null,
+    forwardingSipUri: r.forwarding_sip_uri ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     state: r.state ?? null,
     agentIdentityId: r.agent_identity_id ?? null,
@@ -380,6 +392,20 @@ export function identityPhoneNumberCreateOptionsToWire(
   if (options.incomingCallAction === "webhook" && options.incomingCallWebhookUrl === undefined) {
     throw new Error("incomingCallWebhookUrl is required for webhook");
   }
+  if (options.incomingCallAction === "forward" && options.forwardingTargetType === undefined) {
+    throw new Error("forwardingTargetType is required for forward");
+  }
+  if (options.forwardingTargetType === undefined) {
+    if (options.forwardingPhoneNumber !== undefined || options.forwardingSipUri !== undefined) {
+      throw new Error("forwardingTargetType is required when a forwarding target is set");
+    }
+  } else if (options.forwardingTargetType === "phone") {
+    if (!options.forwardingPhoneNumber || options.forwardingSipUri !== undefined) {
+      throw new Error("phone forwarding requires only forwardingPhoneNumber");
+    }
+  } else if (!options.forwardingSipUri || options.forwardingPhoneNumber !== undefined) {
+    throw new Error("SIP forwarding requires only forwardingSipUri");
+  }
 
   const body: Record<string, unknown> = {};
   if (options.type !== undefined) body["type"] = options.type;
@@ -387,6 +413,9 @@ export function identityPhoneNumberCreateOptionsToWire(
   if (options.incomingCallAction !== undefined) body["incoming_call_action"] = options.incomingCallAction;
   if (options.clientWebsocketUrl !== undefined) body["client_websocket_url"] = options.clientWebsocketUrl;
   if (options.incomingCallWebhookUrl !== undefined) body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
+  if (options.forwardingTargetType !== undefined) body["forwarding_target_type"] = options.forwardingTargetType;
+  if (options.forwardingPhoneNumber !== undefined) body["forwarding_phone_number"] = options.forwardingPhoneNumber;
+  if (options.forwardingSipUri !== undefined) body["forwarding_sip_uri"] = options.forwardingSipUri;
   return body;
 }
 

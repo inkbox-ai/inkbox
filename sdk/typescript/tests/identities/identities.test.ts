@@ -81,6 +81,24 @@ describe("IdentitiesResource.create", () => {
     expect(identity.emailAddress).toBe("sales.team@inkboxmail.com");
   });
 
+  it.each([
+    { incomingCallAction: "forward" as const, forwardingTargetType: "phone" as const },
+    { incomingCallAction: "forward" as const, forwardingTargetType: "sip" as const },
+    { forwardingPhoneNumber: "+14155550100" },
+    {
+      incomingCallAction: "forward" as const,
+      forwardingTargetType: "phone" as const,
+      forwardingPhoneNumber: "+14155550100",
+      forwardingSipUri: "sip:line@voice.example.com",
+    },
+  ])("rejects incoherent nested forwarding options", async (phoneNumber) => {
+    const http = mockHttp();
+    const res = new IdentitiesResource(http);
+
+    await expect(res.create({ agentHandle: HANDLE, phoneNumber })).rejects.toThrow(/forwarding/i);
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
   it("supports a single vault secret ID", async () => {
     const http = mockHttp();
     vi.mocked(http.post).mockResolvedValue(RAW_IDENTITY);

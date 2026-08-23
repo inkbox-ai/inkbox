@@ -1109,7 +1109,7 @@ for (const t of segments) {
 ### Incoming-call routing
 
 ```ts
-import { IncomingCallAction } from "@inkbox/sdk";
+import { ForwardingTargetType, IncomingCallAction } from "@inkbox/sdk";
 
 // Read the current incoming-call config
 const config = await inkbox.incomingCallAction.get();
@@ -1119,6 +1119,18 @@ await inkbox.incomingCallAction.set({
   incomingCallAction: IncomingCallAction.WEBHOOK,
   incomingCallWebhookUrl: "https://your-agent.example.com/incoming-call",
 });
+
+// Forward every incoming call for this identity to a complete E.164 number
+await inkbox.incomingCallAction.set({
+  incomingCallAction: IncomingCallAction.FORWARD,
+  forwardingTargetType: ForwardingTargetType.PHONE,
+  forwardingPhoneNumber: "+14155550100",
+});
+
+// Forwarding attempts are chronological and separate from call.status
+for (const forwarding of (await inkbox.calls.get("call-uuid")).forwardings) {
+  console.log(forwarding.status, forwarding.target);
+}
 ```
 
 ---

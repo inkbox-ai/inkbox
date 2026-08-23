@@ -8,6 +8,7 @@ import { HttpTransport } from "../../_http.js";
 import {
   IncomingCallAction,
   IncomingCallActionConfig,
+  ForwardingTargetType,
   RawIncomingCallActionConfig,
   parseIncomingCallActionConfig,
 } from "../types.js";
@@ -41,19 +42,26 @@ export class IncomingCallActionResource {
   /**
    * Set the incoming-call routing config.
    *
-   * @param options.incomingCallAction - `auto_accept`, `auto_reject`, or `webhook`.
+   * @param options.incomingCallAction - `auto_accept`, `auto_reject`, `webhook`, `hosted_agent`, or `forward`.
    * @param options.agentIdentityId - UUID of the agent identity. Optional
    *   for agent-scoped keys; required under admin/JWT.
    * @param options.clientWebsocketUrl - WebSocket URL (wss://) to bridge
    *   accepted calls to.
    * @param options.incomingCallWebhookUrl - HTTPS URL that decides call
    *   routing when the action is `webhook`.
+   * @param options.forwardingTargetType - `phone` or `sip`; use `null` only
+   *   while switching away from `forward`.
+   * @param options.forwardingPhoneNumber - Complete E.164 destination.
+   * @param options.forwardingSipUri - Complete SIP URI using a public DNS hostname.
    */
   async set(options: {
     incomingCallAction: IncomingCallAction;
     agentIdentityId?: string;
     clientWebsocketUrl?: string;
     incomingCallWebhookUrl?: string;
+    forwardingTargetType?: ForwardingTargetType | null;
+    forwardingPhoneNumber?: string | null;
+    forwardingSipUri?: string | null;
   }): Promise<IncomingCallActionConfig> {
     const body: Record<string, unknown> = {
       incoming_call_action: options.incomingCallAction,
@@ -66,6 +74,15 @@ export class IncomingCallActionResource {
     }
     if (options.incomingCallWebhookUrl !== undefined) {
       body["incoming_call_webhook_url"] = options.incomingCallWebhookUrl;
+    }
+    if (options.forwardingTargetType !== undefined) {
+      body["forwarding_target_type"] = options.forwardingTargetType;
+    }
+    if (options.forwardingPhoneNumber !== undefined) {
+      body["forwarding_phone_number"] = options.forwardingPhoneNumber;
+    }
+    if (options.forwardingSipUri !== undefined) {
+      body["forwarding_sip_uri"] = options.forwardingSipUri;
     }
     const data = await this.http.put<RawIncomingCallActionConfig>(
       "/incoming-call-action",

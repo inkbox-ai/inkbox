@@ -14,6 +14,7 @@ from uuid import UUID
 from inkbox.imessage.types import _compatibility_number_type
 from inkbox.mail.types import FilterMode, FilterModeChangeNotice
 from inkbox.phone.types import SmsStatus
+from inkbox.phone.types import ForwardingTargetType
 from inkbox.tunnels.types import TLSMode, TunnelSummary
 
 # Sentinel for "field omitted" that's distinct from explicit ``None``.
@@ -70,7 +71,9 @@ class IdentityTunnelCreateOptions:
         body: dict[str, Any] = {}
         if self.tls_mode is not None:
             body["tls_mode"] = (
-                self.tls_mode.value if isinstance(self.tls_mode, TLSMode) else self.tls_mode
+                self.tls_mode.value
+                if isinstance(self.tls_mode, TLSMode)
+                else self.tls_mode
             )
         return body
 
@@ -93,13 +96,43 @@ class IdentityPhoneNumberCreateOptions:
     incoming_call_action: str = "auto_reject"
     client_websocket_url: str | None = None
     incoming_call_webhook_url: str | None = None
+    forwarding_target_type: ForwardingTargetType | str | None = None
+    forwarding_phone_number: str | None = None
+    forwarding_sip_uri: str | None = None
 
     def to_wire(self) -> dict[str, Any]:
         """Return a JSON-serializable dict matching the API schema."""
-        if self.incoming_call_action == "auto_accept" and self.client_websocket_url is None:
+        if (
+            self.incoming_call_action == "auto_accept"
+            and self.client_websocket_url is None
+        ):
             raise ValueError("client_websocket_url is required for auto_accept")
-        if self.incoming_call_action == "webhook" and self.incoming_call_webhook_url is None:
+        if (
+            self.incoming_call_action == "webhook"
+            and self.incoming_call_webhook_url is None
+        ):
             raise ValueError("incoming_call_webhook_url is required for webhook")
+        if (
+            self.incoming_call_action == "forward"
+            and self.forwarding_target_type is None
+        ):
+            raise ValueError("forwarding_target_type is required for forward")
+        target_type = (
+            self.forwarding_target_type.value
+            if isinstance(self.forwarding_target_type, ForwardingTargetType)
+            else self.forwarding_target_type
+        )
+        if target_type is None:
+            if self.forwarding_phone_number is not None or self.forwarding_sip_uri is not None:
+                raise ValueError("forwarding_target_type is required when a forwarding target is set")
+        elif target_type == "phone":
+            if not self.forwarding_phone_number or self.forwarding_sip_uri is not None:
+                raise ValueError("phone forwarding requires only forwarding_phone_number")
+        elif target_type == "sip":
+            if not self.forwarding_sip_uri or self.forwarding_phone_number is not None:
+                raise ValueError("SIP forwarding requires only forwarding_sip_uri")
+        else:
+            raise ValueError("forwarding_target_type must be 'phone' or 'sip'")
 
         body: dict[str, Any] = {
             "type": self.type,
@@ -111,6 +144,16 @@ class IdentityPhoneNumberCreateOptions:
             body["client_websocket_url"] = self.client_websocket_url
         if self.incoming_call_webhook_url is not None:
             body["incoming_call_webhook_url"] = self.incoming_call_webhook_url
+        if self.forwarding_target_type is not None:
+            body["forwarding_target_type"] = (
+                self.forwarding_target_type.value
+                if isinstance(self.forwarding_target_type, ForwardingTargetType)
+                else self.forwarding_target_type
+            )
+        if self.forwarding_phone_number is not None:
+            body["forwarding_phone_number"] = self.forwarding_phone_number
+        if self.forwarding_sip_uri is not None:
+            body["forwarding_sip_uri"] = self.forwarding_sip_uri
         return body
 
 
@@ -201,6 +244,9 @@ class IdentityPhoneNumber:
     state: str | None = None
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
+    forwarding_target_type: ForwardingTargetType | None = None
+    forwarding_phone_number: str | None = None
+    forwarding_sip_uri: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityPhoneNumber:
@@ -217,6 +263,13 @@ class IdentityPhoneNumber:
             incoming_call_action=d["incoming_call_action"],
             client_websocket_url=d.get("client_websocket_url"),
             incoming_call_webhook_url=d.get("incoming_call_webhook_url"),
+            forwarding_target_type=(
+                ForwardingTargetType(d["forwarding_target_type"])
+                if d.get("forwarding_target_type")
+                else None
+            ),
+            forwarding_phone_number=d.get("forwarding_phone_number"),
+            forwarding_sip_uri=d.get("forwarding_sip_uri"),
             filter_mode=FilterMode(d.get("filter_mode", "blacklist")),
             created_at=datetime.fromisoformat(d["created_at"]),
             updated_at=datetime.fromisoformat(d["updated_at"]),
@@ -308,7 +361,9 @@ class AgentIdentitySummary:
             updated_at=datetime.fromisoformat(d["updated_at"]),
             imessage_enabled=d.get("imessage_enabled", False),
             contact_sharing_enabled=d.get("contact_sharing_enabled", True),
-            imessage_filter_mode=FilterMode(d.get("imessage_filter_mode") or "blacklist"),
+            imessage_filter_mode=FilterMode(
+                d.get("imessage_filter_mode") or "blacklist"
+            ),
             mail_filter_mode=FilterMode(d.get("mail_filter_mode") or "blacklist"),
             phone_filter_mode=FilterMode(d.get("phone_filter_mode") or "blacklist"),
             signing_key_configured=d.get("signing_key_configured", False),

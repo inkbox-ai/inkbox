@@ -877,6 +877,18 @@ impl AgentIdentity {
         )
     }
 
+    /// Set this identity's inbound-call action with forwarding options.
+    pub fn set_incoming_call_action_with_options(
+        &self,
+        incoming_call_action: IncomingCallAction,
+        mut options: crate::phone::IncomingCallActionSetOptions,
+    ) -> Result<IncomingCallActionConfig> {
+        options.agent_identity_id = Some(self.id().to_string());
+        self.inkbox
+            .incoming_call_action()
+            .set_with_options(incoming_call_action, options)
+    }
+
     // -----------------------------------------------------------------------
     // Text message helpers
     // -----------------------------------------------------------------------

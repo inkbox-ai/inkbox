@@ -127,6 +127,11 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 | Agent-to-agent discovery and history | `a2a()` |
 | Org | `api_keys()`, `identities()`, `signing_keys()`, `tunnels()`, `webhooks()` |
 
+Incoming calls can be forwarded to a complete E.164 number or a SIP URI with a public DNS hostname using
+`incoming_call_action().set_with_options(...)` and
+`IncomingCallActionSetOptions`. Call responses expose chronological
+`forwardings`; older responses deserialize to an empty vector.
+
 Contact rules and webhook signing keys are keyed by **agent identity**, addressed
 by `agent_handle`. Use `mail_identity_contact_rules()` /
 `phone_identity_contact_rules()` (per-identity `list`/`get`/`create`/`update`/

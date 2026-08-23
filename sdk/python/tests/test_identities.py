@@ -4,6 +4,7 @@ sdk/python/tests/test_identities.py
 Tests for IdentitiesResource.
 """
 
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 from uuid import UUID
 
@@ -17,10 +18,13 @@ from sample_data_identities import (
 from inkbox.identities.resources.identities import IdentitiesResource
 from inkbox.identities.types import (
     IdentityMailboxCreateOptions,
+    IdentityPhoneNumber,
     IdentityPhoneNumberCreateOptions,
     IdentityTunnelCreateOptions,
     _AgentIdentityData,
 )
+from inkbox.mail.types import FilterMode
+from inkbox.phone.types import ForwardingTargetType, SmsStatus
 
 
 def _resource():
@@ -29,6 +33,28 @@ def _resource():
 
 
 HANDLE = "sales-agent"
+
+
+def test_identity_phone_number_preserves_existing_direct_constructor():
+    timestamp = datetime.now(UTC)
+
+    number = IdentityPhoneNumber(
+        id=UUID("aaaa1111-0000-0000-0000-000000000001"),
+        number="+18335794607",
+        type="local",
+        status="active",
+        sms_status=SmsStatus.READY,
+        incoming_call_action="auto_reject",
+        client_websocket_url=None,
+        incoming_call_webhook_url=None,
+        filter_mode=FilterMode.BLACKLIST,
+        created_at=timestamp,
+        updated_at=timestamp,
+    )
+
+    assert number.forwarding_target_type is None
+    assert number.forwarding_phone_number is None
+    assert number.forwarding_sip_uri is None
 
 
 class TestIdentitiesCreate:
@@ -90,6 +116,32 @@ class TestIdentitiesCreate:
             },
         )
         assert identity.email_address == "sales.team@inkboxmail.com"
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            IdentityPhoneNumberCreateOptions(
+                incoming_call_action="forward",
+                forwarding_target_type=ForwardingTargetType.PHONE,
+            ),
+            IdentityPhoneNumberCreateOptions(
+                incoming_call_action="forward",
+                forwarding_target_type=ForwardingTargetType.SIP,
+            ),
+            IdentityPhoneNumberCreateOptions(
+                forwarding_phone_number="+14155550100",
+            ),
+            IdentityPhoneNumberCreateOptions(
+                incoming_call_action="forward",
+                forwarding_target_type=ForwardingTargetType.PHONE,
+                forwarding_phone_number="+14155550100",
+                forwarding_sip_uri="sip:line@voice.example.com",
+            ),
+        ],
+    )
+    def test_rejects_incoherent_forwarding_targets(self, options):
+        with pytest.raises(ValueError):
+            options.to_wire()
 
     def test_claims_imessage_number_atomically(self):
         res, http = _resource()

@@ -77,6 +77,55 @@ test("phone help exposes authority controls", () => {
   assert.match(help("phone", "tool-activity"), /--offset <n>/);
   const authorityHelp = help("phone", "hosted-agent", "authority-mode");
   assert.match(authorityHelp, /admin API key/);
+  const incomingHelp = help("phone", "incoming-action");
+  assert.match(incomingHelp, /--forward-to-phone <number>/);
+  assert.match(incomingHelp, /--forward-to-sip <uri>/);
+});
+
+test("incoming-action forward sends one complete SIP destination", async () => {
+  const requests = [];
+  const mock = await listen((req, res) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      requests.push({ method: req.method, url: req.url, body: body ? JSON.parse(body) : null });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      if (req.url === "/api/v1/identities/support-bot") {
+        res.end(JSON.stringify(IDENTITY));
+        return;
+      }
+      res.end(JSON.stringify({
+        agent_identity_id: IDENTITY.id,
+        incoming_call_action: "forward",
+        client_websocket_url: null,
+        incoming_call_webhook_url: null,
+        forwarding_target_type: "sip",
+        forwarding_phone_number: null,
+        forwarding_sip_uri: "sip:+14155550100@voice.example.com",
+      }));
+    });
+  });
+
+  try {
+    const result = await runCli([
+      "--api-key", "test-key",
+      "--base-url", `http://127.0.0.1:${mock.port}`,
+      "--json", "phone", "incoming-action", "forward",
+      "-i", "support-bot",
+      "--forward-to-sip", "sip:+14155550100@voice.example.com",
+    ]);
+    assert.ifError(result.error);
+    assert.deepEqual(requests[1].body, {
+      incoming_call_action: "forward",
+      agent_identity_id: IDENTITY.id,
+      forwarding_target_type: "sip",
+      forwarding_sip_uri: "sip:+14155550100@voice.example.com",
+    });
+    assert.equal(JSON.parse(result.stdout).forwardingTargetType, "sip");
+  } finally {
+    mock.server.close();
+  }
 });
 
 test("buildPlaceCallOptions disables voicemail detection only when requested", () => {

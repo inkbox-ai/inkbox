@@ -656,6 +656,21 @@ export interface WebhookPhoneCall {
   hosted_agent_authority_mode?: HostedAgentAuthorityModeWire | null;
   /** Optional/nullable on webhook replays that predate this control. */
   voicemail_detection?: VoicemailDetectionWire | null;
+  /** Chronological forwarding attempts; absent on older webhook replays. */
+  forwardings?: WebhookPhoneCallForwarding[];
+}
+
+export interface WebhookPhoneCallForwarding {
+  id: string;
+  trigger: "incoming_action";
+  status: "requested" | "dialing" | "forwarded" | "failed";
+  target_type: "phone" | "sip";
+  target: string;
+  requested_at: string;
+  dialing_at: string | null;
+  forwarded_at: string | null;
+  ended_at: string | null;
+  failure_code: string | null;
 }
 
 /**

@@ -127,7 +127,9 @@ class AgentIdentity:
         self._imessage_number: IdentityIMessageNumber | None = data.imessage_number
         self._tunnel: TunnelSummary | None = data.tunnel
         self._credentials: Credentials | None = None
-        self._credentials_vault_ref: object | None = None  # tracks which _unlocked built the cache
+        self._credentials_vault_ref: object | None = (
+            None  # tracks which _unlocked built the cache
+        )
 
     ## Identity properties
 
@@ -234,7 +236,10 @@ class AgentIdentity:
         """
         vault = self._inkbox._vault_resource
         # Invalidate cache if the vault was re-unlocked since we last built it.
-        if self._credentials is not None and vault._unlocked is self._credentials_vault_ref:
+        if (
+            self._credentials is not None
+            and vault._unlocked is self._credentials_vault_ref
+        ):
             return self._credentials
         self._require_vault_unlocked()
         unlocked = vault._unlocked
@@ -284,7 +289,8 @@ class AgentIdentity:
         unlocked = self._inkbox._vault_resource._unlocked
         secret = unlocked.create_secret(name, payload, description=description)  # type: ignore[union-attr]
         self._inkbox._vault_resource.grant_access(
-            str(secret.id), identity_id=str(self.id),
+            str(secret.id),
+            identity_id=str(self.id),
         )
         self._credentials = None  # invalidate cache
         return secret
@@ -376,7 +382,9 @@ class AgentIdentity:
         Returns:
             The newly provisioned and linked phone number.
         """
-        self._inkbox._numbers.provision(agent_handle=self.agent_handle, type=type, state=state)
+        self._inkbox._numbers.provision(
+            agent_handle=self.agent_handle, type=type, state=state
+        )
         data = self._inkbox._ids_resource.get(self.agent_handle)
         self._phone_number = data.phone_number
         self._data = data
@@ -448,7 +456,8 @@ class AgentIdentity:
         """Get one email draft from this identity's mailbox."""
         self._require_mailbox()
         return self._inkbox._drafts.get(
-            self._mailbox.email_address, draft_id  # type: ignore[union-attr]
+            self._mailbox.email_address,
+            draft_id,  # type: ignore[union-attr]
         )
 
     def update_email_draft(
@@ -498,9 +507,7 @@ class AgentIdentity:
             generation=generation,
         )
 
-    def delete_email_draft(
-        self, draft_id: UUID | str, *, generation: int
-    ) -> None:
+    def delete_email_draft(self, draft_id: UUID | str, *, generation: int) -> None:
         """Delete an email draft."""
         self._require_mailbox()
         self._inkbox._drafts.delete(
@@ -509,9 +516,7 @@ class AgentIdentity:
             generation=generation,
         )
 
-    def send_email_draft(
-        self, draft_id: UUID | str, *, generation: int
-    ) -> Message:
+    def send_email_draft(self, draft_id: UUID | str, *, generation: int) -> Message:
         """Send an email draft."""
         self._require_mailbox()
         return self._inkbox._drafts.send(
@@ -731,13 +736,15 @@ class AgentIdentity:
             tz: IANA timezone name (str) for zone-less values; ``None`` is UTC.
         """
         return (
-            msg for msg in self.iter_emails(
+            msg
+            for msg in self.iter_emails(
                 page_size=page_size,
                 direction=direction,
                 start_datetime=start_datetime,
                 end_datetime=end_datetime,
                 tz=tz,
-            ) if not msg.is_read
+            )
+            if not msg.is_read
         )
 
     def mark_emails_read(self, message_ids: list[str]) -> None:
@@ -983,6 +990,9 @@ class AgentIdentity:
         incoming_call_action: IncomingCallAction | str,
         client_websocket_url: str | None = None,
         incoming_call_webhook_url: str | None = None,
+        forwarding_target_type: Any = _UNSET,
+        forwarding_phone_number: Any = _UNSET,
+        forwarding_sip_uri: Any = _UNSET,
     ) -> IncomingCallActionConfig:
         """Set this identity's inbound-call handling config.
 
@@ -993,11 +1003,20 @@ class AgentIdentity:
             incoming_call_webhook_url: HTTPS receiver for the
                 ``webhook`` action.
         """
+        kwargs: dict[str, Any] = {
+            "incoming_call_action": incoming_call_action,
+            "agent_identity_id": self.id,
+            "client_websocket_url": client_websocket_url,
+            "incoming_call_webhook_url": incoming_call_webhook_url,
+        }
+        if forwarding_target_type is not _UNSET:
+            kwargs["forwarding_target_type"] = forwarding_target_type
+        if forwarding_phone_number is not _UNSET:
+            kwargs["forwarding_phone_number"] = forwarding_phone_number
+        if forwarding_sip_uri is not _UNSET:
+            kwargs["forwarding_sip_uri"] = forwarding_sip_uri
         return self._inkbox._incoming_call_action.set(
-            incoming_call_action=incoming_call_action,
-            agent_identity_id=self.id,
-            client_websocket_url=client_websocket_url,
-            incoming_call_webhook_url=incoming_call_webhook_url,
+            **kwargs,
         )
 
     ## Text message helpers
@@ -1485,7 +1504,9 @@ class AgentIdentity:
     ) -> MailIdentityContactRule:
         """Update a mail rule's ``action`` (admin-only)."""
         return self._inkbox._mail_identity_contact_rules.update(
-            self.agent_handle, rule_id, action=action,
+            self.agent_handle,
+            rule_id,
+            action=action,
         )
 
     def delete_mail_contact_rule(self, rule_id: UUID | str) -> None:
@@ -1518,7 +1539,9 @@ class AgentIdentity:
     def get_phone_contact_rule(self, rule_id: UUID | str) -> PhoneIdentityContactRule:
         """Get one of this identity's phone contact rules by id."""
         self._require_phone()
-        return self._inkbox._phone_identity_contact_rules.get(self.agent_handle, rule_id)
+        return self._inkbox._phone_identity_contact_rules.get(
+            self.agent_handle, rule_id
+        )
 
     def create_phone_contact_rule(
         self,
@@ -1548,7 +1571,9 @@ class AgentIdentity:
         """Update a phone rule's ``action`` (admin-only)."""
         self._require_phone()
         return self._inkbox._phone_identity_contact_rules.update(
-            self.agent_handle, rule_id, action=action,
+            self.agent_handle,
+            rule_id,
+            action=action,
         )
 
     def delete_phone_contact_rule(self, rule_id: UUID | str) -> None:
@@ -2011,7 +2036,8 @@ class AgentIdentity:
                 else phone_filter_mode
             )
         result = self._inkbox._ids_resource.update(
-            self.agent_handle, **update_kwargs,
+            self.agent_handle,
+            **update_kwargs,
         )
         # PATCH returns the full detail shape, including the current dedicated
         # number and renamed tunnel. Update every cached channel directly;
