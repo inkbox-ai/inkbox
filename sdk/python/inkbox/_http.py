@@ -26,6 +26,8 @@ from inkbox.exceptions import (
 from inkbox.error_guidance import parse_agent_support
 
 _DEFAULT_TIMEOUT = 30.0
+# Retries connection setup only; the request has not been sent yet, so any method is safe.
+CONNECT_RETRIES = 2
 
 
 def _sdk_version() -> str:
@@ -61,6 +63,7 @@ class HttpTransport:
             base_url=base_url,
             headers=headers,
             timeout=timeout,
+            transport=httpx.HTTPTransport(retries=CONNECT_RETRIES),
         )
         self._cookie_jar = cookie_jar or CookieJar()
 

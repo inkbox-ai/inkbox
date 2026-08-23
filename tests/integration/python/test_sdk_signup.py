@@ -6,6 +6,7 @@ Live agent-signup coverage for the Python SDK.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import httpx
@@ -15,15 +16,24 @@ from conftest import SdkIntegrationContext, log_step
 from inkbox import Inkbox
 
 
-def _approve_all_pending(jwt_client: httpx.Client, org_id: str) -> None:
-    """Claim every unclaimed agent linked to the pooled human, freeing the cap.
+# The signup human is shared, so this list can also hold an agent that a
+# concurrently running suite created moments ago. Only agents older than this
+# count as leftovers worth claiming.
+_LEFTOVER_MIN_AGE = timedelta(minutes=10)
+
+
+def _approve_stale_pending(jwt_client: httpx.Client, org_id: str) -> None:
+    """Claim leftover unclaimed agents linked to the signup human, freeing the cap.
 
     Best-effort: a leftover that won't approve is skipped, since freeing even
     one slot is enough for the subsequent signup to succeed.
     """
+    cutoff = datetime.now(timezone.utc) - _LEFTOVER_MIN_AGE
     resp = jwt_client.get("/agent-signup/pending")
     resp.raise_for_status()
     for agent in resp.json().get("agents", []):
+        if datetime.fromisoformat(agent["created_at"]) > cutoff:
+            continue
         try:
             jwt_client.post(
                 f"/agent-signup/{agent['identity_id']}/approve",
@@ -67,11 +77,11 @@ def test_python_sdk_signup_accepts_custom_handle_and_email_local_part(
         headers={"Authorization": f"Bearer {jwt}"},
         timeout=cfg.http_timeout,
     ) as jwt_client:
-        # The bootstrap human is a shared pooled creator, so unclaimed agents
-        # leaked by earlier failed runs accumulate against a per-email cap and
-        # would 429 this signup. Claim any leftovers first to free the cap.
-        log_step(ctx, "drain leftover unclaimed agents for the pooled human")
-        _approve_all_pending(jwt_client, ctx.bootstrap.org_id)
+        # The signup human is shared, so unclaimed agents leaked by earlier
+        # failed runs accumulate against a per-email cap and would 429 this
+        # signup. Claim those leftovers first to free the cap.
+        log_step(ctx, "drain stale unclaimed agents for the signup human")
+        _approve_stale_pending(jwt_client, ctx.bootstrap.org_id)
 
         log_step(ctx, "sign up agent with explicit handle and email local part")
         signup = Inkbox.signup(

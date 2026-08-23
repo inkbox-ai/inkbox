@@ -12,10 +12,15 @@ import {
   type BootstrapResult,
 } from "./helpers.js";
 
-// Approve (claim) every unclaimed agent currently linked to the pooled human,
-// dropping its per-email unclaimed count to zero. Best-effort: a leftover that
-// won't approve is skipped, since freeing even one slot is enough to sign up.
-async function approveAllPending(
+// The signup human is shared, so the pending list can also hold an agent that a
+// concurrently running suite created moments ago. Only agents older than this
+// count as leftovers worth claiming.
+const LEFTOVER_MIN_AGE_MS = 10 * 60 * 1000;
+
+// Approve (claim) leftover unclaimed agents linked to the signup human, freeing
+// its per-email unclaimed count. Best-effort: a leftover that won't approve is
+// skipped, since freeing even one slot is enough to sign up.
+async function approveStalePending(
   apiUrl: string,
   authHeaders: Record<string, string>,
   orgId: string,
@@ -23,7 +28,9 @@ async function approveAllPending(
   const resp = await fetch(`${apiUrl}/agent-signup/pending`, { headers: authHeaders });
   if (!resp.ok) return;
   const { agents } = await resp.json();
+  const cutoff = Date.now() - LEFTOVER_MIN_AGE_MS;
   for (const agent of agents ?? []) {
+    if (Date.parse(agent.created_at) > cutoff) continue;
     try {
       await fetch(`${apiUrl}/agent-signup/${agent.identity_id}/approve`, {
         method: "POST",
@@ -76,11 +83,11 @@ describe("TypeScript SDK signup", { timeout: 300_000 }, () => {
     const jwt = (await jwtResp.json()).jwt as string;
     const authHeaders = { Authorization: `Bearer ${jwt}` };
 
-    // The bootstrap human is a shared pooled creator, so unclaimed agents
-    // leaked by earlier failed runs accumulate against a per-email cap and
-    // would 429 this signup. Claim any leftovers first to free the cap.
-    logStep(config, "drain leftover unclaimed agents for the pooled human");
-    await approveAllPending(apiUrl, authHeaders, bootstrap.orgId);
+    // The signup human is shared, so unclaimed agents leaked by earlier failed
+    // runs accumulate against a per-email cap and would 429 this signup. Claim
+    // those leftovers first to free the cap.
+    logStep(config, "drain stale unclaimed agents for the signup human");
+    await approveStalePending(apiUrl, authHeaders, bootstrap.orgId);
 
     logStep(config, "sign up agent with explicit handle and email local part");
     const signup = await Inkbox.signup(
