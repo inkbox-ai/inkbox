@@ -9,6 +9,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
+from inkbox._http import CONNECT_RETRIES
 from inkbox.a2a.types import (
     A2ACard,
     A2AResolvedTarget,
@@ -64,7 +65,11 @@ class A2AClient:
     ) -> None:
         self._api_key = api_key
         self._platform_origin = _origin(platform_base_url)
-        self._client = httpx.Client(timeout=timeout, follow_redirects=False)
+        self._client = httpx.Client(
+            timeout=timeout,
+            follow_redirects=False,
+            transport=httpx.HTTPTransport(retries=CONNECT_RETRIES),
+        )
         self._next_id = 0
 
     def close(self) -> None:

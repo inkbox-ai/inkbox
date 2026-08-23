@@ -4,6 +4,23 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.4 — Retry connection setup
+
+### Changed
+
+- The Python SDK now retries connection setup before giving up, so a connection
+  that is reset or dropped while it is still being established no longer
+  surfaces as an immediate error. Only connection setup is retried; a request
+  that has already been sent is never resent, so this is safe for every method.
+- Applies to the main API client, the one-shot `Inkbox.signup` request, and the
+  A2A client. The tunnel runtime is unchanged and keeps its own reconnect
+  handling.
+
+### Compatibility
+
+- No API changes. Callers that already handle `httpx.ConnectError` keep working;
+  it is simply raised less often.
+
 ## 0.6.3 — Incoming call forwarding
 
 ### Added

@@ -12,7 +12,7 @@ from uuid import UUID
 
 import httpx
 
-from inkbox._http import HttpTransport, sdk_user_agent
+from inkbox._http import CONNECT_RETRIES, HttpTransport, sdk_user_agent
 from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
 from inkbox.a2a.resource import A2AResource
@@ -635,7 +635,10 @@ class Inkbox:
         if api_key:
             headers["X-API-Key"] = api_key
 
-        with httpx.Client(timeout=timeout) as client:
+        with httpx.Client(
+            timeout=timeout,
+            transport=httpx.HTTPTransport(retries=CONNECT_RETRIES),
+        ) as client:
             resp = client.request(method, url, headers=headers, json=json)
 
         if resp.status_code >= 400:
