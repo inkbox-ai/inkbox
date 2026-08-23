@@ -19,11 +19,15 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Forwarding fields preserve omission separately from explicit `null`, so a
   caller can retain or clear saved destinations deliberately.
-- Python preserves direct `PhoneNumber(...)` construction by appending the new
-  forwarding fields with `None` defaults.
-- TypeScript callers that construct `PhoneNumber` or `PhoneCall` object literals
-  must include the new forwarding fields. Rust struct literals and exhaustive
-  matches must include the new forwarding fields and `Forward` action variant.
+- Python preserves direct `PhoneNumber(...)` and `IdentityPhoneNumber(...)`
+  construction by appending the new forwarding fields with `None` defaults.
+- TypeScript callers that construct `PhoneNumber`, `PhoneCall`,
+  `IdentityPhoneNumber`, or `IncomingCallActionConfig` object literals must
+  include the new forwarding fields.
+- Rust struct literals for `PhoneNumber`, `PhoneCall`, `IdentityPhoneNumber`,
+  `IdentityPhoneNumberCreateOptions`, and `IncomingCallActionConfig` must
+  include the new forwarding fields. Exhaustive matches on `IncomingCallAction`
+  must include the `Forward` variant.
 
 ## 0.6.2 — Undo an iMessage tapback
 

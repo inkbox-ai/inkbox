@@ -103,8 +103,9 @@ export enum HostedAgentAuthorityMode {
 /**
  * What happens when a call comes in for an agent identity.
  *
- * `hosted_agent` answers with Inkbox Voice AI and is the
- * only action that requires neither a WebSocket nor a webhook URL.
+ * `auto_accept` requires a client WebSocket, `webhook` requires a webhook URL,
+ * and `forward` requires one phone or SIP destination. `auto_reject` and
+ * `hosted_agent` require neither URL.
  */
 export enum IncomingCallAction {
   AUTO_ACCEPT = "auto_accept",
@@ -355,9 +356,9 @@ export interface HostedAgentToolInvocationPage {
 /**
  * The incoming-call routing config for an agent identity.
  *
- * Controls what happens when a call comes in: auto-accept and bridge to
- * `clientWebsocketUrl`, auto-reject, or fan the decision out to
- * `incomingCallWebhookUrl`.
+ * Controls whether an incoming call is bridged to `clientWebsocketUrl`,
+ * rejected, delegated to `incomingCallWebhookUrl`, answered by Inkbox Voice
+ * AI, or forwarded to a phone or SIP destination.
  */
 export interface IncomingCallActionConfig {
   agentIdentityId: string;

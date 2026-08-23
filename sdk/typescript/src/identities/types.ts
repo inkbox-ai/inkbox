@@ -136,7 +136,7 @@ export interface IdentityPhoneNumber {
   smsErrorCode: string | null;
   smsErrorDetail: string | null;
   smsReadyAt: Date | null;
-  /** "auto_accept" | "auto_reject" | "webhook" */
+  /** "auto_accept" | "auto_reject" | "webhook" | "hosted_agent" | "forward" */
   incomingCallAction: string;
   clientWebsocketUrl: string | null;
   incomingCallWebhookUrl: string | null;

@@ -222,8 +222,9 @@ impl HostedAgentAuthorityMode {
 
 /// Routing decision applied to inbound calls for an agent identity.
 ///
-/// `hosted_agent` answers with Inkbox Voice AI and is the
-/// only action that requires neither a WebSocket nor a webhook URL.
+/// `auto_accept` requires a client WebSocket, `webhook` requires a webhook URL,
+/// and `forward` requires one phone or SIP destination. `auto_reject` and
+/// `hosted_agent` require neither URL.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IncomingCallAction {
@@ -236,7 +237,7 @@ pub enum IncomingCallAction {
 
 impl IncomingCallAction {
     /// The wire string value (`"auto_accept"` / `"auto_reject"` / `"webhook"`
-    /// / `"hosted_agent"`).
+    /// / `"hosted_agent"` / `"forward"`).
     pub fn as_str(&self) -> &'static str {
         match self {
             IncomingCallAction::AutoAccept => "auto_accept",

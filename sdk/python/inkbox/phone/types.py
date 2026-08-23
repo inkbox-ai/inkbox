@@ -111,8 +111,9 @@ class HostedAgentAuthorityMode(StrEnum):
 class IncomingCallAction(StrEnum):
     """What to do when an inbound call arrives for an identity.
 
-    ``hosted_agent`` answers with Inkbox Voice AI and is
-    the only action that requires neither a WebSocket nor a webhook URL.
+    ``auto_accept`` requires a client WebSocket, ``webhook`` requires a
+    webhook URL, and ``forward`` requires one phone or SIP destination.
+    ``auto_reject`` and ``hosted_agent`` require neither URL.
     """
 
     AUTO_ACCEPT = "auto_accept"
