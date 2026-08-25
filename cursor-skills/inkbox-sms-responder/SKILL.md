@@ -11,10 +11,11 @@ opt-out or contact rule.
 ## Workflow
 
 1. Use `inkbox_identity_get` or `inkbox_channel_status_get` to resolve the
-   active phone number and its `phone_number_id`.
+   active phone number. Read its identifier from `channels.phone.id` and pass
+   that value as `phone_number_id`.
 2. Use `inkbox_text_conversations_list` to find a thread and
-   `inkbox_text_conversation_get` to read bounded history. Use the stable
-   conversation ID for existing one-to-one and group threads.
+   `inkbox_text_conversation_get` to read bounded history. When replying to an
+   existing group, re-supply the full current participant list in `to`.
 3. Before a first send or when consent is uncertain, call
    `inkbox_sms_consent_get` with the recipient. Supply the conversation or phone
    number when available so contact rules can also be evaluated.

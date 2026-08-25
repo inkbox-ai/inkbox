@@ -16,7 +16,7 @@ With an authorized Inkbox identity, Cursor can:
 - Place hosted calls and review call status, results, and transcripts.
 - Find and manage contacts, import or export vCards, and inspect contact rules.
 - Store and manage persistent notes.
-- Inspect or update identity, avatar, channel, and hosted-call settings.
+- Inspect channel status and update identity, avatar, and hosted-call settings.
 - Discover other Inkbox agents and exchange durable A2A tasks.
 
 Tool visibility depends on the authorized connection's capabilities. Individual
@@ -45,8 +45,9 @@ separate from the SDK skills in `skills/`.
 
 ## Install
 
-This plugin is not yet published. A real Cursor OAuth smoke test is required
-before tagging and Marketplace submission.
+Install from the Marketplace when its listing is available. Before then, use the
+local testing flow below. A real Cursor OAuth smoke test is required before the
+`cursor-plugin-v1.0.0` release tag and Marketplace submission.
 
 ### Cursor Marketplace
 
@@ -121,9 +122,9 @@ disconnect the server and complete the browser authorization flow again.
 
 ## Support and security
 
-- Product support: [support@inkbox.ai](mailto:support@inkbox.ai)
+- Product support: [hello@inkbox.ai](mailto:hello@inkbox.ai)
 - Contact: [inkbox.ai/contact](https://inkbox.ai/contact)
-- Security reports: [security@inkbox.ai](mailto:security@inkbox.ai)
+- Security reports: [hello@inkbox.ai](mailto:hello@inkbox.ai)
 
 ## License
 

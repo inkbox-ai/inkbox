@@ -4,7 +4,7 @@
   "description": "Give Cursor an Inkbox identity for email, SMS, iMessage, voice calls, contacts, notes, and agent-to-agent tasks.",
   "author": {
     "name": "Inkbox",
-    "email": "support@inkbox.ai"
+    "email": "hello@inkbox.ai"
   },
   "homepage": "https://inkbox.ai/docs/integrations/cursor-plugin",
   "repository": "https://github.com/inkbox-ai/inkbox",

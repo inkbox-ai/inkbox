@@ -24,12 +24,12 @@ available.
    assignment state and `inkbox_imessage_onboarding_get`; do not call the
    conversation-scoped consent tool without both required values.
 4. Every `inkbox_imessage_send` requires `recipient`. For a one-to-one reply,
-   pass the exact remote recipient plus the conversation ID. For a group reply,
-   pass the conversation ID and the exact current recipient list returned by a
-   fresh conversation read; that list prevents sending across a concurrent
-   membership change. Start a new conversation only when the current line
-   supports it. Group creation requires a supported dedicated outbound line and
-   two to eight distinct recipients.
+   use the conversation ID and provide the recipient required by the tool
+   schema. For a group reply, pass the conversation ID and the exact current
+   recipient list returned by a fresh conversation read; that list is the
+   concurrency fence against a membership change. Start a new conversation only
+   when the current line supports it. Group creation requires a supported
+   dedicated outbound line and two to eight distinct recipients.
 5. Stage at most one attachment with `inkbox_imessage_media_upload`. Bind staged
    media to the send using both the returned `handle` and `content_hash`; carry
    both values forward unchanged.

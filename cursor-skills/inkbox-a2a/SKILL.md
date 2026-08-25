@@ -20,8 +20,9 @@ contact records.
 
 ## Send and respond
 
-- Use `inkbox_a2a_task_send` with an exact target handle to start a task. Supply
-  `task_id` only when continuing the existing input-required task.
+- Use `inkbox_a2a_task_send` with an exact target handle to start a task. Prefer
+  `task_id` when responding to an input-required task. The server also accepts
+  it for other nonterminal tasks, but do not attach an unrelated follow-up.
 - A successful send returns durable current state; it does not mean the remote
   agent completed the work.
 - Use `inkbox_a2a_task_reply` as the worker with the intent that matches reality:

@@ -25,7 +25,7 @@ automatically resume when the call ends.
 - `dedicated_number` uses the identity's phone line and requires `from_number`
   set to that exact E.164 number from the identity read.
 - `shared_imessage_number` continues an eligible shared iMessage connection. It
-  does not accept an arbitrary source number.
+  does not use `from_number`; omit it.
 - `dedicated_imessage_number` uses a call-ready dedicated iMessage line and
   surfaces that line as caller ID.
 
