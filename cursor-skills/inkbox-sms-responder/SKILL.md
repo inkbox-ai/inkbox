@@ -11,7 +11,8 @@ opt-out or contact rule.
 ## Workflow
 
 1. Use `inkbox_identity_get` or `inkbox_channel_status_get` to resolve the
-   active phone number. Read its identifier from `channels.phone.id` and pass
+   active phone number. Read its identifier from `identity.channels.phone.id`
+   in the identity result or `phone.id` in the channel-status result, and pass
    that value as `phone_number_id`.
 2. Use `inkbox_text_conversations_list` to find a thread and
    `inkbox_text_conversation_get` to read bounded history. When replying to an
