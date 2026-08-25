@@ -1,9 +1,9 @@
 ---
 name: inkbox-identity-profile
-description: Inspect or update the connected Inkbox identity, avatar, channel readiness, incoming-call behavior, and hosted voice-agent configuration. Use for identity questions and explicit settings changes; do not use for ordinary messages or calls.
+description: Inspect the connected Inkbox identity and channel readiness, or update its profile, avatar, incoming-call behavior, and hosted voice-agent configuration. Use for identity questions and explicit settings changes; do not use for ordinary messages or calls.
 ---
 
-# Inkbox identity and channel settings
+# Inkbox identity profile and channel status
 
 ## Inspect first
 

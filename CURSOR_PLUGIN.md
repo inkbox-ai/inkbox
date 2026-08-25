@@ -37,7 +37,7 @@ contact rules, and Inkbox plan.
 | `inkbox-contact-management` | Search, edit, import, and export contacts |
 | `inkbox-contact-rules` | Inspect rules and preflight phone destinations |
 | `inkbox-notes-memory` | Manage persistent Inkbox notes |
-| `inkbox-identity-profile` | Inspect and update identity and channel settings |
+| `inkbox-identity-profile` | Inspect channel status and manage identity and call settings |
 | `inkbox-a2a` | Discover agents and exchange durable A2A tasks |
 
 These skills live in `cursor-skills/` so their hosted-MCP guidance remains
