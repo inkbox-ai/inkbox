@@ -12,7 +12,7 @@ Official AI agent skills from [Inkbox](https://inkbox.ai) — load them into you
 /reload-plugins
 ```
 
-Installs six skills for automatic use. Self-signup is also available as `/inkbox:inkbox-agent-self-signup`. The plugin connects the Inkbox MCP server; sign in when prompted to authorize an identity.
+Installs seven skills for automatic use. Self-signup is also available as `/inkbox:inkbox-agent-self-signup`. The plugin connects the Inkbox MCP server; sign in when prompted to authorize an identity.
 
 ### Codex (plugin)
 
@@ -32,6 +32,9 @@ cp -r skills/inkbox-python ~/.claude/skills/
 
 # TypeScript SDK skill
 cp -r skills/inkbox-ts ~/.claude/skills/
+
+# Rust SDK skill
+cp -r skills/inkbox-rust ~/.claude/skills/
 ```
 
 ## Prerequisites
@@ -44,6 +47,9 @@ cp -r skills/inkbox-ts ~/.claude/skills/
 
    # TypeScript / Node
    npm install @inkbox/sdk
+
+   # Rust
+   cargo add inkbox
    ```
 
 2. **Get an API key** from the [Inkbox Console](https://inkbox.ai/console)
@@ -56,6 +62,7 @@ Once the skills are installed, your coding agent will automatically know how to 
 |-------|----------|-------------|
 | **inkbox-python** | Python ≥ 3.11 | Agent signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, and webhooks using the `inkbox` Python SDK |
 | **inkbox-ts** | TypeScript / Node ≥ 22 | Agent signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, and webhooks using the `@inkbox/sdk` TypeScript SDK |
+| **inkbox-rust** | Rust ≥ 1.86 | Agent signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, and webhooks using the `inkbox` Rust crate |
 | **inkbox-cli** | TypeScript / Node ≥ 22 | CLI reference for `inkbox` / `@inkbox/cli` commands covering signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, mailboxes, numbers, webhooks, and signing keys |
 | **inkbox-all** | Language-agnostic | Index of all Inkbox skills in this repository, including example skills and links for choosing the right one |
 | **inkbox-agent-self-signup** | Language-agnostic | Shared reference for the agent self-signup flow — SDK examples (Python & TS) and direct API (curl) |

@@ -30,6 +30,10 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-python/SKILL.md
   Python SDK reference for `inkbox`, including identities, email drafts, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
 
+- `inkbox-rust`
+  GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-rust/SKILL.md
+  Rust SDK reference for the `inkbox` crate, including identities, email, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels. The surface is blocking (no async), options are positional rather than keyword, and tri-state fields use the `Unset<T>` sentinel. A2A receiver configuration and the standard outbound protocol client are Python/TS only; the tunnels data plane needs the `tunnels-runtime` cargo feature and forwards to a URL rather than an in-process handler.
+
 - `inkbox-ts`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-ts/SKILL.md
   TypeScript/JavaScript SDK reference for `@inkbox/sdk`, including identities, email drafts, MBOX/EML/ZIP mailbox imports, phone, text/SMS, iMessage, A2A task/message history, contacts, notes, contact rules, custom sending domains, mailbox storage caps, mail clients (IMAP/SMTP), vault, signing keys, and tunnels.
@@ -65,6 +69,10 @@ These example directories are useful references, but they are not standalone ski
 - `use-inkbox-cli`
   GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-cli
   Shell script examples for automating Inkbox from terminal workflows, CI, and agent shell execution using `@inkbox/cli` plus `jq`.
+
+- `use-inkbox-rust`
+  GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-rust
+  Runnable Rust examples mirroring the CLI scripts — identity and email, vault TOTP, inbox monitoring, and agent self-signup — as numbered binaries in a single crate.
 
 - `use-inkbox-vault`
   GitHub: https://github.com/inkbox-ai/inkbox/tree/main/examples/use-inkbox-vault
@@ -119,6 +127,7 @@ sent mail, duplicate or delete it instead.
 
 - Use `inkbox-python` when writing Python application code against the SDK.
 - Use `inkbox-ts` when writing TypeScript or JavaScript application code against the SDK.
+- Use `inkbox-rust` when writing Rust application code against the `inkbox` crate.
 - Use `inkbox-cli` when the task is operational and best handled with shell commands.
 - Use `inkbox-tunnels` when bringing a local server online at a public Inkbox URL via `inkbox.tunnels.connect(...)`.
 - Use `inkbox-agent-self-signup` when the agent does not have an API key yet and needs to self-register.
