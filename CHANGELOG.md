@@ -4,6 +4,21 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.5 — Identity onboarding skill
+
+### Added
+
+- A language-agnostic `inkbox-onboarding` skill guides agents through inspecting
+  an existing identity, checking email, SMS, voice, and iMessage readiness,
+  completing recipient consent, choosing inbound handling, and offering bounded
+  recurring triage. It includes API, CLI, Python, and TypeScript examples while
+  keeping channel-specific reference material in the existing skills.
+
+### Compatibility
+
+- No API, SDK, or CLI behavior changes. This release updates bundled guidance
+  only.
+
 ## 0.6.4 — Retry connection setup
 
 ### Changed
