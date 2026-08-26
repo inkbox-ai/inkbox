@@ -16,6 +16,9 @@ API-first communication infrastructure for AI agents — email (with custom send
 
 ## Cursor plugin
 
+**Status:** Pre-release and under repository review; not yet submitted to or
+available in the Cursor Marketplace.
+
 This repository includes an MCP-only Cursor plugin package that connects to
 `https://inkbox.ai/mcp/cursor`. After Marketplace publication, install
 **Inkbox** from Cursor's **Customize** view, enable the Inkbox MCP server, and
