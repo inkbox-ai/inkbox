@@ -156,8 +156,8 @@ def main() -> None:
         "plugin repository URL is incorrect",
     )
     require(
-        manifest["homepage"] == "https://inkbox.ai/docs/integrations/cursor-plugin",
-        "plugin homepage must point to the Cursor documentation",
+        manifest["homepage"] == "https://inkbox.ai",
+        "plugin homepage must point to the Inkbox homepage",
     )
 
     logo_path = resolve_manifest_path(manifest["logo"])
