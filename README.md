@@ -19,11 +19,12 @@ API-first communication infrastructure for AI agents — email (with custom send
 This repository also contains official plugin packages for supported agent
 hosts:
 
-- `.claude-plugin/` connects Claude Code to Inkbox's hosted MCP server and SDK
-  skills.
-- `.codex-plugin/` packages Inkbox skills and MCP configuration for Codex.
+- `.claude-plugin/` connects Claude Code to Inkbox's hosted MCP server and the
+  shared skills in `skills/`.
+- `.codex-plugin/` packages the shared Inkbox skills and MCP configuration for
+  Codex.
 - `.cursor-plugin/` connects Cursor to `https://inkbox.ai/mcp/cursor` and loads
-  the dedicated hosted-MCP skills in `cursor-skills/`. See the
+  the same shared `skills/` catalog. See the
   [Cursor plugin guide](CURSOR_PLUGIN.md).
 
 ### Cursor plugin

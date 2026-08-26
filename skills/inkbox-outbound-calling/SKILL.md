@@ -1,13 +1,19 @@
 ---
 name: inkbox-outbound-calling
-description: Place or end hosted outbound Inkbox calls through the connected MCP server. Use when the user asks Cursor to call a phone number or contact, inspect call readiness, choose a supported origination path, or hang up an active call.
+description: Place or end hosted outbound Inkbox calls through a connected MCP server that exposes call-control tools. Use when the user asks to call a phone number or contact, inspect call readiness, choose a supported origination path, or hang up an active call.
 ---
 
 # Inkbox outbound calling
 
+This workflow requires `inkbox_call_place`, `inkbox_call_hangup`,
+`inkbox_call_settings_get`, and `inkbox_phone_contact_rule_preflight`. Some host
+profiles intentionally omit hosted-call controls. If those tools are absent,
+explain that the current MCP connection cannot place or end calls; do not invent
+a substitute tool or claim the call was queued.
+
 `inkbox_call_place` queues a hosted call and returns immediately. It does not
-make the current Cursor conversation a live voice session, and Cursor will not
-automatically resume when the call ends.
+make the current agent conversation a live voice session, and the conversation
+will not automatically resume when the call ends.
 
 ## Before placing a call
 

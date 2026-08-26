@@ -1,6 +1,6 @@
 # Inkbox for Cursor
 
-![Inkbox](assets/inkbox-octopus.png)
+![Inkbox](assets/logo.png)
 
 Give Cursor an Inkbox identity with email, SMS, iMessage, voice calls, contacts,
 notes, and agent-to-agent tasks. The plugin connects to Inkbox's hosted Model
@@ -23,7 +23,12 @@ Tool visibility depends on the authorized connection's capabilities. Individual
 actions can also depend on the selected identity, channel readiness, consent,
 contact rules, and Inkbox plan.
 
-## Included Cursor skills
+The hosted MCP server supplies the live tools, schemas, resources, and MCP
+prompts. The Markdown skills are a separate plugin layer: OAuth and tools work
+without them, while the bundled skills add detailed guidance for reliable
+multi-tool workflows and consequential actions.
+
+## Included MCP workflow skills
 
 | Skill | Purpose |
 |---|---|
@@ -40,8 +45,10 @@ contact rules, and Inkbox plan.
 | `inkbox-identity-profile` | Inspect channel status and manage identity and call settings |
 | `inkbox-a2a` | Discover agents and exchange durable A2A tasks |
 
-These skills live in `cursor-skills/` so their hosted-MCP guidance remains
-separate from the SDK skills in `skills/`.
+These workflows live beside the SDK and CLI guidance in the repository's shared
+`skills/` catalog. Cursor loads the whole catalog and selects the relevant skill
+for each task. The Cursor manifest keeps only the host-specific MCP endpoint
+wiring separate.
 
 ## Install
 

@@ -14,9 +14,35 @@ Useful links:
 - LLMs: https://inkbox.ai/llms.txt
 - OpenAPI: https://inkbox.ai/api/openapi.json
 
-This skill is just a directory of the other Inkbox skills in this repository. Use it when you want to see the full menu before choosing a more specific skill. In practice, the SDK skills are the main references for application code, `inkbox-agent-self-signup` covers the self-registration flow, `inkbox-cli` covers shell usage, and the example skills under `examples/` are prompt templates for browser-capable agents.
+This skill is just a directory of the other Inkbox skills in this repository.
+Use it when you want to see the full menu before choosing a more specific skill.
+In practice, the MCP workflow skills operate the connected Inkbox server, the
+SDK skills are the main references for application code,
+`inkbox-agent-self-signup` covers self-registration, `inkbox-cli` covers shell
+usage, and the example skills under `examples/` are prompt templates for
+browser-capable agents.
 
 ## Core Skills
+
+### Hosted MCP workflows
+
+- `inkbox-mcp` — connect and troubleshoot hosted MCP and browser OAuth.
+- `inkbox-email-triage` — read, search, summarize, and organize email.
+- `inkbox-send-email` — compose, send, reply, reply-all, and forward email.
+- `inkbox-sms-responder` — read and send consent-aware SMS/MMS.
+- `inkbox-imessage-responder` — onboard, read, send, and react on iMessage.
+- `inkbox-outbound-calling` — place, monitor, and end hosted calls when the
+  connected host profile exposes call control.
+- `inkbox-call-review` — review call history, results, and transcripts.
+- `inkbox-contact-management` — search, edit, import, and export contacts.
+- `inkbox-contact-rules` — inspect rules and preflight phone destinations when
+  the connected host profile exposes preflight.
+- `inkbox-notes-memory` — manage persistent Inkbox notes.
+- `inkbox-identity-profile` — inspect channel status and manage identity
+  settings available through the connected host profile.
+- `inkbox-a2a` — discover agents and exchange durable A2A tasks.
+
+### SDK and CLI guidance
 
 - `inkbox-agent-self-signup`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-agent-self-signup/SKILL.md

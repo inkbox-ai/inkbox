@@ -11,7 +11,7 @@ Do not infer externally visible details silently.
 ## Choose the operation
 
 - Treat "draft," "write," or "compose" as a request to prepare text for review.
-  The Cursor MCP catalog does not store email drafts.
+  The Inkbox MCP catalog does not store email drafts.
 - Use `inkbox_email_send` only when the user asks to deliver a new message.
 - Use `inkbox_email_reply` for a reply to one visible message,
   `inkbox_email_reply_all` for the server-resolved visible participants, and

@@ -5,7 +5,7 @@ description: Search, read, create, update, or delete persistent Inkbox notes thr
 
 # Inkbox notes
 
-Inkbox notes are persistent shared product data, not Cursor workspace memory.
+Inkbox notes are persistent shared product data, not local workspace memory.
 Do not claim information was remembered unless an Inkbox note write succeeds.
 
 ## Workflow
@@ -21,7 +21,7 @@ Do not claim information was remembered unless an Inkbox note write succeeds.
    target is ambiguous or inferred.
 
 If a write result is ambiguous, read the note list before deciding whether
-another create, update, or deletion is safe. The Cursor MCP catalog does not
+another create, update, or deletion is safe. The Inkbox MCP catalog does not
 expose note access-grant tools, so do not claim to grant or revoke another
 identity's access.
 

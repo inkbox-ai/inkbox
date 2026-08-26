@@ -19,7 +19,7 @@
     "mcp",
     "ai-agent"
   ],
-  "logo": "./assets/inkbox-octopus.png",
-  "skills": "./cursor-skills/",
+  "logo": "./assets/logo.png",
+  "skills": "./skills/",
   "mcpServers": "./.cursor-mcp.json"
 }

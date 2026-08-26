@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / ".cursor-plugin" / "plugin.json"
 MCP_PATH = ROOT / ".cursor-mcp.json"
-SKILLS_PATH = ROOT / "cursor-skills"
+SKILLS_PATH = ROOT / "skills"
 README_PATH = ROOT / "CURSOR_PLUGIN.md"
 ROOT_README_PATH = ROOT / "README.md"
 CHANGELOG_PATH = ROOT / "CURSOR_PLUGIN_CHANGELOG.md"
@@ -31,7 +31,7 @@ EXPECTED_MANIFEST_KEYS = {
     "skills",
     "version",
 }
-EXPECTED_SKILLS = {
+EXPECTED_MCP_WORKFLOW_SKILLS = {
     "inkbox-a2a",
     "inkbox-call-review",
     "inkbox-contact-management",
@@ -167,7 +167,7 @@ def main() -> None:
     validate_png(logo_path)
     require(
         skills_path == SKILLS_PATH and skills_path.is_dir(),
-        "manifest must reference cursor-skills",
+        "manifest must reference the shared root skills directory",
     )
     require(mcp_path == MCP_PATH, "manifest must reference .cursor-mcp.json")
 
@@ -196,10 +196,10 @@ def main() -> None:
 
     skill_dirs = {path.name for path in skills_path.iterdir() if path.is_dir()}
     require(
-        skill_dirs == EXPECTED_SKILLS,
-        "Cursor skill directory set does not match validation",
+        EXPECTED_MCP_WORKFLOW_SKILLS <= skill_dirs,
+        "shared skills directory is missing a Cursor MCP workflow skill",
     )
-    for skill_name in sorted(skill_dirs):
+    for skill_name in sorted(EXPECTED_MCP_WORKFLOW_SKILLS):
         skill_file = skills_path / skill_name / "SKILL.md"
         require(skill_file.is_file(), f"missing {skill_file.relative_to(ROOT)}")
         frontmatter = parse_frontmatter(skill_file)
@@ -236,7 +236,8 @@ def main() -> None:
         [ROOT_README_PATH, README_PATH, CHANGELOG_PATH, *skills_path.rglob("*.md")]
     )
     print(
-        f"Validated Cursor Plugin {manifest['version']} with {len(skill_dirs)} skills"
+        f"Validated Cursor Plugin {manifest['version']} with "
+        f"{len(skill_dirs)} shared skills ({len(EXPECTED_MCP_WORKFLOW_SKILLS)} MCP workflows)"
     )
 
 

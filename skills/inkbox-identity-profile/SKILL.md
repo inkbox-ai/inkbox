@@ -11,8 +11,9 @@ description: Inspect the connected Inkbox identity and channel readiness, or upd
 - Use `inkbox_identity_avatar_get` for current avatar metadata.
 - Use `inkbox_channel_status_get` for email, phone, SMS, iMessage, domain, and
   calling readiness.
-- Use `inkbox_call_settings_get` and `inkbox_hosted_agent_config_get` before
-  proposing a voice configuration change.
+- When exposed by the current host profile, use `inkbox_call_settings_get` and
+  `inkbox_hosted_agent_config_get` before proposing a voice configuration
+  change. If these tools are absent, do not infer or claim current settings.
 
 ## Profile and avatar
 
@@ -25,6 +26,10 @@ description: Inspect the connected Inkbox identity and channel readiness, or upd
   intended action.
 
 ## Incoming and hosted calls
+
+The tools in this section are intentionally unavailable in some MCP host
+profiles. If they are absent, explain that the current connection cannot inspect
+or change hosted-call configuration and leave existing settings untouched.
 
 - `inkbox_incoming_call_action_update` replaces inbound behavior. Confirm the
   selected action and all required destination or endpoint fields before writing.
