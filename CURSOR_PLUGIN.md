@@ -1,6 +1,6 @@
 # Inkbox for Cursor
 
-![Inkbox](assets/inkbox-octopus.svg)
+![Inkbox](assets/inkbox-octopus.png)
 
 Give Cursor an Inkbox identity with email, SMS, iMessage, voice calls, contacts,
 notes, and agent-to-agent tasks. The plugin connects to Inkbox's hosted Model

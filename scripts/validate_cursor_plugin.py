@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import json
 import re
+import struct
 from collections.abc import Iterable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,7 +15,22 @@ MANIFEST_PATH = ROOT / ".cursor-plugin" / "plugin.json"
 MCP_PATH = ROOT / ".cursor-mcp.json"
 SKILLS_PATH = ROOT / "cursor-skills"
 README_PATH = ROOT / "CURSOR_PLUGIN.md"
+ROOT_README_PATH = ROOT / "README.md"
 CHANGELOG_PATH = ROOT / "CURSOR_PLUGIN_CHANGELOG.md"
+EXPECTED_MANIFEST_KEYS = {
+    "author",
+    "description",
+    "displayName",
+    "homepage",
+    "keywords",
+    "license",
+    "logo",
+    "mcpServers",
+    "name",
+    "repository",
+    "skills",
+    "version",
+}
 EXPECTED_SKILLS = {
     "inkbox-a2a",
     "inkbox-call-review",
@@ -47,10 +63,27 @@ def resolve_manifest_path(value: object) -> Path:
         isinstance(value, str) and value.startswith("./"),
         "manifest component paths must be relative to the plugin root",
     )
+    parts = PurePosixPath(value).parts
+    require(".." not in parts, "manifest component paths must not contain '..'")
+    require("\\" not in value, "manifest component paths must use forward slashes")
     resolved = (ROOT / value).resolve()
     require(resolved.is_relative_to(ROOT), "manifest path escapes the plugin root")
     require(resolved.exists(), f"missing manifest component: {value}")
     return resolved
+
+
+def validate_png(path: Path) -> None:
+    data = path.read_bytes()
+    require(data.startswith(b"\x89PNG\r\n\x1a\n"), "plugin logo must be a PNG")
+    require(
+        len(data) >= 24 and data[12:16] == b"IHDR",
+        "plugin logo has an invalid PNG header",
+    )
+    width, height = struct.unpack(">II", data[16:24])
+    require(
+        width == height and width >= 128,
+        "plugin logo must be a square PNG at least 128px wide",
+    )
 
 
 def parse_frontmatter(path: Path) -> dict[str, str]:
@@ -91,12 +124,33 @@ def validate_markdown_links(paths: Iterable[Path]) -> None:
 
 def main() -> None:
     manifest = load_json(MANIFEST_PATH)
+    require(
+        set(manifest) == EXPECTED_MANIFEST_KEYS,
+        "plugin manifest fields changed without updating Cursor package validation",
+    )
     require(manifest["name"] == "inkbox", "plugin name must be inkbox")
+    require(manifest["displayName"] == "Inkbox", "plugin displayName must be Inkbox")
     require(
         re.fullmatch(r"\d+\.\d+\.\d+", str(manifest["version"])),
         "plugin version must use semantic versioning",
     )
     require(manifest["license"] == "MIT", "plugin license must be MIT")
+    require(
+        manifest["author"] == {"name": "Inkbox", "email": "hello@inkbox.ai"},
+        "plugin author metadata is incorrect",
+    )
+    require(
+        isinstance(manifest["description"], str) and len(manifest["description"]) >= 40,
+        "plugin description is missing or too short",
+    )
+    require(
+        isinstance(manifest["keywords"], list)
+        and manifest["keywords"]
+        and all(
+            isinstance(keyword, str) and keyword for keyword in manifest["keywords"]
+        ),
+        "plugin keywords must be a non-empty string array",
+    )
     require(
         manifest["repository"] == "https://github.com/inkbox-ai/inkbox",
         "plugin repository URL is incorrect",
@@ -109,7 +163,8 @@ def main() -> None:
     logo_path = resolve_manifest_path(manifest["logo"])
     skills_path = resolve_manifest_path(manifest["skills"])
     mcp_path = resolve_manifest_path(manifest["mcpServers"])
-    require(logo_path.suffix == ".svg", "plugin logo must be an SVG")
+    require(logo_path.suffix == ".png", "plugin logo must be a PNG")
+    validate_png(logo_path)
     require(
         skills_path == SKILLS_PATH and skills_path.is_dir(),
         "manifest must reference cursor-skills",
@@ -158,11 +213,28 @@ def main() -> None:
         )
 
     require(README_PATH.is_file(), "CURSOR_PLUGIN.md is required")
+    root_readme = ROOT_README_PATH.read_text()
+    require(
+        all(
+            marker in root_readme
+            for marker in (
+                "### Cursor plugin",
+                "~/.cursor/plugins/local/inkbox",
+                "**Customize**",
+                "**Connect**",
+                "No API key",
+                "[Cursor plugin guide](CURSOR_PLUGIN.md)",
+            )
+        ),
+        "README.md must document Cursor purpose, installation, and configuration",
+    )
     require(
         f"## {manifest['version']} " in CHANGELOG_PATH.read_text(),
         "Cursor plugin changelog must contain the manifest version",
     )
-    validate_markdown_links([README_PATH, CHANGELOG_PATH, *skills_path.rglob("*.md")])
+    validate_markdown_links(
+        [ROOT_README_PATH, README_PATH, CHANGELOG_PATH, *skills_path.rglob("*.md")]
+    )
     print(
         f"Validated Cursor Plugin {manifest['version']} with {len(skill_dirs)} skills"
     )

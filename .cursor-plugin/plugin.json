@@ -1,5 +1,6 @@
 {
   "name": "inkbox",
+  "displayName": "Inkbox",
   "version": "1.0.0",
   "description": "Give Cursor an Inkbox identity for email, SMS, iMessage, voice calls, contacts, notes, and agent-to-agent tasks.",
   "author": {
@@ -18,7 +19,7 @@
     "mcp",
     "ai-agent"
   ],
-  "logo": "./assets/inkbox-octopus.svg",
+  "logo": "./assets/inkbox-octopus.png",
   "skills": "./cursor-skills/",
   "mcpServers": "./.cursor-mcp.json"
 }

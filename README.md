@@ -26,6 +26,21 @@ hosts:
   the dedicated hosted-MCP skills in `cursor-skills/`. See the
   [Cursor plugin guide](CURSOR_PLUGIN.md).
 
+### Cursor plugin
+
+Install **Inkbox** from Cursor's **Customize** view when the Marketplace listing
+is available. For local testing, clone this repository into
+`~/.cursor/plugins/local/inkbox`, then restart Cursor or run
+**Developer: Reload Window**.
+
+Enable the Inkbox MCP server and select **Connect**. Cursor opens the Inkbox
+browser authorization flow, where you sign in and select an organization and
+identity. No API key, OAuth client secret, plugin variable, or local process is
+required. The plugin adds skills for email, SMS/MMS, iMessage, voice calls,
+contacts, notes, identity settings, and agent-to-agent tasks. See the
+[Cursor plugin guide](CURSOR_PLUGIN.md) for usage, data access, disconnection,
+support, and security information.
+
 ---
 
 ## Quick Start
