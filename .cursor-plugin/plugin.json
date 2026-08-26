@@ -1,0 +1,33 @@
+{
+  "name": "inkbox",
+  "displayName": "Inkbox",
+  "version": "1.0.0",
+  "description": "Give Cursor an Inkbox identity for email, SMS, iMessage, voice calls, contacts, notes, and agent-to-agent tasks.",
+  "author": {
+    "name": "Inkbox",
+    "email": "hello@inkbox.ai"
+  },
+  "homepage": "https://inkbox.ai",
+  "repository": "https://github.com/inkbox-ai/inkbox",
+  "license": "MIT",
+  "keywords": [
+    "communications",
+    "email",
+    "sms",
+    "imessage",
+    "voice",
+    "calls",
+    "agent2agent",
+    "a2a",
+    "mcp",
+    "ai-agent"
+  ],
+  "logo": "./assets/logo.png",
+  "skills": [],
+  "mcpServers": {
+    "inkbox": {
+      "type": "http",
+      "url": "https://inkbox.ai/mcp/cursor"
+    }
+  }
+}
