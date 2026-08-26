@@ -16,11 +16,11 @@ API-first communication infrastructure for AI agents — email (with custom send
 
 ## Cursor plugin
 
-The official Cursor plugin connects directly to Inkbox's hosted MCP server at
-`https://inkbox.ai/mcp/cursor`. Install **Inkbox** from Cursor's **Customize**
-view, enable the Inkbox MCP server, and select **Connect** to authorize an
-organization and identity in the browser. No API key, client secret, local
-process, or bundled Cursor skills are required.
+This repository includes an MCP-only Cursor plugin package that connects to
+`https://inkbox.ai/mcp/cursor`. After Marketplace publication, install
+**Inkbox** from Cursor's **Customize** view, enable the Inkbox MCP server, and
+select **Connect** to authorize an organization and identity in the browser. No
+API key, client secret, local process, or bundled Cursor skills are required.
 
 ---
 
