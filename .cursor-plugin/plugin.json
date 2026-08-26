@@ -20,6 +20,11 @@
     "ai-agent"
   ],
   "logo": "./assets/logo.png",
-  "skills": "./skills/",
-  "mcpServers": "./.cursor-mcp.json"
+  "skills": [],
+  "mcpServers": {
+    "inkbox": {
+      "type": "http",
+      "url": "https://inkbox.ai/mcp/cursor"
+    }
+  }
 }

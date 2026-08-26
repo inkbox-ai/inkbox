@@ -14,33 +14,13 @@ API-first communication infrastructure for AI agents — email (with custom send
 | [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 22 | `npm install @inkbox/sdk` |
 | [`@inkbox/cli`](./cli/) | CLI / Node ≥ 22 | `npm install -g @inkbox/cli` |
 
-## Agent plugins
+## Cursor plugin
 
-This repository also contains official plugin packages for supported agent
-hosts:
-
-- `.claude-plugin/` connects Claude Code to Inkbox's hosted MCP server and the
-  shared skills in `skills/`.
-- `.codex-plugin/` packages the shared Inkbox skills and MCP configuration for
-  Codex.
-- `.cursor-plugin/` connects Cursor to `https://inkbox.ai/mcp/cursor` and loads
-  the same shared `skills/` catalog. See the
-  [Cursor plugin guide](CURSOR_PLUGIN.md).
-
-### Cursor plugin
-
-Install **Inkbox** from Cursor's **Customize** view when the Marketplace listing
-is available. For local testing, clone this repository into
-`~/.cursor/plugins/local/inkbox`, then restart Cursor or run
-**Developer: Reload Window**.
-
-Enable the Inkbox MCP server and select **Connect**. Cursor opens the Inkbox
-browser authorization flow, where you sign in and select an organization and
-identity. No API key, OAuth client secret, plugin variable, or local process is
-required. The plugin adds skills for email, SMS/MMS, iMessage, voice calls,
-contacts, notes, identity settings, and agent-to-agent tasks. See the
-[Cursor plugin guide](CURSOR_PLUGIN.md) for usage, data access, disconnection,
-support, and security information.
+The official Cursor plugin connects directly to Inkbox's hosted MCP server at
+`https://inkbox.ai/mcp/cursor`. Install **Inkbox** from Cursor's **Customize**
+view, enable the Inkbox MCP server, and select **Connect** to authorize an
+organization and identity in the browser. No API key, client secret, local
+process, or bundled Cursor skills are required.
 
 ---
 
