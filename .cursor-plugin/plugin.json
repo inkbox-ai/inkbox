@@ -16,6 +16,9 @@
     "sms",
     "imessage",
     "voice",
+    "calls",
+    "agent2agent",
+    "a2a",
     "mcp",
     "ai-agent"
   ],
