@@ -14,9 +14,13 @@ Useful links:
 - LLMs: https://inkbox.ai/llms.txt
 - OpenAPI: https://inkbox.ai/api/openapi.json
 
-This skill is just a directory of the other Inkbox skills in this repository. Use it when you want to see the full menu before choosing a more specific skill. In practice, the SDK skills are the main references for application code, `inkbox-agent-self-signup` covers the self-registration flow, `inkbox-cli` covers shell usage, and the example skills under `examples/` are prompt templates for browser-capable agents.
+This skill is just a directory of the other Inkbox skills in this repository. Use it when you want to see the full menu before choosing a more specific skill. In practice, `inkbox-onboarding` covers channel setup and readiness, the SDK skills are the main references for application code, `inkbox-agent-self-signup` covers the self-registration flow, `inkbox-cli` covers shell usage, and the example skills under `examples/` are prompt templates for browser-capable agents.
 
 ## Core Skills
+
+- `inkbox-onboarding`
+  GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-onboarding/SKILL.md
+  Language-agnostic setup flow for an existing identity, including channel readiness, recipient consent, inbound handling, recurring triage, and API/CLI/SDK examples.
 
 - `inkbox-agent-self-signup`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-agent-self-signup/SKILL.md
@@ -121,6 +125,7 @@ sent mail, duplicate or delete it instead.
 - Use `inkbox-ts` when writing TypeScript or JavaScript application code against the SDK.
 - Use `inkbox-cli` when the task is operational and best handled with shell commands.
 - Use `inkbox-tunnels` when bringing a local server online at a public Inkbox URL via `inkbox.tunnels.connect(...)`.
+- Use `inkbox-onboarding` when an identity exists but its communication channels, recipient setup, inbound handling, or recurring triage still need configuration.
 - Use `inkbox-agent-self-signup` when the agent does not have an API key yet and needs to self-register.
 - Use the example skills when you want a reusable agent prompt rather than SDK integration code.
 - Use the related examples when you want runnable scripts or end-to-end sample workflows instead of a reusable skill prompt.

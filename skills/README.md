@@ -12,7 +12,7 @@ Official AI agent skills from [Inkbox](https://inkbox.ai) — load them into you
 /reload-plugins
 ```
 
-Installs six skills for automatic use. Self-signup is also available as `/inkbox:inkbox-agent-self-signup`. The plugin connects the Inkbox MCP server; sign in when prompted to authorize an identity.
+Installs seven skills for automatic use. Onboarding and self-signup are also available as `/inkbox:inkbox-onboarding` and `/inkbox:inkbox-agent-self-signup`. The plugin connects the Inkbox MCP server; sign in when prompted to authorize an identity.
 
 ### Codex (plugin)
 
@@ -54,6 +54,7 @@ Once the skills are installed, your coding agent will automatically know how to 
 
 | Skill | Language | Description |
 |-------|----------|-------------|
+| **inkbox-onboarding** | Language-agnostic | Set up an existing identity's channels, recipient consent, inbound handling, and recurring triage with API, CLI, Python, and TypeScript examples |
 | **inkbox-python** | Python ≥ 3.11 | Agent signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, and webhooks using the `inkbox` Python SDK |
 | **inkbox-ts** | TypeScript / Node ≥ 22 | Agent signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, and webhooks using the `@inkbox/sdk` TypeScript SDK |
 | **inkbox-cli** | TypeScript / Node ≥ 22 | CLI reference for `inkbox` / `@inkbox/cli` commands covering signup, identities, email, phone, text, iMessage, A2A history, contacts, notes, contact rules, vault, mailboxes, numbers, webhooks, and signing keys |
