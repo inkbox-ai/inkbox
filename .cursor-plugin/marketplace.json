@@ -1,0 +1,18 @@
+{
+  "name": "inkbox",
+  "owner": {
+    "name": "Inkbox AI",
+    "email": "hello@inkbox.ai"
+  },
+  "metadata": {
+    "description": "Give Cursor an Inkbox identity for email, SMS, iMessage, voice calls, contacts, notes, and agent-to-agent tasks."
+  },
+  "plugins": [
+    {
+      "name": "inkbox",
+      "source": ".",
+      "description": "Give Cursor an Inkbox identity for email, SMS, iMessage, voice calls, contacts, notes, and agent-to-agent tasks.",
+      "category": "Productivity"
+    }
+  ]
+}
