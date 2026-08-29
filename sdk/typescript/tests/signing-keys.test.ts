@@ -84,6 +84,16 @@ describe("verifyWebhook", () => {
   it("returns false when headers are missing", () => {
     expect(verifyWebhook({ payload: TEST_BODY, headers: {}, secret: TEST_KEY })).toBe(false);
   });
+
+  it("accepts a Web API Headers object", () => {
+    const sig = makeSignature(TEST_KEY, TEST_REQUEST_ID, TEST_TIMESTAMP, TEST_BODY);
+    const headers = new Headers({
+      "X-Inkbox-Signature": sig,
+      "X-Inkbox-Request-ID": TEST_REQUEST_ID,
+      "X-Inkbox-Timestamp": TEST_TIMESTAMP,
+    });
+    expect(verifyWebhook({ payload: TEST_BODY, headers, secret: TEST_KEY })).toBe(true);
+  });
 });
 
 describe("SigningKeysResource", () => {

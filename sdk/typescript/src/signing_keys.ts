@@ -60,11 +60,22 @@ function parseSigningKeyStatus(r: RawSigningKeyStatus): SigningKeyStatus {
   };
 }
 
+type HeaderValue = string | string[] | undefined;
+type HeaderMap = Record<string, HeaderValue>;
+
+/** Express `req.headers` is a plain object; Next.js / fetch give a `Headers` instance. */
+function headerList(headers: HeaderMap | Headers): [string, HeaderValue][] {
+  if (typeof Headers !== "undefined" && headers instanceof Headers) {
+    return [...headers.entries()];
+  }
+  return Object.entries(headers as HeaderMap);
+}
+
 /**
  * Verify that an incoming webhook request was sent by Inkbox.
  *
  * @param payload  - Raw request body as a Buffer or string.
- * @param headers  - Request headers object (keys are lowercased internally).
+ * @param headers  - Request headers (plain object or Web API `Headers`). Keys are lowercased internally.
  * @param secret   - Your signing key, with or without a `whsec_` prefix.
  * @returns True if the signature is valid.
  */
@@ -74,11 +85,11 @@ export function verifyWebhook({
   secret,
 }: {
   payload: Buffer | string;
-  headers: Record<string, string | string[] | undefined>;
+  headers: HeaderMap | Headers;
   secret: string;
 }): boolean {
   const h: Record<string, string | undefined> = {};
-  for (const [k, v] of Object.entries(headers)) {
+  for (const [k, v] of headerList(headers)) {
     h[k.toLowerCase()] = Array.isArray(v) ? v[0] : v;
   }
   const signature = h["x-inkbox-signature"] ?? "";
