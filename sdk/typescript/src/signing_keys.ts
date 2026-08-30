@@ -63,19 +63,41 @@ function parseSigningKeyStatus(r: RawSigningKeyStatus): SigningKeyStatus {
 type HeaderValue = string | string[] | undefined;
 type HeaderMap = Record<string, HeaderValue>;
 
-/** Express `req.headers` is a plain object; Next.js / fetch give a `Headers` instance. */
-function headerList(headers: HeaderMap | Headers): [string, HeaderValue][] {
-  if (typeof Headers !== "undefined" && headers instanceof Headers) {
+/**
+ * Web API `Headers`, Next.js `ReadonlyHeaders`, undici `Headers` from
+ * another realm, or any object with the same `.entries()` / `.get()` shape.
+ * `instanceof Headers` is not used: it fails across realms and for
+ * ReadonlyHeaders that do not inherit from the local `Headers` class.
+ */
+interface HeadersLike {
+  entries(): Iterable<[string, string]>;
+  get(name: string): string | null;
+}
+
+function isHeadersLike(headers: unknown): headers is HeadersLike {
+  return (
+    typeof headers === "object" &&
+    headers !== null &&
+    typeof (headers as HeadersLike).entries === "function" &&
+    typeof (headers as HeadersLike).get === "function"
+  );
+}
+
+/** Express `req.headers` is a plain object; Next.js / fetch give a Headers-like object. */
+function headerList(headers: HeaderMap | HeadersLike): [string, HeaderValue][] {
+  if (isHeadersLike(headers)) {
     return [...headers.entries()];
   }
-  return Object.entries(headers as HeaderMap);
+  return Object.entries(headers);
 }
 
 /**
  * Verify that an incoming webhook request was sent by Inkbox.
  *
  * @param payload  - Raw request body as a Buffer or string.
- * @param headers  - Request headers (plain object or Web API `Headers`). Keys are lowercased internally.
+ * @param headers  - Request headers (plain object, Web API `Headers`, or
+ *   any Headers-like object with `.entries()` / `.get()`, including Next.js
+ *   `headers()` / ReadonlyHeaders). Keys are lowercased internally.
  * @param secret   - Your signing key, with or without a `whsec_` prefix.
  * @returns True if the signature is valid.
  */
@@ -85,7 +107,7 @@ export function verifyWebhook({
   secret,
 }: {
   payload: Buffer | string;
-  headers: HeaderMap | Headers;
+  headers: HeaderMap | HeadersLike;
   secret: string;
 }): boolean {
   const h: Record<string, string | undefined> = {};
