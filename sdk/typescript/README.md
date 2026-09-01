@@ -1448,6 +1448,28 @@ The config types (`WebhookContextConfig`, `WebhookContextClassConfig`) and
 the payload types (`WebhookContext`, `WebhookContextBlock`,
 `WebhookTranscriptEntry`, …) are exported from `@inkbox/sdk`.
 
+### Delivery auth token
+
+If your endpoint requires its own `Authorization` header, set an optional
+bearer token on the subscription. Every delivery (and replay) then carries
+`Authorization: Bearer <token>` in addition to the signature headers.
+Reads return the stored token as `authToken` (`null` when unset) along
+with the boolean `hasAuthToken` flag; both default to unset on servers
+that predate the fields.
+
+```ts
+await inkbox.webhooks.subscriptions.create({
+  mailboxId: mb.id,
+  url: "https://example.com/hook",
+  eventTypes: ["message.received"],
+  authToken: "your-endpoint-token",
+});
+
+// update() is tri-state: omit authToken to leave it unchanged, pass a
+// string to replace it, or pass null to clear it.
+await inkbox.webhooks.subscriptions.update(sub.id, { authToken: null });
+```
+
 ### Incoming-call webhooks (still per-number)
 
 ```ts

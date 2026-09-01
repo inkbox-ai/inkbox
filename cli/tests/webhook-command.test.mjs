@@ -21,6 +21,8 @@ const CREATE_ROW = {
     email: { mode: "count", count: 10 },
     texts: { mode: "window", hours: 24 },
   },
+  hasAuthToken: true,
+  authToken: "your-endpoint-token",
   createdAt: new Date("2026-06-02T03:04:05Z"),
   updatedAt: new Date("2026-06-02T03:04:05Z"),
   signingKey: "whsec_first_create_plaintext",
@@ -39,6 +41,9 @@ test("flattenCreateForOutput keeps the one-time signingKey and ownerIdentityId",
       texts: { mode: "window", hours: 24 },
     }),
   );
+  // reads return the token; the flattened shape carries both fields
+  assert.equal(flat.hasAuthToken, true);
+  assert.equal(flat.authToken, "your-endpoint-token");
 });
 
 test("buildCreateOutput human output includes signingKey", () => {
@@ -88,4 +93,10 @@ test("parseContextSpec rejects malformed specs", () => {
       value,
     );
   }
+});
+
+test("resolveAuthTokenInput is a no-op without the stdin flag", async () => {
+  // There is no literal-token option: the secret only ever arrives on stdin.
+  const { resolveAuthTokenInput } = await import("../dist/commands/webhook.js");
+  assert.equal(await resolveAuthTokenInput({}), undefined);
 });

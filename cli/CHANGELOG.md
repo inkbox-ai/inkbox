@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.6 — Webhook delivery auth token
+
+- `webhook subscription create` accepts `--auth-token-stdin`, which reads a
+  bearer token from stdin (never from an argument) and sends it
+  as `Authorization` on every delivery; `webhook subscription update`
+  accepts `--auth-token-stdin` or `--clear-auth-token` (mutually exclusive).
+- Reads return the token: `get` and `--json` output include `authToken`,
+  while list tables show only the `hasAuthToken` flag.
+- CLI and SDK dependency versions moved in lockstep to 0.6.6.
+
 ## 0.6.3 — Incoming call forwarding
 
 - `phone incoming-action forward` and `number update

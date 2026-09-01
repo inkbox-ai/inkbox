@@ -1403,6 +1403,28 @@ The config types (`WebhookContextConfig`, `WebhookContextClassConfig`) and
 the payload wire types (`WebhookContextWire`, `WebhookContextBlockWire`,
 `WebhookTranscriptEntryWire`, …) are exported from `inkbox`.
 
+### Delivery auth token
+
+If your endpoint requires its own `Authorization` header, set an optional
+bearer token on the subscription. Every delivery (and replay) then carries
+`Authorization: Bearer <token>` in addition to the signature headers.
+Reads return the stored token as `auth_token` (`None` when unset) along
+with the boolean `has_auth_token` flag; both default to unset on servers
+that predate the fields.
+
+```python
+inkbox.webhooks.subscriptions.create(
+    mailbox_id=mailbox.id,
+    url="https://example.com/hook",
+    event_types=["message.received"],
+    auth_token="your-endpoint-token",
+)
+
+# update() is tri-state: omit auth_token to leave it unchanged, pass a
+# string to replace it, or pass None to clear it.
+inkbox.webhooks.subscriptions.update(sub.id, auth_token=None)
+```
+
 ### Incoming-call webhooks (still per-number)
 
 ```python

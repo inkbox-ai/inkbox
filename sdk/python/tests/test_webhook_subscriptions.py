@@ -584,3 +584,95 @@ class TestContextConfig:
         )
         _, kwargs = http.post.call_args
         assert kwargs["json"]["context_config"]["texts"] is None
+
+
+class TestAuthToken:
+    def test_create_includes_auth_token_in_body(self):
+        res, http = _resource()
+        http.post.return_value = {
+            **RAW_SUBSCRIPTION,
+            "has_auth_token": True,
+            "auth_token": "your-endpoint-token",
+        }
+
+        sub = res.create(
+            mailbox_id=_MAILBOX_ID,
+            url="https://x/y",
+            event_types=["message.received"],
+            auth_token="your-endpoint-token",
+        )
+
+        http.post.assert_called_once_with(
+            "/webhooks/subscriptions",
+            json={
+                "url": "https://x/y",
+                "event_types": ["message.received"],
+                "mailbox_id": _MAILBOX_ID,
+                "auth_token": "your-endpoint-token",
+            },
+        )
+        assert sub.has_auth_token is True
+        assert sub.auth_token == "your-endpoint-token"
+
+    def test_create_omits_auth_token_when_none(self):
+        res, http = _resource()
+        http.post.return_value = RAW_SUBSCRIPTION
+        res.create(
+            mailbox_id=_MAILBOX_ID,
+            url="https://x/y",
+            event_types=["message.received"],
+        )
+        _, kwargs = http.post.call_args
+        assert "auth_token" not in kwargs["json"]
+
+    def test_update_sends_auth_token_replacement(self):
+        res, http = _resource()
+        http.patch.return_value = {**RAW_SUBSCRIPTION, "has_auth_token": True}
+
+        res.update(_SUB_ID, auth_token="your-endpoint-token")
+
+        http.patch.assert_called_once_with(
+            f"/webhooks/subscriptions/{_SUB_ID}",
+            json={"auth_token": "your-endpoint-token"},
+        )
+
+    def test_update_none_auth_token_sends_null(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+
+        res.update(_SUB_ID, auth_token=None)
+
+        http.patch.assert_called_once_with(
+            f"/webhooks/subscriptions/{_SUB_ID}",
+            json={"auth_token": None},
+        )
+
+    def test_update_omits_auth_token_when_unset(self):
+        res, http = _resource()
+        http.patch.return_value = RAW_SUBSCRIPTION
+        res.update(_SUB_ID, url="https://new/hook")
+        _, kwargs = http.patch.call_args
+        assert "auth_token" not in kwargs["json"]
+
+    def test_parse_reads_auth_token_fields_when_present(self):
+        sub = WebhookSubscription._from_dict(
+            {
+                **RAW_SUBSCRIPTION,
+                "has_auth_token": True,
+                "auth_token": "your-endpoint-token",
+            },
+        )
+        assert sub.has_auth_token is True
+        assert sub.auth_token == "your-endpoint-token"
+
+    def test_parse_reads_null_auth_token_as_none(self):
+        sub = WebhookSubscription._from_dict(
+            {**RAW_SUBSCRIPTION, "has_auth_token": False, "auth_token": None},
+        )
+        assert sub.auth_token is None
+
+    def test_parse_defaults_missing_auth_token_fields(self):
+        # Older payloads without the keys must keep parsing.
+        sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
+        assert sub.has_auth_token is False
+        assert sub.auth_token is None

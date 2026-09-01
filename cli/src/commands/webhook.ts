@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
+import { readSecretFromStdin } from "../invitation-token.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import { verifyWebhook } from "@inkbox/sdk";
@@ -11,6 +12,8 @@ import type {
   WebhookContextConfig,
 } from "@inkbox/sdk";
 
+// The list table shows only hasAuthToken; the token itself still reaches
+// `get` output and `--json` everywhere via flattenForOutput.
 const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "id",
   "mailboxId",
@@ -19,6 +22,7 @@ const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "url",
   "eventTypes",
   "contextConfig",
+  "hasAuthToken",
   "status",
   "createdAt",
 ];
@@ -33,6 +37,8 @@ function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
     url: sub.url,
     eventTypes: sub.eventTypes.join(", "),
     contextConfig: sub.contextConfig ? JSON.stringify(sub.contextConfig) : null,
+    hasAuthToken: sub.hasAuthToken,
+    authToken: sub.authToken,
     status: sub.status,
     createdAt: sub.createdAt,
     updatedAt: sub.updatedAt,
@@ -62,6 +68,15 @@ export function buildCreateOutput(
   return json
     ? { data: row, json: true }
     : { data: flattenCreateForOutput(row), json: false };
+}
+
+// Shared by create/update. Stdin is the only input path: a bearer token
+// passed as an argument would persist in shell history and process listings.
+export async function resolveAuthTokenInput(cmdOpts: {
+  authTokenStdin?: boolean;
+}): Promise<string | undefined> {
+  if (!cmdOpts.authTokenStdin) return undefined;
+  return readSecretFromStdin("auth token");
 }
 
 // `count:N` -> {mode:"count",count:N}; `window:H` -> {mode:"window",hours:H}.
@@ -163,6 +178,7 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--context-email <spec>", "Include recent emails as context: count:N or window:H")
     .option("--context-texts <spec>", "Include recent SMS+iMessage as context: count:N or window:H")
     .option("--context-calls <spec>", "Include recent calls+transcripts as context: count:N or window:H")
+    .option("--auth-token-stdin", "Read the delivery bearer token from stdin; sent as Authorization on every delivery")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -175,10 +191,12 @@ function registerSubscriptionCommands(parent: Command): void {
           contextEmail?: string;
           contextTexts?: string;
           contextCalls?: string;
+          authTokenStdin?: boolean;
         },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
+        const authToken = await resolveAuthTokenInput(cmdOpts);
         const row = await inkbox.webhooks.subscriptions.create({
           mailboxId: cmdOpts.mailboxId,
           phoneNumberId: cmdOpts.phoneNumberId,
@@ -186,6 +204,7 @@ function registerSubscriptionCommands(parent: Command): void {
           url: cmdOpts.url,
           eventTypes: cmdOpts.eventType,
           contextConfig: buildContextConfigFromFlags(cmdOpts),
+          authToken,
         });
         const { data, json } = buildCreateOutput(row, !!opts.json);
         output(data, { json });
@@ -194,7 +213,7 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("update <sub-id>")
-    .description("Update url and/or event_types on a subscription. --event-type replaces the stored list.")
+    .description("Update url, event_types, context, and/or the delivery auth token on a subscription. --event-type replaces the stored list.")
     .option("--url <url>", "New HTTPS destination")
     .option(
       "--event-type <type>",
@@ -209,6 +228,8 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--context-texts <spec>", "Set texts context: count:N or window:H (replaces stored config)")
     .option("--context-calls <spec>", "Set calls context: count:N or window:H (replaces stored config)")
     .option("--clear-context", "Clear all conversation context (mutually exclusive with --context-*)")
+    .option("--auth-token-stdin", "Read the replacement bearer token from stdin")
+    .option("--clear-auth-token", "Clear the delivery bearer token (mutually exclusive with --auth-token-stdin)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -220,6 +241,8 @@ function registerSubscriptionCommands(parent: Command): void {
           contextTexts?: string;
           contextCalls?: string;
           clearContext?: boolean;
+          authTokenStdin?: boolean;
+          clearAuthToken?: boolean;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -228,6 +251,7 @@ function registerSubscriptionCommands(parent: Command): void {
           url?: string;
           eventTypes?: string[];
           contextConfig?: WebhookContextConfig | null;
+          authToken?: string | null;
         } = {};
         if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
         if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
@@ -241,6 +265,17 @@ function registerSubscriptionCommands(parent: Command): void {
           body.contextConfig = null;
         } else if (contextConfig !== undefined) {
           body.contextConfig = contextConfig;
+        }
+        if (cmdOpts.clearAuthToken && cmdOpts.authTokenStdin) {
+          throw new Error(
+            "--clear-auth-token cannot be combined with --auth-token-stdin.",
+          );
+        }
+        const newAuthToken = await resolveAuthTokenInput(cmdOpts);
+        if (cmdOpts.clearAuthToken) {
+          body.authToken = null;
+        } else if (newAuthToken !== undefined) {
+          body.authToken = newAuthToken;
         }
         const row = await inkbox.webhooks.subscriptions.update(subId, body);
         output(flattenForOutput(row), { json: !!opts.json });
