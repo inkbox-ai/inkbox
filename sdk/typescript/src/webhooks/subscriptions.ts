@@ -67,11 +67,15 @@ export interface WebhookSubscription {
    */
   contextConfig: WebhookContextConfig | null;
   /**
-   * Whether a delivery bearer token is configured. Status only, never the
-   * token itself — reads never return it. Defaults to `false` on servers
-   * that predate the field.
+   * Whether a delivery bearer token is configured. Defaults to `false` on
+   * servers that predate the field.
    */
   hasAuthToken: boolean;
+  /**
+   * The delivery bearer token, returned on every read; `null` when unset
+   * (and on servers that predate the field).
+   */
+  authToken: string | null;
 }
 
 /**
@@ -100,6 +104,7 @@ export interface RawWebhookSubscription {
   updated_at: string;
   context_config?: WebhookContextConfig | null;
   has_auth_token?: boolean;
+  auth_token?: string | null;
 }
 
 export interface RawWebhookSubscriptionCreateResponse extends RawWebhookSubscription {
@@ -127,6 +132,7 @@ export function parseWebhookSubscription(
     updatedAt: new Date(r.updated_at),
     contextConfig: r.context_config ?? null,
     hasAuthToken: r.has_auth_token ?? false,
+    authToken: r.auth_token ?? null,
   };
 }
 
@@ -317,7 +323,7 @@ export interface CreateWebhookSubscriptionOptions {
   /**
    * Optional bearer token for endpoints that require `Authorization` on
    * deliveries; sent as `Authorization: Bearer <token>` alongside the
-   * signature headers. Write-only — reads expose only `hasAuthToken`.
+   * signature headers. Reads return it back as `authToken`.
    */
   authToken?: string;
 }
@@ -378,8 +384,8 @@ export class WebhookSubscriptionsResource {
    *
    * `authToken` is an optional bearer token for endpoints that require an
    * `Authorization` header: when set, every delivery (and replay) carries
-   * `Authorization: Bearer <token>` alongside the signature headers. It is
-   * write-only — reads expose only `hasAuthToken`, never the token.
+   * `Authorization: Bearer <token>` alongside the signature headers. Reads
+   * return the stored token back as `authToken` alongside `hasAuthToken`.
    *
    * Returns a {@link WebhookSubscriptionCreateResponse}. Its `signingKey`
    * is populated **once** when this is the first subscription for an

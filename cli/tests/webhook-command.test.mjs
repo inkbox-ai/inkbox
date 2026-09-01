@@ -22,6 +22,7 @@ const CREATE_ROW = {
     texts: { mode: "window", hours: 24 },
   },
   hasAuthToken: true,
+  authToken: "your-endpoint-token",
   createdAt: new Date("2026-06-02T03:04:05Z"),
   updatedAt: new Date("2026-06-02T03:04:05Z"),
   signingKey: "whsec_first_create_plaintext",
@@ -40,8 +41,9 @@ test("flattenCreateForOutput keeps the one-time signingKey and ownerIdentityId",
       texts: { mode: "window", hours: 24 },
     }),
   );
-  // status flag only — the token itself never appears in any read shape
+  // reads return the token; the flattened shape carries both fields
   assert.equal(flat.hasAuthToken, true);
+  assert.equal(flat.authToken, "your-endpoint-token");
 });
 
 test("buildCreateOutput human output includes signingKey", () => {
@@ -91,4 +93,18 @@ test("parseContextSpec rejects malformed specs", () => {
       value,
     );
   }
+});
+
+test("resolveAuthTokenInput passes the literal flag through", async () => {
+  const { resolveAuthTokenInput } = await import("../dist/commands/webhook.js");
+  assert.equal(await resolveAuthTokenInput({ authToken: "tok_x" }), "tok_x");
+  assert.equal(await resolveAuthTokenInput({}), undefined);
+});
+
+test("resolveAuthTokenInput rejects combining stdin with the literal flag", async () => {
+  const { resolveAuthTokenInput } = await import("../dist/commands/webhook.js");
+  await assert.rejects(
+    () => resolveAuthTokenInput({ authToken: "tok_x", authTokenStdin: true }),
+    /--auth-token-stdin cannot be combined/,
+  );
 });

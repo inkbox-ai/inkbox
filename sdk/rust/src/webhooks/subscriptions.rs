@@ -130,10 +130,14 @@ pub struct WebhookSubscription {
     // opted in and on servers that predate the field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_config: Option<WebhookContextConfig>,
-    /// Whether a delivery bearer token is configured. Status only, never the
-    /// token itself. Defaults to `false` when the server omits the field.
+    /// Whether a delivery bearer token is configured. Defaults to `false`
+    /// when the server omits the field.
     #[serde(default)]
     pub has_auth_token: bool,
+    /// The delivery bearer token, returned on every read; `None` when unset
+    /// (and on servers that predate the field).
+    #[serde(default)]
+    pub auth_token: Option<String>,
 }
 
 /// The response from creating a webhook subscription.
@@ -350,15 +354,16 @@ impl WebhookSubscriptionsResource {
     ///
     /// `auth_token` is an optional bearer token for endpoints that require an
     /// `Authorization` header: when set, every delivery (and replay) carries
-    /// `Authorization: Bearer <token>` alongside the signature headers. It is
-    /// write-only — reads expose only `has_auth_token`, never the token.
+    /// `Authorization: Bearer <token>` alongside the signature headers. Reads
+    /// return the stored token back in `auth_token` alongside the
+    /// `has_auth_token` flag.
     ///
     /// # Arguments
     /// * `url` - HTTPS receiver endpoint.
     /// * `event_types` - non-empty, distinct event-type strings.
     /// * `mailbox_id` / `phone_number_id` / `agent_identity_id` - exactly one.
     /// * `context_config` - optional per-class conversation-context config.
-    /// * `auth_token` - optional delivery bearer token (write-only).
+    /// * `auth_token` - optional delivery bearer token.
     ///
     /// # Returns
     /// A [`WebhookSubscriptionCreateResponse`]. Its `signing_key` is populated
@@ -571,8 +576,8 @@ mod tests {
     }
 
     #[test]
-    fn has_auth_token_defaults_false_and_parses_true() {
-        // Older wire bodies omit the key entirely; newer ones carry a bool.
+    fn auth_token_fields_default_and_parse() {
+        // Older wire bodies omit the keys entirely; newer ones carry them.
         let base = serde_json::json!({
             "id": "11111111-1111-1111-1111-111111111111",
             "organization_id": "org_test",
@@ -586,10 +591,13 @@ mod tests {
         });
         let sub: WebhookSubscription = serde_json::from_value(base.clone()).unwrap();
         assert!(!sub.has_auth_token);
+        assert_eq!(sub.auth_token, None);
 
         let mut with_token = base;
         with_token["has_auth_token"] = serde_json::json!(true);
+        with_token["auth_token"] = serde_json::json!("your-endpoint-token");
         let sub: WebhookSubscription = serde_json::from_value(with_token).unwrap();
         assert!(sub.has_auth_token);
+        assert_eq!(sub.auth_token.as_deref(), Some("your-endpoint-token"));
     }
 }

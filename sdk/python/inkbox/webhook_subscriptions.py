@@ -83,8 +83,9 @@ class WebhookSubscription:
     ``organization_id`` is an ``"org_..."`` token string, not a UUID.
     ``status`` is always ``"active"`` for subscriptions callers can
     observe; deleted subscriptions are not returned by ``list`` /
-    ``get``. ``has_auth_token`` is status only, never the token itself;
-    it defaults to ``False`` on servers that predate the field.
+    ``get``. Reads return the delivery bearer token as ``auth_token``
+    (``None`` when unset) alongside the ``has_auth_token`` flag; both
+    default off on servers that predate the fields.
     """
 
     id: UUID
@@ -100,6 +101,7 @@ class WebhookSubscription:
     owner_identity_id: UUID | None = None
     context_config: WebhookContextConfig | None = None
     has_auth_token: bool = False
+    auth_token: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookSubscription:
@@ -121,6 +123,7 @@ class WebhookSubscription:
             ),
             context_config=d.get("context_config"),
             has_auth_token=bool(d.get("has_auth_token", False)),
+            auth_token=d.get("auth_token"),
         )
 
 
@@ -370,8 +373,8 @@ class WebhookSubscriptionsResource:
         ``auth_token`` is an optional bearer token for endpoints that
         require an ``Authorization`` header: when set, every delivery
         (and replay) carries ``Authorization: Bearer <token>`` alongside
-        the signature headers. It is write-only — reads expose only
-        ``has_auth_token``, never the token.
+        the signature headers. Reads return the stored token back as
+        ``auth_token`` alongside the ``has_auth_token`` flag.
 
         Returns a :class:`WebhookSubscriptionCreateResponse`. Its
         ``signing_key`` is populated **once** when this is the first

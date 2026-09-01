@@ -1321,7 +1321,7 @@ inkbox.webhooks.subscriptions.create(
 inkbox.webhooks.subscriptions.update(created.id, context_config=None)  # clear
 ```
 
-**Delivery auth token:** for endpoints that require their own `Authorization` header, pass `auth_token` on `create` / `update` — every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Write-only: reads expose only the boolean `has_auth_token` (`False` on servers that predate the field), never the token. On `update` it is tri-state: omit = unchanged, `None` = clear, string = replace.
+**Delivery auth token:** for endpoints that require their own `Authorization` header, pass `auth_token` on `create` / `update` — every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the stored token as `auth_token` (`None` when unset) plus the boolean `has_auth_token` flag; both default to unset on servers that predate the fields. On `update` it is tri-state: omit = unchanged, `None` = clear, string = replace.
 
 **Mail contact / identity resolution:** `data["contacts"]` and `data["agent_identities"]` are lists of `{"bucket", "address", "id", ...}` entries (always present, possibly empty). Inbound events resolve `from` + every `cc`; outbound events resolve every `to` + `cc` + `bcc`. Pair entries to the source field by `(bucket, address)`. Contact entries carry active memory text newest-first in `memories`; use `match.get("memories", [])` for older replays. Outbound payloads also carry `data["message"]["bcc_addresses"]` (`None` on inbound, since BCC is not visible to recipients).
 

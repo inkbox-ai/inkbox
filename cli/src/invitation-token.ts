@@ -9,6 +9,13 @@ async function readAllStdin(): Promise<string> {
   return value.trim();
 }
 
+/** Read a secret from stdin so it never appears in argv or shell history. */
+export async function readSecretFromStdin(what: string): Promise<string> {
+  const value = await readAllStdin();
+  if (!value) throw new Error(`No ${what} was provided on stdin.`);
+  return value;
+}
+
 async function hiddenPrompt(stdinOption = "--token-stdin"): Promise<string> {
   if (!process.stdin.isTTY) {
     throw new Error(

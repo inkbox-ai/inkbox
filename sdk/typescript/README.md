@@ -1452,9 +1452,10 @@ the payload types (`WebhookContext`, `WebhookContextBlock`,
 
 If your endpoint requires its own `Authorization` header, set an optional
 bearer token on the subscription. Every delivery (and replay) then carries
-`Authorization: Bearer <token>` in addition to the signature headers. The
-token is write-only: reads expose only the boolean `hasAuthToken` (`false`
-on servers that predate the field), never the token itself.
+`Authorization: Bearer <token>` in addition to the signature headers.
+Reads return the stored token as `authToken` (`null` when unset) along
+with the boolean `hasAuthToken` flag; both default to unset on servers
+that predate the fields.
 
 ```ts
 await inkbox.webhooks.subscriptions.create({

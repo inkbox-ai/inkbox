@@ -1407,9 +1407,10 @@ the payload wire types (`WebhookContextWire`, `WebhookContextBlockWire`,
 
 If your endpoint requires its own `Authorization` header, set an optional
 bearer token on the subscription. Every delivery (and replay) then carries
-`Authorization: Bearer <token>` in addition to the signature headers. The
-token is write-only: reads expose only the boolean `has_auth_token`
-(`False` on servers that predate the field), never the token itself.
+`Authorization: Bearer <token>` in addition to the signature headers.
+Reads return the stored token as `auth_token` (`None` when unset) along
+with the boolean `has_auth_token` flag; both default to unset on servers
+that predate the fields.
 
 ```python
 inkbox.webhooks.subscriptions.create(

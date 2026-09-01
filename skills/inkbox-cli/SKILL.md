@@ -751,12 +751,12 @@ inkbox webhook subscription create --agent-identity-id <id> --url <url> \
 # Opt into per-class conversation context on received events (count:N | window:H):
 inkbox webhook subscription create --mailbox-id <id> --url <url> \
   --event-type message.received --context-email count:10 --context-texts window:24
-# Bearer token sent as Authorization on every delivery (write-only):
+# Bearer token sent as Authorization on every delivery (returned by reads):
 inkbox webhook subscription create --mailbox-id <id> --url <url> \
-  --event-type message.received --auth-token <token>
+  --event-type message.received --auth-token-stdin   # token read from stdin
 inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...] \
   [--context-email <spec>] [--context-texts <spec>] [--context-calls <spec>] [--clear-context] \
-  [--auth-token <token>] [--clear-auth-token]
+  [--auth-token-stdin | --auth-token <token>] [--clear-auth-token]
 inkbox webhook subscription delete <sub-id>
 ```
 
@@ -764,7 +764,7 @@ Every subscription row carries `ownerIdentityId` (the resolved owning agent iden
 
 The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. A2A subscriptions do not support these flags. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
 
-`--auth-token` sets an optional bearer token for endpoints that require their own `Authorization` header; every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Write-only — subscription output shows only `hasAuthToken`, never the token. On `update`, `--auth-token` replaces the stored token and `--clear-auth-token` removes it (the two are mutually exclusive).
+`--auth-token` sets an optional bearer token for endpoints that require their own `Authorization` header; every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the token: `get` and `--json` output include `authToken`, while list tables show only the `hasAuthToken` flag. Prefer `--auth-token-stdin` (reads the token from stdin) so the secret never lands in argv or shell history; `--auth-token <token>` remains for scripts that accept that exposure. On `update` either form replaces the stored token and `--clear-auth-token` removes it (mutually exclusive).
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 

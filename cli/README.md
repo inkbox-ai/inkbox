@@ -738,9 +738,12 @@ inkbox webhook subscription create           # Create a subscription
                                              #     class: count:N or window:H
   --context-texts <spec>                     #   Same for texts (count:N | window:H)
   --context-calls <spec>                     #   Same for calls (count:N | window:H)
-  --auth-token <token>                       #   Bearer token sent as Authorization on
-                                             #     every delivery (write-only; reads
-                                             #     show only hasAuthToken)
+  --auth-token-stdin                         #   Read the delivery bearer token from
+                                             #     stdin (keeps it out of shell history)
+  --auth-token <token>                       #   Same, as a literal flag (lands in
+                                             #     shell history; prefer stdin). Reads
+                                             #     return the token; list tables show
+                                             #     only hasAuthToken
 inkbox webhook subscription update <sub-id>  # Update url, event_types, context, and/or auth token
   --url <url>                                #   New HTTPS destination
   --event-type <type>                        #   Replacement event-type list (repeatable)
@@ -749,9 +752,12 @@ inkbox webhook subscription update <sub-id>  # Update url, event_types, context,
   --context-calls <spec>                     #   Replace calls context (count:N | window:H)
   --clear-context                            #   Clear all conversation context
                                              #     (mutually exclusive with --context-*)
-  --auth-token <token>                       #   Replace the delivery bearer token
+  --auth-token-stdin                         #   Replace the bearer token, read from stdin
+  --auth-token <token>                       #   Replace it as a literal flag
+                                             #     (prefer --auth-token-stdin)
   --clear-auth-token                         #   Clear the delivery bearer token
-                                             #     (mutually exclusive with --auth-token)
+                                             #     (mutually exclusive with the other
+                                             #     --auth-token flags)
 inkbox webhook subscription delete <sub-id>  # Remove a subscription
 ```
 

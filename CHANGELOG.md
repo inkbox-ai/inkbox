@@ -13,27 +13,29 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `Authorization` header. When set, every webhook delivery (and replay)
   carries `Authorization: Bearer <token>` in addition to the existing
   signature headers.
-- The token is write-only: subscription reads expose only a boolean
-  `has_auth_token` (`hasAuthToken` in TypeScript) and never the token itself.
-  The flag defaults to false on servers that predate the field.
+- Subscription reads return the stored token as `auth_token` (`authToken` in
+  TypeScript; null when unset) alongside a boolean `has_auth_token`
+  (`hasAuthToken`) convenience flag. Both default to unset/false on servers
+  that predate the fields.
 - Updates treat the token tri-state, mirroring the context-config handling:
   omit the field to leave it unchanged, pass an explicit `null` to clear it,
   or pass a string to replace it.
-- The CLI adds `--auth-token` to `webhook subscription create` and
+- The CLI adds `--auth-token-stdin` (preferred; keeps the secret out of
+  argv and shell history) and `--auth-token` to `webhook subscription create`, and
   `--auth-token` / `--clear-auth-token` (mutually exclusive) to
-  `webhook subscription update`, and subscription output includes
-  `hasAuthToken`.
+  `webhook subscription update`. `get` and `--json` output include
+  `authToken`; list tables show only the `hasAuthToken` flag.
 
 ### Compatibility
 
 - Setting a token requires server-side support; reads on older servers omit
-  `has_auth_token` and the SDKs parse it as false.
+  `auth_token` and `has_auth_token`, which the SDKs parse as unset/false.
 - TypeScript callers that construct `WebhookSubscription` object literals
-  must include the new `hasAuthToken` field.
+  must include the new `hasAuthToken` and `authToken` fields.
 - Rust `WebhookSubscriptionsResource::create` and `update` take a new
   trailing `auth_token` argument (pass `None` to keep the previous
   behavior), and struct literals for `WebhookSubscription` must include
-  `has_auth_token`.
+  `has_auth_token` and `auth_token`.
 
 ## 0.6.5 — Identity onboarding skill
 

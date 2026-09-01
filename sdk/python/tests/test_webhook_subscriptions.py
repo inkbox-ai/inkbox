@@ -589,7 +589,11 @@ class TestContextConfig:
 class TestAuthToken:
     def test_create_includes_auth_token_in_body(self):
         res, http = _resource()
-        http.post.return_value = {**RAW_SUBSCRIPTION, "has_auth_token": True}
+        http.post.return_value = {
+            **RAW_SUBSCRIPTION,
+            "has_auth_token": True,
+            "auth_token": "your-endpoint-token",
+        }
 
         sub = res.create(
             mailbox_id=_MAILBOX_ID,
@@ -608,6 +612,7 @@ class TestAuthToken:
             },
         )
         assert sub.has_auth_token is True
+        assert sub.auth_token == "your-endpoint-token"
 
     def test_create_omits_auth_token_when_none(self):
         res, http = _resource()
@@ -649,13 +654,25 @@ class TestAuthToken:
         _, kwargs = http.patch.call_args
         assert "auth_token" not in kwargs["json"]
 
-    def test_parse_reads_has_auth_token_when_present(self):
+    def test_parse_reads_auth_token_fields_when_present(self):
         sub = WebhookSubscription._from_dict(
-            {**RAW_SUBSCRIPTION, "has_auth_token": True},
+            {
+                **RAW_SUBSCRIPTION,
+                "has_auth_token": True,
+                "auth_token": "your-endpoint-token",
+            },
         )
         assert sub.has_auth_token is True
+        assert sub.auth_token == "your-endpoint-token"
 
-    def test_parse_defaults_missing_has_auth_token_to_false(self):
-        # Older payloads without the key must keep parsing.
+    def test_parse_reads_null_auth_token_as_none(self):
+        sub = WebhookSubscription._from_dict(
+            {**RAW_SUBSCRIPTION, "has_auth_token": False, "auth_token": None},
+        )
+        assert sub.auth_token is None
+
+    def test_parse_defaults_missing_auth_token_fields(self):
+        # Older payloads without the keys must keep parsing.
         sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
         assert sub.has_auth_token is False
+        assert sub.auth_token is None
