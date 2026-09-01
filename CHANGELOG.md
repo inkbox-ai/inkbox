@@ -20,8 +20,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Updates treat the token tri-state, mirroring the context-config handling:
   omit the field to leave it unchanged, pass an explicit `null` to clear it,
   or pass a string to replace it.
-- The CLI adds `--auth-token-stdin` (preferred; keeps the secret out of
-  argv and shell history) and `--auth-token` to `webhook subscription create`, and
+- The CLI adds `--auth-token-stdin` to `webhook subscription create`, reading
+  the token from stdin so it never enters argv or shell history, and
   `--auth-token` / `--clear-auth-token` (mutually exclusive) to
   `webhook subscription update`. `get` and `--json` output include
   `authToken`; list tables show only the `hasAuthToken` flag.

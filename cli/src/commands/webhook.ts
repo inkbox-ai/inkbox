@@ -70,17 +70,13 @@ export function buildCreateOutput(
     : { data: flattenCreateForOutput(row), json: false };
 }
 
-// Shared by create/update: prefer the stdin path so the secret never rides
-// argv; the literal flag stays for scripts that accept the exposure.
+// Shared by create/update. Stdin is the only input path: a bearer token
+// passed as an argument would persist in shell history and process listings.
 export async function resolveAuthTokenInput(cmdOpts: {
-  authToken?: string;
   authTokenStdin?: boolean;
 }): Promise<string | undefined> {
-  if (cmdOpts.authTokenStdin && cmdOpts.authToken !== undefined) {
-    throw new Error("--auth-token-stdin cannot be combined with --auth-token.");
-  }
-  if (cmdOpts.authTokenStdin) return readSecretFromStdin("auth token");
-  return cmdOpts.authToken;
+  if (!cmdOpts.authTokenStdin) return undefined;
+  return readSecretFromStdin("auth token");
 }
 
 // `count:N` -> {mode:"count",count:N}; `window:H` -> {mode:"window",hours:H}.
@@ -182,8 +178,7 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--context-email <spec>", "Include recent emails as context: count:N or window:H")
     .option("--context-texts <spec>", "Include recent SMS+iMessage as context: count:N or window:H")
     .option("--context-calls <spec>", "Include recent calls+transcripts as context: count:N or window:H")
-    .option("--auth-token-stdin", "Read the delivery bearer token from stdin (keeps it out of argv/shell history)")
-    .option("--auth-token <token>", "Bearer token sent as Authorization on every delivery (visible in shell history; prefer --auth-token-stdin)")
+    .option("--auth-token-stdin", "Read the delivery bearer token from stdin; sent as Authorization on every delivery")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -196,7 +191,6 @@ function registerSubscriptionCommands(parent: Command): void {
           contextEmail?: string;
           contextTexts?: string;
           contextCalls?: string;
-          authToken?: string;
           authTokenStdin?: boolean;
         },
       ) {
@@ -234,9 +228,8 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--context-texts <spec>", "Set texts context: count:N or window:H (replaces stored config)")
     .option("--context-calls <spec>", "Set calls context: count:N or window:H (replaces stored config)")
     .option("--clear-context", "Clear all conversation context (mutually exclusive with --context-*)")
-    .option("--auth-token-stdin", "Read the replacement bearer token from stdin (keeps it out of argv/shell history)")
-    .option("--auth-token <token>", "Replace the delivery bearer token (visible in shell history; prefer --auth-token-stdin)")
-    .option("--clear-auth-token", "Clear the delivery bearer token (mutually exclusive with the other --auth-token flags)")
+    .option("--auth-token-stdin", "Read the replacement bearer token from stdin")
+    .option("--clear-auth-token", "Clear the delivery bearer token (mutually exclusive with --auth-token-stdin)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -248,7 +241,6 @@ function registerSubscriptionCommands(parent: Command): void {
           contextTexts?: string;
           contextCalls?: string;
           clearContext?: boolean;
-          authToken?: string;
           authTokenStdin?: boolean;
           clearAuthToken?: boolean;
         },
@@ -274,9 +266,9 @@ function registerSubscriptionCommands(parent: Command): void {
         } else if (contextConfig !== undefined) {
           body.contextConfig = contextConfig;
         }
-        if (cmdOpts.clearAuthToken && (cmdOpts.authToken !== undefined || cmdOpts.authTokenStdin)) {
+        if (cmdOpts.clearAuthToken && cmdOpts.authTokenStdin) {
           throw new Error(
-            "--clear-auth-token cannot be combined with --auth-token/--auth-token-stdin.",
+            "--clear-auth-token cannot be combined with --auth-token-stdin.",
           );
         }
         const newAuthToken = await resolveAuthTokenInput(cmdOpts);

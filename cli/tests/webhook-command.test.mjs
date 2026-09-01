@@ -95,16 +95,8 @@ test("parseContextSpec rejects malformed specs", () => {
   }
 });
 
-test("resolveAuthTokenInput passes the literal flag through", async () => {
+test("resolveAuthTokenInput is a no-op without the stdin flag", async () => {
+  // There is no literal-token option: the secret only ever arrives on stdin.
   const { resolveAuthTokenInput } = await import("../dist/commands/webhook.js");
-  assert.equal(await resolveAuthTokenInput({ authToken: "tok_x" }), "tok_x");
   assert.equal(await resolveAuthTokenInput({}), undefined);
-});
-
-test("resolveAuthTokenInput rejects combining stdin with the literal flag", async () => {
-  const { resolveAuthTokenInput } = await import("../dist/commands/webhook.js");
-  await assert.rejects(
-    () => resolveAuthTokenInput({ authToken: "tok_x", authTokenStdin: true }),
-    /--auth-token-stdin cannot be combined/,
-  );
 });
