@@ -21,6 +21,7 @@ const CREATE_ROW = {
     email: { mode: "count", count: 10 },
     texts: { mode: "window", hours: 24 },
   },
+  hasAuthToken: true,
   createdAt: new Date("2026-06-02T03:04:05Z"),
   updatedAt: new Date("2026-06-02T03:04:05Z"),
   signingKey: "whsec_first_create_plaintext",
@@ -39,6 +40,8 @@ test("flattenCreateForOutput keeps the one-time signingKey and ownerIdentityId",
       texts: { mode: "window", hours: 24 },
     }),
   );
+  // status flag only — the token itself never appears in any read shape
+  assert.equal(flat.hasAuthToken, true);
 });
 
 test("buildCreateOutput human output includes signingKey", () => {

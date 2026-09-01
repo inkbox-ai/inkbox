@@ -4,6 +4,37 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.6 — Webhook delivery auth token
+
+### Added
+
+- Webhook subscriptions accept an optional delivery auth token across the
+  Python, TypeScript, and Rust SDKs, for endpoints that require their own
+  `Authorization` header. When set, every webhook delivery (and replay)
+  carries `Authorization: Bearer <token>` in addition to the existing
+  signature headers.
+- The token is write-only: subscription reads expose only a boolean
+  `has_auth_token` (`hasAuthToken` in TypeScript) and never the token itself.
+  The flag defaults to false on servers that predate the field.
+- Updates treat the token tri-state, mirroring the context-config handling:
+  omit the field to leave it unchanged, pass an explicit `null` to clear it,
+  or pass a string to replace it.
+- The CLI adds `--auth-token` to `webhook subscription create` and
+  `--auth-token` / `--clear-auth-token` (mutually exclusive) to
+  `webhook subscription update`, and subscription output includes
+  `hasAuthToken`.
+
+### Compatibility
+
+- Setting a token requires server-side support; reads on older servers omit
+  `has_auth_token` and the SDKs parse it as false.
+- TypeScript callers that construct `WebhookSubscription` object literals
+  must include the new `hasAuthToken` field.
+- Rust `WebhookSubscriptionsResource::create` and `update` take a new
+  trailing `auth_token` argument (pass `None` to keep the previous
+  behavior), and struct literals for `WebhookSubscription` must include
+  `has_auth_token`.
+
 ## 0.6.5 — Identity onboarding skill
 
 ### Added

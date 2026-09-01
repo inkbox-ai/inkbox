@@ -751,14 +751,20 @@ inkbox webhook subscription create --agent-identity-id <id> --url <url> \
 # Opt into per-class conversation context on received events (count:N | window:H):
 inkbox webhook subscription create --mailbox-id <id> --url <url> \
   --event-type message.received --context-email count:10 --context-texts window:24
+# Bearer token sent as Authorization on every delivery (write-only):
+inkbox webhook subscription create --mailbox-id <id> --url <url> \
+  --event-type message.received --auth-token <token>
 inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...] \
-  [--context-email <spec>] [--context-texts <spec>] [--context-calls <spec>] [--clear-context]
+  [--context-email <spec>] [--context-texts <spec>] [--context-calls <spec>] [--clear-context] \
+  [--auth-token <token>] [--clear-auth-token]
 inkbox webhook subscription delete <sub-id>
 ```
 
 Every subscription row carries `ownerIdentityId` (the resolved owning agent identity). The **first** subscription created for an identity that has no signing key yet returns that identity's `signingKey` **once** in the create output (otherwise null) — capture it then, it cannot be retrieved again (use `--json` to read it reliably).
 
 The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. A2A subscriptions do not support these flags. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
+
+`--auth-token` sets an optional bearer token for endpoints that require their own `Authorization` header; every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Write-only — subscription output shows only `hasAuthToken`, never the token. On `update`, `--auth-token` replaces the stored token and `--clear-auth-token` removes it (the two are mutually exclusive).
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 

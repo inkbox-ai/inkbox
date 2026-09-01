@@ -738,7 +738,10 @@ inkbox webhook subscription create           # Create a subscription
                                              #     class: count:N or window:H
   --context-texts <spec>                     #   Same for texts (count:N | window:H)
   --context-calls <spec>                     #   Same for calls (count:N | window:H)
-inkbox webhook subscription update <sub-id>  # Update url, event_types, and/or context
+  --auth-token <token>                       #   Bearer token sent as Authorization on
+                                             #     every delivery (write-only; reads
+                                             #     show only hasAuthToken)
+inkbox webhook subscription update <sub-id>  # Update url, event_types, context, and/or auth token
   --url <url>                                #   New HTTPS destination
   --event-type <type>                        #   Replacement event-type list (repeatable)
   --context-email <spec>                     #   Replace email context (count:N | window:H)
@@ -746,6 +749,9 @@ inkbox webhook subscription update <sub-id>  # Update url, event_types, and/or c
   --context-calls <spec>                     #   Replace calls context (count:N | window:H)
   --clear-context                            #   Clear all conversation context
                                              #     (mutually exclusive with --context-*)
+  --auth-token <token>                       #   Replace the delivery bearer token
+  --clear-auth-token                         #   Clear the delivery bearer token
+                                             #     (mutually exclusive with --auth-token)
 inkbox webhook subscription delete <sub-id>  # Remove a subscription
 ```
 

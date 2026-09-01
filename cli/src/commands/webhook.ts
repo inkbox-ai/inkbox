@@ -19,6 +19,7 @@ const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "url",
   "eventTypes",
   "contextConfig",
+  "hasAuthToken",
   "status",
   "createdAt",
 ];
@@ -33,6 +34,7 @@ function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
     url: sub.url,
     eventTypes: sub.eventTypes.join(", "),
     contextConfig: sub.contextConfig ? JSON.stringify(sub.contextConfig) : null,
+    hasAuthToken: sub.hasAuthToken,
     status: sub.status,
     createdAt: sub.createdAt,
     updatedAt: sub.updatedAt,
@@ -163,6 +165,7 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--context-email <spec>", "Include recent emails as context: count:N or window:H")
     .option("--context-texts <spec>", "Include recent SMS+iMessage as context: count:N or window:H")
     .option("--context-calls <spec>", "Include recent calls+transcripts as context: count:N or window:H")
+    .option("--auth-token <token>", "Bearer token sent as Authorization on every delivery (write-only)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -175,6 +178,7 @@ function registerSubscriptionCommands(parent: Command): void {
           contextEmail?: string;
           contextTexts?: string;
           contextCalls?: string;
+          authToken?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -186,6 +190,7 @@ function registerSubscriptionCommands(parent: Command): void {
           url: cmdOpts.url,
           eventTypes: cmdOpts.eventType,
           contextConfig: buildContextConfigFromFlags(cmdOpts),
+          authToken: cmdOpts.authToken,
         });
         const { data, json } = buildCreateOutput(row, !!opts.json);
         output(data, { json });
@@ -209,6 +214,8 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--context-texts <spec>", "Set texts context: count:N or window:H (replaces stored config)")
     .option("--context-calls <spec>", "Set calls context: count:N or window:H (replaces stored config)")
     .option("--clear-context", "Clear all conversation context (mutually exclusive with --context-*)")
+    .option("--auth-token <token>", "Replace the delivery bearer token (write-only)")
+    .option("--clear-auth-token", "Clear the delivery bearer token (mutually exclusive with --auth-token)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -220,6 +227,8 @@ function registerSubscriptionCommands(parent: Command): void {
           contextTexts?: string;
           contextCalls?: string;
           clearContext?: boolean;
+          authToken?: string;
+          clearAuthToken?: boolean;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -228,6 +237,7 @@ function registerSubscriptionCommands(parent: Command): void {
           url?: string;
           eventTypes?: string[];
           contextConfig?: WebhookContextConfig | null;
+          authToken?: string | null;
         } = {};
         if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
         if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
@@ -241,6 +251,16 @@ function registerSubscriptionCommands(parent: Command): void {
           body.contextConfig = null;
         } else if (contextConfig !== undefined) {
           body.contextConfig = contextConfig;
+        }
+        if (cmdOpts.clearAuthToken && cmdOpts.authToken !== undefined) {
+          throw new Error(
+            "--clear-auth-token cannot be combined with --auth-token.",
+          );
+        }
+        if (cmdOpts.clearAuthToken) {
+          body.authToken = null;
+        } else if (cmdOpts.authToken !== undefined) {
+          body.authToken = cmdOpts.authToken;
         }
         const row = await inkbox.webhooks.subscriptions.update(subId, body);
         output(flattenForOutput(row), { json: !!opts.json });

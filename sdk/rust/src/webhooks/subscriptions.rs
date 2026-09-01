@@ -130,6 +130,10 @@ pub struct WebhookSubscription {
     // opted in and on servers that predate the field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_config: Option<WebhookContextConfig>,
+    /// Whether a delivery bearer token is configured. Status only, never the
+    /// token itself. Defaults to `false` when the server omits the field.
+    #[serde(default)]
+    pub has_auth_token: bool,
 }
 
 /// The response from creating a webhook subscription.
@@ -344,11 +348,17 @@ impl WebhookSubscriptionsResource {
     /// events. It is not supported for A2A subscriptions. See
     /// [`WebhookContextConfig`].
     ///
+    /// `auth_token` is an optional bearer token for endpoints that require an
+    /// `Authorization` header: when set, every delivery (and replay) carries
+    /// `Authorization: Bearer <token>` alongside the signature headers. It is
+    /// write-only — reads expose only `has_auth_token`, never the token.
+    ///
     /// # Arguments
     /// * `url` - HTTPS receiver endpoint.
     /// * `event_types` - non-empty, distinct event-type strings.
     /// * `mailbox_id` / `phone_number_id` / `agent_identity_id` - exactly one.
     /// * `context_config` - optional per-class conversation-context config.
+    /// * `auth_token` - optional delivery bearer token (write-only).
     ///
     /// # Returns
     /// A [`WebhookSubscriptionCreateResponse`]. Its `signing_key` is populated
@@ -364,6 +374,7 @@ impl WebhookSubscriptionsResource {
         phone_number_id: Option<Uuid>,
         agent_identity_id: Option<Uuid>,
         context_config: Option<&WebhookContextConfig>,
+        auth_token: Option<&str>,
     ) -> Result<WebhookSubscriptionCreateResponse> {
         // Exactly one owner FK must be set.
         let owners: [(&str, Option<Uuid>); 3] = [
@@ -400,28 +411,36 @@ impl WebhookSubscriptionsResource {
             assert_a2a_context_absent(event_types, Some(cfg))?;
             body.insert("context_config".into(), json!(cfg));
         }
+        if let Some(token) = auth_token {
+            body.insert("auth_token".into(), json!(token));
+        }
         let body = serde_json::Value::Object(body);
         let data = self.http.post(BASE, Some(&body), crate::http::NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
-    /// Update the URL, event-type list, and/or context config.
+    /// Update the URL, event-type list, context config, and/or auth token.
     ///
     /// `event_types`, if supplied, replaces the stored list and must be
     /// non-empty and distinct. Owner FKs are not mutable. Passing every
     /// argument as `None` issues a PATCH with an empty body (a no-op),
     /// matching the Python `_UNSET` behaviour.
     ///
-    /// `context_config` is tri-state — the one field where `null` is meaningful
-    /// on the wire: `None` omits the key (unchanged), `Some(None)` sends JSON
+    /// `context_config` is tri-state — a field where `null` is meaningful on
+    /// the wire: `None` omits the key (unchanged), `Some(None)` sends JSON
     /// `null` (clear), `Some(Some(cfg))` validates and replaces. A2A
     /// subscriptions do not support a context object.
+    ///
+    /// `auth_token` is tri-state the same way: `None` leaves the delivery
+    /// bearer token unchanged, `Some(None)` clears it, `Some(Some(token))`
+    /// replaces it.
     ///
     /// # Arguments
     /// * `sub_id` - subscription UUID.
     /// * `url` - `None` to leave unchanged, `Some` to replace.
     /// * `event_types` - `None` to leave unchanged, `Some` to replace.
     /// * `context_config` - tri-state (see above).
+    /// * `auth_token` - tri-state (see above).
     ///
     /// # Returns
     /// The updated subscription.
@@ -431,6 +450,7 @@ impl WebhookSubscriptionsResource {
         url: Option<&str>,
         event_types: Option<&[String]>,
         context_config: Option<Option<&WebhookContextConfig>>,
+        auth_token: Option<Option<&str>>,
     ) -> Result<WebhookSubscription> {
         // Only include keys the caller supplied (Python omits `_UNSET` keys).
         let mut body = serde_json::Map::new();
@@ -454,6 +474,17 @@ impl WebhookSubscriptionsResource {
                 }
                 None => {
                     body.insert("context_config".into(), Value::Null);
+                }
+            }
+        }
+        if let Some(token) = auth_token {
+            // `Some(None)` passes through as JSON null to clear the token.
+            match token {
+                Some(token) => {
+                    body.insert("auth_token".into(), json!(token));
+                }
+                None => {
+                    body.insert("auth_token".into(), Value::Null);
                 }
             }
         }
@@ -537,5 +568,28 @@ mod tests {
     fn rejects_unknown_channel() {
         let err = assert_channel_coherence("mailbox", &ev(&["bogus.thing"])).unwrap_err();
         assert!(matches!(err, InkboxError::InvalidArgument(m) if m.contains("any known channel")));
+    }
+
+    #[test]
+    fn has_auth_token_defaults_false_and_parses_true() {
+        // Older wire bodies omit the key entirely; newer ones carry a bool.
+        let base = serde_json::json!({
+            "id": "11111111-1111-1111-1111-111111111111",
+            "organization_id": "org_test",
+            "mailbox_id": "22222222-2222-2222-2222-222222222222",
+            "phone_number_id": null,
+            "url": "https://customer.example.com/hook",
+            "event_types": ["message.received"],
+            "status": "active",
+            "created_at": "2026-04-10T18:00:00+00:00",
+            "updated_at": "2026-04-10T18:00:00+00:00",
+        });
+        let sub: WebhookSubscription = serde_json::from_value(base.clone()).unwrap();
+        assert!(!sub.has_auth_token);
+
+        let mut with_token = base;
+        with_token["has_auth_token"] = serde_json::json!(true);
+        let sub: WebhookSubscription = serde_json::from_value(with_token).unwrap();
+        assert!(sub.has_auth_token);
     }
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.6 — Webhook delivery auth token
+
+- `webhook subscription create` accepts `--auth-token`, a write-only bearer
+  token sent as `Authorization` on every delivery; `webhook subscription
+  update` accepts `--auth-token` or `--clear-auth-token` (mutually
+  exclusive).
+- Subscription output includes `hasAuthToken`; the token itself is never
+  displayed.
+- CLI and SDK dependency versions moved in lockstep to 0.6.6.
+
 ## 0.6.3 — Incoming call forwarding
 
 - `phone incoming-action forward` and `number update

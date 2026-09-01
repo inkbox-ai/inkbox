@@ -66,6 +66,12 @@ export interface WebhookSubscription {
    * that predate the field). Unconfigured classes may echo as explicit `null`.
    */
   contextConfig: WebhookContextConfig | null;
+  /**
+   * Whether a delivery bearer token is configured. Status only, never the
+   * token itself — reads never return it. Defaults to `false` on servers
+   * that predate the field.
+   */
+  hasAuthToken: boolean;
 }
 
 /**
@@ -93,6 +99,7 @@ export interface RawWebhookSubscription {
   created_at: string;
   updated_at: string;
   context_config?: WebhookContextConfig | null;
+  has_auth_token?: boolean;
 }
 
 export interface RawWebhookSubscriptionCreateResponse extends RawWebhookSubscription {
@@ -119,6 +126,7 @@ export function parseWebhookSubscription(
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     contextConfig: r.context_config ?? null,
+    hasAuthToken: r.has_auth_token ?? false,
   };
 }
 
@@ -306,6 +314,12 @@ export interface CreateWebhookSubscriptionOptions {
   eventTypes: string[];
   /** Opt into context on received mail, text, or iMessage events; unsupported for A2A. */
   contextConfig?: WebhookContextConfig;
+  /**
+   * Optional bearer token for endpoints that require `Authorization` on
+   * deliveries; sent as `Authorization: Bearer <token>` alongside the
+   * signature headers. Write-only — reads expose only `hasAuthToken`.
+   */
+  authToken?: string;
 }
 
 export interface UpdateWebhookSubscriptionOptions {
@@ -313,6 +327,8 @@ export interface UpdateWebhookSubscriptionOptions {
   eventTypes?: string[];
   /** Tri-state: omit = unchanged, `null` = clear, object = replace; unsupported for A2A. */
   contextConfig?: WebhookContextConfig | null;
+  /** Tri-state: omit = unchanged, `null` = clear, string = replace the delivery bearer token. */
+  authToken?: string | null;
 }
 
 export interface ListWebhookSubscriptionsOptions {
@@ -360,6 +376,11 @@ export class WebhookSubscriptionsResource {
    * carries a single channel. A2A subscriptions do not support
    * `contextConfig`.
    *
+   * `authToken` is an optional bearer token for endpoints that require an
+   * `Authorization` header: when set, every delivery (and replay) carries
+   * `Authorization: Bearer <token>` alongside the signature headers. It is
+   * write-only — reads expose only `hasAuthToken`, never the token.
+   *
    * Returns a {@link WebhookSubscriptionCreateResponse}. Its `signingKey`
    * is populated **once** when this is the first subscription for an
    * identity that had no signing key yet — store it securely; it is the
@@ -398,15 +419,20 @@ export class WebhookSubscriptionsResource {
       assertA2AContextAbsent(options.eventTypes, options.contextConfig);
       body["context_config"] = options.contextConfig;
     }
+    if (options.authToken !== undefined) {
+      body["auth_token"] = options.authToken;
+    }
     const data = await this.http.post<RawWebhookSubscriptionCreateResponse>(PATH, body);
     return parseWebhookSubscriptionCreateResponse(data);
   }
 
   /**
-   * Update the destination URL and/or event-type list of a subscription.
-   * Omitting both is a no-op. `eventTypes`, if supplied, replaces the
-   * stored list and must be non-empty and distinct. Owner FKs are not
-   * mutable.
+   * Update the destination URL, event-type list, context config, and/or
+   * delivery auth token of a subscription. Omitting every field is a
+   * no-op. `eventTypes`, if supplied, replaces the stored list and must
+   * be non-empty and distinct. Owner FKs are not mutable. `contextConfig`
+   * and `authToken` are tri-state: omit = unchanged, `null` = clear,
+   * value = replace.
    */
   async update(
     subId: string,
@@ -437,6 +463,10 @@ export class WebhookSubscriptionsResource {
         }
         body["context_config"] = options.contextConfig;
       }
+    }
+    if (options.authToken !== undefined) {
+      // `null` passes through as JSON null to clear the stored token.
+      body["auth_token"] = options.authToken;
     }
     const data = await this.http.patch<RawWebhookSubscription>(
       `${PATH}/${subId}`,

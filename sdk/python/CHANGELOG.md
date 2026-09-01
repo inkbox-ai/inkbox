@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.6 — Webhook delivery auth token
+
+- `webhooks.subscriptions.create(...)` accepts `auth_token`, a write-only
+  bearer token sent as `Authorization: Bearer <token>` on every delivery and
+  replay alongside the signature headers.
+- `update(...)` treats `auth_token` tri-state: omit to leave it unchanged,
+  pass `None` to clear it, or a string to replace it.
+- `WebhookSubscription.has_auth_token` reports whether a token is configured
+  (never the token itself); it defaults to `False` on older servers.
+
 ## 0.6.3 — Incoming call forwarding
 
 - Added `IncomingCallAction.FORWARD`, forwarding destination configuration,

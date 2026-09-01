@@ -299,6 +299,98 @@ describe("WebhookSubscriptionsResource.create", () => {
   });
 });
 
+describe("WebhookSubscriptionsResource — auth token", () => {
+  it("posts auth_token when authToken is provided on create", async () => {
+    const { resource, http } = makeResource();
+    http.post.mockResolvedValue({ ...RAW_SUBSCRIPTION, has_auth_token: true });
+
+    const sub = await resource.create({
+      mailboxId: "22222222-2222-2222-2222-222222222222",
+      url: "https://customer.example.com/hook",
+      eventTypes: ["message.received"],
+      authToken: "your-endpoint-token",
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      mailbox_id: "22222222-2222-2222-2222-222222222222",
+      url: "https://customer.example.com/hook",
+      event_types: ["message.received"],
+      auth_token: "your-endpoint-token",
+    });
+    expect(sub.hasAuthToken).toBe(true);
+  });
+
+  it("omits auth_token on create when authToken is undefined", async () => {
+    const { resource, http } = makeResource();
+    http.post.mockResolvedValue(RAW_SUBSCRIPTION);
+
+    await resource.create({
+      mailboxId: "m",
+      url: "https://x/y",
+      eventTypes: ["message.received"],
+    });
+
+    expect(http.post).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      mailbox_id: "m",
+      url: "https://x/y",
+      event_types: ["message.received"],
+    });
+  });
+
+  it("sends replacement auth_token on update", async () => {
+    const { resource, http } = makeResource();
+    http.patch.mockResolvedValue({ ...RAW_SUBSCRIPTION, has_auth_token: true });
+
+    const sub = await resource.update("subid", { authToken: "your-endpoint-token" });
+
+    expect(http.patch).toHaveBeenCalledWith(
+      "/webhooks/subscriptions/subid",
+      { auth_token: "your-endpoint-token" },
+    );
+    expect(sub.hasAuthToken).toBe(true);
+  });
+
+  it("sends auth_token: null on update when clearing the token", async () => {
+    const { resource, http } = makeResource();
+    http.patch.mockResolvedValue({ ...RAW_SUBSCRIPTION, has_auth_token: false });
+
+    const sub = await resource.update("subid", { authToken: null });
+
+    expect(http.patch).toHaveBeenCalledWith(
+      "/webhooks/subscriptions/subid",
+      { auth_token: null },
+    );
+    expect(sub.hasAuthToken).toBe(false);
+  });
+
+  it("omits auth_token on update when authToken is undefined", async () => {
+    const { resource, http } = makeResource();
+    http.patch.mockResolvedValue(RAW_SUBSCRIPTION);
+
+    await resource.update("subid", { url: "https://new/hook" });
+
+    expect(http.patch).toHaveBeenCalledWith(
+      "/webhooks/subscriptions/subid",
+      { url: "https://new/hook" },
+    );
+  });
+
+  it("parses has_auth_token and defaults a missing key to false", async () => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValue({
+      subscriptions: [
+        { ...RAW_SUBSCRIPTION, has_auth_token: true },
+        RAW_SUBSCRIPTION,
+      ],
+    });
+
+    const rows = await resource.list();
+
+    expect(rows[0].hasAuthToken).toBe(true);
+    expect(rows[1].hasAuthToken).toBe(false);
+  });
+});
+
 describe("WebhookSubscriptionsResource.update", () => {
   it("sends only fields that were provided", async () => {
     const { resource, http } = makeResource();

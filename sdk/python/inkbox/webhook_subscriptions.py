@@ -83,7 +83,8 @@ class WebhookSubscription:
     ``organization_id`` is an ``"org_..."`` token string, not a UUID.
     ``status`` is always ``"active"`` for subscriptions callers can
     observe; deleted subscriptions are not returned by ``list`` /
-    ``get``.
+    ``get``. ``has_auth_token`` is status only, never the token itself;
+    it defaults to ``False`` on servers that predate the field.
     """
 
     id: UUID
@@ -98,6 +99,7 @@ class WebhookSubscription:
     updated_at: datetime
     owner_identity_id: UUID | None = None
     context_config: WebhookContextConfig | None = None
+    has_auth_token: bool = False
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookSubscription:
@@ -118,6 +120,7 @@ class WebhookSubscription:
                 UUID(d["owner_identity_id"]) if d.get("owner_identity_id") else None
             ),
             context_config=d.get("context_config"),
+            has_auth_token=bool(d.get("has_auth_token", False)),
         )
 
 
@@ -347,6 +350,7 @@ class WebhookSubscriptionsResource:
         phone_number_id: UUID | str | None = None,
         agent_identity_id: UUID | str | None = None,
         context_config: WebhookContextConfig | None = None,
+        auth_token: str | None = None,
     ) -> WebhookSubscriptionCreateResponse:
         """Create a webhook subscription.
 
@@ -362,6 +366,12 @@ class WebhookSubscriptionsResource:
         per-class conversation context (email/texts/calls) delivered on
         received events. It is not supported for A2A subscriptions. See
         :class:`WebhookContextConfig`.
+
+        ``auth_token`` is an optional bearer token for endpoints that
+        require an ``Authorization`` header: when set, every delivery
+        (and replay) carries ``Authorization: Bearer <token>`` alongside
+        the signature headers. It is write-only — reads expose only
+        ``has_auth_token``, never the token.
 
         Returns a :class:`WebhookSubscriptionCreateResponse`. Its
         ``signing_key`` is populated **once** when this is the first
@@ -399,6 +409,8 @@ class WebhookSubscriptionsResource:
             _assert_valid_context_config(context_config)
             _assert_a2a_context_absent(event_types, context_config)
             body["context_config"] = context_config
+        if auth_token is not None:
+            body["auth_token"] = auth_token
         data = self._http.post(_BASE, json=body)
         return WebhookSubscriptionCreateResponse._from_dict(data)
 
@@ -409,17 +421,21 @@ class WebhookSubscriptionsResource:
         url: str = _UNSET,  # type: ignore[assignment]
         event_types: list[str] = _UNSET,  # type: ignore[assignment]
         context_config: WebhookContextConfig | None = _UNSET,  # type: ignore[assignment]
+        auth_token: str | None = _UNSET,  # type: ignore[assignment]
     ) -> WebhookSubscription:
-        """Update the URL, event-type list, and/or context config.
+        """Update the URL, event-type list, context config, and/or auth token.
 
         ``event_types``, if supplied, replaces the stored list and must
         be non-empty and distinct. Owner FKs are not mutable.
 
-        ``context_config`` is tri-state and the one field where ``None``
-        is meaningful on the wire: omitted = unchanged, ``None`` = clear
+        ``context_config`` is tri-state and a field where ``None`` is
+        meaningful on the wire: omitted = unchanged, ``None`` = clear
         (send JSON ``null``), a dict = validate and replace. A2A
         subscriptions do not support a context object. Omitting every kwarg
         is a no-op.
+
+        ``auth_token`` is tri-state the same way: omitted = unchanged,
+        ``None`` = clear the delivery bearer token, a string = replace it.
         """
         body: dict[str, Any] = {}
         if url is not _UNSET:
@@ -439,6 +455,9 @@ class WebhookSubscriptionsResource:
                 if event_types is not _UNSET:
                     _assert_a2a_context_absent(event_types, context_config)
                 body["context_config"] = context_config
+        if auth_token is not _UNSET:
+            # `None` passes through as JSON null to clear the stored token.
+            body["auth_token"] = auth_token
         data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}", json=body)
         return WebhookSubscription._from_dict(data)
 
