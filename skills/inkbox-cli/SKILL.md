@@ -764,7 +764,7 @@ Every subscription row carries `ownerIdentityId` (the resolved owning agent iden
 
 The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. A2A subscriptions do not support these flags. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
 
-`--auth-token` sets an optional bearer token for endpoints that require their own `Authorization` header; every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the token: `get` and `--json` output include `authToken`, while list tables show only the `hasAuthToken` flag. The token is only ever read from stdin via `--auth-token-stdin`, so it never lands in argv or shell history. On `update` it replaces the stored token and `--clear-auth-token` removes it (mutually exclusive).
+`--auth-token-stdin` sets an optional bearer token for endpoints that require their own `Authorization` header; every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the token: `get` and `--json` output include `authToken`, while list tables show only the `hasAuthToken` flag. The token is only ever read from stdin via `--auth-token-stdin`, so it never lands in argv or shell history. On `update` it replaces the stored token and `--clear-auth-token` removes it (mutually exclusive).
 
 Use `whoami --json` when you need the authenticated caller shape exactly.
 

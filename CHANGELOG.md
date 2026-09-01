@@ -22,7 +22,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   or pass a string to replace it.
 - The CLI adds `--auth-token-stdin` to `webhook subscription create`, reading
   the token from stdin so it never enters argv or shell history, and
-  `--auth-token` / `--clear-auth-token` (mutually exclusive) to
+  `--auth-token-stdin` / `--clear-auth-token` (mutually exclusive) to
   `webhook subscription update`. `get` and `--json` output include
   `authToken`; list tables show only the `hasAuthToken` flag.
 
