@@ -207,3 +207,20 @@ describe("cross-SDK compatibility", () => {
     expect(hash.startsWith("056863c98cd0759f")).toBe(true);
   });
 });
+
+describe("short ciphertext payload validation", () => {
+  it("unwrapOrgKey throws InkboxVaultKeyError on truncated payload (< 28 bytes)", async () => {
+    const mk = await deriveMasterKey("pw", deriveSalt("org_test_wrap"));
+    const shortPayloadB64 = Buffer.from("short-data").toString("base64");
+    expect(() => unwrapOrgKey(mk, shortPayloadB64)).toThrow(InkboxVaultKeyError);
+    expect(() => unwrapOrgKey(mk, shortPayloadB64)).toThrow("payload is too short");
+  });
+
+  it("decryptPayload throws InkboxVaultKeyError on truncated payload (< 28 bytes)", () => {
+    const orgKey = generateOrgEncryptionKey();
+    const shortPayloadB64 = Buffer.from("short-data").toString("base64");
+    expect(() => decryptPayload(orgKey, shortPayloadB64)).toThrow(InkboxVaultKeyError);
+    expect(() => decryptPayload(orgKey, shortPayloadB64)).toThrow("payload is too short");
+  });
+});
+
