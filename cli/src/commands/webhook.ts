@@ -199,7 +199,7 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("update <sub-id>")
-    .description("Update url and/or event_types on a subscription. --event-type replaces the stored list.")
+    .description("Update url, event_types, context, and/or the delivery auth token on a subscription. --event-type replaces the stored list.")
     .option("--url <url>", "New HTTPS destination")
     .option(
       "--event-type <type>",
