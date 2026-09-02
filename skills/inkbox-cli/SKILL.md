@@ -290,7 +290,7 @@ inkbox phone incoming-action hosted_agent -i <handle>          # or auto_accept 
 inkbox phone incoming-action forward -i <handle> --forward-to-phone +15551234567
 inkbox phone incoming-action forward -i <handle> --forward-to-sip sip:agent@voice.example.com
 inkbox phone hosted-agent get -i <handle>
-inkbox phone hosted-agent set -i <handle> --voice <voice> --model <model> --instructions <text>
+inkbox phone hosted-agent set -i <handle> --voice <voice> --instructions <text>
 ```
 
 Before placing a call, confirm the destination number, origination, and the

@@ -425,7 +425,7 @@ export function registerPhoneCommands(program: Command): void {
     )
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--voice <voice>", "Voice override")
-    .option("--model <model>", "Model override")
+    .option("--model <model>", "Deprecated; accepted but ignored")
     .option("--instructions <text>", "Per-identity steering prompt")
     .action(
       withErrorHandler(async function (

@@ -80,7 +80,7 @@ class TestHostedAgentGetConfig:
 
 
 class TestHostedAgentSetConfig:
-    def test_set_all_fields(self, client, transport):
+    def test_set_accepts_but_omits_deprecated_model(self, client, transport):
         transport.put.return_value = HOSTED_AGENT_CONFIG_DICT
 
         cfg = client._hosted_agent.set_config(
@@ -95,7 +95,6 @@ class TestHostedAgentSetConfig:
             json={
                 "agent_identity_id": IDENTITY_ID,
                 "voice": "warm-voice",
-                "model": "fast-model",
                 "instructions": "Always offer to text a summary after the call.",
             },
         )

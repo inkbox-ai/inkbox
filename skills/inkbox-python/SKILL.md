@@ -352,8 +352,8 @@ for t in identity.list_transcripts(calls[0].id):
 # calls surface the server's 409)
 call = identity.hangup_call(calls[0].id)
 
-# Per-identity Inkbox Voice AI config: voice / model / instructions,
-# all nullable (None means the server default). set is a FULL REPLACE —
+# Per-identity Inkbox Voice AI config: voice and instructions.
+# Both are nullable (None means the server default). set is a FULL REPLACE —
 # an omitted field resets to the server default.
 cfg = identity.get_hosted_agent_config()
 cfg = identity.set_hosted_agent_config(instructions="Be brief and friendly.")

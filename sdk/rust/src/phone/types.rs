@@ -552,8 +552,8 @@ pub struct PhoneCallForwarding {
 
 /// Per-identity Inkbox Voice AI configuration.
 ///
-/// `voice` / `model` / `instructions` are nullable overrides.
-/// `effective_voice` and `effective_model` show the resolved settings.
+/// `voice` and `instructions` are nullable overrides. `model` is a deprecated
+/// compatibility field; `effective_model` is server-selected.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HostedAgentConfig {
     pub agent_identity_id: Uuid,

@@ -357,8 +357,8 @@ for (const t of segments) {
 // calls surface the server's 409)
 const hungUp = await identity.hangupCall(calls[0].id);
 
-// Per-identity Inkbox Voice AI config: voice / model / instructions,
-// all nullable (null means the server default). setHostedAgentConfig is
+// Per-identity Inkbox Voice AI config: voice and instructions.
+// Both are nullable (null means the server default). setHostedAgentConfig is
 // a FULL REPLACE — an omitted field resets to the server default.
 const cfg = await identity.getHostedAgentConfig();
 await identity.setHostedAgentConfig({ instructions: "Be brief and friendly." });

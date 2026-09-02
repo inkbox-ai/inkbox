@@ -276,7 +276,7 @@ inkbox phone hosted-agent get -i <handle>    # Show the Inkbox Voice AI config
 inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitted flag
                                              #   resets that field to the server default
   --voice <voice>                            #   Voice override
-  --model <model>                            #   Model override
+  --model <model>                            #   Deprecated; accepted but ignored
   --instructions <text>                      #   Per-identity steering prompt
 
 inkbox phone hosted-agent authority-mode yolo -i <handle>  # Saved inbound/outbound default; admin API key

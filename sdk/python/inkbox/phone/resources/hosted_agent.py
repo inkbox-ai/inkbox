@@ -50,13 +50,12 @@ class HostedAgentConfigResource:
     ) -> HostedAgentConfig:
         """Set the Inkbox Voice AI config for an identity.
 
-        Full-replace PUT: every call sets all three fields, and a field
-        left at ``None`` resets to the server default — there is no
-        partial update.
+        Full-replace PUT: every call replaces voice and instructions. The
+        deprecated ``model`` argument remains accepted but is ignored.
 
         Args:
             voice: Voice override, or ``None`` for the server default.
-            model: Model override, or ``None`` for the server default.
+            model: Deprecated compatibility argument; accepted but ignored.
             instructions: Per-identity steering prompt appended to
                 Voice AI's system prompt, or ``None`` for none.
             agent_identity_id: UUID of the agent identity, or ``None`` for
@@ -69,8 +68,6 @@ class HostedAgentConfigResource:
         # full-replace PUT: the server resets them to its defaults.
         if voice is not None:
             body["voice"] = voice
-        if model is not None:
-            body["model"] = model
         if instructions is not None:
             body["instructions"] = instructions
         data = self._http.put("/hosted-agent-config", json=body)

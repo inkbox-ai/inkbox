@@ -4,6 +4,25 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.7 — Server-selected Voice AI model
+
+### Changed
+
+- Voice AI now always uses the platform-selected model. The Python,
+  TypeScript, and Rust SDKs retain their existing `model` arguments for source
+  compatibility but ignore them, and the CLI continues accepting `--model`
+  as a no-op for script compatibility.
+- Hosted-agent configuration responses retain `model` and `effective_model`;
+  `model` is now always unset and `effective_model` reports the active
+  platform selection.
+- Bundled plugin manifests receive patch releases: Claude `0.6.7`, Codex
+  `0.1.2`, and Cursor `1.0.1`.
+
+### Compatibility
+
+- Existing method calls, CLI commands, response parsing, and stored
+  configuration remain valid. No caller migration is required.
+
 ## 0.6.6 — Webhook delivery auth token
 
 ### Added

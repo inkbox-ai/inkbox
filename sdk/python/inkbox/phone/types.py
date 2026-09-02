@@ -678,8 +678,8 @@ class IncomingCallActionConfig:
 class HostedAgentConfig:
     """Per-identity Inkbox Voice AI configuration.
 
-    ``voice`` / ``model`` / ``instructions`` are nullable overrides.
-    ``effective_voice`` and ``effective_model`` show the resolved settings.
+    ``voice`` and ``instructions`` are nullable overrides. ``model`` is a
+    deprecated compatibility field; ``effective_model`` is server-selected.
     """
 
     agent_identity_id: UUID
