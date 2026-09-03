@@ -3,6 +3,7 @@ inkbox — Python SDK for the Inkbox APIs.
 """
 
 from inkbox.client import Inkbox
+from inkbox.async_client import AsyncAgentIdentity, AsyncInkbox
 from inkbox.agent_identity import AgentIdentity
 from inkbox.credentials import Credentials
 from inkbox.a2a import (
@@ -443,6 +444,8 @@ __all__ = [
     "A2AWireTaskState",
     # Entry points
     "Inkbox",
+    "AsyncInkbox",
+    "AsyncAgentIdentity",
     "AgentIdentity",
     "Credentials",
     # Exceptions
