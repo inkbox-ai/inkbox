@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.7 — Server-selected Voice AI model
+
+- Voice AI always uses the platform-selected model. The existing `model`
+  option remains accepted for compatibility but is ignored.
+- Configuration responses retain `model` and `effectiveModel`; `model` is
+  unset and `effectiveModel` reports the active platform selection.
+
 ## 0.6.6 — Webhook delivery auth token
 
 - `webhooks.subscriptions.create(...)` accepts `authToken`, a bearer token

@@ -75,6 +75,10 @@ test("phone help exposes authority controls", () => {
   assert.match(help("phone", "call"), /dedicated_imessage_number/);
   assert.match(help("phone", "tool-activity"), /--limit <n>/);
   assert.match(help("phone", "tool-activity"), /--offset <n>/);
+  assert.match(
+    help("phone", "hosted-agent", "set"),
+    /--model <model>\s+Deprecated; accepted but ignored/,
+  );
   const authorityHelp = help("phone", "hosted-agent", "authority-mode");
   assert.match(authorityHelp, /admin API key/);
   const incomingHelp = help("phone", "incoming-action");

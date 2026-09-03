@@ -37,14 +37,14 @@ impl HostedAgentConfigResource {
 
     /// Set the Inkbox Voice AI config.
     ///
-    /// Full-replace PUT: every call sets all three fields, and a field left
-    /// `None` resets to the server default — there is no partial update.
+    /// Full-replace PUT: every call replaces voice and instructions. The
+    /// deprecated `model` argument remains accepted but is ignored.
     ///
     /// # Arguments
     /// * `agent_identity_id` - UUID (or string) of the agent identity. `None`
     ///   for agent-scoped keys; required under admin/JWT.
     /// * `voice` - Voice override; `None` for the server default.
-    /// * `model` - Model override; `None` for the server default.
+    /// * `model` - Deprecated compatibility argument; accepted but ignored.
     /// * `instructions` - Per-identity steering prompt appended to the hosted
     ///   agent's system prompt; `None` for none.
     pub fn set_config(
@@ -63,9 +63,7 @@ impl HostedAgentConfigResource {
         if let Some(v) = voice {
             body.insert("voice".into(), v.into());
         }
-        if let Some(m) = model {
-            body.insert("model".into(), m.into());
-        }
+        let _ = model;
         if let Some(i) = instructions {
             body.insert("instructions".into(), i.into());
         }
@@ -174,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn set_config_sends_full_body_when_all_args_given() {
+    fn set_config_accepts_but_omits_deprecated_model() {
         let server = MockServer::start();
         // Exact json_body match: full PUT body shape, no stray keys.
         let mock = server.mock(|when, then| {
@@ -183,7 +181,6 @@ mod tests {
                 .json_body(json!({
                     "agent_identity_id": "33333333-3333-3333-3333-333333333333",
                     "voice": "warm-voice",
-                    "model": "fast-model",
                     "instructions": "Always offer to text a summary after the call."
                 }));
             then.status(200).json_body(config_json());

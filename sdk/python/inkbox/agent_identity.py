@@ -952,11 +952,12 @@ class AgentIdentity:
     ) -> HostedAgentConfig:
         """Set this identity's Inkbox Voice AI config (full replace).
 
-        A field left at ``None`` resets to the server default.
+        Voice and instructions left at ``None`` reset to their defaults. The
+        deprecated ``model`` argument remains accepted but is ignored.
 
         Args:
             voice: Voice override, or ``None`` for the server default.
-            model: Model override, or ``None`` for the server default.
+            model: Deprecated compatibility argument; accepted but ignored.
             instructions: Per-identity steering prompt, or ``None`` for none.
         """
         return self._inkbox._hosted_agent.set_config(

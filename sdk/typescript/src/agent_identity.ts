@@ -692,14 +692,16 @@ export class AgentIdentity {
   /**
    * Set this identity's Inkbox Voice AI config (full replace).
    *
-   * A field left undefined resets to the server default.
+   * Voice and instructions left undefined reset to their defaults. The
+   * deprecated `model` option remains accepted but is ignored.
    *
    * @param options.voice - Voice override; omit for the server default.
-   * @param options.model - Model override; omit for the server default.
+   * @param options.model - Deprecated compatibility option; accepted but ignored.
    * @param options.instructions - Per-identity steering prompt; omit for none.
    */
   async setHostedAgentConfig(options?: {
     voice?: string;
+    /** @deprecated Accepted for compatibility but ignored. */
     model?: string;
     instructions?: string;
   }): Promise<HostedAgentConfig> {

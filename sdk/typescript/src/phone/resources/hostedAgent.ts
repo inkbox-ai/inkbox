@@ -41,11 +41,11 @@ export class HostedAgentConfigResource {
   /**
    * Set the Inkbox Voice AI config.
    *
-   * Full-replace PUT: every call sets all three fields, and a field left
-   * undefined resets to the server default — there is no partial update.
+   * Full-replace PUT: every call replaces voice and instructions. The
+   * deprecated `model` option remains accepted but is ignored.
    *
    * @param options.voice - Voice override; omit for the server default.
-   * @param options.model - Model override; omit for the server default.
+   * @param options.model - Deprecated compatibility option; accepted but ignored.
    * @param options.instructions - Per-identity steering prompt appended to
    *   Voice AI's system prompt; omit for none.
    * @param options.agentIdentityId - UUID of the agent identity. Optional
@@ -53,6 +53,7 @@ export class HostedAgentConfigResource {
    */
   async setConfig(options?: {
     voice?: string;
+    /** @deprecated Accepted for compatibility but ignored. */
     model?: string;
     instructions?: string;
     agentIdentityId?: string;
@@ -64,7 +65,6 @@ export class HostedAgentConfigResource {
     // Omitted fields are equivalent to explicit nulls on this full-replace
     // PUT: the server resets them to its defaults.
     if (options?.voice !== undefined) body["voice"] = options.voice;
-    if (options?.model !== undefined) body["model"] = options.model;
     if (options?.instructions !== undefined) {
       body["instructions"] = options.instructions;
     }

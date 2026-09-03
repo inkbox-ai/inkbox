@@ -822,7 +822,8 @@ impl AgentIdentity {
 
     /// Set this identity's Inkbox Voice AI config (full replace).
     ///
-    /// A field left `None` resets to the server default.
+    /// Voice and instructions left `None` reset to their defaults. The model
+    /// argument remains accepted for compatibility but is ignored.
     pub fn set_hosted_agent_config(
         &self,
         voice: Option<&str>,

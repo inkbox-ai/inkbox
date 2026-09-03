@@ -71,7 +71,7 @@ describe("HostedAgentConfigResource.getConfig", () => {
 });
 
 describe("HostedAgentConfigResource.setConfig", () => {
-  it("sends all set fields", async () => {
+  it("accepts but omits the deprecated model option", async () => {
     const http = mockHttp();
     vi.mocked(http.put).mockResolvedValue(RAW_HOSTED_AGENT_CONFIG);
     const res = new HostedAgentConfigResource(http);
@@ -86,7 +86,6 @@ describe("HostedAgentConfigResource.setConfig", () => {
     expect(http.put).toHaveBeenCalledWith("/hosted-agent-config", {
       agent_identity_id: IDENTITY_ID,
       voice: "warm-voice",
-      model: "fast-model",
       instructions: "Always offer to text a summary after the call.",
     });
     expect(config.voice).toBe("warm-voice");

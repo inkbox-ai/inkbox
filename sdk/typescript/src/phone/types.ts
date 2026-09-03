@@ -387,12 +387,13 @@ export interface PhoneCallForwarding {
 /**
  * Per-identity Inkbox Voice AI configuration.
  *
- * `voice` / `model` / `instructions` are nullable overrides.
- * `effectiveVoice` and `effectiveModel` show the resolved settings.
+ * `voice` and `instructions` are nullable overrides. `model` is a deprecated
+ * compatibility field; `effectiveModel` is server-selected.
  */
 export interface HostedAgentConfig {
   agentIdentityId: string;
   voice: string | null;
+  /** @deprecated Current servers return `null`; use `effectiveModel`. */
   model: string | null;
   effectiveVoice: string;
   effectiveModel: string;

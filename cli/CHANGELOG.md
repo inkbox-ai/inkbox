@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.7 — Server-selected Voice AI model
+
+- Voice AI always uses the platform-selected model. `phone hosted-agent set`
+  continues accepting `--model` for script compatibility but ignores it.
+- CLI and SDK dependency versions moved in lockstep to 0.6.7.
+
 ## 0.6.6 — Webhook delivery auth token
 
 - `webhook subscription create` accepts `--auth-token-stdin`, which reads a
