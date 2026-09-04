@@ -84,6 +84,38 @@ describe("verifyWebhook", () => {
   it("returns false when headers are missing", () => {
     expect(verifyWebhook({ payload: TEST_BODY, headers: {}, secret: TEST_KEY })).toBe(false);
   });
+
+  it("accepts a Web API Headers object", () => {
+    const sig = makeSignature(TEST_KEY, TEST_REQUEST_ID, TEST_TIMESTAMP, TEST_BODY);
+    const headers = new Headers({
+      "X-Inkbox-Signature": sig,
+      "X-Inkbox-Request-ID": TEST_REQUEST_ID,
+      "X-Inkbox-Timestamp": TEST_TIMESTAMP,
+    });
+    expect(verifyWebhook({ payload: TEST_BODY, headers, secret: TEST_KEY })).toBe(true);
+  });
+
+  it("accepts a Headers-like object that is not a Headers instance", () => {
+    const sig = makeSignature(TEST_KEY, TEST_REQUEST_ID, TEST_TIMESTAMP, TEST_BODY);
+    const pairs: [string, string][] = [
+      ["X-Inkbox-Signature", sig],
+      ["X-Inkbox-Request-ID", TEST_REQUEST_ID],
+      ["X-Inkbox-Timestamp", TEST_TIMESTAMP],
+    ];
+    // Next.js ReadonlyHeaders / cross-realm undici Headers fail instanceof.
+    const headers = {
+      entries() {
+        return pairs[Symbol.iterator]();
+      },
+      get(name: string) {
+        const wanted = name.toLowerCase();
+        const found = pairs.find(([key]) => key.toLowerCase() === wanted);
+        return found ? found[1] : null;
+      },
+    };
+    expect(headers instanceof Headers).toBe(false);
+    expect(verifyWebhook({ payload: TEST_BODY, headers, secret: TEST_KEY })).toBe(true);
+  });
 });
 
 describe("SigningKeysResource", () => {
