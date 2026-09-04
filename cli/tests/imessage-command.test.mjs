@@ -40,6 +40,30 @@ test("iMessage unreact is registered and requires an identity", () => {
   assert.equal(identity?.mandatory, true);
 });
 
+test("iMessage contact-rule get is registered and requires an identity", () => {
+  const program = new Command();
+  registerIMessageCommands(program);
+  const imessage = program.commands.find((command) => command.name() === "imessage");
+  const contactRule = imessage?.commands.find((command) => command.name() === "contact-rule");
+  const get = contactRule?.commands.find((command) => command.name() === "get");
+  assert.ok(get, "contact-rule get command is registered");
+  assert.equal(get?.registeredArguments?.[0]?.name(), "rule-id");
+  const identity = get?.options.find((option) => option.long === "--identity");
+  assert.equal(identity?.mandatory, true);
+});
+
+test("iMessage contact-rule create/list/list-all accept --match-type", () => {
+  const program = new Command();
+  registerIMessageCommands(program);
+  const imessage = program.commands.find((command) => command.name() === "imessage");
+  const contactRule = imessage?.commands.find((command) => command.name() === "contact-rule");
+  for (const name of ["create", "list", "list-all"]) {
+    const command = contactRule?.commands.find((c) => c.name() === name);
+    const matchType = command?.options.find((option) => option.long === "--match-type");
+    assert.ok(matchType, `contact-rule ${name} registers --match-type`);
+  }
+});
+
 test("buildIMessageSendOptions preserves a scalar recipient", () => {
   assert.deepEqual(buildIMessageSendOptions({
     identity: "support-bot",
