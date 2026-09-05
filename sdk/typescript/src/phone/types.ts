@@ -1,3 +1,5 @@
+import { parseContact, type Contact, type RawContact } from "../contacts/types.js";
+
 /**
  * inkbox-phone TypeScript SDK — public types.
  */
@@ -211,6 +213,7 @@ export interface PhoneContactRule {
  * `phoneNumberId`.
  */
 export interface PhoneIdentityContactRule {
+  contact: Contact | null;
   id: string;
   agentIdentityId: string;
   action: PhoneRuleAction;
@@ -526,6 +529,7 @@ export interface RawPhoneContactRule {
 }
 
 export interface RawPhoneIdentityContactRule {
+  contact?: RawContact | null;
   id: string;
   agent_identity_id: string;
   action: string;
@@ -769,6 +773,7 @@ export function parsePhoneIdentityContactRule(
   r: RawPhoneIdentityContactRule,
 ): PhoneIdentityContactRule {
   return {
+    contact: r.contact == null ? null : parseContact(r.contact),
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     action: r.action as PhoneRuleAction,

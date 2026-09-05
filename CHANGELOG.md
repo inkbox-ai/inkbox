@@ -4,6 +4,23 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.8 — Contacts on communication rules
+
+### Added
+
+- Identity-owned mail, phone, and iMessage rules include the matching contact
+  card when available. Domain rules and unresolved targets have no contact.
+- CLI identity mail/phone rule lists and iMessage rule lists show the contact
+  name; JSON output includes the full card.
+
+### Changed
+
+- TypeScript callers constructing identity-owned rule objects must include
+  `contact`, using `null` when unavailable.
+- Rust callers constructing `MailIdentityContactRule`, `PhoneIdentityContactRule`,
+  or `IMessageContactRule` with struct literals must supply the new `contact`
+  field. Use `None` when no card is available. Older API responses still parse.
+
 ## 0.6.7 — Server-selected Voice AI model
 
 ### Changed

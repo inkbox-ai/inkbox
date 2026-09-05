@@ -1,3 +1,5 @@
+import { parseContact, type Contact, type RawContact } from "../contacts/types.js";
+
 /**
  * inkbox-mail TypeScript SDK — public types.
  */
@@ -365,6 +367,7 @@ export interface MailContactRule {
  * instead of `mailboxId`.
  */
 export interface MailIdentityContactRule {
+  contact: Contact | null;
   id: string;
   agentIdentityId: string;
   action: MailRuleAction;
@@ -534,6 +537,7 @@ export interface RawMailContactRule {
 }
 
 export interface RawMailIdentityContactRule {
+  contact?: RawContact | null;
   id: string;
   agent_identity_id: string;
   action: string;
@@ -749,6 +753,7 @@ export function parseMailIdentityContactRule(
   r: RawMailIdentityContactRule,
 ): MailIdentityContactRule {
   return {
+    contact: r.contact == null ? null : parseContact(r.contact),
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     action: r.action as MailRuleAction,

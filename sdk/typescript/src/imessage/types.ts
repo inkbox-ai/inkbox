@@ -1,3 +1,5 @@
+import { parseContact, type Contact, type RawContact } from "../contacts/types.js";
+
 /**
  * inkbox-imessage/types.ts
  *
@@ -280,6 +282,7 @@ export interface IMessageMediaUpload {
 
 /** An allow/block rule scoped to an agent identity for iMessage. */
 export interface IMessageContactRule {
+  contact: Contact | null;
   id: string;
   agentIdentityId: string;
   action: IMessageRuleAction;
@@ -423,6 +426,7 @@ function parseCompatibilityNumberType(value: string): "dedicated_outbound" {
 }
 
 export interface RawIMessageContactRule {
+  contact?: RawContact | null;
   id: string;
   agent_identity_id: string;
   action: string;
@@ -609,6 +613,7 @@ export function parseIMessageContactRule(
   r: RawIMessageContactRule,
 ): IMessageContactRule {
   return {
+    contact: r.contact == null ? null : parseContact(r.contact),
     id: r.id,
     agentIdentityId: r.agent_identity_id,
     action: r.action as IMessageRuleAction,

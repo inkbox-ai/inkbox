@@ -785,6 +785,8 @@ pub struct PhoneContactRule {
 /// but keyed by `agent_identity_id` instead of `phone_number_id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhoneIdentityContactRule {
+    #[serde(default)]
+    pub contact: Option<crate::contacts::types::Contact>,
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub action: PhoneRuleAction,
