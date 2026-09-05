@@ -612,6 +612,8 @@ pub struct MailContactRule {
 /// but keyed by `agent_identity_id` instead of `mailbox_id`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MailIdentityContactRule {
+    #[serde(default)]
+    pub contact: Option<crate::contacts::types::Contact>,
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub action: MailRuleAction,

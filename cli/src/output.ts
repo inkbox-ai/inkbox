@@ -69,3 +69,13 @@ export function output(
     console.log(data);
   }
 }
+
+export function outputContactRules(
+  rows: { contact?: { preferredName: string | null } | null }[],
+  opts: { json: boolean; columns: string[] },
+): void {
+  output(
+    opts.json ? rows : rows.map((row) => ({ ...row, contact: row.contact?.preferredName ?? null })),
+    opts,
+  );
+}
