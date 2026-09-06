@@ -11,9 +11,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - `contacts.create` (Python, TypeScript, Rust, CLI, and MCP) now saves a
   matching suggested contact instead of failing with HTTP 409. When an email
   or phone in the request already belongs to an unreviewed contact, that
-  contact is confirmed with the request's profile, keeps its memories and any
-  identifiers it already had, and is returned. A request whose address belongs
-  to a saved contact, or to more than one contact, still fails with
+  contact is confirmed and returned with its memories and existing identifiers.
+  Name fields are replaced; omitted non-name profile fields are preserved, and
+  supplied non-name fields are applied. This also works with agent-scoped API keys.
+  A request whose address belongs to a saved contact, to more than one contact,
+  or is in conflict still fails with
   `duplicate_contact_identifier`.
 - vCard import saves matching suggestions the same way and counts them in
   `created_count`.

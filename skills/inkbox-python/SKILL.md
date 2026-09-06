@@ -1163,9 +1163,11 @@ print(batch.vcard)
 
 `contacts.create` saves a matching suggested contact instead of failing: when an
 email or phone in the request already belongs to an unreviewed contact, that
-contact is confirmed with the request's details, keeps its memories and the
-identifiers it already had, and is returned. When the address belongs to a saved
-contact, or to more than one contact, the call still fails with HTTP 409
+contact is confirmed and returned with its memories and existing identifiers.
+Name fields are replaced; omitted non-name profile fields are preserved, and
+supplied non-name fields are applied. This also works with agent-scoped API keys.
+When the address belongs to a saved contact, to more than one contact, or is in
+conflict, the call still fails with HTTP 409
 `duplicate_contact_identifier`.
 
 ## Notes
