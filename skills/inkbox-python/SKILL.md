@@ -1150,6 +1150,13 @@ batch = inkbox.contacts.vcards.export_vcards(["contact-uuid-1", "contact-uuid-2"
 print(batch.vcard)
 ```
 
+`contacts.create` saves a matching suggested contact instead of failing: when an
+email or phone in the request already belongs to an unreviewed contact, that
+contact is confirmed with the request's details, keeps its memories and the
+identifiers it already had, and is returned. When the address belongs to a saved
+contact, or to more than one contact, the call still fails with HTTP 409
+`duplicate_contact_identifier`.
+
 ## Notes
 
 Admin-only free-form notes with per-identity access grants. Identities must be granted access explicitly — there is no wildcard for notes.

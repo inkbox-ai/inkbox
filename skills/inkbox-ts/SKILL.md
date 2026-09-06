@@ -1146,6 +1146,13 @@ const batch = await inkbox.contacts.vcards.exportMany(["contact-uuid-1", "contac
 console.log(batch.vcard);
 ```
 
+`contacts.create` saves a matching suggested contact instead of failing: when an
+email or phone in the request already belongs to an unreviewed contact, that
+contact is confirmed with the request's details, keeps its memories and the
+identifiers it already had, and is returned. When the address belongs to a saved
+contact, or to more than one contact, the call still fails with HTTP 409
+`duplicate_contact_identifier`.
+
 ## Notes
 
 Admin-only free-form notes with per-identity access grants. There is no wildcard for notes — grant identities explicitly.
