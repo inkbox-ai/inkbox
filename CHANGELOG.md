@@ -4,6 +4,24 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.9 — Creating a contact saves a matching suggestion
+
+### Changed
+
+- `contacts.create` (Python, TypeScript, Rust, CLI, and MCP) now saves a
+  matching suggested contact instead of failing with HTTP 409. When an email
+  or phone in the request already belongs to an unreviewed contact, that
+  contact is confirmed and returned with its memories and existing identifiers.
+  Name fields are replaced; omitted non-name profile fields are preserved, and
+  supplied non-name fields are applied. This also works with agent-scoped API keys.
+  A request whose address belongs to a saved contact, to more than one contact,
+  or is in conflict still fails with
+  `duplicate_contact_identifier`.
+- vCard import saves matching suggestions the same way and counts them in
+  `created_count`.
+- Bundled plugin manifests receive patch releases: Claude `0.6.9` and Codex
+  `0.1.4`.
+
 ## 0.6.8 — Voice AI voice discovery
 
 ### Added

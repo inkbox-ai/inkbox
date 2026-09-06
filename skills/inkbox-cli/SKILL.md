@@ -710,6 +710,15 @@ inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <j
 inkbox contacts access list <contact-id>             # compatibility read only
 ```
 
+`inkbox contacts create` saves a matching suggested contact instead of failing:
+when an email or phone in the payload already belongs to an unreviewed contact,
+that contact is confirmed and printed with its memories and existing identifiers.
+Name fields are replaced; omitted non-name profile fields are preserved, and
+supplied non-name fields are applied. This also works with agent-scoped API keys.
+When the address belongs to a saved contact, to more than one contact, or is in
+conflict, the command still fails with HTTP 409
+`duplicate_contact_identifier`.
+
 Unlocked generated context facts leave the default facts list at `expiresAt`;
 locked facts remain active. `--include-expired` returns expired facts. Any facts
 update makes the fact manually maintained, clears its expiry, and revives it;
