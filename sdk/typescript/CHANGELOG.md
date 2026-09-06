@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.8 — Voice AI voice discovery
+
+- Added `inkbox.hostedAgent.listVoices()` returning a typed
+  `HostedAgentVoiceCatalog` with `HostedAgentVoiceOption` entries and
+  `defaultVoice`. Entries include string IDs, names, descriptions,
+  availability, and optional `previewUrl` values; unavailable entries are
+  retained.
+- Discovery is organization-scoped and does not take an identity ID. Existing
+  string-based voice setters and configuration reads remain compatible.
+
 ## 0.6.7 — Server-selected Voice AI model
 
 - Voice AI always uses the platform-selected model. The existing `model`

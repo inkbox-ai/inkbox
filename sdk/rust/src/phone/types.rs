@@ -550,6 +550,24 @@ pub struct PhoneCallForwarding {
     pub failure_code: Option<String>,
 }
 
+/// A voice in the organization's Inkbox Voice AI catalog.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostedAgentVoiceOption {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub available: bool,
+    #[serde(default)]
+    pub preview_url: Option<String>,
+}
+
+/// Inkbox Voice AI voices and the server-selected default for the organization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostedAgentVoiceCatalog {
+    pub voices: Vec<HostedAgentVoiceOption>,
+    pub default_voice: String,
+}
+
 /// Per-identity Inkbox Voice AI configuration.
 ///
 /// `voice` and `instructions` are nullable overrides. `model` is a deprecated

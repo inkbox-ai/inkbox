@@ -387,7 +387,26 @@ export function registerPhoneCommands(program: Command): void {
 
   const hostedAgent = phone
     .command("hosted-agent")
-    .description("Inkbox Voice AI config (identity-scoped)");
+    .description("Inkbox Voice AI configuration and voice discovery");
+
+  hostedAgent
+    .command("voices")
+    .description("List voices, selection availability, and preview URLs")
+    .action(
+      withErrorHandler(async function (this: Command) {
+        const opts = getGlobalOpts(this);
+        const catalog = await createClient(opts).hostedAgent.listVoices();
+        if (opts.json) {
+          output(catalog, { json: true });
+          return;
+        }
+        console.log(`Default voice: ${catalog.defaultVoice}`);
+        output(catalog.voices, {
+          json: false,
+          columns: ["id", "name", "description", "available", "previewUrl"],
+        });
+      }),
+    );
 
   hostedAgent
     .command("get")

@@ -1,19 +1,30 @@
 /**
  * inkbox-phone/resources/hostedAgent.ts
  *
- * Identity-scoped Inkbox Voice AI config (getConfig / setConfig).
+ * Inkbox Voice AI configuration and voice discovery.
  */
 
 import { HttpTransport } from "../../_http.js";
 import {
   HostedAgentAuthorityMode,
   HostedAgentConfig,
+  HostedAgentVoiceCatalog,
   RawHostedAgentConfig,
+  RawHostedAgentVoiceCatalog,
   parseHostedAgentConfig,
+  parseHostedAgentVoiceCatalog,
 } from "../types.js";
 
 export class HostedAgentConfigResource {
   constructor(private readonly http: HttpTransport) {}
+
+  /** List your organization's voices, availability, previews, and default. */
+  async listVoices(): Promise<HostedAgentVoiceCatalog> {
+    const data = await this.http.get<RawHostedAgentVoiceCatalog>(
+      "/hosted-agent-voices",
+    );
+    return parseHostedAgentVoiceCatalog(data);
+  }
 
   /**
    * Get the Inkbox Voice AI config.

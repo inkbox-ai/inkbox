@@ -357,11 +357,23 @@ for (const t of segments) {
 // calls surface the server's 409)
 const hungUp = await identity.hangupCall(calls[0].id);
 
+// Organization-scoped voice discovery; no identity ID is needed.
+// Entries include id, name, description, available, and optional previewUrl.
+// Keep unavailable entries for display; do not hardcode a voice allowlist.
+const catalog = await inkbox.hostedAgent.listVoices();
+console.log(catalog.defaultVoice, catalog.voices);
+const selectedVoice = catalog.voices.find((voice) => voice.available);
+
 // Per-identity Inkbox Voice AI config: voice and instructions.
 // Both are nullable (null means the server default). setHostedAgentConfig is
 // a FULL REPLACE — an omitted field resets to the server default.
 const cfg = await identity.getHostedAgentConfig();
-await identity.setHostedAgentConfig({ instructions: "Be brief and friendly." });
+if (selectedVoice) {
+  await identity.setHostedAgentConfig({
+    voice: selectedVoice.id,
+    instructions: cfg.instructions ?? undefined, // Preserve when changing only voice.
+  });
+}
 
 // Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent | forward.
 // hosted_agent needs no URL; forward needs exactly one phone or SIP target.

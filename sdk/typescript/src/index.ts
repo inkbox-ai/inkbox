@@ -262,6 +262,8 @@ export type {
   PhoneIdentityContactRule,
   IncomingCallActionConfig,
   HostedAgentConfig,
+  HostedAgentVoiceOption,
+  HostedAgentVoiceCatalog,
   HostedAgentToolInvocation,
   HostedAgentToolInvocationPage,
   HostedAgentToolResultValue,
