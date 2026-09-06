@@ -358,7 +358,7 @@ impl Inkbox {
     pub fn incoming_call_action(&self) -> &IncomingCallActionResource {
         &self.incoming_call_action
     }
-    /// Identity-scoped Inkbox Voice AI config (`get_config()` / `set_config()`).
+    /// Inkbox Voice AI configuration and organization-wide voice discovery.
     pub fn hosted_agent(&self) -> &HostedAgentConfigResource {
         &self.hosted_agent
     }

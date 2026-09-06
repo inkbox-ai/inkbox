@@ -86,6 +86,98 @@ test("phone help exposes authority controls", () => {
   assert.match(incomingHelp, /--forward-to-sip <uri>/);
 });
 
+test("hosted-agent voices requires no identity and preserves the full JSON catalog", async () => {
+  const requests = [];
+  const mock = await listen((req, res) => {
+    requests.push({ method: req.method, url: req.url, apiKey: req.headers["x-api-key"] });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      voices: [
+        { id: "future-voice", name: "Future Voice", description: "Warm", available: true, preview_url: "https://example.com/voice.wav" },
+        { id: "unavailable-voice", name: "Unavailable Voice", description: "Clear", available: false, preview_url: null },
+        { id: "no-preview", name: "No Preview", description: "Calm", available: true },
+      ],
+      default_voice: "future-voice",
+    }));
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+      "--json", "phone", "hosted-agent", "voices",
+    ]);
+    assert.ifError(result.error);
+    assert.deepEqual(requests, [{ method: "GET", url: "/api/v1/phone/hosted-agent-voices", apiKey: "test-key" }]);
+    assert.deepEqual(JSON.parse(result.stdout), {
+      voices: [
+        { id: "future-voice", name: "Future Voice", description: "Warm", available: true, previewUrl: "https://example.com/voice.wav" },
+        { id: "unavailable-voice", name: "Unavailable Voice", description: "Clear", available: false, previewUrl: null },
+        { id: "no-preview", name: "No Preview", description: "Calm", available: true, previewUrl: null },
+      ],
+      defaultVoice: "future-voice",
+    });
+    assert.doesNotMatch(help("phone", "hosted-agent", "voices"), /--identity/);
+  } finally {
+    mock.server.close();
+  }
+});
+
+test("hosted-agent voices displays the default, unavailable voices, and previews", async () => {
+  const mock = await listen((_req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      voices: [{ id: "future-voice", name: "Future Voice", description: "Warm", available: false, preview_url: "https://example.com/voice.wav" }],
+      default_voice: "future-default",
+    }));
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+      "phone", "hosted-agent", "voices",
+    ]);
+    assert.ifError(result.error);
+    assert.match(result.stdout, /Default voice: future-default/);
+    assert.match(result.stdout, /future-voice.*Future Voice.*Warm.*false.*https:\/\/example.com\/voice.wav/);
+  } finally {
+    mock.server.close();
+  }
+});
+
+test("hosted-agent voices retains the default for an empty catalog", async () => {
+  const mock = await listen((_req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ voices: [], default_voice: "future-default" }));
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+      "phone", "hosted-agent", "voices",
+    ]);
+    assert.ifError(result.error);
+    assert.match(result.stdout, /Default voice: future-default/);
+    assert.match(result.stdout, /No results\./);
+  } finally {
+    mock.server.close();
+  }
+});
+
+test("hosted-agent voices surfaces API errors without printing a catalog", async () => {
+  const mock = await listen((_req, res) => {
+    res.writeHead(403, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ detail: "Voice catalog access denied" }));
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+      "--json", "phone", "hosted-agent", "voices",
+    ]);
+    assert.ok(result.error);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /Voice catalog access denied/);
+  } finally {
+    mock.server.close();
+  }
+});
+
 test("incoming-action forward sends one complete SIP destination", async () => {
   const requests = [];
   const mock = await listen((req, res) => {

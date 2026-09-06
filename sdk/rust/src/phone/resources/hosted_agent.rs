@@ -1,4 +1,4 @@
-//! Identity-scoped Inkbox Voice AI config (get_config / set_config).
+//! Inkbox Voice AI configuration and organization-wide voice discovery.
 
 use std::sync::Arc;
 
@@ -6,7 +6,7 @@ use serde_json::Map;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
-use crate::phone::types::{HostedAgentAuthorityMode, HostedAgentConfig};
+use crate::phone::types::{HostedAgentAuthorityMode, HostedAgentConfig, HostedAgentVoiceCatalog};
 
 pub struct HostedAgentConfigResource {
     http: Arc<HttpTransport>,
@@ -15,6 +15,30 @@ pub struct HostedAgentConfigResource {
 impl HostedAgentConfigResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+
+    /// List the organization's voice catalog, including unavailable voices.
+    ///
+    /// This operation needs no identity selector. Use a voice's `id` with
+    /// `set_config` when its `available` flag is true; previews are optional.
+    ///
+    /// ```no_run
+    /// use inkbox::phone::{HostedAgentVoiceCatalog, HostedAgentVoiceOption};
+    ///
+    /// # fn main() -> inkbox::Result<()> {
+    /// let inkbox = inkbox::Inkbox::from_env()?;
+    /// let catalog: HostedAgentVoiceCatalog = inkbox.hosted_agent().list_voices()?;
+    /// println!("Default voice: {}", catalog.default_voice);
+    /// for voice in &catalog.voices {
+    ///     let voice: &HostedAgentVoiceOption = voice;
+    ///     println!("{}: {} (available: {})", voice.id, voice.name, voice.available);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn list_voices(&self) -> Result<HostedAgentVoiceCatalog> {
+        let data = self.http.get("/hosted-agent-voices", &[])?;
+        Ok(serde_json::from_value(data)?)
     }
 
     /// Get the Inkbox Voice AI config.
@@ -117,6 +141,95 @@ mod tests {
             "effective_model": "fast-model",
             "instructions": "Always offer to text a summary after the call."
         })
+    }
+
+    #[test]
+    fn list_voices_preserves_catalog_without_identity_query() {
+        fn no_query_params(req: &HttpMockRequest) -> bool {
+            req.query_params.clone().unwrap_or_default().is_empty()
+        }
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/phone/hosted-agent-voices")
+                .header("x-api-key", "test-key")
+                .matches(no_query_params);
+            then.status(200).json_body(json!({
+                "default_voice": "future-voice",
+                "voices": [
+                    {
+                        "id": "future-voice", "name": "Future Voice",
+                        "description": "A clear, conversational voice.", "available": true,
+                        "preview_url": "https://example.com/voice-preview.mp3"
+                    },
+                    {
+                        "id": "unavailable-voice", "name": "Unavailable Voice",
+                        "description": "Not currently available.", "available": false,
+                        "preview_url": null
+                    },
+                    {
+                        "id": "no-preview", "name": "No Preview",
+                        "description": "A voice without a preview.", "available": true
+                    }
+                ]
+            }));
+        });
+        let catalog: crate::phone::HostedAgentVoiceCatalog =
+            client(&server).hosted_agent().list_voices().unwrap();
+        mock.assert();
+        assert_eq!(catalog.default_voice, "future-voice");
+        assert_eq!(catalog.voices.len(), 3);
+        let first: &crate::phone::HostedAgentVoiceOption = &catalog.voices[0];
+        assert_eq!(first.id, "future-voice");
+        assert_eq!(first.name, "Future Voice");
+        assert_eq!(first.description, "A clear, conversational voice.");
+        assert!(first.available);
+        assert_eq!(
+            first.preview_url.as_deref(),
+            Some("https://example.com/voice-preview.mp3")
+        );
+        assert_eq!(catalog.voices[1].id, "unavailable-voice");
+        assert!(!catalog.voices[1].available);
+        assert_eq!(catalog.voices[1].preview_url, None);
+        assert_eq!(catalog.voices[2].preview_url, None);
+    }
+
+    #[test]
+    fn list_voices_accepts_empty_catalog() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/phone/hosted-agent-voices");
+            then.status(200).json_body(json!({
+                "default_voice": "future-voice", "voices": []
+            }));
+        });
+        let catalog = client(&server).hosted_agent().list_voices().unwrap();
+        mock.assert();
+        assert_eq!(catalog.default_voice, "future-voice");
+        assert!(catalog.voices.is_empty());
+    }
+
+    #[test]
+    fn list_voices_preserves_api_errors() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/phone/hosted-agent-voices");
+            then.status(403)
+                .json_body(json!({"detail": "Voice access is unavailable."}));
+        });
+        let error = client(&server).hosted_agent().list_voices().unwrap_err();
+        mock.assert();
+        match error {
+            crate::InkboxError::Api {
+                status_code,
+                detail,
+                ..
+            } => {
+                assert_eq!(status_code, 403);
+                assert_eq!(detail.to_string(), "Voice access is unavailable.");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 
     #[test]

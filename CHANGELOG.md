@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.6.8 — Creating a contact saves a matching suggestion
+## 0.6.9 — Creating a contact saves a matching suggestion
 
 ### Changed
 
@@ -17,8 +17,33 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `duplicate_contact_identifier`.
 - vCard import saves matching suggestions the same way and counts them in
   `created_count`.
-- Bundled plugin manifests receive patch releases: Claude `0.6.8` and Codex
-  `0.1.3`.
+- Bundled plugin manifests receive patch releases: Claude `0.6.9` and Codex
+  `0.1.4`.
+
+## 0.6.8 — Voice AI voice discovery
+
+### Added
+
+- Native organization-scoped voice catalogs in Python
+  (`inkbox.hosted_agent.list_voices()`), TypeScript
+  (`inkbox.hostedAgent.listVoices()`), and Rust
+  (`client.hosted_agent().list_voices()`). `HostedAgentVoiceCatalog` and
+  `HostedAgentVoiceOption` expose the default voice, voice IDs, names,
+  descriptions, availability, and optional preview URLs.
+- `inkbox phone hosted-agent voices` lists the catalog without requiring an
+  identity. `--json` retains both `voices` and `defaultVoice`.
+
+### Changed
+
+- SDK and CLI packages move to `0.6.8`. Bundled plugin manifests receive
+  patch releases: Claude `0.6.8`, Codex `0.1.3`, and Cursor `1.0.2`.
+
+### Compatibility
+
+- Voice IDs remain unrestricted strings, including IDs added in future
+  catalogs. Existing voice setters and configuration reads are unchanged;
+  this release adds discovery, not a new requirement for selecting voices.
+- Discovery requires an API that supports the voice catalog endpoint.
 
 ## 0.6.7 — Server-selected Voice AI model
 

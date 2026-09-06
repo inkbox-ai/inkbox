@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.8 — Voice AI voice discovery
+
+- Added `inkbox phone hosted-agent voices`, an organization-scoped catalog
+  command that does not require `-i`. Lists voice IDs, names, descriptions,
+  availability, and optional preview URLs, including unavailable entries.
+- `--json` returns the complete catalog with `voices` and `defaultVoice`.
+  Existing `--voice` string arguments remain unchanged.
+- CLI and SDK dependency versions moved in lockstep to 0.6.8.
+
 ## 0.6.7 — Server-selected Voice AI model
 
 - Voice AI always uses the platform-selected model. `phone hosted-agent set`

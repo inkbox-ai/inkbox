@@ -228,7 +228,8 @@ checking sent mail, duplicate or delete that draft instead.
 
 ### phone
 
-Phone operations, scoped to an identity. Requires `-i <handle>`.
+Phone operations require `-i <handle>`, except the organization-scoped
+`phone hosted-agent voices` catalog.
 
 ```bash
 inkbox phone call -i <handle>                # Place an outbound call
@@ -272,6 +273,8 @@ inkbox phone incoming-action [action] -i <handle>  # Get (no action) or set the 
   --forward-to-phone <number>                #   Complete E.164 forwarding target
   --forward-to-sip <uri>                     #   SIP target with a public DNS hostname
 
+inkbox phone hosted-agent voices            # Organization's voice catalog; no -i needed
+inkbox phone hosted-agent voices --json     # Complete { voices, defaultVoice } catalog
 inkbox phone hosted-agent get -i <handle>    # Show the Inkbox Voice AI config
 inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitted flag
                                              #   resets that field to the server default
@@ -281,6 +284,13 @@ inkbox phone hosted-agent set -i <handle>    # Set it — full replace: an omitt
 
 inkbox phone hosted-agent authority-mode yolo -i <handle>  # Saved inbound/outbound default; admin API key
 ```
+
+Voice catalog entries include `id`, `name`, `description`, `available`, and
+optional `previewUrl`. Unavailable entries remain visible; select an available
+voice's ID with `hosted-agent set --voice`. The catalog's `defaultVoice` is
+returned alongside the entries in JSON output. Config setters are a full
+replacement: read the current config first and include its existing
+`--instructions` when changing only the voice.
 
 Shared origination uses the identity's active iMessage-line assignment and
 does not require a dedicated phone number. The recipient must already have a

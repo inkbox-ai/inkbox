@@ -159,6 +159,27 @@ inkbox vault secrets
 inkbox vault get <secret-id>
 ```
 
+### Voice AI voice discovery
+
+Discover the voice catalog for your organization, including the default voice,
+availability, and optional preview URLs. No identity ID is needed:
+
+| Client | Catalog |
+|---|---|
+| Python | `inkbox.hosted_agent.list_voices()` |
+| TypeScript | `await inkbox.hostedAgent.listVoices()` |
+| Rust | `client.hosted_agent().list_voices()?` |
+| CLI | `inkbox phone hosted-agent voices --json` |
+
+The response contains `voices` and `default_voice` (`defaultVoice` in
+TypeScript and CLI JSON). Each voice has `id`, `name`, `description`,
+`available`, and optional `preview_url` (`previewUrl`). Unavailable voices
+remain in the catalog; choose an entry with `available: true` and pass its
+string ID to the existing hosted-agent config setter. Setters replace the
+voice and instructions, so preserve the saved instructions when changing only
+the voice. Discovery requires an API that supports the catalog endpoint;
+existing string-based voice selection does not require this new method.
+
 ### A2A discovery and history
 
 Each identity can inspect work it received, work it requested, or both without
