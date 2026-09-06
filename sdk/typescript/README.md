@@ -440,6 +440,24 @@ const scopedCall = await identity.placeCall({
   hostedAgentAuthorityMode: HostedAgentAuthorityMode.CONTACT_SCOPED,
 });
 
+// Discover Voice AI voices for your organization; no identity ID is needed.
+const catalog = await inkbox.hostedAgent.listVoices();
+console.log(catalog.defaultVoice);
+for (const voice of catalog.voices) {
+  console.log(voice.id, voice.name, voice.description, voice.available, voice.previewUrl);
+}
+
+// Keep unavailable entries for display, but select an available voice.
+const selectedVoice = catalog.voices.find((voice) => voice.available);
+if (selectedVoice) {
+  const config = await identity.getHostedAgentConfig();
+  // Full replacement: preserve instructions when changing only the voice.
+  await identity.setHostedAgentConfig({
+    voice: selectedVoice.id,
+    instructions: config.instructions ?? undefined,
+  });
+}
+
 // List calls (paginated)
 const calls = await identity.listCalls({ limit: 10, offset: 0 });
 for (const c of calls) {

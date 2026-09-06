@@ -352,11 +352,22 @@ for t in identity.list_transcripts(calls[0].id):
 # calls surface the server's 409)
 call = identity.hangup_call(calls[0].id)
 
+# Organization-scoped voice discovery; no identity ID is needed.
+# Entries include id, name, description, available, and optional preview_url.
+# Keep unavailable entries for display; do not hardcode a voice allowlist.
+catalog = inkbox.hosted_agent.list_voices()
+print(catalog.default_voice, catalog.voices)
+selected_voice = next((voice for voice in catalog.voices if voice.available), None)
+
 # Per-identity Inkbox Voice AI config: voice and instructions.
 # Both are nullable (None means the server default). set is a FULL REPLACE —
 # an omitted field resets to the server default.
 cfg = identity.get_hosted_agent_config()
-cfg = identity.set_hosted_agent_config(instructions="Be brief and friendly.")
+if selected_voice is not None:
+    cfg = identity.set_hosted_agent_config(
+        voice=selected_voice.id,
+        instructions=cfg.instructions,  # Preserve when changing only voice.
+    )
 
 # Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent | forward.
 # hosted_agent needs no URL; forward needs exactly one phone or SIP target.

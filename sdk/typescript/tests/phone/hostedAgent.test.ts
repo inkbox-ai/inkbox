@@ -6,6 +6,7 @@ import {
   HostedAgentAuthorityMode,
 } from "../../src/phone/types.js";
 import type { HttpTransport } from "../../src/_http.js";
+import type { HostedAgentVoiceCatalog, HostedAgentVoiceOption } from "../../src/index.js";
 import { RAW_HOSTED_AGENT_CONFIG } from "../sampleData.js";
 
 function mockHttp() {
@@ -19,6 +20,49 @@ function mockHttp() {
 }
 
 const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
+
+describe("HostedAgentConfigResource.listVoices", () => {
+  it("fetches the organization catalog and preserves all voices and preview states", async () => {
+    const http = mockHttp();
+    const voice = { id: "future-voice", name: "Future Voice", description: "Warm", available: true };
+    vi.mocked(http.get).mockResolvedValue({
+      voices: [
+        { ...voice, preview_url: "https://example.com/voice.wav" },
+        { ...voice, id: "unavailable-voice", available: false, preview_url: null },
+        { ...voice, id: "no-preview" },
+      ],
+      default_voice: "future-default",
+    });
+
+    const catalog: HostedAgentVoiceCatalog = await new HostedAgentConfigResource(http).listVoices();
+    const first: HostedAgentVoiceOption = catalog.voices[0];
+
+    expect(http.get).toHaveBeenCalledExactlyOnceWith("/hosted-agent-voices");
+    expect(catalog.defaultVoice).toBe("future-default");
+    expect(first).toEqual({ ...voice, previewUrl: "https://example.com/voice.wav" });
+    expect(catalog.voices.slice(1)).toEqual([
+      { ...voice, id: "unavailable-voice", available: false, previewUrl: null },
+      { ...voice, id: "no-preview", previewUrl: null },
+    ]);
+  });
+
+  it("retains the default when the catalog is empty", async () => {
+    const http = mockHttp();
+    vi.mocked(http.get).mockResolvedValue({ voices: [], default_voice: "future-default" });
+
+    expect(await new HostedAgentConfigResource(http).listVoices()).toEqual({
+      voices: [], defaultVoice: "future-default",
+    });
+  });
+
+  it("propagates request failures instead of returning an empty catalog", async () => {
+    const http = mockHttp();
+    const error = new Error("Voice catalog request failed");
+    vi.mocked(http.get).mockRejectedValue(error);
+
+    await expect(new HostedAgentConfigResource(http).listVoices()).rejects.toBe(error);
+  });
+});
 
 describe("HostedAgentConfigResource.getConfig", () => {
   it("fetches config with no identity scope", async () => {

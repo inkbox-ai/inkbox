@@ -1,7 +1,7 @@
 """
 inkbox/phone/resources/hosted_agent.py
 
-Per-identity Inkbox Voice AI config: get_config, set_config.
+Inkbox Voice AI configuration and voice discovery.
 """
 
 from __future__ import annotations
@@ -9,7 +9,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from inkbox.phone.types import HostedAgentAuthorityMode, HostedAgentConfig
+from inkbox.phone.types import (
+    HostedAgentAuthorityMode,
+    HostedAgentConfig,
+    HostedAgentVoiceCatalog,
+)
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -19,6 +23,15 @@ class HostedAgentConfigResource:
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+
+    def list_voices(self) -> HostedAgentVoiceCatalog:
+        """List Voice AI voices, previews, and your organization's availability.
+
+        No identity is required. Unavailable voices remain in the catalog;
+        select an option with ``available=True`` when updating a config.
+        """
+        data = self._http.get("/hosted-agent-voices")
+        return HostedAgentVoiceCatalog._from_dict(data)
 
     def get_config(
         self,
