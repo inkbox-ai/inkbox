@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.6.8 — Contacts on communication rules
+## 0.6.10 — Contacts on communication rules
 
 ### Added
 
@@ -20,6 +20,49 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Rust callers constructing `MailIdentityContactRule`, `PhoneIdentityContactRule`,
   or `IMessageContactRule` with struct literals must supply the new `contact`
   field. Use `None` when no card is available. Older API responses still parse.
+
+## 0.6.9 — Creating a contact saves a matching suggestion
+
+### Changed
+
+- `contacts.create` (Python, TypeScript, Rust, CLI, and MCP) now saves a
+  matching suggested contact instead of failing with HTTP 409. When an email
+  or phone in the request already belongs to an unreviewed contact, that
+  contact is confirmed and returned with its memories and existing identifiers.
+  Name fields are replaced; omitted non-name profile fields are preserved, and
+  supplied non-name fields are applied. This also works with agent-scoped API keys.
+  A request whose address belongs to a saved contact, to more than one contact,
+  or is in conflict still fails with
+  `duplicate_contact_identifier`.
+- vCard import saves matching suggestions the same way and counts them in
+  `created_count`.
+- Bundled plugin manifests receive patch releases: Claude `0.6.9` and Codex
+  `0.1.4`.
+
+## 0.6.8 — Voice AI voice discovery
+
+### Added
+
+- Native organization-scoped voice catalogs in Python
+  (`inkbox.hosted_agent.list_voices()`), TypeScript
+  (`inkbox.hostedAgent.listVoices()`), and Rust
+  (`client.hosted_agent().list_voices()`). `HostedAgentVoiceCatalog` and
+  `HostedAgentVoiceOption` expose the default voice, voice IDs, names,
+  descriptions, availability, and optional preview URLs.
+- `inkbox phone hosted-agent voices` lists the catalog without requiring an
+  identity. `--json` retains both `voices` and `defaultVoice`.
+
+### Changed
+
+- SDK and CLI packages move to `0.6.8`. Bundled plugin manifests receive
+  patch releases: Claude `0.6.8`, Codex `0.1.3`, and Cursor `1.0.2`.
+
+### Compatibility
+
+- Voice IDs remain unrestricted strings, including IDs added in future
+  catalogs. Existing voice setters and configuration reads are unchanged;
+  this release adds discovery, not a new requirement for selecting voices.
+- Discovery requires an API that supports the voice catalog endpoint.
 
 ## 0.6.7 — Server-selected Voice AI model
 

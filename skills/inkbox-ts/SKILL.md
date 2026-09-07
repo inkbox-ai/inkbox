@@ -357,11 +357,23 @@ for (const t of segments) {
 // calls surface the server's 409)
 const hungUp = await identity.hangupCall(calls[0].id);
 
+// Organization-scoped voice discovery; no identity ID is needed.
+// Entries include id, name, description, available, and optional previewUrl.
+// Keep unavailable entries for display; do not hardcode a voice allowlist.
+const catalog = await inkbox.hostedAgent.listVoices();
+console.log(catalog.defaultVoice, catalog.voices);
+const selectedVoice = catalog.voices.find((voice) => voice.available);
+
 // Per-identity Inkbox Voice AI config: voice and instructions.
 // Both are nullable (null means the server default). setHostedAgentConfig is
 // a FULL REPLACE — an omitted field resets to the server default.
 const cfg = await identity.getHostedAgentConfig();
-await identity.setHostedAgentConfig({ instructions: "Be brief and friendly." });
+if (selectedVoice) {
+  await identity.setHostedAgentConfig({
+    voice: selectedVoice.id,
+    instructions: cfg.instructions ?? undefined, // Preserve when changing only voice.
+  });
+}
 
 // Inbound-call handling: auto_accept | auto_reject | webhook | hosted_agent | forward.
 // hosted_agent needs no URL; forward needs exactly one phone or SIP target.
@@ -1145,6 +1157,15 @@ const vcf = await inkbox.contacts.vcards.export(contact.id);  // vCard 4.0 strin
 const batch = await inkbox.contacts.vcards.exportMany(["contact-uuid-1", "contact-uuid-2"]);
 console.log(batch.vcard);
 ```
+
+`contacts.create` saves a matching suggested contact instead of failing: when an
+email or phone in the request already belongs to an unreviewed contact, that
+contact is confirmed and returned with its memories and existing identifiers.
+Name fields are replaced; omitted non-name profile fields are preserved, and
+supplied non-name fields are applied. This also works with agent-scoped API keys.
+When the address belongs to a saved contact, to more than one contact, or is in
+conflict, the call still fails with HTTP 409
+`duplicate_contact_identifier`.
 
 ## Notes
 

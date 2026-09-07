@@ -379,7 +379,7 @@ class Inkbox:
 
     @property
     def hosted_agent(self) -> HostedAgentConfigResource:
-        """Access per-identity Inkbox Voice AI config (get_config, set_config)."""
+        """Access Inkbox Voice AI configuration and voice discovery."""
         return self._hosted_agent
 
     @property

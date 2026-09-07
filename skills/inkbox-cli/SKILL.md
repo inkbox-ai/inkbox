@@ -275,7 +275,8 @@ Before sending, confirm recipients, subject, and body with the user.
 
 ## Phone
 
-All phone commands are identity-scoped and require `-i <handle>`.
+Phone commands require `-i <handle>`, except `phone hosted-agent voices`,
+which discovers the organization-scoped voice catalog without an identity.
 
 ```bash
 inkbox phone call -i <handle> --to +15551234567 --ws-url wss://example.com/ws
@@ -289,6 +290,8 @@ inkbox phone incoming-action -i <handle>                       # print the incom
 inkbox phone incoming-action hosted_agent -i <handle>          # or auto_accept | auto_reject | webhook
 inkbox phone incoming-action forward -i <handle> --forward-to-phone +15551234567
 inkbox phone incoming-action forward -i <handle> --forward-to-sip sip:agent@voice.example.com
+inkbox phone hosted-agent voices
+inkbox phone hosted-agent voices --json                     # { voices, defaultVoice }
 inkbox phone hosted-agent get -i <handle>
 inkbox phone hosted-agent set -i <handle> --voice <voice> --instructions <text>
 ```
@@ -317,8 +320,14 @@ action (`auto_accept` | `auto_reject` | `webhook` | `hosted_agent` | `forward`,
 with `--ws-url` / `--webhook-url` where applicable). `forward` requires exactly
 one of `--forward-to-phone` or `--forward-to-sip`. `hosted_agent` needs no URL.
 
+`phone hosted-agent voices` returns voice IDs, names, descriptions,
+availability, optional `previewUrl` values, and the catalog's `defaultVoice`.
+Unavailable entries are retained; choose an entry with `available: true` and
+pass its string `id` to `--voice`. Do not maintain a fixed voice allowlist.
+
 `inkbox phone hosted-agent set` is a **full replace**: an omitted flag
-resets that field to the server default.
+resets that field to the server default. Read the current config and include
+its existing `--instructions` when changing only the voice.
 
 `inkbox phone hangup` ends a live call from outside it. The carrier
 confirms the teardown asynchronously, so the printed call can still show
@@ -700,6 +709,15 @@ inkbox contacts correspondence <contact-id> [--identity <uuid>] [--channels <cha
 inkbox contacts merge <survivor-id> --losing <contact-id...> [--field-sources <json>]  # admin-scoped API key required
 inkbox contacts access list <contact-id>             # compatibility read only
 ```
+
+`inkbox contacts create` saves a matching suggested contact instead of failing:
+when an email or phone in the payload already belongs to an unreviewed contact,
+that contact is confirmed and printed with its memories and existing identifiers.
+Name fields are replaced; omitted non-name profile fields are preserved, and
+supplied non-name fields are applied. This also works with agent-scoped API keys.
+When the address belongs to a saved contact, to more than one contact, or is in
+conflict, the command still fails with HTTP 409
+`duplicate_contact_identifier`.
 
 Unlocked generated context facts leave the default facts list at `expiresAt`;
 locked facts remain active. `--include-expired` returns expired facts. Any facts

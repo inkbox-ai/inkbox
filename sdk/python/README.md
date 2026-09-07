@@ -404,6 +404,22 @@ print(call.status, call.rate_limit.calls_remaining)
 # Let Voice AI handle the call using this identity's saved authority.
 from inkbox import CallMode, HostedAgentAuthorityMode, VoicemailDetection
 
+# Discover voices for your organization; no identity argument is needed.
+catalog = inkbox.hosted_agent.list_voices()
+print("Default voice:", catalog.default_voice)
+for voice in catalog.voices:
+    print(voice.id, voice.name, voice.description, voice.available, voice.preview_url)
+
+# Choose an available voice. Config updates replace voice and instructions,
+# so preserve the saved instructions when changing only the voice.
+selected = next((voice for voice in catalog.voices if voice.available), None)
+if selected is not None:
+    config = identity.get_hosted_agent_config()
+    identity.set_hosted_agent_config(
+        voice=selected.id,
+        instructions=config.instructions,
+    )
+
 hosted_call = identity.place_call(
     to_number="+15551234567",
     mode=CallMode.HOSTED_AGENT,

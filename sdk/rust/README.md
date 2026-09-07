@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.5"
+inkbox = "0.6"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.5", features = ["tunnels-runtime"] }
+inkbox = { version = "0.6", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -81,6 +81,27 @@ let scoped_call = identity.place_hosted_call_with_authority(
 )?;
 ```
 
+### Discover Voice AI voices
+
+```rust
+use inkbox::phone::HostedAgentVoiceCatalog;
+
+let catalog: HostedAgentVoiceCatalog = inkbox.hosted_agent().list_voices()?;
+println!("Default voice: {}", catalog.default_voice);
+for voice in &catalog.voices {
+    println!("{}: {} (available: {})", voice.id, voice.name, voice.available);
+    if let Some(preview_url) = &voice.preview_url {
+        println!("Preview: {preview_url}");
+    }
+}
+```
+
+The catalog is organization-wide and needs no identity selector. It includes
+unavailable voices; choose an entry with `available: true` and pass its `id` to
+`hosted_agent().set_config(...)`. Voice IDs are strings, and previews may be
+absent. Setting the config replaces both voice and instructions, so include
+the current instructions when changing only the voice.
+
 ### Advanced construction
 
 ```rust
@@ -121,7 +142,7 @@ Org-level accessors on `Inkbox` mirror the Python `@property` names:
 | Domain | Accessor |
 |---|---|
 | Mail | `mailboxes()`, `messages()`, `drafts()`, `threads()`, `mail_identity_contact_rules()`, `mail_contact_rules()` *(deprecated)*, `domains()` |
-| Phone | `calls()`, `phone_numbers()`, `texts()`, `incoming_call_action()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
+| Phone | `calls()`, `phone_numbers()`, `texts()`, `hosted_agent()`, `incoming_call_action()`, `phone_identity_contact_rules()`, `phone_contact_rules()` *(deprecated)*, `sms_opt_ins()` |
 | iMessage | `imessages()`, `imessage_contact_rules()` |
 | Vault / data | `vault()`, `contacts()`, `notes()` |
 | Agent-to-agent discovery and history | `a2a()` |

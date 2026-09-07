@@ -677,6 +677,46 @@ class IncomingCallActionConfig:
 
 
 @dataclass
+class HostedAgentVoiceOption:
+    """A Voice AI voice and whether your organization can select it.
+
+    Voice IDs are open-ended strings. ``preview_url`` is ``None`` when no
+    prerecorded sample is available.
+    """
+
+    id: str
+    name: str
+    description: str
+    available: bool
+    preview_url: str | None = None
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentVoiceOption:
+        return cls(
+            id=d["id"],
+            name=d["name"],
+            description=d["description"],
+            available=d["available"],
+            preview_url=d.get("preview_url"),
+        )
+
+
+@dataclass
+class HostedAgentVoiceCatalog:
+    """Voice AI options, their availability, and the server's default voice."""
+
+    voices: list[HostedAgentVoiceOption]
+    default_voice: str
+
+    @classmethod
+    def _from_dict(cls, d: dict[str, Any]) -> HostedAgentVoiceCatalog:
+        return cls(
+            voices=[HostedAgentVoiceOption._from_dict(v) for v in d["voices"]],
+            default_voice=d["default_voice"],
+        )
+
+
+@dataclass
 class HostedAgentConfig:
     """Per-identity Inkbox Voice AI configuration.
 

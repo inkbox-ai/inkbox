@@ -404,6 +404,21 @@ export interface HostedAgentConfig {
   authorityMode: HostedAgentAuthorityMode;
 }
 
+/** A Voice AI voice and its current selection availability. */
+export interface HostedAgentVoiceOption {
+  id: string;
+  name: string;
+  description: string;
+  available: boolean;
+  previewUrl: string | null;
+}
+
+/** Organization-scoped Voice AI choices, including unavailable voices. */
+export interface HostedAgentVoiceCatalog {
+  voices: HostedAgentVoiceOption[];
+  defaultVoice: string;
+}
+
 /**
  * An action item Inkbox Voice AI recorded during a call.
  *
@@ -717,6 +732,17 @@ export interface RawHostedAgentConfig {
   authority_mode?: HostedAgentAuthorityMode | string | null;
 }
 
+export interface RawHostedAgentVoiceCatalog {
+  voices: {
+    id: string;
+    name: string;
+    description: string;
+    available: boolean;
+    preview_url?: string | null;
+  }[];
+  default_voice: string;
+}
+
 export interface RawPostCallActionItem {
   id: string;
   seq: number;
@@ -915,6 +941,21 @@ export function parsePhoneCallForwarding(
     forwardedAt: r.forwarded_at ? new Date(r.forwarded_at) : null,
     endedAt: r.ended_at ? new Date(r.ended_at) : null,
     failureCode: r.failure_code ?? null,
+  };
+}
+
+export function parseHostedAgentVoiceCatalog(
+  r: RawHostedAgentVoiceCatalog,
+): HostedAgentVoiceCatalog {
+  return {
+    voices: r.voices.map((voice) => ({
+      id: voice.id,
+      name: voice.name,
+      description: voice.description,
+      available: voice.available,
+      previewUrl: voice.preview_url ?? null,
+    })),
+    defaultVoice: r.default_voice,
   };
 }
 
