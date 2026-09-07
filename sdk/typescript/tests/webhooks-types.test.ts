@@ -13,6 +13,8 @@ import { describe, expect, it } from "vitest";
 import type {
   A2AWebhookPayload,
   CallEndedWebhookPayload,
+  EndedByWire,
+  HangupReasonWire,
   MailWebhookPayload,
   IMessageWebhookPayload,
   PhoneIncomingCallWebhookPayload,
@@ -561,6 +563,29 @@ describe("CallEndedWebhookPayload", () => {
     expect(call.origin).toBe("dedicated_number");
     expect(call.duration_seconds).toBe(123);
     expect(call.status).toBe("completed");
+    // Carrier facts behind hangup_reason ride the call block.
+    expect(call.hangup_reason).toBe("remote");
+    expect(call.ended_by).toBe("remote");
+    expect(call.provider_hangup_cause).toBe("normal_clearing");
+  });
+
+  it("types every hangup reason and ended_by value the server emits", () => {
+    // Compile-time exhaustiveness: a value missing from the union fails tsc.
+    const reasons: Record<HangupReasonWire, true> = {
+      local: true,
+      remote: true,
+      max_duration: true,
+      voicemail: true,
+      rejected: true,
+      failed: true,
+      no_answer: true,
+      missed: true,
+      busy: true,
+      dropped: true,
+    };
+    const endedBy: Record<EndedByWire, true> = { local: true, remote: true, unknown: true };
+    expect(Object.keys(reasons)).toHaveLength(10);
+    expect(Object.keys(endedBy)).toHaveLength(3);
   });
 
   it("always exposes transcript_url; inline transcript present when captured", () => {

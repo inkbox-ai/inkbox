@@ -87,7 +87,10 @@ pub enum CallStatusWire {
     Canceled,
 }
 
-/// Why a call ended.
+/// Why a call ended. `Local`/`Remote`: which side hung up a connected call.
+/// `NoAnswer`/`Missed`/`Busy`/`Rejected`/`Failed`: the call never connected.
+/// `Voicemail`/`MaxDuration`: Inkbox hung up. `Dropped`: the network tore
+/// down a connected call. `Unknown` absorbs values added after this release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HangupReasonWire {
@@ -96,6 +99,24 @@ pub enum HangupReasonWire {
     MaxDuration,
     Voicemail,
     Rejected,
+    Failed,
+    NoAnswer,
+    Missed,
+    Busy,
+    Dropped,
+    #[serde(other)]
+    Unknown,
+}
+
+/// Which side ended the call, as reported by the carrier. `Unknown` covers
+/// both the wire value `"unknown"` and values added after this release.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndedByWire {
+    Local,
+    Remote,
+    #[serde(other)]
+    Unknown,
 }
 
 /// Where a call originated.
@@ -799,6 +820,11 @@ pub struct PhoneIncomingCallWebhookPayload {
     pub use_inkbox_tts: Option<bool>,
     pub use_inkbox_stt: Option<bool>,
     pub hangup_reason: Option<HangupReasonWire>,
+    /// Always `None` on incoming-call payloads; absent from older senders.
+    #[serde(default)]
+    pub ended_by: Option<EndedByWire>,
+    #[serde(default)]
+    pub provider_hangup_cause: Option<String>,
     pub started_at: Option<String>,
     pub ended_at: Option<String>,
     pub created_at: String,
@@ -840,6 +866,11 @@ pub struct WebhookPhoneCall {
     pub direction: CallDirectionWire,
     pub status: CallStatusWire,
     pub hangup_reason: Option<HangupReasonWire>,
+    /// Carrier facts behind `hangup_reason`; absent on payloads predating them.
+    #[serde(default)]
+    pub ended_by: Option<EndedByWire>,
+    #[serde(default)]
+    pub provider_hangup_cause: Option<String>,
     pub started_at: Option<String>,
     pub ended_at: Option<String>,
     pub created_at: String,
@@ -1293,6 +1324,66 @@ mod tests {
         );
         assert_eq!(payload.data.outcome, None);
         assert!(payload.data.post_call_action_items.is_empty());
+        assert_eq!(payload.data.call.ended_by, None);
+        assert_eq!(payload.data.call.provider_hangup_cause, None);
+    }
+
+    #[test]
+    fn call_ended_parses_every_hangup_reason_and_the_carrier_facts() {
+        for (wire, expected) in [
+            ("local", HangupReasonWire::Local),
+            ("remote", HangupReasonWire::Remote),
+            ("max_duration", HangupReasonWire::MaxDuration),
+            ("voicemail", HangupReasonWire::Voicemail),
+            ("rejected", HangupReasonWire::Rejected),
+            ("failed", HangupReasonWire::Failed),
+            ("no_answer", HangupReasonWire::NoAnswer),
+            ("missed", HangupReasonWire::Missed),
+            ("busy", HangupReasonWire::Busy),
+            ("dropped", HangupReasonWire::Dropped),
+            ("something_newer", HangupReasonWire::Unknown),
+        ] {
+            let raw = format!(
+                r#"{{
+                "id": "evt_r", "event_type": "call.ended", "timestamp": "t",
+                "data": {{
+                    "call": {{
+                        "id": "c1", "origin": "dedicated_number",
+                        "local_phone_number": "+14155550100",
+                        "remote_phone_number": "+14155550999",
+                        "direction": "outbound", "status": "completed",
+                        "hangup_reason": "{wire}",
+                        "ended_by": "remote", "provider_hangup_cause": "normal_clearing",
+                        "started_at": "t0", "ended_at": "t1",
+                        "created_at": "t0", "updated_at": "t1",
+                        "duration_seconds": 1
+                    }},
+                    "contacts": [], "agent_identities": [], "transcript": null,
+                    "transcript_url": "https://x/api/v1/phone/calls/c1/transcripts"
+                }}
+            }}"#
+            );
+            let payload: CallEndedWebhookPayload = serde_json::from_str(&raw).unwrap();
+            assert_eq!(payload.data.call.hangup_reason, Some(expected), "{wire}");
+            assert_eq!(payload.data.call.ended_by, Some(EndedByWire::Remote));
+            assert_eq!(
+                payload.data.call.provider_hangup_cause.as_deref(),
+                Some("normal_clearing")
+            );
+        }
+    }
+
+    #[test]
+    fn ended_by_unknown_and_future_values_do_not_fail_parsing() {
+        for wire in ["unknown", "carrier_added_later"] {
+            let raw = format!(r#"{{"ended_by": "{wire}"}}"#);
+            #[derive(Deserialize)]
+            struct Probe {
+                ended_by: Option<EndedByWire>,
+            }
+            let probe: Probe = serde_json::from_str(&raw).unwrap();
+            assert_eq!(probe.ended_by, Some(EndedByWire::Unknown));
+        }
     }
 
     #[test]

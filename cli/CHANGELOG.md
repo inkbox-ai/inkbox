@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.10 — Call end reasons and carrier hangup facts
+
+- `phone calls --json` and `phone hangup` carry the new `endedBy` and
+  `providerHangupCause` fields, and `hangupReason` can now be `no_answer`,
+  `missed`, `busy`, or `dropped`.
+- CLI and SDK dependency versions moved in lockstep to 0.6.10.
+
 ## 0.6.8 — Voice AI voice discovery
 
 - Added `inkbox phone hosted-agent voices`, an organization-scoped catalog

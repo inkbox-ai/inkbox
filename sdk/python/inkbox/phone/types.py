@@ -292,6 +292,11 @@ class PhoneCall:
     post_call_action_items: list[PostCallActionItem] = field(default_factory=list)
     # Forwarding attempts in chronological order. Older responses omit this.
     forwardings: list[PhoneCallForwarding] = field(default_factory=list)
+    # Which side ended the call per the carrier ("local", "remote", "unknown");
+    # None until the carrier reports the hangup, or on older responses.
+    ended_by: str | None = None
+    # Raw carrier cause behind hangup_reason (e.g. "normal_clearing"); opaque.
+    provider_hangup_cause: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneCall:
@@ -331,6 +336,8 @@ class PhoneCall:
             forwardings=[
                 PhoneCallForwarding._from_dict(f) for f in d.get("forwardings", [])
             ],
+            ended_by=d.get("ended_by"),
+            provider_hangup_cause=d.get("provider_hangup_cause"),
         )
 
 

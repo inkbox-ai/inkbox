@@ -442,6 +442,13 @@ pub struct PhoneCall {
     pub use_inkbox_stt: Option<bool>,
     #[serde(default)]
     pub hangup_reason: Option<String>,
+    /// Which side ended the call per the carrier (`local`, `remote`,
+    /// `unknown`); `None` until the carrier reports the hangup.
+    #[serde(default)]
+    pub ended_by: Option<String>,
+    /// Raw carrier cause behind `hangup_reason` (e.g. `normal_clearing`); opaque.
+    #[serde(default)]
+    pub provider_hangup_cause: Option<String>,
     #[serde(default)]
     pub started_at: Option<String>,
     #[serde(default)]
