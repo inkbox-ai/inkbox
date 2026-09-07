@@ -189,12 +189,13 @@ jobs:
             --arg run_id "$ALERT_RUN_ID" \
             --arg attempt "$ALERT_RUN_ATTEMPT" \
             --arg run_url "$ALERT_RUN_URL" '
-            {development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment] as $header |
+            ({development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment]
+              // error("Unknown environment: " + $environment)) as $header |
             {
               text: ($header + "\n❌ Failed\n📦 SDK integration tests\n\nSummary: " + $component + " integration job failed.\nScope: " + $repository + " · " + $component + " · " + $source + "\nDetails: <" + $run_url + "|View run>"),
               thread: {threadKey: ("ci-" + ($repository | gsub("/"; "-")) + "-" + $run_id + "-" + $attempt + "-" + $environment)}
             }')
-          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+          curl --fail-with-body --silent --show-error -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
             "${CHAT_WEBHOOK_URL}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD" \
             -H 'Content-Type: application/json' \
             -d "$payload"
@@ -296,12 +297,13 @@ jobs:
             --arg run_id "$ALERT_RUN_ID" \
             --arg attempt "$ALERT_RUN_ATTEMPT" \
             --arg run_url "$ALERT_RUN_URL" '
-            {development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment] as $header |
+            ({development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment]
+              // error("Unknown environment: " + $environment)) as $header |
             {
               text: ($header + "\n❌ Failed\n📦 SDK integration tests\n\nSummary: " + $component + " integration job failed.\nScope: " + $repository + " · " + $component + " · " + $source + "\nDetails: <" + $run_url + "|View run>"),
               thread: {threadKey: ("ci-" + ($repository | gsub("/"; "-")) + "-" + $run_id + "-" + $attempt + "-" + $environment)}
             }')
-          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+          curl --fail-with-body --silent --show-error -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
             "${CHAT_WEBHOOK_URL}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD" \
             -H 'Content-Type: application/json' \
             -d "$payload"
@@ -401,12 +403,13 @@ jobs:
             --arg run_id "$ALERT_RUN_ID" \
             --arg attempt "$ALERT_RUN_ATTEMPT" \
             --arg run_url "$ALERT_RUN_URL" '
-            {development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment] as $header |
+            ({development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment]
+              // error("Unknown environment: " + $environment)) as $header |
             {
               text: ($header + "\n❌ Failed\n📦 SDK integration tests\n\nSummary: " + $component + " integration job failed.\nScope: " + $repository + " · " + $component + " · " + $source + "\nDetails: <" + $run_url + "|View run>"),
               thread: {threadKey: ("ci-" + ($repository | gsub("/"; "-")) + "-" + $run_id + "-" + $attempt + "-" + $environment)}
             }')
-          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+          curl --fail-with-body --silent --show-error -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
             "${CHAT_WEBHOOK_URL}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD" \
             -H 'Content-Type: application/json' \
             -d "$payload"

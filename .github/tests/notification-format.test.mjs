@@ -9,7 +9,7 @@ const title = '📦 SDK integration tests';
 const environments = { development: '🛠️ Development', beta: '🧪 Beta', production: '🚀 Production' };
 
 // Execute the actual workflow shell with a local curl replacement: no network or secrets.
-function render(job, environment, source, repository = 'example/sdk') {
+function run(job, environment, source, repository = 'example/sdk') {
   const section = workflow.split(/^  (?=[\w-]+:)/m).find(part => part.startsWith(`${job}:`));
   const notification = section.slice(section.indexOf('      - name: Notify Google Chat'));
   const values = {
@@ -28,7 +28,11 @@ function render(job, environment, source, repository = 'example/sdk') {
   const body = notification.match(/        run: \|\n((?:          .*\n|\n)*)/)[1]
     .replace(/^          /gm, '');
   const intercept = 'curl() { while (( $# )); do if [[ "$1" == "-d" || "$1" == "--data" ]]; then printf "%s" "$2"; return; fi; shift; done; return 1; };\n';
-  const result = spawnSync('bash', ['-e', '-c', intercept + substitute(body)], { env, encoding: 'utf8' });
+  return spawnSync('bash', ['-e', '-c', intercept + substitute(body)], { env, encoding: 'utf8' });
+}
+
+function render(job, environment, source, repository) {
+  const result = run(job, environment, source, repository);
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
 }
@@ -44,6 +48,12 @@ for (const [job, component] of Object.entries(components)) {
       });
     }
   }
+  test(`${job}: unknown environment fails instead of posting an unlabeled alert`, () => {
+    const result = run(job, 'staging', 'local');
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /Unknown environment: staging/);
+  });
   test(`${job}: safely encodes shell and JSON metacharacters`, () => {
     const repository = 'example/quote\'"\\$(printf unsafe)';
     const payload = render(job, 'beta', 'local', repository);
