@@ -25,6 +25,16 @@ permissions:
   checks: read  # required by lewagon/wait-on-check-action to poll check-runs
 
 jobs:
+  notification-format-tests:
+    name: CI notification format tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node --test .github/tests/notification-format.test.mjs
+
   # On PRs, gate the rest of the workflow on the unit-test workflow
   # succeeding first. Skipped for scheduled and manual runs, and for
   # draft PRs (tests run once marked ready for review).
@@ -161,13 +171,34 @@ jobs:
 
       - name: Notify Google Chat on scheduled failure
         if: failure() && github.event_name == 'schedule'
+        env:
+          CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          ALERT_ENVIRONMENT: ${{ matrix.environment }}
+          ALERT_COMPONENT: Python SDK
+          ALERT_SOURCE: ${{ matrix.source }}
+          ALERT_REPOSITORY: ${{ github.repository }}
+          ALERT_RUN_ID: ${{ github.run_id }}
+          ALERT_RUN_ATTEMPT: ${{ github.run_attempt }}
+          ALERT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
-            "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+          payload=$(jq -n \
+            --arg environment "$ALERT_ENVIRONMENT" \
+            --arg component "$ALERT_COMPONENT" \
+            --arg source "$ALERT_SOURCE" \
+            --arg repository "$ALERT_REPOSITORY" \
+            --arg run_id "$ALERT_RUN_ID" \
+            --arg attempt "$ALERT_RUN_ATTEMPT" \
+            --arg run_url "$ALERT_RUN_URL" '
+            ({development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment]
+              // error("Unknown environment: " + $environment)) as $header |
+            {
+              text: ($header + "\n❌ Failed\n📦 SDK integration tests\n\nSummary: " + $component + " integration job failed.\nScope: " + $repository + " · " + $component + " · " + $source + "\nDetails: <" + $run_url + "|View run>"),
+              thread: {threadKey: ("ci-" + ($repository | gsub("/"; "-")) + "-" + $run_id + "-" + $attempt + "-" + $environment)}
+            }')
+          curl --fail-with-body --silent --show-error -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+            "${CHAT_WEBHOOK_URL}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD" \
             -H 'Content-Type: application/json' \
-            -d '{
-              "text": "⚠️ Python SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            -d "$payload"
 
   typescript-sdk:
     name: TypeScript SDK (${{ matrix.environment }}, ${{ matrix.source }})
@@ -248,13 +279,34 @@ jobs:
 
       - name: Notify Google Chat on scheduled failure
         if: failure() && github.event_name == 'schedule'
+        env:
+          CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          ALERT_ENVIRONMENT: ${{ matrix.environment }}
+          ALERT_COMPONENT: TypeScript SDK
+          ALERT_SOURCE: ${{ matrix.source }}
+          ALERT_REPOSITORY: ${{ github.repository }}
+          ALERT_RUN_ID: ${{ github.run_id }}
+          ALERT_RUN_ATTEMPT: ${{ github.run_attempt }}
+          ALERT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
-            "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+          payload=$(jq -n \
+            --arg environment "$ALERT_ENVIRONMENT" \
+            --arg component "$ALERT_COMPONENT" \
+            --arg source "$ALERT_SOURCE" \
+            --arg repository "$ALERT_REPOSITORY" \
+            --arg run_id "$ALERT_RUN_ID" \
+            --arg attempt "$ALERT_RUN_ATTEMPT" \
+            --arg run_url "$ALERT_RUN_URL" '
+            ({development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment]
+              // error("Unknown environment: " + $environment)) as $header |
+            {
+              text: ($header + "\n❌ Failed\n📦 SDK integration tests\n\nSummary: " + $component + " integration job failed.\nScope: " + $repository + " · " + $component + " · " + $source + "\nDetails: <" + $run_url + "|View run>"),
+              thread: {threadKey: ("ci-" + ($repository | gsub("/"; "-")) + "-" + $run_id + "-" + $attempt + "-" + $environment)}
+            }')
+          curl --fail-with-body --silent --show-error -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+            "${CHAT_WEBHOOK_URL}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD" \
             -H 'Content-Type: application/json' \
-            -d '{
-              "text": "⚠️ TypeScript SDK integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            -d "$payload"
 
   cli:
     name: CLI (${{ matrix.environment }}, ${{ matrix.source }})
@@ -333,10 +385,31 @@ jobs:
 
       - name: Notify Google Chat on scheduled failure
         if: failure() && github.event_name == 'schedule'
+        env:
+          CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          ALERT_ENVIRONMENT: ${{ matrix.environment }}
+          ALERT_COMPONENT: CLI
+          ALERT_SOURCE: ${{ matrix.source }}
+          ALERT_REPOSITORY: ${{ github.repository }}
+          ALERT_RUN_ID: ${{ github.run_id }}
+          ALERT_RUN_ATTEMPT: ${{ github.run_attempt }}
+          ALERT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          curl -s -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
-            "${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}" \
+          payload=$(jq -n \
+            --arg environment "$ALERT_ENVIRONMENT" \
+            --arg component "$ALERT_COMPONENT" \
+            --arg source "$ALERT_SOURCE" \
+            --arg repository "$ALERT_REPOSITORY" \
+            --arg run_id "$ALERT_RUN_ID" \
+            --arg attempt "$ALERT_RUN_ATTEMPT" \
+            --arg run_url "$ALERT_RUN_URL" '
+            ({development: "🛠️ Development", beta: "🧪 Beta", production: "🚀 Production"}[$environment]
+              // error("Unknown environment: " + $environment)) as $header |
+            {
+              text: ($header + "\n❌ Failed\n📦 SDK integration tests\n\nSummary: " + $component + " integration job failed.\nScope: " + $repository + " · " + $component + " · " + $source + "\nDetails: <" + $run_url + "|View run>"),
+              thread: {threadKey: ("ci-" + ($repository | gsub("/"; "-")) + "-" + $run_id + "-" + $attempt + "-" + $environment)}
+            }')
+          curl --fail-with-body --silent --show-error -X POST --retry 5 --retry-all-errors --retry-delay 2 --max-time 30 \
+            "${CHAT_WEBHOOK_URL}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD" \
             -H 'Content-Type: application/json' \
-            -d '{
-              "text": "⚠️ CLI integration tests *FAILED* for *${{ matrix.environment }}* (${{ matrix.source }})\n\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            }'
+            -d "$payload"
