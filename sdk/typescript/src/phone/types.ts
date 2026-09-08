@@ -269,8 +269,18 @@ export interface PhoneCall {
   clientWebsocketUrl: string | null;
   useInkboxTts: boolean | null;
   useInkboxStt: boolean | null;
-  /** "local" | "remote" | "max_duration" | "voicemail" | "rejected" */
+  /**
+   * "local" | "remote" | "max_duration" | "voicemail" | "rejected" | "failed"
+   * | "no_answer" | "missed" | "busy" | "dropped"
+   */
   hangupReason: string | null;
+  /**
+   * Which side ended the call per the carrier: "local", "remote", or
+   * "unknown". `null` until the carrier reports the hangup.
+   */
+  endedBy: string | null;
+  /** Raw carrier cause behind `hangupReason` (e.g. "normal_clearing"); opaque. */
+  providerHangupCause: string | null;
   startedAt: Date | null;
   endedAt: Date | null;
   /**
@@ -574,6 +584,10 @@ export interface RawPhoneCall {
   use_inkbox_tts: boolean | null;
   use_inkbox_stt: boolean | null;
   hangup_reason: string | null;
+  // Optional for back-compat with older server responses; parser
+  // coerces missing to null.
+  ended_by?: string | null;
+  provider_hangup_cause?: string | null;
   started_at: string | null;
   ended_at: string | null;
   // Optional for back-compat with older server responses that predate
@@ -831,6 +845,8 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     useInkboxTts: r.use_inkbox_tts,
     useInkboxStt: r.use_inkbox_stt,
     hangupReason: r.hangup_reason,
+    endedBy: r.ended_by ?? null,
+    providerHangupCause: r.provider_hangup_cause ?? null,
     startedAt: r.started_at ? new Date(r.started_at) : null,
     endedAt: r.ended_at ? new Date(r.ended_at) : null,
     isBlocked: r.is_blocked ?? false,

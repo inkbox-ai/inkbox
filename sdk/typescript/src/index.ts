@@ -132,6 +132,7 @@ export type {
   PhoneIncomingCallWebhookPayload,
   CallStatusWire,
   HangupReasonWire,
+  EndedByWire,
   CallDirectionWire,
   CallOriginWire,
   CallLifecycleWebhookEventType,

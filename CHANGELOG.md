@@ -4,6 +4,33 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.10 — Call end reasons and carrier hangup facts
+
+### Added
+
+- `hangup_reason` on calls and call webhooks now distinguishes `no_answer`
+  (outbound rang out), `missed` (inbound ended before the agent answered),
+  `busy`, and `dropped` (the network tore down a connected call), alongside
+  the existing `local`, `remote`, `max_duration`, `voicemail`, `rejected`,
+  and `failed`. The Python and TypeScript `HangupReasonWire` unions and the
+  Rust `HangupReasonWire` enum carry the full set.
+- Two carrier facts behind `hangup_reason` on every call object and on
+  `call.ended` / incoming-call payloads: `ended_by` (`local`, `remote`, or
+  `unknown`: which side ended the call) and `provider_hangup_cause` (the raw
+  cause string, passed through verbatim). Python `PhoneCall.ended_by` /
+  `.provider_hangup_cause`, TypeScript `endedBy` / `providerHangupCause`,
+  Rust `ended_by` / `provider_hangup_cause`; new `EndedByWire` wire type in
+  all three.
+
+### Compatibility
+
+- Additive. Calls that never connected now report `no_answer`, `missed`, or
+  `busy` where they previously reported `remote`; consumers that matched on
+  `remote` to mean "ended without us" should also match the new values.
+- Rust: `HangupReasonWire` and `EndedByWire` gain a `#[serde(other)]
+  Unknown` variant, so values added by the server after this release parse
+  instead of failing deserialization.
+
 ## 0.6.9 — Creating a contact saves a matching suggestion
 
 ### Changed

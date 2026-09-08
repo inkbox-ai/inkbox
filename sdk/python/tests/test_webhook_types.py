@@ -19,6 +19,8 @@ import pytest
 from inkbox import (
     A2AWebhookPayload,
     CallEndedWebhookPayload,
+    EndedByWire,
+    HangupReasonWire,
     HostedAgentAuthorityModeWire,
     IMessageReactionTypeWire,
     IMessageWebhookReaction,
@@ -38,6 +40,22 @@ def test_imessage_group_reaction_assignment_is_nullable():
 def test_imessage_reaction_wire_keeps_eyes_and_inbound_custom_distinct():
     values = set(get_args(IMessageReactionTypeWire))
     assert {"eyes", "custom"} <= values
+
+
+def test_hangup_wire_types_cover_every_server_value():
+    assert set(get_args(HangupReasonWire)) == {
+        "local",
+        "remote",
+        "max_duration",
+        "voicemail",
+        "rejected",
+        "failed",
+        "no_answer",
+        "missed",
+        "busy",
+        "dropped",
+    }
+    assert set(get_args(EndedByWire)) == {"local", "remote", "unknown"}
 
 
 def test_hosted_call_wire_types_are_exported_from_package_root():
@@ -457,6 +475,10 @@ def test_call_ended_call_block_shape():
     assert call["origin"] == "dedicated_number"
     assert call["duration_seconds"] == 123
     assert call["status"] == "completed"
+    # Carrier facts behind hangup_reason ride the call block.
+    assert call["hangup_reason"] == "remote"
+    assert call["ended_by"] == "remote"
+    assert call["provider_hangup_cause"] == "normal_clearing"
 
 
 def test_call_ended_transcript_inline_and_url_always_present():

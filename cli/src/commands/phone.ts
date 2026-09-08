@@ -271,6 +271,8 @@ export function registerPhoneCommands(program: Command): void {
             remotePhoneNumber: call.remotePhoneNumber,
             status: call.status,
             hangupReason: call.hangupReason,
+            endedBy: call.endedBy,
+            providerHangupCause: call.providerHangupCause,
           },
           { json: !!opts.json },
         );

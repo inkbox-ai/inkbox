@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.10 — Call end reasons and carrier hangup facts
+
+- `HangupReasonWire` now includes `failed`, `no_answer`, `missed`, `busy`,
+  and `dropped`.
+- `PhoneCall` gains `endedBy` (`"local"`, `"remote"`, `"unknown"`, or
+  `null`) and `providerHangupCause` (raw carrier cause or `null`); the wire
+  fields `ended_by` / `provider_hangup_cause` are optional on
+  `WebhookPhoneCall` and `PhoneIncomingCallWebhookPayload`. New
+  `EndedByWire` export.
+
 ## 0.6.8 — Voice AI voice discovery
 
 - Added `inkbox.hostedAgent.listVoices()` returning a typed

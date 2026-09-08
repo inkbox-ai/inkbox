@@ -67,7 +67,20 @@ HangupReasonWire = Literal[
     "max_duration",
     "voicemail",
     "rejected",
+    "failed",
+    "no_answer",
+    "missed",
+    "busy",
+    "dropped",
 ]
+"""Why a call ended. ``local``: our side hung up or canceled dialing;
+``remote``: the far party hung up a connected call.
+``no_answer``/``missed``/``busy``/``rejected``/``failed``: the call
+never connected. ``voicemail``/``max_duration``: Inkbox hung up.
+``dropped``: the network tore down a connected call."""
+
+EndedByWire = Literal["local", "remote", "unknown"]
+"""Which side ended the call, as reported by the carrier."""
 
 CallModeWire = Literal["client_websocket", "hosted_agent"]
 HostedAgentAuthorityModeWire = Literal["contact_scoped", "yolo"]
@@ -649,6 +662,9 @@ class PhoneIncomingCallWebhookPayload(TypedDict):
     use_inkbox_tts: bool | None
     use_inkbox_stt: bool | None
     hangup_reason: HangupReasonWire | None
+    # Always None on incoming-call payloads; NotRequired for older senders.
+    ended_by: NotRequired[EndedByWire | None]
+    provider_hangup_cause: NotRequired[str | None]
     started_at: str | None
     ended_at: str | None
     created_at: str
@@ -687,6 +703,9 @@ class WebhookPhoneCall(TypedDict):
     direction: CallDirectionWire
     status: CallStatusWire
     hangup_reason: HangupReasonWire | None
+    # Carrier facts behind hangup_reason; absent on payloads predating them.
+    ended_by: NotRequired[EndedByWire | None]
+    provider_hangup_cause: NotRequired[str | None]
     started_at: str | None
     ended_at: str | None
     created_at: str

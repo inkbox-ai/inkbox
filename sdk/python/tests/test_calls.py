@@ -180,6 +180,24 @@ class TestCallsHangup:
         assert call.status == "answered"
         assert call.hangup_reason == "local"
         assert call.ended_at is None
+        # Carrier facts arrive with the later hangup report, not this response.
+        assert call.ended_by is None
+        assert call.provider_hangup_cause is None
+
+    def test_parses_carrier_hangup_facts(self, client, transport):
+        transport.post.return_value = {
+            **PHONE_CALL_DICT,
+            "status": "completed",
+            "hangup_reason": "dropped",
+            "ended_by": "unknown",
+            "provider_hangup_cause": "media_timeout",
+        }
+
+        call = client._calls.hangup(CALL_ID)
+
+        assert call.hangup_reason == "dropped"
+        assert call.ended_by == "unknown"
+        assert call.provider_hangup_cause == "media_timeout"
 
     def test_accepts_uuid(self, client, transport):
         transport.post.return_value = PHONE_CALL_DICT

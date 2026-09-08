@@ -180,6 +180,27 @@ describe("CallsResource.hangup", () => {
     expect(call.status).toBe("answered");
     expect(call.hangupReason).toBe("local");
     expect(call.endedAt).toBeNull();
+    // Carrier facts arrive with the later hangup report, not this response.
+    expect(call.endedBy).toBeNull();
+    expect(call.providerHangupCause).toBeNull();
+  });
+
+  it("parses the carrier hangup facts when present", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue({
+      ...RAW_PHONE_CALL,
+      status: "completed",
+      hangup_reason: "dropped",
+      ended_by: "unknown",
+      provider_hangup_cause: "media_timeout",
+    });
+    const res = new CallsResource(http);
+
+    const call = await res.hangup(CALL_ID);
+
+    expect(call.hangupReason).toBe("dropped");
+    expect(call.endedBy).toBe("unknown");
+    expect(call.providerHangupCause).toBe("media_timeout");
   });
 });
 

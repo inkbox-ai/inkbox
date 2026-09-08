@@ -62,12 +62,27 @@ export type VoicemailDetectionWire = "enabled" | "disabled";
 
 export type CallOutcomeWire = "completed" | "no_answer" | "declined" | "failed";
 
+/**
+ * Why a call ended. `local`: our side hung up or canceled dialing;
+ * `remote`: the far party hung up a connected call.
+ * `no_answer`/`missed`/`busy`/`rejected`/`failed`: the call never connected.
+ * `voicemail`/`max_duration`: Inkbox hung up. `dropped`: the network tore
+ * down a connected call.
+ */
 export type HangupReasonWire =
   | "local"
   | "remote"
   | "max_duration"
   | "voicemail"
-  | "rejected";
+  | "rejected"
+  | "failed"
+  | "no_answer"
+  | "missed"
+  | "busy"
+  | "dropped";
+
+/** Which side ended the call, as reported by the carrier. */
+export type EndedByWire = "local" | "remote" | "unknown";
 
 // ---- Shared ----------------------------------------------------------
 
@@ -605,6 +620,9 @@ export interface PhoneIncomingCallWebhookPayload {
   use_inkbox_tts: boolean | null;
   use_inkbox_stt: boolean | null;
   hangup_reason: HangupReasonWire | null;
+  /** Always `null` on incoming-call payloads; optional for older senders. */
+  ended_by?: EndedByWire | null;
+  provider_hangup_cause?: string | null;
   started_at: string | null;
   ended_at: string | null;
   created_at: string;
@@ -645,6 +663,9 @@ export interface WebhookPhoneCall {
   direction: CallDirectionWire;
   status: CallStatusWire;
   hangup_reason: HangupReasonWire | null;
+  /** Carrier facts behind `hangup_reason`; absent on payloads predating them. */
+  ended_by?: EndedByWire | null;
+  provider_hangup_cause?: string | null;
   started_at: string | null;
   ended_at: string | null;
   created_at: string;

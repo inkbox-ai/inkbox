@@ -8,6 +8,8 @@
   "use_inkbox_tts": null,
   "use_inkbox_stt": null,
   "hangup_reason": null,
+  "ended_by": null,
+  "provider_hangup_cause": null,
   "started_at": null,
   "ended_at": null,
   "created_at": "2026-04-10T18:21:44.018Z",
