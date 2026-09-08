@@ -267,11 +267,11 @@ class IMessagesResource:
     def release_assignment(self, assignment_id: UUID | str) -> None:
         """Release an active iMessage connection.
 
-        Inbound from the recipient stops routing to the agent and the shared
-        line can be reassigned. The recipient is not notified and can reconnect
-        by texting the triage number again. Identity-scoped keys can only
-        release their own identity's connections. Raises ``NotFoundError`` if
-        the connection does not exist or is already released.
+        Requires an admin API key; identity-scoped keys are rejected. Inbound
+        from the recipient stops routing to the agent and the shared line can
+        be reassigned. The recipient is not notified and can reconnect by
+        texting the triage number again. Raises ``NotFoundError`` if the
+        connection does not exist or is already released.
 
         Args:
             assignment_id: UUID of the connection, from ``list_assignments``.

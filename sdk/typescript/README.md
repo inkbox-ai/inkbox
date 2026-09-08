@@ -649,7 +649,7 @@ await identity.sendIMessage({
 // Who is currently connected? (Disconnected conversations stay readable
 // with assignmentStatus === "released"; sends into them return 409.)
 const connections = await identity.listIMessageAssignments();
-await identity.releaseIMessageAssignment(connections[0].id); // disconnect; they can reconnect via triage
+await identity.releaseIMessageAssignment(connections[0].id); // admin key only; they can reconnect via triage
 
 // Tapbacks target inbound one-to-one or group messages by messageId. The seven
 // named reactions include "eyes" ("custom" is rejected locally on send), and a

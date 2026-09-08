@@ -16,8 +16,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   `DELETE /imessage/assignments/{assignment_id}`. Releasing a connection stops
   routing the recipient's inbound to the agent and frees the shared line. The
   recipient is not notified and can reconnect by texting the triage number.
-  Identity-scoped keys can only release their own identity's connections; a
-  missing or already-released connection is a not-found error.
+  Requires an admin API key; identity-scoped keys are rejected. A missing or
+  already-released connection is a not-found error.
 
 ## 0.6.9 — Creating a contact saves a matching suggestion
 

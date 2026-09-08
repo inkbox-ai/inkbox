@@ -390,7 +390,7 @@ export function registerIMessageCommands(program: Command): void {
 
   imessage
     .command("disconnect <assignment-id>")
-    .description("Release an active connection; the recipient is not notified and can reconnect")
+    .description("Release an active connection (admin API key only); the recipient is not notified and can reconnect")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .action(
       withErrorHandler(async function (

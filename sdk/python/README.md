@@ -664,7 +664,7 @@ print(group_convos[0].group_creation_status)
 # Who is currently connected? (Disconnected conversations stay readable
 # with assignment_status == "released"; sends into them return 409.)
 connections = identity.list_imessage_assignments()
-identity.release_imessage_assignment(connections[0].id)  # disconnect; they can reconnect via triage
+identity.release_imessage_assignment(connections[0].id)  # admin key only; they can reconnect via triage
 
 # Tapbacks target inbound one-to-one or group messages by message_id. The seven
 # named reactions include "eyes" ("custom" is rejected locally on send), and a

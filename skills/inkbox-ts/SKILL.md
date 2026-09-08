@@ -537,7 +537,7 @@ console.log(convo.assignmentStatus);
 
 // Who is actively connected to this identity right now (paginated)?
 const connections = await identity.listIMessageAssignments({ limit: 20 });
-await identity.releaseIMessageAssignment(connections[0].id); // disconnect; they can reconnect via triage
+await identity.releaseIMessageAssignment(connections[0].id); // admin key only; they can reconnect via triage
 for (const a of connections) {
   console.log(a.remoteNumber, a.status, a.createdAt);
 }

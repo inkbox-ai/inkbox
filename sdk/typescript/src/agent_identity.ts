@@ -1015,9 +1015,10 @@ export class AgentIdentity {
   /**
    * Disconnect a recipient from this identity.
    *
-   * Inbound from them stops routing here and the shared line can be
-   * reassigned. They are not notified and can reconnect by texting the
-   * triage number again.
+   * Requires an admin API key; identity-scoped keys are rejected. Inbound
+   * from them stops routing here and the shared line can be reassigned.
+   * They are not notified and can reconnect by texting the triage number
+   * again.
    *
    * @param assignmentId - UUID of the connection, from `listIMessageAssignments`.
    */
