@@ -87,7 +87,8 @@ pub enum CallStatusWire {
     Canceled,
 }
 
-/// Why a call ended. `Local`/`Remote`: which side hung up a connected call.
+/// Why a call ended. `Local`: our side hung up or canceled dialing;
+/// `Remote`: the far party hung up a connected call.
 /// `NoAnswer`/`Missed`/`Busy`/`Rejected`/`Failed`: the call never connected.
 /// `Voicemail`/`MaxDuration`: Inkbox hung up. `Dropped`: the network tore
 /// down a connected call. `Unknown` absorbs values added after this release.

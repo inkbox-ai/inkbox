@@ -63,7 +63,8 @@ export type VoicemailDetectionWire = "enabled" | "disabled";
 export type CallOutcomeWire = "completed" | "no_answer" | "declined" | "failed";
 
 /**
- * Why a call ended. `local`/`remote`: which side hung up a connected call.
+ * Why a call ended. `local`: our side hung up or canceled dialing;
+ * `remote`: the far party hung up a connected call.
  * `no_answer`/`missed`/`busy`/`rejected`/`failed`: the call never connected.
  * `voicemail`/`max_duration`: Inkbox hung up. `dropped`: the network tore
  * down a connected call.
