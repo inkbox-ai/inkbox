@@ -619,6 +619,13 @@ class TestIMessageAssignments:
         assert rows[0].remote_number == REMOTE
         assert rows[0].released_at is None
 
+    def test_release_assignment(self, client, transport):
+        assignment_id = "bbbb2222-0000-0000-0000-000000000001"
+
+        client._imessages.release_assignment(UUID(assignment_id))
+
+        transport.delete.assert_called_once_with(f"/assignments/{assignment_id}")
+
 
 class TestConversationAssignmentStatus:
     def test_parses_assignment_status(self, client, transport):

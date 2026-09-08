@@ -332,6 +332,20 @@ impl IMessagesResource {
         Ok(serde_json::from_value(data)?)
     }
 
+    /// Release an active iMessage connection.
+    ///
+    /// Inbound from the recipient stops routing to the agent and the shared
+    /// line can be reassigned. The recipient is not notified and can reconnect
+    /// by texting the triage number again. Identity-scoped keys can only
+    /// release their own identity's connections. Returns a not-found error if
+    /// the connection does not exist or is already released.
+    ///
+    /// # Arguments
+    /// * `assignment_id` - UUID of the connection, from `list_assignments`.
+    pub fn release_assignment(&self, assignment_id: &Uuid) -> Result<()> {
+        self.http.delete(&format!("/assignments/{assignment_id}"))
+    }
+
     /// List iMessage conversations with latest-message preview.
     ///
     /// # Arguments
@@ -916,6 +930,24 @@ mod tests {
         mock.assert();
         assert_eq!(reaction.assignment_id, None);
         assert_eq!(reaction.reaction, IMessageReactionType::Eyes);
+    }
+
+    #[test]
+    fn release_assignment_deletes_the_connection_by_id() {
+        let server = MockServer::start();
+        let assignment_id = Uuid::parse_str("bbbb2222-0000-0000-0000-000000000001").unwrap();
+        let mock = server.mock(|when, then| {
+            when.method(DELETE)
+                .path(format!("/api/v1/imessage/assignments/{assignment_id}"));
+            then.status(204);
+        });
+
+        client(&server)
+            .imessages()
+            .release_assignment(&assignment_id)
+            .unwrap();
+
+        mock.assert();
     }
 
     #[test]

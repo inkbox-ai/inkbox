@@ -807,6 +807,25 @@ describe("IMessagesResource.listAssignments", () => {
     expect(rows[0].remoteNumber).toBe(REMOTE);
     expect(rows[0].releasedAt).toBeNull();
   });
+
+  it("releaseAssignment deletes the connection by id", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      headers: { get() { return null; }, getSetCookie() { return []; } } as unknown as Headers,
+      json: () => Promise.resolve(undefined),
+    } as Response);
+    const resource = new IMessagesResource(new HttpTransport("k", BASE));
+    const assignmentId = "bbbb2222-0000-0000-0000-000000000001";
+
+    await resource.releaseAssignment(assignmentId);
+
+    const { url, init } = lastCall();
+    expect(url).toBe(`${BASE}/assignments/${assignmentId}`);
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+  });
 });
 
 describe("conversation assignmentStatus", () => {

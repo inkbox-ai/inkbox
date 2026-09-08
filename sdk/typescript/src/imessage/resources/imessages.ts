@@ -268,6 +268,21 @@ export class IMessagesResource {
   }
 
   /**
+   * Release an active iMessage connection.
+   *
+   * Inbound from the recipient stops routing to the agent and the shared
+   * line can be reassigned. The recipient is not notified and can reconnect
+   * by texting the triage number again. Identity-scoped keys can only
+   * release their own identity's connections. Throws `NotFoundError` if the
+   * connection does not exist or is already released.
+   *
+   * @param assignmentId - UUID of the connection, from `listAssignments`.
+   */
+  async releaseAssignment(assignmentId: string): Promise<void> {
+    await this.http.delete(`/assignments/${assignmentId}`);
+  }
+
+  /**
    * List iMessage conversations with latest-message preview.
    *
    * @param options.agentIdentityId - Narrow to one agent identity.
