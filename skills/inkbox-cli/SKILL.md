@@ -372,7 +372,7 @@ inkbox imessage send -i <handle> --to +15551234567,+15557654321 --text "Hello gr
 inkbox imessage send -i <handle> --conversation-id <group-conversation-id> --text "Reply" --media-url https://example.com/follow-up.jpg --send-style lasers
 inkbox imessage list -i <handle> --limit 20 --unread-only --include-groups
 inkbox imessage assignments -i <handle> --limit 20   # active connections, newest first
-inkbox imessage disconnect <assignment-id> -i <handle>  # admin key only; recipient can reconnect via triage
+inkbox imessage disconnect <assignment-id>   # admin key only; recipient can reconnect via triage
 inkbox imessage conversations -i <handle> --limit 20 --include-groups
 inkbox imessage conversation <conversation-id> -i <handle> --limit 50
 inkbox imessage react <message-id> -i <handle> --reaction like

@@ -12,12 +12,14 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   (Python), `imessages.releaseAssignment` /
   `identity.releaseIMessageAssignment` (TypeScript), `release_assignment` /
   `release_imessage_assignment` (Rust), and `inkbox imessage disconnect
-  <assignment-id> -i <handle>` (CLI) call the new
+  <assignment-id>` (CLI) call the new
   `DELETE /imessage/assignments/{assignment_id}`. Releasing a connection stops
   routing the recipient's inbound to the agent and frees the shared line. The
   recipient is not notified and can reconnect by texting the triage number.
   Requires an admin API key; identity-scoped keys are rejected. A missing or
   already-released connection is a not-found error.
+- Bundled plugin manifests receive patch releases: Claude `0.6.10`, Codex
+  `0.1.5`, and Cursor `1.0.3`.
 
 ## 0.6.9 — Creating a contact saves a matching suggestion
 
