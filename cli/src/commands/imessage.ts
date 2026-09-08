@@ -389,6 +389,18 @@ export function registerIMessageCommands(program: Command): void {
     );
 
   imessage
+    .command("disconnect <assignment-id>")
+    .description("Release an active connection (admin API key only); the recipient is not notified and can reconnect")
+    .action(
+      withErrorHandler(async function (this: Command, assignmentId: string) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        await inkbox.imessages.releaseAssignment(assignmentId);
+        output({ id: assignmentId, released: true }, { json: !!opts.json });
+      }),
+    );
+
+  imessage
     .command("conversations")
     .description("List iMessage conversation summaries")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")

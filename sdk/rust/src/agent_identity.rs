@@ -1225,6 +1225,20 @@ impl AgentIdentity {
             .list_assignments(Some(&id), limit, offset)
     }
 
+    /// Disconnect a recipient from this identity.
+    ///
+    /// Requires an admin API key; identity-scoped keys are rejected. Inbound
+    /// from them stops routing here and the shared line can be reassigned.
+    /// They are not notified and can reconnect by texting the triage number
+    /// again.
+    ///
+    /// # Arguments
+    /// * `assignment_id` - UUID of the connection, from `list_imessage_assignments`.
+    pub fn release_imessage_assignment(&self, assignment_id: &Uuid) -> Result<()> {
+        self.require_imessage()?;
+        self.inkbox.imessages().release_assignment(assignment_id)
+    }
+
     /// List this identity's iMessage conversations.
     pub fn list_imessage_conversations(
         &self,

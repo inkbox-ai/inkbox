@@ -1013,6 +1013,21 @@ export class AgentIdentity {
   }
 
   /**
+   * Disconnect a recipient from this identity.
+   *
+   * Requires an admin API key; identity-scoped keys are rejected. Inbound
+   * from them stops routing here and the shared line can be reassigned.
+   * They are not notified and can reconnect by texting the triage number
+   * again.
+   *
+   * @param assignmentId - UUID of the connection, from `listIMessageAssignments`.
+   */
+  async releaseIMessageAssignment(assignmentId: string): Promise<void> {
+    this._requireIMessage();
+    await this._inkbox._imessages.releaseAssignment(assignmentId);
+  }
+
+  /**
    * List this identity's iMessage conversations.
    *
    * @param options.limit - Maximum number of results. Defaults to 50.

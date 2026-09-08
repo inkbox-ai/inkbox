@@ -264,6 +264,20 @@ class IMessagesResource:
         data = self._http.get("/assignments", params=params)
         return [IMessageAssignment._from_dict(a) for a in data]
 
+    def release_assignment(self, assignment_id: UUID | str) -> None:
+        """Release an active iMessage connection.
+
+        Requires an admin API key; identity-scoped keys are rejected. Inbound
+        from the recipient stops routing to the agent and the shared line can
+        be reassigned. The recipient is not notified and can reconnect by
+        texting the triage number again. Raises ``NotFoundError`` if the
+        connection does not exist or is already released.
+
+        Args:
+            assignment_id: UUID of the connection, from ``list_assignments``.
+        """
+        self._http.delete(f"/assignments/{assignment_id}")
+
     def list_conversations(
         self,
         *,

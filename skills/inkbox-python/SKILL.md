@@ -559,6 +559,7 @@ print(convo.assignment_status)
 
 # Who is actively connected to this identity right now (paginated)?
 connections = identity.list_imessage_assignments(limit=20)
+identity.release_imessage_assignment(connections[0].id)  # admin key only; they can reconnect via triage
 for a in connections:
     print(a.remote_number, a.status, a.created_at)
 
