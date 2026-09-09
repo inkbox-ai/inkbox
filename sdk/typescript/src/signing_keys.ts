@@ -60,11 +60,44 @@ function parseSigningKeyStatus(r: RawSigningKeyStatus): SigningKeyStatus {
   };
 }
 
+type HeaderValue = string | string[] | undefined;
+type HeaderMap = Record<string, HeaderValue>;
+
+/**
+ * Web API `Headers`, Next.js `ReadonlyHeaders`, undici `Headers` from
+ * another realm, or any object with the same `.entries()` / `.get()` shape.
+ * `instanceof Headers` is not used: it fails across realms and for
+ * ReadonlyHeaders that do not inherit from the local `Headers` class.
+ */
+interface HeadersLike {
+  entries(): Iterable<[string, string]>;
+  get(name: string): string | null;
+}
+
+function isHeadersLike(headers: unknown): headers is HeadersLike {
+  return (
+    typeof headers === "object" &&
+    headers !== null &&
+    typeof (headers as HeadersLike).entries === "function" &&
+    typeof (headers as HeadersLike).get === "function"
+  );
+}
+
+/** Express `req.headers` is a plain object; Next.js / fetch give a Headers-like object. */
+function headerList(headers: HeaderMap | HeadersLike): [string, HeaderValue][] {
+  if (isHeadersLike(headers)) {
+    return [...headers.entries()];
+  }
+  return Object.entries(headers);
+}
+
 /**
  * Verify that an incoming webhook request was sent by Inkbox.
  *
  * @param payload  - Raw request body as a Buffer or string.
- * @param headers  - Request headers object (keys are lowercased internally).
+ * @param headers  - Request headers (plain object, Web API `Headers`, or
+ *   any Headers-like object with `.entries()` / `.get()`, including Next.js
+ *   `headers()` / ReadonlyHeaders). Keys are lowercased internally.
  * @param secret   - Your signing key, with or without a `whsec_` prefix.
  * @returns True if the signature is valid.
  */
@@ -74,11 +107,11 @@ export function verifyWebhook({
   secret,
 }: {
   payload: Buffer | string;
-  headers: Record<string, string | string[] | undefined>;
+  headers: HeaderMap | HeadersLike;
   secret: string;
 }): boolean {
   const h: Record<string, string | undefined> = {};
-  for (const [k, v] of Object.entries(headers)) {
+  for (const [k, v] of headerList(headers)) {
     h[k.toLowerCase()] = Array.isArray(v) ? v[0] : v;
   }
   const signature = h["x-inkbox-signature"] ?? "";
