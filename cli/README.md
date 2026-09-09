@@ -292,6 +292,11 @@ returned alongside the entries in JSON output. Config setters are a full
 replacement: read the current config first and include its existing
 `--instructions` when changing only the voice.
 
+Custom voices assigned to your organization appear in this same catalog and
+use the same `--voice` option. Other organizations do not see them. A relative
+`previewUrl` is resolved against your API origin and requires authentication;
+absolute public preview URLs do not require your API key.
+
 Shared origination uses the identity's active iMessage-line assignment and
 does not require a dedicated phone number. The recipient must already have a
 shared iMessage connection to the identity; otherwise the call fails with

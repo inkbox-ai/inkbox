@@ -557,6 +557,7 @@ pub struct HostedAgentVoiceOption {
     pub name: String,
     pub description: String,
     pub available: bool,
+    /// Relative paths use the API origin and require auth; public URLs do not.
     #[serde(default)]
     pub preview_url: Option<String>,
 }

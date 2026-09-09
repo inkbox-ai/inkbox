@@ -22,6 +22,26 @@ function mockHttp() {
 const IDENTITY_ID = "eeee5555-0000-0000-0000-000000000001";
 
 describe("HostedAgentConfigResource.listVoices", () => {
+  it("selects an opaque custom voice and preserves its authenticated preview path", async () => {
+    const http = mockHttp();
+    const id = "custom_0123456789abcdef0123456789abcdef";
+    const preview = `/api/v1/phone/hosted-agent-voices/${id}/preview`;
+    vi.mocked(http.get).mockResolvedValue({
+      default_voice: "standard-voice",
+      voices: [{ id, name: "Custom Voice", description: "Warm", available: true, preview_url: preview }],
+    });
+    vi.mocked(http.put).mockResolvedValue({ ...RAW_HOSTED_AGENT_CONFIG, voice: id, effective_voice: id });
+    const resource = new HostedAgentConfigResource(http);
+
+    const voice = (await resource.listVoices()).voices[0];
+    const config = await resource.setConfig({ voice: voice.id, instructions: "Be brief." });
+
+    expect(voice.previewUrl).toBe(preview);
+    expect(http.put).toHaveBeenCalledExactlyOnceWith("/hosted-agent-config", { voice: id, instructions: "Be brief." });
+    expect(config.voice).toBe(id);
+    expect(config.effectiveVoice).toBe(id);
+  });
+
   it("fetches the organization catalog and preserves all voices and preview states", async () => {
     const http = mockHttp();
     const voice = { id: "future-voice", name: "Future Voice", description: "Warm", available: true };

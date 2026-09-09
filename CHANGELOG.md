@@ -4,6 +4,13 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## Unreleased
+
+### Documentation
+
+- Clarify organization-specific voice catalogs and authenticated preview paths;
+  voice selection continues to accept opaque catalog IDs in every SDK and the CLI.
+
 ## 0.6.10 — Release an iMessage connection
 
 ### Added

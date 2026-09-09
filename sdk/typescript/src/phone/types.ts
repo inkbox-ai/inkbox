@@ -407,6 +407,7 @@ export interface HostedAgentVoiceOption {
   name: string;
   description: string;
   available: boolean;
+  /** Relative paths use the API origin and require auth; public URLs do not. */
   previewUrl: string | null;
 }
 

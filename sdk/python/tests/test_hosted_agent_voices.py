@@ -3,9 +3,48 @@
 import httpx
 import pytest
 
-from inkbox import HostedAgentVoiceCatalog, HostedAgentVoiceOption, Inkbox, InkboxAPIError
+from inkbox import (
+    HostedAgentVoiceCatalog,
+    HostedAgentVoiceOption,
+    Inkbox,
+    InkboxAPIError,
+)
 from inkbox.phone import HostedAgentVoiceCatalog as PhoneVoiceCatalog
 from inkbox.phone import HostedAgentVoiceOption as PhoneVoiceOption
+from sample_data import HOSTED_AGENT_CONFIG_DICT
+
+
+def test_custom_voice_catalog_entry_can_be_selected_without_rewriting(
+    client, transport
+):
+    voice_id = "custom_0123456789abcdef0123456789abcdef"
+    preview = f"/api/v1/phone/hosted-agent-voices/{voice_id}/preview"
+    transport.get.return_value = {
+        "default_voice": "standard-voice",
+        "voices": [
+            {
+                "id": voice_id,
+                "name": "Custom Voice",
+                "description": "Warm",
+                "available": True,
+                "preview_url": preview,
+            }
+        ],
+    }
+    transport.put.return_value = {
+        **HOSTED_AGENT_CONFIG_DICT,
+        "voice": voice_id,
+        "effective_voice": voice_id,
+    }
+
+    voice = client.hosted_agent.list_voices().voices[0]
+    config = client.hosted_agent.set_config(voice=voice.id, instructions="Be brief.")
+
+    assert voice.preview_url == preview
+    transport.put.assert_called_once_with(
+        "/hosted-agent-config", json={"voice": voice_id, "instructions": "Be brief."}
+    )
+    assert config.voice == config.effective_voice == voice_id
 
 
 def test_list_voices_parses_options_without_filtering(client, transport):
@@ -90,7 +129,9 @@ def test_list_voices_exact_wire_and_errors(monkeypatch, status_code):
             ),
         )
 
-    monkeypatch.setattr(httpx, "HTTPTransport", lambda **kwargs: httpx.MockTransport(handler))
+    monkeypatch.setattr(
+        httpx, "HTTPTransport", lambda **kwargs: httpx.MockTransport(handler)
+    )
     with Inkbox(api_key="sk-test", base_url="https://example.com") as sdk:
         if status_code == 200:
             assert sdk.hosted_agent.list_voices().voices == []

@@ -679,7 +679,8 @@ class HostedAgentVoiceOption:
     """A Voice AI voice and whether your organization can select it.
 
     Voice IDs are open-ended strings. ``preview_url`` is ``None`` when no
-    prerecorded sample is available.
+    prerecorded sample is available. Relative preview paths resolve against
+    the API origin and require authentication; external public URLs do not.
     """
 
     id: str

@@ -144,6 +144,42 @@ mod tests {
     }
 
     #[test]
+    fn custom_voice_catalog_entry_can_be_selected_without_rewriting() {
+        let server = MockServer::start();
+        let id = "custom_0123456789abcdef0123456789abcdef";
+        let preview = format!("/api/v1/phone/hosted-agent-voices/{id}/preview");
+        let catalog_mock = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/phone/hosted-agent-voices");
+            then.status(200).json_body(json!({
+                "default_voice": "standard-voice",
+                "voices": [{"id": id, "name": "Custom Voice", "description": "Warm",
+                            "available": true, "preview_url": preview}]
+            }));
+        });
+        let config_mock = server.mock(|when, then| {
+            when.method(PUT)
+                .path("/api/v1/phone/hosted-agent-config")
+                .json_body(json!({"voice": id, "instructions": "Be brief."}));
+            let mut response = config_json();
+            response["voice"] = json!(id);
+            response["effective_voice"] = json!(id);
+            then.status(200).json_body(response);
+        });
+        let sdk = client(&server);
+        let catalog = sdk.hosted_agent().list_voices().unwrap();
+        let voice = &catalog.voices[0];
+        assert_eq!(voice.preview_url.as_deref(), Some(preview.as_str()));
+        let config = sdk
+            .hosted_agent()
+            .set_config(None, Some(&voice.id), None, Some("Be brief."))
+            .unwrap();
+        assert_eq!(config.voice.as_deref(), Some(id));
+        assert_eq!(config.effective_voice, id);
+        catalog_mock.assert();
+        config_mock.assert();
+    }
+
+    #[test]
     fn list_voices_preserves_catalog_without_identity_query() {
         fn no_query_params(req: &HttpMockRequest) -> bool {
             req.query_params.clone().unwrap_or_default().is_empty()

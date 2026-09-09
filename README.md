@@ -180,6 +180,14 @@ voice and instructions, so preserve the saved instructions when changing only
 the voice. Discovery requires an API that supports the catalog endpoint;
 existing string-based voice selection does not require this new method.
 
+Catalogs can differ by organization. Custom voices assigned to your organization
+appear alongside the standard voices and use the same configuration setter;
+they are not listed for other organizations. Treat voice IDs as opaque strings.
+Preview URLs may be absolute public URLs or paths beginning with `/api/v1/`.
+Resolve a relative preview path against your Inkbox API origin and fetch it
+with the same authentication as the catalog. Do not send API credentials to
+external preview hosts. A missing preview does not prevent voice selection.
+
 ### A2A discovery and history
 
 Each identity can inspect work it received, work it requested, or both without

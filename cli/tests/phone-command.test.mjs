@@ -96,6 +96,7 @@ test("hosted-agent voices requires no identity and preserves the full JSON catal
         { id: "future-voice", name: "Future Voice", description: "Warm", available: true, preview_url: "https://example.com/voice.wav" },
         { id: "unavailable-voice", name: "Unavailable Voice", description: "Clear", available: false, preview_url: null },
         { id: "no-preview", name: "No Preview", description: "Calm", available: true },
+        { id: "custom_0123456789abcdef0123456789abcdef", name: "Custom Voice", description: "Warm", available: true, preview_url: "/api/v1/phone/hosted-agent-voices/custom_0123456789abcdef0123456789abcdef/preview" },
       ],
       default_voice: "future-voice",
     }));
@@ -112,6 +113,7 @@ test("hosted-agent voices requires no identity and preserves the full JSON catal
         { id: "future-voice", name: "Future Voice", description: "Warm", available: true, previewUrl: "https://example.com/voice.wav" },
         { id: "unavailable-voice", name: "Unavailable Voice", description: "Clear", available: false, previewUrl: null },
         { id: "no-preview", name: "No Preview", description: "Calm", available: true, previewUrl: null },
+        { id: "custom_0123456789abcdef0123456789abcdef", name: "Custom Voice", description: "Warm", available: true, previewUrl: "/api/v1/phone/hosted-agent-voices/custom_0123456789abcdef0123456789abcdef/preview" },
       ],
       defaultVoice: "future-voice",
     });
