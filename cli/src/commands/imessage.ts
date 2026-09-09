@@ -124,21 +124,46 @@ function registerContactRuleCommands(parent: Command): void {
     .description("List iMessage contact rules for an identity")
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .option("--action <action>", "Filter by 'allow' or 'block'")
+    .option("--match-type <type>", "Filter by match_type: exact_number")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; action?: string; limit: string; offset: string },
+        cmdOpts: {
+          identity: string;
+          action?: string;
+          matchType?: string;
+          limit: string;
+          offset: string;
+        },
       ) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rules = await inkbox.imessageContactRules.list(cmdOpts.identity, {
           action: cmdOpts.action as never,
+          matchType: cmdOpts.matchType as never,
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
         output(rules, { json: !!opts.json, columns: CONTACT_RULE_COLUMNS });
+      }),
+    );
+
+  rule
+    .command("get <rule-id>")
+    .description("Get a single iMessage contact rule")
+    .requiredOption("-i, --identity <handle>", "Agent identity handle")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        ruleId: string,
+        cmdOpts: { identity: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const inkbox = createClient(opts);
+        const rule = await inkbox.imessageContactRules.get(cmdOpts.identity, ruleId);
+        output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
       }),
     );
 
@@ -148,10 +173,11 @@ function registerContactRuleCommands(parent: Command): void {
     .requiredOption("-i, --identity <handle>", "Agent identity handle")
     .requiredOption("--action <action>", "'allow' or 'block'")
     .requiredOption("--match-target <number>", "Phone number to match (E.164)")
+    .option("--match-type <type>", "match_type: exact_number (default: exact_number)")
     .action(
       withErrorHandler(async function (
         this: Command,
-        cmdOpts: { identity: string; action: string; matchTarget: string },
+        cmdOpts: { identity: string; action: string; matchTarget: string; matchType?: string },
       ) {
         if (cmdOpts.action !== "allow" && cmdOpts.action !== "block") {
           throw new Error("--action must be 'allow' or 'block'");
@@ -161,6 +187,7 @@ function registerContactRuleCommands(parent: Command): void {
         const row = await inkbox.imessageContactRules.create(cmdOpts.identity, {
           action: cmdOpts.action as never,
           matchTarget: cmdOpts.matchTarget,
+          matchType: cmdOpts.matchType as never,
         });
         output(row, { json: !!opts.json });
       }),
@@ -213,6 +240,7 @@ function registerContactRuleCommands(parent: Command): void {
     .description("Org-wide list of iMessage contact rules (admin-only)")
     .option("--agent-identity-id <id>", "Narrow to one agent identity by id")
     .option("--action <action>", "Filter by 'allow' or 'block'")
+    .option("--match-type <type>", "Filter by match_type: exact_number")
     .option("--limit <n>", "Max results", "50")
     .option("--offset <n>", "Pagination offset", "0")
     .action(
@@ -221,6 +249,7 @@ function registerContactRuleCommands(parent: Command): void {
         cmdOpts: {
           agentIdentityId?: string;
           action?: string;
+          matchType?: string;
           limit: string;
           offset: string;
         },
@@ -230,6 +259,7 @@ function registerContactRuleCommands(parent: Command): void {
         const rules = await inkbox.imessageContactRules.listAll({
           agentIdentityId: cmdOpts.agentIdentityId,
           action: cmdOpts.action as never,
+          matchType: cmdOpts.matchType as never,
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
