@@ -4,41 +4,23 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.6 - Sender access metadata
-
-### Added
-
-- Optional `sender_access` on inbound email, SMS/MMS, and iMessage webhooks and
-  Companion history entries, retained across initialization pages in all three SDKs.
-  `direct` means the message passed contact rules at receipt, including allowed by
-  default; `sponsored` means it was admitted through conversation sponsorship.
-  Neither value grants trust or command permission. Unknown or inapplicable access
-  is omitted, never inferred as `direct`.
-
-### Changed
-
-- Companion history parsing consistently accepts omission and rejects explicit
-  `null` or unrecognized `sender_access` values in Python, TypeScript, and Rust.
-- **Rust source compatibility:** `MailWebhookMessage`, `TextWebhookMessage`,
-  `IMessageWebhookMessage`, and `CompanionHistoryEntry` now have a public
-  `sender_access` field. Existing exhaustive struct literals must add
-  `sender_access: None`, or `Some(SenderAccess::Direct)` /
-  `Some(SenderAccess::Sponsored)` when known. Existing JSON with the field omitted
-  remains compatible.
-
-## 0.7.5 - Email sender display names
+## 0.7.5 - Email sender display names and phone country metadata
 
 ### Added
 
 - Email messages expose the optional From display name in Python, TypeScript,
   Rust, and CLI message detail output.
+- Add ISO 3166-1 alpha-2 country metadata to phone-number responses and CLI output.
+- Preserve the legacy US default for responses that predate country metadata.
 
 ### Changed
 
-- Versions move to 0.7.5 across the Python, TypeScript, and Rust SDKs, CLI, and
+- Versions move to 0.7.5 across the Python, TypeScript, Rust SDKs, CLI, and
   bundled plugin. The CLI depends on `@inkbox/sdk` `^0.7.5`.
 - Rust `Message` has a new `from_display_name` field. Exhaustive struct literals
   must include it; use `None` when no display name is available.
+- Allow non-US phone numbers to omit the US-only state field while preserving existing API behavior.
+- Keep phone-number provisioning and purchasing options unchanged.
 
 ## 0.7.4 - Native Windows Python tunnels
 
