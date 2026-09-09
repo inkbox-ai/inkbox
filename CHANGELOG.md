@@ -4,6 +4,22 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.11 — Phone number country metadata
+
+### Added
+
+- Phone numbers and identity-linked phone numbers expose an ISO 3166-1 alpha-2
+  `country` code (for example, `US` or `GB`) across Python, TypeScript, and Rust.
+  Older responses without country default to `US`; state remains nullable.
+- `inkbox identity get` and `inkbox identity refresh` include `phoneCountry` and
+  `phoneState`, preserving the existing `phoneNumber` output.
+
+### Changed
+
+- Rust source compatibility: exhaustive `PhoneNumber` and `IdentityPhoneNumber`
+  struct literals must initialize the new `country` field. JSON deserialization
+  remains compatible with older responses. Purchase options are unchanged.
+
 ## 0.6.10 — Release an iMessage connection
 
 ### Added

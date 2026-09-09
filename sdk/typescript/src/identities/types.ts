@@ -145,9 +145,11 @@ export interface IdentityPhoneNumber {
   forwardingSipUri: string | null;
   filterMode: FilterMode;
   /**
-   * 2-letter US state abbreviation (e.g. `"NY"`); `null` if not set.
+   * US state abbreviation when known; `null` when not applicable.
    */
   state: string | null;
+  /** ISO 3166-1 alpha-2 code. Parsers default older responses to `"US"`. */
+  country?: string;
   /**
    * UUID of the owning agent identity. On the embedded variant this
    * always equals the owning identity's ID.
@@ -249,6 +251,7 @@ export interface RawIdentityPhoneNumber {
   forwarding_sip_uri?: string | null;
   filter_mode?: string;
   state?: string | null;
+  country?: string;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
@@ -319,6 +322,7 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
     forwardingSipUri: r.forwarding_sip_uri ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     state: r.state ?? null,
+    country: r.country ?? "US",
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),

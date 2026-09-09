@@ -26,6 +26,18 @@ import {
 } from "../sampleData.js";
 
 describe("parsePhoneNumber", () => {
+  it.each([
+    [{ country: "GB", state: null, number: "+447700900123" }, "GB", null],
+    [{ country: "US", state: "NY" }, "US", "NY"],
+    [{ state: "NY" }, "US", "NY"],
+    [{ state: undefined }, "US", null],
+  ] as const)("preserves country and nullable state: %j", (fields, country, state) => {
+    const number = parsePhoneNumber({ ...RAW_PHONE_NUMBER, ...fields });
+    expect(number.country).toBe(country);
+    expect(number.state).toBe(state);
+    expect(number.number).toBe("number" in fields ? fields.number : RAW_PHONE_NUMBER.number);
+  });
+
   it("converts all fields", () => {
     const n = parsePhoneNumber(RAW_PHONE_NUMBER);
     expect(n.id).toBe(RAW_PHONE_NUMBER.id);
