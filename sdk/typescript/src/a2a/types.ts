@@ -1,4 +1,6 @@
 /** Inkbox A2A inbox types and standard A2A 1.0 wire types. */
+import { parseDomainAffiliation } from "../organization_domains/types.js";
+import type { DomainAffiliation } from "../organization_domains/types.js";
 
 export type A2ATaskState =
   | "submitted"
@@ -83,7 +85,12 @@ export interface A2ADirectoryListOptions {
   limit?: number;
 }
 
+export interface A2APublicDirectoryListOptions extends A2ADirectoryListOptions {
+  verifiedDomain?: string;
+}
+
 export interface A2ACaller {
+  affiliation?: DomainAffiliation | null;
   identityId: string;
   organizationId: string;
   handle: string | null;
@@ -91,12 +98,14 @@ export interface A2ACaller {
 }
 
 export interface A2ATarget {
+  affiliation?: DomainAffiliation | null;
   identityId: string;
   organizationId: string;
   handle: string | null;
 }
 
 export interface A2AMessage {
+  affiliation?: DomainAffiliation | null;
   id: string;
   messageId: string;
   role: string;
@@ -167,6 +176,7 @@ export type A2ASentContextListOptions = Omit<
 >;
 
 export interface A2AHistoryMessage {
+  affiliation?: DomainAffiliation | null;
   id: string;
   messageId: string;
   taskId: string;
@@ -257,16 +267,19 @@ export function parseA2ATask(raw: Record<string, any>): A2ATask {
       organizationId: raw.caller.organization_id,
       handle: raw.caller.handle ?? null,
       trustTier: raw.caller.trust_tier ?? "inkbox_verified",
+      affiliation: parseDomainAffiliation(raw.caller.affiliation),
     },
     target: raw.target ? {
       identityId: raw.target.identity_id,
       organizationId: raw.target.organization_id,
       handle: raw.target.handle ?? null,
+      affiliation: parseDomainAffiliation(raw.target.affiliation),
     } : null,
     messages: (raw.messages ?? []).map((item: Record<string, any>) => ({
       id: item.id,
       messageId: item.message_id,
       role: item.role,
+      affiliation: parseDomainAffiliation(item.affiliation),
       parts: item.parts ?? [],
       metadata: item.metadata ?? null,
       extensions: item.extensions ?? null,
@@ -289,11 +302,13 @@ export function parseA2AContext(raw: Record<string, any>): A2AContext {
       organizationId: raw.caller.organization_id,
       handle: raw.caller.handle ?? null,
       trustTier: raw.caller.trust_tier ?? "inkbox_verified",
+      affiliation: parseDomainAffiliation(raw.caller.affiliation),
     },
     target: raw.target ? {
       identityId: raw.target.identity_id,
       organizationId: raw.target.organization_id,
       handle: raw.target.handle ?? null,
+      affiliation: parseDomainAffiliation(raw.target.affiliation),
     } : null,
     tasks: (raw.tasks ?? []).map(parseA2ATask),
     tasksTruncated: raw.tasks_truncated ?? false,
@@ -316,13 +331,16 @@ export function parseA2AHistoryMessage(
       organizationId: raw.caller.organization_id,
       handle: raw.caller.handle ?? null,
       trustTier: raw.caller.trust_tier ?? "inkbox_verified",
+      affiliation: parseDomainAffiliation(raw.caller.affiliation),
     },
     target: raw.target ? {
       identityId: raw.target.identity_id,
       organizationId: raw.target.organization_id,
       handle: raw.target.handle ?? null,
+      affiliation: parseDomainAffiliation(raw.target.affiliation),
     } : null,
     role: raw.role,
+    affiliation: parseDomainAffiliation(raw.affiliation),
     parts: raw.parts ?? [],
     metadata: raw.metadata ?? null,
     extensions: raw.extensions ?? null,

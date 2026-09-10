@@ -18,6 +18,7 @@ use crate::identities::types::{
     AgentIdentityData, AgentIdentitySummary, IdentityMailboxCreateOptions,
     IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions, Unset, VaultSecretIds,
 };
+use crate::organization_domains::{path_segment, IdentityDomainAffiliation};
 use uuid::Uuid;
 
 pub struct IdentitiesResource {
@@ -27,6 +28,30 @@ pub struct IdentitiesResource {
 impl IdentitiesResource {
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
+    }
+
+    pub fn get_domain_affiliation(&self, agent_handle: &str) -> Result<IdentityDomainAffiliation> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/{}/domain-affiliation", path_segment(agent_handle)),
+            crate::http::NO_QUERY,
+        )?)?)
+    }
+
+    pub fn set_domain_affiliation(
+        &self,
+        agent_handle: &str,
+        domain_claim_id: &str,
+        publish_publicly: bool,
+    ) -> Result<IdentityDomainAffiliation> {
+        Ok(serde_json::from_value(self.http.put(&format!("/{}/domain-affiliation", path_segment(agent_handle)),
+            &serde_json::json!({"domain_claim_id": domain_claim_id, "publish_publicly": publish_publicly}))?)?)
+    }
+
+    pub fn remove_domain_affiliation(&self, agent_handle: &str) -> Result<()> {
+        self.http.delete(&format!(
+            "/{}/domain-affiliation",
+            path_segment(agent_handle)
+        ))
     }
 
     /// Create a new agent identity. Atomically provisions the identity's

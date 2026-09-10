@@ -580,3 +580,35 @@ WebSocket). See `src/tunnels/client/`.
 ## License
 
 MIT
+
+## Verified domains
+
+An organization admin can prove DNS control, select a domain for an agent, and
+choose public display independently from public directory listing. Hidden
+selected domains remain available to authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, transfer, and recovery rules. These methods require version 0.6.5 or later.
+
+```rust
+let client = inkbox::Inkbox::from_env()?;
+let claim = client.organization_domains().create("example.com")?;
+println!("{} {}", claim.dns_record.name, claim.dns_record.value);
+// Add the exact TXT record before verifying.
+let claim = client.organization_domains().verify(&claim.id)?;
+if claim.state == "verified" {
+    client.identities().set_domain_affiliation("helper", &claim.id, false)?;
+}
+let page = client.a2a().public_directory(&inkbox::a2a::A2ADirectoryListOptions {
+    verified_domain: Some("example.com".into()),
+    ..Default::default()
+})?;
+```
+
+Claim methods: `create`, `list`, `get`, `verify`, `transfer`, `delete`.
+Identity resources expose `get_domain_affiliation`, `set_domain_affiliation`, and
+`remove_domain_affiliation`. The boolean publication argument is required.
+A2A participants and messages expose optional `affiliation` values.

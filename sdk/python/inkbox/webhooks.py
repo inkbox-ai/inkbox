@@ -793,13 +793,22 @@ A2AWebhookEventType = Literal[
 ]
 
 
+class DomainAffiliationPayload(TypedDict):
+    domain: str
+    verifier: str
+    last_success_at: str
+    valid_until: str
+
+
 class A2AWebhookCaller(TypedDict):
+    affiliation: NotRequired[DomainAffiliationPayload | None]
     identity_id: str
     organization_id: str
     handle: str | None
 
 
 class A2AWebhookData(TypedDict):
+    sender: NotRequired[A2AWebhookCaller | None]
     task_id: str
     context_id: str
     state: str

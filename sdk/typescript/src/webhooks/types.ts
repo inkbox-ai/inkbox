@@ -757,12 +757,14 @@ export type A2AWebhookEventType =
   | "a2a.sent_task.updated";
 
 export interface A2AWebhookCaller {
+  affiliation?: { domain: string; verifier: string; last_success_at: string; valid_until: string } | null;
   identity_id: string;
   organization_id: string;
   handle: string | null;
 }
 
 export interface A2AWebhookData {
+  sender?: A2AWebhookCaller | null;
   task_id: string;
   context_id: string;
   state: string;

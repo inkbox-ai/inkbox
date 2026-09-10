@@ -34,6 +34,18 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         whoami = inkbox.whoami()
         assert whoami.organization_id == ctx.bootstrap.org_id
 
+        claim_domain = f"certification-{uuid4().hex}.example.com"
+        claim = inkbox.organization_domains.create(claim_domain)
+        try:
+            assert claim.state == "pending"
+            repeated = inkbox.organization_domains.create(claim_domain.upper() + ".")
+            assert repeated.id == claim.id
+            assert inkbox.organization_domains.get(claim.id).dns_record.name == f"_inkbox.{claim_domain}"
+            assert inkbox.organization_domains.verify(claim.id).valid_until is None
+            assert inkbox.a2a.public_directory(verified_domain=claim_domain).items == []
+        finally:
+            inkbox.organization_domains.delete(claim.id)
+
         # ── empty state ────────────────────────────────────────────
         log_step(ctx, "verify empty identity list")
         identities = inkbox.list_identities()
@@ -51,6 +63,7 @@ def test_python_sdk_lifecycle(sdk_context: SdkIntegrationContext) -> None:
         assert alpha.tunnel.public_host.startswith(f"{alpha_handle}.")
         assert alpha.tunnel.public_host.endswith(".inkboxwire.com")
         assert alpha.description == "alpha integration-test identity"
+        assert inkbox.identities.get_domain_affiliation(alpha_handle).affiliation is None
 
         log_step(ctx, f"create identity {bravo_handle}")
         bravo = inkbox.create_identity(bravo_handle)

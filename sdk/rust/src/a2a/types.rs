@@ -1,3 +1,4 @@
+use crate::organization_domains::DomainAffiliation;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -84,6 +85,7 @@ pub struct A2AContextListOptions {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct A2ADirectoryListOptions {
+    pub verified_domain: Option<String>,
     pub q: Option<String>,
     pub cursor: Option<String>,
     pub limit: Option<u32>,
@@ -114,6 +116,8 @@ pub struct A2ADirectoryPage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2ACaller {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub affiliation: Option<DomainAffiliation>,
     pub identity_id: Uuid,
     pub organization_id: String,
     pub handle: Option<String>,
@@ -122,6 +126,8 @@ pub struct A2ACaller {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2ATarget {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub affiliation: Option<DomainAffiliation>,
     pub identity_id: Uuid,
     pub organization_id: String,
     pub handle: Option<String>,
@@ -129,6 +135,8 @@ pub struct A2ATarget {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2AMessage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub affiliation: Option<DomainAffiliation>,
     pub id: Uuid,
     pub message_id: String,
     pub role: String,
@@ -166,6 +174,8 @@ pub struct A2ATaskPage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2AHistoryMessage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub affiliation: Option<DomainAffiliation>,
     pub id: Uuid,
     pub message_id: String,
     pub task_id: Uuid,

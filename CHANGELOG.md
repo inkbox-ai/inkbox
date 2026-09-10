@@ -4,6 +4,19 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.11 — Verified domains
+
+### Added
+
+- Organization domain ownership claims with TXT instructions, verification, explicit transfer, and release in Python, TypeScript, Rust, and the CLI.
+- Agent domain affiliation with an explicit public-display choice. Authorized A2A participants can inspect current affiliations even when public display is off.
+- Exact verified-domain filtering for public A2A directory searches, including pagination. Task, context, message, and webhook types carry optional domain assertions and actual webhook senders.
+
+### Changed
+
+- SDK and CLI packages move to `0.6.11`; bundled plugin manifests move to Claude `0.6.11`, Codex `0.1.6`, and Cursor `1.0.4`.
+- Rust directory options and A2A response/webhook structs have new fields. Downstream exhaustive struct literals must include them; directory options can use `..Default::default()`.
+
 ## 0.6.10 — Release an iMessage connection
 
 ### Added

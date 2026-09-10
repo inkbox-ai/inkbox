@@ -1382,3 +1382,35 @@ except InkboxAPIError as e:
 - To clear a nullable field (e.g. webhook URL), pass `field=None`
 - The `Inkbox` client **must** be used as a context manager (`with` statement) or `.close()` called manually
 - Mail/phone methods on `AgentIdentity` raise `InkboxError` if the relevant channel isn't assigned
+
+## Verified domains
+
+An organization admin can prove DNS control, select a domain for an agent, and
+choose public display independently from public directory listing. Hidden
+selected domains remain available to authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, transfer, and recovery rules. These methods require version 0.6.5 or later.
+
+```python
+from inkbox import Inkbox
+
+client = Inkbox()
+claim = client.organization_domains.create("example.com")
+print(claim.dns_record.name, claim.dns_record.value)
+# Add the exact TXT record before verifying.
+claim = client.organization_domains.verify(claim.id)
+if claim.state == "verified":
+    client.identities.set_domain_affiliation("helper", claim.id, publish_publicly=False)
+for item in client.a2a.iter_public_directory(verified_domain="example.com"):
+    print(item.card.name)
+```
+
+Claim methods: `create`, `list`, `get`, `verify`, `transfer`, `delete`.
+Use `client.identities.get_domain_affiliation(handle)` to inspect saved settings,
+`set_domain_affiliation(..., publish_publicly=True)` to publish explicitly, and
+`remove_domain_affiliation(handle)` to remove the selection. Task and context
+participants expose optional `.affiliation`; message assertions identify the author.
