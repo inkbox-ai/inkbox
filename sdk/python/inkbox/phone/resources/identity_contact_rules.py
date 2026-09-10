@@ -9,9 +9,8 @@ Phone (voice + SMS) rules live on the **agent identity**, addressed by
 per-number resource (``inkbox.phone_contact_rules``) is kept as a
 deprecated wrapper.
 
-The identity must have a phone number: ``create`` returns 422 and the
-identity helpers guard with ``_require_phone()`` before the request.
-Listing an identity with no number returns an empty list.
+Permissions can be configured before assigning a phone number. Phone rules
+also govern iMessage. Mutations require admin credentials.
 
 Transport note: rides the api-root transport (``{base}/api/v1``) so it
 addresses both ``/identities/{handle}/phone-contact-rules`` and the
@@ -56,8 +55,7 @@ class PhoneIdentityContactRulesResource:
         limit: int | None = None,
         offset: int | None = None,
     ) -> list[PhoneIdentityContactRule]:
-        """List rules for an identity. Returns an empty list when the
-        identity has no phone number."""
+        """List permitted rules for an identity, including unprovisioned identities."""
         params: dict[str, Any] = {}
         if action is not None:
             params["action"] = action.value if isinstance(action, PhoneRuleAction) else action
@@ -87,8 +85,7 @@ class PhoneIdentityContactRulesResource:
     ) -> PhoneIdentityContactRule:
         """Create a rule for an agent identity.
 
-        The identity must have a phone number — otherwise the server
-        returns 422.
+        Requires admin credentials; channel provisioning is not required.
 
         Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
         rule with the same ``(match_type, match_target)`` already exists.

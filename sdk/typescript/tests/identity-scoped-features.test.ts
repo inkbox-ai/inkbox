@@ -485,8 +485,6 @@ describe("AgentIdentity contact-rule delegation", () => {
     const { identity, inkbox } = identityWithoutPhone();
     vi.mocked(inkbox._phoneIdentityContactRules.list).mockResolvedValue([]);
 
-    // List must not prethrow: the server requires a phone only for
-    // create/get/update/delete, not for list.
     await expect(identity.listPhoneContactRules()).resolves.toEqual([]);
     expect(inkbox._phoneIdentityContactRules.list).toHaveBeenCalledWith(
       identity.agentHandle,
@@ -494,22 +492,17 @@ describe("AgentIdentity contact-rule delegation", () => {
     );
   });
 
-  it("create/get/update/delete phone contact-rule methods throw when no phone number", async () => {
+  it("phone contact-rule methods delegate without requiring phone provisioning", async () => {
     const { identity, inkbox } = identityWithoutPhone();
-
-    await expect(
-      identity.createPhoneContactRule({
-        action: PhoneRuleAction.BLOCK,
-        matchTarget: "+14155550199",
-      }),
-    ).rejects.toThrow(/no phone number/);
-    await expect(identity.getPhoneContactRule("rid")).rejects.toThrow(InkboxError);
-    await expect(
-      identity.updatePhoneContactRule("rid", { action: PhoneRuleAction.BLOCK }),
-    ).rejects.toThrow(InkboxError);
-    await expect(identity.deletePhoneContactRule("rid")).rejects.toThrow(InkboxError);
-    expect(inkbox._phoneIdentityContactRules.create).not.toHaveBeenCalled();
-    expect(inkbox._phoneIdentityContactRules.get).not.toHaveBeenCalled();
+    const options = { action: PhoneRuleAction.BLOCK, matchTarget: "+14155550199" };
+    await identity.createPhoneContactRule(options);
+    await identity.getPhoneContactRule("rid");
+    await identity.updatePhoneContactRule("rid", { action: PhoneRuleAction.BLOCK });
+    await identity.deletePhoneContactRule("rid");
+    expect(inkbox._phoneIdentityContactRules.create).toHaveBeenCalledWith(identity.agentHandle, options);
+    expect(inkbox._phoneIdentityContactRules.get).toHaveBeenCalledWith(identity.agentHandle, "rid");
+    expect(inkbox._phoneIdentityContactRules.update).toHaveBeenCalledWith(identity.agentHandle, "rid", { action: PhoneRuleAction.BLOCK });
+    expect(inkbox._phoneIdentityContactRules.delete).toHaveBeenCalledWith(identity.agentHandle, "rid");
   });
 });
 

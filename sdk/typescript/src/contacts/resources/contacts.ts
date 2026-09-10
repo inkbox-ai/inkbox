@@ -6,6 +6,7 @@
 
 import { HttpTransport } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
+import { ContactCommunicationPolicyResource } from "./communicationPolicy.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
@@ -113,9 +114,11 @@ export class ContactsResource {
   readonly correspondence: ContactCorrespondenceResource;
   readonly facts: ContactFactsResource;
   readonly vcards: VCardsResource;
+  readonly communicationPolicy: ContactCommunicationPolicyResource;
 
   constructor(private readonly http: HttpTransport) {
     this.access = new ContactAccessResource(http);
+    this.communicationPolicy = new ContactCommunicationPolicyResource(http);
     this.correspondence = new ContactCorrespondenceResource(http);
     this.facts = new ContactFactsResource(http);
     this.vcards = new VCardsResource(http);

@@ -12,6 +12,7 @@ pub use correspondence::{
     CorrespondenceTranscriptMarker, CorrespondenceTranscriptMode, EmailCorrespondenceItem,
     IMessageCorrespondenceItem, SmsCorrespondenceItem,
 };
+pub use resources::communication_policy::*;
 pub use resources::contact_access::ContactAccessResource;
 pub use resources::contact_facts::ContactFactsResource;
 pub use resources::contacts::{

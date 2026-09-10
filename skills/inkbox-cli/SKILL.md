@@ -126,7 +126,7 @@ inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
 inkbox identity refresh <handle>
 ```
 
-`--mail-filter-mode` / `--phone-filter-mode` set the identity's contact-rule mode (admin-only). Unlike the deprecated `mailbox update --filter-mode` / `number update --filter-mode`, the identity path does **not** print a change notice. `--phone-filter-mode` requires the identity to have a phone number (else a 422).
+`--mail-filter-mode` / `--phone-filter-mode` set the identity's contact-rule mode (admin-only). Unlike the deprecated `mailbox update --filter-mode` / `number update --filter-mode`, the identity path does **not** print a change notice. Phone mode also governs iMessage and can be configured without a dedicated phone number.
 
 `identity create` atomically provisions the mailbox AND the tunnel. The JSON output includes both (`mailbox`, `tunnel.publicHost`, `tunnel.tlsMode`).
 
@@ -681,7 +681,11 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 ## Contacts
 
-Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
+Shared address book with permission-filtered identifiers. Partially restricted contacts omit names, labels, other free-form profile fields, and shared memories. Existing-contact identifier changes and suggestion absorption require admin credentials.
+
+`contacts communication-policy get <contact-id>`, `set <contact-id> --file policy.json`, and `preview <contact-id> <identity-id>` require admin credentials. The JSON file contains `expectedRevision`, `defaults`, and `identities` with `identityId`. `contacts communication-policy list <handle>` and `identity contact-policies <handle>` list the identity's permitted view.
+
+Communication-rule creation, updates, and deletion require admin credentials. Agents cannot authorize themselves; ask a user to change permissions in the Inkbox Console. There is one whitelist/blacklist for email and one for SMS/calls/iMessage. Standalone address/number entries and contact entries contribute to the same list; phone permission setup does not require a dedicated number.
 
 Merging requires an admin-scoped API key. Active memories have per-kind and
 contact-wide limits. Delete a fact from each kind named by a merge error, or any

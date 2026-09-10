@@ -18,6 +18,8 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 ## Core Skills
 
+Communication rules are human-controlled: agent keys can inspect permitted contact data but cannot change their own rules. Contact and standalone value entries share the email or phone whitelist/blacklist; phone includes SMS, calls, and iMessage. The SDK/CLI skills cover contact communication policies and filtered previews.
+
 - `inkbox-onboarding`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-onboarding/SKILL.md
   Language-agnostic setup flow for an existing identity, including channel readiness, recipient consent, inbound handling, recurring triage, and API/CLI/SDK examples.

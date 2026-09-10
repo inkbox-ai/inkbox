@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
+use crate::contacts::resources::communication_policy::ContactCommunicationPolicyResource;
 use crate::contacts::resources::contact_access::ContactAccessResource;
 use crate::contacts::resources::contact_facts::ContactFactsResource;
 use crate::contacts::resources::correspondence::ContactCorrespondenceResource;
@@ -94,19 +95,26 @@ pub struct MergeContactsParams {
     pub field_sources: HashMap<String, String>,
 }
 
-/// Organization-wide contacts and contact memory.
+/// Shared contacts and memory with permission-filtered identity views.
 pub struct ContactsResource {
     http: Arc<HttpTransport>,
     access: ContactAccessResource,
+    communication_policy: ContactCommunicationPolicyResource,
     facts: ContactFactsResource,
     correspondence: ContactCorrespondenceResource,
     vcards: VCardsResource,
 }
 
 impl ContactsResource {
+    /// Contact communication entries and identity previews.
+    pub fn communication_policy(&self) -> &ContactCommunicationPolicyResource {
+        &self.communication_policy
+    }
+
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self {
             access: ContactAccessResource::new(http.clone()),
+            communication_policy: ContactCommunicationPolicyResource::new(http.clone()),
             facts: ContactFactsResource::new(http.clone()),
             correspondence: ContactCorrespondenceResource::new(http.clone()),
             vcards: VCardsResource::new(http.clone()),

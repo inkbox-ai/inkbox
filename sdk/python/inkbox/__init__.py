@@ -177,6 +177,10 @@ from inkbox.identities.types import (
 )
 
 # Contacts types
+from inkbox.contacts import (
+    ContactChannelDecisions, ContactIdentityDecisions, ContactDecision,
+    ContactCommunicationPolicy, ContactCommunicationPreview, ContactCommunicationPolicyPage,
+)
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
     Contact,
@@ -563,6 +567,8 @@ __all__ = [
     # Contacts types
     "Contact",
     "ContactAccess",
+    "ContactChannelDecisions", "ContactIdentityDecisions", "ContactDecision",
+    "ContactCommunicationPolicy", "ContactCommunicationPreview", "ContactCommunicationPolicyPage",
     "ContactAddress",
     "ContactBulkDeleteResult",
     "ContactBulkDeleteResultItem",

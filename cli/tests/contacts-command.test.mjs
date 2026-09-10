@@ -43,6 +43,33 @@ test("contacts exposes contact-memory commands", () => {
   assert.match(text, /facts/);
   assert.match(text, /correspondence/);
   assert.match(text, /merge/);
+  assert.match(text, /communication-policy/);
+});
+
+test("contact communication policy reads use the administrative policy endpoint", async () => {
+  let request;
+  const mock = await listen((req, res) => {
+    request = { method: req.method, url: req.url };
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({
+      contact_id: "contact-1", revision: 3,
+      defaults: { email: "block", phone: "block" },
+      identities: [{ identity_id: "identity-1", email: "allow", phone: "block" }],
+    }));
+  });
+  try {
+    const result = await runCli([
+      "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
+      "contacts", "communication-policy", "get", "contact-1",
+    ]);
+    assert.equal(result.error, null, result.stderr);
+    assert.deepEqual(request, { method: "GET", url: "/api/v1/contacts/contact-1/communication-policy" });
+    const policy = JSON.parse(result.stdout);
+    assert.equal(policy.revision, 3);
+    assert.equal(policy.identities[0].identityId, "identity-1");
+  } finally {
+    await new Promise((resolve) => mock.server.close(resolve));
+  }
 });
 
 test("contact facts exposes read and deletion commands", () => {

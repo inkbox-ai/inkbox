@@ -397,6 +397,7 @@ export type {
   MergeContactsOptions,
   UpdateContactOptions,
 } from "./contacts/index.js";
+export * from "./contacts/resources/communicationPolicy.js";
 export type { Note, NoteAccess } from "./notes/types.js";
 export type {
   CreateNoteOptions,

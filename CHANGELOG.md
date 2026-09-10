@@ -4,6 +4,21 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.11 — Contact communication permissions
+
+### Added
+
+- Contact communication-policy get/replace, identity previews, and paginated identity views in Python, TypeScript, and Rust. The CLI adds `contacts communication-policy get`, `set`, `preview`, and `list`.
+
+### Changed
+
+- Contact and standalone address/number entries contribute to each identity's email or phone whitelist/blacklist. Phone permissions cover SMS, calls, and iMessage together.
+- The selected mode determines active entries: allows in whitelist mode and blocks in blacklist mode. Opposite-action entries no longer override the active list.
+- Agent contact responses, lookup, and vCard exports include only permitted identifiers. Partially restricted profiles omit names, other free-form details, and shared memories.
+- **Authorization change:** communication-rule creation now requires admin credentials, like updates and deletion. Agent keys receive HTTP 403. Existing-contact identifier edits and suggestion absorption also require administrative authority.
+- Identity-level phone-rule helpers no longer require a dedicated phone number. Existing phone/iMessage methods remain supported; their filter-mode fields are aliases and contradictory values return HTTP 422.
+- Releasing or replacing a phone number preserves identity permissions. Migration preserves a sole configured channel's restrictions and ignores never-used/unconfigured defaults.
+
 ## 0.6.10 — Release an iMessage connection
 
 ### Added

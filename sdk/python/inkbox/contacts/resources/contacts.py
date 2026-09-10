@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
 from inkbox.contacts.resources.contact_access import ContactAccessResource
+from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicyResource
 from inkbox.contacts.resources.contact_facts import ContactFactsResource
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceResource
 from inkbox.contacts.resources.vcards import VCardsResource
@@ -40,14 +41,20 @@ def _items_to_wire(items: list[Any] | None) -> list[dict[str, Any]] | None:
 
 
 class ContactsResource:
-    """Organization-wide contacts and contact memory."""
+    """Shared contacts and memory with permission-filtered identity views."""
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
         self._access = ContactAccessResource(http)
+        self._communication_policy = ContactCommunicationPolicyResource(http)
         self._facts = ContactFactsResource(http)
         self._correspondence = ContactCorrespondenceResource(http)
         self._vcards = VCardsResource(http)
+
+    @property
+    def communication_policy(self) -> ContactCommunicationPolicyResource:
+        """Communication-list entries and filtered identity previews."""
+        return self._communication_policy
 
     @property
     def access(self) -> ContactAccessResource:

@@ -9,6 +9,7 @@ import type {
   CorrespondenceTranscriptMode,
   CreateContactOptions,
   MergeContactsOptions,
+  ReplaceContactCommunicationPolicy,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -32,6 +33,31 @@ function collectValues(value: string, previous: string[] = []): string[] {
 }
 
 function registerContactsAccessCommands(parent: Command): void {
+  const policy = parent.command("communication-policy").description("Contact communication lists and previews");
+  policy.command("get <contact-id>").description("Read a contact policy (admin credentials)")
+    .action(withErrorHandler(async function (this: Command, contactId: string): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.communicationPolicy.get(contactId) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  policy.command("set <contact-id>").description("Replace a contact policy (admin credentials)")
+    .requiredOption("--file <path>", "JSON file with expectedRevision, defaults, and identities")
+    .action(withErrorHandler(async function (this: Command, contactId: string, options: { file: string }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      const body = parseJsonArg<ReplaceContactCommunicationPolicy>(readFileSync(options.file, "utf8"), "policy file");
+      output(await createClient(opts).contacts.communicationPolicy.replace(contactId, body) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  policy.command("preview <contact-id> <identity-id>").description("Preview contact visibility (admin credentials)")
+    .action(withErrorHandler(async function (this: Command, contactId: string, identityId: string): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.communicationPolicy.preview(contactId, identityId) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  policy.command("list <handle>").description("List an identity's visible contact permissions")
+    .option("--limit <number>", "Page size", "50").option("--offset <number>", "Page offset", "0")
+    .action(withErrorHandler(async function (this: Command, handle: string, options: { limit: string; offset: string }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.communicationPolicy.listForIdentity(handle, { limit: Number(options.limit), offset: Number(options.offset) }) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+
   const access = parent
     .command("access")
     .description("Compatibility access view");

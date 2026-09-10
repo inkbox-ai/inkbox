@@ -42,7 +42,7 @@ Inkbox (admin-only client)
 ├── .mailContactRules         → MailContactRulesResource    (DEPRECATED — per-mailbox)
 ├── .phoneContactRules        → PhoneContactRulesResource   (DEPRECATED — per-number)
 ├── .smsOptIns                → SmsOptInsResource
-├── .contacts                 → ContactsResource   (.facts, .correspondence, .access, .vcards)
+├── .contacts                 → ContactsResource   (.communicationPolicy, .facts, .correspondence, .access, .vcards)
 ├── .notes                    → NotesResource      (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → Promise<WhoamiResponse>
@@ -54,7 +54,7 @@ AgentIdentity (identity-scoped helper)
 ├── .mailFilterMode / .phoneFilterMode → FilterMode
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── .listMailContactRules() / .createMailContactRule(...) / .get/.update/.delete
-├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (requires phone number)
+├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (writes require admin credentials)
 ├── .getSigningKeyStatus() / .createSigningKey()
 ├── mail methods            (requires assigned mailbox)
 ├── phone methods           (requires assigned phone number)
@@ -570,7 +570,9 @@ const upload = await identity.uploadIMessageMedia({
 await identity.sendIMessage({ to: "+15551234567", mediaUrls: [upload.mediaUrl] });
 ```
 
-Contact rules are scoped to the **identity** (not a phone number) because pool numbers are shared infrastructure:
+Contact rules are scoped to the **identity**, including when it has a dedicated line:
+
+Phone rules cover SMS, calls, and iMessage together. Creation, updates, and deletion require admin credentials. An agent key can inspect permitted rules but cannot authorize itself; a user changes permissions in the Inkbox Console.
 
 ```typescript
 import { IMessageRuleAction } from "@inkbox/sdk";
@@ -988,6 +990,8 @@ Phone numbers carry the same `filterMode` / `agentIdentityId` / `filterModeChang
 
 ## Contact Rules
 
+All mutation examples in this section require an admin API key. There is one active whitelist or blacklist per email/phone group; contact entries and standalone addresses/numbers contribute to that list. Identity-level phone rules do not require a dedicated number. Releasing a number preserves permissions.
+
 Allow/block lists are scoped to the **agent identity** (mirroring iMessage), addressed by `agentHandle`. The identity's `mailFilterMode` / `phoneFilterMode` decides whether each channel's rules act as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number. Returned rows are `MailIdentityContactRule` / `PhoneIdentityContactRule`, keyed by `rule.agentIdentityId` (not a mailbox/phone-number id).
 
 ```typescript
@@ -1087,7 +1091,9 @@ await inkbox.phoneContactRules.create(num.id, {
 
 ## Contacts
 
-Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
+Shared address book with permission-filtered identifiers. Partially restricted contacts omit names, labels, other free-form profile fields, and shared memories. Existing-contact identifier changes and suggestion absorption require admin credentials.
+
+Use `inkbox.contacts.communicationPolicy.get(contactId)` and `.replace(contactId, { expectedRevision, defaults, identities })` with admin credentials. Defaults contain `email` and `phone` entries; identity overrides also contain `identityId`. `.preview(contactId, identityId)` returns the saved identity view; `.listForIdentity(handle)` returns a page with `items` and `hasMore`. Agent keys can list only their own view.
 
 Merging requires an admin-scoped API key. Active memories have per-kind and
 contact-wide limits. Delete a fact from each kind named by a merge error, or any

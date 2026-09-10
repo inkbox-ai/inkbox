@@ -1,6 +1,10 @@
 """Contact types and resource options."""
 
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceOptions
+from inkbox.contacts.resources.communication_policy import (
+    ContactChannelDecisions, ContactIdentityDecisions, ContactDecision,
+    ContactCommunicationPolicy, ContactCommunicationPreview, ContactCommunicationPolicyPage,
+)
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
     Contact,
@@ -42,6 +46,8 @@ from inkbox.contacts.types import (
 )
 
 __all__ = [
+    "ContactChannelDecisions", "ContactIdentityDecisions", "ContactDecision",
+    "ContactCommunicationPolicy", "ContactCommunicationPreview", "ContactCommunicationPolicyPage",
     "CallCorrespondenceItem",
     "Contact",
     "ContactAccess",

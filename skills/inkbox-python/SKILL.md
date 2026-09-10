@@ -43,7 +43,7 @@ Inkbox (admin-only client)
 ├── .mail_contact_rules       → MailContactRulesResource   (DEPRECATED — per-mailbox)
 ├── .phone_contact_rules      → PhoneContactRulesResource  (DEPRECATED — per-number)
 ├── .sms_opt_ins              → SmsOptInsResource
-├── .contacts                 → ContactsResource  (.facts, .correspondence, .access, .vcards)
+├── .contacts                 → ContactsResource  (.communication_policy, .facts, .correspondence, .access, .vcards)
 ├── .notes                    → NotesResource     (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → WhoamiResponse
@@ -55,7 +55,7 @@ AgentIdentity (identity-scoped helper)
 ├── .mail_filter_mode / .phone_filter_mode → FilterMode
 ├── .credentials             → Credentials  (requires vault unlocked)
 ├── .list_mail_contact_rules() / .create_mail_contact_rule(...) / .get_/.update_/.delete_
-├── .list_phone_contact_rules() / .create_phone_contact_rule(...) / ...  (requires phone number)
+├── .list_phone_contact_rules() / .create_phone_contact_rule(...) / ...  (writes require admin credentials)
 ├── .get_signing_key_status() / .create_signing_key()
 ├── mail methods             (requires assigned mailbox)
 ├── phone methods            (requires assigned phone number)
@@ -592,6 +592,8 @@ identity.send_imessage(to="+15551234567", media_urls=[upload.media_url])
 
 Contact rules are scoped to the **identity**, including when it has a dedicated line:
 
+Phone rules cover SMS, calls, and iMessage together. Creation, updates, and deletion require admin credentials. An agent key can inspect permitted rules but cannot authorize itself; a user changes permissions in the Inkbox Console.
+
 ```python
 from inkbox import IMessageRuleAction
 
@@ -1008,6 +1010,8 @@ Phone numbers carry the same `filter_mode` / `agent_identity_id` / `filter_mode_
 
 ## Contact Rules
 
+All mutation examples in this section require an admin API key. There is one active whitelist or blacklist per email/phone group; contact entries and standalone addresses/numbers contribute to that list. Identity-level phone rules do not require a dedicated number. Releasing a number preserves permissions.
+
 Allow/block lists are scoped to the **agent identity** (mirroring iMessage), addressed by `agent_handle`. The identity's `mail_filter_mode` / `phone_filter_mode` decides whether each channel's rules act as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number. Returned rows are `MailIdentityContactRule` / `PhoneIdentityContactRule`, keyed by `rule.agent_identity_id` (not a mailbox/phone-number id).
 
 ```python
@@ -1087,7 +1091,9 @@ inkbox.phone_contact_rules.create(
 
 ## Contacts
 
-Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
+Shared address book with permission-filtered identifiers. Partially restricted contacts omit names, labels, other free-form profile fields, and shared memories. Existing-contact identifier changes and suggestion absorption require admin credentials.
+
+Use `inkbox.contacts.communication_policy.get(contact_id)` and `.replace(contact_id, expected_revision=..., defaults=ContactChannelDecisions(...), identities=[ContactIdentityDecisions(...)])` with admin credentials. Import these types from `inkbox.contacts`. `.preview(contact_id, identity_id)` returns the saved identity view; `.list_for_identity(handle)` returns a page with `items` and `has_more`. Agent keys can list only their own view.
 
 Merging requires an admin-scoped API key. Active memories have per-kind and
 contact-wide limits. Delete a fact from each kind named by a merge error, or any
