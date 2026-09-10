@@ -12,13 +12,10 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from uuid import UUID
 
-import pytest
-
 from sample_data_identities import IDENTITY_DETAIL_DICT
 
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
-from inkbox.mail.exceptions import InkboxError
 from inkbox.mail.resources.identity_contact_rules import (
     MailIdentityContactRulesResource,
 )
