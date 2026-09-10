@@ -145,6 +145,9 @@ function aesGcmEncrypt(key: Uint8Array, plaintext: Uint8Array, aad: string = "")
 }
 
 function aesGcmDecrypt(key: Uint8Array, blob: Uint8Array, aad: string = ""): Uint8Array {
+  if (blob.length < AES_IV_BYTES + AES_TAG_BYTES) {
+    throw new InkboxVaultKeyError("Invalid ciphertext: payload is too short");
+  }
   const tag = blob.slice(-AES_TAG_BYTES);
   const nonce = blob.slice(-(AES_IV_BYTES + AES_TAG_BYTES), -AES_TAG_BYTES);
   const ct = blob.slice(0, -(AES_IV_BYTES + AES_TAG_BYTES));

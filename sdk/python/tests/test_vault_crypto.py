@@ -173,3 +173,21 @@ class TestGenerateRecoveryCode:
         c1, _ = generate_recovery_code("org_test_123", org_key)
         c2, _ = generate_recovery_code("org_test_123", org_key)
         assert c1 != c2
+
+
+class TestShortCiphertextValidation:
+    def test_unwrap_org_key_too_short(self):
+        import base64
+        salt = derive_salt("org_test_wrap")
+        mk = derive_master_key("pw", salt)
+        short_b64 = base64.b64encode(b"short-data").decode()
+        with pytest.raises(InkboxVaultKeyError, match="payload is too short"):
+            unwrap_org_key(mk, short_b64)
+
+    def test_decrypt_payload_too_short(self):
+        import base64
+        org_key = generate_org_encryption_key()
+        short_b64 = base64.b64encode(b"short-data").decode()
+        with pytest.raises(InkboxVaultKeyError, match="payload is too short"):
+            decrypt_payload(org_key, short_b64)
+
