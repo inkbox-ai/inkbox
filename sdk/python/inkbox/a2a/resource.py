@@ -104,10 +104,12 @@ class A2AResource:
         q: str | None = None,
         cursor: str | None = None,
         limit: int = 50,
+        verified_domain: str | None = None,
     ) -> A2ADirectoryPage:
         data = self._public_http.get(
             "/a2a/directory",
-            params={"q": q, "cursor": cursor, "limit": limit},
+            params={"q": q, "cursor": cursor, "limit": limit,
+                    **({"verified_domain": verified_domain} if verified_domain is not None else {})},
         )
         return self._parse_directory(data)
 
@@ -129,8 +131,9 @@ class A2AResource:
         *,
         q: str | None = None,
         limit: int = 50,
+        verified_domain: str | None = None,
     ) -> Iterator[A2ADirectoryItem]:
-        yield from self._iter_directory(public=True, q=q, limit=limit)
+        yield from self._iter_directory(public=True, q=q, limit=limit, verified_domain=verified_domain)
 
     def iter_organization_directory(
         self,
@@ -146,11 +149,12 @@ class A2AResource:
         public: bool,
         q: str | None,
         limit: int,
+        verified_domain: str | None = None,
     ) -> Iterator[A2ADirectoryItem]:
         cursor = None
         while True:
             page = (
-                self.public_directory(q=q, cursor=cursor, limit=limit)
+                self.public_directory(q=q, cursor=cursor, limit=limit, verified_domain=verified_domain)
                 if public
                 else self.organization_directory(q=q, cursor=cursor, limit=limit)
             )

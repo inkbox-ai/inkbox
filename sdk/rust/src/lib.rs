@@ -78,6 +78,12 @@ pub use error::{ApiErrorDetail, InkboxError, Result};
 pub use filters::DateRangeFilter;
 pub use response_metadata::{APIResponse, ResponseMetadata, ResponseNotice, ResponseObserver};
 
+pub mod organization_domains;
+pub use organization_domains::{
+    DomainAffiliation, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain,
+    OrganizationDomainListOptions, OrganizationDomainPage, OrganizationDomainsResource,
+};
+
 #[cfg(test)]
 mod directional_tests;
 #[cfg(test)]

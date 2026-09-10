@@ -45,6 +45,14 @@ impl A2AResource {
         options: &A2ADirectoryListOptions,
     ) -> Result<A2ADirectoryPage> {
         let mut params = Vec::new();
+        if let Some(domain) = &options.verified_domain {
+            if !public {
+                return Err(InkboxError::InvalidArgument(
+                    "verified_domain is only available in the public directory".into(),
+                ));
+            }
+            params.push(("verified_domain", domain.clone()));
+        }
         if let Some(value) = &options.q {
             params.push(("q", value.clone()));
         }
@@ -424,6 +432,7 @@ mod tests {
             q: Some("research".to_string()),
             cursor: Some("page".to_string()),
             limit: Some(20),
+            ..Default::default()
         };
 
         let public_page = client.a2a().public_directory(&options).unwrap();

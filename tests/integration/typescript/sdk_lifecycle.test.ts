@@ -51,6 +51,18 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     const whoami = await inkbox.whoami();
     expect(whoami.organizationId).toBe(bootstrap.orgId);
 
+    const claimDomain = `certification-${randomUUID().replaceAll("-", "")}.example.com`;
+    const claim = await inkbox.organizationDomains.create(claimDomain);
+    try {
+      expect(claim.state).toBe("pending");
+      expect((await inkbox.organizationDomains.create(claimDomain.toUpperCase() + ".")).id).toBe(claim.id);
+      expect((await inkbox.organizationDomains.get(claim.id)).dnsRecord.name).toBe(`_inkbox.${claimDomain}`);
+      expect((await inkbox.organizationDomains.verify(claim.id)).validUntil).toBeNull();
+      expect((await inkbox.a2a.publicDirectory({ verifiedDomain: claimDomain })).items).toEqual([]);
+    } finally {
+      await inkbox.organizationDomains.delete(claim.id);
+    }
+
     // ── empty state ────────────────────────────────────────────
     logStep(config, "verify empty identity list");
     const empty = await inkbox.listIdentities();
@@ -67,6 +79,7 @@ describe("TypeScript SDK lifecycle", { timeout: 300_000 }, () => {
     expect(alpha.tunnel).not.toBeNull();
     expect(alpha.tunnel!.publicHost).toMatch(publicHostRe);
     expect(alpha.description).toBe("alpha integration-test identity");
+    expect((await inkbox.identities.getDomainAffiliation(alphaHandle)).affiliation).toBeNull();
 
     logStep(config, `create identity ${bravoHandle}`);
     const bravo = await inkbox.createIdentity(bravoHandle);
