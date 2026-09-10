@@ -7,6 +7,7 @@
 //! `Arc<Inkbox>` (built with [`Arc::new_cyclic`] so the tunnels resource can
 //! capture a `Weak` without a reference cycle).
 
+use crate::organization_domains::OrganizationDomainsResource;
 use std::sync::{Arc, Weak};
 
 use serde_json::Value;
@@ -170,6 +171,7 @@ pub struct Inkbox {
     identities: IdentitiesResource,
     tunnels: TunnelsResource,
     a2a: A2AResource,
+    organization_domains: OrganizationDomainsResource,
 
     // Transport used for the bare `/api` root (whoami, signup parity).
     root_api_http: Arc<HttpTransport>,
@@ -297,6 +299,7 @@ impl Inkbox {
             api_keys: ApiKeysResource::new(api_http.clone()),
             identities: IdentitiesResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
+            organization_domains: OrganizationDomainsResource::new(api_http.clone()),
             a2a: A2AResource::new(api_http.clone(), public_http.clone(), trimmed.to_string()),
 
             root_api_http: root_api_http.clone(),
@@ -418,6 +421,10 @@ impl Inkbox {
     pub fn tunnels(&self) -> &TunnelsResource {
         &self.tunnels
     }
+    pub fn organization_domains(&self) -> &OrganizationDomainsResource {
+        &self.organization_domains
+    }
+
     pub fn a2a(&self) -> &A2AResource {
         &self.a2a
     }

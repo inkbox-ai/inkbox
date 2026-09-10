@@ -16,6 +16,7 @@ from inkbox._http import CONNECT_RETRIES, HttpTransport, sdk_user_agent
 from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
 from inkbox.a2a.resource import A2AResource
+from inkbox.organization_domains import OrganizationDomainsResource
 from inkbox.a2a.invitations import (
     A2AInvitationPreview,
     A2AInvitationsResource,
@@ -294,6 +295,7 @@ class Inkbox:
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
         self._a2a = A2AResource(self._api_http, self._public_http)
+        self._organization_domains = OrganizationDomainsResource(self._api_http)
         self._a2a_invitations = A2AInvitationsResource(self._api_http, self._base_url)
 
         self._contacts = ContactsResource(self._contacts_http)
@@ -440,6 +442,11 @@ class Inkbox:
         return self._domains
 
     @property
+    def organization_domains(self) -> OrganizationDomainsResource:
+        """Verify domain control and manage organization claims."""
+        return self._organization_domains
+
+    @property
     def tunnels(self) -> TunnelsResource:
         """Tunnels (list, get, update, sign_csr). Tunnel lifecycle is owned by identity-create / identity-delete."""
         return self._tunnels
@@ -562,6 +569,11 @@ class Inkbox:
             vault_secret_ids=vault_secret_ids,
         )
         return AgentIdentity(data, self)
+
+    @property
+    def identities(self) -> IdentitiesResource:
+        """Identity administration, including domain affiliation."""
+        return self._ids_resource
 
     def get_identity(self, agent_handle: str) -> AgentIdentity:
         """

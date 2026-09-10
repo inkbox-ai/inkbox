@@ -61,7 +61,7 @@ const CONTEXT_COLUMNS = [
   "lastActivityAt",
 ];
 const RULE_COLUMNS = ["id", "action", "matchTarget", "direction", "status"];
-const DIRECTORY_COLUMNS = ["name", "cardUrl", "visibility", "description"];
+const DIRECTORY_COLUMNS = ["name", "cardUrl", "visibility", "verifiedDomain", "description"];
 const INVITATION_COLUMNS = [
   "id",
   "status",
@@ -70,6 +70,14 @@ const INVITATION_COLUMNS = [
   "inviteeAgentHandle",
   "expiresAt",
 ];
+
+function directoryDomain(card: Record<string, unknown>): string {
+  const capabilities = card.capabilities as { extensions?: Array<{ uri?: string; params?: Record<string, unknown> }> } | undefined;
+  const assertion = capabilities?.extensions?.find((item) => item.uri === "https://inkbox.ai/a2a/extensions/domain-affiliation/v1")?.params;
+  return assertion?.verifier === "Inkbox" && typeof assertion.domain === "string"
+    && typeof assertion.valid_until === "string" && Date.parse(assertion.valid_until) > Date.now()
+    ? assertion.domain : "";
+}
 
 async function identityFor(command: Command, handle: string) {
   return createClient(getGlobalOpts(command)).getIdentity(handle);
@@ -311,6 +319,7 @@ export function registerA2ACommands(program: Command): void {
   a2a.command("directory")
     .description("Search the organization or public A2A directory")
     .option("--public", "Search the public directory")
+    .option("--verified-domain <domain>", "Exact verified domain (requires --public)")
     .option("-q, --query <query>", "Search handles, descriptions, and skills")
     .option("--cursor <cursor>", "Pagination cursor")
     .option("--limit <n>", "Results per page (1-100)", "50")
@@ -318,14 +327,17 @@ export function registerA2ACommands(program: Command): void {
       this: Command,
       options: {
         public?: boolean;
+        verifiedDomain?: string;
         query?: string;
         cursor?: string;
         limit: string;
       },
     ) {
       const client = createClient(getGlobalOpts(this));
+      if (options.verifiedDomain && !options.public) throw new TypeError("--verified-domain requires --public");
       const result = options.public
         ? await client.a2a.publicDirectory({
+          verifiedDomain: options.verifiedDomain,
           q: options.query,
           cursor: options.cursor,
           limit: positiveInt(options.limit, "--limit"),
@@ -343,6 +355,7 @@ export function registerA2ACommands(program: Command): void {
           ...item,
           name: item.card.name,
           description: item.card.description ?? "",
+          verifiedDomain: directoryDomain(item.card),
         })),
       );
     }));

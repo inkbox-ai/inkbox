@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
+from inkbox.domain_affiliation import DomainAffiliation, parse_domain_affiliation
 
 
 class ForwardCompatibleStrEnum(StrEnum):
@@ -142,6 +143,7 @@ class A2ACaller:
     organization_id: str
     handle: str | None
     trust_tier: str = "inkbox_verified"
+    affiliation: DomainAffiliation | None = None
 
 
 @dataclass(frozen=True)
@@ -149,6 +151,7 @@ class A2ATarget:
     identity_id: str
     organization_id: str
     handle: str | None
+    affiliation: DomainAffiliation | None = None
 
 
 @dataclass(frozen=True)
@@ -161,6 +164,7 @@ class A2AMessage:
     extensions: list[str] | None
     reference_task_ids: list[str] | None
     created_at: datetime
+    affiliation: DomainAffiliation | None = None
 
 
 @dataclass(frozen=True)
@@ -216,6 +220,7 @@ class A2AHistoryMessage:
     extensions: list[str] | None
     reference_task_ids: list[str] | None
     created_at: datetime
+    affiliation: DomainAffiliation | None = None
 
 
 @dataclass(frozen=True)
@@ -313,6 +318,7 @@ def parse_caller(data: dict[str, Any]) -> A2ACaller:
         organization_id=data["organization_id"],
         handle=data.get("handle"),
         trust_tier=data.get("trust_tier", "inkbox_verified"),
+        affiliation=parse_domain_affiliation(data.get("affiliation")),
     )
 
 
@@ -323,6 +329,7 @@ def parse_target(data: dict[str, Any] | None) -> A2ATarget | None:
         identity_id=data["identity_id"],
         organization_id=data["organization_id"],
         handle=data.get("handle"),
+        affiliation=parse_domain_affiliation(data.get("affiliation")),
     )
 
 
@@ -336,6 +343,7 @@ def parse_message(data: dict[str, Any]) -> A2AMessage:
         extensions=data.get("extensions"),
         reference_task_ids=data.get("reference_task_ids"),
         created_at=parse_datetime(data["created_at"]),  # type: ignore[arg-type]
+        affiliation=parse_domain_affiliation(data.get("affiliation")),
     )
 
 
@@ -382,4 +390,5 @@ def parse_history_message(data: dict[str, Any]) -> A2AHistoryMessage:
         extensions=data.get("extensions"),
         reference_task_ids=data.get("reference_task_ids"),
         created_at=parse_datetime(data["created_at"]),  # type: ignore[arg-type]
+        affiliation=parse_domain_affiliation(data.get("affiliation")),
     )

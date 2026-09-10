@@ -455,3 +455,7 @@ export {
   TunnelStateConflict,
   TunnelTLSModeMismatch,
 } from "./tunnels/exceptions.js";
+
+export { OrganizationDomainsResource } from "./organization_domains/resource.js";
+export type { DomainAffiliation, DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, SetDomainAffiliationOptions } from "./organization_domains/types.js";
+export type { A2APublicDirectoryListOptions } from "./a2a/types.js";

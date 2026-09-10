@@ -976,6 +976,8 @@ pub enum A2AWebhookEventType {
 /// Authenticated caller attached to an A2A task event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2AWebhookCaller {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub affiliation: Option<crate::organization_domains::DomainAffiliation>,
     pub identity_id: String,
     pub organization_id: String,
     pub handle: Option<String>,
@@ -984,6 +986,8 @@ pub struct A2AWebhookCaller {
 /// Task-ledger data carried by every A2A task event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct A2AWebhookData {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender: Option<A2AWebhookCaller>,
     pub task_id: String,
     pub context_id: String,
     pub state: String,

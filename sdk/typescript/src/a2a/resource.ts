@@ -9,6 +9,7 @@ import type {
   A2AContextPage,
   A2ADirectoryItem,
   A2ADirectoryListOptions,
+  A2APublicDirectoryListOptions,
   A2ADirectoryPage,
   A2AHistoryMessage,
   A2AHistoryMessagePage,
@@ -115,9 +116,10 @@ export class A2AResource {
   }
 
   async publicDirectory(
-    options: A2ADirectoryListOptions = {},
+    options: A2APublicDirectoryListOptions = {},
   ): Promise<A2ADirectoryPage> {
     return parseDirectory(await this.publicHttp.get<Raw>("/a2a/directory", {
+      ...(options.verifiedDomain === undefined ? {} : { verified_domain: options.verifiedDomain }),
       q: options.q,
       cursor: options.cursor,
       limit: options.limit ?? 50,
@@ -127,6 +129,7 @@ export class A2AResource {
   async organizationDirectory(
     options: A2ADirectoryListOptions = {},
   ): Promise<A2ADirectoryPage> {
+    if ("verifiedDomain" in options) throw new TypeError("verifiedDomain is only available in the public directory");
     return parseDirectory(await this.http.get<Raw>("/identities/a2a/directory", {
       q: options.q,
       cursor: options.cursor,
@@ -135,7 +138,7 @@ export class A2AResource {
   }
 
   async *iterPublicDirectory(
-    options: Omit<A2ADirectoryListOptions, "cursor"> = {},
+    options: Omit<A2APublicDirectoryListOptions, "cursor"> = {},
   ): AsyncGenerator<A2ADirectoryItem> {
     yield* this.iterDirectory(true, options);
   }
@@ -148,7 +151,7 @@ export class A2AResource {
 
   private async *iterDirectory(
     publicDirectory: boolean,
-    options: Omit<A2ADirectoryListOptions, "cursor">,
+    options: Omit<A2APublicDirectoryListOptions, "cursor">,
   ): AsyncGenerator<A2ADirectoryItem> {
     let cursor: string | undefined;
     do {

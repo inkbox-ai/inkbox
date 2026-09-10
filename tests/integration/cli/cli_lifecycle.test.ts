@@ -49,6 +49,17 @@ describe("CLI lifecycle", { timeout: 300_000 }, () => {
     const whoami = inkboxJson<{ organizationId: string }>("whoami", cliOpts);
     expect(whoami.organizationId).toBe(bootstrap.orgId);
 
+    const claimDomain = `certification-${randomUUID().replaceAll("-", "")}.example.com`;
+    const claim = inkboxJson<{ id: string; state: string }>(`organization-domain create ${claimDomain}`, cliOpts);
+    try {
+      expect(claim.state).toBe("pending");
+      expect(inkboxJson<{ id: string }>(`organization-domain get ${claim.id}`, cliOpts).id).toBe(claim.id);
+      expect(inkboxJson<{ validUntil: string | null }>(`organization-domain verify ${claim.id}`, cliOpts).validUntil).toBeNull();
+      expect(inkboxJson<{ items: unknown[] }>(`a2a directory --public --verified-domain ${claimDomain}`, cliOpts).items).toEqual([]);
+    } finally {
+      inkbox(`organization-domain delete ${claim.id}`, cliOpts);
+    }
+
     // ── empty state ────────────────────────────────────────────
     logStep(config, "verify empty identity list");
     const emptyList = inkboxJson<unknown[]>("identity list", cliOpts);

@@ -40,6 +40,7 @@ import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
 import { A2AResource } from "./a2a/resource.js";
+import { OrganizationDomainsResource } from "./organization_domains/resource.js";
 import {
   A2AInvitationsResource,
   extractA2AInvitationToken,
@@ -182,6 +183,7 @@ export class Inkbox {
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
   readonly _a2a: A2AResource;
+  readonly organizationDomains: OrganizationDomainsResource;
   readonly _a2aInvitations: A2AInvitationsResource;
   /** @internal — used by the tunnel-agent runtime for data-plane auth. */
   readonly _apiKey: string;
@@ -233,6 +235,7 @@ export class Inkbox {
     const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar, userAgent);
     const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar, userAgent);
     const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar, userAgent);
+    this.organizationDomains = new OrganizationDomainsResource(apiHttp);
     const publicHttp   = new HttpTransport(apiKey, this._baseUrl, ms, cookieJar, userAgent);
 
     this._mailboxes        = new MailboxesResource(mailHttp);
@@ -484,6 +487,10 @@ export class Inkbox {
     if (options.tunnel !== undefined) createArgs.tunnel = options.tunnel;
     const data = await this._idsResource.create(createArgs);
     return new AgentIdentity(data, this);
+  }
+
+  get identities(): IdentitiesResource {
+    return this._idsResource;
   }
 
   /**

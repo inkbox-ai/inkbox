@@ -312,6 +312,7 @@ from inkbox.signing_keys import SigningKey, SigningKeyStatus, verify_webhook
 
 # Receiver-side webhook payload types
 from inkbox.webhooks import (
+    DomainAffiliationPayload,
     A2AWebhookCaller,
     A2AWebhookData,
     A2AWebhookEventType,
@@ -401,7 +402,12 @@ from inkbox.webhook_deliveries import (
 # API keys
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
+from inkbox.domain_affiliation import DomainAffiliation
+from inkbox.organization_domains import DomainClaimState, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain, OrganizationDomainPage, OrganizationDomainsResource
+
 __all__ = [
+    "DomainAffiliation", "DomainClaimState", "DomainTxtRecord", "IdentityDomainAffiliation",
+    "OrganizationDomain", "OrganizationDomainPage", "OrganizationDomainsResource",
     # A2A
     "A2ACard",
     "A2ACaller",
@@ -673,6 +679,7 @@ __all__ = [
     "SigningKeyStatus",
     "verify_webhook",
     # Receiver-side webhook payload types
+    "DomainAffiliationPayload",
     "A2AWebhookCaller",
     "A2AWebhookData",
     "A2AWebhookEventType",

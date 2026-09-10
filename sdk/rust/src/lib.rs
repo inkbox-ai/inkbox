@@ -65,3 +65,9 @@ pub use client::{Inkbox, InkboxBuilder, DEFAULT_BASE_URL};
 pub use credentials::Credentials;
 pub use error::{ApiErrorDetail, InkboxError, Result};
 pub use filters::DateRangeFilter;
+
+pub mod organization_domains;
+pub use organization_domains::{
+    DomainAffiliation, DomainTxtRecord, IdentityDomainAffiliation, OrganizationDomain,
+    OrganizationDomainListOptions, OrganizationDomainPage, OrganizationDomainsResource,
+};

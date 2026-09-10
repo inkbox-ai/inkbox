@@ -1,0 +1,29 @@
+{
+  "affiliation": {
+    "domain": "example.com",
+    "verifier": "Inkbox",
+    "last_success_at": "2026-09-10T00:00:00Z",
+    "valid_until": "2100-01-01T00:00:00Z"
+  },
+  "claim": {
+    "id": "OrganizationDomainClaim_00000000-0000-4000-8000-000000000001",
+    "domain": "example.com",
+    "state": "verified",
+    "dns_record": {
+      "type": "TXT",
+      "name": "_inkbox.example.com",
+      "value": "inkbox-domain-verification=example-proof"
+    },
+    "verified_at": "2026-09-10T00:00:00Z",
+    "last_checked_at": "2026-09-10T00:00:00Z",
+    "last_success_at": "2026-09-10T00:00:00Z",
+    "valid_until": "2026-09-11T00:00:00Z",
+    "pending_expires_at": null,
+    "next_check_at": "2026-09-10T01:00:00Z",
+    "last_check_result": "present",
+    "ownership_conflict": false,
+    "transfer_eligible": false,
+    "recovery_action": null,
+    "created_at": "2026-09-10T00:00:00Z"
+  }
+}

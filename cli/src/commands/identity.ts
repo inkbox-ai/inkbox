@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -325,6 +325,25 @@ export function registerIdentityCommands(program: Command): void {
   const identity = program
     .command("identity")
     .description("Manage agent identities");
+
+  const affiliation = identity.command("domain-affiliation")
+    .description("Manage an agent's verified domain (admin API key required)");
+  affiliation.command("get <handle>")
+    .action(withErrorHandler(async function (this: Command, handle: string) {
+      output(await createClient(getGlobalOpts(this)).identities.getDomainAffiliation(handle), { json: !!getGlobalOpts(this).json });
+    }));
+  affiliation.command("set <handle> <claim-id>")
+    .addOption(new Option("--visibility <visibility>", "Public display; hidden affiliations remain visible to authorized A2A peers").choices(["public", "hidden"]).makeOptionMandatory())
+    .action(withErrorHandler(async function (this: Command, handle: string, claimId: string, options: { visibility: string }) {
+      output(await createClient(getGlobalOpts(this)).identities.setDomainAffiliation(handle, {
+        domainClaimId: claimId, publishPublicly: options.visibility === "public",
+      }), { json: !!getGlobalOpts(this).json });
+    }));
+  affiliation.command("remove <handle>")
+    .action(withErrorHandler(async function (this: Command, handle: string) {
+      await createClient(getGlobalOpts(this)).identities.removeDomainAffiliation(handle);
+      output({ removed: handle }, { json: !!getGlobalOpts(this).json });
+    }));
 
   identity
     .command("list")

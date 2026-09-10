@@ -7,6 +7,9 @@ Identity CRUD. Mailbox and tunnel are provisioned atomically by
 
 from __future__ import annotations
 
+from urllib.parse import quote
+from inkbox.organization_domains.types import IdentityDomainAffiliation, parse_identity_domain_affiliation
+
 from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
@@ -30,6 +33,17 @@ if TYPE_CHECKING:
 class IdentitiesResource:
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
+
+    def get_domain_affiliation(self, agent_handle: str) -> IdentityDomainAffiliation:
+        return parse_identity_domain_affiliation(self._http.get(f"/{quote(agent_handle, safe='')}/domain-affiliation"))
+
+    def set_domain_affiliation(self, agent_handle: str, domain_claim_id: str, *, publish_publicly: bool) -> IdentityDomainAffiliation:
+        return parse_identity_domain_affiliation(self._http.put(f"/{quote(agent_handle, safe='')}/domain-affiliation", json={
+            "domain_claim_id": domain_claim_id, "publish_publicly": publish_publicly,
+        }))
+
+    def remove_domain_affiliation(self, agent_handle: str) -> None:
+        self._http.delete(f"/{quote(agent_handle, safe='')}/domain-affiliation")
 
     def create(
         self,
