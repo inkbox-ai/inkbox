@@ -5,6 +5,15 @@ import pytest
 from inkbox.imessage.types import IMessageContactRule
 from inkbox.mail.types import MailIdentityContactRule
 from inkbox.phone.types import PhoneIdentityContactRule
+from inkbox.contacts.types import ContactBulkDeleteResultItem
+
+
+def test_bulk_delete_error_codes_are_optional_and_preserved():
+    payload = {"contact_id": "11111111-1111-4111-8111-111111111111", "status": "error", "error": "Reset permissions first"}
+    assert ContactBulkDeleteResultItem._from_dict(payload).error_code is None
+    parsed = ContactBulkDeleteResultItem._from_dict({**payload, "error_code": "contact_policy_reset_required"})
+    assert parsed.error_code == "contact_policy_reset_required"
+    assert parsed.error == payload["error"]
 
 
 @pytest.mark.parametrize("model", [MailIdentityContactRule, PhoneIdentityContactRule, IMessageContactRule])

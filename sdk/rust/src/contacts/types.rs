@@ -469,6 +469,8 @@ pub struct ContactBulkDeleteResultItem {
     pub status: ContactBulkDeleteStatus,
     #[serde(default)]
     pub error: Option<String>,
+    #[serde(default)]
+    pub error_code: Option<String>,
 }
 
 /// Result of deleting multiple contacts.
@@ -531,6 +533,21 @@ mod tests {
     use serde_json::json;
 
     use super::{Contact, ContactFact, ContactImportResult, ContactImportStatus};
+
+    #[test]
+    fn bulk_delete_preserves_optional_error_codes() {
+        let mut payload = json!({"contact_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "status": "error", "error": "Reset permissions first"});
+        let old: super::ContactBulkDeleteResultItem =
+            serde_json::from_value(payload.clone()).unwrap();
+        assert!(old.error_code.is_none());
+        payload["error_code"] = json!("contact_policy_reset_required");
+        let current: super::ContactBulkDeleteResultItem = serde_json::from_value(payload).unwrap();
+        assert_eq!(
+            current.error_code.as_deref(),
+            Some("contact_policy_reset_required")
+        );
+        assert_eq!(current.error.as_deref(), Some("Reset permissions first"));
+    }
 
     #[test]
     fn parses_confidence_from_string_or_number() {

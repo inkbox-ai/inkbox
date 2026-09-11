@@ -763,6 +763,7 @@ class ContactBulkDeleteResultItem:
     contact_id: UUID
     status: ContactBulkDeleteStatus
     error: str | None = None
+    error_code: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ContactBulkDeleteResultItem:
@@ -770,6 +771,7 @@ class ContactBulkDeleteResultItem:
             contact_id=UUID(d["contact_id"]),
             status=ContactBulkDeleteStatus(d["status"]),
             error=d.get("error"),
+            error_code=d.get("error_code"),
         )
 
 

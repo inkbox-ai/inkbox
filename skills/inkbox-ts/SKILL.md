@@ -1091,7 +1091,7 @@ await inkbox.phoneContactRules.create(num.id, {
 
 ## Contacts
 
-Shared address book with four permission groups: Email, Phone, Profile, and Memories. Profile and Memories are independent; inherited settings require the existing full view. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary SDK calls remain scoped.
+Shared address book with four permission groups: Email, Phone, Profile, and Memories. Inherited Profile and Memories are available when every stored identifier is permitted, including standalone whitelist matches. Contacts without identifiers retain their channel-default behavior. Explicit visibility settings take precedence. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary SDK calls remain scoped.
 
 Use `inkbox.contacts.communicationPolicy.get(contactId)` and `.replace(contactId, { expectedRevision, defaults, identities })` with admin credentials. Defaults contain `email` and `phone` entries; identity overrides also contain `identityId`. `.preview(contactId, identityId)` returns the saved identity view; `.listForIdentity(handle)` returns a page with `items` and `hasMore`. Agent keys can list only their own view.
 

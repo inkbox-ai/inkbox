@@ -681,7 +681,7 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 ## Contacts
 
-Shared address book with four permission groups: Email, Phone, Profile, and Memories. Profile and Memories are independent; inherited settings require the existing full view. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary CLI calls remain scoped.
+Shared address book with four permission groups: Email, Phone, Profile, and Memories. Inherited Profile and Memories are available when every stored identifier is permitted, including standalone whitelist matches. Contacts without identifiers retain their channel-default behavior. Explicit visibility settings take precedence. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary CLI calls remain scoped.
 
 `contacts communication-policy get <contact-id>`, `set <contact-id> --file policy.json`, and `preview <contact-id> <identity-id>` require admin credentials. The JSON file contains `expectedRevision`, `defaults`, and `identities` with `identityId`. `contacts communication-policy list <handle>` and `identity contact-policies <handle>` list the identity's permitted view.
 

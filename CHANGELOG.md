@@ -16,10 +16,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Inherited Profile and Memories access includes contacts whose stored identifiers are all permitted, including standalone whitelist matches. Explicit visibility decisions remain authoritative.
+- Contact policy conflicts expose stable error codes. Bulk deletion includes optional `error_code` (Python/Rust) or `errorCode` (TypeScript) alongside the message. Rust struct literals for `ContactBulkDeleteResultItem` must supply `error_code`, using `None` when absent.
 - Rust callers constructing `MailIdentityContactRule`, `PhoneIdentityContactRule`, or `IMessageContactRule` struct literals must supply `contact: None` or a contact. Older wire responses still parse; Python and TypeScript construction remains compatible.
 - Contact and standalone address/number entries contribute to each identity's email or phone whitelist/blacklist. Phone permissions cover SMS, calls, and iMessage together.
 - The selected mode determines active entries: allows in whitelist mode and blocks in blacklist mode. Opposite-action entries no longer override the active list.
-- Agent contact responses, lookup, and vCard exports include only permitted identifiers and profile fields. Profile and Memories are independently controlled; inherited settings preserve the existing full-view requirement. Hosted voice in YOLO mode retains full organization contact and memory access.
+- Agent contact responses, lookup, and vCard exports include only permitted identifiers and profile fields. Profile and Memories are independently controlled; inherited settings require every stored identifier to be permitted. Hosted voice in YOLO mode retains full organization contact and memory access.
 - **Authorization change:** communication-rule creation now requires admin credentials, like updates and deletion. Agent keys receive HTTP 403. Existing-contact identifier edits and suggestion absorption also require administrative authority.
 - Identity-level phone-rule helpers no longer require a dedicated phone number. Existing phone/iMessage methods remain supported; their filter-mode fields are aliases and contradictory values return HTTP 422.
 - Releasing or replacing a phone number preserves identity permissions. Migration preserves a sole configured channel's restrictions and ignores never-used/unconfigured defaults.
