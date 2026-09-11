@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.6.11 — Contact communication permissions
+## 0.7.0 — Contact communication permissions
 
 ### Added
 
