@@ -240,13 +240,15 @@ class IdentityPhoneNumber:
     sms_error_code: str | None = None
     sms_error_detail: str | None = None
     sms_ready_at: datetime | None = None
-    # 2-letter US state abbreviation (e.g. "NY"); null if not set.
+    # US state abbreviation when known; null when not applicable.
     state: str | None = None
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
     forwarding_target_type: ForwardingTargetType | None = None
     forwarding_phone_number: str | None = None
     forwarding_sip_uri: str | None = None
+    # ISO 3166-1 alpha-2 country code; older responses default to US.
+    country: str = "US"
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityPhoneNumber:
@@ -279,6 +281,7 @@ class IdentityPhoneNumber:
                 datetime.fromisoformat(raw_sms_ready_at) if raw_sms_ready_at else None
             ),
             state=d.get("state"),
+            country=d.get("country", "US"),
             agent_identity_id=UUID(agent_identity_id) if agent_identity_id else None,
             filter_mode_change_notice=(
                 FilterModeChangeNotice._from_dict(notice) if notice else None

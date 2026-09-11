@@ -136,6 +136,18 @@ describe("identityMailboxCreateOptionsToWire", () => {
 });
 
 describe("parseIdentityPhoneNumber", () => {
+  it.each([
+    [{ country: "GB", state: null, number: "+447700900123" }, "GB", null],
+    [{ country: "US", state: "NY" }, "US", "NY"],
+    [{ state: "NY" }, "US", "NY"],
+    [{ state: undefined }, "US", null],
+  ] as const)("preserves country and nullable state: %j", (fields, country, state) => {
+    const number = parseIdentityPhoneNumber({ ...RAW_IDENTITY_PHONE, ...fields });
+    expect(number.country).toBe(country);
+    expect(number.state).toBe(state);
+    expect(number.number).toBe("number" in fields ? fields.number : RAW_IDENTITY_PHONE.number);
+  });
+
   it("converts all fields", () => {
     const p = parseIdentityPhoneNumber(RAW_IDENTITY_PHONE);
     expect(p.id).toBe(RAW_IDENTITY_PHONE.id);

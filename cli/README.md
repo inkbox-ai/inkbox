@@ -231,6 +231,11 @@ checking sent mail, duplicate or delete that draft instead.
 Phone operations require `-i <handle>`, except the organization-scoped
 `phone hosted-agent voices` catalog.
 
+Phone number details from `inkbox identity get <handle>` and
+`inkbox identity refresh <handle>` include `phoneCountry` (an ISO 3166-1 alpha-2
+code such as `US` or `GB`) and `phoneState` (null when not applicable).
+Older phone responses without a country code are reported as `US`.
+
 ```bash
 inkbox phone call -i <handle>                # Place an outbound call
   --to <number>                              #   E.164 phone number (required)

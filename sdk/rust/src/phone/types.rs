@@ -410,9 +410,12 @@ pub struct PhoneNumber {
     pub sms_error_detail: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sms_ready_at: Option<String>,
-    /// 2-letter US state abbreviation (e.g. `"NY"`); null if not set.
+    /// US state abbreviation when known; null when not applicable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
+    /// ISO 3166-1 alpha-2 code; defaults to US for older responses.
+    #[serde(default = "default_phone_country")]
+    pub country: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_identity_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -819,11 +822,51 @@ fn default_contact_rule_status_active() -> ContactRuleStatus {
     ContactRuleStatus::Active
 }
 
+fn default_phone_country() -> String {
+    "US".to_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn phone_country_and_nullable_state_in_both_response_shapes() {
+        for (fields, country, state) in [
+            (
+                json!({"country": "GB", "state": null, "number": "+447700900123"}),
+                "GB",
+                None,
+            ),
+            (json!({"country": "US", "state": "NY"}), "US", Some("NY")),
+            (json!({"state": "NY"}), "US", Some("NY")),
+            (json!({}), "US", None),
+        ] {
+            let mut raw = json!({
+                "id": "11111111-1111-1111-1111-111111111111",
+                "number": "+15550001111",
+                "type": "local",
+                "status": "active",
+                "incoming_call_action": "auto_reject",
+                "created_at": "2026-06-01T00:00:00Z",
+                "updated_at": "2026-06-01T00:00:00Z"
+            });
+            raw.as_object_mut()
+                .unwrap()
+                .extend(fields.as_object().unwrap().clone());
+            let standalone: PhoneNumber = serde_json::from_value(raw.clone()).unwrap();
+            let embedded: crate::identities::types::IdentityPhoneNumber =
+                serde_json::from_value(raw.clone()).unwrap();
+            assert_eq!(standalone.country, country);
+            assert_eq!(embedded.country, country);
+            assert_eq!(standalone.state.as_deref(), state);
+            assert_eq!(embedded.state.as_deref(), state);
+            assert_eq!(standalone.number, raw["number"].as_str().unwrap());
+            assert_eq!(embedded.number, standalone.number);
+        }
+    }
 
     /// Minimal valid `PhoneCall` payload; tests mutate a copy per case.
     fn call_json() -> serde_json::Value {

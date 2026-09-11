@@ -646,3 +646,85 @@ test("authority-mode calls the privileged SDK setter", async () => {
     mock.server.close();
   }
 });
+
+for (const command of ["get", "refresh"]) {
+  for (const [name, phoneNumber, country, state] of [
+    ["UK", { ...IDENTITY.phone_number, number: "+447700900123", country: "GB", state: null }, "GB", null],
+    ["legacy US", { ...IDENTITY.phone_number, state: "NY" }, "US", "NY"],
+    ["no phone", null, null, null],
+  ]) {
+    test(`identity ${command} preserves ${name} phone metadata`, async () => {
+      const mock = await listen((_req, res) => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ...IDENTITY, phone_number: phoneNumber }));
+      });
+      try {
+        const result = await runCli([
+          "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+          "--json", "identity", command, "support-bot",
+        ]);
+        assert.ifError(result.error);
+        const output = JSON.parse(result.stdout);
+        assert.equal(output.phoneNumber, phoneNumber?.number ?? null);
+        assert.equal(output.phoneCountry, country);
+        assert.equal(output.phoneState, state);
+      } finally {
+        mock.server.close();
+      }
+    });
+  }
+}
+
+test("text send and list work with a UK identity phone without a state", async () => {
+  const requests = [];
+  const ukIdentity = {
+    ...IDENTITY,
+    phone_number: { ...IDENTITY.phone_number, number: "+447700900123", country: "GB", state: null },
+  };
+  const message = {
+    id: "dddd4444-0000-0000-0000-000000000001",
+    direction: "inbound",
+    local_phone_number: "+447700900123",
+    remote_phone_number: "+447700900456",
+    text: "Hello",
+    type: "sms",
+    media: null,
+    is_read: false,
+    is_blocked: false,
+    created_at: "2026-07-29T00:00:00Z",
+    updated_at: "2026-07-29T00:00:00Z",
+  };
+  const mock = await listen(async (req, res) => {
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    requests.push({ method: req.method, url: req.url, body: body ? JSON.parse(body) : null });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    if (req.method === "POST") {
+      res.end(JSON.stringify({ ...message, direction: "outbound", delivery_status: "queued" }));
+    } else if (req.url.includes("/texts")) {
+      res.end(JSON.stringify([message]));
+    } else {
+      res.end(JSON.stringify(ukIdentity));
+    }
+  });
+  try {
+    const options = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json"];
+    const sent = await runCli([...options, "text", "send", "-i", "support-bot", "--to", "+447700900456", "--text", "Hello"]);
+    assert.ifError(sent.error);
+    assert.equal(JSON.parse(sent.stdout).local, "+447700900123");
+    assert.equal(JSON.parse(sent.stdout).deliveryStatus, "queued");
+    assert.deepEqual(requests.find((request) => request.method === "POST"), {
+      method: "POST",
+      url: `/api/v1/phone/numbers/${IDENTITY.phone_number.id}/texts`,
+      body: { to: "+447700900456", text: "Hello" },
+    });
+    const received = await runCli([...options, "text", "list", "-i", "support-bot"]);
+    assert.ifError(received.error);
+    const inbound = JSON.parse(received.stdout)[0];
+    assert.equal(inbound.localPhoneNumber, "+447700900123");
+    assert.equal(inbound.remotePhoneNumber, "+447700900456");
+    assert.equal(inbound.direction, "inbound");
+  } finally {
+    mock.server.close();
+  }
+});

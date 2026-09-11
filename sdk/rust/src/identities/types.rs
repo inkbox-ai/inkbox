@@ -391,9 +391,12 @@ pub struct IdentityPhoneNumber {
     pub sms_error_detail: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sms_ready_at: Option<String>,
-    /// 2-letter US state abbreviation (e.g. `"NY"`); null if not set.
+    /// US state abbreviation when known; null when not applicable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
+    /// ISO 3166-1 alpha-2 code; defaults to US for older responses.
+    #[serde(default = "default_phone_country")]
+    pub country: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_identity_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -505,6 +508,10 @@ impl std::ops::DerefMut for AgentIdentityData {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.summary
     }
+}
+
+fn default_phone_country() -> String {
+    "US".to_owned()
 }
 
 #[cfg(test)]

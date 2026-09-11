@@ -169,9 +169,11 @@ export interface PhoneNumber {
   forwardingSipUri: string | null;
   filterMode: FilterMode;
   /**
-   * 2-letter US state abbreviation (e.g. `"NY"`); `null` if not set.
+   * US state abbreviation when known; `null` when not applicable.
    */
   state: string | null;
+  /** ISO 3166-1 alpha-2 code. Parsers default older responses to `"US"`. */
+  country?: string;
   /**
    * UUID of the owning agent identity. `null` only for pool / released
    * states — active org-owned numbers are always bound to an identity.
@@ -523,6 +525,7 @@ export interface RawPhoneNumber {
   forwarding_sip_uri?: string | null;
   filter_mode?: string;
   state?: string | null;
+  country?: string;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
@@ -769,6 +772,7 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     forwardingSipUri: r.forwarding_sip_uri ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     state: r.state ?? null,
+    country: r.country ?? "US",
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
