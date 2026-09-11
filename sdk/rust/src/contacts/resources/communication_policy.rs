@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::contacts::types::Contact;
+use crate::contacts::resources::contacts::ListContactsParams;
+use crate::contacts::types::{Contact, ContactEmail, ContactPhone, ContactReviewStatus};
 use crate::error::Result;
 use crate::http::{HttpTransport, NO_QUERY};
 
@@ -110,6 +111,65 @@ pub struct ContactCommunicationPolicyPage {
     pub has_more: bool,
 }
 
+/// Effective access across a contact's current identifiers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IdentifierPermission {
+    All,
+    Some,
+    None,
+    NoIdentifiers,
+}
+
+/// Compact contact identification for permission management.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactPermissionSummary {
+    pub id: uuid::Uuid,
+    pub preferred_name: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
+    pub company_name: Option<String>,
+    pub review_status: ContactReviewStatus,
+    pub emails: Vec<ContactEmail>,
+    pub phones: Vec<ContactPhone>,
+}
+
+/// Visibility defaults and one selected identity's overrides.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactPermissionVisibility {
+    pub defaults: ContactVisibilityDecisions,
+    pub identity_override: ContactVisibilityDecisions,
+}
+
+/// Identifier coverage and independent content permissions.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactPermissionEffective {
+    pub email: IdentifierPermission,
+    pub phone: IdentifierPermission,
+    pub profile: bool,
+    pub memories: bool,
+}
+
+/// Human-managed permissions, including contacts hidden from the identity.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactPermissionEntry {
+    pub contact: ContactPermissionSummary,
+    pub revision: u64,
+    pub defaults: ContactChannelDecisions,
+    pub identity_override: ContactChannelDecisions,
+    pub visibility: ContactPermissionVisibility,
+    pub effective: ContactPermissionEffective,
+}
+
+/// A bounded management roster.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactPermissionPage {
+    pub items: Vec<ContactPermissionEntry>,
+    pub limit: u64,
+    pub offset: u64,
+    pub has_more: bool,
+}
+
 /// Administrative policy writes and permission-filtered contact reads.
 pub struct ContactCommunicationPolicyResource {
     http: Arc<HttpTransport>,
@@ -177,6 +237,34 @@ impl ContactCommunicationPolicyResource {
             &[("limit", limit.to_string()), ("offset", offset.to_string())],
         )?)?)
     }
+
+    /// Manage organization contact permissions using admin credentials.
+    pub fn list_management_for_identity(
+        &self,
+        handle: &str,
+        params: &ListContactsParams,
+    ) -> Result<ContactPermissionPage> {
+        let mut query = Vec::new();
+        if let Some(q) = &params.q {
+            query.push(("q", q.clone()));
+        }
+        if let Some(order) = &params.order {
+            query.push(("order", order.clone()));
+        }
+        if let Some(limit) = params.limit {
+            query.push(("limit", limit.to_string()));
+        }
+        if let Some(offset) = params.offset {
+            query.push(("offset", offset.to_string()));
+        }
+        for status in &params.review_status {
+            query.push(("review_status", status.as_str().to_string()));
+        }
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/identities/{handle}/contact-permissions"),
+            &query,
+        )?)?)
+    }
 }
 
 #[cfg(test)]
@@ -185,6 +273,108 @@ mod tests {
     use crate::client::Inkbox;
     use httpmock::prelude::*;
     use serde_json::json;
+
+    #[test]
+    fn management_roster_preserves_partial_access_and_query_filters() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/identities/test-agent/contact-permissions")
+                .query_param("q", "Person").query_param("order", "name")
+                .query_param("limit", "1").query_param("offset", "2").query_param("review_status", "confirmed");
+            then.status(200).json_body(json!({"items": [{
+                "contact": {"id": "33333333-3333-4333-8333-333333333333", "preferred_name": "Person", "given_name": null,
+                    "family_name": null, "company_name": null, "review_status": "confirmed", "emails": [], "phones": []},
+                "revision": 8, "defaults": {"email": "inherit", "phone": "inherit"},
+                "identity_override": {"email": "allow", "phone": "block"},
+                "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"},
+                    "identity_override": {"profile": "allow", "memories": "block"}},
+                "effective": {"email": "some", "phone": "no_identifiers", "profile": true, "memories": false}
+            }], "limit": 1, "offset": 2, "has_more": true}));
+        });
+        let sdk = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let page = sdk
+            .contacts()
+            .communication_policy()
+            .list_management_for_identity(
+                "test-agent",
+                &ListContactsParams {
+                    q: Some("Person".into()),
+                    order: Some("name".into()),
+                    limit: Some(1),
+                    offset: Some(2),
+                    review_status: vec![ContactReviewStatus::Confirmed],
+                },
+            )
+            .unwrap();
+        assert!(page.has_more);
+        assert_eq!(page.items[0].revision, 8);
+        assert_eq!(page.items[0].effective.email, IdentifierPermission::Some);
+        assert!(page.items[0].effective.profile);
+        request.assert();
+    }
+
+    #[test]
+    fn rule_contacts_parse_absent_null_populated_and_filtered_cards() {
+        for channel in ["mail", "phone", "imessage"] {
+            for shape in ["absent", "null", "card", "filtered"] {
+                let mut payload = json!({
+                    "id": "11111111-1111-4111-8111-111111111111", "agent_identity_id": "22222222-2222-4222-8222-222222222222",
+                    "action": "allow", "status": "active", "match_type": if channel == "mail" { "exact_email" } else { "exact_number" },
+                    "match_target": if channel == "mail" { "person@example.com" } else { "+15555550123" },
+                    "created_at": "2026-09-11T00:00:00Z", "updated_at": "2026-09-11T00:00:00Z"
+                });
+                if shape == "null" {
+                    payload["contact"] = json!(null);
+                }
+                if shape == "card" || shape == "filtered" {
+                    payload["contact"] = json!({"id": "33333333-3333-4333-8333-333333333333",
+                        "preferred_name": if shape == "card" { Some("Person") } else { None },
+                        "emails": [{"value": "person@example.com", "is_primary": true}],
+                        "created_at": "2026-09-11T00:00:00Z", "updated_at": "2026-09-11T00:00:00Z"});
+                }
+                let card = match channel {
+                    "mail" => {
+                        serde_json::from_value::<crate::mail::types::MailIdentityContactRule>(
+                            payload,
+                        )
+                        .unwrap()
+                        .contact
+                    }
+                    "phone" => {
+                        serde_json::from_value::<crate::phone::types::PhoneIdentityContactRule>(
+                            payload,
+                        )
+                        .unwrap()
+                        .contact
+                    }
+                    _ => {
+                        serde_json::from_value::<crate::imessage::types::IMessageContactRule>(
+                            payload,
+                        )
+                        .unwrap()
+                        .contact
+                    }
+                };
+                if shape == "card" || shape == "filtered" {
+                    let card = card.unwrap();
+                    assert_eq!(
+                        card.preferred_name.as_deref(),
+                        if shape == "card" {
+                            Some("Person")
+                        } else {
+                            None
+                        }
+                    );
+                    assert_eq!(card.emails[0].value, "person@example.com");
+                } else {
+                    assert!(card.is_none());
+                }
+            }
+        }
+    }
 
     #[test]
     fn visibility_replacement_keeps_the_legacy_request_shape() {

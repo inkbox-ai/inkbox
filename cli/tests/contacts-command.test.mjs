@@ -7,8 +7,41 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseContactPolicyFile } from "../dist/commands/contacts.js";
+import { outputContactRules } from "../dist/output.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+test("rule tables show names while JSON preserves the card", (t) => {
+  const lines = [];
+  t.mock.method(console, "log", (line) => lines.push(line));
+  const rows = [{ id: "rule-1", contact: { preferredName: "Person" } }, { id: "rule-2", contact: null }];
+  outputContactRules(rows, { json: false, columns: ["id", "contact"] });
+  assert.match(lines[2], /rule-1\s+Person/);
+  assert.match(lines[3], /rule-2\s+-/);
+  lines.length = 0;
+  outputContactRules(rows, { json: true, columns: ["id", "contact"] });
+  assert.deepEqual(JSON.parse(lines[0]), rows);
+});
+
+test("permission management forwards filters and preserves the page in JSON", async () => {
+  let request;
+  const mock = await listen((req, res) => {
+    request = new URL(req.url, "http://localhost");
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ items: [], limit: 1, offset: 2, has_more: true }));
+  });
+  try {
+    const result = await runCli(["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
+      "contacts", "communication-policy", "list-management", "test-agent", "--q", "Person", "--order", "name",
+      "--limit", "1", "--offset", "2", "--review-status", "confirmed", "unreviewed"]);
+    assert.equal(result.error, null, result.stderr);
+    assert.equal(request.pathname, "/api/v1/identities/test-agent/contact-permissions");
+    assert.equal(request.searchParams.get("q"), "Person");
+    assert.equal(request.searchParams.get("order"), "name");
+    assert.deepEqual(request.searchParams.getAll("review_status"), ["confirmed", "unreviewed"]);
+    assert.deepEqual(JSON.parse(result.stdout), { items: [], limit: 1, offset: 2, hasMore: true });
+  } finally { await new Promise((resolve) => mock.server.close(resolve)); }
+});
 
 test("policy files preserve visibility omission and validate every supplied field", () => {
   const base = { expectedRevision: 0, defaults: { email: "inherit", phone: "inherit" }, identities: [] };

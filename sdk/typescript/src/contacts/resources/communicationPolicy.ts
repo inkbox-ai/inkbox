@@ -1,5 +1,5 @@
 import { HttpTransport } from "../../_http.js";
-import { type Contact, type RawContact, parseContact } from "../types.js";
+import { type Contact, type RawContact, type ContactReviewStatus, parseContact, parseContactEmail, parseContactPhone } from "../types.js";
 
 /** An entry contributes to the identity's active whitelist or blacklist. */
 export type ContactDecision = "inherit" | "allow" | "block";
@@ -43,6 +43,45 @@ export interface ContactCommunicationPolicyPage {
   limit: number;
   offset: number;
   hasMore: boolean;
+}
+export type IdentifierPermission = "all" | "some" | "none" | "no_identifiers";
+export type ContactPermissionSummary = Pick<Contact, "id" | "preferredName" | "givenName" | "familyName" | "companyName" | "reviewStatus" | "emails" | "phones">;
+export interface ContactPermissionVisibility {
+  defaults: ContactVisibilityDecisions;
+  identityOverride: ContactVisibilityDecisions;
+}
+export interface ContactPermissionEffective extends ContactVisibilityResult {
+  email: IdentifierPermission;
+  phone: IdentifierPermission;
+}
+export interface ContactPermissionEntry {
+  contact: ContactPermissionSummary;
+  revision: number;
+  defaults: ContactChannelDecisions;
+  identityOverride: ContactChannelDecisions;
+  visibility: ContactPermissionVisibility;
+  effective: ContactPermissionEffective;
+}
+export interface ContactPermissionPage {
+  items: ContactPermissionEntry[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+export interface ListContactPermissionsOptions {
+  q?: string;
+  order?: "name" | "recent";
+  limit?: number;
+  offset?: number;
+  reviewStatus?: ContactReviewStatus[];
+}
+interface RawPermissionEntry {
+  contact: Pick<RawContact, "id" | "preferred_name" | "given_name" | "family_name" | "company_name" | "emails" | "phones"> & { review_status: ContactReviewStatus };
+  revision: number;
+  defaults: ContactChannelDecisions;
+  identity_override: ContactChannelDecisions;
+  visibility: { defaults: ContactVisibilityDecisions; identity_override: ContactVisibilityDecisions };
+  effective: ContactPermissionEffective;
 }
 interface RawPolicy {
   contact_id: string;
@@ -106,5 +145,22 @@ export class ContactCommunicationPolicyResource {
       `/identities/${encodeURIComponent(handle)}/contact-communication-policies`, options,
     );
     return { items: raw.items.map(parsePreview), limit: raw.limit, offset: raw.offset, hasMore: raw.has_more };
+  }
+
+  /** Manage contact permissions, including hidden contacts, using admin credentials. */
+  async listManagementForIdentity(handle: string, options: ListContactPermissionsOptions = {}): Promise<ContactPermissionPage> {
+    const raw = await this.http.get<{ items: RawPermissionEntry[]; limit: number; offset: number; has_more: boolean }>(
+      `/identities/${encodeURIComponent(handle)}/contact-permissions`, {
+        q: options.q, order: options.order, limit: options.limit, offset: options.offset, review_status: options.reviewStatus,
+      },
+    );
+    return { limit: raw.limit, offset: raw.offset, hasMore: raw.has_more, items: raw.items.map((row) => ({
+      contact: { id: row.contact.id, preferredName: row.contact.preferred_name,
+        givenName: row.contact.given_name, familyName: row.contact.family_name, companyName: row.contact.company_name,
+        reviewStatus: row.contact.review_status, emails: (row.contact.emails ?? []).map(parseContactEmail), phones: (row.contact.phones ?? []).map(parseContactPhone) },
+      revision: row.revision, defaults: row.defaults, identityOverride: row.identity_override,
+      visibility: { defaults: row.visibility.defaults, identityOverride: row.visibility.identity_override },
+      effective: row.effective,
+    })) };
   }
 }

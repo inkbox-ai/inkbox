@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { readFileSync, writeFileSync } from "node:fs";
 import type {
   ContactFactKind,
@@ -76,6 +76,22 @@ export function parseContactPolicyFile(raw: string): ReplaceContactCommunication
 
 function registerContactsAccessCommands(parent: Command): void {
   const policy = parent.command("communication-policy").description("Contact communication lists and previews");
+  policy.command("list-management <handle>").description("Manage contact permissions, including hidden contacts (admin credentials)")
+    .option("--q <query>", "Search contact details")
+    .option("--limit <number>", "Page size", "50").option("--offset <number>", "Page offset", "0")
+    .addOption(new Option("--order <order>", "Sort order").choices(["name", "recent"]).default("recent"))
+    .addOption(new Option("--review-status <status...>", "Contact review states").choices(["confirmed", "unreviewed"]))
+    .action(withErrorHandler(async function (this: Command, handle: string, options: {
+      q?: string; limit: string; offset: string; order: "name" | "recent"; reviewStatus?: ContactReviewStatus[];
+    }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      const page = await createClient(opts).contacts.communicationPolicy.listManagementForIdentity(handle, {
+        ...options, limit: Number(options.limit), offset: Number(options.offset),
+      });
+      output(opts.json ? page : page.items.map((row) => ({ id: row.contact.id, contact: row.contact.preferredName,
+        ...row.effective, revision: row.revision })),
+      { json: !!opts.json, columns: ["id", "contact", "email", "phone", "profile", "memories", "revision"] });
+    }));
   policy.command("get <contact-id>").description("Read a contact policy (admin credentials)")
     .action(withErrorHandler(async function (this: Command, contactId: string): Promise<void> {
       const opts = getGlobalOpts(this);

@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
-from inkbox.contacts.types import Contact
+from inkbox.contacts.types import Contact, ContactEmail, ContactPhone, ContactReviewStatus
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -117,6 +117,74 @@ class ContactCommunicationPolicyPage:
     has_more: bool
 
 
+IdentifierPermission = Literal["all", "some", "none", "no_identifiers"]
+
+
+@dataclass(frozen=True)
+class ContactPermissionSummary:
+    """Compact contact identification for permission management."""
+    id: UUID
+    preferred_name: str | None
+    given_name: str | None
+    family_name: str | None
+    company_name: str | None
+    review_status: ContactReviewStatus
+    emails: list[ContactEmail]
+    phones: list[ContactPhone]
+
+
+@dataclass(frozen=True)
+class ContactPermissionVisibility:
+    """Visibility defaults and one identity's overrides."""
+    defaults: ContactVisibilityDecisions
+    identity_override: ContactVisibilityDecisions
+
+
+@dataclass(frozen=True)
+class ContactPermissionEffective:
+    """Identifier coverage and independent profile/memory permissions."""
+    email: IdentifierPermission
+    phone: IdentifierPermission
+    profile: bool
+    memories: bool
+
+
+@dataclass(frozen=True)
+class ContactPermissionEntry:
+    """Human-managed settings including contacts hidden from the identity."""
+    contact: ContactPermissionSummary
+    revision: int
+    defaults: ContactChannelDecisions
+    identity_override: ContactChannelDecisions
+    visibility: ContactPermissionVisibility
+    effective: ContactPermissionEffective
+
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> ContactPermissionEntry:
+        """Parse a compact management row without inventing full contact fields."""
+        contact = data["contact"]
+        return cls(
+            ContactPermissionSummary(UUID(contact["id"]), contact["preferred_name"], contact["given_name"],
+                contact["family_name"], contact["company_name"], ContactReviewStatus(contact["review_status"]),
+                [ContactEmail._from_dict(row) for row in contact["emails"]],
+                [ContactPhone._from_dict(row) for row in contact["phones"]]),
+            data["revision"], ContactChannelDecisions(**data["defaults"]),
+            ContactChannelDecisions(**data["identity_override"]),
+            ContactPermissionVisibility(ContactVisibilityDecisions(**data["visibility"]["defaults"]),
+                ContactVisibilityDecisions(**data["visibility"]["identity_override"])),
+            ContactPermissionEffective(**data["effective"]),
+        )
+
+
+@dataclass(frozen=True)
+class ContactPermissionPage:
+    """A bounded contact-permission management roster."""
+    items: list[ContactPermissionEntry]
+    limit: int
+    offset: int
+    has_more: bool
+
+
 class ContactCommunicationPolicyResource:
     """Manage contact communication entries with admin credentials."""
 
@@ -153,3 +221,17 @@ class ContactCommunicationPolicyResource:
                                 params={"limit": limit, "offset": offset})
         return ContactCommunicationPolicyPage([ContactCommunicationPreview._from_dict(row) for row in result["items"]],
                                                result["limit"], result["offset"], result["has_more"])
+
+    def list_management_for_identity(
+        self, agent_handle: str, *, q: str | None = None, order: Literal["name", "recent"] = "recent",
+        limit: int = 50, offset: int = 0, review_status: list[ContactReviewStatus] | None = None,
+    ) -> ContactPermissionPage:
+        """List organization contacts and effective permissions using admin credentials."""
+        params: dict[str, Any] = {"limit": limit, "offset": offset, "order": order}
+        if q is not None:
+            params["q"] = q
+        if review_status:
+            params["review_status"] = [status.value for status in review_status]
+        result = self._http.get(f"/identities/{agent_handle}/contact-permissions", params=params)
+        return ContactPermissionPage([ContactPermissionEntry._from_dict(row) for row in result["items"]],
+                                     result["limit"], result["offset"], result["has_more"])

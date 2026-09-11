@@ -753,9 +753,9 @@ console.log(login.username, login.password);
 ```typescript
 // Create a login secret (secretType inferred from payload shape)
 await unlocked.createSecret({
-  name: "AWS Production",
+  name: "Example dashboard",
   description: "Production IAM user",
-  payload: { password: "s3cret", username: "admin", url: "https://aws.amazon.com" },
+  payload: { password: "example-password", username: "admin", url: "https://dashboard.example.com" },
 });
 
 // Create an API key secret
@@ -1094,6 +1094,8 @@ await inkbox.phoneContactRules.create(num.id, {
 Shared address book with four permission groups: Email, Phone, Profile, and Memories. Profile and Memories are independent; inherited settings require the existing full view. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary SDK calls remain scoped.
 
 Use `inkbox.contacts.communicationPolicy.get(contactId)` and `.replace(contactId, { expectedRevision, defaults, identities })` with admin credentials. Defaults contain `email` and `phone` entries; identity overrides also contain `identityId`. `.preview(contactId, identityId)` returns the saved identity view; `.listForIdentity(handle)` returns a page with `items` and `hasMore`. Agent keys can list only their own view.
+
+With admin credentials, `.listManagementForIdentity(handle, { q: "Jane", order: "name", limit: 20 })` includes hidden contacts and returns compact contact summaries, defaults, `identityOverride`, and effective access. Email/Phone results are `all`, `some`, `none`, or `no_identifiers`; Profile/Memories are booleans. Fetch the full policy before editing to preserve other identities. Identity-owned communication rules have optional nullable `rule.contact` cards, filtered for the caller and without memories.
 
 Add `visibility: { defaults: { profile: "allow", memories: "block" }, identities: [] }` to share profile fields without memories. Visibility overrides use `{ identityId, profile, memories }`. Omitting visibility preserves that entire portion; reset both portions explicitly to clear everything. Use `preview.visibility?.profile` and `preview.visibility?.memories`; summaries live on `preview.contact?.memoryCount` and `preview.contact?.latestMemory`. Missing visibility means independent controls are not reported. Explicit profile/memory grants authorize stored free text, which can mention contact identifiers.
 

@@ -181,6 +181,7 @@ from inkbox.contacts import (
     ContactChannelDecisions, ContactIdentityDecisions, ContactDecision,
     ContactCommunicationPolicy, ContactCommunicationPreview, ContactCommunicationPolicyPage,
     ContactVisibilityDecisions, ContactIdentityVisibilityDecisions, ContactVisibilityPolicy, ContactVisibilityResult,
+    ContactPermissionSummary, ContactPermissionVisibility, ContactPermissionEffective, ContactPermissionEntry, ContactPermissionPage, IdentifierPermission,
 )
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
@@ -571,6 +572,7 @@ __all__ = [
     "ContactChannelDecisions", "ContactIdentityDecisions", "ContactDecision",
     "ContactCommunicationPolicy", "ContactCommunicationPreview", "ContactCommunicationPolicyPage",
     "ContactVisibilityDecisions", "ContactIdentityVisibilityDecisions", "ContactVisibilityPolicy", "ContactVisibilityResult",
+    "ContactPermissionSummary", "ContactPermissionVisibility", "ContactPermissionEffective", "ContactPermissionEntry", "ContactPermissionPage", "IdentifierPermission",
     "ContactAddress",
     "ContactBulkDeleteResult",
     "ContactBulkDeleteResultItem",

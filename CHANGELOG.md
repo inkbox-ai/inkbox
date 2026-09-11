@@ -11,9 +11,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Contact communication-policy get/replace, identity previews, and paginated identity views in Python, TypeScript, and Rust. The CLI adds `contacts communication-policy get`, `set`, `preview`, and `list`.
 - Independent Profile and Memories controls through an optional `visibility` policy block. Omission preserves existing settings; explicit replacement uses the same revision. Rust adds `replace_with_visibility` without changing the communication-only request type.
 - Per-group preview visibility with memory summaries on the projected contact, and strict CLI policy-file validation for unknown or incomplete settings.
+- Nullable matching contact cards on identity-owned email, phone, and iMessage rules. Cards follow the caller's contact visibility and omit memories. CLI rule tables show contact names while JSON preserves cards.
+- An administrative contact-permission roster, including contacts hidden from the selected identity, with partial identifier access, search, and pagination. Use `list_management_for_identity` (Python/Rust), `listManagementForIdentity` (TypeScript), or `contacts communication-policy list-management` (CLI).
 
 ### Changed
 
+- Rust callers constructing `MailIdentityContactRule`, `PhoneIdentityContactRule`, or `IMessageContactRule` struct literals must supply `contact: None` or a contact. Older wire responses still parse; Python and TypeScript construction remains compatible.
 - Contact and standalone address/number entries contribute to each identity's email or phone whitelist/blacklist. Phone permissions cover SMS, calls, and iMessage together.
 - The selected mode determines active entries: allows in whitelist mode and blocks in blacklist mode. Opposite-action entries no longer override the active list.
 - Agent contact responses, lookup, and vCard exports include only permitted identifiers and profile fields. Profile and Memories are independently controlled; inherited settings preserve the existing full-view requirement. Hosted voice in YOLO mode retains full organization contact and memory access.

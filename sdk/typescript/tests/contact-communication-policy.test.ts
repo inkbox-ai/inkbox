@@ -3,6 +3,26 @@ import { ContactCommunicationPolicyResource } from "../src/contacts/resources/co
 import { type HttpTransport } from "../src/_http.js";
 
 describe("contact communication policies", () => {
+  it("maps the management roster without making it a full contact", async () => {
+    const get = vi.fn().mockResolvedValue({ items: [{
+      contact: { id: "contact", preferred_name: "Person", given_name: null, family_name: null, company_name: null,
+        review_status: "confirmed", emails: [], phones: [{ value_e164: "+15555550123", label: "Work", is_primary: true }] },
+      revision: 8, defaults: { email: "inherit", phone: "inherit" }, identity_override: { email: "block", phone: "allow" },
+      visibility: { defaults: { profile: "inherit", memories: "inherit" }, identity_override: { profile: "allow", memories: "block" } },
+      effective: { email: "no_identifiers", phone: "some", profile: true, memories: false },
+    }], limit: 1, offset: 2, has_more: true });
+    const page = await new ContactCommunicationPolicyResource({ get } as unknown as HttpTransport)
+      .listManagementForIdentity("test-agent", { q: "Person", order: "name", limit: 1, offset: 2, reviewStatus: ["confirmed"] });
+    expect(get).toHaveBeenCalledWith("/identities/test-agent/contact-permissions", {
+      q: "Person", order: "name", limit: 1, offset: 2, review_status: ["confirmed"],
+    });
+    expect(page.hasMore).toBe(true);
+    expect(page.items[0].contact.phones[0].value).toBe("+15555550123");
+    expect(page.items[0].visibility.identityOverride.memories).toBe("block");
+    expect(page.items[0].effective.phone).toBe("some");
+    expect(page.items[0].revision).toBe(8);
+    expect(page.items[0].contact).not.toHaveProperty("notes");
+  });
   it("serializes independent visibility while preserving legacy omission", async () => {
     const put = vi.fn().mockResolvedValue({ contact_id: "contact", revision: 2,
       defaults: { email: "allow", phone: "allow" }, identities: [], visibility: {

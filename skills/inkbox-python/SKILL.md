@@ -775,8 +775,8 @@ print(secret.payload.username, secret.payload.password)   # for login type
 ```python
 # Create a login secret (secret_type inferred from payload type)
 unlocked.create_secret(
-    "AWS Production",
-    LoginPayload(password="s3cret", username="admin", url="https://aws.amazon.com"),
+    "Example dashboard",
+    LoginPayload(password="example-password", username="admin", url="https://dashboard.example.com"),
     description="Production IAM user",
 )
 
@@ -1094,6 +1094,8 @@ inkbox.phone_contact_rules.create(
 Shared address book with four permission groups: Email, Phone, Profile, and Memories. Profile and Memories are independent; inherited settings require the existing full view. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary SDK calls remain scoped.
 
 Use `inkbox.contacts.communication_policy.get(contact_id)` and `.replace(contact_id, expected_revision=..., defaults=ContactChannelDecisions(...), identities=[ContactIdentityDecisions(...)])` with admin credentials. Import these types from `inkbox.contacts`. `.preview(contact_id, identity_id)` returns the saved identity view; `.list_for_identity(handle)` returns a page with `items` and `has_more`. Agent keys can list only their own view.
+
+With admin credentials, `.list_management_for_identity(handle, q="Jane", order="name", limit=20)` includes hidden contacts and returns compact contact summaries, defaults, the selected identity's overrides, and effective access. Email/Phone results are `all`, `some`, `none`, or `no_identifiers`; Profile/Memories are booleans. Fetch the full policy before editing to preserve other identities. Identity-owned communication rules have nullable `rule.contact` cards, filtered for the caller and without memories.
 
 Pass `visibility=ContactVisibilityPolicy(defaults=ContactVisibilityDecisions(profile="allow", memories="block"), identities=[])` to share profile fields without memories. Import these types, plus `ContactIdentityVisibilityDecisions`, from `inkbox.contacts`. Omitting visibility preserves that entire portion, including identity overrides. Reset both portions explicitly to clear all settings. Use `preview.visibility.profile` and `.memories`; summaries live on `preview.contact.memory_count` and `.latest_memory`. A missing visibility result means the connection does not report independent controls. Explicit profile/memory grants authorize stored free text, which can mention contact identifiers.
 

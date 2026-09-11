@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
-import { output } from "../output.js";
+import { output, outputContactRules } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import type {
   SecretPayload,
@@ -17,6 +17,7 @@ const RULE_COLUMNS = [
   "action",
   "matchType",
   "matchTarget",
+  "contact",
   "status",
 ];
 
@@ -46,7 +47,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 
@@ -78,7 +79,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 
@@ -176,7 +177,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 
@@ -208,7 +209,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 

@@ -7,9 +7,33 @@ from uuid import UUID
 from inkbox import (ContactChannelDecisions, ContactIdentityDecisions, ContactVisibilityDecisions,
                     ContactVisibilityPolicy, ContactIdentityVisibilityDecisions)
 from inkbox.contacts.resources.contacts import ContactsResource
+from inkbox import ContactReviewStatus
 
 CONTACT_ID = UUID("11111111-1111-4111-8111-111111111111")
 IDENTITY_ID = UUID("22222222-2222-4222-8222-222222222222")
+
+
+def test_management_roster_uses_distinct_contract_and_filters() -> None:
+    http = MagicMock()
+    http.get.return_value = {"items": [{
+        "contact": {"id": str(CONTACT_ID), "preferred_name": "Person", "given_name": None, "family_name": None,
+                    "company_name": None, "review_status": "confirmed", "emails": [],
+                    "phones": [{"value_e164": "+15555550123", "label": "Work", "is_primary": True}]},
+        "revision": 8, "defaults": {"email": "inherit", "phone": "inherit"},
+        "identity_override": {"email": "block", "phone": "allow"},
+        "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"},
+                       "identity_override": {"profile": "allow", "memories": "block"}},
+        "effective": {"email": "no_identifiers", "phone": "some", "profile": True, "memories": False},
+    }], "limit": 1, "offset": 2, "has_more": True}
+    page = ContactsResource(http).communication_policy.list_management_for_identity(
+        "test-agent", q="Person", order="name", limit=1, offset=2, review_status=[ContactReviewStatus.CONFIRMED])
+    http.get.assert_called_once_with("/identities/test-agent/contact-permissions", params={
+        "q": "Person", "order": "name", "limit": 1, "offset": 2, "review_status": ["confirmed"]})
+    assert page.has_more and page.items[0].revision == 8
+    assert page.items[0].contact.phones[0].value == "+15555550123"
+    assert page.items[0].effective.phone == "some"
+    assert page.items[0].visibility.identity_override.memories == "block"
+    assert not hasattr(page.items[0].contact, "notes")
 
 
 def test_replace_serializes_uuid_overrides_and_revision() -> None:

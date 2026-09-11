@@ -17,8 +17,8 @@ pub enum ApiKeyStatus {
 ///
 /// # Fields
 /// - `id`: API key identifier in `ApiKey_<uuid4>` format.
-/// - `organization_id`: Owning organization's Clerk ID.
-/// - `created_by`: Creator identifier (Clerk user ID for humans, identity
+/// - `organization_id`: Owning organization's ID.
+/// - `created_by`: Creator identifier (user ID for humans, identity
 ///   UUID for agents).
 /// - `creator_type`: `"human"` or `"agent"`.
 /// - `scoped_identity_id`: UUID of the agent identity this key is scoped to,
