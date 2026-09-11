@@ -57,6 +57,7 @@ AgentIdentity (identity-scoped helper)
 ├── .list_mail_contact_rules() / .create_mail_contact_rule(...) / .get_/.update_/.delete_
 ├── .list_phone_contact_rules() / .create_phone_contact_rule(...) / ...  (writes require admin credentials)
 ├── .get_signing_key_status() / .create_signing_key()
+├── .list_contact_communication_policies() → ContactCommunicationPolicyPage
 ├── mail methods             (requires assigned mailbox)
 ├── phone methods            (requires assigned phone number)
 └── text methods             (requires assigned phone number)

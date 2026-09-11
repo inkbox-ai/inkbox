@@ -29,7 +29,7 @@ pub struct ContactChannelDecisions {
 /// One identity's overrides of the contact defaults.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactIdentityDecisions {
-    pub identity_id: String,
+    pub identity_id: uuid::Uuid,
     pub email: ContactDecision,
     pub phone: ContactDecision,
 }
@@ -44,7 +44,7 @@ pub struct ContactVisibilityDecisions {
 /// One identity's visibility overrides.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactIdentityVisibilityDecisions {
-    pub identity_id: String,
+    pub identity_id: uuid::Uuid,
     pub profile: ContactDecision,
     pub memories: ContactDecision,
 }
@@ -66,12 +66,11 @@ pub struct ContactVisibilityResult {
 /// Complete contact communication settings and optimistic revision.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactCommunicationPolicy {
-    pub contact_id: String,
+    pub contact_id: uuid::Uuid,
     pub revision: u64,
     pub defaults: ContactChannelDecisions,
     pub identities: Vec<ContactIdentityDecisions>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub visibility: Option<ContactVisibilityPolicy>,
+    pub visibility: ContactVisibilityPolicy,
 }
 
 /// Complete replacement; a stale expected revision returns HTTP 409.
@@ -93,13 +92,12 @@ pub struct ReplaceContactCommunicationPolicyWithVisibility {
 /// The contact data visible to a selected identity.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ContactCommunicationPreview {
-    pub identity_id: String,
+    pub identity_id: uuid::Uuid,
     pub contact: Option<Contact>,
     pub email: bool,
     pub phone: bool,
     pub full_profile: bool,
-    #[serde(default)]
-    pub visibility: Option<ContactVisibilityResult>,
+    pub visibility: ContactVisibilityResult,
 }
 
 /// Paginated effective contact permissions.
@@ -275,6 +273,66 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn shared_wire_fixture_through_http_transport() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../tests/fixtures/contact_communication_policy.json"
+        ))
+        .unwrap();
+        let server = MockServer::start();
+        let contact_id = fixture["policy"]["contact_id"].as_str().unwrap();
+        let identity_id = fixture["preview"]["identity_id"].as_str().unwrap();
+        let get = server.mock(|when, then| {
+            when.method(GET).path(format!(
+                "/api/v1/contacts/{contact_id}/communication-policy"
+            ));
+            then.status(200).json_body(fixture["policy"].clone());
+        });
+        let put = server.mock(|when, then| {
+            when.method(PUT)
+                .path(format!(
+                    "/api/v1/contacts/{contact_id}/communication-policy"
+                ))
+                .json_body(fixture["update"].clone());
+            then.status(200).json_body(fixture["policy"].clone());
+        });
+        let preview = server.mock(|when, then| {
+            when.method(GET)
+                .path(format!(
+                    "/api/v1/contacts/{contact_id}/communication-preview"
+                ))
+                .query_param("identity_id", identity_id);
+            then.status(200).json_body(fixture["preview"].clone());
+        });
+        let sdk = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let contacts = sdk.contacts();
+        let resource = contacts.communication_policy();
+        let policy = resource.get(contact_id).unwrap();
+        let saved = resource
+            .replace_with_visibility(
+                contact_id,
+                &ReplaceContactCommunicationPolicyWithVisibility {
+                    communication: ReplaceContactCommunicationPolicy {
+                        expected_revision: 7,
+                        defaults: policy.defaults,
+                        identities: policy.identities,
+                    },
+                    visibility: policy.visibility,
+                },
+            )
+            .unwrap();
+        assert_eq!(saved.contact_id.to_string(), contact_id);
+        let projected = resource.preview(contact_id, identity_id).unwrap();
+        assert!(projected.contact.is_none());
+        assert!(!projected.visibility.profile);
+        get.assert();
+        put.assert();
+        preview.assert();
+    }
+
+    #[test]
     fn management_roster_preserves_partial_access_and_query_filters() {
         let server = MockServer::start();
         let request = server.mock(|when, then| {
@@ -383,10 +441,10 @@ mod tests {
             "visibility": {"defaults": {"profile": "allow", "memories": "block"}, "identities": []}});
         let request = server.mock(|when, then| {
             when.method(PUT)
-                .path("/api/v1/contacts/contact-1/communication-policy")
+                .path("/api/v1/contacts/11111111-1111-4111-8111-111111111111/communication-policy")
                 .json_body(wire.clone());
             then.status(200).json_body(
-                json!({"contact_id": "contact-1", "revision": 3, "defaults": wire["defaults"],
+                json!({"contact_id": "11111111-1111-4111-8111-111111111111", "revision": 3, "defaults": wire["defaults"],
                 "identities": [], "visibility": wire["visibility"]}),
             );
         });
@@ -410,7 +468,7 @@ mod tests {
             .contacts()
             .communication_policy()
             .replace_with_visibility(
-                "contact-1",
+                "11111111-1111-4111-8111-111111111111",
                 &ReplaceContactCommunicationPolicyWithVisibility {
                     communication: legacy,
                     visibility: ContactVisibilityPolicy {
@@ -424,7 +482,7 @@ mod tests {
             )
             .unwrap();
         assert!(matches!(
-            saved.visibility.unwrap().defaults.memories,
+            saved.visibility.defaults.memories,
             ContactDecision::Block
         ));
         request.assert();
@@ -436,7 +494,8 @@ mod tests {
         let policy = json!({
             "contact_id": "11111111-1111-4111-8111-111111111111", "revision": 1,
             "defaults": {"email": "block", "phone": "block"},
-            "identities": [{"identity_id": "22222222-2222-4222-8222-222222222222", "email": "allow", "phone": "block"}]
+            "identities": [{"identity_id": "22222222-2222-4222-8222-222222222222", "email": "allow", "phone": "block"}],
+            "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"}, "identities": []}
         });
         let get = server.mock(|when, then| {
             when.method(GET)
@@ -459,7 +518,7 @@ mod tests {
             .unwrap();
         let saved = resource
             .replace(
-                &loaded.contact_id,
+                &loaded.contact_id.to_string(),
                 &ReplaceContactCommunicationPolicy {
                     expected_revision: loaded.revision,
                     defaults: loaded.defaults,
@@ -476,13 +535,15 @@ mod tests {
     fn previews_and_pages_parse_hidden_and_partial_contacts() {
         let server = MockServer::start();
         let preview = server.mock(|when, then| {
-            when.method(GET).path("/api/v1/contacts/contact-1/communication-preview").query_param("identity_id", "identity-1");
-            then.status(200).json_body(json!({"identity_id": "identity-1", "contact": null, "email": false, "phone": false, "full_profile": false}));
+            when.method(GET).path("/api/v1/contacts/11111111-1111-4111-8111-111111111111/communication-preview").query_param("identity_id", "22222222-2222-4222-8222-222222222222");
+            then.status(200).json_body(json!({"identity_id": "22222222-2222-4222-8222-222222222222", "contact": null, "email": false, "phone": false, "full_profile": false,
+                "visibility": {"profile": false, "memories": false}}));
         });
         let page = server.mock(|when, then| {
             when.method(GET).path("/api/v1/identities/sample-agent/contact-communication-policies").query_param("limit", "20").query_param("offset", "40");
             then.status(200).json_body(json!({"limit": 20, "offset": 40, "has_more": true, "items": [{
-                "identity_id": "identity-1", "email": true, "phone": false, "full_profile": false,
+                "identity_id": "22222222-2222-4222-8222-222222222222", "email": true, "phone": false, "full_profile": false,
+                "visibility": {"profile": false, "memories": false},
                 "contact": {"id": "11111111-1111-4111-8111-111111111111", "preferred_name": null,
                     "emails": [{"value": "person@example.com", "label": null}], "phones": [],
                     "created_at": "2026-09-10T12:00:00Z", "updated_at": "2026-09-10T12:00:00Z"}
@@ -495,7 +556,10 @@ mod tests {
         let contacts = sdk.contacts();
         let resource = contacts.communication_policy();
         assert!(resource
-            .preview("contact-1", "identity-1")
+            .preview(
+                "11111111-1111-4111-8111-111111111111",
+                "22222222-2222-4222-8222-222222222222"
+            )
             .unwrap()
             .contact
             .is_none());

@@ -79,7 +79,7 @@ class ContactCommunicationPolicy:
     revision: int
     defaults: ContactChannelDecisions
     identities: list[ContactIdentityDecisions]
-    visibility: ContactVisibilityPolicy | None = None
+    visibility: ContactVisibilityPolicy
 
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactCommunicationPolicy:
@@ -87,7 +87,7 @@ class ContactCommunicationPolicy:
         return cls(UUID(data["contact_id"]), data["revision"], ContactChannelDecisions(**data["defaults"]),
                    [ContactIdentityDecisions(identity_id=UUID(row["identity_id"]), email=row["email"], phone=row["phone"])
                      for row in data["identities"]],
-                   ContactVisibilityPolicy._from_dict(data["visibility"]) if data.get("visibility") is not None else None)
+                   ContactVisibilityPolicy._from_dict(data["visibility"]))
 
 
 @dataclass(frozen=True)
@@ -98,14 +98,14 @@ class ContactCommunicationPreview:
     email: bool
     phone: bool
     full_profile: bool
-    visibility: ContactVisibilityResult | None = None
+    visibility: ContactVisibilityResult
 
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactCommunicationPreview:
         """Parse a permission-filtered contact preview."""
         return cls(UUID(data["identity_id"]), Contact._from_dict(data["contact"]) if data["contact"] else None,
                    data["email"], data["phone"], data["full_profile"],
-                   ContactVisibilityResult(**data["visibility"]) if data.get("visibility") is not None else None)
+                   ContactVisibilityResult(**data["visibility"]))
 
 
 @dataclass(frozen=True)

@@ -1,16 +1,49 @@
 """Communication-policy transport and typed response contracts."""
 
 import json
-from unittest.mock import MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 from uuid import UUID
+
+import httpx
 
 from inkbox import (ContactChannelDecisions, ContactIdentityDecisions, ContactVisibilityDecisions,
                     ContactVisibilityPolicy, ContactIdentityVisibilityDecisions)
 from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox import ContactReviewStatus
+from inkbox._http import HttpTransport
 
 CONTACT_ID = UUID("11111111-1111-4111-8111-111111111111")
 IDENTITY_ID = UUID("22222222-2222-4222-8222-222222222222")
+
+
+def test_shared_wire_fixture_through_http_transport() -> None:
+    fixture = json.loads((Path(__file__).parents[3] / "tests/fixtures/contact_communication_policy.json").read_text())
+    requests = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "PUT":
+            assert json.loads(request.content) == fixture["update"]
+        if request.url.path.endswith("communication-preview"):
+            assert request.url.params["identity_id"] == str(IDENTITY_ID)
+            return httpx.Response(200, json=fixture["preview"])
+        assert request.url.path == f"/api/v1/contacts/{CONTACT_ID}/communication-policy"
+        return httpx.Response(200, json=fixture["policy"])
+
+    with patch("inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(respond)):
+        http = HttpTransport("test-key", "https://example.com/api/v1")
+    try:
+        resource = ContactsResource(http).communication_policy
+        policy = resource.get(CONTACT_ID)
+        saved = resource.replace(CONTACT_ID, expected_revision=7, defaults=policy.defaults,
+                                 identities=policy.identities, visibility=policy.visibility)
+        assert saved == policy
+        preview = resource.preview(CONTACT_ID, IDENTITY_ID)
+        assert preview.contact is None and not preview.visibility.profile
+        assert [request.method for request in requests] == ["GET", "PUT", "GET"]
+    finally:
+        http.close()
 
 
 def test_management_roster_uses_distinct_contract_and_filters() -> None:
@@ -42,6 +75,7 @@ def test_replace_serializes_uuid_overrides_and_revision() -> None:
         "contact_id": str(CONTACT_ID), "revision": 4,
         "defaults": {"email": "block", "phone": "block"},
         "identities": [{"identity_id": str(IDENTITY_ID), "email": "allow", "phone": "block"}],
+        "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"}, "identities": []},
     }
     result = ContactsResource(http).communication_policy.replace(
         CONTACT_ID, expected_revision=3,
@@ -58,7 +92,8 @@ def test_replace_serializes_uuid_overrides_and_revision() -> None:
 
 def test_preview_and_page_handle_hidden_contacts() -> None:
     http = MagicMock()
-    preview = {"identity_id": str(IDENTITY_ID), "contact": None, "email": False, "phone": False, "full_profile": False}
+    preview = {"identity_id": str(IDENTITY_ID), "contact": None, "email": False, "phone": False, "full_profile": False,
+               "visibility": {"profile": False, "memories": False}}
     http.get.return_value = preview
     resource = ContactsResource(http).communication_policy
     assert resource.preview(CONTACT_ID, IDENTITY_ID).contact is None

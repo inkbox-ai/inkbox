@@ -22,7 +22,7 @@ export interface ContactCommunicationPolicy {
   revision: number;
   defaults: ContactChannelDecisions;
   identities: ContactIdentityDecisions[];
-  visibility?: ContactVisibilityPolicy;
+  visibility: ContactVisibilityPolicy;
 }
 export interface ReplaceContactCommunicationPolicy {
   expectedRevision: number;
@@ -36,7 +36,7 @@ export interface ContactCommunicationPreview {
   email: boolean;
   phone: boolean;
   fullProfile: boolean;
-  visibility?: ContactVisibilityResult;
+  visibility: ContactVisibilityResult;
 }
 export interface ContactCommunicationPolicyPage {
   items: ContactCommunicationPreview[];
@@ -88,7 +88,7 @@ interface RawPolicy {
   revision: number;
   defaults: ContactChannelDecisions;
   identities: (ContactChannelDecisions & { identity_id: string })[];
-  visibility?: { defaults: ContactVisibilityDecisions; identities: (ContactVisibilityDecisions & { identity_id: string })[] };
+  visibility: { defaults: ContactVisibilityDecisions; identities: (ContactVisibilityDecisions & { identity_id: string })[] };
 }
 interface RawPreview {
   identity_id: string;
@@ -96,20 +96,20 @@ interface RawPreview {
   email: boolean;
   phone: boolean;
   full_profile: boolean;
-  visibility?: ContactVisibilityResult;
+  visibility: ContactVisibilityResult;
 }
-/** Parse both policy portions while accepting older responses. */
+/** Parse both required policy portions. */
 function parsePolicy(raw: RawPolicy): ContactCommunicationPolicy {
   return { contactId: raw.contact_id, revision: raw.revision, defaults: raw.defaults,
     identities: raw.identities.map((row) => ({ identityId: row.identity_id, email: row.email, phone: row.phone })),
-    ...(raw.visibility ? { visibility: { defaults: raw.visibility.defaults,
-      identities: raw.visibility.identities.map((row) => ({ identityId: row.identity_id, profile: row.profile, memories: row.memories })) } } : {}) };
+    visibility: { defaults: raw.visibility.defaults,
+      identities: raw.visibility.identities.map((row) => ({ identityId: row.identity_id, profile: row.profile, memories: row.memories })) } };
 }
 /** Parse a filtered contact and independently reported visibility. */
 function parsePreview(raw: RawPreview): ContactCommunicationPreview {
   return { identityId: raw.identity_id, contact: raw.contact ? parseContact(raw.contact) : null,
     email: raw.email, phone: raw.phone, fullProfile: raw.full_profile,
-    ...(raw.visibility ? { visibility: raw.visibility } : {}) };
+    visibility: raw.visibility };
 }
 
 /** Administrative communication settings and identity-scoped contact views. */

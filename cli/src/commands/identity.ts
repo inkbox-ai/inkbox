@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { parsePolicyPagination } from "../pagination.js";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output, outputContactRules } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -335,9 +336,7 @@ export function registerIdentityCommands(program: Command): void {
       this: Command, handle: string, options: { limit: string; offset: string },
     ): Promise<void> {
       const opts = getGlobalOpts(this);
-      const page = await createClient(opts).contacts.communicationPolicy.listForIdentity(handle, {
-        limit: Number(options.limit), offset: Number(options.offset),
-      });
+      const page = await createClient(opts).contacts.communicationPolicy.listForIdentity(handle, parsePolicyPagination(options));
       output(page as unknown as Record<string, unknown>, { json: !!opts.json });
     }));
 

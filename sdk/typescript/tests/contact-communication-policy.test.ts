@@ -1,8 +1,32 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { ContactCommunicationPolicyResource } from "../src/contacts/resources/communicationPolicy.js";
-import { type HttpTransport } from "../src/_http.js";
+import { HttpTransport } from "../src/_http.js";
 
 describe("contact communication policies", () => {
+  it("uses the shared wire fixture through the HTTP transport", async () => {
+    const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/contact_communication_policy.json", import.meta.url), "utf8"));
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+      if (init?.method === "PUT") expect(JSON.parse(String(init.body))).toEqual(fixture.update);
+      if (url.pathname.endsWith("communication-preview")) {
+        expect(url.searchParams.get("identity_id")).toBe(fixture.preview.identity_id);
+        return Response.json(fixture.preview);
+      }
+      expect(url.pathname).toBe(`/api/v1/contacts/${fixture.policy.contact_id}/communication-policy`);
+      return Response.json(fixture.policy);
+    });
+    try {
+      const resource = new ContactCommunicationPolicyResource(new HttpTransport("test-key", "https://example.com/api/v1"));
+      const policy = await resource.get(fixture.policy.contact_id);
+      expect(await resource.replace(policy.contactId, { expectedRevision: 7, defaults: policy.defaults,
+        identities: policy.identities, visibility: policy.visibility })).toEqual(policy);
+      const preview = await resource.preview(policy.contactId, fixture.preview.identity_id);
+      expect(preview.visibility).toEqual({ profile: false, memories: false });
+      expect(preview.contact).toBeNull();
+      expect(fetch).toHaveBeenCalledTimes(3);
+    } finally { fetch.mockRestore(); }
+  });
   it("maps the management roster without making it a full contact", async () => {
     const get = vi.fn().mockResolvedValue({ items: [{
       contact: { id: "contact", preferred_name: "Person", given_name: null, family_name: null, company_name: null,
@@ -36,7 +60,7 @@ describe("contact communication policies", () => {
       } });
     expect(put.mock.calls[0][1].visibility.identities[0]).toEqual({ identity_id: "agent", profile: "allow", memories: "block" });
     expect(Object.keys(put.mock.calls[0][1].defaults)).toEqual(["email", "phone"]);
-    expect(result.visibility?.identities[0].identityId).toBe("agent");
+    expect(result.visibility.identities[0].identityId).toBe("agent");
     await resource.replace("contact", { expectedRevision: 2, defaults: { email: "inherit", phone: "inherit" }, identities: [] });
     expect(put.mock.calls[1][1]).not.toHaveProperty("visibility");
   });
@@ -44,6 +68,7 @@ describe("contact communication policies", () => {
     const put = vi.fn().mockResolvedValue({
       contact_id: "contact", revision: 2, defaults: { email: "block", phone: "block" },
       identities: [{ identity_id: "agent", email: "allow", phone: "block" }],
+      visibility: { defaults: { profile: "inherit", memories: "inherit" }, identities: [] },
     });
     const resource = new ContactCommunicationPolicyResource({ put } as unknown as HttpTransport);
     const result = await resource.replace("contact", {
@@ -60,7 +85,7 @@ describe("contact communication policies", () => {
 
   it("preserves null previews and page continuation", async () => {
     const get = vi.fn().mockResolvedValue({
-      items: [{ identity_id: "agent", contact: null, email: false, phone: false, full_profile: false }],
+      items: [{ identity_id: "agent", contact: null, email: false, phone: false, full_profile: false, visibility: { profile: false, memories: false } }],
       limit: 1, offset: 2, has_more: true,
     });
     const resource = new ContactCommunicationPolicyResource({ get } as unknown as HttpTransport);

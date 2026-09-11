@@ -8,8 +8,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
-- Contact communication-policy get/replace, identity previews, and paginated identity views in Python, TypeScript, and Rust. The CLI adds `contacts communication-policy get`, `set`, `preview`, and `list`.
-- Independent Profile and Memories controls through an optional `visibility` policy block. Omission preserves existing settings; explicit replacement uses the same revision. Rust adds `replace_with_visibility` without changing the communication-only request type.
+- Contact communication-policy get/replace, identity previews, and paginated identity views in Python, TypeScript, and Rust. The CLI adds `contacts communication-policy get`, `set`, `preview`, `list`, and `list-management`, plus `identity contact-policies`.
+- Independent Profile and Memories controls through a `visibility` policy block, required in policy and preview responses and optional in replacement requests. Request omission preserves existing settings; explicit replacement uses the same revision. Rust adds `replace_with_visibility` without changing the communication-only request type.
 - Per-group preview visibility with memory summaries on the projected contact, and strict CLI policy-file validation for unknown or incomplete settings.
 - Nullable matching contact cards on identity-owned email, phone, and iMessage rules. Cards follow the caller's contact visibility and omit memories. CLI rule tables show contact names while JSON preserves cards.
 - An administrative contact-permission roster, including contacts hidden from the selected identity, with partial identifier access, search, and pagination. Use `list_management_for_identity` (Python/Rust), `listManagementForIdentity` (TypeScript), or `contacts communication-policy list-management` (CLI).
@@ -24,7 +24,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Agent contact responses, lookup, and vCard exports include only permitted identifiers and profile fields. Profile and Memories are independently controlled; inherited settings require every stored identifier to be permitted. Hosted voice in YOLO mode retains full organization contact and memory access.
 - **Authorization change:** communication-rule creation now requires admin credentials, like updates and deletion. Agent keys receive HTTP 403. Existing-contact identifier edits and suggestion absorption also require administrative authority.
 - Identity-level phone-rule helpers no longer require a dedicated phone number. Existing phone/iMessage methods remain supported; their filter-mode fields are aliases and contradictory values return HTTP 422.
-- Releasing or replacing a phone number preserves identity permissions. Migration preserves a sole configured channel's restrictions and ignores never-used/unconfigured defaults.
+- Releasing or replacing a phone number preserves identity permissions.
+- Rust contact-policy and preview IDs use `uuid::Uuid`, matching other contact types. Struct literals must provide UUIDs rather than strings.
+- CLI policy pagination rejects malformed and out-of-range values before sending a request.
 
 ## 0.6.10 — Release an iMessage connection
 

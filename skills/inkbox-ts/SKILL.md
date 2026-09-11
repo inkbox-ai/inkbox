@@ -56,6 +56,7 @@ AgentIdentity (identity-scoped helper)
 ├── .listMailContactRules() / .createMailContactRule(...) / .get/.update/.delete
 ├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (writes require admin credentials)
 ├── .getSigningKeyStatus() / .createSigningKey()
+├── .listContactCommunicationPolicies() → Promise<ContactCommunicationPolicyPage>
 ├── mail methods            (requires assigned mailbox)
 ├── phone methods           (requires assigned phone number)
 └── text methods            (requires assigned phone number)

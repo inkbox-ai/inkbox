@@ -11,6 +11,22 @@ import { outputContactRules } from "../dist/output.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 
+test("policy pagination rejects malformed and out-of-range arguments before HTTP", async () => {
+  let requests = 0;
+  const mock = await listen((_req, res) => { requests++; res.end("{}"); });
+  try {
+    for (const command of [["contacts", "communication-policy", "list"], ["contacts", "communication-policy", "list-management"], ["identity", "contact-policies"]]) {
+      for (const [flag, value] of [["--limit", "abc"], ["--limit", "1.5"], ["--limit", "0"], ["--limit", "201"], ["--offset", "-1"], ["--offset", "10001"]]) {
+        const result = await runCli(["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, ...command, "test-agent", flag, value]);
+        assert.ok(result.error);
+        assert.match(result.stderr, /must be an integer between/);
+      }
+    }
+    assert.equal(requests, 0);
+    assert.match(help("contacts", "communication-policy", "set"), /optional visibility/);
+  } finally { await new Promise((resolve) => mock.server.close(resolve)); }
+});
+
 test("rule tables show names while JSON preserves the card", (t) => {
   const lines = [];
   t.mock.method(console, "log", (line) => lines.push(line));
@@ -142,6 +158,7 @@ test("contact communication policy reads use the administrative policy endpoint"
       contact_id: "contact-1", revision: 3,
       defaults: { email: "block", phone: "block" },
       identities: [{ identity_id: "identity-1", email: "allow", phone: "block" }],
+      visibility: { defaults: { profile: "inherit", memories: "inherit" }, identities: [] },
     }));
   });
   try {

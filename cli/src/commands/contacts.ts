@@ -14,6 +14,7 @@ import type {
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
+import { parsePolicyPagination } from "../pagination.js";
 
 function parseJsonArg<T>(raw: string, label: string): T {
   try {
@@ -86,7 +87,7 @@ function registerContactsAccessCommands(parent: Command): void {
     }): Promise<void> {
       const opts = getGlobalOpts(this);
       const page = await createClient(opts).contacts.communicationPolicy.listManagementForIdentity(handle, {
-        ...options, limit: Number(options.limit), offset: Number(options.offset),
+        ...options, ...parsePolicyPagination(options),
       });
       output(opts.json ? page : page.items.map((row) => ({ id: row.contact.id, contact: row.contact.preferredName,
         ...row.effective, revision: row.revision })),
@@ -98,7 +99,7 @@ function registerContactsAccessCommands(parent: Command): void {
       output(await createClient(opts).contacts.communicationPolicy.get(contactId) as unknown as Record<string, unknown>, { json: !!opts.json });
     }));
   policy.command("set <contact-id>").description("Replace a contact policy (admin credentials)")
-    .requiredOption("--file <path>", "JSON file with expectedRevision, defaults, and identities")
+    .requiredOption("--file <path>", "JSON file with expectedRevision, defaults, identities, and optional visibility")
     .action(withErrorHandler(async function (this: Command, contactId: string, options: { file: string }): Promise<void> {
       const opts = getGlobalOpts(this);
       const body = parseContactPolicyFile(readFileSync(options.file, "utf8"));
@@ -113,7 +114,7 @@ function registerContactsAccessCommands(parent: Command): void {
     .option("--limit <number>", "Page size", "50").option("--offset <number>", "Page offset", "0")
     .action(withErrorHandler(async function (this: Command, handle: string, options: { limit: string; offset: string }): Promise<void> {
       const opts = getGlobalOpts(this);
-      output(await createClient(opts).contacts.communicationPolicy.listForIdentity(handle, { limit: Number(options.limit), offset: Number(options.offset) }) as unknown as Record<string, unknown>, { json: !!opts.json });
+      output(await createClient(opts).contacts.communicationPolicy.listForIdentity(handle, parsePolicyPagination(options)) as unknown as Record<string, unknown>, { json: !!opts.json });
     }));
 
   const access = parent
