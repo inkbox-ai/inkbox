@@ -9,12 +9,14 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Added
 
 - Contact communication-policy get/replace, identity previews, and paginated identity views in Python, TypeScript, and Rust. The CLI adds `contacts communication-policy get`, `set`, `preview`, and `list`.
+- Independent Profile and Memories controls through an optional `visibility` policy block. Omission preserves existing settings; explicit replacement uses the same revision. Rust adds `replace_with_visibility` without changing the communication-only request type.
+- Per-group preview visibility with memory summaries on the projected contact, and strict CLI policy-file validation for unknown or incomplete settings.
 
 ### Changed
 
 - Contact and standalone address/number entries contribute to each identity's email or phone whitelist/blacklist. Phone permissions cover SMS, calls, and iMessage together.
 - The selected mode determines active entries: allows in whitelist mode and blocks in blacklist mode. Opposite-action entries no longer override the active list.
-- Agent contact responses, lookup, and vCard exports include only permitted identifiers. Partially restricted profiles omit names, other free-form details, and shared memories.
+- Agent contact responses, lookup, and vCard exports include only permitted identifiers and profile fields. Profile and Memories are independently controlled; inherited settings preserve the existing full-view requirement. Hosted voice in YOLO mode retains full organization contact and memory access.
 - **Authorization change:** communication-rule creation now requires admin credentials, like updates and deletion. Agent keys receive HTTP 403. Existing-contact identifier edits and suggestion absorption also require administrative authority.
 - Identity-level phone-rule helpers no longer require a dedicated phone number. Existing phone/iMessage methods remain supported; their filter-mode fields are aliases and contradictory values return HTTP 422.
 - Releasing or replacing a phone number preserves identity permissions. Migration preserves a sole configured channel's restrictions and ignores never-used/unconfigured defaults.

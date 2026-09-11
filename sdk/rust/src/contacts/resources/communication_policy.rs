@@ -33,6 +33,35 @@ pub struct ContactIdentityDecisions {
     pub phone: ContactDecision,
 }
 
+/// Independent profile and memory visibility decisions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactVisibilityDecisions {
+    pub profile: ContactDecision,
+    pub memories: ContactDecision,
+}
+
+/// One identity's visibility overrides.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactIdentityVisibilityDecisions {
+    pub identity_id: String,
+    pub profile: ContactDecision,
+    pub memories: ContactDecision,
+}
+
+/// Complete visibility settings within the contact policy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContactVisibilityPolicy {
+    pub defaults: ContactVisibilityDecisions,
+    pub identities: Vec<ContactIdentityVisibilityDecisions>,
+}
+
+/// Effective permissions, including groups without stored content.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContactVisibilityResult {
+    pub profile: bool,
+    pub memories: bool,
+}
+
 /// Complete contact communication settings and optimistic revision.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactCommunicationPolicy {
@@ -40,6 +69,8 @@ pub struct ContactCommunicationPolicy {
     pub revision: u64,
     pub defaults: ContactChannelDecisions,
     pub identities: Vec<ContactIdentityDecisions>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<ContactVisibilityPolicy>,
 }
 
 /// Complete replacement; a stale expected revision returns HTTP 409.
@@ -50,6 +81,14 @@ pub struct ReplaceContactCommunicationPolicy {
     pub identities: Vec<ContactIdentityDecisions>,
 }
 
+/// Replace communication and visibility settings under one revision.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReplaceContactCommunicationPolicyWithVisibility {
+    #[serde(flatten)]
+    pub communication: ReplaceContactCommunicationPolicy,
+    pub visibility: ContactVisibilityPolicy,
+}
+
 /// The contact data visible to a selected identity.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ContactCommunicationPreview {
@@ -58,6 +97,8 @@ pub struct ContactCommunicationPreview {
     pub email: bool,
     pub phone: bool,
     pub full_profile: bool,
+    #[serde(default)]
+    pub visibility: Option<ContactVisibilityResult>,
 }
 
 /// Paginated effective contact permissions.
@@ -100,6 +141,18 @@ impl ContactCommunicationPolicyResource {
         )?)?)
     }
 
+    /// Replace all four groups; use `replace` to preserve existing visibility.
+    pub fn replace_with_visibility(
+        &self,
+        contact_id: &str,
+        body: &ReplaceContactCommunicationPolicyWithVisibility,
+    ) -> Result<ContactCommunicationPolicy> {
+        Ok(serde_json::from_value(self.http.put(
+            &format!("/contacts/{contact_id}/communication-policy"),
+            body,
+        )?)?)
+    }
+
     /// Preview one identity's contact visibility using admin credentials.
     pub fn preview(
         &self,
@@ -132,6 +185,60 @@ mod tests {
     use crate::client::Inkbox;
     use httpmock::prelude::*;
     use serde_json::json;
+
+    #[test]
+    fn visibility_replacement_keeps_the_legacy_request_shape() {
+        let server = MockServer::start();
+        let wire = json!({"expected_revision": 2, "defaults": {"email": "allow", "phone": "allow"}, "identities": [],
+            "visibility": {"defaults": {"profile": "allow", "memories": "block"}, "identities": []}});
+        let request = server.mock(|when, then| {
+            when.method(PUT)
+                .path("/api/v1/contacts/contact-1/communication-policy")
+                .json_body(wire.clone());
+            then.status(200).json_body(
+                json!({"contact_id": "contact-1", "revision": 3, "defaults": wire["defaults"],
+                "identities": [], "visibility": wire["visibility"]}),
+            );
+        });
+        let sdk = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let legacy = ReplaceContactCommunicationPolicy {
+            expected_revision: 2,
+            defaults: ContactChannelDecisions {
+                email: ContactDecision::Allow,
+                phone: ContactDecision::Allow,
+            },
+            identities: vec![],
+        };
+        assert!(serde_json::to_value(&legacy)
+            .unwrap()
+            .get("visibility")
+            .is_none());
+        let saved = sdk
+            .contacts()
+            .communication_policy()
+            .replace_with_visibility(
+                "contact-1",
+                &ReplaceContactCommunicationPolicyWithVisibility {
+                    communication: legacy,
+                    visibility: ContactVisibilityPolicy {
+                        defaults: ContactVisibilityDecisions {
+                            profile: ContactDecision::Allow,
+                            memories: ContactDecision::Block,
+                        },
+                        identities: vec![],
+                    },
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            saved.visibility.unwrap().defaults.memories,
+            ContactDecision::Block
+        ));
+        request.assert();
+    }
 
     #[test]
     fn policy_replacement_sends_revision_and_complete_overrides() {

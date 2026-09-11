@@ -30,19 +30,64 @@ class ContactIdentityDecisions:
 
 
 @dataclass(frozen=True)
+class ContactVisibilityDecisions:
+    """Independent profile and memory visibility decisions."""
+    profile: ContactDecision
+    memories: ContactDecision
+
+
+@dataclass(frozen=True)
+class ContactIdentityVisibilityDecisions:
+    """An identity's overrides of contact visibility defaults."""
+    identity_id: UUID | str
+    profile: ContactDecision
+    memories: ContactDecision
+
+
+@dataclass(frozen=True)
+class ContactVisibilityPolicy:
+    """Complete visibility defaults and identity overrides."""
+    defaults: ContactVisibilityDecisions
+    identities: list[ContactIdentityVisibilityDecisions]
+
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> ContactVisibilityPolicy:
+        """Parse the visibility portion of a policy."""
+        return cls(ContactVisibilityDecisions(**data["defaults"]), [
+            ContactIdentityVisibilityDecisions(UUID(row["identity_id"]), row["profile"], row["memories"])
+            for row in data["identities"]
+        ])
+
+    def _to_wire(self) -> dict[str, Any]:
+        """Serialize identity UUIDs without changing the communication portion."""
+        return {"defaults": asdict(self.defaults), "identities": [
+            {**asdict(row), "identity_id": str(row.identity_id)} for row in self.identities
+        ]}
+
+
+@dataclass(frozen=True)
+class ContactVisibilityResult:
+    """Effective permissions even when a group contains no data."""
+    profile: bool
+    memories: bool
+
+
+@dataclass(frozen=True)
 class ContactCommunicationPolicy:
     """A contact's default entries, overrides, and current revision."""
     contact_id: UUID
     revision: int
     defaults: ContactChannelDecisions
     identities: list[ContactIdentityDecisions]
+    visibility: ContactVisibilityPolicy | None = None
 
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactCommunicationPolicy:
         """Parse a policy response."""
         return cls(UUID(data["contact_id"]), data["revision"], ContactChannelDecisions(**data["defaults"]),
                    [ContactIdentityDecisions(identity_id=UUID(row["identity_id"]), email=row["email"], phone=row["phone"])
-                    for row in data["identities"]])
+                     for row in data["identities"]],
+                   ContactVisibilityPolicy._from_dict(data["visibility"]) if data.get("visibility") is not None else None)
 
 
 @dataclass(frozen=True)
@@ -53,12 +98,14 @@ class ContactCommunicationPreview:
     email: bool
     phone: bool
     full_profile: bool
+    visibility: ContactVisibilityResult | None = None
 
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactCommunicationPreview:
         """Parse a permission-filtered contact preview."""
         return cls(UUID(data["identity_id"]), Contact._from_dict(data["contact"]) if data["contact"] else None,
-                   data["email"], data["phone"], data["full_profile"])
+                   data["email"], data["phone"], data["full_profile"],
+                   ContactVisibilityResult(**data["visibility"]) if data.get("visibility") is not None else None)
 
 
 @dataclass(frozen=True)
@@ -82,12 +129,16 @@ class ContactCommunicationPolicyResource:
         return ContactCommunicationPolicy._from_dict(self._http.get(f"/contacts/{contact_id}/communication-policy"))
 
     def replace(self, contact_id: UUID | str, *, expected_revision: int,
-                defaults: ContactChannelDecisions, identities: list[ContactIdentityDecisions]) -> ContactCommunicationPolicy:
-        """Atomically replace a policy; a stale revision returns HTTP 409."""
-        result = self._http.put(f"/contacts/{contact_id}/communication-policy", json={
+                defaults: ContactChannelDecisions, identities: list[ContactIdentityDecisions],
+                visibility: ContactVisibilityPolicy | None = None) -> ContactCommunicationPolicy:
+        """Replace settings; omitted visibility is preserved and stale revisions return 409."""
+        body = {
             "expected_revision": expected_revision, "defaults": asdict(defaults),
             "identities": [{**asdict(row), "identity_id": str(row.identity_id)} for row in identities],
-        })
+        }
+        if visibility is not None:
+            body["visibility"] = visibility._to_wire()
+        result = self._http.put(f"/contacts/{contact_id}/communication-policy", json=body)
         return ContactCommunicationPolicy._from_dict(result)
 
     def preview(self, contact_id: UUID | str, identity_id: UUID | str) -> ContactCommunicationPreview:

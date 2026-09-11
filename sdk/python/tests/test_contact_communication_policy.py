@@ -4,7 +4,8 @@ import json
 from unittest.mock import MagicMock
 from uuid import UUID
 
-from inkbox import ContactChannelDecisions, ContactIdentityDecisions
+from inkbox import (ContactChannelDecisions, ContactIdentityDecisions, ContactVisibilityDecisions,
+                    ContactVisibilityPolicy, ContactIdentityVisibilityDecisions)
 from inkbox.contacts.resources.contacts import ContactsResource
 
 CONTACT_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -43,3 +44,36 @@ def test_preview_and_page_handle_hidden_contacts() -> None:
     assert page.has_more is True
     assert page.items[0].identity_id == IDENTITY_ID
     http.get.assert_called_with("/identities/test-agent/contact-communication-policies", params={"limit": 1, "offset": 2})
+
+
+def test_visibility_round_trip_preserves_legacy_defaults_and_omission() -> None:
+    http = MagicMock()
+    visibility = ContactVisibilityPolicy(
+        defaults=ContactVisibilityDecisions("block", "block"),
+        identities=[ContactIdentityVisibilityDecisions(IDENTITY_ID, "allow", "block")],
+    )
+    http.put.return_value = {"contact_id": str(CONTACT_ID), "revision": 8,
+                             "defaults": {"email": "allow", "phone": "allow"}, "identities": [],
+                             "visibility": visibility._to_wire()}
+    resource = ContactsResource(http).communication_policy
+    saved = resource.replace(CONTACT_ID, expected_revision=7, defaults=ContactChannelDecisions("allow", "allow"),
+                             identities=[], visibility=visibility)
+    payload = http.put.call_args.kwargs["json"]
+    assert json.loads(json.dumps(payload))["visibility"]["identities"][0]["identity_id"] == str(IDENTITY_ID)
+    assert ContactChannelDecisions(**payload["defaults"]).email == "allow"
+    assert saved.visibility == visibility
+    resource.replace(CONTACT_ID, expected_revision=8, defaults=ContactChannelDecisions(), identities=[])
+    assert "visibility" not in http.put.call_args.kwargs["json"]
+
+
+def test_preview_parses_profile_without_memories() -> None:
+    http = MagicMock()
+    http.get.return_value = {"identity_id": str(IDENTITY_ID), "email": True, "phone": False, "full_profile": False,
+                             "visibility": {"profile": True, "memories": False},
+                             "contact": {"id": str(CONTACT_ID), "notes": "Visible notes", "emails": [], "phones": [],
+                                         "created_at": "2026-09-10T12:00:00Z", "updated_at": "2026-09-10T12:00:00Z",
+                                         "memory_count": 0, "latest_memory": None}}
+    preview = ContactsResource(http).communication_policy.preview(CONTACT_ID, IDENTITY_ID)
+    assert preview.visibility.profile is True and preview.visibility.memories is False
+    assert preview.contact.notes == "Visible notes"
+    assert preview.contact.memory_count == 0 and preview.contact.latest_memory is None

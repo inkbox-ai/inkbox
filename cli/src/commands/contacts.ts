@@ -32,6 +32,48 @@ function collectValues(value: string, previous: string[] = []): string[] {
   ];
 }
 
+/** Validate objects before serialization can discard unrecognized settings. */
+function policyObject(value: unknown, fields: string[], path: string): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${path} must be an object`);
+  const record = value as Record<string, unknown>;
+  const unknown = Object.keys(record).filter((key) => !fields.includes(key));
+  if (unknown.length) throw new Error(`Unknown field in ${path}: ${unknown.join(", ")}`);
+  return record;
+}
+
+/** Validate a complete communication or visibility portion. */
+function validatePolicyPortion(defaults: unknown, identities: unknown, fields: string[], path: string): void {
+  const validateDecisions = (row: Record<string, unknown>, label: string): void => {
+    for (const key of fields) {
+      if (!["inherit", "allow", "block"].includes(row[key] as string)) throw new Error(`${label}.${key} must be inherit, allow, or block`);
+    }
+  };
+  validateDecisions(policyObject(defaults, fields, `${path}.defaults`), `${path}.defaults`);
+  if (!Array.isArray(identities)) throw new Error(`${path}.identities must be an array`);
+  if (identities.length > 500) throw new Error(`${path}.identities cannot exceed 500 entries`);
+  const seen = new Set<string>();
+  for (const [index, value] of identities.entries()) {
+    const label = `${path}.identities[${index}]`;
+    const row = policyObject(value, ["identityId", ...fields], label);
+    if (typeof row.identityId !== "string" || !row.identityId) throw new Error(`${label}.identityId is required`);
+    if (seen.has(row.identityId)) throw new Error(`${path}.identities contains duplicate identities`);
+    seen.add(row.identityId);
+    validateDecisions(row, label);
+  }
+}
+
+/** Parse a policy file while preserving omission of visibility settings. */
+export function parseContactPolicyFile(raw: string): ReplaceContactCommunicationPolicy {
+  const body = policyObject(parseJsonArg<unknown>(raw, "policy file"), ["expectedRevision", "defaults", "identities", "visibility"], "policy");
+  if (!Number.isSafeInteger(body.expectedRevision) || (body.expectedRevision as number) < 0) throw new Error("policy.expectedRevision must be a nonnegative integer");
+  validatePolicyPortion(body.defaults, body.identities, ["email", "phone"], "policy");
+  if (Object.hasOwn(body, "visibility")) {
+    const visibility = policyObject(body.visibility, ["defaults", "identities"], "policy.visibility");
+    validatePolicyPortion(visibility.defaults, visibility.identities, ["profile", "memories"], "policy.visibility");
+  }
+  return body as unknown as ReplaceContactCommunicationPolicy;
+}
+
 function registerContactsAccessCommands(parent: Command): void {
   const policy = parent.command("communication-policy").description("Contact communication lists and previews");
   policy.command("get <contact-id>").description("Read a contact policy (admin credentials)")
@@ -43,7 +85,7 @@ function registerContactsAccessCommands(parent: Command): void {
     .requiredOption("--file <path>", "JSON file with expectedRevision, defaults, and identities")
     .action(withErrorHandler(async function (this: Command, contactId: string, options: { file: string }): Promise<void> {
       const opts = getGlobalOpts(this);
-      const body = parseJsonArg<ReplaceContactCommunicationPolicy>(readFileSync(options.file, "utf8"), "policy file");
+      const body = parseContactPolicyFile(readFileSync(options.file, "utf8"));
       output(await createClient(opts).contacts.communicationPolicy.replace(contactId, body) as unknown as Record<string, unknown>, { json: !!opts.json });
     }));
   policy.command("preview <contact-id> <identity-id>").description("Preview contact visibility (admin credentials)")

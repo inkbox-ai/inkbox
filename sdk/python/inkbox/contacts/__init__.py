@@ -4,6 +4,7 @@ from inkbox.contacts.resources.correspondence import ContactCorrespondenceOption
 from inkbox.contacts.resources.communication_policy import (
     ContactChannelDecisions, ContactIdentityDecisions, ContactDecision,
     ContactCommunicationPolicy, ContactCommunicationPreview, ContactCommunicationPolicyPage,
+    ContactVisibilityDecisions, ContactIdentityVisibilityDecisions, ContactVisibilityPolicy, ContactVisibilityResult,
 )
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
@@ -48,6 +49,7 @@ from inkbox.contacts.types import (
 __all__ = [
     "ContactChannelDecisions", "ContactIdentityDecisions", "ContactDecision",
     "ContactCommunicationPolicy", "ContactCommunicationPreview", "ContactCommunicationPolicyPage",
+    "ContactVisibilityDecisions", "ContactIdentityVisibilityDecisions", "ContactVisibilityPolicy", "ContactVisibilityResult",
     "CallCorrespondenceItem",
     "Contact",
     "ContactAccess",

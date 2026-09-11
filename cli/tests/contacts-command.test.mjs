@@ -3,8 +3,62 @@ import test from "node:test";
 import { execFile, execFileSync } from "node:child_process";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { parseContactPolicyFile } from "../dist/commands/contacts.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+test("policy files preserve visibility omission and validate every supplied field", () => {
+  const base = { expectedRevision: 0, defaults: { email: "inherit", phone: "inherit" }, identities: [] };
+  assert.deepEqual(parseContactPolicyFile(JSON.stringify(base)), base);
+  const full = { ...base, visibility: { defaults: { profile: "allow", memories: "block" },
+    identities: [{ identityId: "identity-1", profile: "block", memories: "allow" }] } };
+  assert.deepEqual(parseContactPolicyFile(JSON.stringify(full)), full);
+  for (const invalid of [
+    { ...base, visiblity: full.visibility }, { ...base, visibility: null },
+    { ...full, visibility: { ...full.visibility, defaults: { profile: "allow", memory: "block" } } },
+    { ...full, visibility: { ...full.visibility, identities: [{ identityId: "i", profile: "allow", memories: "block", typo: true }] } },
+    { ...base, defaults: { email: "allow" } }, { ...base, expectedRevision: -1 },
+  ]) assert.throws(() => parseContactPolicyFile(JSON.stringify(invalid)));
+});
+
+test("policy set forwards visibility and rejects unknown keys before HTTP", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "contact-policy-"));
+  const path = join(directory, "policy.json");
+  const body = { expectedRevision: 3, defaults: { email: "allow", phone: "allow" }, identities: [],
+    visibility: { defaults: { profile: "allow", memories: "block" }, identities: [{ identityId: "identity-1", profile: "block", memories: "allow" }] } };
+  const requests = [];
+  const mock = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const payload = JSON.parse(Buffer.concat(chunks).toString());
+    requests.push({ method: req.method, url: req.url, payload });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ contact_id: "contact-1", revision: 4, defaults: payload.defaults, identities: [], visibility: payload.visibility }));
+  });
+  try {
+    const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
+      "contacts", "communication-policy", "set", "contact-1", "--file", path];
+    await writeFile(path, JSON.stringify(body));
+    const result = await runCli(args);
+    assert.equal(result.error, null, result.stderr);
+    assert.deepEqual(requests[0], { method: "PUT", url: "/api/v1/contacts/contact-1/communication-policy", payload: {
+      expected_revision: 3, defaults: body.defaults, identities: [], visibility: {
+        defaults: body.visibility.defaults, identities: [{ identity_id: "identity-1", profile: "block", memories: "allow" }],
+      },
+    } });
+    await writeFile(path, JSON.stringify({ ...body, visiblity: body.visibility }));
+    const invalid = await runCli(args);
+    assert.notEqual(invalid.error, null);
+    assert.match(invalid.stderr, /Unknown field/);
+    assert.equal(requests.length, 1);
+  } finally {
+    await new Promise((resolve) => mock.server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 function help(...args) {
   return execFileSync(process.execPath, [cli, ...args, "--help"], {

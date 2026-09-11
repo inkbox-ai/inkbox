@@ -681,9 +681,11 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 ## Contacts
 
-Shared address book with permission-filtered identifiers. Partially restricted contacts omit names, labels, other free-form profile fields, and shared memories. Existing-contact identifier changes and suggestion absorption require admin credentials.
+Shared address book with four permission groups: Email, Phone, Profile, and Memories. Profile and Memories are independent; inherited settings require the existing full view. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary CLI calls remain scoped.
 
 `contacts communication-policy get <contact-id>`, `set <contact-id> --file policy.json`, and `preview <contact-id> <identity-id>` require admin credentials. The JSON file contains `expectedRevision`, `defaults`, and `identities` with `identityId`. `contacts communication-policy list <handle>` and `identity contact-policies <handle>` list the identity's permitted view.
+
+The optional root `visibility` block contains `defaults: { profile, memories }` and `identities: [{ identityId, profile, memories }]`, each decision `inherit`, `allow`, or `block`. Omission preserves existing visibility; a full reset supplies inherited defaults and empty identity lists in both portions. Null blocks and unknown/misspelled fields are rejected. Preview visibility flags are independent; memory summaries are inside `contact`. Use version 0.6.11 or later for this block. Agents cannot select YOLO to widen ordinary reads.
 
 Communication-rule creation, updates, and deletion require admin credentials. Agents cannot authorize themselves; ask a user to change permissions in the Inkbox Console. There is one whitelist/blacklist for email and one for SMS/calls/iMessage. Standalone address/number entries and contact entries contribute to the same list; phone permission setup does not require a dedicated number.
 

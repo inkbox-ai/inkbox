@@ -180,6 +180,7 @@ from inkbox.identities.types import (
 from inkbox.contacts import (
     ContactChannelDecisions, ContactIdentityDecisions, ContactDecision,
     ContactCommunicationPolicy, ContactCommunicationPreview, ContactCommunicationPolicyPage,
+    ContactVisibilityDecisions, ContactIdentityVisibilityDecisions, ContactVisibilityPolicy, ContactVisibilityResult,
 )
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
@@ -569,6 +570,7 @@ __all__ = [
     "ContactAccess",
     "ContactChannelDecisions", "ContactIdentityDecisions", "ContactDecision",
     "ContactCommunicationPolicy", "ContactCommunicationPreview", "ContactCommunicationPolicyPage",
+    "ContactVisibilityDecisions", "ContactIdentityVisibilityDecisions", "ContactVisibilityPolicy", "ContactVisibilityResult",
     "ContactAddress",
     "ContactBulkDeleteResult",
     "ContactBulkDeleteResultItem",

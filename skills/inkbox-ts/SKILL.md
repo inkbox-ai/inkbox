@@ -1091,9 +1091,11 @@ await inkbox.phoneContactRules.create(num.id, {
 
 ## Contacts
 
-Shared address book with permission-filtered identifiers. Partially restricted contacts omit names, labels, other free-form profile fields, and shared memories. Existing-contact identifier changes and suggestion absorption require admin credentials.
+Shared address book with four permission groups: Email, Phone, Profile, and Memories. Profile and Memories are independent; inherited settings require the existing full view. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary SDK calls remain scoped.
 
 Use `inkbox.contacts.communicationPolicy.get(contactId)` and `.replace(contactId, { expectedRevision, defaults, identities })` with admin credentials. Defaults contain `email` and `phone` entries; identity overrides also contain `identityId`. `.preview(contactId, identityId)` returns the saved identity view; `.listForIdentity(handle)` returns a page with `items` and `hasMore`. Agent keys can list only their own view.
+
+Add `visibility: { defaults: { profile: "allow", memories: "block" }, identities: [] }` to share profile fields without memories. Visibility overrides use `{ identityId, profile, memories }`. Omitting visibility preserves that entire portion; reset both portions explicitly to clear everything. Use `preview.visibility?.profile` and `preview.visibility?.memories`; summaries live on `preview.contact?.memoryCount` and `preview.contact?.latestMemory`. Missing visibility means independent controls are not reported. Explicit profile/memory grants authorize stored free text, which can mention contact identifiers.
 
 Merging requires an admin-scoped API key. Active memories have per-kind and
 contact-wide limits. Delete a fact from each kind named by a merge error, or any
