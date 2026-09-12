@@ -10,6 +10,8 @@ from inkbox.contacts.resources.communication_policy import (
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
     Contact,
+    ContactCreatePermissions,
+    ContactInitialAddressPermission,
     ContactAccess,
     ContactBulkDeleteResult,
     ContactBulkDeleteResultItem,
@@ -54,6 +56,8 @@ __all__ = [
     "ContactPermissionSummary", "ContactPermissionVisibility", "ContactPermissionEffective", "ContactPermissionEntry", "ContactPermissionPage", "IdentifierPermission",
     "CallCorrespondenceItem",
     "Contact",
+    "ContactCreatePermissions",
+    "ContactInitialAddressPermission",
     "ContactAccess",
     "ContactBulkDeleteResult",
     "ContactBulkDeleteResultItem",

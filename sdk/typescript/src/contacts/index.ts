@@ -4,6 +4,7 @@ export * from "./correspondence.js";
 export * from "./resources/communicationPolicy.js";
 export type {
   CreateContactOptions,
+  ContactCreatePermissions,
   ListContactsOptions,
   LookupContactsOptions,
   ContactMergeField,

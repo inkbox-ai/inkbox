@@ -8,6 +8,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Added
 
+- Atomic contact creation with optional selected-agent permissions in Python, TypeScript, Rust, and `contacts create --json`. Explicit address choices and Profile/Memories settings are saved with the contact; requires an admin API key.
 - Contact communication-policy get/replace, identity previews, and paginated identity views in Python, TypeScript, and Rust. The CLI adds `contacts communication-policy get`, `set`, `preview`, `list`, and `list-management`, plus `identity contact-policies`.
 - Independent Profile and Memories controls through a `visibility` policy block, required in policy and preview responses and optional in replacement requests. Request omission preserves existing settings; explicit replacement uses the same revision. Rust adds `replace_with_visibility` without changing the communication-only request type.
 - Per-group preview visibility with memory summaries on the projected contact, and strict CLI policy-file validation for unknown or incomplete settings.
@@ -16,6 +17,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Rust `CreateContactParams` struct literals must include `permissions: None` or use `..Default::default()` when no initial permissions are needed.
 - Inherited Profile and Memories access includes contacts whose stored identifiers are all permitted, including standalone whitelist matches. Explicit visibility decisions remain authoritative.
 - Contact policy conflicts expose stable error codes. Bulk deletion includes optional `error_code` (Python/Rust) or `errorCode` (TypeScript) alongside the message. Rust struct literals for `ContactBulkDeleteResultItem` must supply `error_code`, using `None` when absent.
 - Rust callers constructing `MailIdentityContactRule`, `PhoneIdentityContactRule`, or `IMessageContactRule` struct literals must supply `contact: None` or a contact. Older wire responses still parse; Python and TypeScript construction remains compatible.

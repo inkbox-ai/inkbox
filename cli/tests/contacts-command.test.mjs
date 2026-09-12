@@ -11,6 +11,28 @@ import { outputContactRules } from "../dist/output.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 
+test("contact creation forwards permissions in one atomic request", async () => {
+  const requests = [];
+  const mock = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    requests.push({ path: req.url, body: JSON.parse(Buffer.concat(chunks).toString()) });
+    res.writeHead(201, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ id: "contact-1", preferred_name: "Person", emails: [], phones: [], access: [],
+      created_at: "2026-09-12T00:00:00Z", updated_at: "2026-09-12T00:00:00Z" }));
+  });
+  try {
+    const result = await runCli(["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+      "contacts", "create", `--json=${JSON.stringify({ givenName: "Person", permissions: {
+        identityId: "11111111-1111-4111-8111-111111111111", profile: "block", memories: "block",
+      } })}`]);
+    assert.equal(result.error, null, result.stderr);
+    assert.deepEqual(requests, [{ path: "/api/v1/contacts/with-permissions", body: { given_name: "Person", permissions: {
+      identity_id: "11111111-1111-4111-8111-111111111111", profile: "block", memories: "block",
+    } } }]);
+  } finally { await new Promise((resolve) => mock.server.close(resolve)); }
+});
+
 test("policy pagination rejects malformed and out-of-range arguments before HTTP", async () => {
   let requests = 0;
   const mock = await listen((_req, res) => { requests++; res.end("{}"); });

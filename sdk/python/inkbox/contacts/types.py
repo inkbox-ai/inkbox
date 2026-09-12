@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 
@@ -46,6 +46,34 @@ class ContactNameSource(StrEnum):
     PROVIDER = "provider"
     MAIL_HEADER = "mail_header"
     IDENTIFIER_FALLBACK = "identifier_fallback"
+
+
+@dataclass
+class ContactInitialAddressPermission:
+    kind: Literal["email", "phone"]
+    value: str
+    action: Literal["inherit", "allow", "block"]
+
+    def to_wire(self) -> dict[str, str]:
+        return {"kind": self.kind, "value": self.value, "action": self.action}
+
+
+@dataclass
+class ContactCreatePermissions:
+    """Selected-agent permissions committed with contact creation."""
+
+    identity_id: UUID | str
+    addresses: list[ContactInitialAddressPermission] = field(default_factory=list)
+    profile: Literal["inherit", "allow", "block"] | None = None
+    memories: Literal["inherit", "allow", "block"] | None = None
+
+    def to_wire(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"identity_id": str(self.identity_id), "addresses": [item.to_wire() for item in self.addresses]}
+        if self.profile is not None:
+            result["profile"] = self.profile
+        if self.memories is not None:
+            result["memories"] = self.memories
+        return result
 
 
 @dataclass

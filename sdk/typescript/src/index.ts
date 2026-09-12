@@ -390,6 +390,7 @@ export type {
   IMessageCorrespondenceItem,
   CallCorrespondenceItem,
   CreateContactOptions,
+  ContactCreatePermissions,
   GetContactCorrespondenceOptions,
   ListContactsOptions,
   LookupContactsOptions,

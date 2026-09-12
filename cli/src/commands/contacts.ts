@@ -419,7 +419,7 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("create")
     .description("Create a contact (pass the full payload as JSON)")
-    .requiredOption("--json <payload>", "JSON payload matching CreateContactOptions")
+    .requiredOption("--json <payload>", "JSON payload matching CreateContactOptions; optional permissions require an admin API key")
     .action(
       withErrorHandler(async function (
         this: Command,

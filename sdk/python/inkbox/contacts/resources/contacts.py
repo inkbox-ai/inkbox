@@ -17,6 +17,7 @@ from inkbox.contacts.resources.correspondence import ContactCorrespondenceResour
 from inkbox.contacts.resources.vcards import VCardsResource
 from inkbox.contacts.types import (
     Contact,
+    ContactCreatePermissions,
     ContactAddress,
     ContactBulkDeleteResult,
     ContactCustomField,
@@ -166,11 +167,13 @@ class ContactsResource:
         dates: list[ContactDate] | None = None,
         addresses: list[ContactAddress] | None = None,
         custom_fields: list[ContactCustomField] | None = None,
+        permissions: ContactCreatePermissions | None = None,
     ) -> Contact:
         """Create a new contact.
 
         Args:
             birthday: Optional ISO date (``YYYY-MM-DD``) or :class:`datetime.date`.
+            permissions: Initial selected-agent access saved atomically; requires an admin API key.
         """
         body: dict[str, Any] = {}
         for name, value in (
@@ -201,7 +204,9 @@ class ContactsResource:
             wire = _items_to_wire(items)
             if wire is not None:
                 body[name] = wire
-        data = self._http.post(_BASE, json=body)
+        if permissions is not None:
+            body["permissions"] = permissions.to_wire()
+        data = self._http.post(f"{_BASE}/with-permissions" if permissions is not None else _BASE, json=body)
         return Contact._from_dict(data)
 
     def update(

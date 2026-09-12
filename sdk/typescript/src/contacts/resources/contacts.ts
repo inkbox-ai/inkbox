@@ -7,6 +7,7 @@
 import { HttpTransport } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
 import { ContactCommunicationPolicyResource } from "./communicationPolicy.js";
+import type { ContactDecision } from "./communicationPolicy.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
@@ -51,6 +52,13 @@ export interface LookupContactsOptions {
   phoneContains?: string;
 }
 
+export interface ContactCreatePermissions {
+  identityId: string;
+  addresses?: { kind: "email" | "phone"; value: string; action: ContactDecision }[];
+  profile?: ContactDecision;
+  memories?: ContactDecision;
+}
+
 export interface CreateContactOptions {
   preferredName?: string;
   namePrefix?: string;
@@ -69,6 +77,8 @@ export interface CreateContactOptions {
   dates?: ContactDate[];
   addresses?: ContactAddress[];
   customFields?: ContactCustomField[];
+  /** Initial selected-agent access saved atomically; requires an admin API key. */
+  permissions?: ContactCreatePermissions;
 }
 
 export interface UpdateContactOptions {
@@ -185,7 +195,13 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    const data = await this.http.post<RawContact>(BASE, body);
+    if (options.permissions !== undefined) body.permissions = {
+      identity_id: options.permissions.identityId,
+      addresses: options.permissions.addresses,
+      profile: options.permissions.profile,
+      memories: options.permissions.memories,
+    };
+    const data = await this.http.post<RawContact>(options.permissions !== undefined ? `${BASE}/with-permissions` : BASE, body);
     return parseContact(data);
   }
 

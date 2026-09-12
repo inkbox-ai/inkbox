@@ -76,6 +76,22 @@ describe("ContactsResource", () => {
     vi.restoreAllMocks();
   });
 
+  it("creates with permissions atomically and maps the selected identity", async () => {
+    vi.mocked(fetch).mockResolvedValue(makeOkResponse(CONTACT_DICT));
+    const resource = new ContactsResource(new HttpTransport("k", BASE));
+    await resource.create({ givenName: "Alex", emails: [{ value: "alex@example.com" }], permissions: {
+      identityId: "11111111-1111-4111-8111-111111111111", profile: "block",
+      addresses: [{ kind: "email", value: "alex@example.com", action: "allow" }],
+    } });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe(`${BASE}/contacts/with-permissions`);
+    expect(JSON.parse(String(options?.body)).permissions).toEqual({
+      identity_id: "11111111-1111-4111-8111-111111111111", profile: "block",
+      addresses: [{ kind: "email", value: "alex@example.com", action: "allow" }],
+    });
+  });
+
   it("list with q + order builds query string", async () => {
     vi.mocked(fetch).mockResolvedValue(makeOkResponse({ items: [CONTACT_DICT] }));
     const http = new HttpTransport("k", BASE);
