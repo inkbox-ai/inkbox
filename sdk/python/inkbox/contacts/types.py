@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 
