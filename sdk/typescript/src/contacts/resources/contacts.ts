@@ -7,7 +7,7 @@
 import { HttpTransport } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
 import { ContactCommunicationPolicyResource } from "./communicationPolicy.js";
-import type { ContactDecision } from "./communicationPolicy.js";
+import { ContactPermissionsResource, type UpdateContactPermissions } from "./permissions.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
@@ -52,11 +52,8 @@ export interface LookupContactsOptions {
   phoneContains?: string;
 }
 
-export interface ContactCreatePermissions {
+export interface ContactCreatePermissions extends UpdateContactPermissions {
   identityId: string;
-  addresses?: { kind: "email" | "phone"; value: string; action: ContactDecision }[];
-  profile?: ContactDecision;
-  memories?: ContactDecision;
 }
 
 export interface CreateContactOptions {
@@ -125,10 +122,12 @@ export class ContactsResource {
   readonly facts: ContactFactsResource;
   readonly vcards: VCardsResource;
   readonly communicationPolicy: ContactCommunicationPolicyResource;
+  readonly permissions: ContactPermissionsResource;
 
   constructor(private readonly http: HttpTransport) {
     this.access = new ContactAccessResource(http);
     this.communicationPolicy = new ContactCommunicationPolicyResource(http);
+    this.permissions = new ContactPermissionsResource(http);
     this.correspondence = new ContactCorrespondenceResource(http);
     this.facts = new ContactFactsResource(http);
     this.vcards = new VCardsResource(http);
@@ -195,12 +194,10 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    if (options.permissions !== undefined) body.permissions = {
-      identity_id: options.permissions.identityId,
-      addresses: options.permissions.addresses,
-      profile: options.permissions.profile,
-      memories: options.permissions.memories,
-    };
+    if (options.permissions !== undefined) {
+      const { identityId, ...permissions } = options.permissions;
+      body.permissions = { ...permissions, identity_id: identityId };
+    }
     const data = await this.http.post<RawContact>(options.permissions !== undefined ? `${BASE}/with-permissions` : BASE, body);
     return parseContact(data);
   }

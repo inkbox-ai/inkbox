@@ -14,13 +14,17 @@ describe("contact communication policies", () => {
         return Response.json(fixture.preview);
       }
       expect(url.pathname).toBe(`/api/v1/contacts/${fixture.policy.contact_id}/communication-policy`);
+      if (init?.method === "GET") expect(url.searchParams.get("identity_id")).toBe(fixture.policy.identity_id);
       return Response.json(fixture.policy);
     });
     try {
       const resource = new ContactCommunicationPolicyResource(new HttpTransport("test-key", "https://example.com/api/v1"));
-      const policy = await resource.get(fixture.policy.contact_id);
-      expect(await resource.replace(policy.contactId, { expectedRevision: 7, defaults: policy.defaults,
-        identities: policy.identities, visibility: policy.visibility })).toEqual(policy);
+      const policy = await resource.get(fixture.policy.contact_id, fixture.policy.identity_id);
+      expect(policy.addresses[0].allowed).toBe(false);
+      expect(policy.effectiveVisibility).toEqual({ profile: false, memories: false });
+      expect(await resource.replace(policy.contactId, { expectedRevision: 7, identityId: fixture.policy.identity_id,
+        addresses: [{ kind: "email", value: "person@example.com", action: "block", expectedAction: "inherit" }],
+        visibility: policy.visibility })).toEqual(policy);
       const preview = await resource.preview(policy.contactId, fixture.preview.identity_id);
       expect(preview.visibility).toEqual({ profile: false, memories: false });
       expect(preview.contact).toBeNull();
@@ -31,7 +35,7 @@ describe("contact communication policies", () => {
     const get = vi.fn().mockResolvedValue({ items: [{
       contact: { id: "contact", preferred_name: "Person", given_name: null, family_name: null, company_name: null,
         review_status: "confirmed", emails: [], phones: [{ value_e164: "+15555550123", label: "Work", is_primary: true }] },
-      revision: 8, defaults: { email: "inherit", phone: "inherit" }, identity_override: { email: "block", phone: "allow" },
+      revision: 8,
       visibility: { defaults: { profile: "inherit", memories: "inherit" }, identity_override: { profile: "allow", memories: "block" } },
       effective: { email: "no_identifiers", phone: "some", profile: true, memories: false },
     }], limit: 1, offset: 2, has_more: true });
@@ -47,39 +51,39 @@ describe("contact communication policies", () => {
     expect(page.items[0].revision).toBe(8);
     expect(page.items[0].contact).not.toHaveProperty("notes");
   });
-  it("serializes independent visibility while preserving legacy omission", async () => {
+  it("serializes independent visibility while preserving omission", async () => {
     const put = vi.fn().mockResolvedValue({ contact_id: "contact", revision: 2,
-      defaults: { email: "allow", phone: "allow" }, identities: [], visibility: {
+      identity_id: "agent", addresses: [], effective_visibility: { profile: true, memories: false }, visibility: {
         defaults: { profile: "block", memories: "block" },
         identities: [{ identity_id: "agent", profile: "allow", memories: "block" }],
       } });
     const resource = new ContactCommunicationPolicyResource({ put } as unknown as HttpTransport);
     const result = await resource.replace("contact", { expectedRevision: 1,
-      defaults: { email: "allow", phone: "allow" }, identities: [], visibility: {
+      identityId: "agent", addresses: [], visibility: {
         defaults: { profile: "block", memories: "block" }, identities: [{ identityId: "agent", profile: "allow", memories: "block" }],
       } });
     expect(put.mock.calls[0][1].visibility.identities[0]).toEqual({ identity_id: "agent", profile: "allow", memories: "block" });
-    expect(Object.keys(put.mock.calls[0][1].defaults)).toEqual(["email", "phone"]);
+    expect(put.mock.calls[0][1]).not.toHaveProperty("defaults");
     expect(result.visibility.identities[0].identityId).toBe("agent");
-    await resource.replace("contact", { expectedRevision: 2, defaults: { email: "inherit", phone: "inherit" }, identities: [] });
+    await resource.replace("contact", { expectedRevision: 2, identityId: "agent", addresses: [] });
     expect(put.mock.calls[1][1]).not.toHaveProperty("visibility");
   });
-  it("maps revision and identity override fields without changing legacy rule types", async () => {
+  it("maps guarded address edits and an unselected policy response", async () => {
     const put = vi.fn().mockResolvedValue({
-      contact_id: "contact", revision: 2, defaults: { email: "block", phone: "block" },
-      identities: [{ identity_id: "agent", email: "allow", phone: "block" }],
+      contact_id: "contact", revision: 2, identity_id: null, addresses: [], effective_visibility: null,
       visibility: { defaults: { profile: "inherit", memories: "inherit" }, identities: [] },
     });
     const resource = new ContactCommunicationPolicyResource({ put } as unknown as HttpTransport);
     const result = await resource.replace("contact", {
-      expectedRevision: 1, defaults: { email: "block", phone: "block" },
-      identities: [{ identityId: "agent", email: "allow", phone: "block" }],
+      expectedRevision: 1, identityId: "agent",
+      addresses: [{ kind: "phone", value: "+15555550123", action: "allow", expectedAction: "block" }],
     });
     expect(put).toHaveBeenCalledWith("/contacts/contact/communication-policy", {
-      expected_revision: 1, defaults: { email: "block", phone: "block" },
-      identities: [{ identity_id: "agent", email: "allow", phone: "block" }],
+      expected_revision: 1, identity_id: "agent",
+      addresses: [{ kind: "phone", value: "+15555550123", action: "allow", expected_action: "block" }],
     });
-    expect(result.identities[0].identityId).toBe("agent");
+    expect(result.identityId).toBeNull();
+    expect(result.effectiveVisibility).toBeNull();
     expect(result.revision).toBe(2);
   });
 

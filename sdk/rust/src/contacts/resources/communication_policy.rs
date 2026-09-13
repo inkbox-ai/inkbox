@@ -9,7 +9,7 @@ use crate::contacts::types::{Contact, ContactEmail, ContactPhone, ContactReviewS
 use crate::error::Result;
 use crate::http::{HttpTransport, NO_QUERY};
 
-/// Whether the contact contributes to the active communication list.
+/// An explicit exact-address choice overrides the agent's channel mode.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ContactDecision {
@@ -19,19 +19,30 @@ pub enum ContactDecision {
     Block,
 }
 
-/// Email and phone entries; phone includes SMS, calls, and iMessage.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ContactChannelDecisions {
-    pub email: ContactDecision,
-    pub phone: ContactDecision,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContactAddressKind {
+    Email,
+    Phone,
 }
 
-/// One identity's overrides of the contact defaults.
+/// Explicit and effective access to an exact address.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContactIdentityDecisions {
-    pub identity_id: uuid::Uuid,
-    pub email: ContactDecision,
-    pub phone: ContactDecision,
+pub struct ContactAddressPermission {
+    pub kind: ContactAddressKind,
+    pub value: String,
+    pub label: Option<String>,
+    pub action: ContactDecision,
+    pub allowed: bool,
+}
+
+/// An exact-address edit guarded by its observed decision.
+#[derive(Debug, Clone, Serialize)]
+pub struct ContactAddressUpdate {
+    pub kind: ContactAddressKind,
+    pub value: String,
+    pub action: ContactDecision,
+    pub expected_action: ContactDecision,
 }
 
 /// Independent profile and memory visibility decisions.
@@ -57,7 +68,7 @@ pub struct ContactVisibilityPolicy {
 }
 
 /// Effective permissions, including groups without stored content.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactVisibilityResult {
     pub profile: bool,
     pub memories: bool,
@@ -68,8 +79,9 @@ pub struct ContactVisibilityResult {
 pub struct ContactCommunicationPolicy {
     pub contact_id: uuid::Uuid,
     pub revision: u64,
-    pub defaults: ContactChannelDecisions,
-    pub identities: Vec<ContactIdentityDecisions>,
+    pub identity_id: Option<uuid::Uuid>,
+    pub addresses: Vec<ContactAddressPermission>,
+    pub effective_visibility: Option<ContactVisibilityResult>,
     pub visibility: ContactVisibilityPolicy,
 }
 
@@ -77,8 +89,8 @@ pub struct ContactCommunicationPolicy {
 #[derive(Debug, Clone, Serialize)]
 pub struct ReplaceContactCommunicationPolicy {
     pub expected_revision: u64,
-    pub defaults: ContactChannelDecisions,
-    pub identities: Vec<ContactIdentityDecisions>,
+    pub identity_id: uuid::Uuid,
+    pub addresses: Vec<ContactAddressUpdate>,
 }
 
 /// Replace communication and visibility settings under one revision.
@@ -153,8 +165,6 @@ pub struct ContactPermissionEffective {
 pub struct ContactPermissionEntry {
     pub contact: ContactPermissionSummary,
     pub revision: u64,
-    pub defaults: ContactChannelDecisions,
-    pub identity_override: ContactChannelDecisions,
     pub visibility: ContactPermissionVisibility,
     pub effective: ContactPermissionEffective,
 }
@@ -187,6 +197,18 @@ impl ContactCommunicationPolicyResource {
         )?)?)
     }
 
+    /// Read address choices and effective visibility for a selected identity.
+    pub fn get_for_identity(
+        &self,
+        contact_id: &str,
+        identity_id: &str,
+    ) -> Result<ContactCommunicationPolicy> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/contacts/{contact_id}/communication-policy"),
+            &[("identity_id", identity_id.to_string())],
+        )?)?)
+    }
+
     /// Atomically replace the policy using its last observed revision.
     pub fn replace(
         &self,
@@ -199,7 +221,7 @@ impl ContactCommunicationPolicyResource {
         )?)?)
     }
 
-    /// Replace all four groups; use `replace` to preserve existing visibility.
+    /// Edit addresses and replace visibility; `replace` preserves visibility.
     pub fn replace_with_visibility(
         &self,
         contact_id: &str,
@@ -282,9 +304,11 @@ mod tests {
         let contact_id = fixture["policy"]["contact_id"].as_str().unwrap();
         let identity_id = fixture["preview"]["identity_id"].as_str().unwrap();
         let get = server.mock(|when, then| {
-            when.method(GET).path(format!(
-                "/api/v1/contacts/{contact_id}/communication-policy"
-            ));
+            when.method(GET)
+                .path(format!(
+                    "/api/v1/contacts/{contact_id}/communication-policy"
+                ))
+                .query_param("identity_id", identity_id);
             then.status(200).json_body(fixture["policy"].clone());
         });
         let put = server.mock(|when, then| {
@@ -309,15 +333,22 @@ mod tests {
             .unwrap();
         let contacts = sdk.contacts();
         let resource = contacts.communication_policy();
-        let policy = resource.get(contact_id).unwrap();
+        let policy = resource.get_for_identity(contact_id, identity_id).unwrap();
+        assert!(!policy.addresses[0].allowed);
+        assert!(!policy.effective_visibility.as_ref().unwrap().profile);
         let saved = resource
             .replace_with_visibility(
                 contact_id,
                 &ReplaceContactCommunicationPolicyWithVisibility {
                     communication: ReplaceContactCommunicationPolicy {
                         expected_revision: 7,
-                        defaults: policy.defaults,
-                        identities: policy.identities,
+                        identity_id: policy.identity_id.unwrap(),
+                        addresses: vec![ContactAddressUpdate {
+                            kind: ContactAddressKind::Email,
+                            value: "person@example.com".into(),
+                            action: ContactDecision::Block,
+                            expected_action: ContactDecision::Inherit,
+                        }],
                     },
                     visibility: policy.visibility,
                 },
@@ -342,8 +373,7 @@ mod tests {
             then.status(200).json_body(json!({"items": [{
                 "contact": {"id": "33333333-3333-4333-8333-333333333333", "preferred_name": "Person", "given_name": null,
                     "family_name": null, "company_name": null, "review_status": "confirmed", "emails": [], "phones": []},
-                "revision": 8, "defaults": {"email": "inherit", "phone": "inherit"},
-                "identity_override": {"email": "allow", "phone": "block"},
+                "revision": 8,
                 "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"},
                     "identity_override": {"profile": "allow", "memories": "block"}},
                 "effective": {"email": "some", "phone": "no_identifiers", "profile": true, "memories": false}
@@ -435,17 +465,17 @@ mod tests {
     }
 
     #[test]
-    fn visibility_replacement_keeps_the_legacy_request_shape() {
+    fn visibility_replacement_preserves_address_edits() {
         let server = MockServer::start();
-        let wire = json!({"expected_revision": 2, "defaults": {"email": "allow", "phone": "allow"}, "identities": [],
+        let wire = json!({"expected_revision": 2, "identity_id": "22222222-2222-4222-8222-222222222222", "addresses": [],
             "visibility": {"defaults": {"profile": "allow", "memories": "block"}, "identities": []}});
         let request = server.mock(|when, then| {
             when.method(PUT)
                 .path("/api/v1/contacts/11111111-1111-4111-8111-111111111111/communication-policy")
                 .json_body(wire.clone());
             then.status(200).json_body(
-                json!({"contact_id": "11111111-1111-4111-8111-111111111111", "revision": 3, "defaults": wire["defaults"],
-                "identities": [], "visibility": wire["visibility"]}),
+                json!({"contact_id": "11111111-1111-4111-8111-111111111111", "revision": 3, "identity_id": null,
+                "addresses": [], "effective_visibility": null, "visibility": wire["visibility"]}),
             );
         });
         let sdk = Inkbox::builder("test-key")
@@ -454,11 +484,8 @@ mod tests {
             .unwrap();
         let legacy = ReplaceContactCommunicationPolicy {
             expected_revision: 2,
-            defaults: ContactChannelDecisions {
-                email: ContactDecision::Allow,
-                phone: ContactDecision::Allow,
-            },
-            identities: vec![],
+            identity_id: uuid::Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap(),
+            addresses: vec![],
         };
         assert!(serde_json::to_value(&legacy)
             .unwrap()
@@ -489,12 +516,11 @@ mod tests {
     }
 
     #[test]
-    fn policy_replacement_sends_revision_and_complete_overrides() {
+    fn policy_replacement_sends_revision_and_guarded_address_edits() {
         let server = MockServer::start();
         let policy = json!({
             "contact_id": "11111111-1111-4111-8111-111111111111", "revision": 1,
-            "defaults": {"email": "block", "phone": "block"},
-            "identities": [{"identity_id": "22222222-2222-4222-8222-222222222222", "email": "allow", "phone": "block"}],
+            "identity_id": null, "addresses": [], "effective_visibility": null,
             "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"}, "identities": []}
         });
         let get = server.mock(|when, then| {
@@ -504,7 +530,8 @@ mod tests {
         });
         let put = server.mock(|when, then| {
             when.method(PUT).path("/api/v1/contacts/11111111-1111-4111-8111-111111111111/communication-policy")
-                .json_body(json!({"expected_revision": 1, "defaults": policy["defaults"], "identities": policy["identities"]}));
+                .json_body(json!({"expected_revision": 1, "identity_id": "22222222-2222-4222-8222-222222222222",
+                    "addresses": [{"kind": "phone", "value": "+15555550123", "action": "allow", "expected_action": "block"}]}));
             then.status(200).json_body(policy.clone());
         });
         let sdk = Inkbox::builder("test-key")
@@ -521,12 +548,19 @@ mod tests {
                 &loaded.contact_id.to_string(),
                 &ReplaceContactCommunicationPolicy {
                     expected_revision: loaded.revision,
-                    defaults: loaded.defaults,
-                    identities: loaded.identities,
+                    identity_id: uuid::Uuid::parse_str("22222222-2222-4222-8222-222222222222")
+                        .unwrap(),
+                    addresses: vec![ContactAddressUpdate {
+                        kind: ContactAddressKind::Phone,
+                        value: "+15555550123".into(),
+                        action: ContactDecision::Allow,
+                        expected_action: ContactDecision::Block,
+                    }],
                 },
             )
             .unwrap();
-        assert!(matches!(saved.identities[0].phone, ContactDecision::Block));
+        assert!(saved.identity_id.is_none());
+        assert!(saved.effective_visibility.is_none());
         get.assert();
         put.assert();
     }

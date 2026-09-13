@@ -49,30 +49,21 @@ class ContactNameSource(StrEnum):
 
 
 @dataclass
-class ContactInitialAddressPermission:
-    kind: Literal["email", "phone"]
-    value: str
-    action: Literal["inherit", "allow", "block"]
-
-    def to_wire(self) -> dict[str, str]:
-        return {"kind": self.kind, "value": self.value, "action": self.action}
-
-
-@dataclass
 class ContactCreatePermissions:
     """Selected-agent permissions committed with contact creation."""
 
     identity_id: UUID | str
-    addresses: list[ContactInitialAddressPermission] = field(default_factory=list)
-    profile: Literal["inherit", "allow", "block"] | None = None
-    memories: Literal["inherit", "allow", "block"] | None = None
+    emails: dict[str, bool] | None = None
+    phones: dict[str, bool] | None = None
+    profile: bool | None = None
+    memories: bool | None = None
 
     def to_wire(self) -> dict[str, Any]:
-        result: dict[str, Any] = {"identity_id": str(self.identity_id), "addresses": [item.to_wire() for item in self.addresses]}
-        if self.profile is not None:
-            result["profile"] = self.profile
-        if self.memories is not None:
-            result["memories"] = self.memories
+        result: dict[str, Any] = {"identity_id": str(self.identity_id)}
+        for key in ("emails", "phones", "profile", "memories"):
+            value = getattr(self, key)
+            if value is not None:
+                result[key] = value
         return result
 
 

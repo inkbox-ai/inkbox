@@ -5,28 +5,23 @@
 //! `postal`) so the structs carry explicit serde renames and a `to_wire()`
 //! helper that omits `None`/default keys exactly like the Python `to_wire`.
 
-use crate::contacts::resources::communication_policy::ContactDecision;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use std::collections::HashMap;
 use uuid::Uuid;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContactInitialAddressPermission {
-    pub kind: String,
-    pub value: String,
-    pub action: ContactDecision,
-}
 
 /// Selected-agent permissions committed with contact creation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactCreatePermissions {
     pub identity_id: Uuid,
-    #[serde(default)]
-    pub addresses: Vec<ContactInitialAddressPermission>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub profile: Option<ContactDecision>,
+    pub emails: Option<HashMap<String, bool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub memories: Option<ContactDecision>,
+    pub phones: Option<HashMap<String, bool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memories: Option<bool>,
 }
 
 /// How a contact was created.

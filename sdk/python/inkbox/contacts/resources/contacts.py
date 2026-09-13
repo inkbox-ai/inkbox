@@ -12,6 +12,7 @@ from uuid import UUID
 
 from inkbox.contacts.resources.contact_access import ContactAccessResource
 from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicyResource
+from inkbox.contacts.resources.permissions import ContactPermissionsResource
 from inkbox.contacts.resources.contact_facts import ContactFactsResource
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceResource
 from inkbox.contacts.resources.vcards import VCardsResource
@@ -48,9 +49,15 @@ class ContactsResource:
         self._http = http
         self._access = ContactAccessResource(http)
         self._communication_policy = ContactCommunicationPolicyResource(http)
+        self._permissions = ContactPermissionsResource(http)
         self._facts = ContactFactsResource(http)
         self._correspondence = ContactCorrespondenceResource(http)
         self._vcards = VCardsResource(http)
+
+    @property
+    def permissions(self) -> ContactPermissionsResource:
+        """Effective yes/no access for a selected agent and contact."""
+        return self._permissions
 
     @property
     def communication_policy(self) -> ContactCommunicationPolicyResource:

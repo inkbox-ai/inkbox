@@ -14,7 +14,6 @@ from inkbox.contacts.resources.vcards import VCardsResource
 from inkbox.contacts.types import (
     Contact,
     ContactCreatePermissions,
-    ContactInitialAddressPermission,
     ContactEmail,
     ContactImportResult,
     ContactPhone,
@@ -84,15 +83,15 @@ class TestContactsParse:
     def test_create_with_permissions_uses_one_atomic_request(self, transport):
         transport.post.return_value = CONTACT_DICT
         permissions = ContactCreatePermissions(
-            identity_id="11111111-1111-4111-8111-111111111111", profile="block",
-            addresses=[ContactInitialAddressPermission(kind="email", value="alex@example.com", action="allow")],
+            identity_id="11111111-1111-4111-8111-111111111111", profile=False,
+            emails={"alex@example.com": True},
         )
         ContactsResource(transport).create(given_name="Alex", emails=[ContactEmail(label=None, value="alex@example.com")], permissions=permissions)
         transport.post.assert_called_once()
         assert transport.post.call_args.args[0] == "/contacts/with-permissions"
         assert transport.post.call_args.kwargs["json"]["permissions"] == {
-            "identity_id": "11111111-1111-4111-8111-111111111111", "profile": "block",
-            "addresses": [{"kind": "email", "value": "alex@example.com", "action": "allow"}],
+            "identity_id": "11111111-1111-4111-8111-111111111111", "profile": False,
+            "emails": {"alex@example.com": True},
         }
 
     def test_contact_inlines_access(self):

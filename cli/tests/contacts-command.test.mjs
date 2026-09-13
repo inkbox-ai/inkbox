@@ -6,10 +6,60 @@ import { fileURLToPath } from "node:url";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseContactPolicyFile } from "../dist/commands/contacts.js";
+import { parseContactPolicyFile, parseContactPermissionsFile } from "../dist/commands/contacts.js";
 import { outputContactRules } from "../dist/output.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+test("boolean permissions reject null, strings, unknown fields, and excessive maps", () => {
+  for (const body of [{}, { emails: {}, phones: {}, profile: false, memories: true }]) {
+    assert.deepEqual(parseContactPermissionsFile(JSON.stringify(body)), body);
+  }
+  for (const body of [null, [], { profile: null }, { memories: "false" }, { profile: 0 },
+    { emails: null }, { phones: [] }, { emails: { "person@example.com": "allow" } },
+    { email: {} }, { expectedRevision: 0 }, { addresses: [] },
+    { emails: Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`person${i}@example.com`, true])) }]) {
+    assert.throws(() => parseContactPermissionsFile(JSON.stringify(body)));
+  }
+});
+
+test("boolean permissions get and set preserve false, empty maps, and omission", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "contact-permissions-"));
+  const path = join(directory, "permissions.json");
+  const requests = [];
+  const effective = { emails: { "person@example.com": false }, phones: { "+15555550123": true }, profile: false, memories: true };
+  const mock = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    requests.push({ method: req.method, path: req.url, body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : null });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(effective));
+  });
+  try {
+    const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "contacts", "permissions"];
+    const get = await runCli([...args, "get", "test-agent", "contact-1"]);
+    assert.equal(get.error, null, get.stderr);
+    assert.deepEqual(JSON.parse(get.stdout), effective);
+    const update = { emails: { "person@example.com": false }, phones: {}, profile: false };
+    await writeFile(path, JSON.stringify(update));
+    const setArgs = [...args, "set", "test-agent", "contact-1", "--file", path];
+    const set = await runCli(setArgs);
+    assert.equal(set.error, null, set.stderr);
+    assert.deepEqual(JSON.parse(set.stdout), effective);
+    await writeFile(path, "{}");
+    assert.equal((await runCli(setArgs)).error, null);
+    await writeFile(path, '{"profile":"block"}');
+    assert.ok((await runCli(setArgs)).error);
+    assert.deepEqual(requests, [
+      { method: "GET", path: "/api/v1/identities/test-agent/contacts/contact-1/permissions", body: null },
+      { method: "PATCH", path: "/api/v1/identities/test-agent/contacts/contact-1/permissions", body: update },
+      { method: "PATCH", path: "/api/v1/identities/test-agent/contacts/contact-1/permissions", body: {} },
+    ]);
+  } finally {
+    await new Promise((resolve) => mock.server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("contact creation forwards permissions in one atomic request", async () => {
   const requests = [];
@@ -24,11 +74,11 @@ test("contact creation forwards permissions in one atomic request", async () => 
   try {
     const result = await runCli(["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
       "contacts", "create", `--json=${JSON.stringify({ givenName: "Person", permissions: {
-        identityId: "11111111-1111-4111-8111-111111111111", profile: "block", memories: "block",
+        identityId: "11111111-1111-4111-8111-111111111111", profile: false, memories: false,
       } })}`]);
     assert.equal(result.error, null, result.stderr);
     assert.deepEqual(requests, [{ path: "/api/v1/contacts/with-permissions", body: { given_name: "Person", permissions: {
-      identity_id: "11111111-1111-4111-8111-111111111111", profile: "block", memories: "block",
+      identity_id: "11111111-1111-4111-8111-111111111111", profile: false, memories: false,
     } } }]);
   } finally { await new Promise((resolve) => mock.server.close(resolve)); }
 });
@@ -82,7 +132,7 @@ test("permission management forwards filters and preserves the page in JSON", as
 });
 
 test("policy files preserve visibility omission and validate every supplied field", () => {
-  const base = { expectedRevision: 0, defaults: { email: "inherit", phone: "inherit" }, identities: [] };
+  const base = { expectedRevision: 0, identityId: "identity-1", addresses: [] };
   assert.deepEqual(parseContactPolicyFile(JSON.stringify(base)), base);
   const full = { ...base, visibility: { defaults: { profile: "allow", memories: "block" },
     identities: [{ identityId: "identity-1", profile: "block", memories: "allow" }] } };
@@ -92,13 +142,16 @@ test("policy files preserve visibility omission and validate every supplied fiel
     { ...full, visibility: { ...full.visibility, defaults: { profile: "allow", memory: "block" } } },
     { ...full, visibility: { ...full.visibility, identities: [{ identityId: "i", profile: "allow", memories: "block", typo: true }] } },
     { ...base, defaults: { email: "allow" } }, { ...base, expectedRevision: -1 },
+    { ...base, addresses: [{ kind: "email", value: "person@example.com", action: "block" }] },
+    { ...base, addresses: [{ kind: "sms", value: "+15555550123", action: "block", expectedAction: "allow" }] },
   ]) assert.throws(() => parseContactPolicyFile(JSON.stringify(invalid)));
 });
 
 test("policy set forwards visibility and rejects unknown keys before HTTP", async () => {
   const directory = await mkdtemp(join(tmpdir(), "contact-policy-"));
   const path = join(directory, "policy.json");
-  const body = { expectedRevision: 3, defaults: { email: "allow", phone: "allow" }, identities: [],
+  const body = { expectedRevision: 3, identityId: "identity-1",
+    addresses: [{ kind: "email", value: "person@example.com", action: "allow", expectedAction: "block" }],
     visibility: { defaults: { profile: "allow", memories: "block" }, identities: [{ identityId: "identity-1", profile: "block", memories: "allow" }] } };
   const requests = [];
   const mock = await listen(async (req, res) => {
@@ -107,7 +160,9 @@ test("policy set forwards visibility and rejects unknown keys before HTTP", asyn
     const payload = JSON.parse(Buffer.concat(chunks).toString());
     requests.push({ method: req.method, url: req.url, payload });
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ contact_id: "contact-1", revision: 4, defaults: payload.defaults, identities: [], visibility: payload.visibility }));
+    res.end(JSON.stringify({ contact_id: "contact-1", revision: 4, identity_id: payload.identity_id,
+      addresses: [{ kind: "email", value: "person@example.com", action: "allow", allowed: true, label: null }],
+      effective_visibility: { profile: false, memories: true }, visibility: payload.visibility }));
   });
   try {
     const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
@@ -116,7 +171,8 @@ test("policy set forwards visibility and rejects unknown keys before HTTP", asyn
     const result = await runCli(args);
     assert.equal(result.error, null, result.stderr);
     assert.deepEqual(requests[0], { method: "PUT", url: "/api/v1/contacts/contact-1/communication-policy", payload: {
-      expected_revision: 3, defaults: body.defaults, identities: [], visibility: {
+      expected_revision: 3, identity_id: "identity-1",
+      addresses: [{ kind: "email", value: "person@example.com", action: "allow", expected_action: "block" }], visibility: {
         defaults: body.visibility.defaults, identities: [{ identity_id: "identity-1", profile: "block", memories: "allow" }],
       },
     } });
@@ -178,21 +234,20 @@ test("contact communication policy reads use the administrative policy endpoint"
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       contact_id: "contact-1", revision: 3,
-      defaults: { email: "block", phone: "block" },
-      identities: [{ identity_id: "identity-1", email: "allow", phone: "block" }],
+      identity_id: "identity-1", addresses: [], effective_visibility: { profile: false, memories: false },
       visibility: { defaults: { profile: "inherit", memories: "inherit" }, identities: [] },
     }));
   });
   try {
     const result = await runCli([
       "--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json",
-      "contacts", "communication-policy", "get", "contact-1",
+      "contacts", "communication-policy", "get", "contact-1", "--identity-id", "identity-1",
     ]);
     assert.equal(result.error, null, result.stderr);
-    assert.deepEqual(request, { method: "GET", url: "/api/v1/contacts/contact-1/communication-policy" });
+    assert.deepEqual(request, { method: "GET", url: "/api/v1/contacts/contact-1/communication-policy?identity_id=identity-1" });
     const policy = JSON.parse(result.stdout);
     assert.equal(policy.revision, 3);
-    assert.equal(policy.identities[0].identityId, "identity-1");
+    assert.equal(policy.identityId, "identity-1");
   } finally {
     await new Promise((resolve) => mock.server.close(resolve));
   }

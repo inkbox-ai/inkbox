@@ -1,8 +1,9 @@
 """Contact types and resource options."""
 
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceOptions
+from inkbox.contacts.resources.permissions import ContactPermissions, ContactPermissionsResource
 from inkbox.contacts.resources.communication_policy import (
-    ContactChannelDecisions, ContactIdentityDecisions, ContactDecision,
+    ContactAddressPermission, ContactAddressUpdate, ContactDecision,
     ContactCommunicationPolicy, ContactCommunicationPreview, ContactCommunicationPolicyPage,
     ContactVisibilityDecisions, ContactIdentityVisibilityDecisions, ContactVisibilityPolicy, ContactVisibilityResult,
     ContactPermissionSummary, ContactPermissionVisibility, ContactPermissionEffective, ContactPermissionEntry, ContactPermissionPage, IdentifierPermission,
@@ -11,7 +12,6 @@ from inkbox.contacts.types import (
     CallCorrespondenceItem,
     Contact,
     ContactCreatePermissions,
-    ContactInitialAddressPermission,
     ContactAccess,
     ContactBulkDeleteResult,
     ContactBulkDeleteResultItem,
@@ -50,14 +50,14 @@ from inkbox.contacts.types import (
 )
 
 __all__ = [
-    "ContactChannelDecisions", "ContactIdentityDecisions", "ContactDecision",
+    "ContactPermissions", "ContactPermissionsResource",
+    "ContactAddressPermission", "ContactAddressUpdate", "ContactDecision",
     "ContactCommunicationPolicy", "ContactCommunicationPreview", "ContactCommunicationPolicyPage",
     "ContactVisibilityDecisions", "ContactIdentityVisibilityDecisions", "ContactVisibilityPolicy", "ContactVisibilityResult",
     "ContactPermissionSummary", "ContactPermissionVisibility", "ContactPermissionEffective", "ContactPermissionEntry", "ContactPermissionPage", "IdentifierPermission",
     "CallCorrespondenceItem",
     "Contact",
     "ContactCreatePermissions",
-    "ContactInitialAddressPermission",
     "ContactAccess",
     "ContactBulkDeleteResult",
     "ContactBulkDeleteResultItem",

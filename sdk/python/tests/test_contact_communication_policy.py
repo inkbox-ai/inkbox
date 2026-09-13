@@ -7,7 +7,7 @@ from uuid import UUID
 
 import httpx
 
-from inkbox import (ContactChannelDecisions, ContactIdentityDecisions, ContactVisibilityDecisions,
+from inkbox import (ContactAddressUpdate, ContactVisibilityDecisions,
                     ContactVisibilityPolicy, ContactIdentityVisibilityDecisions)
 from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox import ContactReviewStatus
@@ -29,15 +29,19 @@ def test_shared_wire_fixture_through_http_transport() -> None:
             assert request.url.params["identity_id"] == str(IDENTITY_ID)
             return httpx.Response(200, json=fixture["preview"])
         assert request.url.path == f"/api/v1/contacts/{CONTACT_ID}/communication-policy"
+        if request.method == "GET":
+            assert request.url.params["identity_id"] == str(IDENTITY_ID)
         return httpx.Response(200, json=fixture["policy"])
 
     with patch("inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(respond)):
         http = HttpTransport("test-key", "https://example.com/api/v1")
     try:
         resource = ContactsResource(http).communication_policy
-        policy = resource.get(CONTACT_ID)
-        saved = resource.replace(CONTACT_ID, expected_revision=7, defaults=policy.defaults,
-                                 identities=policy.identities, visibility=policy.visibility)
+        policy = resource.get(CONTACT_ID, IDENTITY_ID)
+        assert not policy.addresses[0].allowed and not policy.effective_visibility.profile
+        saved = resource.replace(CONTACT_ID, expected_revision=7, identity_id=IDENTITY_ID,
+                                 addresses=[ContactAddressUpdate(**row) for row in fixture["update"]["addresses"]],
+                                 visibility=policy.visibility)
         assert saved == policy
         preview = resource.preview(CONTACT_ID, IDENTITY_ID)
         assert preview.contact is None and not preview.visibility.profile
@@ -52,8 +56,7 @@ def test_management_roster_uses_distinct_contract_and_filters() -> None:
         "contact": {"id": str(CONTACT_ID), "preferred_name": "Person", "given_name": None, "family_name": None,
                     "company_name": None, "review_status": "confirmed", "emails": [],
                     "phones": [{"value_e164": "+15555550123", "label": "Work", "is_primary": True}]},
-        "revision": 8, "defaults": {"email": "inherit", "phone": "inherit"},
-        "identity_override": {"email": "block", "phone": "allow"},
+        "revision": 8,
         "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"},
                        "identity_override": {"profile": "allow", "memories": "block"}},
         "effective": {"email": "no_identifiers", "phone": "some", "profile": True, "memories": False},
@@ -73,21 +76,21 @@ def test_replace_serializes_uuid_overrides_and_revision() -> None:
     http = MagicMock()
     http.put.return_value = {
         "contact_id": str(CONTACT_ID), "revision": 4,
-        "defaults": {"email": "block", "phone": "block"},
-        "identities": [{"identity_id": str(IDENTITY_ID), "email": "allow", "phone": "block"}],
+        "identity_id": str(IDENTITY_ID), "addresses": [], "effective_visibility": {"profile": False, "memories": False},
         "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"}, "identities": []},
     }
     result = ContactsResource(http).communication_policy.replace(
         CONTACT_ID, expected_revision=3,
-        defaults=ContactChannelDecisions(email="block", phone="block"),
-        identities=[ContactIdentityDecisions(identity_id=IDENTITY_ID, email="allow", phone="block")],
+        identity_id=IDENTITY_ID,
+        addresses=[ContactAddressUpdate("phone", "+15555550123", "allow", "block")],
     )
     payload = http.put.call_args.kwargs["json"]
-    assert json.loads(json.dumps(payload))["identities"][0]["identity_id"] == str(IDENTITY_ID)
+    assert json.loads(json.dumps(payload))["identity_id"] == str(IDENTITY_ID)
+    assert payload["addresses"] == [{"kind": "phone", "value": "+15555550123", "action": "allow", "expected_action": "block"}]
     assert payload["expected_revision"] == 3
     assert result.contact_id == CONTACT_ID
     assert result.revision == 4
-    assert result.identities[0].identity_id == IDENTITY_ID
+    assert result.identity_id == IDENTITY_ID
 
 
 def test_preview_and_page_handle_hidden_contacts() -> None:
@@ -105,23 +108,24 @@ def test_preview_and_page_handle_hidden_contacts() -> None:
     http.get.assert_called_with("/identities/test-agent/contact-communication-policies", params={"limit": 1, "offset": 2})
 
 
-def test_visibility_round_trip_preserves_legacy_defaults_and_omission() -> None:
+def test_visibility_round_trip_preserves_omission() -> None:
     http = MagicMock()
     visibility = ContactVisibilityPolicy(
         defaults=ContactVisibilityDecisions("block", "block"),
         identities=[ContactIdentityVisibilityDecisions(IDENTITY_ID, "allow", "block")],
     )
     http.put.return_value = {"contact_id": str(CONTACT_ID), "revision": 8,
-                             "defaults": {"email": "allow", "phone": "allow"}, "identities": [],
+                             "identity_id": None, "addresses": [], "effective_visibility": None,
                              "visibility": visibility._to_wire()}
     resource = ContactsResource(http).communication_policy
-    saved = resource.replace(CONTACT_ID, expected_revision=7, defaults=ContactChannelDecisions("allow", "allow"),
-                             identities=[], visibility=visibility)
+    saved = resource.replace(CONTACT_ID, expected_revision=7, identity_id=IDENTITY_ID,
+                             addresses=[], visibility=visibility)
     payload = http.put.call_args.kwargs["json"]
     assert json.loads(json.dumps(payload))["visibility"]["identities"][0]["identity_id"] == str(IDENTITY_ID)
-    assert ContactChannelDecisions(**payload["defaults"]).email == "allow"
+    assert "defaults" not in payload
+    assert saved.identity_id is None and saved.effective_visibility is None
     assert saved.visibility == visibility
-    resource.replace(CONTACT_ID, expected_revision=8, defaults=ContactChannelDecisions(), identities=[])
+    resource.replace(CONTACT_ID, expected_revision=8, identity_id=IDENTITY_ID, addresses=[])
     assert "visibility" not in http.put.call_args.kwargs["json"]
 
 

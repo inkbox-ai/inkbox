@@ -80,15 +80,15 @@ describe("ContactsResource", () => {
     vi.mocked(fetch).mockResolvedValue(makeOkResponse(CONTACT_DICT));
     const resource = new ContactsResource(new HttpTransport("k", BASE));
     await resource.create({ givenName: "Alex", emails: [{ value: "alex@example.com" }], permissions: {
-      identityId: "11111111-1111-4111-8111-111111111111", profile: "block",
-      addresses: [{ kind: "email", value: "alex@example.com", action: "allow" }],
+      identityId: "11111111-1111-4111-8111-111111111111", profile: false,
+      emails: { "alex@example.com": true },
     } });
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, options] = vi.mocked(fetch).mock.calls[0];
     expect(url).toBe(`${BASE}/contacts/with-permissions`);
     expect(JSON.parse(String(options?.body)).permissions).toEqual({
-      identity_id: "11111111-1111-4111-8111-111111111111", profile: "block",
-      addresses: [{ kind: "email", value: "alex@example.com", action: "allow" }],
+      identity_id: "11111111-1111-4111-8111-111111111111", profile: false,
+      emails: { "alex@example.com": true },
     });
   });
 

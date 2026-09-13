@@ -991,7 +991,7 @@ Phone numbers carry the same `filterMode` / `agentIdentityId` / `filterModeChang
 
 ## Contact Rules
 
-All mutation examples in this section require an admin API key. There is one active whitelist or blacklist per email/phone group; contact entries and standalone addresses/numbers contribute to that list. Identity-level phone rules do not require a dedicated number. Releasing a number preserves permissions.
+All mutation examples in this section require an admin API key. Exact-address allow/block choices override the email or phone mode. Without an exact choice, matching email domain entries apply in their corresponding mode, then the mode's default applies. Identity-level phone rules do not require a dedicated number. Releasing a number preserves permissions.
 
 Allow/block lists are scoped to the **agent identity** (mirroring iMessage), addressed by `agentHandle`. The identity's `mailFilterMode` / `phoneFilterMode` decides whether each channel's rules act as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number. Returned rows are `MailIdentityContactRule` / `PhoneIdentityContactRule`, keyed by `rule.agentIdentityId` (not a mailbox/phone-number id).
 
@@ -1092,13 +1092,15 @@ await inkbox.phoneContactRules.create(num.id, {
 
 ## Contacts
 
-Shared address book with four permission groups: Email, Phone, Profile, and Memories. Inherited Profile and Memories are available when every stored identifier is permitted, including standalone whitelist matches. Contacts without identifiers retain their channel-default behavior. Explicit visibility settings take precedence. Existing-contact identifier changes and suggestion absorption require admin credentials. Hosted voice in YOLO mode can read all organization contacts and memories; ordinary SDK calls remain scoped.
+Shared address book with per-email, per-phone, Profile, and Memories permissions. Phone covers SMS, calls, and iMessage. Profile and Memories do not grant communication access. Existing-contact identifier changes and suggestion absorption require admin credentials.
 
-Use `inkbox.contacts.communicationPolicy.get(contactId)` and `.replace(contactId, { expectedRevision, defaults, identities })` with admin credentials. Defaults contain `email` and `phone` entries; identity overrides also contain `identityId`. `.preview(contactId, identityId)` returns the saved identity view; `.listForIdentity(handle)` returns a page with `items` and `hasMore`. Agent keys can list only their own view.
+Use `inkbox.contacts.permissions.get(handle, contactId)` with admin credentials to read effective `emails` and `phones` boolean maps plus `profile` and `memories` booleans. Call `.update(handle, contactId, { emails: { "ada@example.com": true }, profile: true, memories: false })` to save explicit choices. Omitted fields and addresses stay unchanged; no revision is required.
 
-With admin credentials, `.listManagementForIdentity(handle, { q: "Jane", order: "name", limit: 20 })` includes hidden contacts and returns compact contact summaries, defaults, `identityOverride`, and effective access. Email/Phone results are `all`, `some`, `none`, or `no_identifiers`; Profile/Memories are booleans. Fetch the full policy before editing to preserve other identities. Identity-owned communication rules have optional nullable `rule.contact` cards, filtered for the caller and without memories.
+For atomic creation, pass `permissions: { identityId, emails: { "ada@example.com": true }, profile: true, memories: false }` to `inkbox.contacts.create`, along with the matching contact email. All initial choices are saved with the contact.
 
-Add `visibility: { defaults: { profile: "allow", memories: "block" }, identities: [] }` to share profile fields without memories. Visibility overrides use `{ identityId, profile, memories }`. Omitting visibility preserves that entire portion; reset both portions explicitly to clear everything. Use `preview.visibility?.profile` and `preview.visibility?.memories`; summaries live on `preview.contact?.memoryCount` and `preview.contact?.latestMemory`. Missing visibility means independent controls are not reported. Explicit profile/memory grants authorize stored free text, which can mention contact identifiers.
+Advanced policies remain under `inkbox.contacts.communicationPolicy`: `.get(contactId, identityId)` returns `addresses`, `effectiveVisibility`, `visibility`, and `revision`. `.replace(contactId, { expectedRevision, identityId, addresses: [{ kind: "email", value: "ada@example.com", action: "allow", expectedAction: "inherit" }] })` makes guarded edits; omitted `visibility` is preserved. `.preview(contactId, identityId)` and `.listForIdentity(handle)` return filtered saved views. Agent keys can list only their own view.
+
+With admin credentials, `.listManagementForIdentity(handle, { q: "Jane", order: "name", limit: 20 })` includes hidden contacts and returns compact contact summaries, visibility settings, and effective access. Email/Phone results are `all`, `some`, `none`, or `no_identifiers`; Profile/Memories are booleans. Identity-owned communication rules have optional nullable `rule.contact` cards, filtered for the caller and without memories.
 
 Merging requires an admin-scoped API key. Active memories have per-kind and
 contact-wide limits. Delete a fact from each kind named by a merge error, or any

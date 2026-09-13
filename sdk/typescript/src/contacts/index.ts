@@ -2,6 +2,7 @@ export * from "./types.js";
 export * from "./facts.js";
 export * from "./correspondence.js";
 export * from "./resources/communicationPolicy.js";
+export * from "./resources/permissions.js";
 export type {
   CreateContactOptions,
   ContactCreatePermissions,

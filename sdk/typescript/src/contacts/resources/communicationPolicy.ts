@@ -1,11 +1,21 @@
 import { HttpTransport } from "../../_http.js";
 import { type Contact, type RawContact, type ContactReviewStatus, parseContact, parseContactEmail, parseContactPhone } from "../types.js";
 
-/** An entry contributes to the identity's active whitelist or blacklist. */
+/** An explicit exact-address choice overrides the agent's channel mode. */
 export type ContactDecision = "inherit" | "allow" | "block";
-/** Phone includes SMS, calls, and iMessage. */
-export interface ContactChannelDecisions { email: ContactDecision; phone: ContactDecision }
-export interface ContactIdentityDecisions extends ContactChannelDecisions { identityId: string }
+export interface ContactAddressPermission {
+  kind: "email" | "phone";
+  value: string;
+  label: string | null;
+  action: ContactDecision;
+  allowed: boolean;
+}
+export interface ContactAddressUpdate {
+  kind: "email" | "phone";
+  value: string;
+  action: ContactDecision;
+  expectedAction: ContactDecision;
+}
 /** Independent profile and memory visibility decisions. */
 export interface ContactVisibilityDecisions { profile: ContactDecision; memories: ContactDecision }
 /** One identity's visibility overrides. */
@@ -20,14 +30,15 @@ export interface ContactVisibilityResult { profile: boolean; memories: boolean }
 export interface ContactCommunicationPolicy {
   contactId: string;
   revision: number;
-  defaults: ContactChannelDecisions;
-  identities: ContactIdentityDecisions[];
+  identityId: string | null;
+  addresses: ContactAddressPermission[];
+  effectiveVisibility: ContactVisibilityResult | null;
   visibility: ContactVisibilityPolicy;
 }
 export interface ReplaceContactCommunicationPolicy {
   expectedRevision: number;
-  defaults: ContactChannelDecisions;
-  identities: ContactIdentityDecisions[];
+  identityId: string;
+  addresses: ContactAddressUpdate[];
   visibility?: ContactVisibilityPolicy;
 }
 export interface ContactCommunicationPreview {
@@ -57,8 +68,6 @@ export interface ContactPermissionEffective extends ContactVisibilityResult {
 export interface ContactPermissionEntry {
   contact: ContactPermissionSummary;
   revision: number;
-  defaults: ContactChannelDecisions;
-  identityOverride: ContactChannelDecisions;
   visibility: ContactPermissionVisibility;
   effective: ContactPermissionEffective;
 }
@@ -78,16 +87,15 @@ export interface ListContactPermissionsOptions {
 interface RawPermissionEntry {
   contact: Pick<RawContact, "id" | "preferred_name" | "given_name" | "family_name" | "company_name" | "emails" | "phones"> & { review_status: ContactReviewStatus };
   revision: number;
-  defaults: ContactChannelDecisions;
-  identity_override: ContactChannelDecisions;
   visibility: { defaults: ContactVisibilityDecisions; identity_override: ContactVisibilityDecisions };
   effective: ContactPermissionEffective;
 }
 interface RawPolicy {
   contact_id: string;
   revision: number;
-  defaults: ContactChannelDecisions;
-  identities: (ContactChannelDecisions & { identity_id: string })[];
+  identity_id: string | null;
+  addresses: ContactAddressPermission[];
+  effective_visibility: ContactVisibilityResult | null;
   visibility: { defaults: ContactVisibilityDecisions; identities: (ContactVisibilityDecisions & { identity_id: string })[] };
 }
 interface RawPreview {
@@ -100,8 +108,8 @@ interface RawPreview {
 }
 /** Parse both required policy portions. */
 function parsePolicy(raw: RawPolicy): ContactCommunicationPolicy {
-  return { contactId: raw.contact_id, revision: raw.revision, defaults: raw.defaults,
-    identities: raw.identities.map((row) => ({ identityId: row.identity_id, email: row.email, phone: row.phone })),
+  return { contactId: raw.contact_id, revision: raw.revision, identityId: raw.identity_id,
+    addresses: raw.addresses, effectiveVisibility: raw.effective_visibility,
     visibility: { defaults: raw.visibility.defaults,
       identities: raw.visibility.identities.map((row) => ({ identityId: row.identity_id, profile: row.profile, memories: row.memories })) } };
 }
@@ -117,16 +125,16 @@ export class ContactCommunicationPolicyResource {
   constructor(private readonly http: HttpTransport) {}
 
   /** Read the current policy and revision using admin credentials. */
-  async get(contactId: string): Promise<ContactCommunicationPolicy> {
-    return parsePolicy(await this.http.get<RawPolicy>(`/contacts/${encodeURIComponent(contactId)}/communication-policy`));
+  async get(contactId: string, identityId?: string): Promise<ContactCommunicationPolicy> {
+    return parsePolicy(await this.http.get<RawPolicy>(`/contacts/${encodeURIComponent(contactId)}/communication-policy`, { identity_id: identityId }));
   }
 
   /** Replace settings; omitted visibility is preserved and stale revisions return 409. */
   async replace(contactId: string, options: ReplaceContactCommunicationPolicy): Promise<ContactCommunicationPolicy> {
     if (options.visibility === null) throw new TypeError("visibility cannot be null; omit it to preserve existing settings");
     return parsePolicy(await this.http.put<RawPolicy>(`/contacts/${encodeURIComponent(contactId)}/communication-policy`, {
-      expected_revision: options.expectedRevision, defaults: options.defaults,
-      identities: options.identities.map((row) => ({ identity_id: row.identityId, email: row.email, phone: row.phone })),
+      expected_revision: options.expectedRevision, identity_id: options.identityId,
+      addresses: options.addresses.map((row) => ({ kind: row.kind, value: row.value, action: row.action, expected_action: row.expectedAction })),
       ...(options.visibility !== undefined ? { visibility: {
         defaults: options.visibility.defaults,
         identities: options.visibility.identities.map((row) => ({ identity_id: row.identityId, profile: row.profile, memories: row.memories })),
@@ -158,7 +166,7 @@ export class ContactCommunicationPolicyResource {
       contact: { id: row.contact.id, preferredName: row.contact.preferred_name,
         givenName: row.contact.given_name, familyName: row.contact.family_name, companyName: row.contact.company_name,
         reviewStatus: row.contact.review_status, emails: (row.contact.emails ?? []).map(parseContactEmail), phones: (row.contact.phones ?? []).map(parseContactPhone) },
-      revision: row.revision, defaults: row.defaults, identityOverride: row.identity_override,
+      revision: row.revision,
       visibility: { defaults: row.visibility.defaults, identityOverride: row.visibility.identity_override },
       effective: row.effective,
     })) };

@@ -11,6 +11,7 @@ use crate::contacts::resources::communication_policy::ContactCommunicationPolicy
 use crate::contacts::resources::contact_access::ContactAccessResource;
 use crate::contacts::resources::contact_facts::ContactFactsResource;
 use crate::contacts::resources::correspondence::ContactCorrespondenceResource;
+use crate::contacts::resources::permissions::ContactPermissionsResource;
 use crate::contacts::resources::vcards::VCardsResource;
 use crate::contacts::types::{
     Contact, ContactAddress, ContactBulkDeleteResult, ContactCreatePermissions, ContactCustomField,
@@ -101,12 +102,18 @@ pub struct ContactsResource {
     http: Arc<HttpTransport>,
     access: ContactAccessResource,
     communication_policy: ContactCommunicationPolicyResource,
+    permissions: ContactPermissionsResource,
     facts: ContactFactsResource,
     correspondence: ContactCorrespondenceResource,
     vcards: VCardsResource,
 }
 
 impl ContactsResource {
+    /// Effective yes/no access for a selected agent and contact.
+    pub fn permissions(&self) -> &ContactPermissionsResource {
+        &self.permissions
+    }
+
     /// Contact communication entries and identity previews.
     pub fn communication_policy(&self) -> &ContactCommunicationPolicyResource {
         &self.communication_policy
@@ -116,6 +123,7 @@ impl ContactsResource {
         Self {
             access: ContactAccessResource::new(http.clone()),
             communication_policy: ContactCommunicationPolicyResource::new(http.clone()),
+            permissions: ContactPermissionsResource::new(http.clone()),
             facts: ContactFactsResource::new(http.clone()),
             correspondence: ContactCorrespondenceResource::new(http.clone()),
             vcards: VCardsResource::new(http.clone()),
@@ -524,8 +532,7 @@ mod tests {
 
     #[test]
     fn creates_contact_with_initial_permissions_atomically() {
-        use crate::contacts::resources::communication_policy::ContactDecision;
-        use crate::contacts::types::{ContactCreatePermissions, ContactInitialAddressPermission};
+        use crate::contacts::ContactCreatePermissions;
         use uuid::Uuid;
 
         let server = MockServer::start();
@@ -537,8 +544,8 @@ mod tests {
                     "emails": [{"value": "ada@example.com"}],
                     "permissions": {
                         "identity_id": CONTACT_ID,
-                        "profile": "block",
-                        "addresses": [{"kind": "email", "value": "ada@example.com", "action": "allow"}]
+                        "profile": false,
+                        "emails": {"ada@example.com": true}
                     }
                 }));
             then.status(201).json_body(contact());
@@ -554,12 +561,9 @@ mod tests {
                 }]),
                 permissions: Some(ContactCreatePermissions {
                     identity_id: Uuid::parse_str(CONTACT_ID).unwrap(),
-                    addresses: vec![ContactInitialAddressPermission {
-                        kind: "email".into(),
-                        value: "ada@example.com".into(),
-                        action: ContactDecision::Allow,
-                    }],
-                    profile: Some(ContactDecision::Block),
+                    emails: Some(HashMap::from([("ada@example.com".into(), true)])),
+                    phones: None,
+                    profile: Some(false),
                     memories: None,
                 }),
                 ..Default::default()
