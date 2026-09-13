@@ -18,6 +18,12 @@ This skill is just a directory of the other Inkbox skills in this repository. Us
 
 ## Core Skills
 
+Communication rules are human-controlled: agent keys can inspect permitted contact data but cannot change their own rules. Exact-address choices override the email or phone mode; phone includes SMS, calls, and iMessage. The SDK/CLI skills cover boolean contact permissions, advanced policies, and filtered previews.
+
+Contact Profile and Memories permissions are independent of each other. Hosted voice in YOLO mode retains organization-wide contact and memory reads; ordinary SDK, CLI, MCP, and webhook access remains scoped.
+
+The Agent workspace's Contacts page manages each saved email and phone number plus Profile and Memories access, including hidden contacts. Administrative SDK/CLI permission rosters distinguish partial access from absent identifiers. Identity-owned communication rules include nullable caller-authorized contact cards without memories; a missing card does not change the rule's effect.
+
 - `inkbox-onboarding`
   GitHub: https://github.com/inkbox-ai/inkbox/blob/main/skills/inkbox-onboarding/SKILL.md
   Language-agnostic setup flow for an existing identity, including channel readiness, recipient consent, inbound handling, recurring triage, and API/CLI/SDK examples.

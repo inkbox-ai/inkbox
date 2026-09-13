@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { Command, Option } from "commander";
 import type { AgentIdentity } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
-import { output } from "../output.js";
+import { output, outputContactRules } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 
 export const IMESSAGE_SENDABLE_REACTIONS = [
@@ -72,6 +72,7 @@ const CONTACT_RULE_COLUMNS = [
   "action",
   "matchType",
   "matchTarget",
+  "contact",
   "status",
   "createdAt",
 ];
@@ -138,7 +139,7 @@ function registerContactRuleCommands(parent: Command): void {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
-        output(rules, { json: !!opts.json, columns: CONTACT_RULE_COLUMNS });
+        outputContactRules(rules, { json: !!opts.json, columns: CONTACT_RULE_COLUMNS });
       }),
     );
 
@@ -233,7 +234,7 @@ function registerContactRuleCommands(parent: Command): void {
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
         });
-        output(rules, { json: !!opts.json, columns: CONTACT_RULE_COLUMNS });
+        outputContactRules(rules, { json: !!opts.json, columns: CONTACT_RULE_COLUMNS });
       }),
     );
 }

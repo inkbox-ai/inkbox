@@ -58,7 +58,7 @@ export interface VaultKey {
   id: string;
   /** `"primary"` or `"recovery"` */
   keyType: string;
-  /** Clerk user ID of the creator, or `null`. */
+  /** User ID of the creator, or `null`. */
   createdBy: string | null;
   createdAt: Date;
   updatedAt: Date;

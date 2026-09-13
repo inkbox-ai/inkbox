@@ -251,14 +251,14 @@ describe("KeyPairPayload roundtrip with all optional fields", () => {
     const original: KeyPairPayload = {
       accessKey: "AKIAIOSFODNN7EXAMPLE",
       secretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-      endpoint: "https://s3.amazonaws.com",
+      endpoint: "https://storage.example.com",
       notes: "cloud service",
     };
     const serialized = serializePayload("key_pair", original);
     expect(serialized).toEqual({
       access_key: "AKIAIOSFODNN7EXAMPLE",
       secret_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-      endpoint: "https://s3.amazonaws.com",
+      endpoint: "https://storage.example.com",
       notes: "cloud service",
     });
     const parsed = parsePayload("key_pair", serialized) as KeyPairPayload;

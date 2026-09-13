@@ -7,13 +7,15 @@ use std::sync::Arc;
 
 use serde_json::{Map, Value};
 
+use crate::contacts::resources::communication_policy::ContactCommunicationPolicyResource;
 use crate::contacts::resources::contact_access::ContactAccessResource;
 use crate::contacts::resources::contact_facts::ContactFactsResource;
 use crate::contacts::resources::correspondence::ContactCorrespondenceResource;
+use crate::contacts::resources::permissions::ContactPermissionsResource;
 use crate::contacts::resources::vcards::VCardsResource;
 use crate::contacts::types::{
-    Contact, ContactAddress, ContactBulkDeleteResult, ContactCustomField, ContactDate,
-    ContactEmail, ContactPhone, ContactReviewStatus, ContactWebsite,
+    Contact, ContactAddress, ContactBulkDeleteResult, ContactCreatePermissions, ContactCustomField,
+    ContactDate, ContactEmail, ContactPhone, ContactReviewStatus, ContactWebsite,
 };
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
@@ -58,6 +60,7 @@ pub struct CreateContactParams {
     pub dates: Option<Vec<ContactDate>>,
     pub addresses: Option<Vec<ContactAddress>>,
     pub custom_fields: Option<Vec<ContactCustomField>>,
+    pub permissions: Option<ContactCreatePermissions>,
 }
 
 /// Fields for [`ContactsResource::update`] (JSON-merge-patch).
@@ -94,19 +97,33 @@ pub struct MergeContactsParams {
     pub field_sources: HashMap<String, String>,
 }
 
-/// Organization-wide contacts and contact memory.
+/// Shared contacts and memory with permission-filtered identity views.
 pub struct ContactsResource {
     http: Arc<HttpTransport>,
     access: ContactAccessResource,
+    communication_policy: ContactCommunicationPolicyResource,
+    permissions: ContactPermissionsResource,
     facts: ContactFactsResource,
     correspondence: ContactCorrespondenceResource,
     vcards: VCardsResource,
 }
 
 impl ContactsResource {
+    /// Effective yes/no access for a selected agent and contact.
+    pub fn permissions(&self) -> &ContactPermissionsResource {
+        &self.permissions
+    }
+
+    /// Contact communication entries and identity previews.
+    pub fn communication_policy(&self) -> &ContactCommunicationPolicyResource {
+        &self.communication_policy
+    }
+
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self {
             access: ContactAccessResource::new(http.clone()),
+            communication_policy: ContactCommunicationPolicyResource::new(http.clone()),
+            permissions: ContactPermissionsResource::new(http.clone()),
             facts: ContactFactsResource::new(http.clone()),
             correspondence: ContactCorrespondenceResource::new(http.clone()),
             vcards: VCardsResource::new(http.clone()),
@@ -244,7 +261,15 @@ impl ContactsResource {
                 wire_list(custom_fields, ContactCustomField::to_wire),
             );
         }
-        let data = self.http.post(BASE, Some(&Value::Object(body)), NO_QUERY)?;
+        if let Some(permissions) = &params.permissions {
+            body.insert("permissions".into(), serde_json::to_value(permissions)?);
+        }
+        let path = if params.permissions.is_some() {
+            "/contacts/with-permissions"
+        } else {
+            BASE
+        };
+        let data = self.http.post(path, Some(&Value::Object(body)), NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
     }
 
@@ -502,6 +527,48 @@ mod tests {
             })
             .unwrap();
 
+        request.assert();
+    }
+
+    #[test]
+    fn creates_contact_with_initial_permissions_atomically() {
+        use crate::contacts::ContactCreatePermissions;
+        use uuid::Uuid;
+
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/contacts/with-permissions")
+                .json_body(json!({
+                    "preferred_name": "Ada",
+                    "emails": [{"value": "ada@example.com"}],
+                    "permissions": {
+                        "identity_id": CONTACT_ID,
+                        "profile": false,
+                        "emails": {"ada@example.com": true}
+                    }
+                }));
+            then.status(201).json_body(contact());
+        });
+        client(&server)
+            .contacts()
+            .create(&CreateContactParams {
+                preferred_name: Some("Ada".into()),
+                emails: Some(vec![crate::contacts::types::ContactEmail {
+                    value: "ada@example.com".into(),
+                    label: None,
+                    is_primary: false,
+                }]),
+                permissions: Some(ContactCreatePermissions {
+                    identity_id: Uuid::parse_str(CONTACT_ID).unwrap(),
+                    emails: Some(HashMap::from([("ada@example.com".into(), true)])),
+                    phones: None,
+                    profile: Some(false),
+                    memories: None,
+                }),
+                ..Default::default()
+            })
+            .unwrap();
         request.assert();
     }
 

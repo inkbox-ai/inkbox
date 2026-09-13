@@ -1467,8 +1467,7 @@ impl AgentIdentity {
 
     /// List this identity's phone allow/block rules, newest first.
     ///
-    /// Returns `[]` for a phoneless identity; the server requires a phone only
-    /// for create/get/update/delete, not for list.
+    /// Rules also apply to iMessage and do not require a dedicated phone number.
     pub fn list_phone_contact_rules(
         &self,
         action: Option<PhoneRuleAction>,
@@ -1486,25 +1485,20 @@ impl AgentIdentity {
     }
 
     /// Get one of this identity's phone contact rules by id.
-    ///
-    /// Errors if this identity has no phone number.
     pub fn get_phone_contact_rule(&self, rule_id: &str) -> Result<PhoneIdentityContactRule> {
-        self.require_phone()?;
         self.inkbox
             .phone_identity_contact_rules()
             .get(&self.agent_handle(), rule_id)
     }
 
     /// Create a phone allow/block rule for this identity.
-    ///
-    /// Errors if this identity has no phone number.
+    /// Requires admin credentials; channel provisioning is not required.
     pub fn create_phone_contact_rule(
         &self,
         action: PhoneRuleAction,
         match_target: &str,
         match_type: PhoneRuleMatchType,
     ) -> Result<PhoneIdentityContactRule> {
-        self.require_phone()?;
         self.inkbox.phone_identity_contact_rules().create(
             &self.agent_handle(),
             action,
@@ -1513,27 +1507,34 @@ impl AgentIdentity {
         )
     }
 
-    /// Update a phone rule's `action` (admin-only). Errors if this identity has
-    /// no phone number.
+    /// Update a phone rule's `action` (admin-only).
     pub fn update_phone_contact_rule(
         &self,
         rule_id: &str,
         action: PhoneRuleAction,
     ) -> Result<PhoneIdentityContactRule> {
-        self.require_phone()?;
         self.inkbox
             .phone_identity_contact_rules()
             .update(&self.agent_handle(), rule_id, action)
     }
 
     /// Delete one of this identity's phone contact rules (admin-only).
-    ///
-    /// Errors if this identity has no phone number.
     pub fn delete_phone_contact_rule(&self, rule_id: &str) -> Result<()> {
-        self.require_phone()?;
         self.inkbox
             .phone_identity_contact_rules()
             .delete(&self.agent_handle(), rule_id)
+    }
+
+    /// List this identity's permission-filtered contact views.
+    pub fn list_contact_communication_policies(
+        &self,
+        limit: u64,
+        offset: u64,
+    ) -> Result<crate::contacts::ContactCommunicationPolicyPage> {
+        self.inkbox
+            .contacts()
+            .communication_policy()
+            .list_for_identity(&self.agent_handle(), limit, offset)
     }
 
     // -----------------------------------------------------------------------
@@ -1936,7 +1937,7 @@ mod tests {
     }
 
     #[test]
-    fn phone_rule_cgud_still_requires_phone_number() {
+    fn phone_rule_mutations_delegate_without_a_phone_number() {
         let identity = phoneless_identity();
         let results = [
             identity.get_phone_contact_rule("rid").err(),
@@ -1953,12 +1954,8 @@ mod tests {
             identity.delete_phone_contact_rule("rid").err(),
         ];
         for res in results {
-            match res {
-                Some(InkboxError::InvalidArgument(m)) => {
-                    assert!(m.contains("no phone number"), "unexpected message: {m}");
-                }
-                other => panic!("expected phone-required error, got {other:?}"),
-            }
+            assert!(res.is_some(), "the test transport has no listening server");
+            assert!(!matches!(res, Some(InkboxError::InvalidArgument(_))));
         }
     }
 

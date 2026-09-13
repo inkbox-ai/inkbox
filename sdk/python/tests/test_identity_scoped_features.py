@@ -12,13 +12,10 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock
 from uuid import UUID
 
-import pytest
-
 from sample_data_identities import IDENTITY_DETAIL_DICT
 
 from inkbox.agent_identity import AgentIdentity
 from inkbox.identities.types import _AgentIdentityData
-from inkbox.mail.exceptions import InkboxError
 from inkbox.mail.resources.identity_contact_rules import (
     MailIdentityContactRulesResource,
 )
@@ -322,21 +319,21 @@ class TestAgentIdentityContactRuleDelegation:
     def test_list_phone_contact_rules_without_phone_returns_empty(self):
         identity, inkbox = _identity_without_phone()
         inkbox._phone_identity_contact_rules.list.return_value = []
-        # List must not prethrow on a phoneless identity: the server requires a
-        # phone only for create/get/update/delete, not for list.
         assert identity.list_phone_contact_rules() == []
         inkbox._phone_identity_contact_rules.list.assert_called_once()
 
-    def test_phone_rule_cgud_requires_phone_number(self):
-        identity, _ = _identity_without_phone()
-        with pytest.raises(InkboxError, match="no phone number"):
-            identity.get_phone_contact_rule("rid")
-        with pytest.raises(InkboxError, match="no phone number"):
-            identity.create_phone_contact_rule(action="block", match_target="+14155550199")
-        with pytest.raises(InkboxError, match="no phone number"):
-            identity.update_phone_contact_rule("rid", action="block")
-        with pytest.raises(InkboxError, match="no phone number"):
-            identity.delete_phone_contact_rule("rid")
+    def test_phone_rule_methods_delegate_without_phone_provisioning(self):
+        identity, inkbox = _identity_without_phone()
+        identity.get_phone_contact_rule("rid")
+        identity.create_phone_contact_rule(action="block", match_target="+14155550199")
+        identity.update_phone_contact_rule("rid", action="block")
+        identity.delete_phone_contact_rule("rid")
+        inkbox._phone_identity_contact_rules.get.assert_called_once_with(identity.agent_handle, "rid")
+        inkbox._phone_identity_contact_rules.create.assert_called_once_with(
+            identity.agent_handle, action="block", match_target="+14155550199", match_type="exact_number",
+        )
+        inkbox._phone_identity_contact_rules.update.assert_called_once_with(identity.agent_handle, "rid", action="block")
+        inkbox._phone_identity_contact_rules.delete.assert_called_once_with(identity.agent_handle, "rid")
 
     def test_create_phone_contact_rule_delegates(self):
         identity, inkbox = _identity()

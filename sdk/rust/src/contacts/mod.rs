@@ -12,6 +12,7 @@ pub use correspondence::{
     CorrespondenceTranscriptMarker, CorrespondenceTranscriptMode, EmailCorrespondenceItem,
     IMessageCorrespondenceItem, SmsCorrespondenceItem,
 };
+pub use resources::communication_policy::*;
 pub use resources::contact_access::ContactAccessResource;
 pub use resources::contact_facts::ContactFactsResource;
 pub use resources::contacts::{
@@ -19,12 +20,13 @@ pub use resources::contacts::{
     UpdateContactParams,
 };
 pub use resources::correspondence::{ContactCorrespondenceResource, CorrespondenceQuery};
+pub use resources::permissions::*;
 pub use resources::vcards::VCardsResource;
 pub use types::{
     Contact, ContactAccess, ContactAddress, ContactBulkDeleteResult, ContactBulkDeleteResultItem,
-    ContactBulkDeleteStatus, ContactCreationSource, ContactCustomField, ContactDate, ContactEmail,
-    ContactFact, ContactFactCitation, ContactFactCitationAvailability, ContactFactCitationDetail,
-    ContactFactDeleteResult, ContactFactKind, ContactFactOrigin, ContactImportResult,
-    ContactImportResultItem, ContactImportStatus, ContactMemorySummary, ContactNameSource,
-    ContactPhone, ContactReviewStatus, ContactVCardExportResult, ContactWebsite,
+    ContactBulkDeleteStatus, ContactCreatePermissions, ContactCreationSource, ContactCustomField,
+    ContactDate, ContactEmail, ContactFact, ContactFactCitation, ContactFactCitationAvailability,
+    ContactFactCitationDetail, ContactFactDeleteResult, ContactFactKind, ContactFactOrigin,
+    ContactImportResult, ContactImportResultItem, ContactImportStatus, ContactMemorySummary,
+    ContactNameSource, ContactPhone, ContactReviewStatus, ContactVCardExportResult, ContactWebsite,
 };

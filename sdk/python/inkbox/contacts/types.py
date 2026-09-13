@@ -49,6 +49,25 @@ class ContactNameSource(StrEnum):
 
 
 @dataclass
+class ContactCreatePermissions:
+    """Selected-agent permissions committed with contact creation."""
+
+    identity_id: UUID | str
+    emails: dict[str, bool] | None = None
+    phones: dict[str, bool] | None = None
+    profile: bool | None = None
+    memories: bool | None = None
+
+    def to_wire(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"identity_id": str(self.identity_id)}
+        for key in ("emails", "phones", "profile", "memories"):
+            value = getattr(self, key)
+            if value is not None:
+                result[key] = value
+        return result
+
+
+@dataclass
 class ContactEmail:
     """An email address on a contact card."""
 
@@ -763,6 +782,7 @@ class ContactBulkDeleteResultItem:
     contact_id: UUID
     status: ContactBulkDeleteStatus
     error: str | None = None
+    error_code: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> ContactBulkDeleteResultItem:
@@ -770,6 +790,7 @@ class ContactBulkDeleteResultItem:
             contact_id=UUID(d["contact_id"]),
             status=ContactBulkDeleteStatus(d["status"]),
             error=d.get("error"),
+            error_code=d.get("error_code"),
         )
 
 

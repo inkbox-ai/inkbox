@@ -126,7 +126,7 @@ inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
 inkbox identity refresh <handle>
 ```
 
-`--mail-filter-mode` / `--phone-filter-mode` set the identity's contact-rule mode (admin-only). Unlike the deprecated `mailbox update --filter-mode` / `number update --filter-mode`, the identity path does **not** print a change notice. `--phone-filter-mode` requires the identity to have a phone number (else a 422).
+`--mail-filter-mode` / `--phone-filter-mode` set the identity's contact-rule mode (admin-only). Unlike the deprecated `mailbox update --filter-mode` / `number update --filter-mode`, the identity path does **not** print a change notice. Phone mode also governs iMessage and can be configured without a dedicated phone number.
 
 `identity create` atomically provisions the mailbox AND the tunnel. The JSON output includes both (`mailbox`, `tunnel.publicHost`, `tunnel.tlsMode`).
 
@@ -681,7 +681,17 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 ## Contacts
 
-Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
+Shared address book with per-email, per-phone, Profile, and Memories permissions. Phone covers SMS, calls, and iMessage. Profile and Memories do not grant communication access. Existing-contact identifier changes and suggestion absorption require admin credentials.
+
+Use `contacts permissions get <handle> <contact-id>` with admin credentials to read effective `emails` and `phones` boolean maps plus `profile` and `memories` booleans. Save a JSON file such as `{"emails":{"ada@example.com":true},"profile":true,"memories":false}` with `contacts permissions set <handle> <contact-id> --file permissions.json`. Omitted fields and addresses stay unchanged; no revision is required.
+
+For atomic creation, `contacts create --json='{"givenName":"Ada","emails":[{"value":"ada@example.com"}],"permissions":{"identityId":"11111111-1111-4111-8111-111111111111","emails":{"ada@example.com":true},"profile":true,"memories":false}}'` saves initial choices with the contact using admin credentials.
+
+Advanced commands remain under `contacts communication-policy`. `get <contact-id> --identity-id <uuid>` reads selected-agent choices. `set <contact-id> --file policy.json` accepts `expectedRevision`, `identityId`, `addresses: [{kind, value, action, expectedAction}]`, and optional `visibility`. Address decisions are `inherit`, `allow`, or `block`. Omitted visibility is preserved. `preview <contact-id> <identity-id>` shows a saved view. `list <handle>` and `identity contact-policies <handle>` list the identity's permitted view.
+
+`contacts communication-policy list-management <handle> --q Jane --order name --limit 20 --json` requires admin credentials and includes hidden contacts. It reports partial identifier access separately from absent identifiers. Identity-owned mail/phone/iMessage rule tables show matching contact names; JSON preserves nullable caller-authorized cards without memories.
+
+Communication-rule mutations require admin credentials. Exact-address allow/block choices override the channel mode. Without an exact choice, matching email domain entries apply in their corresponding mode, then the mode's default applies. Phone permission setup does not require a dedicated number.
 
 Merging requires an admin-scoped API key. Active memories have per-kind and
 contact-wide limits. Delete a fact from each kind named by a merge error, or any

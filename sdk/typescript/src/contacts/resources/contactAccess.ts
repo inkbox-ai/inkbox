@@ -1,8 +1,7 @@
 /**
  * inkbox-contacts/resources/contactAccess.ts
  *
- * Deprecated read-only compatibility metadata that does not restrict
- * organization-wide contact visibility.
+ * Deprecated read-only metadata; communication policies control visibility.
  */
 
 import { HttpTransport } from "../../_http.js";
@@ -19,7 +18,7 @@ export class ContactAccessResource {
 
   /**
    * List deprecated read-only compatibility metadata for a contact.
-   * These records do not restrict organization-wide contact visibility.
+   * Communication policies, not these records, control contact visibility.
    */
   async list(contactId: string): Promise<ContactAccess[]> {
     const data = await this.http.get<

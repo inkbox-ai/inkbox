@@ -63,7 +63,7 @@ class TestMessagesGet:
 
         http.get.assert_called_once_with(f"/mailboxes/{MBOX}/messages/{MSG}")
         assert detail.body_text == "Hi there, this is a test message body."
-        assert detail.ses_message_id == "ses-abc123"
+        assert detail.ses_message_id == "message-abc123"
 
 
 class TestMessagesSend:

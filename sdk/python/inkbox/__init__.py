@@ -177,6 +177,13 @@ from inkbox.identities.types import (
 )
 
 # Contacts types
+from inkbox.contacts import (
+    ContactPermissions, ContactPermissionsResource,
+    ContactAddressPermission, ContactAddressUpdate, ContactDecision,
+    ContactCommunicationPolicy, ContactCommunicationPreview, ContactCommunicationPolicyPage,
+    ContactVisibilityDecisions, ContactIdentityVisibilityDecisions, ContactVisibilityPolicy, ContactVisibilityResult,
+    ContactPermissionSummary, ContactPermissionVisibility, ContactPermissionEffective, ContactPermissionEntry, ContactPermissionPage, IdentifierPermission,
+)
 from inkbox.contacts.types import (
     CallCorrespondenceItem,
     Contact,
@@ -190,6 +197,7 @@ from inkbox.contacts.types import (
     ContactEmail,
     ContactCorrespondence,
     ContactCreationSource,
+    ContactCreatePermissions,
     ContactFact,
     ContactFactCitation,
     ContactFactCitationAvailability,
@@ -563,6 +571,11 @@ __all__ = [
     # Contacts types
     "Contact",
     "ContactAccess",
+    "ContactPermissions", "ContactPermissionsResource",
+    "ContactAddressPermission", "ContactAddressUpdate", "ContactDecision",
+    "ContactCommunicationPolicy", "ContactCommunicationPreview", "ContactCommunicationPolicyPage",
+    "ContactVisibilityDecisions", "ContactIdentityVisibilityDecisions", "ContactVisibilityPolicy", "ContactVisibilityResult",
+    "ContactPermissionSummary", "ContactPermissionVisibility", "ContactPermissionEffective", "ContactPermissionEntry", "ContactPermissionPage", "IdentifierPermission",
     "ContactAddress",
     "ContactBulkDeleteResult",
     "ContactBulkDeleteResultItem",
@@ -573,6 +586,7 @@ __all__ = [
     "ContactCorrespondence",
     "ContactCorrespondenceOptions",
     "ContactCreationSource",
+    "ContactCreatePermissions",
     "ContactFact",
     "ContactFactCitation",
     "ContactFactCitationAvailability",

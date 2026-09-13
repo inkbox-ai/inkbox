@@ -42,7 +42,7 @@ Inkbox (admin-only client)
 ├── .mailContactRules         → MailContactRulesResource    (DEPRECATED — per-mailbox)
 ├── .phoneContactRules        → PhoneContactRulesResource   (DEPRECATED — per-number)
 ├── .smsOptIns                → SmsOptInsResource
-├── .contacts                 → ContactsResource   (.facts, .correspondence, .access, .vcards)
+├── .contacts                 → ContactsResource   (.communicationPolicy, .facts, .correspondence, .access, .vcards)
 ├── .notes                    → NotesResource      (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → Promise<WhoamiResponse>
@@ -54,8 +54,9 @@ AgentIdentity (identity-scoped helper)
 ├── .mailFilterMode / .phoneFilterMode → FilterMode
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── .listMailContactRules() / .createMailContactRule(...) / .get/.update/.delete
-├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (requires phone number)
+├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (writes require admin credentials)
 ├── .getSigningKeyStatus() / .createSigningKey()
+├── .listContactCommunicationPolicies() → Promise<ContactCommunicationPolicyPage>
 ├── mail methods            (requires assigned mailbox)
 ├── phone methods           (requires assigned phone number)
 └── text methods            (requires assigned phone number)
@@ -570,7 +571,9 @@ const upload = await identity.uploadIMessageMedia({
 await identity.sendIMessage({ to: "+15551234567", mediaUrls: [upload.mediaUrl] });
 ```
 
-Contact rules are scoped to the **identity** (not a phone number) because pool numbers are shared infrastructure:
+Contact rules are scoped to the **identity**, including when it has a dedicated line:
+
+Phone rules cover SMS, calls, and iMessage together. Creation, updates, and deletion require admin credentials. An agent key can inspect permitted rules but cannot authorize itself; a user changes permissions in the Inkbox Console.
 
 ```typescript
 import { IMessageRuleAction } from "@inkbox/sdk";
@@ -751,9 +754,9 @@ console.log(login.username, login.password);
 ```typescript
 // Create a login secret (secretType inferred from payload shape)
 await unlocked.createSecret({
-  name: "AWS Production",
+  name: "Example dashboard",
   description: "Production IAM user",
-  payload: { password: "s3cret", username: "admin", url: "https://aws.amazon.com" },
+  payload: { password: "example-password", username: "admin", url: "https://dashboard.example.com" },
 });
 
 // Create an API key secret
@@ -988,6 +991,8 @@ Phone numbers carry the same `filterMode` / `agentIdentityId` / `filterModeChang
 
 ## Contact Rules
 
+All mutation examples in this section require an admin API key. Exact-address allow/block choices override the email or phone mode. Without an exact choice, matching email domain entries apply in their corresponding mode, then the mode's default applies. Identity-level phone rules do not require a dedicated number. Releasing a number preserves permissions.
+
 Allow/block lists are scoped to the **agent identity** (mirroring iMessage), addressed by `agentHandle`. The identity's `mailFilterMode` / `phoneFilterMode` decides whether each channel's rules act as a whitelist or blacklist. Mail matches by exact email or domain; phone matches by exact E.164 number. Returned rows are `MailIdentityContactRule` / `PhoneIdentityContactRule`, keyed by `rule.agentIdentityId` (not a mailbox/phone-number id).
 
 ```typescript
@@ -1087,7 +1092,15 @@ await inkbox.phoneContactRules.create(num.id, {
 
 ## Contacts
 
-Organization-wide address book with lifecycle review, memory, correspondence, and vCard import/export.
+Shared address book with per-email, per-phone, Profile, and Memories permissions. Phone covers SMS, calls, and iMessage. Profile and Memories do not grant communication access. Existing-contact identifier changes and suggestion absorption require admin credentials.
+
+Use `inkbox.contacts.permissions.get(handle, contactId)` with admin credentials to read effective `emails` and `phones` boolean maps plus `profile` and `memories` booleans. Call `.update(handle, contactId, { emails: { "ada@example.com": true }, profile: true, memories: false })` to save explicit choices. Omitted fields and addresses stay unchanged; no revision is required.
+
+For atomic creation, pass `permissions: { identityId, emails: { "ada@example.com": true }, profile: true, memories: false }` to `inkbox.contacts.create`, along with the matching contact email. All initial choices are saved with the contact.
+
+Advanced policies remain under `inkbox.contacts.communicationPolicy`: `.get(contactId, identityId)` returns `addresses`, `effectiveVisibility`, `visibility`, and `revision`. `.replace(contactId, { expectedRevision, identityId, addresses: [{ kind: "email", value: "ada@example.com", action: "allow", expectedAction: "inherit" }] })` makes guarded edits; omitted `visibility` is preserved. `.preview(contactId, identityId)` and `.listForIdentity(handle)` return filtered saved views. Agent keys can list only their own view.
+
+With admin credentials, `.listManagementForIdentity(handle, { q: "Jane", order: "name", limit: 20 })` includes hidden contacts and returns compact contact summaries, visibility settings, and effective access. Email/Phone results are `all`, `some`, `none`, or `no_identifiers`; Profile/Memories are booleans. Identity-owned communication rules have optional nullable `rule.contact` cards, filtered for the caller and without memories.
 
 Merging requires an admin-scoped API key. Active memories have per-kind and
 contact-wide limits. Delete a fact from each kind named by a merge error, or any

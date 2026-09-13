@@ -6,6 +6,8 @@
 
 import { HttpTransport } from "../../_http.js";
 import { ContactAccessResource } from "./contactAccess.js";
+import { ContactCommunicationPolicyResource } from "./communicationPolicy.js";
+import { ContactPermissionsResource, type UpdateContactPermissions } from "./permissions.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
@@ -50,6 +52,10 @@ export interface LookupContactsOptions {
   phoneContains?: string;
 }
 
+export interface ContactCreatePermissions extends UpdateContactPermissions {
+  identityId: string;
+}
+
 export interface CreateContactOptions {
   preferredName?: string;
   namePrefix?: string;
@@ -68,6 +74,8 @@ export interface CreateContactOptions {
   dates?: ContactDate[];
   addresses?: ContactAddress[];
   customFields?: ContactCustomField[];
+  /** Initial selected-agent access saved atomically; requires an admin API key. */
+  permissions?: ContactCreatePermissions;
 }
 
 export interface UpdateContactOptions {
@@ -113,9 +121,13 @@ export class ContactsResource {
   readonly correspondence: ContactCorrespondenceResource;
   readonly facts: ContactFactsResource;
   readonly vcards: VCardsResource;
+  readonly communicationPolicy: ContactCommunicationPolicyResource;
+  readonly permissions: ContactPermissionsResource;
 
   constructor(private readonly http: HttpTransport) {
     this.access = new ContactAccessResource(http);
+    this.communicationPolicy = new ContactCommunicationPolicyResource(http);
+    this.permissions = new ContactPermissionsResource(http);
     this.correspondence = new ContactCorrespondenceResource(http);
     this.facts = new ContactFactsResource(http);
     this.vcards = new VCardsResource(http);
@@ -182,7 +194,11 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    const data = await this.http.post<RawContact>(BASE, body);
+    if (options.permissions !== undefined) {
+      const { identityId, ...permissions } = options.permissions;
+      body.permissions = { ...permissions, identity_id: identityId };
+    }
+    const data = await this.http.post<RawContact>(options.permissions !== undefined ? `${BASE}/with-permissions` : BASE, body);
     return parseContact(data);
   }
 

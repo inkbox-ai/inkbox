@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { readFileSync, writeFileSync } from "node:fs";
 import type {
   ContactFactKind,
@@ -9,10 +9,13 @@ import type {
   CorrespondenceTranscriptMode,
   CreateContactOptions,
   MergeContactsOptions,
+  ReplaceContactCommunicationPolicy,
+  UpdateContactPermissions,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
+import { parsePolicyPagination } from "../pagination.js";
 
 function parseJsonArg<T>(raw: string, label: string): T {
   try {
@@ -31,7 +34,132 @@ function collectValues(value: string, previous: string[] = []): string[] {
   ];
 }
 
+/** Validate objects before serialization can discard unrecognized settings. */
+function policyObject(value: unknown, fields: string[], path: string): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${path} must be an object`);
+  const record = value as Record<string, unknown>;
+  const unknown = Object.keys(record).filter((key) => !fields.includes(key));
+  if (unknown.length) throw new Error(`Unknown field in ${path}: ${unknown.join(", ")}`);
+  return record;
+}
+
+/** Validate a complete visibility portion. */
+function validatePolicyPortion(defaults: unknown, identities: unknown, fields: string[], path: string): void {
+  const validateDecisions = (row: Record<string, unknown>, label: string): void => {
+    for (const key of fields) {
+      if (!["inherit", "allow", "block"].includes(row[key] as string)) throw new Error(`${label}.${key} must be inherit, allow, or block`);
+    }
+  };
+  validateDecisions(policyObject(defaults, fields, `${path}.defaults`), `${path}.defaults`);
+  if (!Array.isArray(identities)) throw new Error(`${path}.identities must be an array`);
+  if (identities.length > 500) throw new Error(`${path}.identities cannot exceed 500 entries`);
+  const seen = new Set<string>();
+  for (const [index, value] of identities.entries()) {
+    const label = `${path}.identities[${index}]`;
+    const row = policyObject(value, ["identityId", ...fields], label);
+    if (typeof row.identityId !== "string" || !row.identityId) throw new Error(`${label}.identityId is required`);
+    if (seen.has(row.identityId)) throw new Error(`${path}.identities contains duplicate identities`);
+    seen.add(row.identityId);
+    validateDecisions(row, label);
+  }
+}
+
+/** Parse a policy file while preserving omission of visibility settings. */
+export function parseContactPolicyFile(raw: string): ReplaceContactCommunicationPolicy {
+  const body = policyObject(parseJsonArg<unknown>(raw, "policy file"), ["expectedRevision", "identityId", "addresses", "visibility"], "policy");
+  if (!Number.isSafeInteger(body.expectedRevision) || (body.expectedRevision as number) < 0) throw new Error("policy.expectedRevision must be a nonnegative integer");
+  if (typeof body.identityId !== "string" || !body.identityId) throw new Error("policy.identityId is required");
+  if (!Array.isArray(body.addresses) || body.addresses.length > 500) throw new Error("policy.addresses must be an array of at most 500 entries");
+  for (const [index, value] of body.addresses.entries()) {
+    const label = `policy.addresses[${index}]`;
+    const row = policyObject(value, ["kind", "value", "action", "expectedAction"], label);
+    if (!["email", "phone"].includes(row.kind as string)) throw new Error(`${label}.kind must be email or phone`);
+    if (typeof row.value !== "string" || !row.value) throw new Error(`${label}.value is required`);
+    for (const key of ["action", "expectedAction"]) {
+      if (!["inherit", "allow", "block"].includes(row[key] as string)) throw new Error(`${label}.${key} must be inherit, allow, or block`);
+    }
+  }
+  if (Object.hasOwn(body, "visibility")) {
+    const visibility = policyObject(body.visibility, ["defaults", "identities"], "policy.visibility");
+    validatePolicyPortion(visibility.defaults, visibility.identities, ["profile", "memories"], "policy.visibility");
+  }
+  return body as unknown as ReplaceContactCommunicationPolicy;
+}
+
+export function parseContactPermissionsFile(raw: string): UpdateContactPermissions {
+  const body = policyObject(parseJsonArg<unknown>(raw, "permissions file"), ["emails", "phones", "profile", "memories"], "permissions");
+  for (const key of ["emails", "phones"]) {
+    if (!Object.hasOwn(body, key)) continue;
+    const value = body[key];
+    if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`permissions.${key} must be an address-to-boolean object`);
+    if (Object.keys(value).length > 50) throw new Error(`permissions.${key} cannot exceed 50 entries`);
+    for (const allowed of Object.values(value)) {
+      if (typeof allowed !== "boolean") throw new Error(`permissions.${key} values must be true or false`);
+    }
+  }
+  for (const key of ["profile", "memories"]) {
+    if (Object.hasOwn(body, key) && typeof body[key] !== "boolean") throw new Error(`permissions.${key} must be true or false`);
+  }
+  return body as UpdateContactPermissions;
+}
+
 function registerContactsAccessCommands(parent: Command): void {
+  const permissions = parent.command("permissions").description("Selected-agent yes/no contact access (admin credentials)");
+  permissions.command("get <handle> <contact-id>").description("Read effective email, phone, profile, and memory access")
+    .action(withErrorHandler(async function (this: Command, handle: string, contactId: string): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.permissions.get(handle, contactId) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  permissions.command("set <handle> <contact-id>").description("Save yes/no choices; omitted fields and addresses stay unchanged")
+    .requiredOption("--file <path>", "JSON file with optional emails/phones boolean maps and profile/memories booleans")
+    .action(withErrorHandler(async function (this: Command, handle: string, contactId: string, options: { file: string }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      const body = parseContactPermissionsFile(readFileSync(options.file, "utf8"));
+      output(await createClient(opts).contacts.permissions.update(handle, contactId, body) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+
+  const policy = parent.command("communication-policy").description("Advanced address policies, visibility settings, and previews");
+  policy.command("list-management <handle>").description("Manage contact permissions, including hidden contacts (admin credentials)")
+    .option("--q <query>", "Search contact details")
+    .option("--limit <number>", "Page size", "50").option("--offset <number>", "Page offset", "0")
+    .addOption(new Option("--order <order>", "Sort order").choices(["name", "recent"]).default("recent"))
+    .addOption(new Option("--review-status <status...>", "Contact review states").choices(["confirmed", "unreviewed"]))
+    .action(withErrorHandler(async function (this: Command, handle: string, options: {
+      q?: string; limit: string; offset: string; order: "name" | "recent"; reviewStatus?: ContactReviewStatus[];
+    }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      const page = await createClient(opts).contacts.communicationPolicy.listManagementForIdentity(handle, {
+        ...options, ...parsePolicyPagination(options),
+      });
+      output(opts.json ? page : page.items.map((row) => ({ id: row.contact.id, contact: row.contact.preferredName,
+        ...row.effective, revision: row.revision })),
+      { json: !!opts.json, columns: ["id", "contact", "email", "phone", "profile", "memories", "revision"] });
+    }));
+  policy.command("get <contact-id>").description("Read a contact policy (admin credentials)")
+    .option("--identity-id <uuid>", "Include this agent's address choices and effective visibility")
+    .action(withErrorHandler(async function (this: Command, contactId: string, options: { identityId?: string }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.communicationPolicy.get(contactId, options.identityId) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  policy.command("set <contact-id>").description("Replace a contact policy (admin credentials)")
+    .requiredOption("--file <path>", "JSON file with expectedRevision, identityId, addresses, and optional visibility")
+    .action(withErrorHandler(async function (this: Command, contactId: string, options: { file: string }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      const body = parseContactPolicyFile(readFileSync(options.file, "utf8"));
+      output(await createClient(opts).contacts.communicationPolicy.replace(contactId, body) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  policy.command("preview <contact-id> <identity-id>").description("Preview contact visibility (admin credentials)")
+    .action(withErrorHandler(async function (this: Command, contactId: string, identityId: string): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.communicationPolicy.preview(contactId, identityId) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  policy.command("list <handle>").description("List an identity's visible contact permissions")
+    .option("--limit <number>", "Page size", "50").option("--offset <number>", "Page offset", "0")
+    .action(withErrorHandler(async function (this: Command, handle: string, options: { limit: string; offset: string }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.communicationPolicy.listForIdentity(handle, parsePolicyPagination(options)) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+
   const access = parent
     .command("access")
     .description("Compatibility access view");
@@ -334,7 +462,7 @@ export function registerContactsCommands(program: Command): void {
   contacts
     .command("create")
     .description("Create a contact (pass the full payload as JSON)")
-    .requiredOption("--json <payload>", "JSON payload matching CreateContactOptions")
+    .requiredOption("--json <payload>", "JSON payload matching CreateContactOptions; optional permissions require an admin API key")
     .action(
       withErrorHandler(async function (
         this: Command,

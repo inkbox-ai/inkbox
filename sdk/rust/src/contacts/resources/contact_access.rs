@@ -1,5 +1,4 @@
-//! Deprecated read-only compatibility metadata that does not restrict
-//! organization-wide contact visibility.
+//! Deprecated read-only metadata; communication policies control visibility.
 
 use std::sync::Arc;
 
@@ -22,7 +21,7 @@ impl ContactAccessResource {
 
     /// List deprecated read-only compatibility metadata for a contact.
     ///
-    /// These records do not restrict organization-wide contact visibility.
+    /// Communication policies, not these records, control contact visibility.
     pub fn list(&self, contact_id: &str) -> Result<Vec<ContactAccess>> {
         let data = self
             .http

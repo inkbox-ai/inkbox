@@ -1,8 +1,7 @@
 /**
  * inkbox-tunnels/client/_protocol.ts
  *
- * Single source of truth for the wire protocol in the TS SDK. Mirrors
- * the server-side definitions in `servers/src/data_models/tunnel.py`.
+ * Tunnel wire-protocol constants.
  *
  * The companion manifest at
  * `sdk/typescript/protocol/tunnel_protocol_constants.json` is the

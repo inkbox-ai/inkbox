@@ -390,6 +390,7 @@ export type {
   IMessageCorrespondenceItem,
   CallCorrespondenceItem,
   CreateContactOptions,
+  ContactCreatePermissions,
   GetContactCorrespondenceOptions,
   ListContactsOptions,
   LookupContactsOptions,
@@ -397,6 +398,8 @@ export type {
   MergeContactsOptions,
   UpdateContactOptions,
 } from "./contacts/index.js";
+export * from "./contacts/resources/communicationPolicy.js";
+export * from "./contacts/resources/permissions.js";
 export type { Note, NoteAccess } from "./notes/types.js";
 export type {
   CreateNoteOptions,

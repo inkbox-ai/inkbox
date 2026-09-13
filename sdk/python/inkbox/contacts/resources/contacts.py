@@ -11,11 +11,14 @@ from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
 from inkbox.contacts.resources.contact_access import ContactAccessResource
+from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicyResource
+from inkbox.contacts.resources.permissions import ContactPermissionsResource
 from inkbox.contacts.resources.contact_facts import ContactFactsResource
 from inkbox.contacts.resources.correspondence import ContactCorrespondenceResource
 from inkbox.contacts.resources.vcards import VCardsResource
 from inkbox.contacts.types import (
     Contact,
+    ContactCreatePermissions,
     ContactAddress,
     ContactBulkDeleteResult,
     ContactCustomField,
@@ -40,14 +43,26 @@ def _items_to_wire(items: list[Any] | None) -> list[dict[str, Any]] | None:
 
 
 class ContactsResource:
-    """Organization-wide contacts and contact memory."""
+    """Shared contacts and memory with permission-filtered identity views."""
 
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
         self._access = ContactAccessResource(http)
+        self._communication_policy = ContactCommunicationPolicyResource(http)
+        self._permissions = ContactPermissionsResource(http)
         self._facts = ContactFactsResource(http)
         self._correspondence = ContactCorrespondenceResource(http)
         self._vcards = VCardsResource(http)
+
+    @property
+    def permissions(self) -> ContactPermissionsResource:
+        """Effective yes/no access for a selected agent and contact."""
+        return self._permissions
+
+    @property
+    def communication_policy(self) -> ContactCommunicationPolicyResource:
+        """Communication-list entries and filtered identity previews."""
+        return self._communication_policy
 
     @property
     def access(self) -> ContactAccessResource:
@@ -159,11 +174,13 @@ class ContactsResource:
         dates: list[ContactDate] | None = None,
         addresses: list[ContactAddress] | None = None,
         custom_fields: list[ContactCustomField] | None = None,
+        permissions: ContactCreatePermissions | None = None,
     ) -> Contact:
         """Create a new contact.
 
         Args:
             birthday: Optional ISO date (``YYYY-MM-DD``) or :class:`datetime.date`.
+            permissions: Initial selected-agent access saved atomically; requires an admin API key.
         """
         body: dict[str, Any] = {}
         for name, value in (
@@ -194,7 +211,9 @@ class ContactsResource:
             wire = _items_to_wire(items)
             if wire is not None:
                 body[name] = wire
-        data = self._http.post(_BASE, json=body)
+        if permissions is not None:
+            body["permissions"] = permissions.to_wire()
+        data = self._http.post(f"{_BASE}/with-permissions" if permissions is not None else _BASE, json=body)
         return Contact._from_dict(data)
 
     def update(

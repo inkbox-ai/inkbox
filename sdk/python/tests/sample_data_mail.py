@@ -54,7 +54,7 @@ MESSAGE_DETAIL_DICT = {
     "in_reply_to": None,
     "references": None,
     "attachment_metadata": None,
-    "ses_message_id": "ses-abc123",
+    "ses_message_id": "message-abc123",
     "updated_at": "2026-03-09T00:00:00Z",
     "reply_all_recipients": {"to": ["alice@example.com"], "cc": ["bob@example.com"]},
 }

@@ -11,6 +11,8 @@ or phone number ID explicitly.
 
 from __future__ import annotations
 
+from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicyPage
+
 from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
 
@@ -1540,8 +1542,7 @@ class AgentIdentity:
     ) -> list[PhoneIdentityContactRule]:
         """List this identity's phone allow/block rules, newest first.
 
-        Returns ``[]`` for a phoneless identity; the server requires a phone
-        only for create/get/update/delete, not for list.
+        Rules also apply to iMessage and do not require a dedicated phone number.
         """
         return self._inkbox._phone_identity_contact_rules.list(
             self.agent_handle,
@@ -1553,7 +1554,6 @@ class AgentIdentity:
 
     def get_phone_contact_rule(self, rule_id: UUID | str) -> PhoneIdentityContactRule:
         """Get one of this identity's phone contact rules by id."""
-        self._require_phone()
         return self._inkbox._phone_identity_contact_rules.get(
             self.agent_handle, rule_id
         )
@@ -1567,9 +1567,8 @@ class AgentIdentity:
     ) -> PhoneIdentityContactRule:
         """Create a phone allow/block rule for this identity.
 
-        Raises ``InkboxError`` if this identity has no phone number.
+        Requires admin credentials; channel provisioning is not required.
         """
-        self._require_phone()
         return self._inkbox._phone_identity_contact_rules.create(
             self.agent_handle,
             action=action,
@@ -1584,7 +1583,6 @@ class AgentIdentity:
         action: PhoneRuleAction | str,
     ) -> PhoneIdentityContactRule:
         """Update a phone rule's ``action`` (admin-only)."""
-        self._require_phone()
         return self._inkbox._phone_identity_contact_rules.update(
             self.agent_handle,
             rule_id,
@@ -1593,8 +1591,11 @@ class AgentIdentity:
 
     def delete_phone_contact_rule(self, rule_id: UUID | str) -> None:
         """Delete one of this identity's phone contact rules (admin-only)."""
-        self._require_phone()
         self._inkbox._phone_identity_contact_rules.delete(self.agent_handle, rule_id)
+
+    def list_contact_communication_policies(self, *, limit: int = 50, offset: int = 0) -> ContactCommunicationPolicyPage:
+        """List this identity's permission-filtered contact views."""
+        return self._inkbox.contacts.communication_policy.list_for_identity(self.agent_handle, limit=limit, offset=offset)
 
     ## A2A
 

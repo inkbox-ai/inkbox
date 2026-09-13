@@ -1,6 +1,7 @@
 import { Command } from "commander";
+import { parsePolicyPagination } from "../pagination.js";
 import { createClient, getGlobalOpts } from "../client.js";
-import { output } from "../output.js";
+import { output, outputContactRules } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import type {
   SecretPayload,
@@ -17,6 +18,7 @@ const RULE_COLUMNS = [
   "action",
   "matchType",
   "matchTarget",
+  "contact",
   "status",
 ];
 
@@ -46,7 +48,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 
@@ -78,7 +80,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 
@@ -153,11 +155,11 @@ function registerIdentityMailRuleCommands(parent: Command): void {
 function registerIdentityPhoneRuleCommands(parent: Command): void {
   const rules = parent
     .command("phone-rules")
-    .description("Phone contact rules scoped to an agent identity (requires a phone number)");
+    .description("Shared phone and iMessage contact rules scoped to an agent identity");
 
   rules
     .command("list <handle>")
-    .description("List an identity's phone contact rules (empty if no phone number)")
+    .description("List an identity's shared phone and iMessage contact rules")
     .option("--action <action>", "Filter by action: allow or block")
     .option("--match-type <type>", "Filter by match_type: exact_number")
     .option("--limit <n>", "Max rows", (v) => parseInt(v, 10))
@@ -176,7 +178,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 
@@ -208,7 +210,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
           limit: cmdOpts.limit,
           offset: cmdOpts.offset,
         });
-        output(rows, { json: !!opts.json, columns: RULE_COLUMNS });
+        outputContactRules(rows, { json: !!opts.json, columns: RULE_COLUMNS });
       }),
     );
 
@@ -226,7 +228,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
 
   rules
     .command("create <handle>")
-    .description("Create a phone contact rule (identity must have a phone number)")
+    .description("Create a shared phone and iMessage contact rule (admin API key required)")
     .requiredOption("--action <action>", "allow or block")
     .requiredOption("--match-target <value>", "E.164 phone number to match")
     .option("--match-type <type>", "Match type (default exact_number)", "exact_number")
@@ -325,6 +327,18 @@ export function registerIdentityCommands(program: Command): void {
   const identity = program
     .command("identity")
     .description("Manage agent identities");
+
+  identity.command("contact-policies <handle>")
+    .description("List the contact permissions visible to an identity")
+    .option("--limit <number>", "Page size", "50")
+    .option("--offset <number>", "Page offset", "0")
+    .action(withErrorHandler(async function (
+      this: Command, handle: string, options: { limit: string; offset: string },
+    ): Promise<void> {
+      const opts = getGlobalOpts(this);
+      const page = await createClient(opts).contacts.communicationPolicy.listForIdentity(handle, parsePolicyPagination(options));
+      output(page as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
 
   identity
     .command("list")
@@ -522,7 +536,7 @@ export function registerIdentityCommands(program: Command): void {
     .option("--contact-sharing-enabled <bool>", "Toggle automatic name and optional photo sharing on a dedicated iMessage line: true or false")
     .option("--imessage-filter-mode <mode>", "iMessage contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
-    .option("--phone-filter-mode <mode>", "Phone contact-rule mode: whitelist or blacklist (admin-only; identity must have a phone number)")
+    .option("--phone-filter-mode <mode>", "Shared phone and iMessage contact-rule mode: whitelist or blacklist (admin API key required)")
     .action(
       withErrorHandler(async function (
         this: Command,

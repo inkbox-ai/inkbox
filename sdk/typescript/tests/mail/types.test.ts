@@ -82,7 +82,7 @@ describe("parseMessageDetail", () => {
     expect(detail.bodyHtml).toBe("<p>Hi there, this is a test message body.</p>");
     expect(detail.bccAddresses).toBeNull();
     expect(detail.inReplyTo).toBeNull();
-    expect(detail.sesMessageId).toBe("ses-abc123");
+    expect(detail.sesMessageId).toBe("message-abc123");
     expect(detail.updatedAt).toBeInstanceOf(Date);
   });
 });
