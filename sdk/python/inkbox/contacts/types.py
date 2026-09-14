@@ -93,8 +93,8 @@ class ContactAccessSettings:
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactAccessSettings:
         return cls(
-            email=ContactChannelAccess(**data["email"]),
-            phone=ContactChannelAccess(**data["phone"]),
+            email=ContactChannelAccess(visible=data["email"]["visible"], contactable=data["email"]["contactable"]),
+            phone=ContactChannelAccess(visible=data["phone"]["visible"], contactable=data["phone"]["contactable"]),
             profile=data["profile"],
             memories=data["memories"],
         )

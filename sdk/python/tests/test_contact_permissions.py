@@ -16,7 +16,7 @@ def test_boolean_permissions_preserve_false_empty_maps_and_omitted_settings() ->
     def respond(request: httpx.Request) -> httpx.Response:
         assert request.url.path == f"/api/v1/identities/test-agent/contacts/{fixture['policy']['contact_id']}/permissions"
         requests.append((request.method, json.loads(request.content) if request.content else None))
-        return httpx.Response(200, json=fixture["permissions"])
+        return httpx.Response(200, json={**fixture["permissions"], "future_field": "ignored"})
 
     with patch("inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(respond)):
         client = Inkbox(api_key="test-key", base_url="https://example.com")
@@ -42,7 +42,11 @@ def test_group_access_preserves_nested_omission_and_atomic_creation_shape() -> N
         requests.append((request.method, request.url.path, body))
         if request.method == "POST":
             return httpx.Response(201, json={"id": contact_id, "created_at": "2026-09-11T00:00:00Z", "updated_at": "2026-09-11T00:00:00Z"})
-        return httpx.Response(200, json=fixture["access"])
+        return httpx.Response(200, json={
+            **fixture["access"], "future_field": "ignored",
+            "email": {**fixture["access"]["email"], "future_field": "ignored"},
+            "phone": {**fixture["access"]["phone"], "future_field": "ignored"},
+        })
 
     with patch("inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(respond)):
         client = Inkbox(api_key="test-key", base_url="https://example.com")

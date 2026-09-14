@@ -39,6 +39,10 @@ class ContactVisibilityDecisions:
     profile: ContactDecision
     memories: ContactDecision
 
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> ContactVisibilityDecisions:
+        return cls(profile=data["profile"], memories=data["memories"])
+
 
 @dataclass(frozen=True)
 class ContactIdentityVisibilityDecisions:
@@ -57,7 +61,7 @@ class ContactVisibilityPolicy:
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactVisibilityPolicy:
         """Parse the visibility portion of a policy."""
-        return cls(ContactVisibilityDecisions(**data["defaults"]), [
+        return cls(ContactVisibilityDecisions._from_dict(data["defaults"]), [
             ContactIdentityVisibilityDecisions(UUID(row["identity_id"]), row["profile"], row["memories"])
             for row in data["identities"]
         ])
@@ -75,6 +79,10 @@ class ContactVisibilityResult:
     profile: bool
     memories: bool
 
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> ContactVisibilityResult:
+        return cls(profile=data["profile"], memories=data["memories"])
+
 
 @dataclass(frozen=True)
 class ContactCommunicationPolicy:
@@ -91,8 +99,8 @@ class ContactCommunicationPolicy:
         """Parse a policy response."""
         return cls(UUID(data["contact_id"]), data["revision"],
                    UUID(data["identity_id"]) if data["identity_id"] else None,
-                   [ContactAddressPermission(**row) for row in data["addresses"]],
-                   ContactVisibilityResult(**data["effective_visibility"]) if data["effective_visibility"] is not None else None,
+                   [ContactAddressPermission(kind=row["kind"], value=row["value"], label=row["label"], action=row["action"], allowed=row["allowed"]) for row in data["addresses"]],
+                   ContactVisibilityResult._from_dict(data["effective_visibility"]) if data["effective_visibility"] is not None else None,
                    ContactVisibilityPolicy._from_dict(data["visibility"]))
 
 
@@ -111,7 +119,7 @@ class ContactCommunicationPreview:
         """Parse a permission-filtered contact preview."""
         return cls(UUID(data["identity_id"]), Contact._from_dict(data["contact"]) if data["contact"] else None,
                    data["email"], data["phone"], data["full_profile"],
-                   ContactVisibilityResult(**data["visibility"]))
+                   ContactVisibilityResult._from_dict(data["visibility"]))
 
 
 @dataclass(frozen=True)
@@ -174,9 +182,10 @@ class ContactPermissionEntry:
                 [ContactEmail._from_dict(row) for row in contact["emails"]],
                 [ContactPhone._from_dict(row) for row in contact["phones"]]),
             data["revision"],
-            ContactPermissionVisibility(ContactVisibilityDecisions(**data["visibility"]["defaults"]),
-                ContactVisibilityDecisions(**data["visibility"]["identity_override"])),
-            ContactPermissionEffective(**data["effective"]),
+            ContactPermissionVisibility(ContactVisibilityDecisions._from_dict(data["visibility"]["defaults"]),
+                ContactVisibilityDecisions._from_dict(data["visibility"]["identity_override"])),
+            ContactPermissionEffective(email=data["effective"]["email"], phone=data["effective"]["phone"],
+                                       profile=data["effective"]["profile"], memories=data["effective"]["memories"]),
             ContactAccessSettings._from_dict(data["access"]) if data.get("access") is not None else None,
         )
 

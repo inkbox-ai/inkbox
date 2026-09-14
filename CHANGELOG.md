@@ -20,6 +20,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Python permission and nested contact-access responses tolerate additional fields while retaining required fields and their values.
+- Human/admin contact deletion and identifier removal no longer require resetting Profile or Memories settings. Standalone communication rules remain intact; agent restrictions still apply.
 - Rust `CreateContactParams` struct literals must include `permissions: None` or use `..Default::default()` when no initial permissions are needed.
 - Inherited Profile and Memories access includes contacts whose stored identifiers are all permitted, including standalone whitelist matches. Explicit visibility decisions remain authoritative.
 - Contact policy conflicts expose stable error codes. Bulk deletion includes optional `error_code` (Python/Rust) or `errorCode` (TypeScript) alongside the message. Rust struct literals for `ContactBulkDeleteResultItem` must supply `error_code`, using `None` when absent.

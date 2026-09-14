@@ -11,10 +11,24 @@ from inkbox import (ContactAddressUpdate, ContactVisibilityDecisions,
                     ContactVisibilityPolicy, ContactIdentityVisibilityDecisions)
 from inkbox.contacts.resources.contacts import ContactsResource
 from inkbox import ContactReviewStatus
+from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicy, ContactCommunicationPreview
 from inkbox._http import HttpTransport
 
 CONTACT_ID = UUID("11111111-1111-4111-8111-111111111111")
 IDENTITY_ID = UUID("22222222-2222-4222-8222-222222222222")
+
+def test_policy_and_preview_ignore_additive_fields_at_every_object_level() -> None:
+    fixture = json.loads((Path(__file__).parents[3] / "tests/fixtures/contact_communication_policy.json").read_text())
+
+    def extended(value):
+        if isinstance(value, dict):
+            return {**{key: extended(item) for key, item in value.items()}, "future_field": {"value": True}}
+        if isinstance(value, list):
+            return [extended(item) for item in value]
+        return value
+
+    for key, model in (("policy", ContactCommunicationPolicy), ("preview", ContactCommunicationPreview)):
+        assert model._from_dict(extended(fixture[key])) == model._from_dict(fixture[key])
 
 
 def test_shared_wire_fixture_through_http_transport() -> None:
@@ -57,9 +71,9 @@ def test_management_roster_uses_distinct_contract_and_filters() -> None:
                     "company_name": None, "review_status": "confirmed", "emails": [],
                     "phones": [{"value_e164": "+15555550123", "label": "Work", "is_primary": True}]},
         "revision": 8,
-        "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"},
-                       "identity_override": {"profile": "allow", "memories": "block"}},
-        "effective": {"email": "no_identifiers", "phone": "some", "profile": True, "memories": False},
+        "visibility": {"defaults": {"profile": "inherit", "memories": "inherit", "future_field": True},
+                       "identity_override": {"profile": "allow", "memories": "block", "future_field": True}},
+        "effective": {"email": "no_identifiers", "phone": "some", "profile": True, "memories": False, "future_field": True},
     }], "limit": 1, "offset": 2, "has_more": True}
     page = ContactsResource(http).communication_policy.list_management_for_identity(
         "test-agent", q="Person", order="name", limit=1, offset=2, review_status=[ContactReviewStatus.CONFIRMED])
