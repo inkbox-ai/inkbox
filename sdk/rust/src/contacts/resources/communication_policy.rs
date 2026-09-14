@@ -167,6 +167,7 @@ pub struct ContactPermissionEntry {
     pub revision: u64,
     pub visibility: ContactPermissionVisibility,
     pub effective: ContactPermissionEffective,
+    pub access: Option<crate::contacts::types::ContactAccessSettings>,
 }
 
 /// A bounded management roster.
@@ -402,6 +403,41 @@ mod tests {
         assert_eq!(page.items[0].effective.email, IdentifierPermission::Some);
         assert!(page.items[0].effective.profile);
         request.assert();
+    }
+
+    #[test]
+    fn management_access_parses_absent_null_and_populated_settings() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../../tests/fixtures/contact_communication_policy.json"
+        ))
+        .unwrap();
+        let mut row = json!({
+            "contact": {"id": "33333333-3333-4333-8333-333333333333", "review_status": "confirmed", "emails": [], "phones": []},
+            "revision": 8,
+            "visibility": {"defaults": {"profile": "inherit", "memories": "inherit"}, "identity_override": {"profile": "allow", "memories": "block"}},
+            "effective": {"email": "some", "phone": "none", "profile": true, "memories": false},
+        });
+        assert!(
+            serde_json::from_value::<ContactPermissionEntry>(row.clone())
+                .unwrap()
+                .access
+                .is_none()
+        );
+        row["access"] = json!(null);
+        assert!(
+            serde_json::from_value::<ContactPermissionEntry>(row.clone())
+                .unwrap()
+                .access
+                .is_none()
+        );
+        row["access"] = fixture["access"].clone();
+        let access = serde_json::from_value::<ContactPermissionEntry>(row)
+            .unwrap()
+            .access
+            .unwrap();
+        assert!(access.email.visible && access.phone.visible);
+        assert_eq!(access.email.contactable, ["person@example.com"]);
+        assert!(access.phone.contactable.is_empty());
     }
 
     #[test]

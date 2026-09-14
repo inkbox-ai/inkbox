@@ -11,13 +11,55 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Selected-agent permissions committed with contact creation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ContactCreatePermissions {
     pub identity_id: Uuid,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub emails: Option<HashMap<String, bool>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phones: Option<HashMap<String, bool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memories: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<ContactChannelAccessUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phone: Option<ContactChannelAccessUpdate>,
+}
+
+/// Whole-group visibility and individually contactable addresses.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct ContactChannelAccess {
+    pub visible: bool,
+    pub contactable: Vec<String>,
+}
+
+/// Effective contact information and communication access for one agent.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct ContactAccessSettings {
+    pub email: ContactChannelAccess,
+    pub phone: ContactChannelAccess,
+    pub profile: bool,
+    pub memories: bool,
+}
+
+/// Omit unchanged fields; an empty contactable list blocks all current addresses.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ContactChannelAccessUpdate {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contactable: Option<Vec<String>>,
+}
+
+/// Partial access choices; hiding Profile also hides omitted groups.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct UpdateContactAccess {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<ContactChannelAccessUpdate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phone: Option<ContactChannelAccessUpdate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub profile: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -11,6 +11,7 @@ import type {
   MergeContactsOptions,
   ReplaceContactCommunicationPolicy,
   UpdateContactPermissions,
+  UpdateContactAccess,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -103,6 +104,27 @@ export function parseContactPermissionsFile(raw: string): UpdateContactPermissio
   return body as UpdateContactPermissions;
 }
 
+export function parseContactAccessFile(raw: string): UpdateContactAccess {
+  const body = policyObject(parseJsonArg<unknown>(raw, "access file"), ["email", "phone", "profile", "memories"], "access");
+  for (const key of ["profile", "memories"]) {
+    if (Object.hasOwn(body, key) && typeof body[key] !== "boolean") throw new Error(`access.${key} must be true or false`);
+  }
+  for (const key of ["email", "phone"]) {
+    if (!Object.hasOwn(body, key)) continue;
+    const group = policyObject(body[key], ["visible", "contactable"], `access.${key}`);
+    if (Object.hasOwn(group, "visible") && typeof group.visible !== "boolean") throw new Error(`access.${key}.visible must be true or false`);
+    if (Object.hasOwn(group, "contactable")) {
+      const values = group.contactable;
+      if (!Array.isArray(values) || values.length > 50 || values.some((value) => typeof value !== "string" || !value.trim())) {
+        throw new Error(`access.${key}.contactable must be an array of at most 50 addresses`);
+      }
+      if (new Set(values).size !== values.length) throw new Error(`access.${key}.contactable must not contain duplicates`);
+      if (group.visible === false && values.length) throw new Error(`access.${key}: hidden addresses cannot be contactable`);
+    }
+  }
+  return body as UpdateContactAccess;
+}
+
 function registerContactsAccessCommands(parent: Command): void {
   const permissions = parent.command("permissions").description("Selected-agent yes/no contact access (admin credentials)");
   permissions.command("get <handle> <contact-id>").description("Read effective email, phone, profile, and memory access")
@@ -162,7 +184,22 @@ function registerContactsAccessCommands(parent: Command): void {
 
   const access = parent
     .command("access")
-    .description("Compatibility access view");
+    .description("Selected-agent visibility and per-address communication access");
+
+  access.command("get <handle> <contact-id>")
+    .description("Read group visibility and contactable addresses (admin credentials)")
+    .action(withErrorHandler(async function (this: Command, handle: string, contactId: string): Promise<void> {
+      const opts = getGlobalOpts(this);
+      output(await createClient(opts).contacts.access.get(handle, contactId) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
+  access.command("set <handle> <contact-id>")
+    .description("Save partial access choices (admin credentials)")
+    .requiredOption("--file <path>", "JSON file with email/phone visible/contactable objects and profile/memories booleans")
+    .action(withErrorHandler(async function (this: Command, handle: string, contactId: string, options: { file: string }): Promise<void> {
+      const opts = getGlobalOpts(this);
+      const body = parseContactAccessFile(readFileSync(options.file, "utf8"));
+      output(await createClient(opts).contacts.access.update(handle, contactId, body) as unknown as Record<string, unknown>, { json: !!opts.json });
+    }));
 
   access
     .command("list <contact-id>")

@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, Literal
 from uuid import UUID
 
-from inkbox.contacts.types import Contact, ContactEmail, ContactPhone, ContactReviewStatus
+from inkbox.contacts.types import Contact, ContactAccessSettings, ContactEmail, ContactPhone, ContactReviewStatus
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -162,6 +162,7 @@ class ContactPermissionEntry:
     revision: int
     visibility: ContactPermissionVisibility
     effective: ContactPermissionEffective
+    access: ContactAccessSettings | None = None
 
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactPermissionEntry:
@@ -176,6 +177,7 @@ class ContactPermissionEntry:
             ContactPermissionVisibility(ContactVisibilityDecisions(**data["visibility"]["defaults"]),
                 ContactVisibilityDecisions(**data["visibility"]["identity_override"])),
             ContactPermissionEffective(**data["effective"]),
+            ContactAccessSettings._from_dict(data["access"]) if data.get("access") is not None else None,
         )
 
 

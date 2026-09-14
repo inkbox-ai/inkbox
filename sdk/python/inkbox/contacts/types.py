@@ -57,6 +57,8 @@ class ContactCreatePermissions:
     phones: dict[str, bool] | None = None
     profile: bool | None = None
     memories: bool | None = None
+    email: ContactChannelAccessUpdate | None = None
+    phone: ContactChannelAccessUpdate | None = None
 
     def to_wire(self) -> dict[str, Any]:
         result: dict[str, Any] = {"identity_id": str(self.identity_id)}
@@ -64,7 +66,53 @@ class ContactCreatePermissions:
             value = getattr(self, key)
             if value is not None:
                 result[key] = value
+        for key in ("email", "phone"):
+            group = getattr(self, key)
+            if group is not None:
+                result[key] = group.to_wire()
         return result
+
+
+@dataclass(frozen=True)
+class ContactChannelAccess:
+    """Whole-group visibility and individually contactable addresses."""
+
+    visible: bool
+    contactable: list[str]
+
+
+@dataclass(frozen=True)
+class ContactAccessSettings:
+    """Effective contact information and communication access for one agent."""
+
+    email: ContactChannelAccess
+    phone: ContactChannelAccess
+    profile: bool
+    memories: bool
+
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> ContactAccessSettings:
+        return cls(
+            email=ContactChannelAccess(**data["email"]),
+            phone=ContactChannelAccess(**data["phone"]),
+            profile=data["profile"],
+            memories=data["memories"],
+        )
+
+
+@dataclass
+class ContactChannelAccessUpdate:
+    """Omit unchanged fields; an empty contactable list blocks all current addresses."""
+
+    visible: bool | None = None
+    contactable: list[str] | None = None
+
+    def to_wire(self) -> dict[str, Any]:
+        return {
+            key: value
+            for key, value in (("visible", self.visible), ("contactable", self.contactable))
+            if value is not None
+        }
 
 
 @dataclass

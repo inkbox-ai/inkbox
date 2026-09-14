@@ -131,7 +131,7 @@ impl ContactsResource {
         }
     }
 
-    /// Deprecated read-only metadata that does not restrict contact visibility.
+    /// Selected-agent visibility and communication access, plus legacy metadata.
     pub fn access(&self) -> &ContactAccessResource {
         &self.access
     }
@@ -565,6 +565,7 @@ mod tests {
                     phones: None,
                     profile: Some(false),
                     memories: None,
+                    ..Default::default()
                 }),
                 ..Default::default()
             })

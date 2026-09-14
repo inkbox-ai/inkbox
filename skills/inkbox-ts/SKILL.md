@@ -1092,7 +1092,11 @@ await inkbox.phoneContactRules.create(num.id, {
 
 ## Contacts
 
-Shared address book with per-email, per-phone, Profile, and Memories permissions. Phone covers SMS, calls, and iMessage. Profile and Memories do not grant communication access. Existing-contact identifier changes and suggestion absorption require admin credentials.
+Shared address book with whole-group email/phone visibility and separate communication choices for each address. Phone covers SMS, calls, and iMessage. Profile and Memories do not grant communication access. Existing-contact identifier changes and suggestion absorption require admin credentials.
+
+With admin credentials, `inkbox.contacts.access.get(handle, contactId)` returns `email`/`phone` objects with `visible` and `contactable`, plus `profile` and `memories`. `.update(handle, contactId, { email: { visible: true, contactable: [] } })` gives View-only email access. A nonempty contactable list allows those current addresses and blocks the rest. Omitted fields are preserved; `profile: false` hides omitted or empty groups and omitted Memories, while explicit choices win. Visibility alone does not grant communication. The roster's optional `access` field has the same effective shape. The legacy `.access.list(contactId)` remains read-only metadata.
+
+For atomic group-access creation, pass `permissions: { identityId, email: { visible: true, contactable: ["ada@example.com"] } }`, with the matching contact email. Use group objects or the older boolean maps, not both.
 
 Use `inkbox.contacts.permissions.get(handle, contactId)` with admin credentials to read effective `emails` and `phones` boolean maps plus `profile` and `memories` booleans. Call `.update(handle, contactId, { emails: { "ada@example.com": true }, profile: true, memories: false })` to save explicit choices. Omitted fields and addresses stay unchanged; no revision is required.
 

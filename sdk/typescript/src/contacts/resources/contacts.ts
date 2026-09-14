@@ -5,7 +5,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
-import { ContactAccessResource } from "./contactAccess.js";
+import { ContactAccessResource, type ContactChannelAccessUpdate } from "./contactAccess.js";
 import { ContactCommunicationPolicyResource } from "./communicationPolicy.js";
 import { ContactPermissionsResource, type UpdateContactPermissions } from "./permissions.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
@@ -54,6 +54,9 @@ export interface LookupContactsOptions {
 
 export interface ContactCreatePermissions extends UpdateContactPermissions {
   identityId: string;
+  /** Use group access objects or boolean address maps, without mixing the two shapes. */
+  email?: ContactChannelAccessUpdate;
+  phone?: ContactChannelAccessUpdate;
 }
 
 export interface CreateContactOptions {

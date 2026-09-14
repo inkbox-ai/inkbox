@@ -31,13 +31,14 @@ describe("contact communication policies", () => {
       expect(fetch).toHaveBeenCalledTimes(3);
     } finally { fetch.mockRestore(); }
   });
-  it("maps the management roster without making it a full contact", async () => {
+  it.each([undefined, null, { email: { visible: true, contactable: [] }, phone: { visible: false, contactable: [] }, profile: true, memories: false }])("maps the management roster with optional access %s", async (access) => {
     const get = vi.fn().mockResolvedValue({ items: [{
       contact: { id: "contact", preferred_name: "Person", given_name: null, family_name: null, company_name: null,
         review_status: "confirmed", emails: [], phones: [{ value_e164: "+15555550123", label: "Work", is_primary: true }] },
       revision: 8,
       visibility: { defaults: { profile: "inherit", memories: "inherit" }, identity_override: { profile: "allow", memories: "block" } },
       effective: { email: "no_identifiers", phone: "some", profile: true, memories: false },
+      access,
     }], limit: 1, offset: 2, has_more: true });
     const page = await new ContactCommunicationPolicyResource({ get } as unknown as HttpTransport)
       .listManagementForIdentity("test-agent", { q: "Person", order: "name", limit: 1, offset: 2, reviewStatus: ["confirmed"] });
@@ -50,6 +51,7 @@ describe("contact communication policies", () => {
     expect(page.items[0].effective.phone).toBe("some");
     expect(page.items[0].revision).toBe(8);
     expect(page.items[0].contact).not.toHaveProperty("notes");
+    expect(page.items[0].access).toEqual(access);
   });
   it("serializes independent visibility while preserving omission", async () => {
     const put = vi.fn().mockResolvedValue({ contact_id: "contact", revision: 2,

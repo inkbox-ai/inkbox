@@ -23,10 +23,12 @@ pub use resources::correspondence::{ContactCorrespondenceResource, Correspondenc
 pub use resources::permissions::*;
 pub use resources::vcards::VCardsResource;
 pub use types::{
-    Contact, ContactAccess, ContactAddress, ContactBulkDeleteResult, ContactBulkDeleteResultItem,
-    ContactBulkDeleteStatus, ContactCreatePermissions, ContactCreationSource, ContactCustomField,
-    ContactDate, ContactEmail, ContactFact, ContactFactCitation, ContactFactCitationAvailability,
-    ContactFactCitationDetail, ContactFactDeleteResult, ContactFactKind, ContactFactOrigin,
-    ContactImportResult, ContactImportResultItem, ContactImportStatus, ContactMemorySummary,
-    ContactNameSource, ContactPhone, ContactReviewStatus, ContactVCardExportResult, ContactWebsite,
+    Contact, ContactAccess, ContactAccessSettings, ContactAddress, ContactBulkDeleteResult,
+    ContactBulkDeleteResultItem, ContactBulkDeleteStatus, ContactChannelAccess,
+    ContactChannelAccessUpdate, ContactCreatePermissions, ContactCreationSource,
+    ContactCustomField, ContactDate, ContactEmail, ContactFact, ContactFactCitation,
+    ContactFactCitationAvailability, ContactFactCitationDetail, ContactFactDeleteResult,
+    ContactFactKind, ContactFactOrigin, ContactImportResult, ContactImportResultItem,
+    ContactImportStatus, ContactMemorySummary, ContactNameSource, ContactPhone,
+    ContactReviewStatus, ContactVCardExportResult, ContactWebsite, UpdateContactAccess,
 };

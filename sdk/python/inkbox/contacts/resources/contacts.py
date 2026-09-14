@@ -66,7 +66,7 @@ class ContactsResource:
 
     @property
     def access(self) -> ContactAccessResource:
-        """Deprecated read-only metadata that does not restrict contact visibility."""
+        """Selected-agent visibility and communication access, plus legacy metadata."""
         return self._access
 
     @property

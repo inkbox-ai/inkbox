@@ -681,7 +681,11 @@ inkbox number rules delete <rule-id> --number <id>                              
 
 ## Contacts
 
-Shared address book with per-email, per-phone, Profile, and Memories permissions. Phone covers SMS, calls, and iMessage. Profile and Memories do not grant communication access. Existing-contact identifier changes and suggestion absorption require admin credentials.
+Shared address book with whole-group email/phone visibility and separate communication choices for each address. Phone covers SMS, calls, and iMessage. Profile and Memories do not grant communication access. Existing-contact identifier changes and suggestion absorption require admin credentials.
+
+`contacts access get <handle> <contact-id>` reads `email`/`phone` objects with `visible` and `contactable`, plus `profile` and `memories`, using admin credentials. `contacts access set <handle> <contact-id> --file access.json` applies partial choices. `{"email":{"visible":true,"contactable":[]}}` is View-only email access; a nonempty list allows those current addresses and blocks the rest. Omitted fields are preserved; `profile: false` hides omitted or empty groups and omitted Memories, while explicit choices win. The management roster's optional `access` has the same shape. `contacts access list <contact-id>` remains compatibility metadata.
+
+`contacts create --json` also accepts nested access in `permissions`, for example `{"identityId":"11111111-1111-4111-8111-111111111111","email":{"visible":true,"contactable":[]}}`. Use group objects or the older boolean maps, not both.
 
 Use `contacts permissions get <handle> <contact-id>` with admin credentials to read effective `emails` and `phones` boolean maps plus `profile` and `memories` booleans. Save a JSON file such as `{"emails":{"ada@example.com":true},"profile":true,"memories":false}` with `contacts permissions set <handle> <contact-id> --file permissions.json`. Omitted fields and addresses stay unchanged; no revision is required.
 

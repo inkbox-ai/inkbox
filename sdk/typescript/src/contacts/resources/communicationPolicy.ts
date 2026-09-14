@@ -1,4 +1,5 @@
 import { HttpTransport } from "../../_http.js";
+import type { ContactAccessSettings } from "./contactAccess.js";
 import { type Contact, type RawContact, type ContactReviewStatus, parseContact, parseContactEmail, parseContactPhone } from "../types.js";
 
 /** An explicit exact-address choice overrides the agent's channel mode. */
@@ -70,6 +71,7 @@ export interface ContactPermissionEntry {
   revision: number;
   visibility: ContactPermissionVisibility;
   effective: ContactPermissionEffective;
+  access?: ContactAccessSettings | null;
 }
 export interface ContactPermissionPage {
   items: ContactPermissionEntry[];
@@ -89,6 +91,7 @@ interface RawPermissionEntry {
   revision: number;
   visibility: { defaults: ContactVisibilityDecisions; identity_override: ContactVisibilityDecisions };
   effective: ContactPermissionEffective;
+  access?: ContactAccessSettings | null;
 }
 interface RawPolicy {
   contact_id: string;
@@ -169,6 +172,7 @@ export class ContactCommunicationPolicyResource {
       revision: row.revision,
       visibility: { defaults: row.visibility.defaults, identityOverride: row.visibility.identity_override },
       effective: row.effective,
+      ...(row.access !== undefined ? { access: row.access } : {}),
     })) };
   }
 }

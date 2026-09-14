@@ -6,10 +6,60 @@ import { fileURLToPath } from "node:url";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseContactPolicyFile, parseContactPermissionsFile } from "../dist/commands/contacts.js";
+import { parseContactAccessFile, parseContactPolicyFile, parseContactPermissionsFile } from "../dist/commands/contacts.js";
 import { outputContactRules } from "../dist/output.js";
 
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+test("access files preserve omission and reject malformed or contradictory groups", () => {
+  for (const body of [{}, { email: {} }, { email: { visible: true, contactable: [] }, profile: false }, { phone: { contactable: ["+15555550123"] } }]) {
+    assert.deepEqual(parseContactAccessFile(JSON.stringify(body)), body);
+  }
+  for (const body of [null, [], { email: null }, { profile: null }, { phone: { visible: "false" } },
+    { email: { visible: false, contactable: ["person@example.com"] } }, { email: { contactable: null } },
+    { email: { contactable: [false] } }, { phone: { contactable: [""] } }, { phone: { allow: true } },
+    { emails: {} }, { memories: 0 }, { email: { contactable: ["person@example.com", "person@example.com"] } },
+    { phone: { contactable: Array.from({ length: 51 }, (_, i) => `+1555555${String(i).padStart(4, "0")}`) } }]) {
+    assert.throws(() => parseContactAccessFile(JSON.stringify(body)));
+  }
+});
+
+test("access get and set preserve nested choices and reject invalid files before HTTP", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "contact-access-"));
+  const path = join(directory, "access.json");
+  const requests = [];
+  const access = { email: { visible: true, contactable: ["person@example.com"] }, phone: { visible: true, contactable: [] }, profile: true, memories: false };
+  const mock = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    requests.push({ method: req.method, path: req.url, body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : null });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(access));
+  });
+  try {
+    const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "contacts", "access"];
+    const get = await runCli([...args, "get", "test-agent", "contact-1"]);
+    assert.equal(get.error, null, get.stderr);
+    assert.deepEqual(JSON.parse(get.stdout), access);
+    const update = { email: { visible: true, contactable: [] }, phone: { visible: false }, profile: false };
+    const setArgs = [...args, "set", "test-agent", "contact-1", "--file", path];
+    for (const body of [update, { email: {} }, {}]) {
+      await writeFile(path, JSON.stringify(body));
+      const result = await runCli(setArgs);
+      assert.equal(result.error, null, result.stderr);
+      assert.deepEqual(JSON.parse(result.stdout), access);
+    }
+    await writeFile(path, '{"email":{"visible":false,"contactable":["person@example.com"]}}');
+    assert.ok((await runCli(setArgs)).error);
+    assert.deepEqual(requests, [
+      { method: "GET", path: "/api/v1/identities/test-agent/contacts/contact-1/access", body: null },
+      ...[update, { email: {} }, {}].map((body) => ({ method: "PATCH", path: "/api/v1/identities/test-agent/contacts/contact-1/access", body })),
+    ]);
+  } finally {
+    await new Promise((resolve) => mock.server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("boolean permissions reject null, strings, unknown fields, and excessive maps", () => {
   for (const body of [{}, { emails: {}, phones: {}, profile: false, memories: true }]) {
@@ -80,6 +130,14 @@ test("contact creation forwards permissions in one atomic request", async () => 
     assert.deepEqual(requests, [{ path: "/api/v1/contacts/with-permissions", body: { given_name: "Person", permissions: {
       identity_id: "11111111-1111-4111-8111-111111111111", profile: false, memories: false,
     } } }]);
+    const nested = await runCli(["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`,
+      "contacts", "create", `--json=${JSON.stringify({ givenName: "Person", permissions: {
+        identityId: "11111111-1111-4111-8111-111111111111", email: { visible: true, contactable: [] },
+      } })}`]);
+    assert.equal(nested.error, null, nested.stderr);
+    assert.deepEqual(requests[1], { path: "/api/v1/contacts/with-permissions", body: { given_name: "Person", permissions: {
+      identity_id: "11111111-1111-4111-8111-111111111111", email: { visible: true, contactable: [] },
+    } } });
   } finally { await new Promise((resolve) => mock.server.close(resolve)); }
 });
 
@@ -354,7 +412,7 @@ test("contacts exposes bulk deletion and batch export", () => {
   assert.match(text, /export-many (?:\[options\] )?<contact-id\.\.\.>/);
 });
 
-test("contact access retains list and removes mutation commands", () => {
+test("contact access retains compatibility list without legacy grant/revoke commands", () => {
   const text = help("contacts", "access");
   assert.match(text, /list <contact-id>/);
   assert.doesNotMatch(text, /^\s+grant(?:\s|$)/m);

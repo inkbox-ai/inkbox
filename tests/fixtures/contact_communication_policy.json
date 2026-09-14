@@ -1,4 +1,16 @@
 {
+  "access": {
+    "email": {"visible": true, "contactable": ["person@example.com"]},
+    "phone": {"visible": true, "contactable": []},
+    "profile": false,
+    "memories": true
+  },
+  "access_update": {
+    "email": {"visible": true, "contactable": []},
+    "phone": {"visible": false},
+    "profile": false,
+    "memories": true
+  },
   "permissions": {
     "emails": {"person@example.com": true, "personal@example.net": false},
     "phones": {"+15555550123": false},

@@ -70,6 +70,13 @@ def test_management_roster_uses_distinct_contract_and_filters() -> None:
     assert page.items[0].effective.phone == "some"
     assert page.items[0].visibility.identity_override.memories == "block"
     assert not hasattr(page.items[0].contact, "notes")
+    assert page.items[0].access is None
+    access = {"email": {"visible": True, "contactable": []}, "phone": {"visible": False, "contactable": []}, "profile": False, "memories": True}
+    http.get.return_value["items"][0]["access"] = access
+    current = ContactsResource(http).communication_policy.list_management_for_identity("test-agent")
+    assert current.items[0].access.email.visible
+    assert current.items[0].access.email.contactable == []
+    assert not current.items[0].access.phone.visible
 
 
 def test_replace_serializes_uuid_overrides_and_revision() -> None:
