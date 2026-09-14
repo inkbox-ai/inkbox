@@ -40,6 +40,7 @@ export function registerEmailCommands(program: Command): void {
       collect,
       [],
     )
+    .option("--idempotency-key <key>", "Stable key that makes this send safe to retry")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -55,6 +56,7 @@ export function registerEmailCommands(program: Command): void {
           trackOpens?: boolean;
           attach: string[];
           inlineImage: string[];
+          idempotencyKey?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -78,6 +80,7 @@ export function registerEmailCommands(program: Command): void {
           inReplyToMessageId: cmdOpts.inReplyTo,
           trackOpens: cmdOpts.trackOpens,
           attachments: buildAttachments(cmdOpts.attach, cmdOpts.inlineImage),
+          idempotencyKey: cmdOpts.idempotencyKey,
         });
         output(
           {
@@ -106,6 +109,7 @@ export function registerEmailCommands(program: Command): void {
       collect,
       [],
     )
+    .option("--idempotency-key <key>", "Stable key that makes this reply safe to retry")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -118,6 +122,7 @@ export function registerEmailCommands(program: Command): void {
           replyTo?: string;
           attach: string[];
           inlineImage: string[];
+          idempotencyKey?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -133,6 +138,7 @@ export function registerEmailCommands(program: Command): void {
           bodyHtml: cmdOpts.bodyHtml,
           replyTo: cmdOpts.replyTo,
           attachments: buildAttachments(cmdOpts.attach, cmdOpts.inlineImage),
+          idempotencyKey: cmdOpts.idempotencyKey,
         });
         output(
           {
@@ -168,6 +174,7 @@ export function registerEmailCommands(program: Command): void {
     .option("--reply-to <address>", "Reply-To address for the forward")
     .option("--track-opens", "Embed an open-tracking pixel (inline forwards can reuse the original's HTML)")
     .option("--attach <path>", "Attach an additional file alongside the forward (repeatable)", collect, [])
+    .option("--idempotency-key <key>", "Stable key that makes this forward safe to retry")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -185,6 +192,7 @@ export function registerEmailCommands(program: Command): void {
           replyTo?: string;
           trackOpens?: boolean;
           attach: string[];
+          idempotencyKey?: string;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -212,6 +220,7 @@ export function registerEmailCommands(program: Command): void {
           includeOriginalAttachments: cmdOpts.includeOriginalAttachments,
           replyTo: cmdOpts.replyTo,
           trackOpens: cmdOpts.trackOpens,
+          idempotencyKey: cmdOpts.idempotencyKey,
         });
         output(
           {
