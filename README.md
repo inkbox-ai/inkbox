@@ -583,3 +583,9 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ## License
 
 MIT
+
+
+Webhook subscriptions belong to an identity and can combine mail, text, iMessage,
+call-lifecycle and A2A notifications, even before channels are configured. All SDKs
+support revision-checked updates/deletion; the CLI exposes `--expected-revision`.
+Incoming-call actions remain a separate identity setting.

@@ -17,9 +17,8 @@ import type {
 // `get` output and `--json` everywhere via flattenForOutput.
 const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "id",
-  "mailboxId",
-  "phoneNumberId",
   "agentIdentityId",
+  "revision",
   "url",
   "eventTypes",
   "contextConfig",
@@ -31,6 +30,7 @@ const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
 function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
   return {
     id: sub.id,
+    revision: sub.revision,
     organizationId: sub.organizationId,
     mailboxId: sub.mailboxId,
     phoneNumberId: sub.phoneNumberId,
@@ -108,17 +108,24 @@ function buildContextConfigFromFlags(cmdOpts: {
   return Object.keys(cfg).length > 0 ? cfg : undefined;
 }
 
+export function parseExpectedRevision(value: string): number {
+  if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+    throw new Error("Expected revision must be a positive safe integer.");
+  }
+  return Number(value);
+}
+
 function registerSubscriptionCommands(parent: Command): void {
   const sub = parent
     .command("subscription")
-    .description("Manage webhook subscriptions (fan-out per (owner, url, event_types))");
+    .description("Manage identity-owned notification subscriptions");
 
   sub
     .command("list")
     .description("List webhook subscriptions in the caller's org (filters AND-combine)")
-    .option("--mailbox-id <id>", "Filter by owning mailbox id")
-    .option("--phone-number-id <id>", "Filter by owning phone number id")
-    .option("--agent-identity-id <id>", "Filter by owning agent identity id (iMessage)")
+    .option("--mailbox-id <id>", "Deprecated: filter the mailbox identity's mail events")
+    .option("--phone-number-id <id>", "Deprecated: filter the phone identity's text events")
+    .option("--agent-identity-id <id>", "Filter by owning agent identity id")
     .option("--url <url>", "Filter by destination URL (exact match)")
     .option("--event-type <type>", "Filter by event type wire value")
     .action(
@@ -162,10 +169,10 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("create")
-    .description("Create a webhook subscription. Exactly one of --mailbox-id / --phone-number-id / --agent-identity-id is required.")
-    .option("--mailbox-id <id>", "Owning mailbox id")
-    .option("--phone-number-id <id>", "Owning phone number id")
-    .option("--agent-identity-id <id>", "Owning agent identity id (for imessage.* or call.ended events)")
+    .description("Create a subscription for any mix of notification events. Prefer --agent-identity-id; provide exactly one owner selector.")
+    .option("--mailbox-id <id>", "Deprecated: resolve the owning identity from a mailbox")
+    .option("--phone-number-id <id>", "Deprecated: resolve the owning identity from a phone number")
+    .option("--agent-identity-id <id>", "Owning agent identity id (all notification events)")
     .requiredOption("--url <url>", "HTTPS destination for delivered events")
     .requiredOption(
       "--event-type <type>",
@@ -230,6 +237,7 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--context-calls <spec>", "Set calls context: count:N or window:H (replaces stored config)")
     .option("--clear-context", "Clear all conversation context (mutually exclusive with --context-*)")
     .option("--auth-token-stdin", "Read the replacement bearer token from stdin")
+    .option("--expected-revision <revision>", "Reject changes since this last-read revision", parseExpectedRevision)
     .option("--clear-auth-token", "Clear the delivery bearer token (mutually exclusive with --auth-token-stdin)")
     .action(
       withErrorHandler(async function (
@@ -244,6 +252,7 @@ function registerSubscriptionCommands(parent: Command): void {
           clearContext?: boolean;
           authTokenStdin?: boolean;
           clearAuthToken?: boolean;
+          expectedRevision?: number;
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -253,7 +262,9 @@ function registerSubscriptionCommands(parent: Command): void {
           eventTypes?: string[];
           contextConfig?: WebhookContextConfig | null;
           authToken?: string | null;
+          expectedRevision?: number;
         } = {};
+        if (cmdOpts.expectedRevision !== undefined) body.expectedRevision = cmdOpts.expectedRevision;
         if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
         if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
         const contextConfig = buildContextConfigFromFlags(cmdOpts);
@@ -285,12 +296,13 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("delete <sub-id>")
-    .description("Remove a webhook subscription")
+    .description("Remove the whole subscription, including every selected event")
+    .option("--expected-revision <revision>", "Reject deletion since this last-read revision", parseExpectedRevision)
     .action(
-      withErrorHandler(async function (this: Command, subId: string) {
+      withErrorHandler(async function (this: Command, subId: string, cmdOpts: { expectedRevision?: number }) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        await inkbox.webhooks.subscriptions.delete(subId);
+        await inkbox.webhooks.subscriptions.delete(subId, { expectedRevision: cmdOpts.expectedRevision });
         printStatus(`Deleted webhook subscription '${subId}'.`);
       }),
     );
@@ -303,6 +315,7 @@ const WEBHOOK_DELIVERY_LIST_COLUMNS = [
   "url",
   "responseStatus",
   "isReplay",
+  "replayable",
   "createdAt",
 ];
 
@@ -311,6 +324,9 @@ function flattenDeliveryForOutput(d: WebhookDelivery): Record<string, unknown> {
     id: d.id,
     organizationId: d.organizationId,
     webhookSubscriptionId: d.webhookSubscriptionId,
+    canonicalSubscriptionId: d.canonicalSubscriptionId,
+    replayable: d.replayable,
+    replayUnavailableReason: d.replayUnavailableReason,
     phoneNumberId: d.phoneNumberId,
     eventId: d.eventId,
     eventType: d.eventType,

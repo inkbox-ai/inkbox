@@ -140,29 +140,11 @@ class TestCreate:
 
     def test_rejects_incoming_call_event_type(self):
         res, _ = _resource()
-        with pytest.raises(ValueError, match="incoming_call_webhook_url"):
+        with pytest.raises(ValueError, match="incoming-call action"):
             res.create(
                 phone_number_id=_PHONE_ID,
                 url="https://x/y",
                 event_types=["phone.incoming_call"],
-            )
-
-    def test_rejects_channel_mismatch_mailbox_with_text(self):
-        res, _ = _resource()
-        with pytest.raises(ValueError, match="does not belong"):
-            res.create(
-                mailbox_id=_MAILBOX_ID,
-                url="https://x/y",
-                event_types=["text.received"],
-            )
-
-    def test_rejects_channel_mismatch_phone_with_message(self):
-        res, _ = _resource()
-        with pytest.raises(ValueError, match="does not belong"):
-            res.create(
-                phone_number_id=_PHONE_ID,
-                url="https://x/y",
-                event_types=["message.received"],
             )
 
     def test_rejects_none_url(self):
@@ -230,7 +212,7 @@ class TestUpdate:
 
     def test_rejects_incoming_call(self):
         res, _ = _resource()
-        with pytest.raises(ValueError, match="incoming_call_webhook_url"):
+        with pytest.raises(ValueError, match="incoming-call action"):
             res.update(_SUB_ID, event_types=["phone.incoming_call"])
 
     def test_defers_owner_compatibility_to_server(self):
@@ -343,24 +325,6 @@ class TestAgentIdentityOwner:
         assert sub.mailbox_id is None
         assert sub.phone_number_id is None
 
-    def test_rejects_imessage_events_on_mailbox_owner(self):
-        res, _http = _resource()
-        with pytest.raises(ValueError, match="agent_identity"):
-            res.create(
-                mailbox_id=_MAILBOX_ID,
-                url="https://x.example.com/hook",
-                event_types=["imessage.received"],
-            )
-
-    def test_rejects_text_events_on_agent_identity_owner(self):
-        res, _http = _resource()
-        with pytest.raises(ValueError, match="phone_number"):
-            res.create(
-                agent_identity_id=_IDENTITY_ID,
-                url="https://x.example.com/hook",
-                event_types=["text.received"],
-            )
-
     def test_accepts_call_ended_on_agent_identity_owner(self):
         res, http = _resource()
         http.post.return_value = {
@@ -393,31 +357,6 @@ class TestAgentIdentityOwner:
         )
 
         assert sub.event_types == ["a2a.task.created", "a2a.task.message"]
-
-    def test_rejects_mixed_identity_owned_events_on_one_sub(self):
-        res, http = _resource()
-        event_types = [
-            "imessage.received",
-            "call.ended",
-            "a2a.sent_task.updated",
-        ]
-
-        with pytest.raises(ValueError, match="one channel"):
-            res.create(
-                agent_identity_id=_IDENTITY_ID,
-                url="https://x.example.com/hook",
-                event_types=event_types,
-            )
-        http.post.assert_not_called()
-
-    def test_rejects_call_ended_on_mailbox_owner(self):
-        res, _http = _resource()
-        with pytest.raises(ValueError, match="agent_identity"):
-            res.create(
-                mailbox_id=_MAILBOX_ID,
-                url="https://x.example.com/hook",
-                event_types=["call.ended"],
-            )
 
     def test_rejects_multiple_owners_including_identity(self):
         res, _http = _resource()
@@ -479,26 +418,15 @@ class TestContextConfig:
         _, kwargs = http.post.call_args
         assert "context_config" not in kwargs["json"]
 
-    def test_create_rejects_context_config_for_a2a(self):
-        res, http = _resource()
-        with pytest.raises(
-            ValueError,
-            match="context_config is not supported for A2A subscriptions",
-        ):
-            res.create(
-                agent_identity_id=_IDENTITY_ID,
-                url="https://x/y",
-                event_types=["a2a.task.created"],
-                context_config={"email": {"mode": "count", "count": 1}},
-            )
-        http.post.assert_not_called()
-
     def test_parse_tolerates_missing_context_config(self):
         sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
         assert sub.context_config is None
 
     def test_parse_reads_context_config_when_present(self):
-        raw = {**RAW_SUBSCRIPTION, "context_config": {"calls": {"mode": "count", "count": 2}}}
+        raw = {
+            **RAW_SUBSCRIPTION,
+            "context_config": {"calls": {"mode": "count", "count": 2}},
+        }
         sub = WebhookSubscription._from_dict(raw)
         assert sub.context_config == {"calls": {"mode": "count", "count": 2}}
 
@@ -527,28 +455,6 @@ class TestContextConfig:
             f"/webhooks/subscriptions/{_SUB_ID}",
             json={"context_config": cfg},
         )
-
-    def test_update_rejects_context_config_with_a2a_events(self):
-        res, http = _resource()
-        with pytest.raises(
-            ValueError,
-            match="context_config is not supported for A2A subscriptions",
-        ):
-            res.update(
-                _SUB_ID,
-                event_types=["a2a.task.message"],
-                context_config={"texts": {"mode": "count", "count": 1}},
-            )
-        http.patch.assert_not_called()
-
-    def test_update_rejects_mixed_event_channels(self):
-        res, http = _resource()
-        with pytest.raises(ValueError, match="one channel"):
-            res.update(
-                _SUB_ID,
-                event_types=["imessage.received", "a2a.task.created"],
-            )
-        http.patch.assert_not_called()
 
     @pytest.mark.parametrize(
         "bad",
@@ -676,3 +582,165 @@ class TestAuthToken:
         sub = WebhookSubscription._from_dict(RAW_SUBSCRIPTION)
         assert sub.has_auth_token is False
         assert sub.auth_token is None
+
+
+ALL_NOTIFICATION_EVENTS = [
+    "message.received",
+    "message.sent",
+    "message.forwarded",
+    "message.delivered",
+    "message.bounced",
+    "message.failed",
+    "text.received",
+    "text.sent",
+    "text.delivered",
+    "text.delivery_failed",
+    "text.delivery_unconfirmed",
+    "imessage.received",
+    "imessage.reaction_received",
+    "imessage.sent",
+    "imessage.delivered",
+    "imessage.delivery_failed",
+    "call.ended",
+    "a2a.task.created",
+    "a2a.task.message",
+    "a2a.task.canceled",
+    "a2a.sent_task.updated",
+]
+
+
+@pytest.mark.parametrize(
+    "selector", ["agent_identity_id", "mailbox_id", "phone_number_id"]
+)
+def test_all_notification_events_with_context_and_no_channel_lookup(selector):
+    res, http = _resource()
+    cfg = {"email": {"mode": "count", "count": 2}}
+    http.post.return_value = {
+        **RAW_SUBSCRIPTION,
+        "mailbox_id": None,
+        "phone_number_id": None,
+        "agent_identity_id": _IDENTITY_ID,
+        "owner_identity_id": _IDENTITY_ID,
+        "revision": 3,
+        "event_types": ALL_NOTIFICATION_EVENTS,
+        "context_config": cfg,
+    }
+    row = res.create(
+        **{selector: _IDENTITY_ID},
+        url="https://example.com/hook",
+        event_types=ALL_NOTIFICATION_EVENTS,
+        context_config=cfg,
+    )
+    http.post.assert_called_once_with(
+        "/webhooks/subscriptions",
+        json={
+            selector: _IDENTITY_ID,
+            "url": "https://example.com/hook",
+            "event_types": ALL_NOTIFICATION_EVENTS,
+            "context_config": cfg,
+        },
+    )
+    http.get.assert_not_called()
+    assert row.revision == 3
+    assert row.mailbox_id is None and row.phone_number_id is None
+    assert row.event_types == ALL_NOTIFICATION_EVENTS
+
+
+def test_conditional_update_replaces_events_and_preserves_context_tristate():
+    res, http = _resource()
+    http.patch.return_value = {**RAW_SUBSCRIPTION, "revision": 8}
+    cfg = {"texts": {"mode": "count", "count": 2}}
+    row = res.update(
+        _SUB_ID,
+        event_types=ALL_NOTIFICATION_EVENTS,
+        context_config=cfg,
+        expected_revision=7,
+    )
+    http.patch.assert_called_once_with(
+        f"/webhooks/subscriptions/{_SUB_ID}",
+        json={
+            "event_types": ALL_NOTIFICATION_EVENTS,
+            "context_config": cfg,
+            "expected_revision": 7,
+        },
+    )
+    assert row.revision == 8
+
+
+def test_conditional_delete_uses_query_revision():
+    res, http = _resource()
+    res.delete(_SUB_ID, expected_revision=7)
+    http.delete.assert_called_once_with(
+        f"/webhooks/subscriptions/{_SUB_ID}", params={"expected_revision": 7}
+    )
+
+
+@pytest.mark.parametrize("revision", [0, -1, 1.5, True, "1"])
+def test_invalid_revision_never_sends(revision):
+    res, http = _resource()
+    with pytest.raises(ValueError, match="positive integer"):
+        res.update(_SUB_ID, expected_revision=revision)
+    with pytest.raises(ValueError, match="positive integer"):
+        res.delete(_SUB_ID, expected_revision=revision)
+    http.patch.assert_not_called()
+    http.delete.assert_not_called()
+
+
+def test_missing_revision_and_legacy_response_keys_are_backward_readable():
+    raw = {
+        k: v
+        for k, v in RAW_SUBSCRIPTION.items()
+        if k not in ("mailbox_id", "phone_number_id")
+    }
+    row = WebhookSubscription._from_dict(raw)
+    assert row.revision == 1
+    assert row.mailbox_id is None and row.phone_number_id is None
+
+
+def test_stale_revision_error_is_not_swallowed_or_retried():
+    from inkbox.exceptions import InkboxAPIError
+
+    res, http = _resource()
+    error = InkboxAPIError(status_code=409, detail="Subscription revision changed")
+    http.patch.side_effect = error
+    with pytest.raises(InkboxAPIError) as caught:
+        res.update(_SUB_ID, event_types=["message.received"], expected_revision=1)
+    assert caught.value is error
+    assert http.patch.call_count == 1
+
+
+def test_delivery_history_keeps_original_target_and_canonical_replay_state():
+    from inkbox.webhook_deliveries import WebhookDelivery
+
+    raw = {
+        "id": _SUB_ID,
+        "organization_id": "org_test",
+        "webhook_subscription_id": _MAILBOX_ID,
+        "phone_number_id": None,
+        "event_id": "evt_example",
+        "event_type": "message.received",
+        "url": "https://example.com/hook",
+        "request_payload": "{}",
+        "is_replay": False,
+        "created_at": "2026-09-15T00:00:00+00:00",
+    }
+    old = WebhookDelivery._from_dict(raw)
+    assert old.canonical_subscription_id is None and old.replayable is False
+    current = WebhookDelivery._from_dict(
+        {
+            **raw,
+            "canonical_subscription_id": _IDENTITY_ID,
+            "replayable": True,
+        }
+    )
+    assert current.webhook_subscription_id == UUID(_MAILBOX_ID)
+    assert current.canonical_subscription_id == UUID(_IDENTITY_ID)
+    assert current.replayable is True
+    unavailable = WebhookDelivery._from_dict(
+        {
+            **raw,
+            "replayable": False,
+            "replay_unavailable_reason": "event_not_subscribed",
+        }
+    )
+    assert unavailable.replay_unavailable_reason == "event_not_subscribed"

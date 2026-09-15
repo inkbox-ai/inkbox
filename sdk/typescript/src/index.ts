@@ -165,6 +165,7 @@ export type {
   WebhookContextClassConfig,
   CreateWebhookSubscriptionOptions,
   UpdateWebhookSubscriptionOptions,
+  DeleteWebhookSubscriptionOptions,
   ListWebhookSubscriptionsOptions,
 } from "./webhooks/subscriptions.js";
 export type { WebhookSubscriptionsResource } from "./webhooks/subscriptions.js";

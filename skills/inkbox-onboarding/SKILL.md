@@ -190,8 +190,9 @@ unread email and recent SMS, iMessage, calls, and A2A tasks; fetch only the
 bounded conversation context needed; then persist a cursor or last-success time
 so the next run does not reply twice.
 
-Use webhooks when the agent needs prompt delivery. Subscribe to only the event
-types and identity resources the agent needs, verify every signature against the
+Use identity-owned webhooks when the agent needs prompt delivery. One subscription
+can combine notification families even before optional channels are configured.
+Subscribe to only the event types and identities the agent needs, verify every signature against the
 raw request body, return quickly, and process idempotently. Use an Inkbox tunnel
 when the receiver runs locally; see `inkbox-tunnels` for setup and recovery.
 

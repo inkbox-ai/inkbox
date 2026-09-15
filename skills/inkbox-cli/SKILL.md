@@ -592,7 +592,7 @@ inkbox mailbox get <email-address>               # includes storageUsedBytes / s
 inkbox mailbox update <email-address> [--filter-mode whitelist|blacklist]
 inkbox mailbox client-settings <email-address>   # IMAP/SMTP settings for a mail client
 # To attach a webhook receiver, use `inkbox webhook subscription create
-# --mailbox-id <id> --url <url> --event-type message.received ...`.
+# --agent-identity-id <id> --url <url> --event-type message.received ...`.
 ```
 
 `mailbox list` / `get` / `update` rows include `filterMode` and `agentIdentityId`. `mailbox update --filter-mode` is the **deprecated** channel path (admin-only; prints a stderr change note when the value actually changes). Prefer `inkbox identity update <handle> --mail-filter-mode whitelist|blacklist`, which sets the mode on the identity and prints no change note.
@@ -781,18 +781,18 @@ inkbox webhook verify --payload <payload> --secret <secret> -H "X-Header: value"
 
 # Webhook subscriptions (fan-out per (owner, url, event_types)):
 inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>] [--agent-identity-id <id>]
-inkbox webhook subscription create --mailbox-id <id> --url <url> --event-type message.received
-inkbox webhook subscription create --phone-number-id <id> --url <url> \
+inkbox webhook subscription create --agent-identity-id <id> --url <url> --event-type message.received
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type text.received --event-type text.delivered
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type imessage.received --event-type imessage.reaction_received
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type call.ended
 # Opt into per-class conversation context on received events (count:N | window:H):
-inkbox webhook subscription create --mailbox-id <id> --url <url> \
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type message.received --context-email count:10 --context-texts window:24
 # Bearer token sent as Authorization on every delivery (returned by reads):
-inkbox webhook subscription create --mailbox-id <id> --url <url> \
+inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type message.received --auth-token-stdin   # token read from stdin
 inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...] \
   [--context-email <spec>] [--context-texts <spec>] [--context-calls <spec>] [--clear-context] \
@@ -802,7 +802,7 @@ inkbox webhook subscription delete <sub-id>
 
 Every subscription row carries `ownerIdentityId` (the resolved owning agent identity). The **first** subscription created for an identity that has no signing key yet returns that identity's `signingKey` **once** in the create output (otherwise null) — capture it then, it cannot be retrieved again (use `--json` to read it reliably).
 
-The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. A2A subscriptions do not support these flags. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
+The `--context-email` / `--context-texts` / `--context-calls` flags each take `count:N` (1..50) or `window:H` (1..168) and opt a mail, text, or iMessage subscription into per-class conversation history delivered under `data.context` on received events. Only received mail, text and iMessage events include context; other selected events ignore it. On `update`, a `--context-*` flag replaces the stored config and `--clear-context` removes it (the two are mutually exclusive).
 
 `--auth-token-stdin` sets an optional bearer token for endpoints that require their own `Authorization` header; every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the token: `get` and `--json` output include `authToken`, while list tables show only the `hasAuthToken` flag. The token is only ever read from stdin via `--auth-token-stdin`, so it never lands in argv or shell history. On `update` it replaces the stored token and `--clear-auth-token` removes it (mutually exclusive).
 
@@ -815,13 +815,13 @@ any of:
 - **Mail** (envelope): `message.received`, `message.sent`,
   `message.forwarded`, `message.delivered`, `message.bounced`,
   `message.failed`. Subscribe via `inkbox webhook subscription create
-  --mailbox-id ...`. On `message.received`, `data.message` carries the
+  --agent-identity-id ...`. On `message.received`, `data.message` carries the
   plain-text `body` (whole under a size cap, else a prefix with
   `body_truncated: true`); when truncated, fetch the full message by its
   `id` (via the API/SDK) — not `message_id` (the RFC 5322 header).
 - **Text** (envelope): `text.received`, `text.sent`, `text.delivered`,
   `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via
-  `inkbox webhook subscription create --phone-number-id ...`.
+  `inkbox webhook subscription create --agent-identity-id ...`.
 - **iMessage** (envelope): `imessage.received`,
   `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`,
   `imessage.delivery_failed`. Subscribe via `inkbox webhook
@@ -838,11 +838,9 @@ any of:
   `failed`; `null` iff the call was client-driven) and
   `data.post_call_action_items` (open items only, `seq`-ascending).
   Voice AI calls fire `call.ended` on every terminal state, not just
-  connected calls. One subscription carries a single channel, so an
-  identity sub cannot mix `imessage.*` with `call.ended`.
+  connected calls. Notification families can share one identity subscription.
 - **Inbound call** (flat, no envelope; response controls call routing).
-  Not subscribable; URL stays on the phone-number resource as
-  `incomingCallWebhookUrl` (contrast the replayable `call.ended` above).
+  Not subscribable; configure the identity incoming-call action (contrast the replayable `call.ended` above).
 
 Mail and text payloads carry `data.contacts` and
 `data.agent_identities` (both always-present lists; mail entries also
@@ -864,6 +862,13 @@ SDK skills (`inkbox-ts`, `inkbox-python`).
 - Prefer `--json` for anything that needs stable parsing.
 - Use the identity handle, not mailbox address or phone number, for identity-scoped commands.
 - If a command fails because the identity lacks a mailbox or phone number, inspect it first with `inkbox identity get <handle>`.
+
+
+Subscriptions are identity-owned and may combine all notification event families
+without configured channels. Use `--expected-revision <revision>` on subscription
+update/delete to reject stale writes with HTTP 409. Update replaces the entire
+event selection, and delete removes the whole subscription. Legacy mailbox/phone
+selectors remain accepted for compatibility; prefer `--agent-identity-id`.
 
 ## Custom email signatures
 

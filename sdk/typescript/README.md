@@ -657,7 +657,7 @@ Customer-managed 10DLC brands and campaigns lift the default per-number cap to t
 
 ```ts
 // Send SMS/MMS. Returns a queued TextMessage; final delivery state
-// arrives via any webhook subscription on the sender's phone number
+// arrives via any webhook subscription on the sender's identity
 // whose eventTypes include the text.* lifecycle events.
 const sent = await identity.sendText({
   to: "+15551234567",
@@ -1467,58 +1467,32 @@ WebSockets receive the matching CLOSE code on their local upstream connection.
 
 ## Webhooks
 
-Webhook delivery uses a dedicated subscription resource. Each
-subscription names exactly one owner (a mailbox, a phone number, **or**
-an agent identity for iMessage), one HTTPS destination URL, and a
-non-empty subset of the catalog's event types. Multiple subscriptions
-on the same owner fan out independently.
+Each notification subscription belongs to an agent identity and can combine all
+21 current mail, text, iMessage, call-lifecycle and A2A event types. Optional
+channels do not have to be configured before subscribing. Multiple receivers
+remain supported; one identity and URL cannot have overlapping event selections.
 
-The one exception is `phone.incoming_call`, which is a synchronous
-control-plane callback (the response body decides whether Inkbox
-answers). That URL still lives on the phone-number resource as
-`incomingCallWebhookUrl`.
+Incoming-call actions are separate identity settings: `phone.incoming_call` is a
+synchronous call-control callback, not a notification subscription.
 
-### Subscribing to mail, text, or iMessage events
+### Subscribe once across channels
 
 ```ts
-// Mail subscription: pick the message.* events you want.
-await inkbox.webhooks.subscriptions.create({
-  mailboxId: mb.id,
-  url: "https://example.com/hook",
-  eventTypes: ["message.received", "message.bounced"],
-});
-
-// Text subscription: pick the text.* events you want.
-await inkbox.webhooks.subscriptions.create({
-  phoneNumberId: number.id,
-  url: "https://example.com/texts",
-  eventTypes: [
-    "text.received",
-    "text.sent",
-    "text.delivered",
-    "text.delivery_failed",
-    "text.delivery_unconfirmed",
-  ],
-});
-
-// iMessage subscription: owned by the agent identity (the shared
-// pool lines aren't org resources).
-await inkbox.webhooks.subscriptions.create({
+const identity = await inkbox.getIdentity("my-agent");
+const sub = await inkbox.webhooks.subscriptions.create({
   agentIdentityId: identity.id,
-  url: "https://example.com/imessage",
-  eventTypes: [
-    "imessage.received",
-    "imessage.reaction_received",
-    "imessage.sent",
-    "imessage.delivered",
-    "imessage.delivery_failed",
-  ],
+  url: "https://example.com/hook",
+  eventTypes: ["message.received", "text.received", "imessage.received",
+    "call.ended", "a2a.task.created"],
 });
 
-// List, update, remove.
-const subs = await inkbox.webhooks.subscriptions.list({ mailboxId: mb.id });
-await inkbox.webhooks.subscriptions.update(subs[0].id, { url: "https://new/hook" });
-await inkbox.webhooks.subscriptions.delete(subs[0].id);
+// Events on update replace the full selection. Check the version you read.
+const updated = await inkbox.webhooks.subscriptions.update(sub.id, {
+  eventTypes: [...sub.eventTypes, "a2a.task.message"],
+  expectedRevision: sub.revision,
+});
+// A stale revision raises HTTP 409; re-read before deciding what to change.
+await inkbox.webhooks.subscriptions.delete(updated.id, { expectedRevision: updated.revision });
 ```
 
 Available event types:
@@ -1528,20 +1502,13 @@ Available event types:
 | Mail | `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed` |
 | Phone text | `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed` |
 | iMessage | `imessage.received`, `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` |
+| Call lifecycle | `call.ended` |
+| A2A | `a2a.task.created`, `a2a.task.message`, `a2a.task.canceled`, `a2a.sent_task.updated` |
 
-Server-side validation: exactly one of `mailboxId` / `phoneNumberId` /
-`agentIdentityId` must be set; `eventTypes` must be non-empty and
-distinct; every event type must belong to the owner's channel (mailbox
-→ `message.*`, phone number → `text.*`, agent identity → `imessage.*`).
-On `create` the SDK mirrors the structural checks (XOR owner,
-non-empty, distinct, no `phone.incoming_call`) plus the `message.` /
-`text.` / `imessage.` prefix check, so most shape mistakes surface as
-`Error` before the request leaves the client. The server remains
-authoritative for the exact event-name enum, so a typo with a valid
-prefix (e.g. `message.received_typo`) passes the SDK's check and is
-rejected as 422 by the server. On `update` the SDK also rejects mixed
-event families. Owner compatibility remains server-validated because the
-SDK doesn't know the owner FK from a subscription ID alone.
+Prefer `agentIdentityId`. Legacy mailbox/phone selectors remain mutually exclusive
+and resolve to their owning identity. Event lists must be nonempty and distinct;
+the API validates exact catalog values, while the SDK rejects unknown prefixes
+and `phone.incoming_call`. No wildcard or automatic channel provisioning is implied.
 
 ### Conversation context
 
@@ -1549,8 +1516,8 @@ Opt a subscription into per-class conversation history on **received**
 events (`message.received`, `text.received`, `imessage.received`) by
 passing `contextConfig`. Each class (`email`, `texts`, `calls`) takes a
 `count` mode (last N items, 1..50) or a `window` mode (last H hours,
-1..168); omit a class to leave it unconfigured. Conversation context is
-not supported for A2A subscriptions.
+1..168); omit a class to leave it unconfigured. Only these received events
+include context; A2A, call-lifecycle and other notifications ignore it.
 
 ```ts
 await inkbox.webhooks.subscriptions.create({
@@ -1862,6 +1829,12 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ## License
 
 MIT
+
+
+Delivery history keeps the original subscription ID and exposes its current
+canonical target, replayability, and any unavailable reason. These projections
+are informational; replay still validates the current event selection and target.
+Older responses default replayability to false rather than guessing.
 
 ## Companion mode
 
