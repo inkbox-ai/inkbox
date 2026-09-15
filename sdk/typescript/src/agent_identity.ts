@@ -11,6 +11,7 @@
 
 import { InkboxAPIError, InkboxError } from "./_http.js";
 import { Credentials } from "./credentials.js";
+import type { ContactCommunicationPolicyPage } from "./contacts/resources/communicationPolicy.js";
 import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
 import { ForwardMode, MessageDirection } from "./mail/types.js";
@@ -369,6 +370,13 @@ export class AgentIdentity {
     attachments?: MailAttachmentInput[];
     /** Embed an open-tracking pixel when `bodyHtml` is present; opens surface as `firstOpenedAt`/`openCount`. */
     trackOpens?: boolean;
+    /**
+     * Makes this send safe to retry after a lost or timed-out response: a
+     * retry under the same key cannot put a second copy of the email on the
+     * wire. At-most-once, not a replay — a repeat under a key that already
+     * sent throws rather than returning the original message.
+     */
+    idempotencyKey?: string;
   }): Promise<Message> {
     this._requireMailbox();
     return this._inkbox._messages.send(this._mailbox!.emailAddress, options);
@@ -396,6 +404,8 @@ export class AgentIdentity {
       /** `contentId` on an entry renders it inline in the HTML body (`cid:<contentId>`); requires `bodyHtml` + `image/*`. */
       attachments?: MailAttachmentInput[];
       replyTo?: string;
+      /** Makes this reply safe to retry — see {@link AgentIdentity.sendEmail}. */
+      idempotencyKey?: string;
     } = {},
   ): Promise<Message> {
     this._requireMailbox();
@@ -449,6 +459,8 @@ export class AgentIdentity {
       replyTo?: string;
       /** Embed an open-tracking pixel (requires an HTML part on the forward). */
       trackOpens?: boolean;
+      /** Makes this forward safe to retry — see {@link AgentIdentity.sendEmail}. */
+      idempotencyKey?: string;
     },
   ): Promise<Message> {
     this._requireMailbox();
@@ -1184,8 +1196,7 @@ export class AgentIdentity {
   /**
    * List this identity's phone allow/block rules, newest first.
    *
-   * Returns `[]` for a phoneless identity; the server requires a phone only
-   * for create/get/update/delete, not for list.
+   * Rules also apply to iMessage and do not require a dedicated phone number.
    */
   async listPhoneContactRules(
     options: ListPhoneIdentityContactRulesOptions = {},
@@ -1195,19 +1206,17 @@ export class AgentIdentity {
 
   /** Get one of this identity's phone contact rules by id. */
   async getPhoneContactRule(ruleId: string): Promise<PhoneIdentityContactRule> {
-    this._requirePhone();
     return this._inkbox._phoneIdentityContactRules.get(this.agentHandle, ruleId);
   }
 
   /**
    * Create a phone allow/block rule for this identity.
    *
-   * @throws {InkboxError} if this identity has no phone number.
+   * Requires admin credentials; channel provisioning is not required.
    */
   async createPhoneContactRule(
     options: CreatePhoneIdentityContactRuleOptions,
   ): Promise<PhoneIdentityContactRule> {
-    this._requirePhone();
     return this._inkbox._phoneIdentityContactRules.create(this.agentHandle, options);
   }
 
@@ -1216,14 +1225,19 @@ export class AgentIdentity {
     ruleId: string,
     options: UpdatePhoneIdentityContactRuleOptions,
   ): Promise<PhoneIdentityContactRule> {
-    this._requirePhone();
     return this._inkbox._phoneIdentityContactRules.update(this.agentHandle, ruleId, options);
   }
 
   /** Delete one of this identity's phone contact rules (admin-only). */
   async deletePhoneContactRule(ruleId: string): Promise<void> {
-    this._requirePhone();
     await this._inkbox._phoneIdentityContactRules.delete(this.agentHandle, ruleId);
+  }
+
+  /** List this identity's permission-filtered contact views. */
+  async listContactCommunicationPolicies(
+    options: { limit?: number; offset?: number } = {},
+  ): Promise<ContactCommunicationPolicyPage> {
+    return this._inkbox.contacts.communicationPolicy.listForIdentity(this.agentHandle, options);
   }
 
   // ------------------------------------------------------------------

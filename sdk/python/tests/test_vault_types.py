@@ -247,14 +247,14 @@ class TestKeyPairPayloadRoundtrip:
         p = KeyPairPayload(
             access_key="AKIAIOSFODNN7EXAMPLE",
             secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-            endpoint="https://s3.amazonaws.com",
+            endpoint="https://storage.example.com",
             notes="cloud service",
         )
         d = p._to_dict()
         assert d == {
             "access_key": "AKIAIOSFODNN7EXAMPLE",
             "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-            "endpoint": "https://s3.amazonaws.com",
+            "endpoint": "https://storage.example.com",
             "notes": "cloud service",
         }
         roundtripped = KeyPairPayload._from_dict(d)

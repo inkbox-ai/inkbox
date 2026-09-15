@@ -10,7 +10,7 @@ export interface ApiKey {
   /** API key identifier in `ApiKey_<uuid4>` format. */
   id: string;
   organizationId: string;
-  /** Clerk user ID for humans, identity UUID for agents. */
+  /** User ID for humans, identity UUID for agents. */
   createdBy: string;
   /** `"human"` or `"agent"`. */
   creatorType: string;

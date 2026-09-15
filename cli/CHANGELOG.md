@@ -1,13 +1,13 @@
 # Changelog
 
-## 0.6.11 — Custom email signatures
+## 0.7.1 — Custom email signatures
 
 - `mailbox update` supports inline HTML/text, UTF-8 signature files, enable/disable,
   and explicit clear flags. Files are size-bounded, decoded strictly, and stripped
   of a UTF-8 byte-order mark when present.
 - Mailbox get/update output exposes saved signature fields; README and CLI skill
   include setup examples. Signature command tests now run in pull-request CI.
-- Bump `@inkbox/cli` and its SDK dependency to 0.6.11.
+- Bump `@inkbox/cli` and its SDK dependency to 0.7.1.
 
 ## 0.6.8 — Voice AI voice discovery
 

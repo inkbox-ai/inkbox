@@ -11,6 +11,8 @@ or phone number ID explicitly.
 
 from __future__ import annotations
 
+from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicyPage
+
 from typing import TYPE_CHECKING, Any, Iterator, Literal
 from uuid import UUID
 
@@ -537,6 +539,7 @@ class AgentIdentity:
         in_reply_to_message_id: str | None = None,
         attachments: list[dict] | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Send an email from this identity's mailbox.
 
@@ -554,6 +557,8 @@ class AgentIdentity:
                 requires ``body_html`` and an ``image/*`` ``content_type``.
             track_opens: Embed an open-tracking pixel when ``body_html`` is
                 present; opens surface as ``first_opened_at``/``open_count``.
+            idempotency_key: Makes this send safe to retry — see
+                :meth:`inkbox.mail.resources.messages.MessagesResource.send`.
 
         Raises:
             StorageLimitExceededError: 402 — the mailbox is at its plan's
@@ -576,6 +581,7 @@ class AgentIdentity:
             in_reply_to_message_id=in_reply_to_message_id,
             attachments=attachments,
             track_opens=track_opens,
+            idempotency_key=idempotency_key,
         )
 
     def reply_all_email(
@@ -587,6 +593,7 @@ class AgentIdentity:
         body_html: str | None = None,
         attachments: list[dict] | None = None,
         reply_to: str | None = None,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Reply to everyone on a stored message from this identity's mailbox.
 
@@ -600,6 +607,8 @@ class AgentIdentity:
                 to render an entry inline in the HTML body (``cid:<content_id>``);
                 requires ``body_html`` and an ``image/*`` ``content_type``.
             reply_to: Optional Reply-To address.
+            idempotency_key: Makes this reply safe to retry — see
+                :meth:`inkbox.mail.resources.messages.MessagesResource.send`.
 
         Raises:
             StorageLimitExceededError: 402 — the mailbox is at its plan's
@@ -614,6 +623,7 @@ class AgentIdentity:
             body_html=body_html,
             attachments=attachments,
             reply_to=reply_to,
+            idempotency_key=idempotency_key,
         )
 
     def forward_email(
@@ -631,6 +641,7 @@ class AgentIdentity:
         include_original_attachments: bool = True,
         reply_to: str | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Forward a stored message out from this identity's mailbox.
 
@@ -657,6 +668,8 @@ class AgentIdentity:
             track_opens: Embed an open-tracking pixel (requires an HTML part
                 on the forward); opens surface as
                 ``first_opened_at``/``open_count``.
+            idempotency_key: Makes this forward safe to retry — see
+                :meth:`inkbox.mail.resources.messages.MessagesResource.send`.
 
         Raises:
             StorageLimitExceededError: 402 — the mailbox is at its plan's
@@ -677,6 +690,7 @@ class AgentIdentity:
             include_original_attachments=include_original_attachments,
             reply_to=reply_to,
             track_opens=track_opens,
+            idempotency_key=idempotency_key,
         )
 
     def iter_emails(
@@ -1540,8 +1554,7 @@ class AgentIdentity:
     ) -> list[PhoneIdentityContactRule]:
         """List this identity's phone allow/block rules, newest first.
 
-        Returns ``[]`` for a phoneless identity; the server requires a phone
-        only for create/get/update/delete, not for list.
+        Rules also apply to iMessage and do not require a dedicated phone number.
         """
         return self._inkbox._phone_identity_contact_rules.list(
             self.agent_handle,
@@ -1553,7 +1566,6 @@ class AgentIdentity:
 
     def get_phone_contact_rule(self, rule_id: UUID | str) -> PhoneIdentityContactRule:
         """Get one of this identity's phone contact rules by id."""
-        self._require_phone()
         return self._inkbox._phone_identity_contact_rules.get(
             self.agent_handle, rule_id
         )
@@ -1567,9 +1579,8 @@ class AgentIdentity:
     ) -> PhoneIdentityContactRule:
         """Create a phone allow/block rule for this identity.
 
-        Raises ``InkboxError`` if this identity has no phone number.
+        Requires admin credentials; channel provisioning is not required.
         """
-        self._require_phone()
         return self._inkbox._phone_identity_contact_rules.create(
             self.agent_handle,
             action=action,
@@ -1584,7 +1595,6 @@ class AgentIdentity:
         action: PhoneRuleAction | str,
     ) -> PhoneIdentityContactRule:
         """Update a phone rule's ``action`` (admin-only)."""
-        self._require_phone()
         return self._inkbox._phone_identity_contact_rules.update(
             self.agent_handle,
             rule_id,
@@ -1593,8 +1603,11 @@ class AgentIdentity:
 
     def delete_phone_contact_rule(self, rule_id: UUID | str) -> None:
         """Delete one of this identity's phone contact rules (admin-only)."""
-        self._require_phone()
         self._inkbox._phone_identity_contact_rules.delete(self.agent_handle, rule_id)
+
+    def list_contact_communication_policies(self, *, limit: int = 50, offset: int = 0) -> ContactCommunicationPolicyPage:
+        """List this identity's permission-filtered contact views."""
+        return self._inkbox.contacts.communication_policy.list_for_identity(self.agent_handle, limit=limit, offset=offset)
 
     ## A2A
 

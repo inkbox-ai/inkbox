@@ -5,7 +5,9 @@
  */
 
 import { HttpTransport } from "../../_http.js";
-import { ContactAccessResource } from "./contactAccess.js";
+import { ContactAccessResource, type ContactChannelAccessUpdate } from "./contactAccess.js";
+import { ContactCommunicationPolicyResource } from "./communicationPolicy.js";
+import { ContactPermissionsResource, type UpdateContactPermissions } from "./permissions.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
@@ -50,6 +52,16 @@ export interface LookupContactsOptions {
   phoneContains?: string;
 }
 
+interface ContactCreatePermissionsBase extends Omit<UpdateContactPermissions, "emails" | "phones"> {
+  identityId: string;
+}
+
+/** Use group access objects or boolean address maps, without mixing the two shapes. */
+export type ContactCreatePermissions = ContactCreatePermissionsBase & (
+  | { emails?: Record<string, boolean>; phones?: Record<string, boolean>; email?: never; phone?: never }
+  | { emails?: never; phones?: never; email?: ContactChannelAccessUpdate; phone?: ContactChannelAccessUpdate }
+);
+
 export interface CreateContactOptions {
   preferredName?: string;
   namePrefix?: string;
@@ -68,6 +80,8 @@ export interface CreateContactOptions {
   dates?: ContactDate[];
   addresses?: ContactAddress[];
   customFields?: ContactCustomField[];
+  /** Initial selected-agent access saved atomically; requires an admin API key. */
+  permissions?: ContactCreatePermissions;
 }
 
 export interface UpdateContactOptions {
@@ -113,9 +127,13 @@ export class ContactsResource {
   readonly correspondence: ContactCorrespondenceResource;
   readonly facts: ContactFactsResource;
   readonly vcards: VCardsResource;
+  readonly communicationPolicy: ContactCommunicationPolicyResource;
+  readonly permissions: ContactPermissionsResource;
 
   constructor(private readonly http: HttpTransport) {
     this.access = new ContactAccessResource(http);
+    this.communicationPolicy = new ContactCommunicationPolicyResource(http);
+    this.permissions = new ContactPermissionsResource(http);
     this.correspondence = new ContactCorrespondenceResource(http);
     this.facts = new ContactFactsResource(http);
     this.vcards = new VCardsResource(http);
@@ -182,7 +200,20 @@ export class ContactsResource {
     if (options.dates !== undefined) body.dates = options.dates.map(contactDateToWire);
     if (options.addresses !== undefined) body.addresses = options.addresses.map(contactAddressToWire);
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
-    const data = await this.http.post<RawContact>(BASE, body);
+    if (options.permissions !== undefined) {
+      const { identityId, ...permissions } = options.permissions;
+      const usesMaps = permissions.emails !== undefined || permissions.phones !== undefined;
+      const usesGroups = permissions.email !== undefined || permissions.phone !== undefined;
+      if (usesMaps && usesGroups) throw new Error("Use boolean address maps or group access objects, not both");
+      if (permissions.profile === false && (
+        permissions.memories === true
+        || Object.values(permissions.emails ?? {}).some(Boolean)
+        || Object.values(permissions.phones ?? {}).some(Boolean)
+        || [permissions.email, permissions.phone].some((group) => group?.visible === true || Boolean(group?.contactable?.length))
+      )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
+      body.permissions = { ...permissions, identity_id: identityId };
+    }
+    const data = await this.http.post<RawContact>(options.permissions !== undefined ? `${BASE}/with-permissions` : BASE, body);
     return parseContact(data);
   }
 

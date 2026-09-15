@@ -101,7 +101,7 @@ TEXT_MESSAGE_MMS_DICT = {
         {
             "content_type": "image/jpeg",
             "size": 534972,
-            "url": "https://s3.example.com/media/photo.jpg?signed=1",
+            "url": "https://files.example.com/media/photo.jpg?signed=1",
         },
     ],
     "is_read": True,

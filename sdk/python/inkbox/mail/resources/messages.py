@@ -9,12 +9,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Iterator
 from uuid import UUID
 
+from inkbox.imessage.types import _validate_idempotency_key
 from inkbox.mail.types import ForwardMode, Message, MessageDetail, MessageDirection
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
 
 _DEFAULT_PAGE_SIZE = 50
+
+
+def _idempotency_headers(key: str | None) -> dict[str, Any]:
+    """``post`` kwargs carrying an idempotency key, or nothing when unset."""
+    if key is None:
+        return {}
+    return {"headers": {"Idempotency-Key": _validate_idempotency_key(key)}}
 
 
 class MessagesResource:
@@ -128,6 +136,7 @@ class MessagesResource:
         in_reply_to_message_id: str | None = None,
         attachments: list[dict[str, str]] | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Send an email from a mailbox.
 
@@ -157,6 +166,16 @@ class MessagesResource:
                 debounce collapses repeats), so prefer ``first_opened_at``
                 as the reliable open signal. Note: pixels can raise spam
                 scores.
+            idempotency_key: Makes this send safe to retry after a lost or
+                timed-out response — a retry under the same key cannot put a
+                second copy of the email on the wire. At-most-once, not a
+                replay: a repeat under a key that already sent raises 409
+                rather than returning the original message, and 503 when the
+                earlier attempt's outcome is unresolved. Keys are scoped per
+                organization and per method, last 7 days, and do not cover the
+                request body, so use a fresh key for each distinct email.
+                Always retry with the *same* key: a new key is a new send, so
+                minting one after a failure is what duplicates the email.
 
         Returns:
             The sent message metadata.
@@ -194,7 +213,11 @@ class MessagesResource:
         if track_opens:
             body["track_opens"] = True
 
-        data = self._http.post(f"/mailboxes/{email_address}/messages", json=body)
+        data = self._http.post(
+            f"/mailboxes/{email_address}/messages",
+            json=body,
+            **_idempotency_headers(idempotency_key),
+        )
         return Message._from_dict(data)
 
     def reply_all(
@@ -207,6 +230,7 @@ class MessagesResource:
         body_html: str | None = None,
         attachments: list[dict[str, str]] | None = None,
         reply_to: str | None = None,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Reply to everyone on a stored message.
 
@@ -221,6 +245,10 @@ class MessagesResource:
             attachments: Optional file attachments. Same shape as
                 ``send(attachments=...)``, including ``content_id`` for inline images.
             reply_to: Optional Reply-To address.
+            idempotency_key: Makes this reply safe to retry — see
+                :meth:`send`. Reply-all keys live in their own namespace, so a
+                key used here never collides with one used for a send or a
+                forward.
 
         Raises:
             StorageLimitExceededError: 402 — the mailbox is at its plan's
@@ -246,6 +274,7 @@ class MessagesResource:
         data = self._http.post(
             f"/mailboxes/{email_address}/messages/{message_id}/reply-all",
             json=body,
+            **_idempotency_headers(idempotency_key),
         )
         return Message._from_dict(data)
 
@@ -265,6 +294,7 @@ class MessagesResource:
         include_original_attachments: bool = True,
         reply_to: str | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Forward a stored message out from this mailbox.
 
@@ -303,6 +333,10 @@ class MessagesResource:
                 (no caller ``body_html`` needed), wrapped mode needs one. A
                 no-HTML forward is rejected with 422. Opens surface as
                 ``first_opened_at``/``open_count``.
+            idempotency_key: Makes this forward safe to retry — see
+                :meth:`send`. Forward keys live in their own namespace, so a
+                key used here never collides with one used for a send or a
+                reply-all.
 
         Returns:
             The newly forwarded message metadata.
@@ -345,6 +379,7 @@ class MessagesResource:
         data = self._http.post(
             f"/mailboxes/{email_address}/messages/{message_id}/forward",
             json=body,
+            **_idempotency_headers(idempotency_key),
         )
         return Message._from_dict(data)
 

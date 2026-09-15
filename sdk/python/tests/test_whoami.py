@@ -30,7 +30,7 @@ RAW_API_KEY = {
 
 RAW_JWT = {
     "auth_type": "jwt",
-    "auth_subtype": "clerk",
+    "auth_subtype": "jwt.org_admin",
     "user_id": "user_abc",
     "email": "dev@example.com",
     "name": "Dev User",

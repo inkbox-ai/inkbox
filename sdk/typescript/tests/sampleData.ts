@@ -40,7 +40,7 @@ export const RAW_MESSAGE_DETAIL = {
   in_reply_to: null,
   references: null,
   attachment_metadata: null,
-  ses_message_id: "ses-abc123",
+  ses_message_id: "message-abc123",
   updated_at: "2026-03-09T00:00:00Z",
   reply_all_recipients: { to: ["alice@example.com"], cc: ["bob@example.com"] },
 };
@@ -241,7 +241,7 @@ export const RAW_TEXT_MESSAGE_MMS = {
     {
       content_type: "image/jpeg",
       size: 534972,
-      url: "https://s3.example.com/media/photo.jpg?signed=1",
+      url: "https://files.example.com/media/photo.jpg?signed=1",
     },
   ],
   is_read: true,
@@ -450,7 +450,7 @@ export const RAW_WHOAMI_API_KEY = {
 
 export const RAW_WHOAMI_JWT = {
   auth_type: "jwt" as const,
-  auth_subtype: "clerk",
+  auth_subtype: "jwt.org_admin",
   user_id: "user_abc",
   email: "dev@example.com",
   name: "Dev User",

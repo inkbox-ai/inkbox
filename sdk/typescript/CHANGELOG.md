@@ -1,12 +1,12 @@
 # Changelog
 
-## 0.6.11 — Custom email signatures
+## 0.7.1 — Custom email signatures
 
 - `mailboxes.update()` accepts `signatureHtml`, `signatureText`, and
   `signatureEnabled`, preserving omitted fields and explicit `null` clears.
 - Mailbox and identity mailbox responses expose saved signatures, with defaults
   for earlier API responses. README and TypeScript skill include setup examples.
-- Bump `@inkbox/sdk` to 0.6.11.
+- Bump `@inkbox/sdk` to 0.7.1.
 
 ## 0.6.8 — Voice AI voice discovery
 

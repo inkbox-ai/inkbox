@@ -311,6 +311,9 @@ impl AgentIdentity {
     /// * `track_opens` - Embed an open-tracking pixel when `body_html` is
     ///   present; opens surface as `first_opened_at` / `open_count`.
     ///
+    /// To make a send safe to retry, use
+    /// [`send_email_with_idempotency_key`](Self::send_email_with_idempotency_key).
+    ///
     /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
     /// (HTTP 402) when the mailbox has reached its plan's storage cap. Delete
     /// messages/threads to free space (reclaim is immediate), or upgrade the
@@ -343,6 +346,38 @@ impl AgentIdentity {
             in_reply_to_message_id,
             attachments,
             track_opens,
+        )
+    }
+
+    /// [`send_email`](Self::send_email) carrying an `Idempotency-Key` — see
+    /// [`crate::mail::resources::MessagesResource::send_with_idempotency_key`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_email_with_idempotency_key(
+        &self,
+        to: &[String],
+        subject: &str,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        in_reply_to_message_id: Option<&str>,
+        attachments: Option<&[crate::mail::resources::Attachment]>,
+        track_opens: bool,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.messages().send_with_idempotency_key(
+            &email,
+            to,
+            subject,
+            body_text,
+            body_html,
+            cc,
+            bcc,
+            in_reply_to_message_id,
+            attachments,
+            track_opens,
+            idempotency_key,
         )
     }
 
@@ -406,6 +441,9 @@ impl AgentIdentity {
     /// * `attachments` - Optional file attachments.
     /// * `reply_to` - Optional Reply-To address.
     ///
+    /// To make a reply safe to retry, use
+    /// [`reply_all_email_with_idempotency_key`](Self::reply_all_email_with_idempotency_key).
+    ///
     /// Subject to the same storage cap and Free-plan footer as
     /// [`send_email`](Self::send_email).
     #[allow(clippy::too_many_arguments)]
@@ -430,6 +468,33 @@ impl AgentIdentity {
         )
     }
 
+    /// [`reply_all_email`](Self::reply_all_email) carrying an
+    /// `Idempotency-Key` — see
+    /// [`crate::mail::resources::MessagesResource::send_with_idempotency_key`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn reply_all_email_with_idempotency_key(
+        &self,
+        message_id: &str,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        attachments: Option<&[crate::mail::resources::Attachment]>,
+        reply_to: Option<&str>,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.messages().reply_all_with_idempotency_key(
+            &email,
+            message_id,
+            subject,
+            body_text,
+            body_html,
+            attachments,
+            reply_to,
+            idempotency_key,
+        )
+    }
+
     /// Forward a stored message out from this identity's mailbox.
     ///
     /// # Arguments
@@ -444,6 +509,9 @@ impl AgentIdentity {
     /// * `track_opens` - Embed an open-tracking pixel (requires an HTML part —
     ///   `inline` inherits the original email's HTML, `wrapped` needs a caller
     ///   `body_html`); opens surface as `first_opened_at` / `open_count`.
+    ///
+    /// To make a forward safe to retry, use
+    /// [`forward_email_with_idempotency_key`](Self::forward_email_with_idempotency_key).
     ///
     /// Subject to the same storage cap and Free-plan footer as
     /// [`send_email`](Self::send_email).
@@ -478,6 +546,45 @@ impl AgentIdentity {
             include_original_attachments,
             reply_to,
             track_opens,
+        )
+    }
+
+    /// [`forward_email`](Self::forward_email) carrying an `Idempotency-Key` —
+    /// see
+    /// [`crate::mail::resources::MessagesResource::send_with_idempotency_key`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn forward_email_with_idempotency_key(
+        &self,
+        message_id: &str,
+        to: Option<&[String]>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        mode: ForwardMode,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        additional_attachments: Option<&[crate::mail::resources::Attachment]>,
+        include_original_attachments: bool,
+        reply_to: Option<&str>,
+        track_opens: bool,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.messages().forward_with_idempotency_key(
+            &email,
+            message_id,
+            to,
+            cc,
+            bcc,
+            mode,
+            subject,
+            body_text,
+            body_html,
+            additional_attachments,
+            include_original_attachments,
+            reply_to,
+            track_opens,
+            idempotency_key,
         )
     }
 
@@ -1467,8 +1574,7 @@ impl AgentIdentity {
 
     /// List this identity's phone allow/block rules, newest first.
     ///
-    /// Returns `[]` for a phoneless identity; the server requires a phone only
-    /// for create/get/update/delete, not for list.
+    /// Rules also apply to iMessage and do not require a dedicated phone number.
     pub fn list_phone_contact_rules(
         &self,
         action: Option<PhoneRuleAction>,
@@ -1486,25 +1592,20 @@ impl AgentIdentity {
     }
 
     /// Get one of this identity's phone contact rules by id.
-    ///
-    /// Errors if this identity has no phone number.
     pub fn get_phone_contact_rule(&self, rule_id: &str) -> Result<PhoneIdentityContactRule> {
-        self.require_phone()?;
         self.inkbox
             .phone_identity_contact_rules()
             .get(&self.agent_handle(), rule_id)
     }
 
     /// Create a phone allow/block rule for this identity.
-    ///
-    /// Errors if this identity has no phone number.
+    /// Requires admin credentials; channel provisioning is not required.
     pub fn create_phone_contact_rule(
         &self,
         action: PhoneRuleAction,
         match_target: &str,
         match_type: PhoneRuleMatchType,
     ) -> Result<PhoneIdentityContactRule> {
-        self.require_phone()?;
         self.inkbox.phone_identity_contact_rules().create(
             &self.agent_handle(),
             action,
@@ -1513,27 +1614,34 @@ impl AgentIdentity {
         )
     }
 
-    /// Update a phone rule's `action` (admin-only). Errors if this identity has
-    /// no phone number.
+    /// Update a phone rule's `action` (admin-only).
     pub fn update_phone_contact_rule(
         &self,
         rule_id: &str,
         action: PhoneRuleAction,
     ) -> Result<PhoneIdentityContactRule> {
-        self.require_phone()?;
         self.inkbox
             .phone_identity_contact_rules()
             .update(&self.agent_handle(), rule_id, action)
     }
 
     /// Delete one of this identity's phone contact rules (admin-only).
-    ///
-    /// Errors if this identity has no phone number.
     pub fn delete_phone_contact_rule(&self, rule_id: &str) -> Result<()> {
-        self.require_phone()?;
         self.inkbox
             .phone_identity_contact_rules()
             .delete(&self.agent_handle(), rule_id)
+    }
+
+    /// List this identity's permission-filtered contact views.
+    pub fn list_contact_communication_policies(
+        &self,
+        limit: u64,
+        offset: u64,
+    ) -> Result<crate::contacts::ContactCommunicationPolicyPage> {
+        self.inkbox
+            .contacts()
+            .communication_policy()
+            .list_for_identity(&self.agent_handle(), limit, offset)
     }
 
     // -----------------------------------------------------------------------
@@ -1936,7 +2044,7 @@ mod tests {
     }
 
     #[test]
-    fn phone_rule_cgud_still_requires_phone_number() {
+    fn phone_rule_mutations_delegate_without_a_phone_number() {
         let identity = phoneless_identity();
         let results = [
             identity.get_phone_contact_rule("rid").err(),
@@ -1953,12 +2061,8 @@ mod tests {
             identity.delete_phone_contact_rule("rid").err(),
         ];
         for res in results {
-            match res {
-                Some(InkboxError::InvalidArgument(m)) => {
-                    assert!(m.contains("no phone number"), "unexpected message: {m}");
-                }
-                other => panic!("expected phone-required error, got {other:?}"),
-            }
+            assert!(res.is_some(), "the test transport has no listening server");
+            assert!(!matches!(res, Some(InkboxError::InvalidArgument(_))));
         }
     }
 
