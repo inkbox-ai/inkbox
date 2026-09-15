@@ -311,6 +311,9 @@ impl AgentIdentity {
     /// * `track_opens` - Embed an open-tracking pixel when `body_html` is
     ///   present; opens surface as `first_opened_at` / `open_count`.
     ///
+    /// To make a send safe to retry, use
+    /// [`send_email_with_idempotency_key`](Self::send_email_with_idempotency_key).
+    ///
     /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
     /// (HTTP 402) when the mailbox has reached its plan's storage cap. Delete
     /// messages/threads to free space (reclaim is immediate), or upgrade the
@@ -343,6 +346,38 @@ impl AgentIdentity {
             in_reply_to_message_id,
             attachments,
             track_opens,
+        )
+    }
+
+    /// [`send_email`](Self::send_email) carrying an `Idempotency-Key` — see
+    /// [`crate::mail::resources::MessagesResource::send_with_idempotency_key`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_email_with_idempotency_key(
+        &self,
+        to: &[String],
+        subject: &str,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        in_reply_to_message_id: Option<&str>,
+        attachments: Option<&[crate::mail::resources::Attachment]>,
+        track_opens: bool,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.messages().send_with_idempotency_key(
+            &email,
+            to,
+            subject,
+            body_text,
+            body_html,
+            cc,
+            bcc,
+            in_reply_to_message_id,
+            attachments,
+            track_opens,
+            idempotency_key,
         )
     }
 
@@ -406,6 +441,9 @@ impl AgentIdentity {
     /// * `attachments` - Optional file attachments.
     /// * `reply_to` - Optional Reply-To address.
     ///
+    /// To make a reply safe to retry, use
+    /// [`reply_all_email_with_idempotency_key`](Self::reply_all_email_with_idempotency_key).
+    ///
     /// Subject to the same storage cap and Free-plan footer as
     /// [`send_email`](Self::send_email).
     #[allow(clippy::too_many_arguments)]
@@ -430,6 +468,33 @@ impl AgentIdentity {
         )
     }
 
+    /// [`reply_all_email`](Self::reply_all_email) carrying an
+    /// `Idempotency-Key` — see
+    /// [`crate::mail::resources::MessagesResource::send_with_idempotency_key`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn reply_all_email_with_idempotency_key(
+        &self,
+        message_id: &str,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        attachments: Option<&[crate::mail::resources::Attachment]>,
+        reply_to: Option<&str>,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.messages().reply_all_with_idempotency_key(
+            &email,
+            message_id,
+            subject,
+            body_text,
+            body_html,
+            attachments,
+            reply_to,
+            idempotency_key,
+        )
+    }
+
     /// Forward a stored message out from this identity's mailbox.
     ///
     /// # Arguments
@@ -444,6 +509,9 @@ impl AgentIdentity {
     /// * `track_opens` - Embed an open-tracking pixel (requires an HTML part —
     ///   `inline` inherits the original email's HTML, `wrapped` needs a caller
     ///   `body_html`); opens surface as `first_opened_at` / `open_count`.
+    ///
+    /// To make a forward safe to retry, use
+    /// [`forward_email_with_idempotency_key`](Self::forward_email_with_idempotency_key).
     ///
     /// Subject to the same storage cap and Free-plan footer as
     /// [`send_email`](Self::send_email).
@@ -478,6 +546,45 @@ impl AgentIdentity {
             include_original_attachments,
             reply_to,
             track_opens,
+        )
+    }
+
+    /// [`forward_email`](Self::forward_email) carrying an `Idempotency-Key` —
+    /// see
+    /// [`crate::mail::resources::MessagesResource::send_with_idempotency_key`].
+    #[allow(clippy::too_many_arguments)]
+    pub fn forward_email_with_idempotency_key(
+        &self,
+        message_id: &str,
+        to: Option<&[String]>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        mode: ForwardMode,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        additional_attachments: Option<&[crate::mail::resources::Attachment]>,
+        include_original_attachments: bool,
+        reply_to: Option<&str>,
+        track_opens: bool,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        let email = self.require_mailbox()?;
+        self.inkbox.messages().forward_with_idempotency_key(
+            &email,
+            message_id,
+            to,
+            cc,
+            bcc,
+            mode,
+            subject,
+            body_text,
+            body_html,
+            additional_attachments,
+            include_original_attachments,
+            reply_to,
+            track_opens,
+            idempotency_key,
         )
     }
 

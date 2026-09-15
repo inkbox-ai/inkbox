@@ -539,6 +539,7 @@ class AgentIdentity:
         in_reply_to_message_id: str | None = None,
         attachments: list[dict] | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Send an email from this identity's mailbox.
 
@@ -556,6 +557,8 @@ class AgentIdentity:
                 requires ``body_html`` and an ``image/*`` ``content_type``.
             track_opens: Embed an open-tracking pixel when ``body_html`` is
                 present; opens surface as ``first_opened_at``/``open_count``.
+            idempotency_key: Makes this send safe to retry — see
+                :meth:`inkbox.mail.resources.messages.MessagesResource.send`.
 
         Raises:
             StorageLimitExceededError: 402 — the mailbox is at its plan's
@@ -578,6 +581,7 @@ class AgentIdentity:
             in_reply_to_message_id=in_reply_to_message_id,
             attachments=attachments,
             track_opens=track_opens,
+            idempotency_key=idempotency_key,
         )
 
     def reply_all_email(
@@ -589,6 +593,7 @@ class AgentIdentity:
         body_html: str | None = None,
         attachments: list[dict] | None = None,
         reply_to: str | None = None,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Reply to everyone on a stored message from this identity's mailbox.
 
@@ -602,6 +607,8 @@ class AgentIdentity:
                 to render an entry inline in the HTML body (``cid:<content_id>``);
                 requires ``body_html`` and an ``image/*`` ``content_type``.
             reply_to: Optional Reply-To address.
+            idempotency_key: Makes this reply safe to retry — see
+                :meth:`inkbox.mail.resources.messages.MessagesResource.send`.
 
         Raises:
             StorageLimitExceededError: 402 — the mailbox is at its plan's
@@ -616,6 +623,7 @@ class AgentIdentity:
             body_html=body_html,
             attachments=attachments,
             reply_to=reply_to,
+            idempotency_key=idempotency_key,
         )
 
     def forward_email(
@@ -633,6 +641,7 @@ class AgentIdentity:
         include_original_attachments: bool = True,
         reply_to: str | None = None,
         track_opens: bool = False,
+        idempotency_key: str | None = None,
     ) -> Message:
         """Forward a stored message out from this identity's mailbox.
 
@@ -659,6 +668,8 @@ class AgentIdentity:
             track_opens: Embed an open-tracking pixel (requires an HTML part
                 on the forward); opens surface as
                 ``first_opened_at``/``open_count``.
+            idempotency_key: Makes this forward safe to retry — see
+                :meth:`inkbox.mail.resources.messages.MessagesResource.send`.
 
         Raises:
             StorageLimitExceededError: 402 — the mailbox is at its plan's
@@ -679,6 +690,7 @@ class AgentIdentity:
             include_original_attachments=include_original_attachments,
             reply_to=reply_to,
             track_opens=track_opens,
+            idempotency_key=idempotency_key,
         )
 
     def iter_emails(

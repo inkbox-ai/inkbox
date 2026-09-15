@@ -370,6 +370,13 @@ export class AgentIdentity {
     attachments?: MailAttachmentInput[];
     /** Embed an open-tracking pixel when `bodyHtml` is present; opens surface as `firstOpenedAt`/`openCount`. */
     trackOpens?: boolean;
+    /**
+     * Makes this send safe to retry after a lost or timed-out response: a
+     * retry under the same key cannot put a second copy of the email on the
+     * wire. At-most-once, not a replay — a repeat under a key that already
+     * sent throws rather than returning the original message.
+     */
+    idempotencyKey?: string;
   }): Promise<Message> {
     this._requireMailbox();
     return this._inkbox._messages.send(this._mailbox!.emailAddress, options);
@@ -397,6 +404,8 @@ export class AgentIdentity {
       /** `contentId` on an entry renders it inline in the HTML body (`cid:<contentId>`); requires `bodyHtml` + `image/*`. */
       attachments?: MailAttachmentInput[];
       replyTo?: string;
+      /** Makes this reply safe to retry — see {@link AgentIdentity.sendEmail}. */
+      idempotencyKey?: string;
     } = {},
   ): Promise<Message> {
     this._requireMailbox();
@@ -450,6 +459,8 @@ export class AgentIdentity {
       replyTo?: string;
       /** Embed an open-tracking pixel (requires an HTML part on the forward). */
       trackOpens?: boolean;
+      /** Makes this forward safe to retry — see {@link AgentIdentity.sendEmail}. */
+      idempotencyKey?: string;
     },
   ): Promise<Message> {
     this._requireMailbox();
