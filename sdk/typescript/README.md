@@ -1698,10 +1698,6 @@ Runnable example scripts are available in the [examples/typescript](https://gith
 | `receive-agent-email-webhook.ts` | Register and delete a mailbox webhook |
 | `receive-agent-call-webhook.ts` | Register, update, and delete a phone webhook |
 
-## License
-
-MIT
-
 ## Custom email signatures
 
 Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
@@ -1725,3 +1721,7 @@ await inkbox.mailboxes.update("alex@example.com", {
 // Pause without deleting; use null for both content fields to clear them.
 await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ```
+
+## License
+
+MIT

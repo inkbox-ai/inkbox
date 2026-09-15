@@ -820,10 +820,6 @@ Full setup walkthrough:
 
 The CLI honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` automatically on every supported Node version — no `NODE_USE_ENV_PROXY` needed. Set `NODE_USE_ENV_PROXY=0` to opt out.
 
-## License
-
-MIT
-
 ## Custom email signatures
 
 Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
@@ -849,3 +845,7 @@ inkbox mailbox get alex@example.com --json
 
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
+
+## License
+
+MIT

@@ -2,15 +2,12 @@
 
 ## 0.6.11 — Custom email signatures
 
-### Added
-
-- Configure per-mailbox HTML/plain-text signatures and automatic insertion from Python, TypeScript, Rust, and the CLI.
-- Read saved signatures from mailboxes and identity mailbox responses, with compatible defaults for earlier responses.
-- CLI file-content input, enable/disable, and explicit clear flags; signature setup examples in the bundled skills.
-
-### Changed
-
-- Bump Python, TypeScript, Rust, CLI, and bundled plugin versions to 0.6.11.
+- `mailbox update` supports inline HTML/text, UTF-8 signature files, enable/disable,
+  and explicit clear flags. Files are size-bounded, decoded strictly, and stripped
+  of a UTF-8 byte-order mark when present.
+- Mailbox get/update output exposes saved signature fields; README and CLI skill
+  include setup examples. Signature command tests now run in pull-request CI.
+- Bump `@inkbox/cli` and its SDK dependency to 0.6.11.
 
 ## 0.6.8 — Voice AI voice discovery
 

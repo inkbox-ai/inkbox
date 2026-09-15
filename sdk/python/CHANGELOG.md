@@ -2,15 +2,11 @@
 
 ## 0.6.11 — Custom email signatures
 
-### Added
-
-- Configure per-mailbox HTML/plain-text signatures and automatic insertion from Python, TypeScript, Rust, and the CLI.
-- Read saved signatures from mailboxes and identity mailbox responses, with compatible defaults for earlier responses.
-- CLI file-content input, enable/disable, and explicit clear flags; signature setup examples in the bundled skills.
-
-### Changed
-
-- Bump Python, TypeScript, Rust, CLI, and bundled plugin versions to 0.6.11.
+- `mailboxes.update()` accepts `signature_html`, `signature_text`, and
+  `signature_enabled`, preserving omitted fields and explicit `None` clears.
+- Mailbox and identity mailbox responses expose saved signatures, with defaults
+  for earlier API responses. README and Python skill include setup examples.
+- Bump the Python package to 0.6.11.
 
 ## 0.6.8 — Voice AI voice discovery
 

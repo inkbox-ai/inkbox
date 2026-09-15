@@ -577,10 +577,6 @@ runtime lifecycle. The passthrough data plane has been validated end-to-end
 against a live edge (TLS-terminated HTTP plus a real-time call media
 WebSocket). See `src/tunnels/client/`.
 
-## License
-
-MIT
-
 ## Custom email signatures
 
 Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
@@ -612,3 +608,7 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 # Ok(())
 # }
 ```
+
+## License
+
+MIT

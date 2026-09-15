@@ -1668,10 +1668,6 @@ Runnable example scripts are available in the [examples/python](https://github.c
 | `receive_agent_email_webhook.py` | Register and delete a mailbox webhook |
 | `receive_agent_call_webhook.py` | Register, update, and delete a phone webhook |
 
-## License
-
-MIT
-
 ## Custom email signatures
 
 Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
@@ -1698,3 +1694,7 @@ inkbox.mailboxes.update(
 # Pause without deleting; use None for both content fields to clear them.
 inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 ```
+
+## License
+
+MIT

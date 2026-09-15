@@ -1,6 +1,6 @@
 import { Command, Option } from "commander";
 import { openAsBlob } from "node:fs";
-import { stat, readFile } from "node:fs/promises";
+import { stat, open } from "node:fs/promises";
 import { basename } from "node:path";
 import {
   FilterMode,
@@ -82,6 +82,44 @@ export function mailboxGetRecord(
     record.storage = formatStorage(mb.storageUsedBytes, mb.storageLimitBytes);
   }
   return record;
+}
+
+const MAX_SIGNATURE_CHARACTERS = 16_384;
+// Four UTF-8 bytes per Unicode character, plus an optional byte-order mark.
+const MAX_SIGNATURE_FILE_BYTES = MAX_SIGNATURE_CHARACTERS * 4 + 3;
+
+export async function readSignatureFile(path: string): Promise<string> {
+  const file = await open(path, "r");
+  try {
+    const info = await file.stat();
+    if (!info.isFile()) throw new Error("Signature input must be a regular UTF-8 file.");
+    if (info.size > MAX_SIGNATURE_FILE_BYTES) {
+      throw new Error("Signature file is too large; the limit is 16,384 characters.");
+    }
+    // Bound the actual read too, in case the file grows after stat.
+    const buffer = Buffer.alloc(MAX_SIGNATURE_FILE_BYTES + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > MAX_SIGNATURE_FILE_BYTES) {
+      throw new Error("Signature file is too large; the limit is 16,384 characters.");
+    }
+    let text: string;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length));
+    } catch {
+      throw new Error("Signature file must contain valid UTF-8 text. Save it as UTF-8 and try again.");
+    }
+    if ([...text].length > MAX_SIGNATURE_CHARACTERS) {
+      throw new Error("Signature file is too large; the limit is 16,384 characters.");
+    }
+    return text;
+  } finally {
+    await file.close();
+  }
 }
 
 function parsePositiveSeconds(value: string): number {
@@ -593,7 +631,7 @@ export function registerMailboxCommands(program: Command): void {
           const value = cmdOpts[`signature${format}`];
           const file = cmdOpts[`signature${format}File`];
           if (cmdOpts[`clearSignature${format}`]) updateBody[`signature${format}`] = null;
-          else if (file !== undefined) updateBody[`signature${format}`] = await readFile(file, "utf8");
+          else if (file !== undefined) updateBody[`signature${format}`] = await readSignatureFile(file);
           else if (value !== undefined) updateBody[`signature${format}`] = value;
         }
         if (cmdOpts.signatureEnabled !== undefined) {

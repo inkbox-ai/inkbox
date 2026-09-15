@@ -517,10 +517,6 @@ See [`skills/README.md`](./skills/README.md) for details.
 
 Maintainers: see [RELEASING.md](./RELEASING.md) for the lockstep version-bump and per-registry publish steps (PyPI, npm, crates.io).
 
-## License
-
-MIT
-
 ## Custom email signatures
 
 Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
@@ -555,3 +551,7 @@ await inkbox.mailboxes.update("alex@example.com", {
 // Pause without deleting; use null for both content fields to clear them.
 await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ```
+
+## License
+
+MIT

@@ -20,6 +20,7 @@ import {
   mailboxGetRecord,
   mailboxListRow,
   resolveMailDomain,
+  readSignatureFile,
 } from "../dist/commands/mailbox.js";
 
 const MAILBOX = {
@@ -481,7 +482,7 @@ test("mailbox signature flags send exact PATCH bodies and expose saved signature
   const html = join(dir, "signature.html");
   const text = join(dir, "signature.sig");
   writeFileSync(html, "<b>Alex</b>");
-  writeFileSync(text, "Alex");
+  writeFileSync(text, "\ufeffAlex");
   const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
   for (const [flags, expected] of [
     [[], {}],
@@ -510,4 +511,27 @@ test("mailbox signature flags send exact PATCH bodies and expose saved signature
   ]) {
     assert.throws(() => execFileSync(process.execPath, [cli, "mailbox", "update", email, ...flags], { stdio: "pipe" }), /cannot be used with/);
   }
+});
+
+
+test("signature files enforce UTF-8 and character/byte bounds", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "inkbox-signature-bounds-"));
+  const { rm } = await import("node:fs/promises");
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const path = join(dir, "signature.sig");
+  writeFileSync(path, "\ufeffAlex\r\nTeam");
+  assert.equal(await readSignatureFile(path), "Alex\r\nTeam");
+  writeFileSync(path, "\ufeff" + "😀".repeat(16_384));
+  assert.equal([...(await readSignatureFile(path))].length, 16_384);
+  writeFileSync(path, "a".repeat(16_385));
+  await assert.rejects(readSignatureFile(path), /too large.*16,384/);
+  writeFileSync(path, Buffer.alloc(65_540));
+  await assert.rejects(readSignatureFile(path), /too large.*16,384/);
+  writeFileSync(path, Buffer.from([0xff, 0xfe, 0x41, 0x00]));
+  await assert.rejects(readSignatureFile(path), /valid UTF-8/);
+  writeFileSync(path, Buffer.from([0xe2, 0x82]));
+  await assert.rejects(readSignatureFile(path), /valid UTF-8/);
+  writeFileSync(path, "");
+  assert.equal(await readSignatureFile(path), "");
+  await assert.rejects(readSignatureFile(dir), /regular UTF-8 file/);
 });
