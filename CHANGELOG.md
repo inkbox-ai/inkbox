@@ -16,6 +16,10 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Bump Python, TypeScript, Rust, CLI, and bundled plugin versions to 0.7.1.
 
+### Fixed
+
+- Keep large CLI validation errors complete and UTF-8-safe when JSON error output is piped.
+
 ## 0.7.0 — Contact communication permissions
 
 ### Added

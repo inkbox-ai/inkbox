@@ -1,27 +1,26 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { InkboxAPIError, StorageLimitExceededError } from "@inkbox/sdk";
 import { withErrorHandler } from "../dist/errors.js";
 
 const BILLING_URL = "https://inkbox.ai/console/billing";
 
-// withErrorHandler writes to console.error and exits; capture both.
+// Capture error output and restore the test runner's exit status.
 async function runAndCapture(err, json = false) {
   const lines = [];
   const origError = console.error;
-  const origExit = process.exit;
+  const origExitCode = process.exitCode;
   let exitCode = null;
   console.error = (...args) => lines.push(args.join(" "));
-  process.exit = (code) => {
-    exitCode = code;
-  };
   try {
     await withErrorHandler(async () => {
       throw err;
     }).call(json ? { opts: () => ({ json: true }), parent: null } : undefined);
+    exitCode = process.exitCode;
   } finally {
     console.error = origError;
-    process.exit = origExit;
+    process.exitCode = origExitCode;
   }
   return { lines, exitCode };
 }
@@ -162,4 +161,22 @@ test("withErrorHandler emits one stable JSON error object to stderr", async () =
       agentSupport: "Contact support.",
     },
   });
+});
+
+test("large Unicode API errors remain complete JSON when stderr is piped", () => {
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    import { InkboxAPIError } from "@inkbox/sdk";
+    import { withErrorHandler } from "./dist/errors.js";
+    await withErrorHandler(async () => {
+      throw new InkboxAPIError(422, { input: "😀".repeat(262144) });
+    }).call({ opts: () => ({ json: true }), parent: null });
+  `], { cwd: new URL("..", import.meta.url), maxBuffer: 4 * 1024 * 1024 });
+
+  assert.ifError(result.error);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout.length, 0);
+  const stderr = new TextDecoder("utf-8", { fatal: true }).decode(result.stderr);
+  const { error } = JSON.parse(stderr);
+  assert.equal(error.statusCode, 422);
+  assert.equal(error.detail.input, "😀".repeat(262144));
 });

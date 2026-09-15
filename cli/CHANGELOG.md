@@ -7,6 +7,7 @@
   of a UTF-8 byte-order mark when present.
 - Mailbox get/update output exposes saved signature fields; README and CLI skill
   include setup examples. Signature command tests now run in pull-request CI.
+- Preserve complete UTF-8 JSON error output when validation errors are piped.
 - Bump `@inkbox/cli` and its SDK dependency to 0.7.1.
 
 ## 0.6.8 — Voice AI voice discovery
