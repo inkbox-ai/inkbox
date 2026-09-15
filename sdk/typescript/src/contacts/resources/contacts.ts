@@ -52,12 +52,15 @@ export interface LookupContactsOptions {
   phoneContains?: string;
 }
 
-export interface ContactCreatePermissions extends UpdateContactPermissions {
+interface ContactCreatePermissionsBase extends Omit<UpdateContactPermissions, "emails" | "phones"> {
   identityId: string;
-  /** Use group access objects or boolean address maps, without mixing the two shapes. */
-  email?: ContactChannelAccessUpdate;
-  phone?: ContactChannelAccessUpdate;
 }
+
+/** Use group access objects or boolean address maps, without mixing the two shapes. */
+export type ContactCreatePermissions = ContactCreatePermissionsBase & (
+  | { emails?: Record<string, boolean>; phones?: Record<string, boolean>; email?: never; phone?: never }
+  | { emails?: never; phones?: never; email?: ContactChannelAccessUpdate; phone?: ContactChannelAccessUpdate }
+);
 
 export interface CreateContactOptions {
   preferredName?: string;
@@ -199,6 +202,9 @@ export class ContactsResource {
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
     if (options.permissions !== undefined) {
       const { identityId, ...permissions } = options.permissions;
+      const usesMaps = permissions.emails !== undefined || permissions.phones !== undefined;
+      const usesGroups = permissions.email !== undefined || permissions.phone !== undefined;
+      if (usesMaps && usesGroups) throw new Error("Use boolean address maps or group access objects, not both");
       body.permissions = { ...permissions, identity_id: identityId };
     }
     const data = await this.http.post<RawContact>(options.permissions !== undefined ? `${BASE}/with-permissions` : BASE, body);

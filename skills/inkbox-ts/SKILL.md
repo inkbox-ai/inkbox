@@ -42,7 +42,7 @@ Inkbox (admin-only client)
 ├── .mailContactRules         → MailContactRulesResource    (DEPRECATED — per-mailbox)
 ├── .phoneContactRules        → PhoneContactRulesResource   (DEPRECATED — per-number)
 ├── .smsOptIns                → SmsOptInsResource
-├── .contacts                 → ContactsResource   (.communicationPolicy, .facts, .correspondence, .access, .vcards)
+├── .contacts                 → ContactsResource   (.communicationPolicy, .permissions, .facts, .correspondence, .access, .vcards)
 ├── .notes                    → NotesResource      (.access)
 ├── .vault                    → VaultResource
 ├── .whoami()                 → Promise<WhoamiResponse>

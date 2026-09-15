@@ -92,6 +92,19 @@ describe("ContactsResource", () => {
     });
   });
 
+  it("rejects mixed initial permission shapes before sending", async () => {
+    const resource = new ContactsResource(new HttpTransport("k", BASE));
+    await expect(resource.create({
+      givenName: "Alex",
+      permissions: {
+        identityId: "11111111-1111-4111-8111-111111111111",
+        emails: { "alex@example.com": true },
+        email: { visible: true },
+      } as never,
+    })).rejects.toThrow("not both");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("list with q + order builds query string", async () => {
     vi.mocked(fetch).mockResolvedValue(makeOkResponse({ items: [CONTACT_DICT] }));
     const http = new HttpTransport("k", BASE);

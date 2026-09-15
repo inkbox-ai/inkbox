@@ -60,6 +60,10 @@ class ContactCreatePermissions:
     email: ContactChannelAccessUpdate | None = None
     phone: ContactChannelAccessUpdate | None = None
 
+    def __post_init__(self) -> None:
+        if (self.emails is not None or self.phones is not None) and (self.email is not None or self.phone is not None):
+            raise ValueError("Use boolean address maps or group access objects, not both")
+
     def to_wire(self) -> dict[str, Any]:
         result: dict[str, Any] = {"identity_id": str(self.identity_id)}
         for key in ("emails", "phones", "profile", "memories"):

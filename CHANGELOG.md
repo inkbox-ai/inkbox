@@ -4,7 +4,7 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.0 — Contact communication permissions
+## 0.6.11 — Contact communication permissions
 
 ### Added
 
@@ -22,7 +22,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Python permission and nested contact-access responses tolerate additional fields while retaining required fields and their values.
 - Human/admin contact deletion and identifier removal no longer require resetting Profile or Memories settings. Standalone communication rules remain intact; agent restrictions still apply.
-- Rust `CreateContactParams` struct literals must include `permissions: None` or use `..Default::default()` when no initial permissions are needed.
+- Rust `CreateContactParams` adds `permissions`; struct literals must include `permissions: None` or use `..Default::default()` when no initial permissions are needed.
 - Inherited Profile and Memories access includes contacts whose stored identifiers are all permitted, including standalone whitelist matches. Explicit visibility decisions remain authoritative.
 - Contact policy conflicts expose stable error codes. Bulk deletion includes optional `error_code` (Python/Rust) or `errorCode` (TypeScript) alongside the message. Rust struct literals for `ContactBulkDeleteResultItem` must supply `error_code`, using `None` when absent.
 - Rust callers constructing `MailIdentityContactRule`, `PhoneIdentityContactRule`, or `IMessageContactRule` struct literals must supply `contact: None` or a contact. Older wire responses still parse; Python and TypeScript construction remains compatible.
@@ -32,12 +32,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Initial contact permissions accept either `emails`/`phones` boolean maps or `email`/`phone` group-access objects, plus optional `profile` and `memories` booleans. Do not mix the two address shapes. Replace action-string address lists and `ContactInitialAddressPermission` with one of these shapes.
 - Identifier visibility is now all-or-nothing per email or phone group, independently of communication to individual addresses. Inherited group visibility reveals all identifiers of that kind when any is communication-permitted, so an existing mixed group can reveal previously hidden addresses without allowing communication to them. Profile and Memories remain independently controlled; their inherited settings require every stored identifier to be communication-permitted. Hosted voice in YOLO mode retains full organization contact and memory access.
 - Access PATCH preserves omitted choices; `contactable: []` blocks all current addresses, and `visible: true` alone preserves communication. Hiding Profile hides omitted or empty email/phone groups and omitted Memories; explicit choices in the same request win. Hiding a group also blocks identifiers subsequently added to it; an explicit exact-address allow reveals a uniquely matched group without allowing its other addresses.
-- Rust `ContactCreatePermissions` struct literals must include `email` and `phone` or use `..Default::default()`. `ContactPermissionEntry` literals must include `access`, using `None` when absent. Older roster responses still parse.
+- `ContactPermissionEntry` adds optional `access`; Rust struct literals must use `None` when absent. Older roster responses still parse.
 - **Authorization change:** communication-rule creation now requires admin credentials, like updates and deletion. Agent keys receive HTTP 403. Existing-contact identifier edits and suggestion absorption also require administrative authority.
 - Identity-level phone-rule helpers no longer require a dedicated phone number. Existing phone/iMessage methods remain supported; their filter-mode fields are aliases and contradictory values return HTTP 422.
 - Releasing or replacing a phone number preserves identity permissions.
-- Rust contact-policy and preview IDs use `uuid::Uuid`, matching other contact types. Struct literals must provide UUIDs rather than strings.
 - CLI policy pagination rejects malformed and out-of-range values before sending a request.
+- Bundled Codex plugin version `0.1.6` includes the updated SDK and CLI skills.
 
 ## 0.6.10 — Release an iMessage connection
 

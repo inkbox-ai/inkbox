@@ -262,6 +262,9 @@ impl ContactsResource {
             );
         }
         if let Some(permissions) = &params.permissions {
+            permissions
+                .validate()
+                .map_err(|message| InkboxError::InvalidArgument(message.into()))?;
             body.insert("permissions".into(), serde_json::to_value(permissions)?);
         }
         let path = if params.permissions.is_some() {
@@ -571,6 +574,37 @@ mod tests {
             })
             .unwrap();
         request.assert();
+    }
+
+    #[test]
+    fn rejects_mixed_initial_permission_shapes_before_sending() {
+        use crate::contacts::{ContactChannelAccessUpdate, ContactCreatePermissions};
+        use crate::InkboxError;
+        use uuid::Uuid;
+
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(POST);
+            then.status(500);
+        });
+        let result = client(&server).contacts().create(&CreateContactParams {
+            preferred_name: Some("Ada".into()),
+            permissions: Some(ContactCreatePermissions {
+                identity_id: Uuid::parse_str(CONTACT_ID).unwrap(),
+                emails: Some(HashMap::from([("ada@example.com".into(), true)])),
+                email: Some(ContactChannelAccessUpdate {
+                    visible: Some(true),
+                    contactable: None,
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert!(
+            matches!(result, Err(InkboxError::InvalidArgument(message)) if message.contains("not both"))
+        );
+        request.assert_hits(0);
     }
 
     #[test]

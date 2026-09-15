@@ -5,8 +5,18 @@ from pathlib import Path
 from unittest.mock import patch
 
 import httpx
+import pytest
 
 from inkbox import ContactAccessSettings, ContactChannelAccessUpdate, ContactCreatePermissions, ContactPermissions, Inkbox
+
+
+def test_creation_permissions_reject_mixed_address_shapes() -> None:
+    with pytest.raises(ValueError, match="not both"):
+        ContactCreatePermissions(
+            identity_id="11111111-1111-4111-8111-111111111111",
+            emails={"ada@example.com": True},
+            email=ContactChannelAccessUpdate(visible=True),
+        )
 
 
 def test_boolean_permissions_preserve_false_empty_maps_and_omitted_settings() -> None:

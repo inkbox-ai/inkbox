@@ -28,6 +28,17 @@ pub struct ContactCreatePermissions {
     pub phone: Option<ContactChannelAccessUpdate>,
 }
 
+impl ContactCreatePermissions {
+    pub(crate) fn validate(&self) -> Result<(), &'static str> {
+        let uses_maps = self.emails.is_some() || self.phones.is_some();
+        let uses_groups = self.email.is_some() || self.phone.is_some();
+        if uses_maps && uses_groups {
+            return Err("use boolean address maps or group access objects, not both");
+        }
+        Ok(())
+    }
+}
+
 /// Whole-group visibility and individually contactable addresses.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct ContactChannelAccess {
