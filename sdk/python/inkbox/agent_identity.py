@@ -1075,9 +1075,9 @@ class AgentIdentity:
             The queued ``TextMessage``. The full outbound lifecycle
             (``text.sent`` -> ``text.delivered`` / ``text.delivery_failed``
             / ``text.delivery_unconfirmed``) arrives via webhook
-            subscriptions on the sender's phone number, not the return
+            subscriptions on the sender's identity, not the return
             value
-            (``inkbox.webhooks.subscriptions.create(phone_number_id=...,
+            (``inkbox.webhooks.subscriptions.create(agent_identity_id=...,
             url=..., event_types=[...])``). See ``TextWebhookEventType``
             and ``TextWebhookPayload`` for the typed receiver-side
             shapes.

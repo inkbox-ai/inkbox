@@ -636,3 +636,22 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 ## License
 
 MIT
+
+
+### Identity-owned webhook subscriptions
+
+`client.webhooks().subscriptions().create_for_identity(identity_id, url, &events,
+context_config, auth_token)` creates one receiver for any mix of notification
+families, including channels not yet configured. The legacy `create` signature
+remains available and resolves its mailbox/phone selector to the owning identity.
+
+`update_if_revision(sub_id, url, event_types, context_config, auth_token,
+Some(subscription.revision))` performs a conditional full replacement of supplied
+fields. `delete_if_revision(sub_id, Some(subscription.revision))` conditionally
+removes the whole subscription. Stale revisions return HTTP 409; re-read before
+recomputing changes. Existing `update`/`delete` signatures remain unchanged.
+
+Context is included only for received mail/text/iMessage events; other selected
+events ignore it. Incoming-call actions remain separate. Delivery records retain
+the original subscription ID and expose `canonical_subscription_id`, `replayable`
+and `replay_unavailable_reason` for current replay status.

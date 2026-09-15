@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.3 — Identity-owned webhook subscriptions
+
+- Combine all notification families on one identity, regardless of configured channels;
+  legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
+- Add revision-checked subscription updates and deletion, plus CLI `--expected-revision`.
+  Event-list updates remain full replacement. Incoming-call actions remain separate.
+- Expose canonical delivery targets and replayability without changing original history IDs.
+  Conversation context applies only to received mail, text and iMessage events.
+
 ## 0.7.2 — Voicemail handling on outbound calls
 
 - Added `OnVoicemail` (`leave_message`, `hang_up`, `ignore`). `calls.place()`
