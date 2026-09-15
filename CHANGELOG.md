@@ -4,6 +4,33 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.11 — Idempotency keys on email sends
+
+### Added
+
+- Email sends, reply-alls and forwards accept an optional idempotency key. A
+  retry under the same key cannot put a second copy of the email on the wire.
+
+  - Python: `idempotency_key=` on `messages.send` / `reply_all` / `forward` and
+    on `identity.send_email` / `reply_all_email` / `forward_email`.
+  - TypeScript: `idempotencyKey` in the options object of the same methods.
+  - Rust: new `send_with_idempotency_key`, `reply_all_with_idempotency_key` and
+    `forward_with_idempotency_key` on `MessagesResource`, plus
+    `send_email_with_idempotency_key`, `reply_all_email_with_idempotency_key`
+    and `forward_email_with_idempotency_key` on `AgentIdentity`. The existing
+    methods are unchanged.
+  - CLI: `--idempotency-key <key>` on `inkbox email send`, `inkbox email
+    reply-all` and `inkbox email forward`.
+
+  This is at-most-once, not a replay: a repeat under a key that already sent
+  raises rather than returning the original message (409 when the email was
+  accepted, 503 when an earlier attempt's outcome is unresolved). Keys are
+  scoped per organization and per method, last 7 days, and do not cover the
+  request body, so use a fresh key for each distinct email. Always retry with
+  the same key: a new key is a new send, so minting one after a failure is what
+  duplicates the email. Calls that omit the key are unchanged, and every
+  existing signature in all four packages keeps working as-is.
+
 ## 0.6.10 — Release an iMessage connection
 
 ### Added

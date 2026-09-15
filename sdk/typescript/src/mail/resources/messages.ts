@@ -4,7 +4,7 @@
  * Message operations: list (auto-paginated), get, send, flag updates, delete.
  */
 
-import { HttpTransport } from "../../_http.js";
+import { HttpTransport, validateIdempotencyKey } from "../../_http.js";
 import {
   ForwardMode,
   MailAttachmentInput,
@@ -18,6 +18,15 @@ import {
 } from "../types.js";
 
 const DEFAULT_PAGE_SIZE = 50;
+
+/** Trailing `post` argument carrying a validated idempotency key, if given. */
+function idempotencyArgs(
+  key?: string,
+): [] | [{ headers: Record<string, string> }] {
+  if (key === undefined) return [];
+  validateIdempotencyKey(key);
+  return [{ headers: { "Idempotency-Key": key } }];
+}
 
 export class MessagesResource {
   constructor(private readonly http: HttpTransport) {}
@@ -106,6 +115,15 @@ export class MessagesResource {
    *   with 422. Opens surface as `firstOpenedAt`/`openCount`; `openCount` is
    *   approximate (proxy prefetch inflates it, the per-window debounce
    *   collapses repeats) so prefer `firstOpenedAt`. Pixels can raise spam scores.
+   * @param options.idempotencyKey - Makes this send safe to retry after a lost
+   *   or timed-out response: a retry under the same key cannot put a second
+   *   copy of the email on the wire. At-most-once, not a replay — a repeat
+   *   under a key that already sent throws 409 rather than returning the
+   *   original message, and 503 when the earlier attempt's outcome is
+   *   unresolved. Keys are scoped per organization and per method, last 7
+   *   days, and do not cover the request body, so use a fresh key for each
+   *   distinct email. Always retry with the *same* key: a new key is a new
+   *   send, so minting one after a failure is what duplicates the email.
    *
    * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
    *   plan's storage cap. Free space with `messages.delete` / `threads.delete`
@@ -128,6 +146,7 @@ export class MessagesResource {
       inReplyToMessageId?: string;
       attachments?: MailAttachmentInput[];
       trackOpens?: boolean;
+      idempotencyKey?: string;
     },
   ): Promise<Message> {
     const recipients: Record<string, unknown> = { to: options.to };
@@ -159,6 +178,7 @@ export class MessagesResource {
     const data = await this.http.post<RawMessage>(
       `/mailboxes/${emailAddress}/messages`,
       body,
+      ...idempotencyArgs(options.idempotencyKey),
     );
     return parseMessage(data);
   }
@@ -176,6 +196,10 @@ export class MessagesResource {
    * @param options.attachments - Optional file attachments. Same shape as
    *   `send({ attachments })`, including `contentId` for inline images.
    * @param options.replyTo - Optional Reply-To address.
+   * @param options.idempotencyKey - Makes this reply safe to retry — see
+   *   {@link MessagesResource.send}. Reply-all keys live in their own
+   *   namespace, so a key used here never collides with one used for a send
+   *   or a forward.
    *
    * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
    *   plan's storage cap. Free space with `messages.delete` /
@@ -193,6 +217,7 @@ export class MessagesResource {
       bodyHtml?: string;
       attachments?: MailAttachmentInput[];
       replyTo?: string;
+      idempotencyKey?: string;
     } = {},
   ): Promise<Message> {
     const body: Record<string, unknown> = {};
@@ -215,6 +240,7 @@ export class MessagesResource {
     const data = await this.http.post<RawMessage>(
       `/mailboxes/${emailAddress}/messages/${messageId}/reply-all`,
       body,
+      ...idempotencyArgs(options.idempotencyKey),
     );
     return parseMessage(data);
   }
@@ -249,6 +275,10 @@ export class MessagesResource {
    * @param options.trackOpens - Embed an open-tracking pixel; requires HTML on
    *   the outgoing forward — inline mode inherits the original's HTML (no caller
    *   `bodyHtml` needed), wrapped mode needs one. A no-HTML forward returns 422.
+   * @param options.idempotencyKey - Makes this forward safe to retry — see
+   *   {@link MessagesResource.send}. Forward keys live in their own namespace,
+   *   so a key used here never collides with one used for a send or a
+   *   reply-all.
    *
    * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
    *   plan's storage cap. Free space with `messages.delete` /
@@ -276,6 +306,7 @@ export class MessagesResource {
       includeOriginalAttachments?: boolean;
       replyTo?: string;
       trackOpens?: boolean;
+      idempotencyKey?: string;
     },
   ): Promise<Message> {
     const recipients: Record<string, unknown> = {};
@@ -304,6 +335,7 @@ export class MessagesResource {
     const data = await this.http.post<RawMessage>(
       `/mailboxes/${emailAddress}/messages/${messageId}/forward`,
       body,
+      ...idempotencyArgs(options.idempotencyKey),
     );
     return parseMessage(data);
   }

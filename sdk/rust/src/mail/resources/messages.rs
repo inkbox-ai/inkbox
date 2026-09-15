@@ -6,10 +6,31 @@ use serde_json::{json, Value};
 
 use crate::error::Result;
 use crate::filters::DateRangeFilter;
-use crate::http::HttpTransport;
+use crate::http::{validate_idempotency_key, HttpTransport};
 use crate::mail::types::{ForwardMode, Message, MessageDetail, MessageDirection};
 
 const DEFAULT_PAGE_SIZE: i64 = 50;
+
+/// `POST` a send, attaching a validated `Idempotency-Key` when one was given.
+fn post_send(
+    http: &HttpTransport,
+    path: &str,
+    body: &Value,
+    idempotency_key: Option<&str>,
+) -> Result<Value> {
+    match idempotency_key {
+        Some(key) => {
+            validate_idempotency_key(key)?;
+            http.post_with_headers(
+                path,
+                Some(body),
+                crate::http::NO_QUERY,
+                &[("Idempotency-Key", key)],
+            )
+        }
+        None => http.post(path, Some(body), crate::http::NO_QUERY),
+    }
+}
 
 /// An attachment to ride along with a `send`/`forward`.
 ///
@@ -165,6 +186,9 @@ impl MessagesResource {
     ///   server-side. Opens surface as `first_opened_at` / `open_count`; prefer
     ///   `first_opened_at` as the reliable "opened" signal.
     ///
+    /// To make a send safe to retry, use
+    /// [`send_with_idempotency_key`](Self::send_with_idempotency_key).
+    ///
     /// # Returns
     /// The sent message metadata.
     ///
@@ -189,6 +213,77 @@ impl MessagesResource {
         in_reply_to_message_id: Option<&str>,
         attachments: Option<&[Attachment]>,
         track_opens: bool,
+    ) -> Result<Message> {
+        self.send_inner(
+            email_address,
+            to,
+            subject,
+            body_text,
+            body_html,
+            cc,
+            bcc,
+            in_reply_to_message_id,
+            attachments,
+            track_opens,
+            None,
+        )
+    }
+
+    /// [`send`](Self::send) carrying an `Idempotency-Key`.
+    ///
+    /// Makes the send safe to retry after a lost or timed-out response: a
+    /// retry under the same key cannot put a second copy of the email on the
+    /// wire. At-most-once, not a replay — a repeat under a key that already
+    /// sent returns 409 rather than the original message, and 503 when the
+    /// earlier attempt's outcome is unresolved. Keys are scoped per
+    /// organization and per method, last 7 days, and do not cover the request
+    /// body, so use a fresh key for each distinct email. Always retry with the
+    /// *same* key: a new key is a new send, so minting one after a failure is
+    /// what duplicates the email.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_with_idempotency_key(
+        &self,
+        email_address: &str,
+        to: &[String],
+        subject: &str,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        in_reply_to_message_id: Option<&str>,
+        attachments: Option<&[Attachment]>,
+        track_opens: bool,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        self.send_inner(
+            email_address,
+            to,
+            subject,
+            body_text,
+            body_html,
+            cc,
+            bcc,
+            in_reply_to_message_id,
+            attachments,
+            track_opens,
+            Some(idempotency_key),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn send_inner(
+        &self,
+        email_address: &str,
+        to: &[String],
+        subject: &str,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        in_reply_to_message_id: Option<&str>,
+        attachments: Option<&[Attachment]>,
+        track_opens: bool,
+        idempotency_key: Option<&str>,
     ) -> Result<Message> {
         // Recipients: `to` always present; `cc`/`bcc` only when non-empty
         // (Python tests truthiness, so empty lists are dropped).
@@ -227,10 +322,11 @@ impl MessagesResource {
             body.insert("track_opens".into(), Value::Bool(true));
         }
 
-        let data = self.http.post(
+        let data = post_send(
+            &self.http,
             &format!("/mailboxes/{email_address}/messages"),
-            Some(&Value::Object(body)),
-            crate::http::NO_QUERY,
+            &Value::Object(body),
+            idempotency_key,
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -253,6 +349,9 @@ impl MessagesResource {
     /// # Returns
     /// The sent reply's message metadata.
     ///
+    /// To make a reply safe to retry, use
+    /// [`reply_all_with_idempotency_key`](Self::reply_all_with_idempotency_key).
+    ///
     /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
     /// (HTTP 402) when the mailbox has reached its plan's storage cap, and — on
     /// the Free plan — appends a footer to the stored body. See
@@ -267,6 +366,60 @@ impl MessagesResource {
         body_html: Option<&str>,
         attachments: Option<&[Attachment]>,
         reply_to: Option<&str>,
+    ) -> Result<Message> {
+        self.reply_all_inner(
+            email_address,
+            message_id,
+            subject,
+            body_text,
+            body_html,
+            attachments,
+            reply_to,
+            None,
+        )
+    }
+
+    /// [`reply_all`](Self::reply_all) carrying an `Idempotency-Key`.
+    ///
+    /// Semantics match
+    /// [`send_with_idempotency_key`](Self::send_with_idempotency_key).
+    /// Reply-all keys live in their own namespace, so a key used here never
+    /// collides with one used for a send or a forward.
+    #[allow(clippy::too_many_arguments)]
+    pub fn reply_all_with_idempotency_key(
+        &self,
+        email_address: &str,
+        message_id: &str,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        attachments: Option<&[Attachment]>,
+        reply_to: Option<&str>,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        self.reply_all_inner(
+            email_address,
+            message_id,
+            subject,
+            body_text,
+            body_html,
+            attachments,
+            reply_to,
+            Some(idempotency_key),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn reply_all_inner(
+        &self,
+        email_address: &str,
+        message_id: &str,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        attachments: Option<&[Attachment]>,
+        reply_to: Option<&str>,
+        idempotency_key: Option<&str>,
     ) -> Result<Message> {
         let mut body = serde_json::Map::new();
         if let Some(s) = subject {
@@ -285,10 +438,11 @@ impl MessagesResource {
             body.insert("reply_to".into(), Value::String(rt.to_string()));
         }
 
-        let data = self.http.post(
+        let data = post_send(
+            &self.http,
             &format!("/mailboxes/{email_address}/messages/{message_id}/reply-all"),
-            Some(&Value::Object(body)),
-            crate::http::NO_QUERY,
+            &Value::Object(body),
+            idempotency_key,
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -322,6 +476,9 @@ impl MessagesResource {
     /// # Returns
     /// The newly forwarded message metadata.
     ///
+    /// To make a forward safe to retry, use
+    /// [`forward_with_idempotency_key`](Self::forward_with_idempotency_key).
+    ///
     /// Returns [`InkboxError::StorageLimitExceeded`](crate::error::InkboxError)
     /// (HTTP 402) when the mailbox has reached its plan's storage cap, and — on
     /// the Free plan — appends a footer to the stored body. See
@@ -342,6 +499,84 @@ impl MessagesResource {
         include_original_attachments: bool,
         reply_to: Option<&str>,
         track_opens: bool,
+    ) -> Result<Message> {
+        self.forward_inner(
+            email_address,
+            message_id,
+            to,
+            cc,
+            bcc,
+            mode,
+            subject,
+            body_text,
+            body_html,
+            additional_attachments,
+            include_original_attachments,
+            reply_to,
+            track_opens,
+            None,
+        )
+    }
+
+    /// [`forward`](Self::forward) carrying an `Idempotency-Key`.
+    ///
+    /// Semantics match
+    /// [`send_with_idempotency_key`](Self::send_with_idempotency_key).
+    /// Forward keys live in their own namespace, so a key used here never
+    /// collides with one used for a send or a reply-all.
+    #[allow(clippy::too_many_arguments)]
+    pub fn forward_with_idempotency_key(
+        &self,
+        email_address: &str,
+        message_id: &str,
+        to: Option<&[String]>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        mode: ForwardMode,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        additional_attachments: Option<&[Attachment]>,
+        include_original_attachments: bool,
+        reply_to: Option<&str>,
+        track_opens: bool,
+        idempotency_key: &str,
+    ) -> Result<Message> {
+        self.forward_inner(
+            email_address,
+            message_id,
+            to,
+            cc,
+            bcc,
+            mode,
+            subject,
+            body_text,
+            body_html,
+            additional_attachments,
+            include_original_attachments,
+            reply_to,
+            track_opens,
+            Some(idempotency_key),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn forward_inner(
+        &self,
+        email_address: &str,
+        message_id: &str,
+        to: Option<&[String]>,
+        cc: Option<&[String]>,
+        bcc: Option<&[String]>,
+        mode: ForwardMode,
+        subject: Option<&str>,
+        body_text: Option<&str>,
+        body_html: Option<&str>,
+        additional_attachments: Option<&[Attachment]>,
+        include_original_attachments: bool,
+        reply_to: Option<&str>,
+        track_opens: bool,
+        idempotency_key: Option<&str>,
     ) -> Result<Message> {
         // Recipients map: each list is only added when non-empty (Python's
         // truthiness check), so an empty `to`/`cc`/`bcc` is omitted entirely.
@@ -388,10 +623,11 @@ impl MessagesResource {
             body.insert("track_opens".into(), Value::Bool(true));
         }
 
-        let data = self.http.post(
+        let data = post_send(
+            &self.http,
             &format!("/mailboxes/{email_address}/messages/{message_id}/forward"),
-            Some(&Value::Object(body)),
-            crate::http::NO_QUERY,
+            &Value::Object(body),
+            idempotency_key,
         )?;
         Ok(serde_json::from_value(data)?)
     }
@@ -504,6 +740,24 @@ mod tests {
             .unwrap()
     }
 
+    /// A minimal outbound `Message` body, enough for the resource to parse.
+    fn message() -> serde_json::Value {
+        json!({
+            "id": "55555555-5555-5555-5555-555555555555",
+            "mailbox_id": "66666666-6666-6666-6666-666666666666",
+            "message_id": "<sent@inkboxmail.com>",
+            "from_address": MAILBOX,
+            "to_addresses": ["dest@example.com"],
+            "subject": "hi",
+            "direction": "outbound",
+            "status": "sent",
+            "is_read": true,
+            "is_starred": false,
+            "has_attachments": false,
+            "created_at": "2026-09-14T10:00:00Z"
+        })
+    }
+
     /// The structured 402 the server emits once a mailbox is at its cap.
     fn storage_limit_402() -> serde_json::Value {
         json!({
@@ -561,6 +815,83 @@ mod tests {
             .unwrap_err();
         mock.assert();
         assert_storage_limit(err);
+    }
+
+    #[test]
+    fn keyed_sends_attach_a_validated_idempotency_key_header() {
+        let server = MockServer::start();
+        let sent = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/messages"))
+                .header("Idempotency-Key", "send-1");
+            then.status(201).json_body(message());
+        });
+
+        client(&server)
+            .messages()
+            .send_with_idempotency_key(
+                MAILBOX,
+                &["dest@example.com".to_string()],
+                "hi",
+                Some("body"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                "send-1",
+            )
+            .unwrap();
+        sent.assert();
+
+        // An empty key is rejected before any request leaves the client.
+        assert!(matches!(
+            client(&server).messages().reply_all_with_idempotency_key(
+                MAILBOX,
+                MSG_ID,
+                None,
+                Some("body"),
+                None,
+                None,
+                None,
+                "",
+            ),
+            Err(InkboxError::InvalidArgument(_))
+        ));
+    }
+
+    #[test]
+    fn unkeyed_sends_omit_the_idempotency_key_header() {
+        let server = MockServer::start();
+        let sent = server.mock(|when, then| {
+            when.method(POST)
+                .path(format!("/api/v1/mail/mailboxes/{MAILBOX}/messages"))
+                .matches(|req| {
+                    !req.headers.as_ref().is_some_and(|h| {
+                        h.iter()
+                            .any(|(k, _)| k.eq_ignore_ascii_case("idempotency-key"))
+                    })
+                });
+            then.status(201).json_body(message());
+        });
+
+        client(&server)
+            .messages()
+            .send(
+                MAILBOX,
+                &["dest@example.com".to_string()],
+                "hi",
+                Some("body"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        sent.assert();
     }
 
     #[test]
