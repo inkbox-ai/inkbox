@@ -122,7 +122,8 @@ export class MessagesResource {
    *   original message, and 503 when the earlier attempt's outcome is
    *   unresolved. Keys are scoped per organization and per method, last 7
    *   days, and do not cover the request body, so use a fresh key for each
-   *   distinct email. An attempt that errors still consumes its key.
+   *   distinct email. Always retry with the *same* key: a new key is a new
+   *   send, so minting one after a failure is what duplicates the email.
    *
    * @throws {@link StorageLimitExceededError} 402 — the mailbox is at its
    *   plan's storage cap. Free space with `messages.delete` / `threads.delete`

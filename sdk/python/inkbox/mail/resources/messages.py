@@ -173,8 +173,9 @@ class MessagesResource:
                 rather than returning the original message, and 503 when the
                 earlier attempt's outcome is unresolved. Keys are scoped per
                 organization and per method, last 7 days, and do not cover the
-                request body, so use a fresh key for each distinct email. An
-                attempt that errors still consumes its key.
+                request body, so use a fresh key for each distinct email.
+                Always retry with the *same* key: a new key is a new send, so
+                minting one after a failure is what duplicates the email.
 
         Returns:
             The sent message metadata.
