@@ -215,6 +215,9 @@ export interface FilterModeChangeNotice {
  * @see {@link WebhookSubscriptionsResource} on `inkbox.webhooks.subscriptions`
  */
 export interface Mailbox {
+  signatureHtml: string | null;
+  signatureText: string | null;
+  signatureEnabled: boolean;
   id: string;
   emailAddress: string;
   /**
@@ -384,6 +387,9 @@ export interface RawFilterModeChangeNotice {
 }
 
 export interface RawMailbox {
+  signature_html?: string | null;
+  signature_text?: string | null;
+  signature_enabled?: boolean;
   id: string;
   email_address: string;
   sending_domain?: string;
@@ -564,6 +570,9 @@ export function parseFilterModeChangeNotice(
 
 export function parseMailbox(r: RawMailbox): Mailbox {
   return {
+    signatureHtml: r.signature_html ?? null,
+    signatureText: r.signature_text ?? null,
+    signatureEnabled: r.signature_enabled ?? false,
     id: r.id,
     emailAddress: r.email_address,
     sendingDomain: r.sending_domain ?? r.email_address.split("@")[1] ?? "",

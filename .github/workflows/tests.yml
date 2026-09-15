@@ -115,3 +115,23 @@ jobs:
 
       - name: Format check
         run: cargo fmt --check
+
+  cli-tests:
+    name: CLI Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Build TypeScript SDK
+        working-directory: sdk/typescript
+        run: npm ci && npm run build
+
+      - name: Run CLI tests against the local SDK
+        working-directory: cli
+        run: npm ci && npm test

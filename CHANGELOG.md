@@ -4,6 +4,18 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.11 — Custom email signatures
+
+### Added
+
+- Configure per-mailbox HTML/plain-text signatures and automatic insertion from Python, TypeScript, Rust, and the CLI.
+- Read saved signatures from mailboxes and identity mailbox responses, with compatible defaults for earlier responses.
+- CLI file-content input, enable/disable, and explicit clear flags; signature setup examples in the bundled skills.
+
+### Changed
+
+- Bump Python, TypeScript, Rust, CLI, and bundled plugin versions to 0.6.11.
+
 ## 0.6.10 — Release an iMessage connection
 
 ### Added

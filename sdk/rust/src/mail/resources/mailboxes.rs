@@ -10,8 +10,21 @@ use serde_json::Value;
 
 use crate::error::Result;
 use crate::http::HttpTransport;
+use crate::identities::types::Unset;
 use crate::mail::resources::imports::MailboxImportsResource;
 use crate::mail::types::{FilterMode, Mailbox, Message};
+
+/// Partial mailbox update. Omitted fields are unchanged; explicit null clears content.
+/// Setting content or enabling signatures requires an eligible paid plan.
+#[derive(Debug, Clone, Default)]
+pub struct MailboxUpdateOptions {
+    pub filter_mode: Option<FilterMode>,
+    /// HTML fragment. Updating HTML without text generates a text fallback.
+    pub signature_html: Unset<String>,
+    /// Plain text. Clearing allows sending to derive text from saved HTML.
+    pub signature_text: Unset<String>,
+    pub signature_enabled: Option<bool>,
+}
 
 const BASE: &str = "/mailboxes";
 
@@ -69,9 +82,35 @@ impl MailboxesResource {
     /// actually changed, `mailbox.filter_mode_change_notice` is populated;
     /// otherwise it's `None`.
     pub fn update(&self, email_address: &str, filter_mode: Option<FilterMode>) -> Result<Mailbox> {
+        self.update_with_options(
+            email_address,
+            &MailboxUpdateOptions {
+                filter_mode,
+                ..Default::default()
+            },
+        )
+    }
+
+    /// Update filter mode and/or the saved signature, preserving omitted fields.
+    pub fn update_with_options(
+        &self,
+        email_address: &str,
+        options: &MailboxUpdateOptions,
+    ) -> Result<Mailbox> {
         let mut body = serde_json::Map::new();
-        if let Some(fm) = filter_mode {
+        if let Some(fm) = options.filter_mode {
             body.insert("filter_mode".into(), Value::String(fm.as_str().to_string()));
+        }
+        for (key, field) in [
+            ("signature_html", &options.signature_html),
+            ("signature_text", &options.signature_text),
+        ] {
+            if let Unset::Value(value) = field {
+                body.insert(key.into(), serde_json::to_value(value)?);
+            }
+        }
+        if let Some(enabled) = options.signature_enabled {
+            body.insert("signature_enabled".into(), Value::Bool(enabled));
         }
         let data = self
             .http
@@ -203,5 +242,62 @@ mod tests {
             .unwrap();
         mock.assert();
         assert_eq!(mailbox.storage_limit_bytes, Some(2_147_483_648));
+    }
+    #[test]
+    fn signature_updates_preserve_omission_clear_and_disabled() {
+        use crate::identities::types::{IdentityMailbox, Unset};
+        use crate::mail::MailboxUpdateOptions;
+        let server = MockServer::start();
+        let options = [
+            (MailboxUpdateOptions::default(), json!({})),
+            (
+                MailboxUpdateOptions {
+                    signature_html: Unset::Value(Some("<b>Alex</b>".into())),
+                    signature_enabled: Some(true),
+                    ..Default::default()
+                },
+                json!({"signature_html": "<b>Alex</b>", "signature_enabled": true}),
+            ),
+            (
+                MailboxUpdateOptions {
+                    signature_html: Unset::Value(None),
+                    signature_text: Unset::Value(None),
+                    signature_enabled: Some(false),
+                    ..Default::default()
+                },
+                json!({"signature_html": null, "signature_text": null, "signature_enabled": false}),
+            ),
+        ];
+        for (options, wire) in options {
+            let mut mock = server.mock(|when, then| {
+                when.method(httpmock::Method::PATCH)
+                    .path("/api/v1/mail/mailboxes/alex@example.com")
+                    .json_body(wire);
+                then.status(200).json_body(mailbox_json());
+            });
+            let result = client(&server)
+                .mailboxes()
+                .update_with_options("alex@example.com", &options)
+                .unwrap();
+            mock.assert();
+            assert!(!result.signature_enabled);
+            assert_eq!(result.signature_html, None);
+            mock.delete();
+        }
+        let mut data = mailbox_json();
+        data["signature_html"] = json!("<b>Alex</b>");
+        data["signature_text"] = json!("Alex");
+        data["signature_enabled"] = json!(true);
+        let mailbox = crate::mail::Mailbox::from_value(data.clone()).unwrap();
+        assert!(mailbox.signature_enabled);
+        assert_eq!(mailbox.signature_text.as_deref(), Some("Alex"));
+        let nested = IdentityMailbox::from_value(data).unwrap();
+        assert!(nested.signature_enabled);
+        assert_eq!(nested.signature_html.as_deref(), Some("<b>Alex</b>"));
+        assert!(
+            !IdentityMailbox::from_value(mailbox_json())
+                .unwrap()
+                .signature_enabled
+        );
     }
 }

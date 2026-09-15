@@ -14,6 +14,6 @@ pub use domains::DomainsResource;
 pub use drafts::{CreateDraftOptions, DraftsResource, UpdateDraftOptions};
 pub use identity_contact_rules::MailIdentityContactRulesResource;
 pub use imports::MailboxImportsResource;
-pub use mailboxes::MailboxesResource;
+pub use mailboxes::{MailboxUpdateOptions, MailboxesResource};
 pub use messages::{Attachment, MessagesResource};
 pub use threads::ThreadsResource;

@@ -823,3 +823,27 @@ The CLI honors `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` automatically on every 
 ## License
 
 MIT
+
+## Custom email signatures
+
+Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
+Each HTML/text field supports up to 16,384 characters. HTML is sanitized; logos
+must use absolute HTTPS URLs. Updating HTML without text generates a plain-text
+fallback. Omitted fields stay unchanged; null clears saved content. If saved text
+is null, sending derives it from HTML when possible. Disable without deleting to
+pause automatic insertion. Disabling and clearing remain available on every plan.
+Signatures are inserted when mail is sent, including replies, forwards, and sent
+drafts; do not append them manually. The Inkbox watermark is controlled separately.
+A `.sig` file is not a standardized attachment format: read its UTF-8 text or HTML
+content into the corresponding field; images and proprietary formats are not imported.
+
+```bash
+inkbox mailbox update alex@example.com --signature-html-file signature.html --signature-enabled
+inkbox mailbox update alex@example.com --signature-text-file signature.sig
+inkbox mailbox update alex@example.com --no-signature-enabled
+inkbox mailbox update alex@example.com --clear-signature-html --clear-signature-text
+inkbox mailbox get alex@example.com --json
+```
+
+Inline content uses `--signature-html <html>` or `--signature-text <text>`.
+For each format, choose inline content, a file, or its clear flag, not more than one.

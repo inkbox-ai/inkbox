@@ -22,6 +22,6 @@ pub use types::{
 // Re-export the resources.
 pub use resources::{
     Attachment, CreateDraftOptions, DomainsResource, DraftsResource, MailContactRulesResource,
-    MailIdentityContactRulesResource, MailboxImportsResource, MailboxesResource, MessagesResource,
-    ThreadsResource, UpdateDraftOptions,
+    MailIdentityContactRulesResource, MailboxImportsResource, MailboxUpdateOptions,
+    MailboxesResource, MessagesResource, ThreadsResource, UpdateDraftOptions,
 };

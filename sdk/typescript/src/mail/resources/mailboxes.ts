@@ -58,12 +58,21 @@ export class MailboxesResource {
     emailAddress: string,
     options: {
       filterMode?: FilterMode;
+      /** HTML fragment; null clears. Updating HTML alone regenerates plain text. */
+      signatureHtml?: string | null;
+      /** Plain text; null clears the saved fallback (sending can derive it from HTML). */
+      signatureText?: string | null;
+      /** Automatic insertion; setting content or enabling requires an eligible paid plan. */
+      signatureEnabled?: boolean;
     },
   ): Promise<Mailbox> {
     const body: Record<string, unknown> = {};
     if (options.filterMode !== undefined) {
       body["filter_mode"] = options.filterMode;
     }
+    if (options.signatureHtml !== undefined) body["signature_html"] = options.signatureHtml;
+    if (options.signatureText !== undefined) body["signature_text"] = options.signatureText;
+    if (options.signatureEnabled !== undefined) body["signature_enabled"] = options.signatureEnabled;
     const data = await this.http.patch<RawMailbox>(`${BASE}/${emailAddress}`, body);
     return parseMailbox(data);
   }

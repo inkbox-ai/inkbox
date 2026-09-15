@@ -580,3 +580,33 @@ WebSocket). See `src/tunnels/client/`.
 ## License
 
 MIT
+
+## Custom email signatures
+
+Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
+Each HTML/text field supports up to 16,384 characters. HTML is sanitized; logos
+must use absolute HTTPS URLs. Updating HTML without text generates a plain-text
+fallback. Omitted fields stay unchanged; null clears saved content. If saved text
+is null, sending derives it from HTML when possible. Disable without deleting to
+pause automatic insertion. Disabling and clearing remain available on every plan.
+Signatures are inserted when mail is sent, including replies, forwards, and sent
+drafts; do not append them manually. The Inkbox watermark is controlled separately.
+A `.sig` file is not a standardized attachment format: read its UTF-8 text or HTML
+content into the corresponding field; images and proprietary formats are not imported.
+
+```rust,no_run
+use inkbox::Inkbox;
+use inkbox::mail::MailboxUpdateOptions;
+use inkbox::identities::Unset;
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let inkbox = Inkbox::builder("YOUR_API_KEY").build()?;
+inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions {
+    signature_html: Unset::Value(Some("<b>Alex</b>".into())),
+    signature_enabled: Some(true),
+    ..Default::default()
+})?;
+// Unset::Omit leaves content unchanged; Unset::Value(None) clears it.
+# Ok(())
+# }
+```

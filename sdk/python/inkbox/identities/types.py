@@ -192,6 +192,10 @@ class IdentityMailbox:
     agent_identity_id: UUID | None = None
     filter_mode_change_notice: FilterModeChangeNotice | None = None
 
+    signature_html: str | None = None
+    signature_text: str | None = None
+    signature_enabled: bool = False
+
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityMailbox:
         notice = d.get("filter_mode_change_notice")
@@ -201,6 +205,9 @@ class IdentityMailbox:
             email_address = d["email_address"]
             _, _, sending_domain = email_address.partition("@")
         return cls(
+            signature_html=d.get("signature_html"),
+            signature_text=d.get("signature_text"),
+            signature_enabled=d.get("signature_enabled", False),
             id=UUID(d["id"]),
             email_address=d["email_address"],
             sending_domain=sending_domain,
