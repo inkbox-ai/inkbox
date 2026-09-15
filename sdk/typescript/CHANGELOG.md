@@ -7,6 +7,12 @@
 - Mailbox and identity mailbox responses expose saved signatures, with defaults
   for earlier API responses. README and TypeScript skill include setup examples.
 - Bump `@inkbox/sdk` to 0.7.1.
+- **Source-breaking migration:** `Mailbox` and `IdentityMailbox` now require
+  `signatureHtml`, `signatureText`, and `signatureEnabled`. Update manually
+  constructed objects and test fixtures with `signatureHtml: null`,
+  `signatureText: null`, and `signatureEnabled: false` when no signature is
+  configured. Older API responses still parse with these defaults; only
+  manually constructed source objects need this migration.
 
 ## 0.6.8 — Voice AI voice discovery
 

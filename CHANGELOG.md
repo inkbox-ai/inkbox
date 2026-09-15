@@ -15,6 +15,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 ### Changed
 
 - Bump Python, TypeScript, Rust, CLI, and bundled plugin versions to 0.7.1.
+- **Source-breaking migration:** manually constructed `Mailbox` and `IdentityMailbox` objects or test fixtures need the new signature fields. In TypeScript, add `signatureHtml: null`, `signatureText: null`, and `signatureEnabled: false` when no signature is configured. In Rust struct literals, add `signature_html: None`, `signature_text: None`, and `signature_enabled: false`. Older API responses still parse with these defaults; this migration applies to source literals when upgrading and recompiling.
 
 ### Fixed
 
