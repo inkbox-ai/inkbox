@@ -17,6 +17,12 @@ def test_creation_permissions_reject_mixed_address_shapes() -> None:
             emails={"ada@example.com": True},
             email=ContactChannelAccessUpdate(visible=True),
         )
+    with pytest.raises(ValueError, match="Profile cannot be disabled"):
+        ContactCreatePermissions(
+            identity_id="11111111-1111-4111-8111-111111111111",
+            emails={"ada@example.com": True},
+            profile=False,
+        ).to_wire()
 
 
 def test_boolean_permissions_preserve_false_empty_maps_and_omitted_settings() -> None:
@@ -68,21 +74,29 @@ def test_group_access_preserves_nested_omission_and_atomic_creation_shape() -> N
         assert not loaded.profile and loaded.memories
         assert client.contacts.access.update(
             "test-agent", contact_id,
-            email=ContactChannelAccessUpdate(visible=True, contactable=[]),
-            phone=ContactChannelAccessUpdate(visible=False), profile=False, memories=True,
+            email=ContactChannelAccessUpdate(visible=False, contactable=[]),
+            phone=ContactChannelAccessUpdate(visible=False), profile=False, memories=False,
         ) == loaded
         client.contacts.access.update("test-agent", contact_id, email=ContactChannelAccessUpdate())
         client.contacts.access.update("test-agent", contact_id)
         client.contacts.create(given_name="Ada", permissions=ContactCreatePermissions(
             identity_id=fixture["policy"]["identity_id"],
-            email=ContactChannelAccessUpdate(visible=True, contactable=[]), profile=False,
+            email=ContactChannelAccessUpdate(visible=True, contactable=[]), profile=True,
         ))
+        with pytest.raises(ValueError, match="Profile cannot be disabled"):
+            client.contacts.access.update(
+                "test-agent", contact_id, profile=False, memories=True,
+            )
+        with pytest.raises(ValueError, match="Profile cannot be disabled"):
+            client.contacts.permissions.update(
+                "test-agent", contact_id, profile=False, emails={"person@example.com": True},
+            )
         path = f"/api/v1/identities/test-agent/contacts/{contact_id}/access"
         assert requests == [
             ("GET", path, None), ("PATCH", path, fixture["access_update"]),
             ("PATCH", path, {"email": {}}), ("PATCH", path, {}),
             ("POST", "/api/v1/contacts/with-permissions", {"given_name": "Ada", "permissions": {
-                "identity_id": fixture["policy"]["identity_id"], "profile": False,
+                "identity_id": fixture["policy"]["identity_id"], "profile": True,
                 "email": {"visible": True, "contactable": []},
             }}),
         ]

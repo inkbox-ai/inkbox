@@ -35,6 +35,28 @@ impl ContactCreatePermissions {
         if uses_maps && uses_groups {
             return Err("use boolean address maps or group access objects, not both");
         }
+        if self.profile == Some(false)
+            && (self.memories == Some(true)
+                || self
+                    .emails
+                    .as_ref()
+                    .is_some_and(|values| values.values().any(|allowed| *allowed))
+                || self
+                    .phones
+                    .as_ref()
+                    .is_some_and(|values| values.values().any(|allowed| *allowed))
+                || [&self.email, &self.phone].iter().any(|group| {
+                    group.as_ref().is_some_and(|value| {
+                        value.visible == Some(true)
+                            || value
+                                .contactable
+                                .as_ref()
+                                .is_some_and(|addresses| !addresses.is_empty())
+                    })
+                }))
+        {
+            return Err("Profile cannot be disabled while email, phone, or memories is enabled");
+        }
         Ok(())
     }
 }
@@ -75,6 +97,26 @@ pub struct UpdateContactAccess {
     pub profile: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memories: Option<bool>,
+}
+
+impl UpdateContactAccess {
+    pub(crate) fn validate(&self) -> Result<(), &'static str> {
+        if self.profile == Some(false)
+            && (self.memories == Some(true)
+                || [&self.email, &self.phone].iter().any(|group| {
+                    group.as_ref().is_some_and(|value| {
+                        value.visible == Some(true)
+                            || value
+                                .contactable
+                                .as_ref()
+                                .is_some_and(|addresses| !addresses.is_empty())
+                    })
+                }))
+        {
+            return Err("Profile cannot be disabled while email, phone, or memories is enabled");
+        }
+        Ok(())
+    }
 }
 
 /// How a contact was created.

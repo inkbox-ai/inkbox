@@ -12,13 +12,14 @@ import { outputContactRules } from "../dist/output.js";
 const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 
 test("access files preserve omission and reject malformed or contradictory groups", () => {
-  for (const body of [{}, { email: {} }, { email: { visible: true, contactable: [] }, profile: false }, { phone: { contactable: ["+15555550123"] } }]) {
+  for (const body of [{}, { email: {} }, { email: { visible: false, contactable: [] }, profile: false }, { phone: { contactable: ["+15555550123"] } }]) {
     assert.deepEqual(parseContactAccessFile(JSON.stringify(body)), body);
   }
   for (const body of [null, [], { email: null }, { profile: null }, { phone: { visible: "false" } },
     { email: { visible: false, contactable: ["person@example.com"] } }, { email: { contactable: null } },
     { email: { contactable: [false] } }, { phone: { contactable: [""] } }, { phone: { allow: true } },
-    { emails: {} }, { memories: 0 }, { email: { contactable: ["person@example.com", "person@example.com"] } },
+    { emails: {} }, { memories: 0 }, { profile: false, memories: true }, { profile: false, email: { visible: true } },
+    { profile: false, phone: { contactable: ["+15555550123"] } }, { email: { contactable: ["person@example.com", "person@example.com"] } },
     { phone: { contactable: Array.from({ length: 51 }, (_, i) => `+1555555${String(i).padStart(4, "0")}`) } }]) {
     assert.throws(() => parseContactAccessFile(JSON.stringify(body)));
   }
@@ -41,7 +42,7 @@ test("access get and set preserve nested choices and reject invalid files before
     const get = await runCli([...args, "get", "test-agent", "contact-1"]);
     assert.equal(get.error, null, get.stderr);
     assert.deepEqual(JSON.parse(get.stdout), access);
-    const update = { email: { visible: true, contactable: [] }, phone: { visible: false }, profile: false };
+    const update = { email: { visible: false, contactable: [] }, phone: { visible: false }, profile: false };
     const setArgs = [...args, "set", "test-agent", "contact-1", "--file", path];
     for (const body of [update, { email: {} }, {}]) {
       await writeFile(path, JSON.stringify(body));
@@ -62,12 +63,13 @@ test("access get and set preserve nested choices and reject invalid files before
 });
 
 test("boolean permissions reject null, strings, unknown fields, and excessive maps", () => {
-  for (const body of [{}, { emails: {}, phones: {}, profile: false, memories: true }]) {
+  for (const body of [{}, { emails: {}, phones: {}, profile: false, memories: false }]) {
     assert.deepEqual(parseContactPermissionsFile(JSON.stringify(body)), body);
   }
   for (const body of [null, [], { profile: null }, { memories: "false" }, { profile: 0 },
     { emails: null }, { phones: [] }, { emails: { "person@example.com": "allow" } },
-    { email: {} }, { expectedRevision: 0 }, { addresses: [] },
+    { email: {} }, { expectedRevision: 0 }, { addresses: [] }, { profile: false, memories: true },
+    { profile: false, emails: { "person@example.com": true } },
     { emails: Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`person${i}@example.com`, true])) }]) {
     assert.throws(() => parseContactPermissionsFile(JSON.stringify(body)));
   }
@@ -193,7 +195,7 @@ test("policy files preserve visibility omission and validate every supplied fiel
   const base = { expectedRevision: 0, identityId: "identity-1", addresses: [] };
   assert.deepEqual(parseContactPolicyFile(JSON.stringify(base)), base);
   const full = { ...base, visibility: { defaults: { profile: "allow", memories: "block" },
-    identities: [{ identityId: "identity-1", profile: "block", memories: "allow" }] } };
+    identities: [{ identityId: "identity-1", profile: "allow", memories: "allow" }] } };
   assert.deepEqual(parseContactPolicyFile(JSON.stringify(full)), full);
   for (const invalid of [
     { ...base, visiblity: full.visibility }, { ...base, visibility: null },
@@ -202,6 +204,9 @@ test("policy files preserve visibility omission and validate every supplied fiel
     { ...base, defaults: { email: "allow" } }, { ...base, expectedRevision: -1 },
     { ...base, addresses: [{ kind: "email", value: "person@example.com", action: "block" }] },
     { ...base, addresses: [{ kind: "sms", value: "+15555550123", action: "block", expectedAction: "allow" }] },
+    { ...base, visibility: { defaults: { profile: "block", memories: "allow" }, identities: [] } },
+    { ...base, visibility: { defaults: { profile: "allow", memories: "allow" },
+      identities: [{ identityId: "identity-1", profile: "block", memories: "allow" }] } },
   ]) assert.throws(() => parseContactPolicyFile(JSON.stringify(invalid)));
 });
 
@@ -210,7 +215,7 @@ test("policy set forwards visibility and rejects unknown keys before HTTP", asyn
   const path = join(directory, "policy.json");
   const body = { expectedRevision: 3, identityId: "identity-1",
     addresses: [{ kind: "email", value: "person@example.com", action: "allow", expectedAction: "block" }],
-    visibility: { defaults: { profile: "allow", memories: "block" }, identities: [{ identityId: "identity-1", profile: "block", memories: "allow" }] } };
+    visibility: { defaults: { profile: "allow", memories: "block" }, identities: [{ identityId: "identity-1", profile: "allow", memories: "allow" }] } };
   const requests = [];
   const mock = await listen(async (req, res) => {
     const chunks = [];
@@ -231,7 +236,7 @@ test("policy set forwards visibility and rejects unknown keys before HTTP", asyn
     assert.deepEqual(requests[0], { method: "PUT", url: "/api/v1/contacts/contact-1/communication-policy", payload: {
       expected_revision: 3, identity_id: "identity-1",
       addresses: [{ kind: "email", value: "person@example.com", action: "allow", expected_action: "block" }], visibility: {
-        defaults: body.visibility.defaults, identities: [{ identity_id: "identity-1", profile: "block", memories: "allow" }],
+        defaults: body.visibility.defaults, identities: [{ identity_id: "identity-1", profile: "allow", memories: "allow" }],
       },
     } });
     await writeFile(path, JSON.stringify({ ...body, visiblity: body.visibility }));

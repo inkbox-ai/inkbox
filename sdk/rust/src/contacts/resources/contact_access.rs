@@ -5,7 +5,7 @@ use std::sync::Arc;
 use serde_json::Value;
 
 use crate::contacts::types::{ContactAccess, ContactAccessSettings, UpdateContactAccess};
-use crate::error::Result;
+use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
 const BASE: &str = "/contacts";
@@ -34,6 +34,8 @@ impl ContactAccessResource {
         contact_id: &str,
         body: &UpdateContactAccess,
     ) -> Result<ContactAccessSettings> {
+        body.validate()
+            .map_err(|message| InkboxError::InvalidArgument(message.into()))?;
         Ok(serde_json::from_value(self.http.patch(
             &format!("/identities/{handle}/contacts/{contact_id}/access"),
             body,
@@ -106,7 +108,7 @@ mod tests {
         });
         let create = server.mock(|when, then| {
             when.method(POST).path("/api/v1/contacts/with-permissions").json_body(json!({"given_name": "Ada", "permissions": {
-                "identity_id": fixture["policy"]["identity_id"], "profile": false,
+                "identity_id": fixture["policy"]["identity_id"], "profile": true,
                 "email": {"visible": true, "contactable": []},
             }}));
             then.status(201).json_body(json!({"id": contact_id, "created_at": "2026-09-11T00:00:00Z", "updated_at": "2026-09-11T00:00:00Z"}));
@@ -132,13 +134,16 @@ mod tests {
                     "test-agent",
                     contact_id,
                     &UpdateContactAccess {
-                        email: Some(email.clone()),
+                        email: Some(ContactChannelAccessUpdate {
+                            visible: Some(false),
+                            contactable: Some(vec![]),
+                        }),
                         phone: Some(ContactChannelAccessUpdate {
                             visible: Some(false),
                             ..Default::default()
                         }),
                         profile: Some(false),
-                        memories: Some(true),
+                        memories: Some(false),
                     }
                 )
                 .unwrap(),
@@ -167,12 +172,23 @@ mod tests {
                         .parse()
                         .unwrap(),
                     email: Some(email),
-                    profile: Some(false),
+                    profile: Some(true),
                     ..Default::default()
                 }),
                 ..Default::default()
             })
             .unwrap();
+        assert!(access
+            .update(
+                "test-agent",
+                contact_id,
+                &UpdateContactAccess {
+                    profile: Some(false),
+                    memories: Some(true),
+                    ..Default::default()
+                },
+            )
+            .is_err());
         get.assert();
         patch.assert();
         empty.assert();

@@ -4,6 +4,12 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.6.12 - Profile-gated contact permissions
+
+### Changed
+
+- Profile is now the parent contact permission. Outbound SDK and CLI requests reject Email, Phone, or Memories access when the same request disables Profile. Profile-off responses remain readable for compatibility during rollout.
+
 ## 0.6.11 — Contact communication permissions
 
 ### Added

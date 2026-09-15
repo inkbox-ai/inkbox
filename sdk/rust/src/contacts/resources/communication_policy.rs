@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::contacts::resources::contacts::ListContactsParams;
 use crate::contacts::types::{Contact, ContactEmail, ContactPhone, ContactReviewStatus};
-use crate::error::Result;
+use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
 /// An explicit exact-address choice overrides the agent's channel mode.
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ContactDecision {
     #[default]
@@ -45,7 +45,7 @@ pub struct ContactAddressUpdate {
     pub expected_action: ContactDecision,
 }
 
-/// Independent profile and memory visibility decisions.
+/// Profile and dependent memory visibility decisions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContactVisibilityDecisions {
     pub profile: ContactDecision,
@@ -65,6 +65,46 @@ pub struct ContactIdentityVisibilityDecisions {
 pub struct ContactVisibilityPolicy {
     pub defaults: ContactVisibilityDecisions,
     pub identities: Vec<ContactIdentityVisibilityDecisions>,
+}
+
+impl ContactVisibilityPolicy {
+    fn validate(
+        &self,
+        identity_id: uuid::Uuid,
+        addresses: &[ContactAddressUpdate],
+    ) -> std::result::Result<(), &'static str> {
+        let defaults_profile = self.defaults.profile != ContactDecision::Block;
+        if !defaults_profile && self.defaults.memories != ContactDecision::Block {
+            return Err("Profile cannot be disabled while memories is enabled");
+        }
+        let mut selected_profile = defaults_profile;
+        for row in &self.identities {
+            let profile = if row.profile == ContactDecision::Inherit {
+                defaults_profile
+            } else {
+                row.profile == ContactDecision::Allow
+            };
+            let memories = if row.memories == ContactDecision::Inherit {
+                self.defaults.memories != ContactDecision::Block
+            } else {
+                row.memories == ContactDecision::Allow
+            };
+            if !profile && memories {
+                return Err("Profile cannot be disabled while memories is enabled");
+            }
+            if row.identity_id == identity_id {
+                selected_profile = profile;
+            }
+        }
+        if !selected_profile
+            && addresses
+                .iter()
+                .any(|row| row.action == ContactDecision::Allow)
+        {
+            return Err("Profile cannot be disabled while email or phone is enabled");
+        }
+        Ok(())
+    }
 }
 
 /// Effective permissions, including groups without stored content.
@@ -228,6 +268,12 @@ impl ContactCommunicationPolicyResource {
         contact_id: &str,
         body: &ReplaceContactCommunicationPolicyWithVisibility,
     ) -> Result<ContactCommunicationPolicy> {
+        body.visibility
+            .validate(
+                body.communication.identity_id,
+                &body.communication.addresses,
+            )
+            .map_err(|message| InkboxError::InvalidArgument(message.into()))?;
         Ok(serde_json::from_value(self.http.put(
             &format!("/contacts/{contact_id}/communication-policy"),
             body,
@@ -356,6 +402,28 @@ mod tests {
             )
             .unwrap();
         assert_eq!(saved.contact_id.to_string(), contact_id);
+        let invalid = ReplaceContactCommunicationPolicyWithVisibility {
+            communication: ReplaceContactCommunicationPolicy {
+                expected_revision: 8,
+                identity_id: policy.identity_id.unwrap(),
+                addresses: vec![ContactAddressUpdate {
+                    kind: ContactAddressKind::Email,
+                    value: "person@example.com".into(),
+                    action: ContactDecision::Allow,
+                    expected_action: ContactDecision::Block,
+                }],
+            },
+            visibility: ContactVisibilityPolicy {
+                defaults: ContactVisibilityDecisions {
+                    profile: ContactDecision::Block,
+                    memories: ContactDecision::Block,
+                },
+                identities: vec![],
+            },
+        };
+        assert!(resource
+            .replace_with_visibility(contact_id, &invalid)
+            .is_err());
         let projected = resource.preview(contact_id, identity_id).unwrap();
         assert!(projected.contact.is_none());
         assert!(!projected.visibility.profile);

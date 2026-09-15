@@ -44,5 +44,11 @@ class ContactPermissionsResource:
         body = {key: value for key, value in {
             "emails": emails, "phones": phones, "profile": profile, "memories": memories,
         }.items() if value is not None}
+        if profile is False and (
+            memories is True
+            or any((emails or {}).values())
+            or any((phones or {}).values())
+        ):
+            raise ValueError("Profile cannot be disabled while email, phone, or memories is enabled")
         return ContactPermissions._from_dict(self._http.patch(
             f"/identities/{quote(handle, safe='')}/contacts/{quote(str(contact_id), safe='')}/permissions", json=body))

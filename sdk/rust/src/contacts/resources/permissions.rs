@@ -4,7 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::Result;
+use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 
 /// Effective access. Phone covers SMS, calls, and iMessage.
@@ -27,6 +27,25 @@ pub struct UpdateContactPermissions {
     pub profile: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memories: Option<bool>,
+}
+
+impl UpdateContactPermissions {
+    fn validate(&self) -> std::result::Result<(), &'static str> {
+        if self.profile == Some(false)
+            && (self.memories == Some(true)
+                || self
+                    .emails
+                    .as_ref()
+                    .is_some_and(|values| values.values().any(|allowed| *allowed))
+                || self
+                    .phones
+                    .as_ref()
+                    .is_some_and(|values| values.values().any(|allowed| *allowed)))
+        {
+            return Err("Profile cannot be disabled while email, phone, or memories is enabled");
+        }
+        Ok(())
+    }
 }
 
 /// Administrative yes/no access controls.
@@ -54,6 +73,8 @@ impl ContactPermissionsResource {
         contact_id: &str,
         body: &UpdateContactPermissions,
     ) -> Result<ContactPermissions> {
+        body.validate()
+            .map_err(|message| InkboxError::InvalidArgument(message.into()))?;
         Ok(serde_json::from_value(self.http.patch(
             &format!("/identities/{handle}/contacts/{contact_id}/permissions"),
             body,
@@ -125,6 +146,17 @@ mod tests {
                 &UpdateContactPermissions::default(),
             )
             .unwrap();
+        assert!(resource
+            .update(
+                "test-agent",
+                contact_id,
+                &UpdateContactPermissions {
+                    emails: Some(HashMap::from([("person@example.com".into(), true)])),
+                    profile: Some(false),
+                    ..Default::default()
+                },
+            )
+            .is_err());
         get.assert();
         patch.assert();
         empty.assert();

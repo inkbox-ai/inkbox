@@ -547,7 +547,7 @@ mod tests {
                     "emails": [{"value": "ada@example.com"}],
                     "permissions": {
                         "identity_id": CONTACT_ID,
-                        "profile": false,
+                        "profile": true,
                         "emails": {"ada@example.com": true}
                     }
                 }));
@@ -566,7 +566,7 @@ mod tests {
                     identity_id: Uuid::parse_str(CONTACT_ID).unwrap(),
                     emails: Some(HashMap::from([("ada@example.com".into(), true)])),
                     phones: None,
-                    profile: Some(false),
+                    profile: Some(true),
                     memories: None,
                     ..Default::default()
                 }),

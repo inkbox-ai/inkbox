@@ -17,7 +17,7 @@ export interface ContactAddressUpdate {
   action: ContactDecision;
   expectedAction: ContactDecision;
 }
-/** Independent profile and memory visibility decisions. */
+/** Profile and dependent memory visibility decisions. */
 export interface ContactVisibilityDecisions { profile: ContactDecision; memories: ContactDecision }
 /** One identity's visibility overrides. */
 export interface ContactIdentityVisibilityDecisions extends ContactVisibilityDecisions { identityId: string }
@@ -26,7 +26,7 @@ export interface ContactVisibilityPolicy {
   defaults: ContactVisibilityDecisions;
   identities: ContactIdentityVisibilityDecisions[];
 }
-/** Effective access, independent of whether the group has stored data. */
+/** Effective access, including groups without stored data. */
 export interface ContactVisibilityResult { profile: boolean; memories: boolean }
 export interface ContactCommunicationPolicy {
   contactId: string;
@@ -135,6 +135,24 @@ export class ContactCommunicationPolicyResource {
   /** Replace settings; omitted visibility is preserved and stale revisions return 409. */
   async replace(contactId: string, options: ReplaceContactCommunicationPolicy): Promise<ContactCommunicationPolicy> {
     if (options.visibility === null) throw new TypeError("visibility cannot be null; omit it to preserve existing settings");
+    if (options.visibility !== undefined) {
+      const defaultsProfile = options.visibility.defaults.profile !== "block";
+      if (!defaultsProfile && options.visibility.defaults.memories !== "block") {
+        throw new Error("Profile cannot be disabled while memories is enabled");
+      }
+      const profiles = new Map<string, boolean>();
+      for (const row of options.visibility.identities) {
+        const profile = row.profile === "inherit" ? defaultsProfile : row.profile === "allow";
+        const memories = row.memories === "inherit"
+          ? options.visibility.defaults.memories !== "block"
+          : row.memories === "allow";
+        if (!profile && memories) throw new Error("Profile cannot be disabled while memories is enabled");
+        profiles.set(row.identityId, profile);
+      }
+      if (!(profiles.get(options.identityId) ?? defaultsProfile) && options.addresses.some((row) => row.action === "allow")) {
+        throw new Error("Profile cannot be disabled while email or phone is enabled");
+      }
+    }
     return parsePolicy(await this.http.put<RawPolicy>(`/contacts/${encodeURIComponent(contactId)}/communication-policy`, {
       expected_revision: options.expectedRevision, identity_id: options.identityId,
       addresses: options.addresses.map((row) => ({ kind: row.kind, value: row.value, action: row.action, expected_action: row.expectedAction })),

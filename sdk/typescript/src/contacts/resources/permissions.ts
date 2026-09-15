@@ -21,6 +21,11 @@ export class ContactPermissionsResource {
 
   /** Save explicit yes/no choices using admin credentials. */
   async update(handle: string, contactId: string, options: UpdateContactPermissions): Promise<ContactPermissions> {
+    if (options.profile === false && (
+      options.memories === true
+      || Object.values(options.emails ?? {}).some(Boolean)
+      || Object.values(options.phones ?? {}).some(Boolean)
+    )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
     return this.http.patch(`/identities/${encodeURIComponent(handle)}/contacts/${encodeURIComponent(contactId)}/permissions`, options);
   }
 }

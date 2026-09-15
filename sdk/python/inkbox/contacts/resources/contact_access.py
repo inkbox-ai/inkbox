@@ -48,6 +48,14 @@ class ContactAccessResource:
         for key, group in (("email", email), ("phone", phone)):
             if group is not None:
                 body[key] = group.to_wire()
+        if profile is False and (
+            memories is True
+            or any(
+                group is not None and (group.visible is True or bool(group.contactable))
+                for group in (email, phone)
+            )
+        ):
+            raise ValueError("Profile cannot be disabled while email, phone, or memories is enabled")
         data = self._http.patch(
             f"/identities/{quote(handle, safe='')}/contacts/{quote(str(contact_id), safe='')}/access",
             json=body,

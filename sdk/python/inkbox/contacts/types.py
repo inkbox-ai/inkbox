@@ -65,6 +65,16 @@ class ContactCreatePermissions:
             raise ValueError("Use boolean address maps or group access objects, not both")
 
     def to_wire(self) -> dict[str, Any]:
+        if self.profile is False and (
+            self.memories is True
+            or any((self.emails or {}).values())
+            or any((self.phones or {}).values())
+            or any(
+                group is not None and (group.visible is True or bool(group.contactable))
+                for group in (self.email, self.phone)
+            )
+        ):
+            raise ValueError("Profile cannot be disabled while email, phone, or memories is enabled")
         result: dict[str, Any] = {"identity_id": str(self.identity_id)}
         for key in ("emails", "phones", "profile", "memories"):
             value = getattr(self, key)

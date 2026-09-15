@@ -45,6 +45,10 @@ export class ContactAccessResource {
 
   /** Save partial access choices; hiding Profile also hides omitted groups. */
   async update(handle: string, contactId: string, options: UpdateContactAccess): Promise<ContactAccessSettings> {
+    if (options.profile === false && (
+      options.memories === true
+      || [options.email, options.phone].some((group) => group?.visible === true || Boolean(group?.contactable?.length))
+    )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
     return this.http.patch(`/identities/${encodeURIComponent(handle)}/contacts/${encodeURIComponent(contactId)}/access`, options);
   }
 

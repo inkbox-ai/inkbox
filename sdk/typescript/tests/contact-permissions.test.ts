@@ -17,17 +17,23 @@ describe("boolean contact permissions", () => {
       const client = new Inkbox({ apiKey: "test-key", baseUrl: "https://example.com" });
       const loaded: ContactAccessSettings = await client.contacts.access.get("test-agent", fixture.policy.contact_id);
       expect(loaded).toEqual(fixture.access);
-      const update: UpdateContactAccess = { email: { visible: true, contactable: [] }, phone: { visible: false }, profile: false, memories: true };
+      const update: UpdateContactAccess = { email: { visible: false, contactable: [] }, phone: { visible: false }, profile: false, memories: false };
       expect(await client.contacts.access.update("test-agent", fixture.policy.contact_id, update)).toEqual(loaded);
       await client.contacts.access.update("test-agent", fixture.policy.contact_id, { email: {} });
       await client.contacts.access.update("test-agent", fixture.policy.contact_id, {});
-      await client.contacts.create({ givenName: "Ada", permissions: { identityId: fixture.policy.identity_id, email: { visible: true, contactable: [] }, profile: false } });
+      await client.contacts.create({ givenName: "Ada", permissions: { identityId: fixture.policy.identity_id, email: { visible: true, contactable: [] }, profile: true } });
+      await expect(client.contacts.access.update("test-agent", fixture.policy.contact_id, {
+        profile: false, memories: true,
+      })).rejects.toThrow("Profile cannot be disabled");
+      await expect(client.contacts.create({ permissions: {
+        identityId: fixture.policy.identity_id, profile: false, emails: { "person@example.com": true },
+      } })).rejects.toThrow("Profile cannot be disabled");
       const path = `/api/v1/identities/test-agent/contacts/${fixture.policy.contact_id}/access`;
       expect(requests).toEqual([
         { method: "GET", path, body: null }, { method: "PATCH", path, body: fixture.access_update },
         { method: "PATCH", path, body: { email: {} } }, { method: "PATCH", path, body: {} },
         { method: "POST", path: "/api/v1/contacts/with-permissions", body: { given_name: "Ada", permissions: {
-          identity_id: fixture.policy.identity_id, profile: false, email: { visible: true, contactable: [] },
+          identity_id: fixture.policy.identity_id, profile: true, email: { visible: true, contactable: [] },
         } } },
       ]);
     } finally { fetch.mockRestore(); }
@@ -46,6 +52,9 @@ describe("boolean contact permissions", () => {
       const update: UpdateContactPermissions = { emails: { "person@example.com": false }, phones: {}, profile: false };
       expect(await client.contacts.permissions.update("test-agent", fixture.policy.contact_id, update)).toEqual(loaded);
       await client.contacts.permissions.update("test-agent", fixture.policy.contact_id, {});
+      await expect(client.contacts.permissions.update("test-agent", fixture.policy.contact_id, {
+        profile: false, emails: { "person@example.com": true },
+      })).rejects.toThrow("Profile cannot be disabled");
       expect(requests).toEqual([
         { method: "GET", body: null }, { method: "PATCH", body: fixture.permissions_update }, { method: "PATCH", body: {} },
       ]);

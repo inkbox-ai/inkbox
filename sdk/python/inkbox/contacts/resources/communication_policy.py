@@ -35,7 +35,7 @@ class ContactAddressUpdate:
 
 @dataclass(frozen=True)
 class ContactVisibilityDecisions:
-    """Independent profile and memory visibility decisions."""
+    """Profile and dependent memory visibility decisions."""
     profile: ContactDecision
     memories: ContactDecision
 
@@ -156,7 +156,7 @@ class ContactPermissionVisibility:
 
 @dataclass(frozen=True)
 class ContactPermissionEffective:
-    """Identifier coverage and independent profile/memory permissions."""
+    """Identifier coverage and Profile-gated memory permissions."""
     email: IdentifierPermission
     phone: IdentifierPermission
     profile: bool
@@ -215,6 +215,25 @@ class ContactCommunicationPolicyResource:
                 identity_id: UUID | str, addresses: list[ContactAddressUpdate],
                 visibility: ContactVisibilityPolicy | None = None) -> ContactCommunicationPolicy:
         """Replace settings; omitted visibility is preserved and stale revisions return 409."""
+        if visibility is not None:
+            defaults_profile = visibility.defaults.profile != "block"
+            if not defaults_profile and visibility.defaults.memories != "block":
+                raise ValueError("Profile cannot be disabled while memories is enabled")
+            profiles = {}
+            for row in visibility.identities:
+                profile = defaults_profile if row.profile == "inherit" else row.profile == "allow"
+                memories = (
+                    visibility.defaults.memories != "block"
+                    if row.memories == "inherit"
+                    else row.memories == "allow"
+                )
+                if not profile and memories:
+                    raise ValueError("Profile cannot be disabled while memories is enabled")
+                profiles[str(row.identity_id)] = profile
+            if not profiles.get(str(identity_id), defaults_profile) and any(
+                row.action == "allow" for row in addresses
+            ):
+                raise ValueError("Profile cannot be disabled while email or phone is enabled")
         body = {
             "expected_revision": expected_revision, "identity_id": str(identity_id),
             "addresses": [asdict(row) for row in addresses],

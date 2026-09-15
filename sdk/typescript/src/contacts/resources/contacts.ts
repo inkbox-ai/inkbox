@@ -205,6 +205,12 @@ export class ContactsResource {
       const usesMaps = permissions.emails !== undefined || permissions.phones !== undefined;
       const usesGroups = permissions.email !== undefined || permissions.phone !== undefined;
       if (usesMaps && usesGroups) throw new Error("Use boolean address maps or group access objects, not both");
+      if (permissions.profile === false && (
+        permissions.memories === true
+        || Object.values(permissions.emails ?? {}).some(Boolean)
+        || Object.values(permissions.phones ?? {}).some(Boolean)
+        || [permissions.email, permissions.phone].some((group) => group?.visible === true || Boolean(group?.contactable?.length))
+      )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
       body.permissions = { ...permissions, identity_id: identityId };
     }
     const data = await this.http.post<RawContact>(options.permissions !== undefined ? `${BASE}/with-permissions` : BASE, body);

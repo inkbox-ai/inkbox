@@ -89,6 +89,24 @@ describe("contact communication policies", () => {
     expect(result.revision).toBe(2);
   });
 
+  it("rejects Profile child contradictions before HTTP", async () => {
+    const put = vi.fn();
+    const resource = new ContactCommunicationPolicyResource({ put } as unknown as HttpTransport);
+    await expect(resource.replace("contact", {
+      expectedRevision: 1,
+      identityId: "agent",
+      addresses: [{ kind: "email", value: "person@example.com", action: "allow", expectedAction: "block" }],
+      visibility: { defaults: { profile: "block", memories: "block" }, identities: [] },
+    })).rejects.toThrow("Profile cannot be disabled");
+    await expect(resource.replace("contact", {
+      expectedRevision: 1,
+      identityId: "agent",
+      addresses: [],
+      visibility: { defaults: { profile: "block", memories: "allow" }, identities: [] },
+    })).rejects.toThrow("Profile cannot be disabled");
+    expect(put).not.toHaveBeenCalled();
+  });
+
   it("preserves null previews and page continuation", async () => {
     const get = vi.fn().mockResolvedValue({
       items: [{ identity_id: "agent", contact: null, email: false, phone: false, full_profile: false, visibility: { profile: false, memories: false } }],

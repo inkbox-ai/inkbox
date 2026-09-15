@@ -6,10 +6,10 @@
     "memories": true
   },
   "access_update": {
-    "email": {"visible": true, "contactable": []},
+    "email": {"visible": false, "contactable": []},
     "phone": {"visible": false},
     "profile": false,
-    "memories": true
+    "memories": false
   },
   "permissions": {
     "emails": {"person@example.com": true, "personal@example.net": false},

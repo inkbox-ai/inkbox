@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import httpx
+import pytest
 
 from inkbox import (ContactAddressUpdate, ContactVisibilityDecisions,
                     ContactVisibilityPolicy, ContactIdentityVisibilityDecisions)
@@ -148,6 +149,34 @@ def test_visibility_round_trip_preserves_omission() -> None:
     assert saved.visibility == visibility
     resource.replace(CONTACT_ID, expected_revision=8, identity_id=IDENTITY_ID, addresses=[])
     assert "visibility" not in http.put.call_args.kwargs["json"]
+
+
+def test_replace_rejects_profile_child_contradictions_before_http() -> None:
+    http = MagicMock()
+    resource = ContactsResource(http).communication_policy
+    with pytest.raises(ValueError, match="Profile cannot be disabled"):
+        resource.replace(
+            CONTACT_ID,
+            expected_revision=1,
+            identity_id=IDENTITY_ID,
+            addresses=[ContactAddressUpdate("email", "person@example.com", "allow", "block")],
+            visibility=ContactVisibilityPolicy(
+                defaults=ContactVisibilityDecisions("block", "block"),
+                identities=[],
+            ),
+        )
+    with pytest.raises(ValueError, match="Profile cannot be disabled"):
+        resource.replace(
+            CONTACT_ID,
+            expected_revision=1,
+            identity_id=IDENTITY_ID,
+            addresses=[],
+            visibility=ContactVisibilityPolicy(
+                defaults=ContactVisibilityDecisions("block", "allow"),
+                identities=[],
+            ),
+        )
+    http.put.assert_not_called()
 
 
 def test_preview_parses_profile_without_memories() -> None:

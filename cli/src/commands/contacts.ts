@@ -83,6 +83,22 @@ export function parseContactPolicyFile(raw: string): ReplaceContactCommunication
   if (Object.hasOwn(body, "visibility")) {
     const visibility = policyObject(body.visibility, ["defaults", "identities"], "policy.visibility");
     validatePolicyPortion(visibility.defaults, visibility.identities, ["profile", "memories"], "policy.visibility");
+    const defaults = visibility.defaults as Record<string, unknown>;
+    const defaultsProfile = defaults.profile !== "block";
+    if (!defaultsProfile && defaults.memories !== "block") {
+      throw new Error("Profile cannot be disabled while memories is enabled");
+    }
+    let selectedProfile = defaultsProfile;
+    for (const value of visibility.identities as unknown[]) {
+      const row = value as Record<string, unknown>;
+      const profile = row.profile === "inherit" ? defaultsProfile : row.profile === "allow";
+      const memories = row.memories === "inherit" ? defaults.memories !== "block" : row.memories === "allow";
+      if (!profile && memories) throw new Error("Profile cannot be disabled while memories is enabled");
+      if (row.identityId === body.identityId) selectedProfile = profile;
+    }
+    if (!selectedProfile && (body.addresses as Record<string, unknown>[]).some((row) => row.action === "allow")) {
+      throw new Error("Profile cannot be disabled while email or phone is enabled");
+    }
   }
   return body as unknown as ReplaceContactCommunicationPolicy;
 }
@@ -101,6 +117,10 @@ export function parseContactPermissionsFile(raw: string): UpdateContactPermissio
   for (const key of ["profile", "memories"]) {
     if (Object.hasOwn(body, key) && typeof body[key] !== "boolean") throw new Error(`permissions.${key} must be true or false`);
   }
+  if (body.profile === false && (
+    body.memories === true
+    || [body.emails, body.phones].some((value) => value && Object.values(value).some(Boolean))
+  )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
   return body as UpdateContactPermissions;
 }
 
@@ -122,6 +142,13 @@ export function parseContactAccessFile(raw: string): UpdateContactAccess {
       if (group.visible === false && values.length) throw new Error(`access.${key}: hidden addresses cannot be contactable`);
     }
   }
+  if (body.profile === false && (
+    body.memories === true
+    || [body.email, body.phone].some((value) => {
+      const group = value as Record<string, unknown> | undefined;
+      return group?.visible === true || (Array.isArray(group?.contactable) && group.contactable.length > 0);
+    })
+  )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
   return body as UpdateContactAccess;
 }
 

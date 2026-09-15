@@ -83,14 +83,14 @@ class TestContactsParse:
     def test_create_with_permissions_uses_one_atomic_request(self, transport):
         transport.post.return_value = CONTACT_DICT
         permissions = ContactCreatePermissions(
-            identity_id="11111111-1111-4111-8111-111111111111", profile=False,
+            identity_id="11111111-1111-4111-8111-111111111111", profile=True,
             emails={"alex@example.com": True},
         )
         ContactsResource(transport).create(given_name="Alex", emails=[ContactEmail(label=None, value="alex@example.com")], permissions=permissions)
         transport.post.assert_called_once()
         assert transport.post.call_args.args[0] == "/contacts/with-permissions"
         assert transport.post.call_args.kwargs["json"]["permissions"] == {
-            "identity_id": "11111111-1111-4111-8111-111111111111", "profile": False,
+            "identity_id": "11111111-1111-4111-8111-111111111111", "profile": True,
             "emails": {"alex@example.com": True},
         }
 
