@@ -94,7 +94,7 @@ class TestMessageDetailParsing:
         assert m.in_reply_to is None
         assert m.references is None
         assert m.attachment_metadata is None
-        assert m.ses_message_id == "ses-abc123"
+        assert m.ses_message_id == "message-abc123"
         assert isinstance(m.updated_at, datetime)
         assert m.reply_all_recipients is not None
         assert m.reply_all_recipients.to == ["alice@example.com"]
@@ -129,5 +129,4 @@ class TestThreadDetailParsing:
         d = {**THREAD_DICT, "messages": []}
         t = ThreadDetail._from_dict(d)
         assert t.messages == []
-
 

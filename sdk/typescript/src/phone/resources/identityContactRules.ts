@@ -8,9 +8,8 @@
  * `agentHandle`, mirroring the iMessage rule shape. The legacy per-number
  * resource (`inkbox.phoneContactRules`) is kept as a deprecated wrapper.
  *
- * The identity must have a phone number: `create` returns 422 and the
- * identity helpers guard with a require-phone check before the request.
- * Listing an identity with no number returns an empty list.
+ * Permissions can be configured before assigning a number and also govern
+ * iMessage. Mutations require admin credentials.
  *
  * Transport note: rides the api-root transport (`{base}/api/v1`) so it
  * addresses both `/identities/{handle}/phone-contact-rules` and the
@@ -64,8 +63,7 @@ export class PhoneIdentityContactRulesResource {
   constructor(private readonly http: HttpTransport) {}
 
   /**
-   * List rules for an identity. Returns an empty list when the identity
-   * has no phone number.
+   * List permitted rules, including for unprovisioned identities.
    */
   async list(
     agentHandle: string,
@@ -92,8 +90,7 @@ export class PhoneIdentityContactRulesResource {
 
   /**
    * Create a rule for an agent identity.
-   * The identity must have
-   * a phone number — otherwise the server returns 422.
+   * Requires admin credentials; channel provisioning is not required.
    *
    * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
    *   the same `(matchType, matchTarget)` already exists.

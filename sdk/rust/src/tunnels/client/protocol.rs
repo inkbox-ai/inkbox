@@ -1,9 +1,6 @@
 //! Single source of truth for the tunnel data-plane wire protocol.
 //!
-//! Ported from the TS SDK's `_protocol.ts` (which mirrors the server-side
-//! definitions in `servers/src/data_models/tunnel.py`). The constants here
-//! match `sdk/typescript/protocol/tunnel_protocol_constants.json`
-//! byte-for-byte. When the protocol changes, update both in lockstep.
+//! Constants for the tunnel wire format exchanged by the client.
 
 /// Namespace prefix on every inkbox-defined meta header.
 pub const INKBOX_NAMESPACE_PREFIX: &str = "inkbox-";

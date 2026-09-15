@@ -1,14 +1,8 @@
 """
 inkbox/tunnels/_validation.py
 
-Local handle / tunnel-name validation. Mirrors the syntactic rules in
-the canonical server validator
-(``~/servers/src/data_models/api_contracts/tunnel.py``). Reserved-name
-collisions are NOT checked here — the server is authoritative and will
-return a 409 (``HandleUnavailableError``). Handle and tunnel-name share
-a single global namespace; the same rules apply to both.
-:func:`validate_agent_handle` is an alias for callers who think of the
-value as an agent handle rather than a tunnel name.
+Local handle and tunnel-name syntax validation.
+Availability is checked by the API; unavailable names return HTTP 409.
 """
 
 from __future__ import annotations

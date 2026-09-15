@@ -640,6 +640,16 @@ inkbox contacts bulk-delete <contact-id...>
 inkbox contacts import <file.vcf>
 inkbox contacts export-many <contact-id...> [--out <file>]
 inkbox contacts access list <contact-id>              # Compatibility read only
+inkbox contacts access get <handle> <contact-id>
+inkbox contacts access set <handle> <contact-id> --file <access.json>
+inkbox contacts permissions get <handle> <contact-id>
+inkbox contacts permissions set <handle> <contact-id> --file <permissions.json>
+inkbox contacts communication-policy get <contact-id> [--identity-id <uuid>]
+inkbox contacts communication-policy set <contact-id> --file <policy.json>
+inkbox contacts communication-policy preview <contact-id> <identity-id>
+inkbox contacts communication-policy list <handle>
+inkbox contacts communication-policy list-management <handle>
+inkbox identity contact-policies <handle>
 ```
 
 Active memories have per-kind and contact-wide limits. A merge is rejected

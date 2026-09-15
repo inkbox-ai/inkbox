@@ -439,6 +439,8 @@ pub struct IMessageTriageNumber {
 /// An allow/block rule scoped to an agent identity for iMessage.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct IMessageContactRule {
+    #[serde(default)]
+    pub contact: Option<crate::contacts::types::Contact>,
     pub id: Uuid,
     pub agent_identity_id: Uuid,
     pub action: IMessageRuleAction,

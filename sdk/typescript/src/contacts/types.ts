@@ -140,6 +140,7 @@ export interface ContactBulkDeleteResultItem {
   contactId: string;
   status: ContactBulkDeleteStatus;
   error: string | null;
+  errorCode?: string | null;
 }
 
 export interface ContactBulkDeleteResult {
@@ -249,6 +250,7 @@ export interface RawContactBulkDeleteResult {
     contact_id: string;
     status: "deleted" | "error";
     error?: string | null;
+    error_code?: string | null;
   }>;
 }
 
@@ -381,6 +383,7 @@ export function parseContactBulkDeleteResult(
       contactId: item.contact_id,
       status: item.status,
       error: item.error ?? null,
+      errorCode: item.error_code ?? null,
     })),
   };
 }

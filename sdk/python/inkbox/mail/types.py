@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
+from inkbox.contacts.types import Contact
 
 
 class MessageDirection(StrEnum):
@@ -693,10 +694,12 @@ class MailIdentityContactRule:
     status: ContactRuleStatus
     created_at: datetime
     updated_at: datetime
+    contact: Contact | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> MailIdentityContactRule:
         return cls(
+            contact=Contact._from_dict(d["contact"]) if d.get("contact") is not None else None,
             id=UUID(d["id"]),
             agent_identity_id=UUID(d["agent_identity_id"]),
             action=MailRuleAction(d["action"]),

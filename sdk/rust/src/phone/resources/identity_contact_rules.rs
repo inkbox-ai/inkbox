@@ -6,9 +6,8 @@
 //! resource ([`crate::phone::resources::contact_rules::PhoneContactRulesResource`])
 //! is kept as a deprecated wrapper.
 //!
-//! The identity must have a phone number: `create` returns 422 otherwise and
-//! the identity helpers guard with a phone-presence check before the request.
-//! Listing an identity with no number returns an empty list.
+//! Permissions can be configured before assigning a number and also govern
+//! iMessage. Mutations require admin credentials.
 //!
 //! Transport note: rides the api-root transport (`{base}/api/v1`) so it
 //! addresses both `/identities/{handle}/phone-contact-rules` and the org-wide
@@ -57,8 +56,7 @@ impl PhoneIdentityContactRulesResource {
         Self { http }
     }
 
-    /// List rules for an identity. Returns an empty list when the identity has
-    /// no phone number.
+    /// List permitted rules, including for unprovisioned identities.
     pub fn list(
         &self,
         agent_handle: &str,
@@ -96,7 +94,7 @@ impl PhoneIdentityContactRulesResource {
     /// Create a rule for an agent identity. Use [`Self::update`] to change its
     /// allow/block action.
     ///
-    /// The identity must have a phone number — otherwise the server returns 422.
+    /// Requires admin credentials; channel provisioning is not required.
     ///
     /// Returns [`crate::error::InkboxError::DuplicateContactRule`] on 409 when a
     /// non-deleted rule with the same `(match_type, match_target)` already exists.
