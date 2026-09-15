@@ -1393,6 +1393,8 @@ is null, sending derives it from HTML when possible. Disable without deleting to
 pause automatic insertion. Disabling and clearing remain available on every plan.
 Signatures are inserted when mail is sent, including replies, forwards, and sent
 drafts; do not append them manually. The Inkbox watermark is controlled separately.
+Signed/encrypted SMTP mail cannot have a custom signature inserted; disable
+automatic insertion before sending those messages.
 A `.sig` file is not a standardized attachment format: read its UTF-8 text or HTML
 content into the corresponding field; images and proprietary formats are not imported.
 
