@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1 — Custom email signatures
+
+- `mailboxes.update()` accepts `signature_html`, `signature_text`, and
+  `signature_enabled`, preserving omitted fields and explicit `None` clears.
+- Mailbox and identity mailbox responses expose saved signatures, with defaults
+  for earlier API responses. README and Python skill include setup examples.
+- Bump the Python package to 0.7.1.
+
 ## 0.6.8 — Voice AI voice discovery
 
 - Added `inkbox.hosted_agent.list_voices()` returning a typed

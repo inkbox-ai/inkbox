@@ -20,6 +20,7 @@ import {
   mailboxGetRecord,
   mailboxListRow,
   resolveMailDomain,
+  readSignatureFile,
 } from "../dist/commands/mailbox.js";
 
 const MAILBOX = {
@@ -456,4 +457,81 @@ test("mailbox imports run does not retry a deterministic upload rejection", asyn
   assert.equal(seen.reissues, 0);
   assert.equal(seen.cancels, 1);
   assert.match(result.stderr, /HTTP 400/i);
+});
+
+test("mailbox signature flags send exact PATCH bodies and expose saved signatures", async (t) => {
+  const email = "alex@example.com";
+  let body;
+  const server = createServer(async (req, res) => {
+    let raw = "";
+    for await (const chunk of req) raw += chunk;
+    body = JSON.parse(raw);
+    assert.equal(req.method, "PATCH");
+    assert.equal(req.url, `/api/v1/mail/mailboxes/${email}`);
+    res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
+      id: "11111111-1111-1111-1111-111111111111", email_address: email,
+      created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z",
+      signature_html: "<b>Alex</b>", signature_text: "Alex", signature_enabled: true,
+    }));
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => server.close());
+  const dir = mkdtempSync(join(tmpdir(), "inkbox-signature-"));
+  t.after(async () => (await import("node:fs/promises")).rm(dir, { recursive: true, force: true }));
+  const html = join(dir, "signature.html");
+  const text = join(dir, "signature.sig");
+  writeFileSync(html, "<b>Alex</b>");
+  writeFileSync(text, "\ufeffAlex");
+  const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+  for (const [flags, expected] of [
+    [[], {}],
+    [["--signature-html", "<b>Alex</b>", "--signature-enabled"], { signature_html: "<b>Alex</b>", signature_enabled: true }],
+    [["--signature-html-file", html, "--signature-text-file", text], { signature_html: "<b>Alex</b>", signature_text: "Alex" }],
+    [["--clear-signature-html", "--clear-signature-text", "--no-signature-enabled"], { signature_html: null, signature_text: null, signature_enabled: false }],
+    [["--signature-text", "Alex"], { signature_text: "Alex" }],
+  ]) {
+    const child = spawn(process.execPath, [cli, "--json", "--api-key", "ApiKey_test", "--base-url",
+      `http://127.0.0.1:${server.address().port}`, "mailbox", "update", email, ...flags]);
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    const [code] = await once(child, "close");
+    assert.equal(code, 0, stderr);
+    assert.deepEqual(body, expected);
+    assert.equal(JSON.parse(stdout).signatureEnabled, true);
+    assert.equal(JSON.parse(stdout).signatureHtml, "<b>Alex</b>");
+  }
+  for (const flags of [
+    ["--signature-html", "x", "--signature-html-file", html],
+    ["--signature-html-file", html, "--clear-signature-html"],
+    ["--signature-text", "x", "--clear-signature-text"],
+    ["--signature-text-file", text, "--clear-signature-text"],
+  ]) {
+    assert.throws(() => execFileSync(process.execPath, [cli, "mailbox", "update", email, ...flags], { stdio: "pipe" }), /cannot be used with/);
+  }
+});
+
+
+test("signature files enforce UTF-8 and character/byte bounds", async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "inkbox-signature-bounds-"));
+  const { rm } = await import("node:fs/promises");
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const path = join(dir, "signature.sig");
+  writeFileSync(path, "\ufeffAlex\r\nTeam");
+  assert.equal(await readSignatureFile(path), "Alex\r\nTeam");
+  writeFileSync(path, "\ufeff" + "😀".repeat(16_384));
+  assert.equal([...(await readSignatureFile(path))].length, 16_384);
+  writeFileSync(path, "a".repeat(16_385));
+  await assert.rejects(readSignatureFile(path), /too large.*16,384/);
+  writeFileSync(path, Buffer.alloc(65_540));
+  await assert.rejects(readSignatureFile(path), /too large.*16,384/);
+  writeFileSync(path, Buffer.from([0xff, 0xfe, 0x41, 0x00]));
+  await assert.rejects(readSignatureFile(path), /valid UTF-8/);
+  writeFileSync(path, Buffer.from([0xe2, 0x82]));
+  await assert.rejects(readSignatureFile(path), /valid UTF-8/);
+  writeFileSync(path, "");
+  assert.equal(await readSignatureFile(path), "");
+  await assert.rejects(readSignatureFile(dir), /regular UTF-8 file/);
 });

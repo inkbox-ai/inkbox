@@ -135,3 +135,12 @@ sent mail, duplicate or delete it instead.
 - Use `inkbox-agent-self-signup` when the agent does not have an API key yet and needs to self-register.
 - Use the example skills when you want a reusable agent prompt rather than SDK integration code.
 - Use the related examples when you want runnable scripts or end-to-end sample workflows instead of a reusable skill prompt.
+
+## Custom Email Signatures
+
+Use `mailboxes.update` (Python/TypeScript), `mailboxes().update_with_options`
+(Rust), or `inkbox mailbox update` to save a per-mailbox HTML/text signature and
+toggle automatic insertion. CLI file flags read UTF-8 content, including text
+`.sig` files. See the language or CLI skill for fields and clear semantics.
+Setting or enabling requires an eligible paid plan; clearing and disabling remain
+available. The Inkbox watermark is separate from the custom signature.

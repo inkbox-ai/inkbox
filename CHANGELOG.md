@@ -4,6 +4,23 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.1 — Custom email signatures
+
+### Added
+
+- Configure per-mailbox HTML/plain-text signatures and automatic insertion from Python, TypeScript, Rust, and the CLI.
+- Read saved signatures from mailboxes and identity mailbox responses, with compatible defaults for earlier responses.
+- CLI file-content input, enable/disable, and explicit clear flags; signature setup examples in the bundled skills.
+
+### Changed
+
+- Bump Python, TypeScript, Rust, CLI, and bundled plugin versions to 0.7.1.
+- **Source-breaking migration:** manually constructed `Mailbox` and `IdentityMailbox` objects or test fixtures need the new signature fields. In TypeScript, add `signatureHtml: null`, `signatureText: null`, and `signatureEnabled: false` when no signature is configured. In Rust struct literals, add `signature_html: None`, `signature_text: None`, and `signature_enabled: false`. Older API responses still parse with these defaults; this migration applies to source literals when upgrading and recompiling.
+
+### Fixed
+
+- Keep large CLI validation errors complete and UTF-8-safe when JSON error output is piped.
+
 ## 0.7.0 — Contact communication permissions
 
 ### Added

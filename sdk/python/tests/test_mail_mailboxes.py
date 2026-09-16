@@ -161,3 +161,23 @@ class TestMailboxesSearch:
             params={"q": "test", "limit": 10},
         )
         assert results == []
+
+
+class TestMailboxSignatures:
+    def test_signature_update_preserves_omission_null_and_false(self):
+        res, http = _resource()
+        http.patch.return_value = MAILBOX_DICT
+        for fields in ({}, {"signature_html": "<b>Alex</b>", "signature_enabled": True},
+                       {"signature_html": None, "signature_text": None, "signature_enabled": False},
+                       {"signature_text": "Alex"}):
+            res.update("alex@example.com", **fields)
+            http.patch.assert_called_with("/mailboxes/alex@example.com", json=fields)
+
+    def test_mailbox_and_identity_parse_signatures_and_old_responses(self):
+        from inkbox import Mailbox, IdentityMailbox
+        for cls in (Mailbox, IdentityMailbox):
+            old = cls._from_dict(MAILBOX_DICT)
+            assert (old.signature_html, old.signature_text, old.signature_enabled) == (None, None, False)
+            new = cls._from_dict({**MAILBOX_DICT, "signature_html": "<b>Alex</b>",
+                                  "signature_text": "Alex", "signature_enabled": True})
+            assert (new.signature_html, new.signature_text, new.signature_enabled) == ("<b>Alex</b>", "Alex", True)

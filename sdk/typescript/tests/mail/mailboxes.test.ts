@@ -176,3 +176,30 @@ describe("MailboxesResource.search", () => {
     expect(http.get).toHaveBeenCalledWith(`/mailboxes/${ADDR}/search`, { q: "test", limit: 10 });
   });
 });
+
+describe("mailbox signatures", () => {
+  it("preserves omitted fields, explicit null and false on PATCH", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_MAILBOX);
+    const res = new MailboxesResource(http);
+    for (const [options, wire] of [
+      [{}, {}],
+      [{ signatureHtml: "<b>Alex</b>", signatureEnabled: true }, { signature_html: "<b>Alex</b>", signature_enabled: true }],
+      [{ signatureHtml: null, signatureText: null, signatureEnabled: false }, { signature_html: null, signature_text: null, signature_enabled: false }],
+      [{ signatureText: "Alex" }, { signature_text: "Alex" }],
+    ] as const) {
+      await res.update(ADDR, options);
+      expect(http.patch).toHaveBeenLastCalledWith(`/mailboxes/${ADDR}`, wire);
+    }
+  });
+
+  it("parses mailbox and nested identity signatures with old-response defaults", async () => {
+    const { parseMailbox } = await import("../../src/mail/types.js");
+    const { parseIdentityMailbox } = await import("../../src/identities/types.js");
+    for (const parse of [parseMailbox, parseIdentityMailbox]) {
+      expect(parse(RAW_MAILBOX)).toMatchObject({ signatureHtml: null, signatureText: null, signatureEnabled: false });
+      expect(parse({ ...RAW_MAILBOX, signature_html: "<b>Alex</b>", signature_text: "Alex", signature_enabled: true }))
+        .toMatchObject({ signatureHtml: "<b>Alex</b>", signatureText: "Alex", signatureEnabled: true });
+    }
+  });
+});

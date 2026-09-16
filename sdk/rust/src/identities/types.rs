@@ -310,6 +310,12 @@ fn default_contact_sharing_enabled() -> bool {
 /// `email_address` when the server omits it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityMailbox {
+    #[serde(default)]
+    pub signature_html: Option<String>,
+    #[serde(default)]
+    pub signature_text: Option<String>,
+    #[serde(default)]
+    pub signature_enabled: bool,
     pub id: Uuid,
     pub email_address: String,
     /// Defaults to `Blacklist` when the server omits the field.

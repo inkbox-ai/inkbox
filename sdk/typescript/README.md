@@ -1698,6 +1698,30 @@ Runnable example scripts are available in the [examples/typescript](https://gith
 | `receive-agent-email-webhook.ts` | Register and delete a mailbox webhook |
 | `receive-agent-call-webhook.ts` | Register, update, and delete a phone webhook |
 
+## Custom email signatures
+
+Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
+Each HTML/text field supports up to 16,384 characters. HTML is sanitized; logos
+must use absolute HTTPS URLs. Updating HTML without text generates a plain-text
+fallback. Omitted fields stay unchanged; null clears saved content. If saved text
+is null, sending derives it from HTML when possible. Disable without deleting to
+pause automatic insertion. Disabling and clearing remain available on every plan.
+Signatures are inserted when mail is sent, including replies, forwards, and sent
+drafts; do not append them manually. The Inkbox watermark is controlled separately.
+Signed/encrypted SMTP mail cannot have a custom signature inserted; disable
+automatic insertion before sending those messages.
+A `.sig` file is not a standardized attachment format: read its UTF-8 text or HTML
+content into the corresponding field; images and proprietary formats are not imported.
+
+```typescript
+await inkbox.mailboxes.update("alex@example.com", {
+  signatureHtml: '<b>Alex</b><br><a href="https://example.com">Website</a>',
+  signatureEnabled: true,
+});
+// Pause without deleting; use null for both content fields to clear them.
+await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
+```
+
 ## License
 
 MIT

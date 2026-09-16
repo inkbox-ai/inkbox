@@ -45,6 +45,9 @@ class MailboxesResource:
         email_address: str,
         *,
         filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        signature_html: str | None = _UNSET,  # type: ignore[assignment]
+        signature_text: str | None = _UNSET,  # type: ignore[assignment]
+        signature_enabled: bool = _UNSET,  # type: ignore[assignment]
     ) -> Mailbox:
         """Update mutable mailbox fields.
 
@@ -61,6 +64,13 @@ class MailboxesResource:
             email_address: Full email address of the mailbox to update.
             filter_mode: ``"whitelist"`` or ``"blacklist"``. Admin-only on
                 the server — agent-scoped keys will receive 403.
+            signature_html: HTML fragment (up to 16,384 characters). None clears it.
+                Updating HTML without text generates a plain-text fallback.
+            signature_text: Plain text (up to 16,384 characters). None clears it;
+                sending then derives text from saved HTML, when present.
+            signature_enabled: Insert the saved signature on outgoing mail.
+                Setting content or enabling requires an eligible paid plan.
+                Disabling and clearing remain available on every plan.
 
         Returns:
             The updated mailbox. When ``filter_mode`` was supplied and the
@@ -74,6 +84,13 @@ class MailboxesResource:
                 if isinstance(filter_mode, FilterMode)
                 else filter_mode
             )
+        for key, value in (
+            ("signature_html", signature_html),
+            ("signature_text", signature_text),
+            ("signature_enabled", signature_enabled),
+        ):
+            if value is not _UNSET:
+                body[key] = value
         data = self._http.patch(
             f"{_BASE}/{email_address}",
             json=body,

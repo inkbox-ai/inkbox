@@ -263,6 +263,12 @@ pub struct FilterModeChangeNotice {
 /// verified custom domain registered to your org.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mailbox {
+    #[serde(default)]
+    pub signature_html: Option<String>,
+    #[serde(default)]
+    pub signature_text: Option<String>,
+    #[serde(default)]
+    pub signature_enabled: bool,
     pub id: Uuid,
     pub email_address: String,
     /// Bare domain the mailbox sends from. Server may omit it, in which case

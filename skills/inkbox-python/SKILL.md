@@ -1399,3 +1399,30 @@ except InkboxAPIError as e:
 - To clear a nullable field (e.g. webhook URL), pass `field=None`
 - The `Inkbox` client **must** be used as a context manager (`with` statement) or `.close()` called manually
 - Mail/phone methods on `AgentIdentity` raise `InkboxError` if the relevant channel isn't assigned
+
+## Custom email signatures
+
+Custom signatures are saved per mailbox and require an eligible paid plan to set or enable.
+Each HTML/text field supports up to 16,384 characters. HTML is sanitized; logos
+must use absolute HTTPS URLs. Updating HTML without text generates a plain-text
+fallback. Omitted fields stay unchanged; null clears saved content. If saved text
+is null, sending derives it from HTML when possible. Disable without deleting to
+pause automatic insertion. Disabling and clearing remain available on every plan.
+Signatures are inserted when mail is sent, including replies, forwards, and sent
+drafts; do not append them manually. The Inkbox watermark is controlled separately.
+Signed/encrypted SMTP mail cannot have a custom signature inserted; disable
+automatic insertion before sending those messages.
+A `.sig` file is not a standardized attachment format: read its UTF-8 text or HTML
+content into the corresponding field; images and proprietary formats are not imported.
+
+```python
+from pathlib import Path
+
+inkbox.mailboxes.update(
+    "alex@example.com",
+    signature_html=Path("signature.html").read_text(encoding="utf-8"),
+    signature_enabled=True,
+)
+# Pause without deleting; use None for both content fields to clear them.
+inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
+```

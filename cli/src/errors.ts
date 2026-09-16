@@ -118,7 +118,8 @@ export function withErrorHandler<T extends unknown[]>(
         console.error("An unknown error occurred.");
       }
       if (!wantsJson(this) && err instanceof InkboxAPIError) renderAgentSupport(err);
-      process.exit(1);
+      // Allow piped stderr to drain before exiting, including large JSON errors.
+      process.exitCode = 1;
     }
   };
 }
