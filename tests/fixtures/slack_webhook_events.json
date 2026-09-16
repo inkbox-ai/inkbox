@@ -1,0 +1,344 @@
+[
+  {
+    "id": "slack-event-0",
+    "event_type": "slack.message_received",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-1",
+    "event_type": "slack.message_updated",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-2",
+    "event_type": "slack.message_deleted",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-3",
+    "event_type": "slack.reaction_added",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-4",
+    "event_type": "slack.reaction_removed",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-5",
+    "event_type": "slack.member_joined",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-6",
+    "event_type": "slack.member_left",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-7",
+    "event_type": "slack.channel_updated",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-8",
+    "event_type": "slack.file_shared",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-9",
+    "event_type": "slack.file_changed",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-10",
+    "event_type": "slack.file_deleted",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-11",
+    "event_type": "slack.pin_added",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-12",
+    "event_type": "slack.pin_removed",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-13",
+    "event_type": "slack.connection_changed",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": null,
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-14",
+    "event_type": "slack.message_sent",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-15",
+    "event_type": "slack.message_send_failed",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-16",
+    "event_type": "slack.message_send_unknown",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-17",
+    "event_type": "slack.interaction",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  },
+  {
+    "id": "slack-event-18",
+    "event_type": "slack.session_stopped",
+    "timestamp": "2026-09-01T00:00:00Z",
+    "data": {
+      "identity_id": "22222222-2222-4222-8222-222222222222",
+      "connection_id": "11111111-1111-4111-8111-111111111111",
+      "workspace_id": "TEXAMPLE",
+      "conversation_id": "CEXAMPLE",
+      "message_ts": "1780000000.000001",
+      "thread_ts": null,
+      "actor_id": null,
+      "message_kinds": [
+        "mention"
+      ],
+      "event": {}
+    }
+  }
+]

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add Slack workspace invitations/connections, live conversations/messages, durable
+  idempotent sends/actions, and byte-preserving file downloads across the SDKs and CLI.
+- Add all 19 Slack webhook event types and optional connection/conversation/message-kind
+  filters, preserving omitted versus explicitly cleared filters on updates.
+- Document browser invitation onboarding, terminal unknown send outcomes, and
+  metadata-only Slack delivery diagnostics without historical replay.
+
 All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.

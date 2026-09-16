@@ -48,6 +48,7 @@ use crate::phone::resources::numbers::PhoneNumbersResource;
 use crate::phone::resources::sms_opt_ins::SmsOptInsResource;
 use crate::phone::resources::texts::TextsResource;
 use crate::signing_keys::{SigningKey, SigningKeysResource};
+use crate::slack::SlackResource;
 use crate::tunnels::resources::tunnels::TunnelsResource;
 use crate::vault::resources::vault::VaultResource;
 use crate::webhooks::deliveries::WebhookDeliveriesResource;
@@ -181,6 +182,7 @@ pub struct Inkbox {
     api_keys: ApiKeysResource,
     identities: IdentitiesResource,
     tunnels: TunnelsResource,
+    slack: SlackResource,
     a2a: A2AResource,
 
     // Transport used for the bare `/api` root (whoami, signup parity).
@@ -315,6 +317,7 @@ impl Inkbox {
             api_keys: ApiKeysResource::new(api_http.clone()),
             identities: IdentitiesResource::new(ids_http.clone()),
             tunnels: TunnelsResource::new(api_http.clone(), weak.clone()),
+            slack: SlackResource::new(api_http.clone()),
             a2a: A2AResource::new(api_http.clone(), public_http.clone(), trimmed.to_string()),
 
             root_api_http: root_api_http.clone(),
@@ -466,6 +469,10 @@ impl Inkbox {
     pub fn tunnels(&self) -> &TunnelsResource {
         &self.tunnels
     }
+    pub fn slack(&self) -> &SlackResource {
+        &self.slack
+    }
+
     pub fn a2a(&self) -> &A2AResource {
         &self.a2a
     }

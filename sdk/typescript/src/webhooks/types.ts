@@ -791,3 +791,41 @@ export interface A2AWebhookPayload {
   timestamp: string;
   data: A2AWebhookData;
 }
+
+export type SlackWebhookEventType =
+  | "slack.message_received"
+  | "slack.message_updated"
+  | "slack.message_deleted"
+  | "slack.reaction_added"
+  | "slack.reaction_removed"
+  | "slack.member_joined"
+  | "slack.member_left"
+  | "slack.channel_updated"
+  | "slack.file_shared"
+  | "slack.file_changed"
+  | "slack.file_deleted"
+  | "slack.pin_added"
+  | "slack.pin_removed"
+  | "slack.connection_changed"
+  | "slack.message_sent"
+  | "slack.message_send_failed"
+  | "slack.message_send_unknown"
+  | "slack.interaction"
+  | "slack.session_stopped";
+export interface SlackWebhookData {
+  identity_id: string;
+  connection_id: string;
+  workspace_id: string;
+  conversation_id?: string | null;
+  message_ts?: string | null;
+  thread_ts?: string | null;
+  actor_id?: string | null;
+  message_kinds: import("../slack.js").SlackMessageKind[];
+  event: Record<string, unknown>;
+}
+export interface SlackWebhookPayload {
+  id: string;
+  event_type: SlackWebhookEventType;
+  timestamp: string;
+  data: SlackWebhookData;
+}

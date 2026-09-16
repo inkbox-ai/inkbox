@@ -907,3 +907,15 @@ inkbox mailbox get alex@example.com --json
 
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
+
+## Slack
+
+See the [Slack API and onboarding guide](../../cli/README.md#slack) for implemented SDK/CLI methods.
+Use an existing identity, list workspace connections and installation availability,
+and create an invitation for browser installation with organization management
+credentials. Open the returned invitation URL; do not start browser-only OAuth
+installation from a server-side request. Add the bot to the selected channel.
+Use the explicit connection ID and a stable caller-provided idempotency key for sends.
+Poll only while sending; unknown means terminal uncertainty and must not be blindly
+resent. Slack webhooks support optional connection/conversation/message-kind filters,
+not cross-channel context or historical replay. The runtime owns attention and memory.

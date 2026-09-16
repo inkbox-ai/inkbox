@@ -11,7 +11,8 @@
  * *miss*: a compliant endpoint that already processed the original event
  * dedupes the replay away. It does not force reprocessing. Incoming-call
  * deliveries (which carry a `phoneNumberId` and no
- * `webhookSubscriptionId`) are logged but not replayable.
+ * `webhookSubscriptionId`) are logged but not replayable. Slack deliveries are also not replayable;
+ * their logs contain event metadata only, not original message content.
  */
 
 import { HttpTransport } from "../_http.js";
@@ -30,11 +31,11 @@ export interface WebhookDelivery {
   eventId: string;
   eventType: string;
   url: string;
-  /** Raw signed request body that was delivered. */
+  /** Signed body for replayable channels; event metadata only for Slack. */
   requestPayload: string;
   /** HTTP status returned by the endpoint; null on transport failure. */
   responseStatus: number | null;
-  /** Truncated response body snippet. */
+  /** Truncated response body snippet; absent for Slack. */
   responseBody: string | null;
   /** Transport error summary, if any. */
   errorDetail: string | null;
@@ -133,7 +134,7 @@ export class WebhookDeliveriesResource {
    * request-id/timestamp, and records a new delivery row with
    * `isReplay: true` — which is what this returns.
    *
-   * Rejects incoming-call deliveries (not replayable, 422) and
+   * Rejects incoming-call and Slack deliveries (not replayable, 422) and
    * deliveries whose subscription is no longer active or no longer
    * subscribes to the event type (409).
    */

@@ -21,6 +21,7 @@ import { registerWebhookCommands } from "./commands/webhook.js";
 import { registerContactsCommands } from "./commands/contacts.js";
 import { registerNotesCommands } from "./commands/notes.js";
 import { registerDomainCommands } from "./commands/domain.js";
+import { registerSlackCommands } from "./commands/slack.js";
 import { registerA2ACommands } from "./commands/a2a.js";
 
 // Node's fetch ignores HTTP(S)_PROXY/NO_PROXY unless NODE_USE_ENV_PROXY is
@@ -67,5 +68,6 @@ registerContactsCommands(program);
 registerNotesCommands(program);
 registerDomainCommands(program);
 registerA2ACommands(program);
+registerSlackCommands(program);
 
 program.parse();

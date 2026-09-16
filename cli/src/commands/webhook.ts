@@ -1,5 +1,7 @@
 import { Command, Option } from "commander";
 import { printStatus } from "../output.js";
+
+import type { SlackWebhookFilter } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { readSecretFromStdin } from "../invitation-token.js";
 import { output } from "../output.js";
@@ -23,6 +25,7 @@ const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "url",
   "eventTypes",
   "contextConfig",
+  "slackFilter",
   "hasAuthToken",
   "status",
   "createdAt",
@@ -38,6 +41,7 @@ function flattenForOutput(sub: WebhookSubscription): Record<string, unknown> {
     url: sub.url,
     eventTypes: sub.eventTypes.join(", "),
     contextConfig: sub.contextConfig ? JSON.stringify(sub.contextConfig) : null,
+    slackFilter: sub.slackFilter ?? null,
     hasAuthToken: sub.hasAuthToken,
     authToken: sub.authToken,
     status: sub.status,
@@ -179,6 +183,7 @@ function registerSubscriptionCommands(parent: Command): void {
       },
       [] as string[],
     )
+    .option("--slack-filter <json>", "Slack filter JSON: connectionIds, conversationIds, messageKinds; null clears")
     .option("--context-email <spec>", "Include recent emails as context: count:N or window:H")
     .option("--context-texts <spec>", "Include recent SMS+iMessage as context: count:N or window:H")
     .option("--context-calls <spec>", "Include recent calls+transcripts as context: count:N or window:H")
@@ -192,6 +197,7 @@ function registerSubscriptionCommands(parent: Command): void {
           agentIdentityId?: string;
           url: string;
           eventType: string[];
+          slackFilter?: string;
           contextEmail?: string;
           contextTexts?: string;
           contextCalls?: string;
@@ -208,6 +214,7 @@ function registerSubscriptionCommands(parent: Command): void {
           url: cmdOpts.url,
           eventTypes: cmdOpts.eventType,
           contextConfig: buildContextConfigFromFlags(cmdOpts),
+          slackFilter: parseSlackFilterFlag(cmdOpts.slackFilter),
           authToken,
         });
         const { data, json } = buildCreateOutput(row, !!opts.json);
@@ -229,6 +236,7 @@ function registerSubscriptionCommands(parent: Command): void {
       // intentionally no default: undefined distinguishes "not provided"
       // from "explicitly empty" (the latter is invalid and the SDK throws).
     )
+    .option("--slack-filter <json>", "Slack filter JSON: connectionIds, conversationIds, messageKinds; null clears")
     .option("--context-email <spec>", "Set email context: count:N or window:H (replaces stored config)")
     .option("--context-texts <spec>", "Set texts context: count:N or window:H (replaces stored config)")
     .option("--context-calls <spec>", "Set calls context: count:N or window:H (replaces stored config)")
@@ -242,6 +250,7 @@ function registerSubscriptionCommands(parent: Command): void {
         cmdOpts: {
           url?: string;
           eventType?: string[];
+          slackFilter?: string;
           contextEmail?: string;
           contextTexts?: string;
           contextCalls?: string;
@@ -257,10 +266,12 @@ function registerSubscriptionCommands(parent: Command): void {
           url?: string;
           eventTypes?: string[];
           contextConfig?: WebhookContextConfig | null;
+          slackFilter?: SlackWebhookFilter | null;
           authToken?: string | null;
           scope?: "identity";
         } = {};
         if (cmdOpts.scope !== undefined) body.scope = cmdOpts.scope;
+        if (cmdOpts.slackFilter !== undefined) body.slackFilter = parseSlackFilterFlag(cmdOpts.slackFilter);
         if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
         if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
         const contextConfig = buildContextConfigFromFlags(cmdOpts);
@@ -462,4 +473,19 @@ export function registerWebhookCommands(program: Command): void {
 
   registerSubscriptionCommands(webhook);
   registerDeliveryCommands(webhook);
+}
+
+export function parseSlackFilterFlag(
+  value?: string,
+): SlackWebhookFilter | null | undefined {
+  if (value === undefined) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("--slack-filter must be valid JSON");
+  }
+  if (parsed !== null && (typeof parsed !== "object" || Array.isArray(parsed)))
+    throw new Error("--slack-filter must be an object or null");
+  return parsed as SlackWebhookFilter | null;
 }
