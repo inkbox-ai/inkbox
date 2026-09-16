@@ -13,3 +13,7 @@ diverges between Python and TypeScript, one side is wrong.
 Each fixture is a JSON file with `input` (wire-shaped) and `expected`
 (the parsed `DispatchRequest`-equivalent shape). Both SDKs load the
 same JSON and assert.
+
+Slack fixtures are shared by Python, TypeScript, Rust, and CLI wire tests:
+`slack.json` contains API response examples, and `slack_webhook_events.json`
+contains all 19 event envelopes. Both files contain synthetic identifiers and data.

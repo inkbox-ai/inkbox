@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add Slack workspace invitations/connections, live conversations/messages, durable
+  idempotent sends/actions, and byte-preserving file downloads across the SDKs and CLI.
+- Add all 19 Slack webhook event types and optional connection/conversation/message-kind
+  filters, preserving omitted versus explicitly cleared filters on updates.
+- Document browser invitation onboarding, terminal unknown send outcomes, and
+  metadata-only Slack delivery diagnostics without historical replay.
+
 ## 0.7.2 — Voicemail handling on outbound calls
 
 - Added the `OnVoicemail` enum (`leave_message`, `hang_up`, `ignore`).

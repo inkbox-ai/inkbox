@@ -555,3 +555,13 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ## License
 
 MIT
+
+## Slack workspace connections
+
+Use an existing Inkbox identity across multiple Slack workspace connections. The
+[Python SDK](sdk/python/README.md#slack), [TypeScript SDK](sdk/typescript/README.md#slack),
+[Rust SDK](sdk/rust/README.md#slack), and [CLI](cli/README.md#slack) support invitation
+onboarding, live conversations/history, idempotent message sends, action status,
+file metadata/downloads, and filtered identity-owned Slack webhooks. Installation
+starts through the browser invitation page; adding the bot to a workspace does not
+provide unrestricted channel access. Slack is transport, not a workspace archive.

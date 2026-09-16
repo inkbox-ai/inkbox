@@ -1,0 +1,59 @@
+{
+  "connection": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "identity_id": "22222222-2222-4222-8222-222222222222",
+    "workspace_id": "TEXAMPLE",
+    "workspace_name": "Example Workspace",
+    "bot_user_id": "UBOT",
+    "status": "connected",
+    "scopes": [
+      "chat:write"
+    ],
+    "created_at": "2026-09-01T00:00:00Z"
+  },
+  "invitation": {
+    "id": "33333333-3333-4333-8333-333333333333",
+    "identity_id": "22222222-2222-4222-8222-222222222222",
+    "status": "pending",
+    "expires_at": "2026-09-02T00:00:00Z",
+    "invitation_url": "https://inkbox.ai/console/slack/install#token=synthetic-invitation-not-a-real-token"
+  },
+  "action": {
+    "id": "44444444-4444-4444-8444-444444444444",
+    "connection_id": "11111111-1111-4111-8111-111111111111",
+    "status": "unknown",
+    "conversation_id": "CEXAMPLE",
+    "message_ts": null,
+    "thread_ts": "1780000000.000001",
+    "error_code": "outcome_unknown"
+  },
+  "file": {
+    "id": "FEXAMPLE",
+    "name": "example.bin",
+    "title": null,
+    "mimetype": "application/octet-stream",
+    "size": 4,
+    "downloadable": true
+  },
+  "subscription": {
+    "id": "55555555-5555-4555-8555-555555555555",
+    "organization_id": "org_example",
+    "mailbox_id": null,
+    "phone_number_id": null,
+    "agent_identity_id": "22222222-2222-4222-8222-222222222222",
+    "owner_identity_id": "22222222-2222-4222-8222-222222222222",
+    "url": "https://example.com/hooks/slack",
+    "event_types": [
+      "slack.message_received"
+    ],
+    "status": "active",
+    "created_at": "2026-09-01T00:00:00Z",
+    "updated_at": "2026-09-01T00:00:00Z",
+    "slack_filter": {
+      "message_kinds": [
+        "mention",
+        "thread"
+      ]
+    }
+  }
+}

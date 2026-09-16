@@ -636,3 +636,77 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 ## License
 
 MIT
+
+## Slack
+
+```rust,no_run
+use inkbox::{Inkbox, SlackSendMessageOptions};
+use uuid::Uuid;
+
+let client = Inkbox::new("ApiKey_...")?;
+let identity_id = Uuid::parse_str("22222222-2222-4222-8222-222222222222")?;
+let connections = client.slack().list_connections(identity_id)?;
+if connections.installation_available {
+    let invitation = client.slack().create_invitation(identity_id, None)?;
+    // Open invitation.invitation_url in the installer's browser.
+}
+if let Some(connection) = connections.connections.first() {
+    let action = client.slack().send_message(connection.id, &SlackSendMessageOptions {
+        conversation_id: "CEXAMPLE".into(),
+        text: "Hello from Inkbox".into(),
+        idempotency_key: "greeting:2026-09-16".into(),
+        thread_ts: None,
+    })?;
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`client.slack()` also provides `list_invitations`, `revoke_invitation`, `disconnect`,
+`list_conversations`, `open_conversation`, `get_conversation`, `list_messages`,
+`get_action`, `get_file`, and `download_file` (returns `Vec<u8>`). Pass
+`SlackPageOptions` / `SlackMessagesOptions` for pagination. Connections, invitations,
+actions, file metadata, pages, send options, and filters are public typed exports.
+
+For webhook subscriptions use `create_with_slack_filter` and
+`update_with_slack_filter`; the existing `create` / `update` signatures remain
+unchanged. The update filter argument is `None` to preserve, `Some(None)` to clear,
+or `Some(Some(&filter))` to replace a `SlackWebhookFilter`.
+
+### Slack behavior
+
+An existing identity can connect to multiple Slack workspaces. Organization management
+credentials create/revoke invitations and disconnect connections; claimed identity
+credentials can read and use their own connections. Check the returned installation
+availability before offering onboarding. Invitation links are returned once: open the
+full link in a browser and treat it as a secret. The browser page handles installation.
+Do not call the browser-only installation/accept endpoints from a server and then open
+the returned authorization URL: the installation must start and finish in the same
+browser. Add the bot to each selected channel afterward, including authorized private
+channels. Slack workspace permissions and approval rules still apply.
+
+Conversation/history/file reads are live and scoped to the selected connection, not
+an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
+pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
+page. Slack timestamp identifiers are strings, never floating-point numbers. Direct
+messages accept 1..8 user IDs. Message text is 1..12000 characters; sends require a
+stable 1..128-character idempotency key using letters, digits, `.`, `_`, `:`, or `-`.
+Reuse a key only for the exact same operation. A different body with the same key is a
+conflict. Poll an action while it is `sending`; `sent` is not a delivered/read receipt.
+`unknown` is terminal uncertainty, not a promise of future reconciliation: do not
+blindly resend. Inspect authorized live history before deliberately starting a new
+operation. File downloads return bytes; unavailable or oversized files surface API
+errors. Uploads and explicitly shared-conversation operations are not supported.
+Disconnect removes Inkbox authority, not the workspace's Slack app installation.
+
+Slack webhook envelopes use the existing signature verification and stable `id`
+deduplication. All 19 event types are exported as `SlackWebhookEventType`, with
+`SlackWebhookData` and `SlackWebhookPayload` types. Optional connection/conversation
+selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_dm`,
+`mention`, `channel`, `thread`) affect received/updated/deleted messages only. `thread`
+means any reply, not a managed thread watch. Connection-status events bypass
+conversation/kind selectors but retain connection scope. A filter selector array must
+be nonempty and distinct (maximum 100 IDs or 5 kinds). Null means unrestricted.
+Slack subscriptions belong to the identity and reject conversation context. Omitted
+filters on PATCH preserve the stored filter; explicit null clears it. Slack delivery
+logs contain metadata only; historical replay is not supported. The agent runtime
+owns attention rules, thread watches, and its own memory.

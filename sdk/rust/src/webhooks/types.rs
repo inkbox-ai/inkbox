@@ -1396,3 +1396,70 @@ mod tests {
         assert!(payload.data.transcript_url.ends_with("/transcripts"));
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SlackWebhookEventType {
+    #[serde(rename = "slack.message_received")]
+    MessageReceived,
+    #[serde(rename = "slack.message_updated")]
+    MessageUpdated,
+    #[serde(rename = "slack.message_deleted")]
+    MessageDeleted,
+    #[serde(rename = "slack.reaction_added")]
+    ReactionAdded,
+    #[serde(rename = "slack.reaction_removed")]
+    ReactionRemoved,
+    #[serde(rename = "slack.member_joined")]
+    MemberJoined,
+    #[serde(rename = "slack.member_left")]
+    MemberLeft,
+    #[serde(rename = "slack.channel_updated")]
+    ChannelUpdated,
+    #[serde(rename = "slack.file_shared")]
+    FileShared,
+    #[serde(rename = "slack.file_changed")]
+    FileChanged,
+    #[serde(rename = "slack.file_deleted")]
+    FileDeleted,
+    #[serde(rename = "slack.pin_added")]
+    PinAdded,
+    #[serde(rename = "slack.pin_removed")]
+    PinRemoved,
+    #[serde(rename = "slack.connection_changed")]
+    ConnectionChanged,
+    #[serde(rename = "slack.message_sent")]
+    MessageSent,
+    #[serde(rename = "slack.message_send_failed")]
+    MessageSendFailed,
+    #[serde(rename = "slack.message_send_unknown")]
+    MessageSendUnknown,
+    #[serde(rename = "slack.interaction")]
+    Interaction,
+    #[serde(rename = "slack.session_stopped")]
+    SessionStopped,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackWebhookData {
+    pub identity_id: String,
+    pub connection_id: String,
+    pub workspace_id: String,
+    #[serde(default)]
+    pub conversation_id: Option<String>,
+    #[serde(default)]
+    pub message_ts: Option<String>,
+    #[serde(default)]
+    pub thread_ts: Option<String>,
+    #[serde(default)]
+    pub actor_id: Option<String>,
+    #[serde(default)]
+    pub message_kinds: Vec<crate::slack::SlackMessageKind>,
+    #[serde(default)]
+    pub event: serde_json::Map<String, serde_json::Value>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackWebhookPayload {
+    pub id: String,
+    pub event_type: SlackWebhookEventType,
+    pub timestamp: String,
+    pub data: SlackWebhookData,
+}
