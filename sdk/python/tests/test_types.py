@@ -32,6 +32,23 @@ from inkbox.phone.types import (
 
 
 class TestPhoneNumberParsing:
+    def test_country_and_nullable_state(self):
+        cases = [
+            ({"country": "GB", "state": None, "number": "+447700900123"}, "GB", None),
+            ({"country": "US", "state": "NY"}, "US", "NY"),
+            ({"state": "NY"}, "US", "NY"),
+            ({}, "US", None),
+        ]
+        for fields, country, state in cases:
+            raw = {
+                k: v for k, v in PHONE_NUMBER_DICT.items()
+                if k not in ("country", "state")
+            }
+            number = PhoneNumber._from_dict({**raw, **fields})
+            assert number.country == country
+            assert number.state == state
+            assert number.number == fields.get("number", raw["number"])
+
     def test_from_dict(self):
         n = PhoneNumber._from_dict(PHONE_NUMBER_DICT)
 
