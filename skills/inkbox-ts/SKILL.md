@@ -51,7 +51,8 @@ Inkbox (admin-only client)
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                → IdentityMailbox | null
 ├── .phoneNumber            → IdentityPhoneNumber | null
-├── .mailFilterMode / .phoneFilterMode → FilterMode
+├── .mailFilterMode / .phoneFilterMode → FilterMode  (inbound mode; supervised reads as whitelist)
+├── .mailInboundFilterMode / .mailOutboundFilterMode / .phoneInboundFilterMode / .phoneOutboundFilterMode → DirectionalFilterMode
 ├── .getCredentials()       → Promise<Credentials>  (requires vault unlocked)
 ├── .listMailContactRules() / .createMailContactRule(...) / .get/.update/.delete
 ├── .listPhoneContactRules() / .createPhoneContactRule(...) / ...  (writes require admin credentials)
@@ -1061,6 +1062,50 @@ await identity.update({ mailFilterMode: "whitelist", phoneFilterMode: "blacklist
 console.log(identity.mailFilterMode, identity.phoneFilterMode);
 ```
 
+These single-mode fields set **both directions** of the channel. Each channel
+also has a separate inbound mode (who can reach the agent) and outbound mode
+(who the agent can contact), plus a third value, `supervised`:
+
+- `blacklist` ("Open"), `whitelist` ("Allowed only"), `supervised` ("Supervised").
+- Outbound `supervised` (mail and phone): like `whitelist`, but a message may
+  include non-allowed recipients as long as at least one recipient of that same
+  message is an allowed contact (group texts, reply-all, CCs). A 1:1 message to a
+  non-allowed person stays blocked (`RecipientBlockedError`), calls behave like
+  `whitelist`, and an explicit block rule always wins.
+- Inbound `supervised` (phone only, SMS and iMessage groups): only allowed
+  contacts wake the agent. Messages from other participants of a group that
+  includes an allowed contact are readable context: listed with
+  `isBlocked: true`, already read, never their own webhook. Everything not marked
+  `isBlocked` came from an allowed participant or the agent.
+  `mailInboundFilterMode` accepts only `whitelist` / `blacklist`.
+- Do not pass a single-mode field together with a directional field of the same
+  channel (`imessageFilterMode` counts as phone) — `update` throws. Only the
+  fields you pass are sent; the other direction keeps its mode.
+- `mailFilterMode` / `phoneFilterMode` report the inbound mode (`supervised`
+  shows as `whitelist`). Older responses without the directional fields read as
+  inbound = single mode, outbound = inbound.
+
+Recipe — only I can wake my agent, but it can answer my group chats and keep
+people I CC:
+
+```typescript
+await identity.update({
+  phoneInboundFilterMode: "supervised",
+  phoneOutboundFilterMode: "supervised",
+  mailInboundFilterMode: "whitelist",
+  mailOutboundFilterMode: "supervised",
+});
+await identity.createPhoneContactRule({
+  action: PhoneRuleAction.ALLOW,
+  matchTarget: "+15551234567",
+});
+await identity.createMailContactRule({
+  action: MailRuleAction.ALLOW,
+  matchType: MailRuleMatchType.EXACT_EMAIL,
+  matchTarget: "me@example.com",
+});
+```
+
 ### Deprecated: per-mailbox / per-number rules
 
 The legacy per-mailbox `inkbox.mailContactRules` and per-number
@@ -1360,6 +1405,8 @@ const created = await inkbox.webhooks.subscriptions.create({
 console.log(created.ownerIdentityId);
 if (created.signingKey) saveSecret(created.signingKey);   // populated once if the identity had no key yet
 ```
+
+**Group context messages:** on `text.received` and `imessage.received`, `data` may carry `context_messages` — filled only for a group message while the identity's inbound phone mode is `supervised`: up to 10 messages that participants who are not allowed contacts sent since the previous allowed message, oldest first. Read it with `data.context_messages ?? []`. Items are `TextContextMessageWire` (`id`, `sender_phone_number`, `text`, `media`, `created_at`) or `IMessageContextMessageWire` (`id`, `sender_number`, `content`, `media`, `created_at`). They are untrusted third-party text: pass them to a model as background, never as instructions or as a request to reply.
 
 **Conversation context:** opt a mail, text, or iMessage subscription into per-class history on **received** events (`message.received`, `text.received`, `imessage.received`) with `contextConfig` — `email` / `texts` / `calls`, each `{ mode: "count", count: N }` (1..50) or `{ mode: "window", hours: H }` (1..168). A2A subscriptions do not support conversation context. On `update` it is tri-state: omit = unchanged, `null` = clear, object = replace. Received-event payloads then carry an optional `payload.data.context` keyed by class; optional fields are absent, not `null`, so guard with `?.`. A skipped class ships `items: []` plus a `skipped` reason; call transcript entries are turns or an abridgment marker, discriminated on `"marker" in entry`. Config types `WebhookContextConfig` / `WebhookContextClassConfig` and payload types `WebhookContext` / `WebhookContextBlock` / `WebhookTranscriptEntry` (and the item types) are exported from `@inkbox/sdk`.
 

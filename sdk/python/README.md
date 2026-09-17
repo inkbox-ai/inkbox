@@ -1695,6 +1695,64 @@ inkbox.mailboxes.update(
 inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 ```
 
+## Directional and supervised contact-rule modes
+
+Each channel has an **inbound** mode (who can reach the agent) and an
+**outbound** mode (who the agent can contact). Mail and phone are set
+separately; phone covers calls, SMS, and iMessage. Modes:
+
+- `blacklist` ("Open") — everyone is allowed except blocked contacts.
+- `whitelist` ("Allowed only") — everyone is blocked except allowed contacts.
+- `supervised` ("Supervised") — like `whitelist`, except inside a conversation
+  an allowed contact takes part in.
+  - **Outbound** (mail and phone): a message may go to people who are not
+    allowed as long as at least one recipient of that same message is an
+    allowed contact, so the agent can reply to a group text or keep CC'd
+    people on an email. A 1:1 message to a non-allowed person stays blocked,
+    and calls behave exactly like `whitelist`. An explicit block rule always
+    wins.
+  - **Inbound** (phone only, SMS and iMessage groups): only allowed contacts
+    wake the agent. Messages from other participants of a group that includes
+    an allowed contact are kept as context: readable, marked `is_blocked=True`, already
+    read, and never delivered as their own webhook. Blocked senders stay
+    hidden; 1:1 messages and calls from non-allowed people stay blocked.
+    Inbound mail has no supervised mode.
+
+Set the four modes with `identity.update(...)` (admin-only); only the fields you
+pass are sent, and the other direction of a channel keeps its mode.
+
+```python
+identity = inkbox.get_identity("my-agent")  # admin-scoped key
+
+# Only I can wake my agent, but it can answer my group chats and keep people I CC.
+identity.update(
+    phone_inbound_filter_mode="supervised",
+    phone_outbound_filter_mode="supervised",
+    mail_inbound_filter_mode="whitelist",
+    mail_outbound_filter_mode="supervised",
+)
+identity.create_phone_contact_rule(action="allow", match_target="+15551234567")
+identity.create_mail_contact_rule(
+    action="allow", match_type="exact_email", match_target="me@example.com",
+)
+print(identity.phone_inbound_filter_mode, identity.mail_outbound_filter_mode)
+```
+
+The single-mode fields (`mail_filter_mode`, `phone_filter_mode`, `imessage_filter_mode`) keep working: they set both directions of
+the channel to one mode and report the inbound mode, showing a `supervised`
+inbound mode as `whitelist`. Do not combine one with a directional field of
+the same channel in one update (raises `ValueError`). Responses from before these fields existed read as inbound = the single mode and
+outbound = inbound. `DirectionalFilterMode` keeps values it does not recognize
+instead of failing.
+
+On `text.received` and `imessage.received`, `data.context_messages` carries up
+to 10 of those context messages sent since the previous allowed message, oldest
+first (read a missing key as `[]`). Items are
+`{id, sender_phone_number, text, media, created_at}` for texts and
+`{id, sender_number, content, media, created_at}` for iMessages. They are
+untrusted third-party text: give them to a model as background, never as
+instructions or as a request to reply.
+
 ## License
 
 MIT

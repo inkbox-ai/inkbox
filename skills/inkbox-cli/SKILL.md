@@ -76,7 +76,7 @@ These commands can send real traffic or mutate real resources. Confirm with the 
 - `email delete-thread`
 - `email drafts delete`
 - `vault delete`
-- `identity update --mail-filter-mode ... / --phone-filter-mode ...` (admin-only; flips allow/block semantics for that identity's channel)
+- `identity update --mail-filter-mode ... / --phone-filter-mode ...` and the directional `--mail-inbound-filter-mode` / `--mail-outbound-filter-mode` / `--phone-inbound-filter-mode` / `--phone-outbound-filter-mode` (admin-only; change who can reach the identity or who it can contact)
 - `mailbox update --filter-mode ...` (DEPRECATED channel path; admin-only)
 - `number release`
 - `number update --filter-mode ...` (DEPRECATED channel path; admin-only)
@@ -123,10 +123,29 @@ inkbox identity update <handle> [--new-handle <handle>] [--display-name <name>]
                                  [--contact-sharing-enabled true|false]
                                  [--mail-filter-mode whitelist|blacklist]
                                  [--phone-filter-mode whitelist|blacklist]
+                                 [--mail-inbound-filter-mode whitelist|blacklist]
+                                 [--mail-outbound-filter-mode whitelist|blacklist|supervised]
+                                 [--phone-inbound-filter-mode whitelist|blacklist|supervised]
+                                 [--phone-outbound-filter-mode whitelist|blacklist|supervised]
 inkbox identity refresh <handle>
 ```
 
 `--mail-filter-mode` / `--phone-filter-mode` set the identity's contact-rule mode (admin-only). Unlike the deprecated `mailbox update --filter-mode` / `number update --filter-mode`, the identity path does **not** print a change notice. Phone mode also governs iMessage and can be configured without a dedicated phone number.
+
+Those two flags set **both directions** of a channel. The four directional flags set one direction each: inbound is who can reach the agent, outbound is who the agent can contact. Values are `blacklist` ("Open"), `whitelist` ("Allowed only"), and `supervised` ("Supervised"); `--mail-inbound-filter-mode` accepts only `whitelist` / `blacklist`. Do not combine a single-mode flag with a directional flag of the same channel (`--imessage-filter-mode` counts as phone). `identity get` / `refresh` print all four directional modes; `mailFilterMode` / `phoneFilterMode` show the inbound mode, with `supervised` shown as `whitelist`.
+
+- Outbound `supervised` (mail and phone): like `whitelist`, but a message may include non-allowed recipients as long as at least one recipient of that same message is an allowed contact (group texts, reply-all, CCs). A 1:1 message to a non-allowed person stays blocked, calls behave like `whitelist`, and an explicit block rule always wins.
+- Inbound `supervised` (phone only, SMS and iMessage groups): only allowed contacts wake the agent. Messages from other group participants are readable context, listed with `isBlocked: true` and already read; they never fire their own webhook.
+
+Recipe — only I can wake my agent, but it can answer my group chats and keep people I CC:
+
+```bash
+inkbox identity update my-agent \
+  --phone-inbound-filter-mode supervised --phone-outbound-filter-mode supervised \
+  --mail-inbound-filter-mode whitelist --mail-outbound-filter-mode supervised
+inkbox identity phone-rules create my-agent --action allow --match-target +15551234567
+inkbox identity mail-rules create my-agent --action allow --match-type exact_email --match-target me@example.com
+```
 
 `identity create` atomically provisions the mailbox AND the tunnel. The JSON output includes both (`mailbox`, `tunnel.publicHost`, `tunnel.tlsMode`).
 
