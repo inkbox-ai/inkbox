@@ -16,7 +16,7 @@ use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use crate::imessage::types::IdentityIMessageNumber;
-use crate::mail::types::{FilterMode, FilterModeChangeNotice};
+use crate::mail::types::{DirectionalFilterMode, FilterMode, FilterModeChangeNotice};
 use crate::phone::types::SmsStatus;
 use crate::tunnels::types::TunnelSummary;
 
@@ -296,6 +296,10 @@ fn default_filter_mode_blacklist() -> FilterMode {
     FilterMode::Blacklist
 }
 
+fn default_directional_filter_mode_blacklist() -> DirectionalFilterMode {
+    DirectionalFilterMode::Blacklist
+}
+
 fn default_contact_sharing_enabled() -> bool {
     true
 }
@@ -415,7 +419,15 @@ pub struct IdentityPhoneNumber {
 /// `mail_filter_mode` / `phone_filter_mode` are the whitelist/blacklist modes
 /// for this identity's mail and phone contact rules. They live on the identity
 /// (set via `identity.update(...)`); the same field on the mailbox /
-/// phone-number objects is the deprecated legacy mirror.
+/// phone-number objects is the deprecated legacy mirror. They report the
+/// inbound mode and only ever carry `whitelist` or `blacklist`; a `supervised`
+/// inbound mode reads as `whitelist` here.
+///
+/// `mail_inbound_filter_mode` / `mail_outbound_filter_mode` /
+/// `phone_inbound_filter_mode` / `phone_outbound_filter_mode` are the
+/// per-direction modes: inbound governs who can reach the agent, outbound
+/// governs who the agent can contact. Responses that omit them parse with
+/// inbound equal to the single mode above and outbound equal to inbound.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentIdentitySummary {
     pub id: Uuid,
@@ -447,6 +459,18 @@ pub struct AgentIdentitySummary {
     /// Defaults to `blacklist` when absent.
     #[serde(default = "default_filter_mode_blacklist")]
     pub phone_filter_mode: FilterMode,
+    /// Mode governing who can email this identity.
+    #[serde(default = "default_directional_filter_mode_blacklist")]
+    pub mail_inbound_filter_mode: DirectionalFilterMode,
+    /// Mode governing who this identity can email.
+    #[serde(default = "default_directional_filter_mode_blacklist")]
+    pub mail_outbound_filter_mode: DirectionalFilterMode,
+    /// Mode governing who can call or message this identity.
+    #[serde(default = "default_directional_filter_mode_blacklist")]
+    pub phone_inbound_filter_mode: DirectionalFilterMode,
+    /// Mode governing who this identity can call or message.
+    #[serde(default = "default_directional_filter_mode_blacklist")]
+    pub phone_outbound_filter_mode: DirectionalFilterMode,
     /// Whether this identity has a webhook signing key configured. Status only,
     /// never the secret. Defaults to `false` when the server omits the field.
     #[serde(default)]
@@ -465,8 +489,9 @@ pub struct AgentIdentitySummary {
 }
 
 impl AgentIdentitySummary {
-    pub(crate) fn from_value(v: Value) -> crate::error::Result<Self> {
+    pub(crate) fn from_value(mut v: Value) -> crate::error::Result<Self> {
         let tunnel = v.get("tunnel").cloned();
+        backfill_directional_filter_modes(&mut v);
         let mut summary: AgentIdentitySummary = serde_json::from_value(v)?;
         if let Some(mailbox) = summary.mailbox.take() {
             summary.mailbox = Some(IdentityMailbox::from_value(serde_json::to_value(mailbox)?)?);
@@ -475,6 +500,88 @@ impl AgentIdentitySummary {
             summary.tunnel = Some(TunnelSummary::from_value(&tunnel)?);
         }
         Ok(summary)
+    }
+}
+
+/// Fill directional filter modes an older response omits: inbound falls back
+/// to the channel's single mode, outbound falls back to inbound.
+fn backfill_directional_filter_modes(v: &mut Value) {
+    let Some(map) = v.as_object_mut() else {
+        return;
+    };
+    for (single, inbound, outbound) in [
+        (
+            "mail_filter_mode",
+            "mail_inbound_filter_mode",
+            "mail_outbound_filter_mode",
+        ),
+        (
+            "phone_filter_mode",
+            "phone_inbound_filter_mode",
+            "phone_outbound_filter_mode",
+        ),
+    ] {
+        let present = |map: &Map<String, Value>, key: &str| {
+            map.get(key).filter(|value| !value.is_null()).cloned()
+        };
+        let inbound_value = present(map, inbound)
+            .or_else(|| present(map, single))
+            .unwrap_or_else(|| Value::String("blacklist".into()));
+        let outbound_value = present(map, outbound).unwrap_or_else(|| inbound_value.clone());
+        map.insert(inbound.into(), inbound_value);
+        map.insert(outbound.into(), outbound_value);
+    }
+}
+
+/// Directional contact-rule filter modes to change on an identity.
+///
+/// Each field sets one direction of one channel; `None` leaves that direction
+/// unchanged, and the other direction of the channel keeps its current mode.
+/// Admin-only. `mail_inbound_filter_mode` does not accept
+/// [`DirectionalFilterMode::Supervised`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct IdentityFilterModeUpdate {
+    /// Who can email this identity.
+    pub mail_inbound_filter_mode: Option<DirectionalFilterMode>,
+    /// Who this identity can email.
+    pub mail_outbound_filter_mode: Option<DirectionalFilterMode>,
+    /// Who can call or message this identity.
+    pub phone_inbound_filter_mode: Option<DirectionalFilterMode>,
+    /// Who this identity can call or message.
+    pub phone_outbound_filter_mode: Option<DirectionalFilterMode>,
+}
+
+impl IdentityFilterModeUpdate {
+    /// Build the PATCH body, keeping only the directions that were set.
+    pub(crate) fn to_wire(self) -> crate::error::Result<Map<String, Value>> {
+        if self.mail_inbound_filter_mode == Some(DirectionalFilterMode::Supervised) {
+            return Err(crate::error::InkboxError::InvalidArgument(
+                "mail_inbound_filter_mode does not support supervised".into(),
+            ));
+        }
+        let mut body = Map::new();
+        for (key, mode) in [
+            ("mail_inbound_filter_mode", self.mail_inbound_filter_mode),
+            ("mail_outbound_filter_mode", self.mail_outbound_filter_mode),
+            ("phone_inbound_filter_mode", self.phone_inbound_filter_mode),
+            (
+                "phone_outbound_filter_mode",
+                self.phone_outbound_filter_mode,
+            ),
+        ] {
+            match mode {
+                Some(DirectionalFilterMode::Unknown) => {
+                    return Err(crate::error::InkboxError::InvalidArgument(format!(
+                        "{key} cannot be set to an unknown mode"
+                    )));
+                }
+                Some(mode) => {
+                    body.insert(key.into(), Value::String(mode.as_str().into()));
+                }
+                None => {}
+            }
+        }
+        Ok(body)
     }
 }
 
@@ -517,7 +624,11 @@ impl std::ops::DerefMut for AgentIdentityData {
 mod tests {
     use serde_json::json;
 
-    use super::{AgentIdentityData, IdentityPhoneNumberCreateOptions};
+    use super::{
+        AgentIdentityData, AgentIdentitySummary, IdentityFilterModeUpdate,
+        IdentityPhoneNumberCreateOptions,
+    };
+    use crate::mail::types::{DirectionalFilterMode, FilterMode};
     use crate::phone::ForwardingTargetType;
 
     fn identity_with_tunnel(public_host: &str) -> serde_json::Value {
@@ -545,6 +656,125 @@ mod tests {
                 "updated_at": "2026-03-09T00:00:00Z"
             }
         })
+    }
+
+    fn identity_with_modes(modes: serde_json::Value) -> serde_json::Value {
+        let mut value = identity_with_tunnel("sales-agent.inkboxwire.com");
+        for (key, mode) in modes.as_object().unwrap() {
+            value[key] = mode.clone();
+        }
+        value
+    }
+
+    #[test]
+    fn identity_parses_directional_filter_modes() {
+        let data = AgentIdentityData::from_value(identity_with_modes(json!({
+            "mail_filter_mode": "whitelist",
+            "phone_filter_mode": "whitelist",
+            "mail_inbound_filter_mode": "whitelist",
+            "mail_outbound_filter_mode": "supervised",
+            "phone_inbound_filter_mode": "supervised",
+            "phone_outbound_filter_mode": "blacklist"
+        })))
+        .unwrap();
+
+        assert_eq!(data.mail_filter_mode, FilterMode::Whitelist);
+        assert_eq!(
+            data.mail_inbound_filter_mode,
+            DirectionalFilterMode::Whitelist
+        );
+        assert_eq!(
+            data.mail_outbound_filter_mode,
+            DirectionalFilterMode::Supervised
+        );
+        assert_eq!(
+            data.phone_inbound_filter_mode,
+            DirectionalFilterMode::Supervised
+        );
+        assert_eq!(
+            data.phone_outbound_filter_mode,
+            DirectionalFilterMode::Blacklist
+        );
+    }
+
+    #[test]
+    fn identity_without_directional_modes_falls_back_to_single_mode() {
+        let data = AgentIdentitySummary::from_value(identity_with_modes(json!({
+            "mail_filter_mode": "whitelist",
+            "phone_filter_mode": "blacklist"
+        })))
+        .unwrap();
+
+        assert_eq!(
+            data.mail_inbound_filter_mode,
+            DirectionalFilterMode::Whitelist
+        );
+        assert_eq!(
+            data.mail_outbound_filter_mode,
+            DirectionalFilterMode::Whitelist
+        );
+        assert_eq!(
+            data.phone_inbound_filter_mode,
+            DirectionalFilterMode::Blacklist
+        );
+        assert_eq!(
+            data.phone_outbound_filter_mode,
+            DirectionalFilterMode::Blacklist
+        );
+    }
+
+    #[test]
+    fn identity_absent_outbound_follows_inbound_and_bare_defaults_to_blacklist() {
+        let data = AgentIdentitySummary::from_value(identity_with_modes(json!({
+            "phone_filter_mode": "whitelist",
+            "phone_inbound_filter_mode": "supervised"
+        })))
+        .unwrap();
+
+        assert_eq!(
+            data.phone_outbound_filter_mode,
+            DirectionalFilterMode::Supervised
+        );
+        assert_eq!(
+            data.mail_inbound_filter_mode,
+            DirectionalFilterMode::Blacklist
+        );
+        assert_eq!(
+            data.mail_outbound_filter_mode,
+            DirectionalFilterMode::Blacklist
+        );
+    }
+
+    #[test]
+    fn identity_unknown_directional_mode_does_not_fail_parsing() {
+        let data = AgentIdentityData::from_value(identity_with_modes(json!({
+            "phone_outbound_filter_mode": "a_future_mode"
+        })))
+        .unwrap();
+
+        assert_eq!(
+            data.phone_outbound_filter_mode,
+            DirectionalFilterMode::Unknown
+        );
+    }
+
+    #[test]
+    fn filter_mode_update_serializes_only_set_directions() {
+        let body = IdentityFilterModeUpdate {
+            phone_inbound_filter_mode: Some(DirectionalFilterMode::Supervised),
+            phone_outbound_filter_mode: Some(DirectionalFilterMode::Whitelist),
+            ..Default::default()
+        }
+        .to_wire()
+        .unwrap();
+
+        assert_eq!(
+            serde_json::Value::Object(body),
+            json!({
+                "phone_inbound_filter_mode": "supervised",
+                "phone_outbound_filter_mode": "whitelist"
+            })
+        );
     }
 
     #[test]

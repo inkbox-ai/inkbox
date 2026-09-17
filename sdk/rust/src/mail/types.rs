@@ -54,6 +54,37 @@ pub enum FilterMode {
     Blacklist,
 }
 
+/// Per-direction contact-rule filter mode on an agent identity.
+///
+/// Each channel (mail, phone) has an inbound mode (who can reach the agent)
+/// and an outbound mode (who the agent can contact).
+///
+/// `Whitelist` passes only contacts matching an `allow` rule. `Blacklist`
+/// passes everything except contacts matching a `block` rule — this is the
+/// default. `Supervised` is like `Whitelist`, except inside a conversation an
+/// allowed contact takes part in. Outbound (mail and phone), a message may
+/// include recipients who are not allowed as long as at least one recipient of
+/// that same message is an allowed contact; a 1:1 message to a non-allowed
+/// person stays blocked, and calls behave exactly like `Whitelist`. Inbound
+/// (phone only: SMS and iMessage group conversations), only allowed contacts
+/// wake the agent; messages from other participants of a group that includes
+/// an allowed contact are kept as readable context, marked `is_blocked`. An
+/// explicit `block` rule always wins. `Supervised` is not accepted for inbound
+/// mail.
+///
+/// `Unknown` stands in for a value this release does not recognize, so a
+/// newer response never fails identity parsing. It cannot be sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum DirectionalFilterMode {
+    Whitelist,
+    Blacklist,
+    Supervised,
+    #[serde(other)]
+    Unknown,
+}
+
 /// Logical folder a thread lives in.
 ///
 /// `Blocked` is server-assigned; clients cannot move a thread into `Blocked`.
@@ -208,6 +239,18 @@ impl FilterMode {
         match self {
             FilterMode::Whitelist => "whitelist",
             FilterMode::Blacklist => "blacklist",
+        }
+    }
+}
+
+impl DirectionalFilterMode {
+    /// The exact wire string for this filter mode.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DirectionalFilterMode::Whitelist => "whitelist",
+            DirectionalFilterMode::Blacklist => "blacklist",
+            DirectionalFilterMode::Supervised => "supervised",
+            DirectionalFilterMode::Unknown => "unknown",
         }
     }
 }

@@ -16,9 +16,9 @@ pub mod types;
 
 // Re-export the public types.
 pub use types::{
-    AgentIdentityData, AgentIdentitySummary, IdentityMailbox, IdentityMailboxCreateOptions,
-    IdentityPhoneNumber, IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions, Unset,
-    VaultSecretIds,
+    AgentIdentityData, AgentIdentitySummary, IdentityFilterModeUpdate, IdentityMailbox,
+    IdentityMailboxCreateOptions, IdentityPhoneNumber, IdentityPhoneNumberCreateOptions,
+    IdentityTunnelCreateOptions, Unset, VaultSecretIds,
 };
 
 // Re-export the domain exceptions.
