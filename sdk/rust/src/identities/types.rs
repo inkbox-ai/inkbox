@@ -428,6 +428,8 @@ pub struct IdentityPhoneNumber {
 /// per-direction modes: inbound governs who can reach the agent, outbound
 /// governs who the agent can contact. Responses that omit them parse with
 /// inbound equal to the single mode above and outbound equal to inbound.
+/// That fallback is applied by the SDK's resource methods; deserializing this
+/// struct directly defaults each absent directional field to `blacklist`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentIdentitySummary {
     pub id: Uuid,

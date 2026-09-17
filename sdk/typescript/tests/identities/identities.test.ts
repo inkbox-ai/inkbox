@@ -255,17 +255,31 @@ describe("IdentitiesResource.update", () => {
     });
   });
 
-  it("allows a single mode and a directional mode on different channels", async () => {
+  it.each([
+    [
+      { mailFilterMode: "whitelist", phoneInboundFilterMode: "supervised" },
+      { mail_filter_mode: "whitelist", phone_inbound_filter_mode: "supervised" },
+    ],
+    [
+      { mailFilterMode: "whitelist", phoneOutboundFilterMode: "supervised" },
+      { mail_filter_mode: "whitelist", phone_outbound_filter_mode: "supervised" },
+    ],
+    [
+      { phoneFilterMode: "whitelist", mailOutboundFilterMode: "supervised" },
+      { phone_filter_mode: "whitelist", mail_outbound_filter_mode: "supervised" },
+    ],
+    [
+      { imessageFilterMode: "blacklist", mailInboundFilterMode: "whitelist" },
+      { imessage_filter_mode: "blacklist", mail_inbound_filter_mode: "whitelist" },
+    ],
+  ] as const)("allows a single mode and a directional mode on different channels %j", async (options, body) => {
     const http = mockHttp();
     vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
     const res = new IdentitiesResource(http);
 
-    await res.update(HANDLE, { mailFilterMode: "whitelist", phoneOutboundFilterMode: "supervised" });
+    await res.update(HANDLE, options);
 
-    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
-      mail_filter_mode: "whitelist",
-      phone_outbound_filter_mode: "supervised",
-    });
+    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, body);
   });
 
   it.each([

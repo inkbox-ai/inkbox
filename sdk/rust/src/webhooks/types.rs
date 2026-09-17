@@ -570,8 +570,12 @@ pub struct TextWebhookData {
     /// `text.received` only. Filled for a group message while the inbound
     /// phone mode is `supervised`: up to 10 messages that participants who are
     /// not allowed contacts sent since the previous allowed message in the
-    /// conversation, oldest first. Empty when absent.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// conversation, oldest first. Empty when absent or `null`.
+    #[serde(
+        default,
+        deserialize_with = "crate::contacts::types::null_as_default",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub context_messages: Vec<TextContextMessageWire>,
 }
 
@@ -805,8 +809,12 @@ pub struct IMessageWebhookData {
     /// `imessage.received` only. Filled for a group message while the inbound
     /// phone mode is `supervised`: up to 10 messages that participants who are
     /// not allowed contacts sent since the previous allowed message in the
-    /// conversation, oldest first. Empty when absent.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// conversation, oldest first. Empty when absent or `null`.
+    #[serde(
+        default,
+        deserialize_with = "crate::contacts::types::null_as_default",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub context_messages: Vec<IMessageContextMessageWire>,
 }
 
@@ -1203,6 +1211,29 @@ mod tests {
         assert!(plain.data.context_messages.is_empty());
         let reserialized = serde_json::to_value(&plain.data).unwrap();
         assert!(reserialized.get("context_messages").is_none());
+    }
+
+    #[test]
+    fn null_context_messages_reads_as_empty() {
+        let text_data: TextWebhookData = {
+            let mut payload: serde_json::Value = serde_json::from_str(include_str!(
+                "../../../../tests/fixtures/webhook_payloads/text_received.json"
+            ))
+            .unwrap();
+            payload["data"]["context_messages"] = serde_json::Value::Null;
+            serde_json::from_value(payload["data"].take()).unwrap()
+        };
+        assert!(text_data.context_messages.is_empty());
+
+        let imessage_data: IMessageWebhookData = serde_json::from_str(
+            r#"{
+                "message": null, "reaction": null,
+                "contacts": [], "agent_identities": [],
+                "context_messages": null
+            }"#,
+        )
+        .unwrap();
+        assert!(imessage_data.context_messages.is_empty());
     }
 
     #[test]

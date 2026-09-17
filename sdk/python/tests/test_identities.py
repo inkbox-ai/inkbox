@@ -433,23 +433,25 @@ class TestIdentitiesIMessageFields:
             },
         )
 
-    def test_update_allows_single_mode_and_directional_on_different_channels(self):
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"mail_filter_mode": "whitelist", "phone_inbound_filter_mode": "supervised"},
+            {"mail_filter_mode": "whitelist", "phone_outbound_filter_mode": "supervised"},
+            {"phone_filter_mode": "whitelist", "mail_outbound_filter_mode": "supervised"},
+            {"imessage_filter_mode": "blacklist", "mail_inbound_filter_mode": "whitelist"},
+        ],
+    )
+    def test_update_allows_single_mode_and_directional_on_different_channels(
+        self, kwargs
+    ):
         res, http = _resource()
         http.patch.return_value = IDENTITY_DICT
 
-        res.update(
-            HANDLE,
-            mail_filter_mode="whitelist",
-            phone_outbound_filter_mode="supervised",
-        )
+        res.update(HANDLE, **kwargs)
 
-        http.patch.assert_called_once_with(
-            f"/{HANDLE}",
-            json={
-                "mail_filter_mode": "whitelist",
-                "phone_outbound_filter_mode": "supervised",
-            },
-        )
+        # Both keys go out unchanged.
+        http.patch.assert_called_once_with(f"/{HANDLE}", json=kwargs)
 
     @pytest.mark.parametrize(
         "kwargs",
