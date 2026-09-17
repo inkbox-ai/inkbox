@@ -12,7 +12,11 @@ from typing import Any, Literal
 from uuid import UUID
 
 from inkbox.imessage.types import _compatibility_number_type
-from inkbox.mail.types import FilterMode, FilterModeChangeNotice
+from inkbox.mail.types import (
+    DirectionalFilterMode,
+    FilterMode,
+    FilterModeChangeNotice,
+)
 from inkbox.phone.types import SmsStatus
 from inkbox.phone.types import ForwardingTargetType
 from inkbox.tunnels.types import TLSMode, TunnelSummary
@@ -326,7 +330,15 @@ class AgentIdentitySummary:
     ``mail_filter_mode`` / ``phone_filter_mode`` are the whitelist/blacklist
     modes for this identity's mail and phone contact rules. They live on the
     identity (set via ``identity.update(...)``); the same field on the mailbox
-    / phone-number objects is the deprecated legacy mirror.
+    / phone-number objects is the deprecated legacy mirror. They report the
+    inbound mode and only ever carry ``whitelist`` or ``blacklist``; a
+    ``supervised`` inbound mode reads as ``whitelist`` here.
+
+    ``mail_inbound_filter_mode`` / ``mail_outbound_filter_mode`` /
+    ``phone_inbound_filter_mode`` / ``phone_outbound_filter_mode`` are the
+    per-direction modes: inbound governs who can reach the agent, outbound
+    governs who the agent can contact. Responses that omit them parse with
+    inbound equal to the single mode above and outbound equal to inbound.
     """
 
     id: UUID
@@ -342,6 +354,10 @@ class AgentIdentitySummary:
     imessage_filter_mode: FilterMode = FilterMode.BLACKLIST
     mail_filter_mode: FilterMode = FilterMode.BLACKLIST
     phone_filter_mode: FilterMode = FilterMode.BLACKLIST
+    mail_inbound_filter_mode: DirectionalFilterMode = DirectionalFilterMode.BLACKLIST
+    mail_outbound_filter_mode: DirectionalFilterMode = DirectionalFilterMode.BLACKLIST
+    phone_inbound_filter_mode: DirectionalFilterMode = DirectionalFilterMode.BLACKLIST
+    phone_outbound_filter_mode: DirectionalFilterMode = DirectionalFilterMode.BLACKLIST
     # Webhook signing-key status (never the secret itself).
     signing_key_configured: bool = False
     signing_key_created_at: datetime | None = None
@@ -357,6 +373,14 @@ class AgentIdentitySummary:
         phone_data = d.get("phone_number")
         imessage_data = d.get("imessage_number")
         tunnel_data = d.get("tunnel")
+        # Directional modes are absent on older responses: inbound falls
+        # back to the single mode, outbound falls back to inbound.
+        mail_inbound = d.get("mail_inbound_filter_mode") or (
+            d.get("mail_filter_mode") or "blacklist"
+        )
+        phone_inbound = d.get("phone_inbound_filter_mode") or (
+            d.get("phone_filter_mode") or "blacklist"
+        )
         return cls(
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
@@ -373,6 +397,14 @@ class AgentIdentitySummary:
             ),
             mail_filter_mode=FilterMode(d.get("mail_filter_mode") or "blacklist"),
             phone_filter_mode=FilterMode(d.get("phone_filter_mode") or "blacklist"),
+            mail_inbound_filter_mode=DirectionalFilterMode(mail_inbound),
+            mail_outbound_filter_mode=DirectionalFilterMode(
+                d.get("mail_outbound_filter_mode") or mail_inbound
+            ),
+            phone_inbound_filter_mode=DirectionalFilterMode(phone_inbound),
+            phone_outbound_filter_mode=DirectionalFilterMode(
+                d.get("phone_outbound_filter_mode") or phone_inbound
+            ),
             signing_key_configured=d.get("signing_key_configured", False),
             signing_key_created_at=(
                 datetime.fromisoformat(raw_signing_created_at)

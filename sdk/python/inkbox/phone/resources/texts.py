@@ -101,6 +101,10 @@ class TextsResource:
         blocked-only listing or ``is_blocked=False`` to exclude blocked
         rows.
 
+        The exception is the ``supervised`` inbound phone mode: group messages
+        from participants who are not allowed contacts are readable as context,
+        marked ``is_blocked=True`` and already read.
+
         Args:
             phone_number_id: UUID of the phone number.
             limit: Max results to return (1–200).
@@ -190,6 +194,10 @@ class TextsResource:
         clean of blocked spam, or ``is_blocked=True`` to search only the
         blocked folder.
 
+        The exception is the ``supervised`` inbound phone mode: group context
+        messages from participants who are not allowed contacts are included,
+        marked ``is_blocked=True``.
+
         Args:
             phone_number_id: UUID of the phone number.
             q: Search query string.
@@ -227,6 +235,11 @@ class TextsResource:
         and stops blocked rows from bumping quiet conversations to the
         top, while ``is_blocked=True`` narrows to conversations made up
         of blocked rows.
+
+        The exception is the ``supervised`` inbound phone mode: group context
+        messages from participants who are not allowed contacts count toward
+        totals and can be the latest message, marked ``is_blocked=True``. They
+        arrive already read, so they never count as unread.
 
         Args:
             phone_number_id: UUID of the phone number.

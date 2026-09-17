@@ -199,6 +199,10 @@ class IMessagesResource:
         access-policy layer. Admin-scoped keys and JWT humans see
         everything by default.
 
+        The exception is the ``supervised`` inbound phone mode: group
+        messages from participants who are not allowed contacts are readable
+        as context, marked ``is_blocked=True`` and already read.
+
         Args:
             agent_identity_id: Narrow to one agent identity. Ignored
                 for identity-scoped keys (always their own identity).

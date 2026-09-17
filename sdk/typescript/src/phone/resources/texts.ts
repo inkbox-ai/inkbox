@@ -84,6 +84,10 @@ export class TextsResource {
    * callers see everything by default; pass `isBlocked=true` for the
    * blocked-only listing or `isBlocked=false` to exclude blocked rows.
    *
+   * The exception is the `supervised` inbound phone mode: group messages from
+   * participants who are not allowed contacts are readable as context, marked
+   * `isBlocked: true` and already read.
+   *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
@@ -165,6 +169,10 @@ export class TextsResource {
    * by default; `isBlocked=false` keeps search clean of blocked spam,
    * `isBlocked=true` searches only the blocked folder.
    *
+   * The exception is the `supervised` inbound phone mode: group context
+   * messages from participants who are not allowed contacts are included,
+   * marked `isBlocked: true`.
+   *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.q - Search query string.
    * @param options.limit - Max results (1–200). Defaults to 50.
@@ -197,6 +205,11 @@ export class TextsResource {
    * spam-only counterparties and stop blocked rows from bumping quiet
    * conversations to the top, or `isBlocked=true` to narrow to
    * conversations made up of blocked rows.
+   *
+   * The exception is the `supervised` inbound phone mode: group context
+   * messages from participants who are not allowed contacts count toward
+   * totals and can be the latest message, marked `isBlocked: true`. They
+   * arrive already read, so they never count as unread.
    *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.limit - Max results (1–200). Defaults to 50.

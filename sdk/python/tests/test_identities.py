@@ -415,6 +415,65 @@ class TestIdentitiesIMessageFields:
             json={"imessage_enabled": True, "imessage_filter_mode": "whitelist"},
         )
 
+    def test_update_sends_only_the_directional_modes_supplied(self):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DICT
+
+        res.update(
+            HANDLE,
+            phone_inbound_filter_mode="supervised",
+            mail_outbound_filter_mode="supervised",
+        )
+
+        http.patch.assert_called_once_with(
+            f"/{HANDLE}",
+            json={
+                "mail_outbound_filter_mode": "supervised",
+                "phone_inbound_filter_mode": "supervised",
+            },
+        )
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"mail_filter_mode": "whitelist", "phone_inbound_filter_mode": "supervised"},
+            {"mail_filter_mode": "whitelist", "phone_outbound_filter_mode": "supervised"},
+            {"phone_filter_mode": "whitelist", "mail_outbound_filter_mode": "supervised"},
+            {"imessage_filter_mode": "blacklist", "mail_inbound_filter_mode": "whitelist"},
+        ],
+    )
+    def test_update_allows_single_mode_and_directional_on_different_channels(
+        self, kwargs
+    ):
+        res, http = _resource()
+        http.patch.return_value = IDENTITY_DICT
+
+        res.update(HANDLE, **kwargs)
+
+        # Both keys go out unchanged.
+        http.patch.assert_called_once_with(f"/{HANDLE}", json=kwargs)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"mail_filter_mode": "whitelist", "mail_inbound_filter_mode": "blacklist"},
+            {"mail_filter_mode": "whitelist", "mail_outbound_filter_mode": "supervised"},
+            {"phone_filter_mode": "whitelist", "phone_inbound_filter_mode": "supervised"},
+            {
+                "imessage_filter_mode": "whitelist",
+                "phone_outbound_filter_mode": "supervised",
+            },
+            {"mail_inbound_filter_mode": "supervised"},
+        ],
+    )
+    def test_update_rejects_invalid_filter_mode_combinations(self, kwargs):
+        res, http = _resource()
+
+        with pytest.raises(ValueError):
+            res.update(HANDLE, **kwargs)
+
+        http.patch.assert_not_called()
+
     def test_create_and_update_send_contact_sharing_toggle(self):
         res, http = _resource()
         http.post.return_value = IDENTITY_DICT

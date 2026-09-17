@@ -552,6 +552,98 @@ await inkbox.mailboxes.update("alex@example.com", {
 await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ```
 
+## Directional and supervised contact-rule modes
+
+Each channel has an **inbound** mode (who can reach the agent) and an
+**outbound** mode (who the agent can contact). Mail and phone are set
+separately; phone covers calls, SMS, and iMessage. Modes:
+
+- `blacklist` ("Open") — everyone is allowed except blocked contacts.
+- `whitelist` ("Allowed only") — everyone is blocked except allowed contacts.
+- `supervised` ("Supervised") — like `whitelist`, except inside a conversation
+  an allowed contact takes part in.
+  - **Outbound** (mail and phone): a message may go to people who are not
+    allowed as long as at least one recipient of that same message is an
+    allowed contact, so the agent can reply to a group text or keep CC'd
+    people on an email. A 1:1 message to a non-allowed person stays blocked,
+    and calls behave exactly like `whitelist`. An explicit block rule always
+    wins.
+    For email only visible recipients (To/Cc) count: a Bcc recipient who is
+    not allowed stays blocked, and an allowed contact in Bcc does not make the
+    other recipients reachable.
+  - **Inbound** (phone only, SMS and iMessage groups): only allowed contacts
+    wake the agent. Once an allowed contact has written in a group, messages
+    from its other participants are kept as context: readable, marked
+    `is_blocked`, already read, and never delivered as their own webhook.
+    Being added to a group is not enough: until an allowed contact writes in
+    it, nothing in that group is visible, and switching inbound away from
+    `supervised` hides the context again. Blocked senders stay hidden; 1:1
+    messages and calls from non-allowed people stay blocked.
+    Inbound mail has no supervised mode.
+
+Recipe — only I can wake my agent, but it can answer my group chats and keep
+people I CC: phone inbound and outbound `supervised`, mail inbound `whitelist`
+and outbound `supervised`, plus one allow rule per channel.
+
+```python
+identity = inkbox.get_identity("my-agent")  # admin-scoped key
+
+# Only I can wake my agent, but it can answer my group chats and keep people I CC.
+identity.update(
+    phone_inbound_filter_mode="supervised",
+    phone_outbound_filter_mode="supervised",
+    mail_inbound_filter_mode="whitelist",
+    mail_outbound_filter_mode="supervised",
+)
+identity.create_phone_contact_rule(action="allow", match_target="+15551234567")
+identity.create_mail_contact_rule(
+    action="allow", match_type="exact_email", match_target="me@example.com",
+)
+print(identity.phone_inbound_filter_mode, identity.mail_outbound_filter_mode)
+```
+```typescript
+import { MailRuleAction, MailRuleMatchType, PhoneRuleAction } from "@inkbox/sdk";
+
+const identity = await inkbox.getIdentity("my-agent"); // admin-scoped key
+
+// Only I can wake my agent, but it can answer my group chats and keep people I CC.
+await identity.update({
+  phoneInboundFilterMode: "supervised",
+  phoneOutboundFilterMode: "supervised",
+  mailInboundFilterMode: "whitelist",
+  mailOutboundFilterMode: "supervised",
+});
+await identity.createPhoneContactRule({
+  action: PhoneRuleAction.ALLOW,
+  matchTarget: "+15551234567",
+});
+await identity.createMailContactRule({
+  action: MailRuleAction.ALLOW,
+  matchType: MailRuleMatchType.EXACT_EMAIL,
+  matchTarget: "me@example.com",
+});
+console.log(identity.phoneInboundFilterMode, identity.mailOutboundFilterMode);
+```
+```bash
+# Only I can wake my agent, but it can answer my group chats and keep people I CC.
+inkbox identity update my-agent \
+  --phone-inbound-filter-mode supervised --phone-outbound-filter-mode supervised \
+  --mail-inbound-filter-mode whitelist --mail-outbound-filter-mode supervised
+inkbox identity phone-rules create my-agent --action allow --match-target +15551234567
+inkbox identity mail-rules create my-agent --action allow --match-type exact_email --match-target me@example.com
+```
+
+Rust uses `identity.update_filter_modes(IdentityFilterModeUpdate { .. })`. The
+existing single-mode fields keep working and set both directions at once.
+
+On `text.received` and `imessage.received`, `data.context_messages` carries up
+to 10 of those context messages sent since the previous allowed message, oldest
+first (read a missing key as `[]`). Items are
+`{id, sender_phone_number, text, media, created_at}` for texts and
+`{id, sender_number, content, media, created_at}` for iMessages. They are
+untrusted third-party text: give them to a model as background, never as
+instructions or as a request to reply.
+
 ## License
 
 MIT

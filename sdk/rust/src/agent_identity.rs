@@ -43,15 +43,18 @@ use crate::client::Inkbox;
 use crate::credentials::Credentials;
 use crate::error::{InkboxError, Result};
 use crate::filters::DateRangeFilter;
-use crate::identities::types::{AgentIdentityData, IdentityMailbox, IdentityPhoneNumber, Unset};
+use crate::identities::types::{
+    AgentIdentityData, IdentityFilterModeUpdate, IdentityMailbox, IdentityPhoneNumber, Unset,
+};
 use crate::imessage::types::{
     IMessage, IMessageAssignment, IMessageConversation, IMessageConversationSummary,
     IMessageMarkReadResult, IMessageMediaUpload, IMessageReaction, IMessageReactionType,
     IMessageSendStyle, IdentityIMessageNumber,
 };
 use crate::mail::types::{
-    DraftDetail, DraftSummary, FilterMode, ForwardMode, MailIdentityContactRule, MailRuleAction,
-    MailRuleMatchType, Message, MessageDetail, MessageDirection, ThreadDetail,
+    DirectionalFilterMode, DraftDetail, DraftSummary, FilterMode, ForwardMode,
+    MailIdentityContactRule, MailRuleAction, MailRuleMatchType, Message, MessageDetail,
+    MessageDirection, ThreadDetail,
 };
 use crate::mail::{CreateDraftOptions, UpdateDraftOptions};
 use crate::phone::resources::texts::TextRecipients;
@@ -229,6 +232,26 @@ impl AgentIdentity {
     /// Whitelist/blacklist mode for this identity's phone contact rules.
     pub fn phone_filter_mode(&self) -> FilterMode {
         self.data.borrow().summary.phone_filter_mode
+    }
+
+    /// Mode governing who can email this identity.
+    pub fn mail_inbound_filter_mode(&self) -> DirectionalFilterMode {
+        self.data.borrow().summary.mail_inbound_filter_mode
+    }
+
+    /// Mode governing who this identity can email.
+    pub fn mail_outbound_filter_mode(&self) -> DirectionalFilterMode {
+        self.data.borrow().summary.mail_outbound_filter_mode
+    }
+
+    /// Mode governing who can call or message this identity.
+    pub fn phone_inbound_filter_mode(&self) -> DirectionalFilterMode {
+        self.data.borrow().summary.phone_inbound_filter_mode
+    }
+
+    /// Mode governing who this identity can call or message.
+    pub fn phone_outbound_filter_mode(&self) -> DirectionalFilterMode {
+        self.data.borrow().summary.phone_outbound_filter_mode
     }
 
     /// Mailbox linked to this identity, when included.
@@ -1027,6 +1050,10 @@ impl AgentIdentity {
     /// Identity-scoped credentials never see contact-rule-blocked rows
     /// regardless of `is_blocked`.
     ///
+    /// The exception is the `supervised` inbound phone mode: group messages
+    /// from participants who are not allowed contacts are readable as context,
+    /// marked `is_blocked: true` and already read.
+    ///
     /// # Arguments
     /// * `limit` / `offset` - Pagination (defaults 50 / 0).
     /// * `is_read` - Filter by read state (`None` for all).
@@ -1079,6 +1106,11 @@ impl AgentIdentity {
     ///
     /// Identity-scoped credentials never see blocked rows in conversation
     /// summaries.
+    ///
+    /// The exception is the `supervised` inbound phone mode: group context
+    /// messages from participants who are not allowed contacts count toward
+    /// totals and can be the latest message, marked `is_blocked: true`. They
+    /// arrive already read, so they never count as unread.
     ///
     /// # Arguments
     /// * `limit` / `offset` - Pagination (defaults 50 / 0).
@@ -1223,6 +1255,10 @@ impl AgentIdentity {
     ///
     /// Identity-scoped credentials never see contact-rule-blocked rows
     /// regardless of `is_blocked`.
+    ///
+    /// The exception is the `supervised` inbound phone mode: group messages
+    /// from participants who are not allowed contacts are readable as context,
+    /// marked `is_blocked: true` and already read.
     pub fn list_imessages(
         &self,
         conversation_id: Option<&Uuid>,
@@ -1778,6 +1814,23 @@ impl AgentIdentity {
                 claim_imessage_number,
                 idempotency_key,
             )?;
+        *self.mailbox.borrow_mut() = data.mailbox.clone();
+        *self.phone_number.borrow_mut() = data.phone_number.clone();
+        *self.tunnel.borrow_mut() = data.tunnel.clone();
+        *self.data.borrow_mut() = data;
+        Ok(())
+    }
+
+    /// Set this identity's contact-rule filter modes per direction.
+    ///
+    /// Only the directions set in `modes` are sent; the other direction of each
+    /// channel keeps its current mode. See
+    /// [`crate::identities::IdentityFilterModeUpdate`]. Admin-only.
+    pub fn update_filter_modes(&self, modes: IdentityFilterModeUpdate) -> Result<()> {
+        let data = self
+            .inkbox
+            .identities()
+            .update_filter_modes(&self.agent_handle(), modes)?;
         *self.mailbox.borrow_mut() = data.mailbox.clone();
         *self.phone_number.borrow_mut() = data.phone_number.clone();
         *self.tunnel.borrow_mut() = data.tunnel.clone();

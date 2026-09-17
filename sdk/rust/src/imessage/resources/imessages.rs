@@ -182,6 +182,10 @@ impl IMessagesResource {
     /// Identity-scoped API keys never see contact-rule-blocked rows regardless
     /// of `is_blocked` — the server filters them at the access-policy layer.
     ///
+    /// The exception is the `supervised` inbound phone mode: group messages
+    /// from participants who are not allowed contacts are readable as context,
+    /// marked `is_blocked: true` and already read.
+    ///
     /// # Arguments
     /// * `agent_identity_id` - Narrow to one agent identity. Ignored for
     ///   identity-scoped keys.

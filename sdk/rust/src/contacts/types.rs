@@ -602,7 +602,7 @@ pub struct ContactVCardExportResult {
 
 /// Deserialize a list field that the server may send as `null` into an empty
 /// `Vec` (mirrors Python's `d.get(...) or []`).
-fn null_as_default<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
+pub(crate) fn null_as_default<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: Deserialize<'de>,

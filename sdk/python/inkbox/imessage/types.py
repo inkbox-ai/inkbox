@@ -243,6 +243,12 @@ class IMessage:
 
     Group rows have ``is_group=True``, no assignment, a best-known participant
     snapshot, and per-recipient outbound delivery state.
+
+    ``is_blocked`` is ``True`` when a contact rule or default-block rejected
+    the message. Identity-scoped (agent) API keys do not receive those rows,
+    except under the ``supervised`` inbound phone mode: group messages from
+    participants who are not allowed contacts are readable as context, marked
+    ``is_blocked=True`` and already read.
     """
 
     id: UUID

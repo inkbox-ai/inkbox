@@ -17,6 +17,7 @@ import {
   parseAgentIdentitySummary,
 } from "../src/identities/types.js";
 import {
+  DirectionalFilterMode,
   FilterMode,
   MailIdentityContactRule,
   MailRuleAction,
@@ -562,5 +563,38 @@ describe("AgentIdentity.update filter modes", () => {
     // Regression: the cache rebuild must not reset the modes to default.
     expect(identity.mailFilterMode).toBe(FilterMode.WHITELIST);
     expect(identity.phoneFilterMode).toBe(FilterMode.WHITELIST);
+  });
+
+  it("update() refreshes the directional filter modes from the response", async () => {
+    const { identity, inkbox } = identityWithPhone();
+    const updated = parseAgentIdentitySummary({
+      id: identity.id,
+      organization_id: "org-abc123",
+      agent_handle: identity.agentHandle,
+      display_name: null,
+      description: null,
+      email_address: null,
+      created_at: "2026-06-09T00:00:00Z",
+      updated_at: "2026-06-09T00:00:00Z",
+      phone_filter_mode: "whitelist",
+      phone_inbound_filter_mode: "supervised",
+      phone_outbound_filter_mode: "supervised",
+    });
+    vi.mocked(inkbox._idsResource.update).mockResolvedValue(updated);
+
+    await identity.update({
+      phoneInboundFilterMode: "supervised",
+      phoneOutboundFilterMode: "supervised",
+    });
+
+    expect(inkbox._idsResource.update).toHaveBeenCalledWith(identity.agentHandle, {
+      phoneInboundFilterMode: "supervised",
+      phoneOutboundFilterMode: "supervised",
+    });
+    expect(identity.phoneFilterMode).toBe(FilterMode.WHITELIST);
+    expect(identity.phoneInboundFilterMode).toBe(DirectionalFilterMode.SUPERVISED);
+    expect(identity.phoneOutboundFilterMode).toBe(DirectionalFilterMode.SUPERVISED);
+    expect(identity.mailInboundFilterMode).toBe(DirectionalFilterMode.BLACKLIST);
+    expect(identity.mailOutboundFilterMode).toBe(DirectionalFilterMode.BLACKLIST);
   });
 });

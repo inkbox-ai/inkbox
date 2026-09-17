@@ -19,7 +19,7 @@ from inkbox.identities.types import _AgentIdentityData
 from inkbox.mail.resources.identity_contact_rules import (
     MailIdentityContactRulesResource,
 )
-from inkbox.mail.types import FilterMode, MailIdentityContactRule
+from inkbox.mail.types import DirectionalFilterMode, FilterMode, MailIdentityContactRule
 from inkbox.phone.resources.identity_contact_rules import (
     PhoneIdentityContactRulesResource,
 )
@@ -385,3 +385,31 @@ class TestAgentIdentityFilterModeUpdate:
         inkbox._ids_resource.get.assert_not_called()
         assert identity.mail_filter_mode == FilterMode.WHITELIST
         assert identity.phone_filter_mode == FilterMode.WHITELIST
+
+    def test_update_sends_directional_modes_as_wire_strings(self):
+        identity, inkbox = _identity()
+        updated = _AgentIdentityData._from_dict(
+            {
+                **IDENTITY_DETAIL_DICT,
+                "phone_filter_mode": "whitelist",
+                "phone_inbound_filter_mode": "supervised",
+                "phone_outbound_filter_mode": "supervised",
+            }
+        )
+        inkbox._ids_resource.update.return_value = updated
+
+        identity.update(
+            phone_inbound_filter_mode=DirectionalFilterMode.SUPERVISED,
+            phone_outbound_filter_mode="supervised",
+        )
+
+        inkbox._ids_resource.update.assert_called_once_with(
+            identity.agent_handle,
+            phone_inbound_filter_mode="supervised",
+            phone_outbound_filter_mode="supervised",
+        )
+        assert identity.phone_filter_mode == FilterMode.WHITELIST
+        assert identity.phone_inbound_filter_mode is DirectionalFilterMode.SUPERVISED
+        assert identity.phone_outbound_filter_mode is DirectionalFilterMode.SUPERVISED
+        assert identity.mail_inbound_filter_mode is DirectionalFilterMode.BLACKLIST
+        assert identity.mail_outbound_filter_mode is DirectionalFilterMode.BLACKLIST

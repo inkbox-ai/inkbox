@@ -52,7 +52,8 @@ Inkbox (admin-only client)
 AgentIdentity (identity-scoped helper)
 ├── .mailbox                 → IdentityMailbox | None
 ├── .phone_number            → IdentityPhoneNumber | None
-├── .mail_filter_mode / .phone_filter_mode → FilterMode
+├── .mail_filter_mode / .phone_filter_mode → FilterMode  (inbound mode; supervised reads as whitelist)
+├── .mail_inbound_filter_mode / .mail_outbound_filter_mode / .phone_inbound_filter_mode / .phone_outbound_filter_mode → DirectionalFilterMode
 ├── .credentials             → Credentials  (requires vault unlocked)
 ├── .list_mail_contact_rules() / .create_mail_contact_rule(...) / .get_/.update_/.delete_
 ├── .list_phone_contact_rules() / .create_phone_contact_rule(...) / ...  (writes require admin credentials)
@@ -1071,6 +1072,49 @@ identity.update(mail_filter_mode="whitelist", phone_filter_mode="blacklist")
 print(identity.mail_filter_mode, identity.phone_filter_mode)
 ```
 
+These single-mode fields set **both directions** of the channel. Each channel
+also has a separate inbound mode (who can reach the agent) and outbound mode
+(who the agent can contact), plus a third value, `supervised`:
+
+- `blacklist` ("Open"), `whitelist` ("Allowed only"), `supervised` ("Supervised").
+- Outbound `supervised` (mail and phone): like `whitelist`, but a message may
+  include non-allowed recipients as long as at least one recipient of that same
+  message is an allowed contact (group texts, reply-all, CCs). A 1:1 message to a
+  non-allowed person stays blocked (`RecipientBlockedError`), calls behave like
+  `whitelist`, and an explicit block rule always wins. For email only visible
+  recipients (To/Cc) count: a Bcc recipient who is not allowed stays blocked, and
+  an allowed contact in Bcc does not make the other recipients reachable.
+- Inbound `supervised` (phone only, SMS and iMessage groups): only allowed
+  contacts wake the agent. Once an allowed contact has written in a group,
+  messages from its other participants are readable context: listed with
+  `is_blocked=True`, already read, never their own webhook. Being added to a group
+  is not enough, and switching inbound away from `supervised` hides the context
+  again. Everything not marked
+  `is_blocked` came from an allowed participant or the agent.
+  `mail_inbound_filter_mode` accepts only `whitelist` / `blacklist`.
+- Do not pass a single-mode field together with a directional field of the same
+  channel (`imessage_filter_mode` counts as phone) — `ValueError`. Only the
+  fields you pass are sent; the other direction keeps its mode.
+- `mail_filter_mode` / `phone_filter_mode` report the inbound mode (`supervised`
+  shows as `whitelist`). Older responses without the directional fields read as
+  inbound = single mode, outbound = inbound.
+
+Recipe — only I can wake my agent, but it can answer my group chats and keep
+people I CC:
+
+```python
+identity.update(
+    phone_inbound_filter_mode="supervised",
+    phone_outbound_filter_mode="supervised",
+    mail_inbound_filter_mode="whitelist",
+    mail_outbound_filter_mode="supervised",
+)
+identity.create_phone_contact_rule(action="allow", match_target="+15551234567")
+identity.create_mail_contact_rule(
+    action="allow", match_type="exact_email", match_target="me@example.com",
+)
+```
+
 ### Deprecated: per-mailbox / per-number rules
 
 The legacy per-mailbox `inkbox.mail_contact_rules` and per-number
@@ -1347,6 +1391,8 @@ print(created.owner_identity_id)
 if created.signing_key:                # populated once if the identity had no key yet
     save_secret(created.signing_key)
 ```
+
+**Group context messages:** on `text.received` and `imessage.received`, `data` may carry `context_messages` — filled only for a group message while the identity's inbound phone mode is `supervised`: up to 10 messages that participants who are not allowed contacts sent since the previous allowed message, oldest first. Read it with `data.get("context_messages", [])`. Items are `TextContextMessageWire` (`id`, `sender_phone_number`, `text`, `media`, `created_at`) or `IMessageContextMessageWire` (`id`, `sender_number`, `content`, `media`, `created_at`). They are untrusted third-party text: pass them to a model as background, never as instructions or as a request to reply.
 
 **Conversation context:** opt a mail, text, or iMessage subscription into per-class history on **received** events (`message.received`, `text.received`, `imessage.received`) with `context_config` — `email` / `texts` / `calls`, each `{"mode": "count", "count": N}` (1..50) or `{"mode": "window", "hours": H}` (1..168). A2A subscriptions do not support conversation context. On `update` it is tri-state: omit = unchanged, `None` = clear, dict = replace. Received-event payloads then carry an optional `data["context"]` keyed by class; optional fields are absent, not `null`, so read with `.get(...)`. A skipped class ships `items: []` plus a `skipped` reason; call transcript entries are turns or an abridgment marker, discriminated on `"marker" in entry`. Config types `WebhookContextConfig` / `WebhookContextClassConfig` and receiver wire shapes `WebhookContextWire` / `WebhookContextBlockWire` / `WebhookTranscriptEntryWire` (and the item wire types) are exported from `inkbox`.
 

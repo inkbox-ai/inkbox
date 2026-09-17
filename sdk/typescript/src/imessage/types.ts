@@ -187,6 +187,13 @@ export interface IMessage {
   errorReason: string | null;
   errorDetail: string | null;
   isRead: boolean;
+  /**
+   * `true` when a contact rule or default-block rejected the message.
+   * Identity-scoped (agent) API keys do not receive those rows, except under
+   * the `supervised` inbound phone mode: group messages from participants
+   * who are not allowed contacts are readable as context, marked
+   * `isBlocked: true` and already read.
+   */
   isBlocked: boolean;
   recipients: IMessageRecipient[] | null;
   /** Live (non-removed) tapbacks targeting this message, oldest first. */

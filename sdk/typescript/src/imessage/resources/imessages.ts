@@ -189,6 +189,10 @@ export class IMessagesResource {
    * regardless of `isBlocked` (filtered server-side). Admin/JWT callers
    * see everything by default.
    *
+   * The exception is the `supervised` inbound phone mode: group messages
+   * from participants who are not allowed contacts are readable as context,
+   * marked `isBlocked: true` and already read.
+   *
    * @param options.agentIdentityId - Narrow to one agent identity.
    *   Ignored for identity-scoped keys (always their own identity).
    * @param options.conversationId - Narrow to one conversation.

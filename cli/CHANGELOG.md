@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.2 — Directional and supervised contact-rule modes
+
+- `identity update` adds `--mail-inbound-filter-mode`,
+  `--mail-outbound-filter-mode`, `--phone-inbound-filter-mode`, and
+  `--phone-outbound-filter-mode`. Outbound and phone-inbound flags accept
+  `supervised`; inbound mail accepts only `whitelist` or `blacklist`.
+- The existing `--mail-filter-mode`, `--phone-filter-mode`, and
+  `--imessage-filter-mode` flags keep working and set both directions. Combining
+  one with a directional flag of the same channel is rejected before any request.
+- `identity get` and `identity refresh` print the four directional modes.
+- README and CLI skill include a setup recipe.
+- Bump `@inkbox/cli` and its SDK dependency to 0.7.2.
+
 ## 0.7.1 — Custom email signatures
 
 - `mailbox update` supports inline HTML/text, UTF-8 signature files, enable/disable,

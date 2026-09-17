@@ -102,6 +102,12 @@ inkbox identity update <handle>              # Update an identity
   --clear-description                        #   Explicit null (mutually exclusive with --description)
   --imessage-enabled <bool>                  #   Toggle iMessage reachability (true/false)
   --imessage-filter-mode <mode>              #   whitelist or blacklist (admin API key required)
+  --mail-filter-mode <mode>                  #   Mail mode for both directions: whitelist or blacklist
+  --phone-filter-mode <mode>                 #   Phone + iMessage mode for both directions: whitelist or blacklist
+  --mail-inbound-filter-mode <mode>          #   Who can email the identity: whitelist or blacklist
+  --mail-outbound-filter-mode <mode>         #   Who the identity can email: whitelist, blacklist, or supervised
+  --phone-inbound-filter-mode <mode>         #   Who can call or message the identity: whitelist, blacklist, or supervised
+  --phone-outbound-filter-mode <mode>        #   Who the identity can call or message: whitelist, blacklist, or supervised
 inkbox identity refresh <handle>             # Re-fetch identity from API
 
 inkbox identity create-secret <handle>       # Create a secret scoped to identity (vault key)
@@ -855,6 +861,52 @@ inkbox mailbox get alex@example.com --json
 
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
+
+## Directional and supervised contact-rule modes
+
+Each channel has an **inbound** mode (who can reach the agent) and an
+**outbound** mode (who the agent can contact). Mail and phone are set
+separately; phone covers calls, SMS, and iMessage. Modes:
+
+- `blacklist` ("Open") — everyone is allowed except blocked contacts.
+- `whitelist` ("Allowed only") — everyone is blocked except allowed contacts.
+- `supervised` ("Supervised") — like `whitelist`, except inside a conversation
+  an allowed contact takes part in.
+  - **Outbound** (mail and phone): a message may go to people who are not
+    allowed as long as at least one recipient of that same message is an
+    allowed contact, so the agent can reply to a group text or keep CC'd
+    people on an email. A 1:1 message to a non-allowed person stays blocked,
+    and calls behave exactly like `whitelist`. An explicit block rule always
+    wins.
+    For email only visible recipients (To/Cc) count: a Bcc recipient who is
+    not allowed stays blocked, and an allowed contact in Bcc does not make the
+    other recipients reachable.
+  - **Inbound** (phone only, SMS and iMessage groups): only allowed contacts
+    wake the agent. Once an allowed contact has written in a group, messages
+    from its other participants are kept as context: readable, marked
+    `isBlocked: true`, already read, and never delivered as their own webhook.
+    Being added to a group is not enough: until an allowed contact writes in
+    it, nothing in that group is visible, and switching inbound away from
+    `supervised` hides the context again. Blocked senders stay hidden; 1:1
+    messages and calls from non-allowed people stay blocked.
+    Inbound mail has no supervised mode.
+
+Set them with `identity update` (admin API key required); only the flags you
+pass are sent. `identity get` and `identity refresh` print all four modes.
+
+```bash
+# Only I can wake my agent, but it can answer my group chats and keep people I CC.
+inkbox identity update my-agent \
+  --phone-inbound-filter-mode supervised --phone-outbound-filter-mode supervised \
+  --mail-inbound-filter-mode whitelist --mail-outbound-filter-mode supervised
+inkbox identity phone-rules create my-agent --action allow --match-target +15551234567
+inkbox identity mail-rules create my-agent --action allow --match-type exact_email --match-target me@example.com
+```
+
+`--mail-filter-mode`, `--phone-filter-mode`, and `--imessage-filter-mode` keep
+working: they set both directions of the channel to one mode. Do not combine one
+with a directional flag of the same channel. `--mail-inbound-filter-mode` accepts
+only `whitelist` or `blacklist`.
 
 ## License
 

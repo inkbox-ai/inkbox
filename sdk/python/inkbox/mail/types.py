@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
+from inkbox.a2a.types import ForwardCompatibleStrEnum
 from inkbox.contacts.types import Contact
 
 
@@ -63,6 +64,42 @@ class FilterMode(StrEnum):
 
     WHITELIST = "whitelist"
     BLACKLIST = "blacklist"
+
+
+class DirectionalFilterMode(ForwardCompatibleStrEnum):
+    """
+    Per-direction contact-rule filter mode on an agent identity.
+
+    Each channel (mail, phone) has an inbound mode (who can reach the agent)
+    and an outbound mode (who the agent can contact). Values added by newer
+    servers are preserved instead of failing identity parsing.
+
+    Attributes:
+        WHITELIST: Only contacts matching an ``allow`` rule pass; everything
+            else is blocked.
+        BLACKLIST: Everything passes except contacts matching a ``block``
+            rule. This is the default.
+        SUPERVISED: Like ``WHITELIST``, except inside a conversation an
+            allowed contact takes part in. Outbound (mail and phone), a
+            message may include recipients who are not allowed as long as at
+            least one recipient of that same message is an allowed contact; a
+            1:1 message to a non-allowed person stays blocked, and calls
+            behave exactly like ``WHITELIST``. For email only visible
+            recipients (To/Cc) count: a Bcc recipient who is not allowed
+            stays blocked, and an allowed contact in Bcc does not make the
+            other recipients reachable. Inbound (phone only: SMS and
+            iMessage group conversations), only allowed contacts wake the
+            agent; once an allowed contact has written in a group, messages
+            from its other participants are kept as readable context, marked
+            ``is_blocked``. Being added to a group is not enough, and
+            switching inbound away from ``SUPERVISED`` hides the context
+            again. An explicit ``block`` rule always wins. Not accepted for
+            inbound mail.
+    """
+
+    WHITELIST = "whitelist"
+    BLACKLIST = "blacklist"
+    SUPERVISED = "supervised"
 
 
 class ThreadFolder(StrEnum):

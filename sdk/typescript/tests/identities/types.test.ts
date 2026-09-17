@@ -7,6 +7,7 @@ import {
   parseIdentityMailbox,
   parseIdentityPhoneNumber,
 } from "../../src/identities/types.js";
+import { DirectionalFilterMode, FilterMode } from "../../src/index.js";
 import {
   RAW_IDENTITY,
   RAW_IDENTITY_DETAIL,
@@ -41,6 +42,70 @@ describe("parseAgentIdentitySummary", () => {
     const i = parseAgentIdentitySummary(RAW_IDENTITY);
     expect(i.signingKeyConfigured).toBe(false);
     expect(i.signingKeyCreatedAt).toBeNull();
+  });
+});
+
+describe("parseAgentIdentitySummary directional filter modes", () => {
+  it("parses all four directional modes", () => {
+    const i = parseAgentIdentitySummary({
+      ...RAW_IDENTITY,
+      mail_filter_mode: "whitelist",
+      phone_filter_mode: "whitelist",
+      imessage_filter_mode: "whitelist",
+      mail_inbound_filter_mode: "whitelist",
+      mail_outbound_filter_mode: "supervised",
+      phone_inbound_filter_mode: "supervised",
+      phone_outbound_filter_mode: "blacklist",
+    });
+    expect(i.mailFilterMode).toBe(FilterMode.WHITELIST);
+    expect(i.phoneFilterMode).toBe(FilterMode.WHITELIST);
+    expect(i.mailInboundFilterMode).toBe(DirectionalFilterMode.WHITELIST);
+    expect(i.mailOutboundFilterMode).toBe(DirectionalFilterMode.SUPERVISED);
+    expect(i.phoneInboundFilterMode).toBe(DirectionalFilterMode.SUPERVISED);
+    expect(i.phoneOutboundFilterMode).toBe(DirectionalFilterMode.BLACKLIST);
+  });
+
+  it("falls back to the single mode when directional modes are absent", () => {
+    const i = parseAgentIdentitySummary({
+      ...RAW_IDENTITY,
+      mail_filter_mode: "whitelist",
+      phone_filter_mode: "blacklist",
+    });
+    expect(i.mailInboundFilterMode).toBe(DirectionalFilterMode.WHITELIST);
+    expect(i.mailOutboundFilterMode).toBe(DirectionalFilterMode.WHITELIST);
+    expect(i.phoneInboundFilterMode).toBe(DirectionalFilterMode.BLACKLIST);
+    expect(i.phoneOutboundFilterMode).toBe(DirectionalFilterMode.BLACKLIST);
+  });
+
+  it("uses inbound for an absent outbound mode", () => {
+    const i = parseAgentIdentitySummary({
+      ...RAW_IDENTITY,
+      phone_filter_mode: "whitelist",
+      phone_inbound_filter_mode: "supervised",
+    });
+    expect(i.phoneOutboundFilterMode).toBe(DirectionalFilterMode.SUPERVISED);
+  });
+
+  it("defaults every mode to blacklist when nothing is present", () => {
+    const i = parseAgentIdentitySummary(RAW_IDENTITY);
+    expect(i.mailInboundFilterMode).toBe(DirectionalFilterMode.BLACKLIST);
+    expect(i.phoneOutboundFilterMode).toBe(DirectionalFilterMode.BLACKLIST);
+  });
+
+  it("keeps an unrecognized mode instead of failing", () => {
+    const i = parseAgentIdentityData({
+      ...RAW_IDENTITY_DETAIL,
+      phone_outbound_filter_mode: "a_future_mode",
+    });
+    expect(i.phoneOutboundFilterMode).toBe("a_future_mode");
+  });
+
+  it("exposes exactly three mode values", () => {
+    expect(Object.values(DirectionalFilterMode)).toStrictEqual([
+      "whitelist",
+      "blacklist",
+      "supervised",
+    ]);
   });
 });
 

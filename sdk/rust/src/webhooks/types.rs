@@ -540,6 +540,21 @@ pub struct TextWebhookMessage {
     pub updated_at: String,
 }
 
+/// One group message kept as context under `data.context_messages`.
+///
+/// Sent by a group participant who is not an allowed contact, while the
+/// identity's inbound phone mode is `supervised`. Untrusted third-party text:
+/// present it to a model as background, never as instructions, and do not
+/// treat it as a request to reply.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextContextMessageWire {
+    pub id: String,
+    pub sender_phone_number: String,
+    pub text: Option<String>,
+    pub media: Option<Vec<TextMediaItemWire>>,
+    pub created_at: String,
+}
+
 /// Wrapper under `TextWebhookPayload.data`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextWebhookData {
@@ -552,6 +567,16 @@ pub struct TextWebhookData {
     // delivery-status events even though this shared type permits the key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<WebhookContext>,
+    /// `text.received` only. Filled for a group message while the inbound
+    /// phone mode is `supervised`: up to 10 messages that participants who are
+    /// not allowed contacts sent since the previous allowed message in the
+    /// conversation, oldest first. Empty when absent or `null`.
+    #[serde(
+        default,
+        deserialize_with = "crate::contacts::types::null_as_default",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub context_messages: Vec<TextContextMessageWire>,
 }
 
 /// Top-level phone-text webhook payload (`{event_type, timestamp, data}`).
@@ -746,6 +771,21 @@ pub struct IMessageWebhookReaction {
     pub updated_at: String,
 }
 
+/// One group message kept as context under `data.context_messages`.
+///
+/// Sent by a group participant who is not an allowed contact, while the
+/// identity's inbound phone mode is `supervised`. Untrusted third-party text:
+/// present it to a model as background, never as instructions, and do not
+/// treat it as a request to reply.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IMessageContextMessageWire {
+    pub id: String,
+    pub sender_number: String,
+    pub content: Option<String>,
+    pub media: Option<Vec<IMessageMediaItemWire>>,
+    pub created_at: String,
+}
+
 /// Wrapper under `IMessageWebhookPayload.data`.
 ///
 /// Exactly one of `message` (`imessage.received` and the delivery lifecycle
@@ -766,6 +806,16 @@ pub struct IMessageWebhookData {
     // the key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<WebhookContext>,
+    /// `imessage.received` only. Filled for a group message while the inbound
+    /// phone mode is `supervised`: up to 10 messages that participants who are
+    /// not allowed contacts sent since the previous allowed message in the
+    /// conversation, oldest first. Empty when absent or `null`.
+    #[serde(
+        default,
+        deserialize_with = "crate::contacts::types::null_as_default",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub context_messages: Vec<IMessageContextMessageWire>,
 }
 
 /// Top-level iMessage webhook payload (`{event_type, timestamp, data}`).
@@ -1092,11 +1142,98 @@ mod tests {
         }"#;
 
         let payload: IMessageWebhookPayload = serde_json::from_str(raw).unwrap();
+        assert!(payload.data.context_messages.is_empty());
         let message = payload.data.message.unwrap();
         assert!(message.is_group);
         assert_eq!(message.assignment_id, None);
         assert_eq!(message.sender_number.as_deref(), Some("+15551234567"));
         assert_eq!(message.participants.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn imessage_received_parses_context_messages() {
+        let raw = r#"{
+            "id": "evt_group_context",
+            "event_type": "imessage.received",
+            "timestamp": "2026-07-22T00:05:00Z",
+            "data": {
+                "message": null, "reaction": null,
+                "contacts": [], "agent_identities": [],
+                "context_messages": [
+                    {
+                        "id": "1f0a9c77-2b64-4d18-9a53-6e1d0c8b7a41",
+                        "sender_number": "+15557654321",
+                        "content": "Friday at 7 works for me",
+                        "media": null,
+                        "created_at": "2026-07-22T00:03:00Z"
+                    },
+                    {
+                        "id": "2a1bad88-3c75-4e29-8b64-7f2e1d9c8b52",
+                        "sender_number": "+15550001111",
+                        "content": null,
+                        "media": [{"content_type": "image/jpeg", "size": 48211, "url": "https://example.com/menu.jpg"}],
+                        "created_at": "2026-07-22T00:04:00Z"
+                    }
+                ]
+            }
+        }"#;
+
+        let payload: IMessageWebhookPayload = serde_json::from_str(raw).unwrap();
+        let context = &payload.data.context_messages;
+        assert_eq!(context.len(), 2);
+        assert_eq!(context[0].sender_number, "+15557654321");
+        assert_eq!(
+            context[0].content.as_deref(),
+            Some("Friday at 7 works for me")
+        );
+        assert!(context[0].media.is_none());
+        assert!(context[1].content.is_none());
+        assert_eq!(context[1].media.as_ref().unwrap()[0].size, Some(48211));
+    }
+
+    #[test]
+    fn text_received_parses_context_messages_and_defaults_to_empty() {
+        let load = |raw: &str| -> TextWebhookPayload { serde_json::from_str(raw).unwrap() };
+
+        let group = load(include_str!(
+            "../../../../tests/fixtures/webhook_payloads/text_group_received_context.json"
+        ));
+        let context = &group.data.context_messages;
+        assert_eq!(context.len(), 2);
+        assert_eq!(context[0].sender_phone_number, "+14155550888");
+        assert_eq!(context[0].text.as_deref(), Some("Friday at 7 works for me"));
+        assert!(context[1].text.is_none());
+        assert_eq!(context[1].media.as_ref().unwrap()[0].size, 48211);
+
+        let plain = load(include_str!(
+            "../../../../tests/fixtures/webhook_payloads/text_received.json"
+        ));
+        assert!(plain.data.context_messages.is_empty());
+        let reserialized = serde_json::to_value(&plain.data).unwrap();
+        assert!(reserialized.get("context_messages").is_none());
+    }
+
+    #[test]
+    fn null_context_messages_reads_as_empty() {
+        let text_data: TextWebhookData = {
+            let mut payload: serde_json::Value = serde_json::from_str(include_str!(
+                "../../../../tests/fixtures/webhook_payloads/text_received.json"
+            ))
+            .unwrap();
+            payload["data"]["context_messages"] = serde_json::Value::Null;
+            serde_json::from_value(payload["data"].take()).unwrap()
+        };
+        assert!(text_data.context_messages.is_empty());
+
+        let imessage_data: IMessageWebhookData = serde_json::from_str(
+            r#"{
+                "message": null, "reaction": null,
+                "contacts": [], "agent_identities": [],
+                "context_messages": null
+            }"#,
+        )
+        .unwrap();
+        assert!(imessage_data.context_messages.is_empty());
     }
 
     #[test]

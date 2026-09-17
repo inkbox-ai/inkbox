@@ -14,6 +14,7 @@ import type {
   A2AWebhookPayload,
   CallEndedWebhookPayload,
   MailWebhookPayload,
+  IMessageContextMessageWire,
   IMessageWebhookPayload,
   PhoneIncomingCallWebhookPayload,
   RawTextMessageRecipient,
@@ -40,6 +41,7 @@ const EXPECTED_FIXTURES = [
   "text_delivery_failed.json",
   "text_delivery_unconfirmed.json",
   "text_group_delivered.json",
+  "text_group_received_context.json",
   "phone_incoming_call.json",
   "call_ended.json",
   "call_ended_hosted.json",
@@ -358,6 +360,24 @@ describe("WebhookContext", () => {
     };
     expect(groupPayload.data.message?.assignment_id).toBeNull();
     expect(groupPayload.data.message?.participants).toHaveLength(2);
+    // Older payloads omit the key; receivers read it as an empty list.
+    expect(groupPayload.data.context_messages ?? []).toStrictEqual([]);
+
+    const contextMessage: IMessageContextMessageWire = {
+      id: "imsg_ctx_1",
+      sender_number: "+15557654321",
+      content: null,
+      media: [{ content_type: "image/jpeg", size: 48211, url: "https://example.com/menu.jpg" }],
+      created_at: "2026-07-04T00:03:00Z",
+    };
+    const supervisedGroupPayload: IMessageWebhookPayload = {
+      ...groupPayload,
+      data: { ...groupPayload.data, context_messages: [contextMessage] },
+    };
+    expect(supervisedGroupPayload.data.context_messages).toHaveLength(1);
+    expect(Object.keys(supervisedGroupPayload.data.context_messages![0]).sort()).toStrictEqual(
+      ["content", "created_at", "id", "media", "sender_number"],
+    );
 
     const groupReactionPayload: IMessageWebhookPayload = {
       id: "evt_context_imessage_group_reaction",
@@ -395,6 +415,7 @@ describe("TextWebhookPayload", () => {
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
     "text_group_delivered.json",
+    "text_group_received_context.json",
   ] as const;
 
   it.each(textEvents)("parses %s into TextWebhookPayload", (file) => {
@@ -402,6 +423,30 @@ describe("TextWebhookPayload", () => {
     expect(payload.event_type.startsWith("text.")).toBe(true);
     expect(payload.data.text_message.id).toBeTypeOf("string");
     expect(payload.data.text_message.origin).toBe("user_initiated");
+  });
+
+  it("carries group context messages oldest first on text.received", () => {
+    const payload = loadFixture<TextWebhookPayload>("text_group_received_context.json");
+    const context = payload.data.context_messages ?? [];
+    expect(context.map((item) => item.sender_phone_number)).toStrictEqual([
+      "+14155550888",
+      "+14155550777",
+    ]);
+    expect(context[0].created_at < context[1].created_at).toBe(true);
+    for (const item of context) {
+      expect(Object.keys(item).sort()).toStrictEqual(
+        ["created_at", "id", "media", "sender_phone_number", "text"],
+      );
+    }
+    expect(context[0].media).toBeNull();
+    expect(context[1].text).toBeNull();
+    expect(context[1].media?.[0].content_type).toBe("image/jpeg");
+  });
+
+  it("reads absent context_messages as an empty list", () => {
+    const payload = loadFixture<TextWebhookPayload>("text_received.json");
+    expect(Object.prototype.hasOwnProperty.call(payload.data, "context_messages")).toBe(false);
+    expect(payload.data.context_messages ?? []).toStrictEqual([]);
   });
 
   it.each(textEvents)("data.contacts and agent_identities are arrays, and singular 'contact' is absent on %s", (file) => {

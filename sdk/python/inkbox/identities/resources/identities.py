@@ -133,6 +133,10 @@ class IdentitiesResource:
         imessage_filter_mode: str | None = None,
         mail_filter_mode: str | None = None,
         phone_filter_mode: str | None = None,
+        mail_inbound_filter_mode: str | None = None,
+        mail_outbound_filter_mode: str | None = None,
+        phone_inbound_filter_mode: str | None = None,
+        phone_outbound_filter_mode: str | None = None,
     ) -> _AgentIdentityData:
         """Update an identity's handle, display name, description,
         iMessage reachability, and contact-rule filter modes.
@@ -165,6 +169,29 @@ class IdentitiesResource:
             phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
                 identity's phone contact rules (admin-only). The server
                 rejects this with 422 when the identity has no phone number.
+                Like ``mail_filter_mode`` and ``imessage_filter_mode``, this
+                sets both directions of the channel to the same mode.
+            mail_inbound_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
+                who can email this identity (admin-only). ``"supervised"``
+                is not available for inbound mail.
+            mail_outbound_filter_mode: ``"whitelist"``, ``"blacklist"``, or
+                ``"supervised"`` for who this identity can email
+                (admin-only).
+            phone_inbound_filter_mode: ``"whitelist"``, ``"blacklist"``, or
+                ``"supervised"`` for who can call or message this identity
+                (admin-only).
+            phone_outbound_filter_mode: ``"whitelist"``, ``"blacklist"``, or
+                ``"supervised"`` for who this identity can call or message
+                (admin-only).
+
+        Returns:
+            _AgentIdentityData: The updated identity.
+
+        Raises:
+            ValueError: If a single-mode field is combined with a directional
+                field of the same channel (``imessage_filter_mode`` counts
+                as phone), or ``mail_inbound_filter_mode`` is
+                ``"supervised"``.
         """
         if claim_imessage_number is not None and claim_imessage_number is not True:
             raise ValueError("claim_imessage_number must be True when supplied")
@@ -204,12 +231,40 @@ class IdentitiesResource:
                 if imessage_number_id is not None
                 else None
             )
+        # A directional field sets one direction; the single-mode fields set
+        # both, so the two cannot be combined for the same channel.
+        if mail_filter_mode is not None and (
+            mail_inbound_filter_mode is not None
+            or mail_outbound_filter_mode is not None
+        ):
+            raise ValueError(
+                "mail_filter_mode cannot be combined with "
+                "mail_inbound_filter_mode or mail_outbound_filter_mode"
+            )
+        if (phone_filter_mode is not None or imessage_filter_mode is not None) and (
+            phone_inbound_filter_mode is not None
+            or phone_outbound_filter_mode is not None
+        ):
+            raise ValueError(
+                "phone_filter_mode and imessage_filter_mode cannot be combined with "
+                "phone_inbound_filter_mode or phone_outbound_filter_mode"
+            )
+        if mail_inbound_filter_mode == "supervised":
+            raise ValueError("mail_inbound_filter_mode does not support 'supervised'")
         if imessage_filter_mode is not None:
             body["imessage_filter_mode"] = imessage_filter_mode
         if mail_filter_mode is not None:
             body["mail_filter_mode"] = mail_filter_mode
         if phone_filter_mode is not None:
             body["phone_filter_mode"] = phone_filter_mode
+        if mail_inbound_filter_mode is not None:
+            body["mail_inbound_filter_mode"] = mail_inbound_filter_mode
+        if mail_outbound_filter_mode is not None:
+            body["mail_outbound_filter_mode"] = mail_outbound_filter_mode
+        if phone_inbound_filter_mode is not None:
+            body["phone_inbound_filter_mode"] = phone_inbound_filter_mode
+        if phone_outbound_filter_mode is not None:
+            body["phone_outbound_filter_mode"] = phone_outbound_filter_mode
         headers = None
         if idempotency_key is not None:
             headers = {

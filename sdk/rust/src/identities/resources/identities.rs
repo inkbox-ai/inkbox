@@ -15,8 +15,9 @@ use crate::error::Result;
 use crate::http::{validate_idempotency_key, HttpTransport};
 use crate::identities::exceptions::map_identity_conflict_error;
 use crate::identities::types::{
-    AgentIdentityData, AgentIdentitySummary, IdentityMailboxCreateOptions,
-    IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions, Unset, VaultSecretIds,
+    AgentIdentityData, AgentIdentitySummary, IdentityFilterModeUpdate,
+    IdentityMailboxCreateOptions, IdentityPhoneNumberCreateOptions, IdentityTunnelCreateOptions,
+    Unset, VaultSecretIds,
 };
 use uuid::Uuid;
 
@@ -237,6 +238,10 @@ impl IdentitiesResource {
     /// * `phone_filter_mode` - `"whitelist"` or `"blacklist"` for this identity's
     ///   phone contact rules (admin-only). The server rejects this with 422 when
     ///   the identity has no phone number.
+    ///
+    /// The three filter-mode arguments set both directions of their channel to
+    /// the same mode. Use [`Self::update_filter_modes`] to set the inbound and
+    /// outbound modes separately, including `supervised`.
     #[allow(clippy::too_many_arguments)]
     pub fn update(
         &self,
@@ -413,6 +418,34 @@ impl IdentitiesResource {
         AgentIdentityData::from_value(data)
     }
 
+    /// Set an identity's contact-rule filter modes per direction.
+    ///
+    /// Inbound modes govern who can reach the agent; outbound modes govern who
+    /// the agent can contact. Only the directions set in `modes` are sent; the
+    /// other direction of each channel keeps its current mode. To set both
+    /// directions of a channel to one mode, pass `mail_filter_mode` /
+    /// `phone_filter_mode` to [`Self::update`] instead. Admin-only.
+    ///
+    /// # Arguments
+    /// * `agent_handle` - Handle of the identity to update.
+    /// * `modes` - Directions to change.
+    ///
+    /// # Errors
+    /// `InkboxError::InvalidArgument` when `mail_inbound_filter_mode` is
+    /// `Supervised`, or any mode is `Unknown`.
+    pub fn update_filter_modes(
+        &self,
+        agent_handle: &str,
+        modes: IdentityFilterModeUpdate,
+    ) -> Result<AgentIdentityData> {
+        let body = Value::Object(modes.to_wire()?);
+        let data = self
+            .http
+            .patch(&format!("/{agent_handle}"), &body)
+            .map_err(map_identity_conflict_error)?;
+        AgentIdentityData::from_value(data)
+    }
+
     /// Delete an identity.
     ///
     /// Cascades: flips the linked mailbox to `deleted`, force-finalizes the
@@ -439,6 +472,7 @@ mod tests {
     use super::*;
     use crate::client::Inkbox;
     use crate::imessage::types::IdentityIMessageNumber;
+    use crate::mail::types::{DirectionalFilterMode, FilterMode};
 
     fn client(server: &MockServer) -> std::sync::Arc<Inkbox> {
         Inkbox::builder("test-key")
@@ -610,6 +644,83 @@ mod tests {
             crate::error::InkboxError::InvalidArgument(message)
                 if message.contains("only accepts true")
         ));
+    }
+
+    #[test]
+    fn update_filter_modes_sends_only_the_directions_set() {
+        let server = MockServer::start();
+        let mut response = identity_list_detail_json();
+        response["phone_filter_mode"] = json!("whitelist");
+        response["phone_inbound_filter_mode"] = json!("supervised");
+        response["phone_outbound_filter_mode"] = json!("blacklist");
+        response["mail_outbound_filter_mode"] = json!("supervised");
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH)
+                .path("/api/v1/identities/support-bot")
+                .json_body(json!({
+                    "mail_outbound_filter_mode": "supervised",
+                    "phone_inbound_filter_mode": "supervised"
+                }));
+            then.status(200).json_body(response);
+        });
+
+        let data = client(&server)
+            .identities()
+            .update_filter_modes(
+                "support-bot",
+                IdentityFilterModeUpdate {
+                    mail_outbound_filter_mode: Some(DirectionalFilterMode::Supervised),
+                    phone_inbound_filter_mode: Some(DirectionalFilterMode::Supervised),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        mock.assert();
+        assert_eq!(data.phone_filter_mode, FilterMode::Whitelist);
+        assert_eq!(
+            data.phone_inbound_filter_mode,
+            DirectionalFilterMode::Supervised
+        );
+        assert_eq!(
+            data.phone_outbound_filter_mode,
+            DirectionalFilterMode::Blacklist
+        );
+        assert_eq!(
+            data.mail_outbound_filter_mode,
+            DirectionalFilterMode::Supervised
+        );
+    }
+
+    #[test]
+    fn update_filter_modes_rejects_modes_that_cannot_be_sent() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::PATCH);
+            then.status(200).json_body(identity_list_detail_json());
+        });
+        let inkbox = client(&server);
+
+        for modes in [
+            IdentityFilterModeUpdate {
+                mail_inbound_filter_mode: Some(DirectionalFilterMode::Supervised),
+                ..Default::default()
+            },
+            IdentityFilterModeUpdate {
+                phone_outbound_filter_mode: Some(DirectionalFilterMode::Unknown),
+                ..Default::default()
+            },
+        ] {
+            let error = inkbox
+                .identities()
+                .update_filter_modes("support-bot", modes)
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                crate::error::InkboxError::InvalidArgument(_)
+            ));
+        }
+        mock.assert_hits(0);
     }
 
     #[test]

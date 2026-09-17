@@ -135,7 +135,21 @@ export class IdentitiesResource {
    *   identity's mail contact rules (admin-only).
    * @param options.phoneFilterMode - `"whitelist"` or `"blacklist"` for this
    *   identity's phone contact rules (admin-only). The server rejects this
-   *   with 422 when the identity has no phone number.
+   *   with 422 when the identity has no phone number. Like `mailFilterMode`
+   *   and `imessageFilterMode`, this sets both directions of the channel to
+   *   the same mode.
+   * @param options.mailInboundFilterMode - `"whitelist"` or `"blacklist"` for
+   *   who can email this identity (admin-only). `"supervised"` is not
+   *   available for inbound mail.
+   * @param options.mailOutboundFilterMode - `"whitelist"`, `"blacklist"`, or
+   *   `"supervised"` for who this identity can email (admin-only).
+   * @param options.phoneInboundFilterMode - `"whitelist"`, `"blacklist"`, or
+   *   `"supervised"` for who can call or message this identity (admin-only).
+   * @param options.phoneOutboundFilterMode - `"whitelist"`, `"blacklist"`, or
+   *   `"supervised"` for who this identity can call or message (admin-only).
+   * @throws Error when a single-mode field is combined with a directional
+   *   field of the same channel (`imessageFilterMode` counts as phone), or
+   *   `mailInboundFilterMode` is `"supervised"`.
    */
   async update(
     agentHandle: string,
@@ -165,6 +179,27 @@ export class IdentitiesResource {
     if (options.idempotencyKey !== undefined) {
       validateIdempotencyKey(options.idempotencyKey);
     }
+    // A directional field sets one direction; the single-mode fields set
+    // both, so the two cannot be combined for the same channel.
+    if (
+      options.mailFilterMode !== undefined
+      && (options.mailInboundFilterMode !== undefined || options.mailOutboundFilterMode !== undefined)
+    ) {
+      throw new Error(
+        "mailFilterMode cannot be combined with mailInboundFilterMode or mailOutboundFilterMode",
+      );
+    }
+    if (
+      (options.phoneFilterMode !== undefined || options.imessageFilterMode !== undefined)
+      && (options.phoneInboundFilterMode !== undefined || options.phoneOutboundFilterMode !== undefined)
+    ) {
+      throw new Error(
+        "phoneFilterMode and imessageFilterMode cannot be combined with phoneInboundFilterMode or phoneOutboundFilterMode",
+      );
+    }
+    if ((options.mailInboundFilterMode as string | undefined) === "supervised") {
+      throw new Error("mailInboundFilterMode does not support 'supervised'");
+    }
     const body: Record<string, unknown> = {};
     if (options.newHandle !== undefined) body["agent_handle"] = options.newHandle;
     if (options.displayName !== undefined) body["display_name"] = options.displayName;
@@ -178,6 +213,10 @@ export class IdentitiesResource {
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
     if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;
+    if (options.mailInboundFilterMode !== undefined) body["mail_inbound_filter_mode"] = options.mailInboundFilterMode;
+    if (options.mailOutboundFilterMode !== undefined) body["mail_outbound_filter_mode"] = options.mailOutboundFilterMode;
+    if (options.phoneInboundFilterMode !== undefined) body["phone_inbound_filter_mode"] = options.phoneInboundFilterMode;
+    if (options.phoneOutboundFilterMode !== undefined) body["phone_outbound_filter_mode"] = options.phoneOutboundFilterMode;
     try {
       const data = options.idempotencyKey === undefined
         ? await this.http.patch<RawAgentIdentityData>(`/${agentHandle}`, body)

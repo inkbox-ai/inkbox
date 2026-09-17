@@ -376,6 +376,10 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            mailInboundFilterMode: id.mailInboundFilterMode,
+            mailOutboundFilterMode: id.mailOutboundFilterMode,
+            phoneInboundFilterMode: id.phoneInboundFilterMode,
+            phoneOutboundFilterMode: id.phoneOutboundFilterMode,
             signingKeyConfigured: id.signingKeyConfigured,
             signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel
@@ -537,6 +541,10 @@ export function registerIdentityCommands(program: Command): void {
     .option("--imessage-filter-mode <mode>", "Alias for the shared phone and iMessage contact-rule mode (admin API key required)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--phone-filter-mode <mode>", "Shared phone and iMessage contact-rule mode: whitelist or blacklist (admin API key required)")
+    .option("--mail-inbound-filter-mode <mode>", "Who can email this identity: whitelist or blacklist (admin API key required)")
+    .option("--mail-outbound-filter-mode <mode>", "Who this identity can email: whitelist, blacklist, or supervised (admin API key required)")
+    .option("--phone-inbound-filter-mode <mode>", "Who can call or message this identity: whitelist, blacklist, or supervised (admin API key required)")
+    .option("--phone-outbound-filter-mode <mode>", "Who this identity can call or message: whitelist, blacklist, or supervised (admin API key required)")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -551,6 +559,10 @@ export function registerIdentityCommands(program: Command): void {
           imessageFilterMode?: string;
           mailFilterMode?: string;
           phoneFilterMode?: string;
+          mailInboundFilterMode?: string;
+          mailOutboundFilterMode?: string;
+          phoneInboundFilterMode?: string;
+          phoneOutboundFilterMode?: string;
         },
       ) {
         if (cmdOpts.description !== undefined && cmdOpts.clearDescription) {
@@ -571,6 +583,40 @@ export function registerIdentityCommands(program: Command): void {
             throw new Error(`${flag} must be 'whitelist' or 'blacklist'`);
           }
         }
+        if (
+          cmdOpts.mailInboundFilterMode !== undefined
+          && cmdOpts.mailInboundFilterMode !== "whitelist"
+          && cmdOpts.mailInboundFilterMode !== "blacklist"
+        ) {
+          throw new Error("--mail-inbound-filter-mode must be 'whitelist' or 'blacklist'");
+        }
+        for (const [flag, value] of [
+          ["--mail-outbound-filter-mode", cmdOpts.mailOutboundFilterMode],
+          ["--phone-inbound-filter-mode", cmdOpts.phoneInboundFilterMode],
+          ["--phone-outbound-filter-mode", cmdOpts.phoneOutboundFilterMode],
+        ] as const) {
+          if (value !== undefined && value !== "whitelist" && value !== "blacklist" && value !== "supervised") {
+            throw new Error(`${flag} must be 'whitelist', 'blacklist', or 'supervised'`);
+          }
+        }
+        // A directional flag sets one direction; the single-mode flags set
+        // both, so the two cannot be combined for the same channel.
+        if (
+          cmdOpts.mailFilterMode !== undefined
+          && (cmdOpts.mailInboundFilterMode !== undefined || cmdOpts.mailOutboundFilterMode !== undefined)
+        ) {
+          throw new Error(
+            "--mail-filter-mode cannot be combined with --mail-inbound-filter-mode or --mail-outbound-filter-mode",
+          );
+        }
+        if (
+          (cmdOpts.phoneFilterMode !== undefined || cmdOpts.imessageFilterMode !== undefined)
+          && (cmdOpts.phoneInboundFilterMode !== undefined || cmdOpts.phoneOutboundFilterMode !== undefined)
+        ) {
+          throw new Error(
+            "--phone-filter-mode and --imessage-filter-mode cannot be combined with --phone-inbound-filter-mode or --phone-outbound-filter-mode",
+          );
+        }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
@@ -583,6 +629,10 @@ export function registerIdentityCommands(program: Command): void {
           imessageFilterMode?: "whitelist" | "blacklist";
           mailFilterMode?: "whitelist" | "blacklist";
           phoneFilterMode?: "whitelist" | "blacklist";
+          mailInboundFilterMode?: "whitelist" | "blacklist";
+          mailOutboundFilterMode?: "whitelist" | "blacklist" | "supervised";
+          phoneInboundFilterMode?: "whitelist" | "blacklist" | "supervised";
+          phoneOutboundFilterMode?: "whitelist" | "blacklist" | "supervised";
         } = {};
         if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
         if (cmdOpts.displayName !== undefined) {
@@ -607,6 +657,18 @@ export function registerIdentityCommands(program: Command): void {
         }
         if (cmdOpts.phoneFilterMode !== undefined) {
           updateOpts.phoneFilterMode = cmdOpts.phoneFilterMode as "whitelist" | "blacklist";
+        }
+        if (cmdOpts.mailInboundFilterMode !== undefined) {
+          updateOpts.mailInboundFilterMode = cmdOpts.mailInboundFilterMode as "whitelist" | "blacklist";
+        }
+        if (cmdOpts.mailOutboundFilterMode !== undefined) {
+          updateOpts.mailOutboundFilterMode = cmdOpts.mailOutboundFilterMode as "whitelist" | "blacklist" | "supervised";
+        }
+        if (cmdOpts.phoneInboundFilterMode !== undefined) {
+          updateOpts.phoneInboundFilterMode = cmdOpts.phoneInboundFilterMode as "whitelist" | "blacklist" | "supervised";
+        }
+        if (cmdOpts.phoneOutboundFilterMode !== undefined) {
+          updateOpts.phoneOutboundFilterMode = cmdOpts.phoneOutboundFilterMode as "whitelist" | "blacklist" | "supervised";
         }
         await id.update(updateOpts);
         console.log(`Updated identity '${handle}'.`);
@@ -635,6 +697,10 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            mailInboundFilterMode: id.mailInboundFilterMode,
+            mailOutboundFilterMode: id.mailOutboundFilterMode,
+            phoneInboundFilterMode: id.phoneInboundFilterMode,
+            phoneOutboundFilterMode: id.phoneOutboundFilterMode,
             signingKeyConfigured: id.signingKeyConfigured,
             signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel

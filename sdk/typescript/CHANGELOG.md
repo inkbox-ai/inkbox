@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.7.2 — Directional and supervised contact-rule modes
+
+- Identities expose `mailInboundFilterMode`, `mailOutboundFilterMode`,
+  `phoneInboundFilterMode`, and `phoneOutboundFilterMode` as the new
+  `DirectionalFilterMode` enum (`whitelist`, `blacklist`, `supervised`), and
+  `identity.update()` / `identities.update()` accept the same four options.
+  Only supplied fields are sent.
+- The single-mode options keep working and set both directions. Combining one
+  with a directional option of the same channel, or `supervised` for inbound
+  mail, throws before the request.
+- Responses without the directional fields fall back to the single mode.
+- `TextWebhookPayload` and `IMessageWebhookPayload` data add optional
+  `context_messages` with `TextContextMessageWire` / `IMessageContextMessageWire`
+  items; read a missing key as `[]`.
+- Text and iMessage `isBlocked` docs cover group context messages readable under
+  the `supervised` inbound mode. README and TypeScript skill include a setup
+  recipe.
+- Bump `@inkbox/sdk` to 0.7.2.
+- **Source-breaking migration:** `AgentIdentitySummary` now requires the four
+  directional fields. Update manually constructed objects and test fixtures;
+  parsed API responses need no change.
+
 ## 0.7.1 — Custom email signatures
 
 - `mailboxes.update()` accepts `signatureHtml`, `signatureText`, and

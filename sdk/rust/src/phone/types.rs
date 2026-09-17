@@ -667,6 +667,11 @@ pub struct TextMessage {
     pub delivered_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failed_at: Option<String>,
+    /// `true` when a contact rule or default-block rejected the text.
+    /// Identity-scoped (agent) API keys do not receive those rows, except under
+    /// the `supervised` inbound phone mode: group messages from participants
+    /// who are not allowed contacts are readable as context, marked
+    /// `is_blocked: true` and already read.
     /// Defaults to `false` for older server responses that predate the field.
     #[serde(default)]
     pub is_blocked: bool,

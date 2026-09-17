@@ -480,6 +480,10 @@ export interface TextMessage {
    * server filters them at the access-policy layer. Admin/JWT callers see
    * both values mixed and can narrow with `isBlocked` on
    * `TextsResource.list` / `search` / `listConversations`.
+   *
+   * The exception is the `supervised` inbound phone mode: group messages from
+   * participants who are not allowed contacts are readable as context, marked
+   * `isBlocked: true` and already read.
    */
   isBlocked: boolean;
   createdAt: Date;

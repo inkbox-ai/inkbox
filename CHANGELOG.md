@@ -4,6 +4,24 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.2 — Directional and supervised contact-rule modes
+
+### Added
+
+- Separate inbound and outbound contact-rule modes per channel on agent identities: `mail_inbound_filter_mode`, `mail_outbound_filter_mode`, `phone_inbound_filter_mode`, and `phone_outbound_filter_mode` (camelCase in TypeScript) are readable and settable from Python, TypeScript, Rust, and `inkbox identity update` / `get` / `refresh`. Setting one direction leaves the other unchanged.
+- A third mode, `supervised`, through the new `DirectionalFilterMode` type. Outbound, a message may include recipients who are not allowed as long as at least one recipient of that same message is an allowed contact, so an agent can answer a group text or keep CC'd people on an email; a 1:1 message to a non-allowed person stays blocked and calls behave like `whitelist`. For email only visible recipients (To/Cc) count: a Bcc recipient who is not allowed stays blocked, and an allowed contact in Bcc does not make the other recipients reachable. Inbound (phone only, SMS and iMessage groups), only allowed contacts wake the agent, and once an allowed contact has written in a group, messages from its other participants are readable as context, marked `is_blocked` and already read; being added to a group is not enough, and switching inbound away from `supervised` hides the context again. An explicit block rule always wins. Inbound mail accepts only `whitelist` or `blacklist`.
+- `context_messages` on `text.received` and `imessage.received` webhook payload types, with the `TextContextMessageWire` and `IMessageContextMessageWire` item types: up to 10 group messages from participants who are not allowed contacts, sent since the previous allowed message, oldest first. Treat them as untrusted background, never as instructions. Absent keys read as an empty list.
+- Rust adds `IdentityFilterModeUpdate` with `update_filter_modes` on the identities resource and `AgentIdentity`, leaving the existing `update*` signatures unchanged.
+- README, SDK, CLI, and skill guidance, including a recipe for "only I can wake my agent, but it can answer my group chats and keep people I CC".
+
+### Changed
+
+- Bump Python, TypeScript, Rust, CLI, and the bundled Claude plugin to 0.7.2; the bundled Codex plugin moves to 0.1.7 with the updated skills.
+- `mail_filter_mode`, `phone_filter_mode`, and `imessage_filter_mode` keep working and still only carry `whitelist` or `blacklist`. Writing one sets both directions of its channel; reading one reports the inbound mode, with `supervised` shown as `whitelist`. Combining one with a directional field of the same channel in a single update is rejected before the request is sent, as is `supervised` for inbound mail.
+- Responses without the directional fields still parse: inbound reads as the single mode and outbound as inbound. Unrecognized directional mode values do not fail identity parsing (Python keeps the raw value, Rust parses `DirectionalFilterMode::Unknown`).
+- Text and iMessage `is_blocked` documentation now covers group context messages readable under the `supervised` inbound mode.
+- **Source-breaking migration:** manually constructed identity objects need the four directional fields, and Rust `TextWebhookData` / `IMessageWebhookData` struct literals need `context_messages: Vec::new()`. In TypeScript, add `mailInboundFilterMode`, `mailOutboundFilterMode`, `phoneInboundFilterMode`, and `phoneOutboundFilterMode` to `AgentIdentitySummary` literals and test fixtures. Parsed API responses need no change.
+
 ## 0.7.1 — Custom email signatures
 
 ### Added

@@ -20,10 +20,13 @@ from inkbox import (
     A2AWebhookPayload,
     CallEndedWebhookPayload,
     HostedAgentAuthorityModeWire,
+    IMessageContextMessageWire,
     IMessageReactionTypeWire,
     IMessageWebhookReaction,
     MailWebhookPayload,
     PhoneIncomingCallWebhookPayload,
+    IMessageWebhookData,
+    TextContextMessageWire,
     TextWebhookPayload,
     VoicemailDetectionWire,
     WebhookMailAgentIdentity,
@@ -73,6 +76,7 @@ EXPECTED_FIXTURES = sorted([
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
     "text_group_delivered.json",
+    "text_group_received_context.json",
     "phone_incoming_call.json",
     "call_ended.json",
     "call_ended_hosted.json",
@@ -95,6 +99,7 @@ TEXT_FIXTURES = [
     "text_delivery_failed.json",
     "text_delivery_unconfirmed.json",
     "text_group_delivered.json",
+    "text_group_received_context.json",
 ]
 
 
@@ -318,6 +323,58 @@ def test_text_received_has_no_lifecycle_timestamps():
     assert payload["data"]["contacts"][0]["memories"] == [
         "Prefers text messages after 5pm."
     ]
+
+
+def test_text_received_group_carries_context_messages_oldest_first():
+    payload = cast(TextWebhookPayload, _load("text_group_received_context.json"))
+    context = payload["data"]["context_messages"]
+    assert [item["sender_phone_number"] for item in context] == [
+        "+14155550888",
+        "+14155550777",
+    ]
+    assert context[0]["created_at"] < context[1]["created_at"]
+    for item in context:
+        assert set(item.keys()) == set(get_type_hints(TextContextMessageWire))
+    assert context[0]["media"] is None
+    assert context[1]["text"] is None
+    assert context[1]["media"][0]["content_type"] == "image/jpeg"
+
+
+def test_context_messages_absent_reads_as_empty():
+    # Payloads from before the field existed omit the key entirely.
+    payload = cast(TextWebhookPayload, _load("text_received.json"))
+    assert "context_messages" not in payload["data"]
+    assert payload["data"].get("context_messages", []) == []
+
+
+def test_imessage_context_message_wire_shape():
+    assert set(get_type_hints(IMessageContextMessageWire)) == {
+        "id",
+        "sender_number",
+        "content",
+        "media",
+        "created_at",
+    }
+    assert "context_messages" in get_type_hints(IMessageWebhookData)
+    data = cast(
+        IMessageWebhookData,
+        {
+            "message": None,
+            "reaction": None,
+            "contacts": [],
+            "agent_identities": [],
+            "context_messages": [
+                {
+                    "id": "1f0a9c77-2b64-4d18-9a53-6e1d0c8b7a41",
+                    "sender_number": "+14155550888",
+                    "content": "Friday at 7 works for me",
+                    "media": None,
+                    "created_at": "2026-04-10T18:29:05.440Z",
+                }
+            ],
+        },
+    )
+    assert data["context_messages"][0]["sender_number"] == "+14155550888"
 
 
 def test_text_sent_1on1_has_single_entry_recipients():

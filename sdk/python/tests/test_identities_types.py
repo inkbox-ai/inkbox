@@ -186,6 +186,108 @@ class TestIdentityIMessageFields:
         assert summary.imessage_filter_mode is FilterMode.BLACKLIST
 
 
+class TestIdentityDirectionalFilterModes:
+    BASE = {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "organization_id": "org_x",
+        "agent_handle": "support-bot",
+        "display_name": None,
+        "description": None,
+        "email_address": None,
+        "created_at": "2026-06-01T00:00:00+00:00",
+        "updated_at": "2026-06-01T00:00:00+00:00",
+    }
+
+    def test_summary_parses_directional_modes(self):
+        from inkbox.identities.types import AgentIdentitySummary
+        from inkbox.mail.types import DirectionalFilterMode, FilterMode
+
+        summary = AgentIdentitySummary._from_dict(
+            {
+                **self.BASE,
+                "mail_filter_mode": "whitelist",
+                "phone_filter_mode": "whitelist",
+                "imessage_filter_mode": "whitelist",
+                "mail_inbound_filter_mode": "whitelist",
+                "mail_outbound_filter_mode": "supervised",
+                "phone_inbound_filter_mode": "supervised",
+                "phone_outbound_filter_mode": "blacklist",
+            }
+        )
+
+        assert summary.mail_filter_mode is FilterMode.WHITELIST
+        assert summary.phone_filter_mode is FilterMode.WHITELIST
+        assert summary.mail_inbound_filter_mode is DirectionalFilterMode.WHITELIST
+        assert summary.mail_outbound_filter_mode is DirectionalFilterMode.SUPERVISED
+        assert summary.phone_inbound_filter_mode is DirectionalFilterMode.SUPERVISED
+        assert summary.phone_outbound_filter_mode is DirectionalFilterMode.BLACKLIST
+
+    def test_absent_directional_modes_fall_back_to_single_mode(self):
+        from inkbox.identities.types import AgentIdentitySummary
+        from inkbox.mail.types import DirectionalFilterMode
+
+        summary = AgentIdentitySummary._from_dict(
+            {
+                **self.BASE,
+                "mail_filter_mode": "whitelist",
+                "phone_filter_mode": "blacklist",
+            }
+        )
+
+        assert summary.mail_inbound_filter_mode is DirectionalFilterMode.WHITELIST
+        assert summary.mail_outbound_filter_mode is DirectionalFilterMode.WHITELIST
+        assert summary.phone_inbound_filter_mode is DirectionalFilterMode.BLACKLIST
+        assert summary.phone_outbound_filter_mode is DirectionalFilterMode.BLACKLIST
+
+    def test_absent_outbound_follows_inbound(self):
+        from inkbox.identities.types import AgentIdentitySummary
+        from inkbox.mail.types import DirectionalFilterMode
+
+        summary = AgentIdentitySummary._from_dict(
+            {
+                **self.BASE,
+                "phone_filter_mode": "whitelist",
+                "phone_inbound_filter_mode": "supervised",
+            }
+        )
+
+        assert summary.phone_outbound_filter_mode is DirectionalFilterMode.SUPERVISED
+
+    def test_all_modes_default_to_blacklist_when_absent(self):
+        from inkbox.identities.types import AgentIdentitySummary
+        from inkbox.mail.types import DirectionalFilterMode
+
+        summary = AgentIdentitySummary._from_dict(self.BASE)
+
+        assert summary.mail_inbound_filter_mode is DirectionalFilterMode.BLACKLIST
+        assert summary.phone_outbound_filter_mode is DirectionalFilterMode.BLACKLIST
+
+    def test_unknown_directional_mode_does_not_fail_parsing(self):
+        from inkbox.identities.types import _AgentIdentityData
+        from inkbox.mail.types import DirectionalFilterMode
+
+        detail = _AgentIdentityData._from_dict(
+            {**self.BASE, "phone_outbound_filter_mode": "a_future_mode"}
+        )
+
+        assert detail.phone_outbound_filter_mode == "a_future_mode"
+        assert isinstance(detail.phone_outbound_filter_mode, DirectionalFilterMode)
+        assert detail.phone_outbound_filter_mode not in (
+            DirectionalFilterMode.WHITELIST,
+            DirectionalFilterMode.BLACKLIST,
+            DirectionalFilterMode.SUPERVISED,
+        )
+
+    def test_directional_mode_values(self):
+        from inkbox import DirectionalFilterMode
+
+        assert [m.value for m in DirectionalFilterMode] == [
+            "whitelist",
+            "blacklist",
+            "supervised",
+        ]
+
+
 class TestIdentitySigningKeyStatusFields:
     def test_summary_parses_signing_key_status(self):
         d = {

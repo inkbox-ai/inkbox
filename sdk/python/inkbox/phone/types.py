@@ -439,6 +439,10 @@ class TextMessage:
     access-policy layer. Admin-scoped API keys and JWT humans see both
     values mixed by default and can narrow with ``is_blocked`` on
     ``TextsResource.list`` / ``search`` / ``list_conversations``.
+
+    The exception is the ``supervised`` inbound phone mode: group messages from
+    participants who are not allowed contacts are readable as context, marked
+    ``is_blocked=True`` and already read.
     """
 
     id: UUID
