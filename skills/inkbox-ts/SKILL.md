@@ -1071,11 +1071,15 @@ also has a separate inbound mode (who can reach the agent) and outbound mode
   include non-allowed recipients as long as at least one recipient of that same
   message is an allowed contact (group texts, reply-all, CCs). A 1:1 message to a
   non-allowed person stays blocked (`RecipientBlockedError`), calls behave like
-  `whitelist`, and an explicit block rule always wins.
+  `whitelist`, and an explicit block rule always wins. For email only visible
+  recipients (To/Cc) count: a Bcc recipient who is not allowed stays blocked, and
+  an allowed contact in Bcc does not make the other recipients reachable.
 - Inbound `supervised` (phone only, SMS and iMessage groups): only allowed
-  contacts wake the agent. Messages from other participants of a group that
-  includes an allowed contact are readable context: listed with
-  `isBlocked: true`, already read, never their own webhook. Everything not marked
+  contacts wake the agent. Once an allowed contact has written in a group,
+  messages from its other participants are readable context: listed with
+  `isBlocked: true`, already read, never their own webhook. Being added to a group
+  is not enough, and switching inbound away from `supervised` hides the context
+  again. Everything not marked
   `isBlocked` came from an allowed participant or the agent.
   `mailInboundFilterMode` accepts only `whitelist` / `blacklist`.
 - Do not pass a single-mode field together with a directional field of the same

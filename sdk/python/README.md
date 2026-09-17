@@ -1711,11 +1711,17 @@ separately; phone covers calls, SMS, and iMessage. Modes:
     people on an email. A 1:1 message to a non-allowed person stays blocked,
     and calls behave exactly like `whitelist`. An explicit block rule always
     wins.
+    For email only visible recipients (To/Cc) count: a Bcc recipient who is
+    not allowed stays blocked, and an allowed contact in Bcc does not make the
+    other recipients reachable.
   - **Inbound** (phone only, SMS and iMessage groups): only allowed contacts
-    wake the agent. Messages from other participants of a group that includes
-    an allowed contact are kept as context: readable, marked `is_blocked=True`, already
-    read, and never delivered as their own webhook. Blocked senders stay
-    hidden; 1:1 messages and calls from non-allowed people stay blocked.
+    wake the agent. Once an allowed contact has written in a group, messages
+    from its other participants are kept as context: readable, marked
+    `is_blocked=True`, already read, and never delivered as their own webhook.
+    Being added to a group is not enough: until an allowed contact writes in
+    it, nothing in that group is visible, and switching inbound away from
+    `supervised` hides the context again. Blocked senders stay hidden; 1:1
+    messages and calls from non-allowed people stay blocked.
     Inbound mail has no supervised mode.
 
 Set the four modes with `identity.update(...)` (admin-only); only the fields you

@@ -117,11 +117,15 @@ export enum FilterMode {
  *   contact takes part in. Outbound (mail and phone), a message may include
  *   recipients who are not allowed as long as at least one recipient of that
  *   same message is an allowed contact; a 1:1 message to a non-allowed
- *   person stays blocked, and calls behave exactly like `WHITELIST`. Inbound
- *   (phone only: SMS and iMessage group conversations), only allowed
- *   contacts wake the agent; messages from other participants of a group
- *   that includes an allowed contact are kept as readable context, marked
- *   `isBlocked`. An explicit `block` rule always wins. Not accepted for
+ *   person stays blocked, and calls behave exactly like `WHITELIST`. For
+ *   email only visible recipients (To/Cc) count: a Bcc recipient who is not
+ *   allowed stays blocked, and an allowed contact in Bcc does not make the
+ *   other recipients reachable. Inbound (phone only: SMS and iMessage group
+ *   conversations), only allowed contacts wake the agent; once an allowed
+ *   contact has written in a group, messages from its other participants are
+ *   kept as readable context, marked `isBlocked`. Being added to a group is
+ *   not enough, and switching inbound away from `SUPERVISED` hides the
+ *   context again. An explicit `block` rule always wins. Not accepted for
  *   inbound mail.
  *
  * Responses may carry values added after this release; compare against the
