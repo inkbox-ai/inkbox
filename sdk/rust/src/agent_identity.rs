@@ -1107,6 +1107,11 @@ impl AgentIdentity {
     /// Identity-scoped credentials never see blocked rows in conversation
     /// summaries.
     ///
+    /// The exception is the `supervised` inbound phone mode: group context
+    /// messages from participants who are not allowed contacts count toward
+    /// totals and can be the latest message, marked `is_blocked: true`. They
+    /// arrive already read, so they never count as unread.
+    ///
     /// # Arguments
     /// * `limit` / `offset` - Pagination (defaults 50 / 0).
     /// * `is_blocked` - Tri-state filter (`None` for all).

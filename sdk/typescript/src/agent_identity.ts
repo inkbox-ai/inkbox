@@ -879,6 +879,11 @@ export class AgentIdentity {
    * counterparties or `isBlocked=true` to narrow to conversations made
    * up of blocked rows.
    *
+   * The exception is the `supervised` inbound phone mode: group context
+   * messages from participants who are not allowed contacts count toward
+   * totals and can be the latest message, marked `isBlocked: true`. They
+   * arrive already read, so they never count as unread.
+   *
    * @param options.limit - Maximum number of results. Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isBlocked - Tri-state filter. `true` for only blocked,

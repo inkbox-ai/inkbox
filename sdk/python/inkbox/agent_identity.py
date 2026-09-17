@@ -1181,6 +1181,11 @@ class AgentIdentity:
         to hide spam-only counterparties or ``is_blocked=True`` to
         narrow to conversations made up of blocked rows.
 
+        The exception is the ``supervised`` inbound phone mode: group context
+        messages from participants who are not allowed contacts count toward
+        totals and can be the latest message, marked ``is_blocked=True``. They
+        arrive already read, so they never count as unread.
+
         Args:
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
