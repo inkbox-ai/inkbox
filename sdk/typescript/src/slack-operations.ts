@@ -1,4 +1,4 @@
-/** Scoped Slack utilities, durable actions, and explicitly retained history. */
+/** Scoped Slack utilities, durable actions, and retained history. */
 import type { HttpTransport } from "./_http.js";
 import type { SlackPageOptions } from "./slack.js";
 

@@ -1,4 +1,4 @@
-"""Scoped Slack utilities, durable actions, and explicitly retained history."""
+"""Scoped Slack utilities, durable actions, and retained history."""
 
 from dataclasses import dataclass
 from datetime import datetime

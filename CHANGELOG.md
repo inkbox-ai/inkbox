@@ -5,7 +5,7 @@
 - Add direct Slack browser installation handoffs, capabilities/users/members, exact message
   context/permalinks, reactions/pins, own-message edits/deletions, bounded general file
   uploads, channel join/leave, native processing status, and durable operation lookup.
-- Add explicit retained-history settings, message search, bounded backfill/restart,
+- Add configurable retained-history settings, message search, bounded backfill/restart,
   coverage, and purge with Python, TypeScript, Rust, and CLI parity.
 
 - Add Slack workspace invitations/connections, live conversations/messages, durable

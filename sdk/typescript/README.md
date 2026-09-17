@@ -2007,10 +2007,11 @@ processing support depends on the workspace and may fail explicitly; no reaction
 used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
 Disconnect removes Inkbox authority, not the workspace's Slack app installation.
 
-Retained history is separate from live reads and webhook diagnostics. Organization
-management configures capture, conversation selection, and retention; capture is
-explicit, not an automatic whole-workspace copy. Archive messages/search return
-retained records only. Backfill queues bounded imports and reports coverage; a
+Retained history is separate from live reads and webhook diagnostics. Capture is on
+by default for messages observed in conversations the connection can access, with no
+time-based retention limit. This is not an automatic whole-workspace or historical
+copy. Organization management can disable capture, restrict conversation selection,
+set retention, or purge. Archive messages/search return retained records only. Backfill queues bounded imports and reports coverage; a
 completed channel page does not prove every thread is complete. `restart=true`
 restarts a completed/failed import. Purge disables capture and queues retained-content
 deletion. Archive reads still require current connection/conversation access.
@@ -2033,7 +2034,7 @@ owns attention rules, thread watches, and its own memory.
 ### Retained history and utility actions
 
 ```typescript
-// Capture must first be enabled by organization management.
+// Capture is on by default for observed accessible messages; check archive settings.
 const history = await client.slack.searchArchivedMessages(
   connectionId, "release notes", { conversationId: "CEXAMPLE", limit: 20 },
 );
