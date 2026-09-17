@@ -8,7 +8,7 @@
       "local_phone_number": "+14155550100",
       "remote_phone_number": "+14155550999",
       "text": "Can you book the table for all of us?",
-      "type": "sms",
+      "type": "mms",
       "media": null,
       "is_read": false,
       "delivery_status": null,
