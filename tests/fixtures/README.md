@@ -17,3 +17,6 @@ same JSON and assert.
 Slack fixtures are shared by Python, TypeScript, Rust, and CLI wire tests:
 `slack.json` contains API response examples, and `slack_webhook_events.json`
 contains all 19 event envelopes. Both files contain synthetic identifiers and data.
+
+`slack_operations.json` covers the 28 additional public Slack utility, retained-history,
+and browser-handoff operations with shared synthetic requests and responses.

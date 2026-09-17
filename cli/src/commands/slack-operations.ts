@@ -259,7 +259,7 @@ export function registerSlackOperationCommands(
   const archive = slack
     .command("archive")
     .description(
-      "Retained history; capture policy, bounded imports, and coverage are explicit",
+      "Retained history; default-on observed-message capture, bounded imports, and coverage",
     );
   const settings = archive.command("settings");
   action(connection(settings.command("get")), (s, o) =>

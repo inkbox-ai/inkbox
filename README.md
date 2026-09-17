@@ -563,6 +563,8 @@ Use an existing Inkbox identity across multiple Slack workspace connections. The
 [Rust SDK](sdk/rust/README.md#slack), and [CLI](cli/README.md#slack) support invitation
 onboarding and direct browser handoffs, live conversations/history, durable message
 and utility actions, general file uploads/downloads, and filtered identity-owned
-Slack webhooks. Explicit archive capture, searchable retained history, bounded imports,
-and coverage are separate from live reads. Workspace approval, connection ownership,
+Slack webhooks. Default-on capture of observed accessible messages, searchable retained history,
+bounded imports, and coverage are separate from live reads. Retention has no time
+limit by default; organization management can disable capture, restrict it, set a
+retention limit, or purge. Workspace approval, connection ownership,
 and current conversation access remain required.
