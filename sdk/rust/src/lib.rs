@@ -68,4 +68,6 @@ pub use filters::DateRangeFilter;
 
 pub mod slack;
 pub use slack::*;
+pub mod slack_operations;
+pub use slack_operations::*;
 pub use webhooks::types::{SlackWebhookData, SlackWebhookEventType, SlackWebhookPayload};

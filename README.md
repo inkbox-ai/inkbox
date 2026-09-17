@@ -561,7 +561,8 @@ MIT
 Use an existing Inkbox identity across multiple Slack workspace connections. The
 [Python SDK](sdk/python/README.md#slack), [TypeScript SDK](sdk/typescript/README.md#slack),
 [Rust SDK](sdk/rust/README.md#slack), and [CLI](cli/README.md#slack) support invitation
-onboarding, live conversations/history, idempotent message sends, action status,
-file metadata/downloads, and filtered identity-owned Slack webhooks. Installation
-starts through the browser invitation page; adding the bot to a workspace does not
-provide unrestricted channel access. Slack is transport, not a workspace archive.
+onboarding and direct browser handoffs, live conversations/history, durable message
+and utility actions, general file uploads/downloads, and filtered identity-owned
+Slack webhooks. Explicit archive capture, searchable retained history, bounded imports,
+and coverage are separate from live reads. Workspace approval, connection ownership,
+and current conversation access remain required.

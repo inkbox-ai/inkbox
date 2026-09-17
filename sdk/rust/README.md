@@ -679,10 +679,12 @@ credentials create/revoke invitations and disconnect connections; claimed identi
 credentials can read and use their own connections. Check the returned installation
 availability before offering onboarding. Invitation links are returned once: open the
 full link in a browser and treat it as a secret. The browser page handles installation.
-Do not call the browser-only installation/accept endpoints from a server and then open
-the returned authorization URL: the installation must start and finish in the same
-browser. Add the bot to each selected channel afterward, including authorized private
-channels. Slack workspace permissions and approval rules still apply.
+Direct installation is also supported: `start_installation` (Python/Rust),
+`startInstallation` (TypeScript), or `slack installation start` returns a short-lived
+opaque authorization URL to open in a browser. Treat it as a secret; the browser
+handoff establishes installation state. Workspace approval and channel permissions
+still apply. Join accessible public channels or invite the agent to private channels;
+Slack Connect conversations are supported when the connection has access.
 
 Conversation/history/file reads are live and scoped to the selected connection, not
 an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
@@ -695,8 +697,23 @@ conflict. Poll an action while it is `sending`; `sent` is not a delivered/read r
 `unknown` is terminal uncertainty, not a promise of future reconciliation: do not
 blindly resend. Inspect authorized live history before deliberately starting a new
 operation. File downloads return bytes; unavailable or oversized files surface API
-errors. Uploads and explicitly shared-conversation operations are not supported.
+errors. General file uploads accept standard base64 for 1 byte..10 MiB of decoded
+content (CLI: `slack file upload --file PATH`). Reactions, pins, own-message edits and
+deletions, channel join/leave, and native processing status use stable keys and return
+operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Native
+processing support depends on the workspace and may fail explicitly; no reaction is
+used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
 Disconnect removes Inkbox authority, not the workspace's Slack app installation.
+
+Retained history is separate from live reads and webhook diagnostics. Organization
+management configures capture, conversation selection, and retention; capture is
+explicit, not an automatic whole-workspace copy. Archive messages/search return
+retained records only. Backfill queues bounded imports and reports coverage; a
+completed channel page does not prove every thread is complete. `restart=true`
+restarts a completed/failed import. Purge disables capture and queues retained-content
+deletion. Archive reads still require current connection/conversation access.
+Archive source URLs may be null; use the exact-message permalink method when needed.
+Live message context is a bounded window (`complete=false`), not full history.
 
 Slack webhook envelopes use the existing signature verification and stable `id`
 deduplication. All 19 event types are exported as `SlackWebhookEventType`, with
@@ -710,3 +727,26 @@ Slack subscriptions belong to the identity and reject conversation context. Omit
 filters on PATCH preserve the stored filter; explicit null clears it. Slack delivery
 logs contain metadata only; historical replay is not supported. The agent runtime
 owns attention rules, thread watches, and its own memory.
+
+### Retained history and utility actions
+
+```rust,no_run
+# fn example(client: &inkbox::Inkbox, connection_id: uuid::Uuid) -> inkbox::Result<()> {
+let history = client.slack().search_archived_messages(
+    connection_id, "release notes",
+    &inkbox::SlackArchiveSearchOptions {
+        conversation_id: Some("CEXAMPLE".into()), limit: Some(20), ..Default::default()
+    },
+)?;
+let operation = client.slack().add_reaction(
+    connection_id, "CEXAMPLE", "1780000000.000001", "eyes", "review:release:1",
+)?;
+// Capture is explicit. Never repeat an unknown outcome.
+# Ok(())
+# }
+```
+
+Additional methods on `client.slack()` include users/members, exact message context
+and permalinks, reactions/pins, own-message update/delete, join/leave, native processing
+status, general `upload_file`, and `get_operation`. Archive settings, listing/search,
+backfill, coverage, and purge use exported `SlackArchive*` response and option types.
