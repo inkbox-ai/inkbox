@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.2 — Directional and supervised contact-rule modes
+
+- Identities expose `mail_inbound_filter_mode`, `mail_outbound_filter_mode`,
+  `phone_inbound_filter_mode`, and `phone_outbound_filter_mode` as the new
+  `DirectionalFilterMode` (`whitelist`, `blacklist`, `supervised`), and
+  `identity.update()` / `identities.update()` accept the same four keywords.
+  Only supplied fields are sent.
+- The single-mode fields keep working and set both directions. Combining one with
+  a directional field of the same channel, or `supervised` for inbound mail,
+  raises `ValueError` before the request.
+- Responses without the directional fields fall back to the single mode, and
+  unrecognized mode values are preserved instead of failing identity parsing.
+- `TextWebhookData` and `IMessageWebhookData` add optional `context_messages`
+  with `TextContextMessageWire` / `IMessageContextMessageWire` items; read a
+  missing key as `[]`.
+- Text and iMessage `is_blocked` docs cover group context messages readable under
+  the `supervised` inbound mode. README and Python skill include a setup recipe.
+- Bump the Python package to 0.7.2.
+
 ## 0.7.1 — Custom email signatures
 
 - `mailboxes.update()` accepts `signature_html`, `signature_text`, and
