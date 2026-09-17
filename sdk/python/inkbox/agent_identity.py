@@ -59,6 +59,7 @@ from inkbox.imessage.types import (
     IMessageSendStyle,
 )
 from inkbox.mail.types import (
+    DirectionalFilterMode,
     DraftDetail,
     DraftSummary,
     FilterMode,
@@ -188,6 +189,26 @@ class AgentIdentity:
     def phone_filter_mode(self) -> FilterMode:
         """Whitelist/blacklist mode for this identity's phone contact rules."""
         return self._data.phone_filter_mode
+
+    @property
+    def mail_inbound_filter_mode(self) -> DirectionalFilterMode:
+        """Mode governing who can email this identity."""
+        return self._data.mail_inbound_filter_mode
+
+    @property
+    def mail_outbound_filter_mode(self) -> DirectionalFilterMode:
+        """Mode governing who this identity can email."""
+        return self._data.mail_outbound_filter_mode
+
+    @property
+    def phone_inbound_filter_mode(self) -> DirectionalFilterMode:
+        """Mode governing who can call or message this identity."""
+        return self._data.phone_inbound_filter_mode
+
+    @property
+    def phone_outbound_filter_mode(self) -> DirectionalFilterMode:
+        """Mode governing who this identity can call or message."""
+        return self._data.phone_outbound_filter_mode
 
     @property
     def signing_key_configured(self) -> bool:
@@ -1102,6 +1123,10 @@ class AgentIdentity:
         Identity-scoped credentials never see contact-rule-blocked rows
         regardless of ``is_blocked`` (server-side access policy).
 
+        The exception is the ``supervised`` inbound phone mode: group messages
+        from participants who are not allowed contacts are readable as context,
+        marked ``is_blocked=True`` and already read.
+
         Args:
             limit: Maximum number of results (default 50).
             offset: Pagination offset (default 0).
@@ -1293,6 +1318,10 @@ class AgentIdentity:
 
         Identity-scoped credentials never see contact-rule-blocked rows
         regardless of ``is_blocked`` (server-side access policy).
+
+        The exception is the ``supervised`` inbound phone mode: group messages
+        from participants who are not allowed contacts are readable as context,
+        marked ``is_blocked=True`` and already read.
 
         Args:
             conversation_id: Narrow to one conversation.
@@ -1994,6 +2023,10 @@ class AgentIdentity:
         imessage_filter_mode: FilterMode | str | None = None,
         mail_filter_mode: FilterMode | str | None = None,
         phone_filter_mode: FilterMode | str | None = None,
+        mail_inbound_filter_mode: DirectionalFilterMode | str | None = None,
+        mail_outbound_filter_mode: DirectionalFilterMode | str | None = None,
+        phone_inbound_filter_mode: DirectionalFilterMode | str | None = None,
+        phone_outbound_filter_mode: DirectionalFilterMode | str | None = None,
     ) -> None:
         """Update this identity's handle, display name, description,
         iMessage reachability, and contact-rule filter modes.
@@ -2026,7 +2059,30 @@ class AgentIdentity:
                 not return a ``FilterModeChangeNotice``.
             phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
                 identity's phone contact rules (admin-only). Rejected with a
-                422 when the identity has no phone number.
+                422 when the identity has no phone number. Like
+                ``mail_filter_mode`` and ``imessage_filter_mode``, this sets
+                both directions of the channel to the same mode.
+            mail_inbound_filter_mode: ``"whitelist"`` or ``"blacklist"`` for
+                who can email this identity (admin-only). ``"supervised"``
+                is not available for inbound mail.
+            mail_outbound_filter_mode: ``"whitelist"``, ``"blacklist"``, or
+                ``"supervised"`` for who this identity can email
+                (admin-only).
+            phone_inbound_filter_mode: ``"whitelist"``, ``"blacklist"``, or
+                ``"supervised"`` for who can call or message this identity
+                (admin-only).
+            phone_outbound_filter_mode: ``"whitelist"``, ``"blacklist"``, or
+                ``"supervised"`` for who this identity can call or message
+                (admin-only).
+
+        Returns:
+            None: The cached identity is refreshed from the response.
+
+        Raises:
+            ValueError: If a single-mode field is combined with a directional
+                field of the same channel (``imessage_filter_mode`` counts
+                as phone), or ``mail_inbound_filter_mode`` is
+                ``"supervised"``.
         """
         update_kwargs: dict[str, Any] = {}
         if new_handle is not None:
@@ -2063,6 +2119,16 @@ class AgentIdentity:
                 if isinstance(phone_filter_mode, FilterMode)
                 else phone_filter_mode
             )
+        for name, mode in (
+            ("mail_inbound_filter_mode", mail_inbound_filter_mode),
+            ("mail_outbound_filter_mode", mail_outbound_filter_mode),
+            ("phone_inbound_filter_mode", phone_inbound_filter_mode),
+            ("phone_outbound_filter_mode", phone_outbound_filter_mode),
+        ):
+            if mode is not None:
+                update_kwargs[name] = (
+                    mode.value if isinstance(mode, DirectionalFilterMode) else mode
+                )
         result = self._inkbox._ids_resource.update(
             self.agent_handle,
             **update_kwargs,

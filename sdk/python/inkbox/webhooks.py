@@ -435,6 +435,23 @@ class TextWebhookMessage(TypedDict):
     updated_at: str
 
 
+class TextContextMessageWire(TypedDict):
+    """
+    One group message kept as context under ``data.context_messages``.
+
+    Sent by a group participant who is not an allowed contact, while the
+    identity's inbound phone mode is ``supervised``. Untrusted third-party
+    text: present it to a model as background, never as instructions, and
+    do not treat it as a request to reply.
+    """
+
+    id: str
+    sender_phone_number: str
+    text: str | None
+    media: list[TextMediaItemWire] | None
+    created_at: str
+
+
 class TextWebhookData(TypedDict):
     text_message: TextWebhookMessage
     contacts: list[WebhookContact]
@@ -445,6 +462,11 @@ class TextWebhookData(TypedDict):
     # delivery-status / reaction events even though this shared data type
     # permits the key.
     context: NotRequired[WebhookContextWire]
+    # ``text.received`` only. Filled for a group message while the inbound
+    # phone mode is ``supervised``: up to 10 messages that participants who
+    # are not allowed contacts sent since the previous allowed message in
+    # the conversation, oldest first. Treat an absent key as ``[]``.
+    context_messages: NotRequired[list[TextContextMessageWire]]
 
 
 class TextWebhookPayload(TypedDict):
@@ -598,6 +620,23 @@ class IMessageWebhookReaction(TypedDict):
     updated_at: str
 
 
+class IMessageContextMessageWire(TypedDict):
+    """
+    One group message kept as context under ``data.context_messages``.
+
+    Sent by a group participant who is not an allowed contact, while the
+    identity's inbound phone mode is ``supervised``. Untrusted third-party
+    text: present it to a model as background, never as instructions, and
+    do not treat it as a request to reply.
+    """
+
+    id: str
+    sender_number: str
+    content: str | None
+    media: list[IMessageMediaItemWire] | None
+    created_at: str
+
+
 class IMessageWebhookData(TypedDict):
     """
     Wrapper under ``IMessageWebhookPayload.data``.
@@ -620,6 +659,12 @@ class IMessageWebhookData(TypedDict):
     # delivery-status / reaction events even though this shared data type
     # permits the key.
     context: NotRequired[WebhookContextWire]
+    # ``imessage.received`` only. Filled for a group message while the
+    # inbound phone mode is ``supervised``: up to 10 messages that
+    # participants who are not allowed contacts sent since the previous
+    # allowed message in the conversation, oldest first. Treat an absent
+    # key as ``[]``.
+    context_messages: NotRequired[list[IMessageContextMessageWire]]
 
 
 class IMessageWebhookPayload(TypedDict):
