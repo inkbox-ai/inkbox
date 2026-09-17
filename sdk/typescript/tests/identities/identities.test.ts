@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { IdentitiesResource } from "../../src/identities/resources/identities.js";
 import type { HttpTransport } from "../../src/_http.js";
+import { DirectionalFilterMode } from "../../src/mail/types.js";
 import {
   RAW_IDENTITY,
   RAW_IDENTITY_DETAIL,
@@ -236,6 +237,51 @@ describe("IdentitiesResource.update", () => {
 
     expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, { agent_handle: "new-handle" });
     expect(result.agentHandle).toBe("new-handle");
+  });
+
+  it("sends only the directional filter modes supplied", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
+    const res = new IdentitiesResource(http);
+
+    await res.update(HANDLE, {
+      phoneInboundFilterMode: DirectionalFilterMode.SUPERVISED,
+      mailOutboundFilterMode: "supervised",
+    });
+
+    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
+      mail_outbound_filter_mode: "supervised",
+      phone_inbound_filter_mode: "supervised",
+    });
+  });
+
+  it("allows a single mode and a directional mode on different channels", async () => {
+    const http = mockHttp();
+    vi.mocked(http.patch).mockResolvedValue(RAW_IDENTITY);
+    const res = new IdentitiesResource(http);
+
+    await res.update(HANDLE, { mailFilterMode: "whitelist", phoneOutboundFilterMode: "supervised" });
+
+    expect(http.patch).toHaveBeenCalledWith(`/${HANDLE}`, {
+      mail_filter_mode: "whitelist",
+      phone_outbound_filter_mode: "supervised",
+    });
+  });
+
+  it.each([
+    { mailFilterMode: "whitelist", mailInboundFilterMode: "blacklist" },
+    { mailFilterMode: "whitelist", mailOutboundFilterMode: "supervised" },
+    { phoneFilterMode: "whitelist", phoneInboundFilterMode: "supervised" },
+    { imessageFilterMode: "whitelist", phoneOutboundFilterMode: "supervised" },
+    { mailInboundFilterMode: "supervised" },
+  ])("rejects invalid filter mode combination %j before sending", async (options) => {
+    const http = mockHttp();
+    const res = new IdentitiesResource(http);
+
+    await expect(
+      res.update(HANDLE, options as unknown as Parameters<IdentitiesResource["update"]>[1]),
+    ).rejects.toThrow(/FilterMode/);
+    expect(http.patch).not.toHaveBeenCalled();
   });
 
   it("omits undefined fields", async () => {

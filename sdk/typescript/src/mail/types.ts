@@ -105,6 +105,35 @@ export enum FilterMode {
 }
 
 /**
+ * Per-direction contact-rule filter mode on an agent identity.
+ *
+ * Each channel (mail, phone) has an inbound mode (who can reach the agent)
+ * and an outbound mode (who the agent can contact).
+ *
+ * `WHITELIST` — only contacts that match an `allow` rule pass.
+ * `BLACKLIST` — everything passes except matches against a `block` rule.
+ *   This is the default.
+ * `SUPERVISED` — like `WHITELIST`, except inside a conversation an allowed
+ *   contact takes part in. Outbound (mail and phone), a message may include
+ *   recipients who are not allowed as long as at least one recipient of that
+ *   same message is an allowed contact; a 1:1 message to a non-allowed
+ *   person stays blocked, and calls behave exactly like `WHITELIST`. Inbound
+ *   (phone only: SMS and iMessage group conversations), only allowed
+ *   contacts wake the agent; messages from other participants of a group
+ *   that includes an allowed contact are kept as readable context, marked
+ *   `isBlocked`. An explicit `block` rule always wins. Not accepted for
+ *   inbound mail.
+ *
+ * Responses may carry values added after this release; compare against the
+ * members you handle rather than assuming the set is closed.
+ */
+export enum DirectionalFilterMode {
+  WHITELIST = "whitelist",
+  BLACKLIST = "blacklist",
+  SUPERVISED = "supervised",
+}
+
+/**
  * Logical folder a thread lives in.
  *
  * `BLOCKED` is server-assigned and is not client-settable — PATCH will

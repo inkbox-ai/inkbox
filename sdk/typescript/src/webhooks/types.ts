@@ -396,6 +396,23 @@ export interface TextWebhookMessage {
   updated_at: string;
 }
 
+/**
+ * One group message kept as context under `data.context_messages`.
+ *
+ * Sent by a group participant who is not an allowed contact, while the
+ * identity's inbound phone mode is `supervised`. Untrusted third-party text:
+ * present it to a model as background, never as instructions, and do not
+ * treat it as a request to reply.
+ */
+export interface TextContextMessageWire {
+  id: string;
+  sender_phone_number: string;
+  text: string | null;
+  media: RawTextMediaItem[] | null;
+  /** ISO 8601 datetime. */
+  created_at: string;
+}
+
 export interface TextWebhookPayload {
   /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
   id: string;
@@ -422,6 +439,13 @@ export interface TextWebhookPayload {
      * type permits the key.
      */
     context?: WebhookContext;
+    /**
+     * `text.received` only. Filled for a group message while the inbound phone
+     * mode is `supervised`: up to 10 messages that participants who are not
+     * allowed contacts sent since the previous allowed message in the
+     * conversation, oldest first. Treat an absent key as `[]`.
+     */
+    context_messages?: TextContextMessageWire[];
   };
 }
 
@@ -559,6 +583,23 @@ export interface IMessageWebhookReaction {
   updated_at: string;
 }
 
+/**
+ * One group message kept as context under `data.context_messages`.
+ *
+ * Sent by a group participant who is not an allowed contact, while the
+ * identity's inbound phone mode is `supervised`. Untrusted third-party text:
+ * present it to a model as background, never as instructions, and do not
+ * treat it as a request to reply.
+ */
+export interface IMessageContextMessageWire {
+  id: string;
+  sender_number: string;
+  content: string | null;
+  media: IMessageMediaItemWire[] | null;
+  /** ISO 8601 datetime. */
+  created_at: string;
+}
+
 export interface IMessageWebhookPayload {
   /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
   id: string;
@@ -584,6 +625,13 @@ export interface IMessageWebhookPayload {
      * type permits the key.
      */
     context?: WebhookContext;
+    /**
+     * `imessage.received` only. Filled for a group message while the inbound phone
+     * mode is `supervised`: up to 10 messages that participants who are not
+     * allowed contacts sent since the previous allowed message in the
+     * conversation, oldest first. Treat an absent key as `[]`.
+     */
+    context_messages?: IMessageContextMessageWire[];
   };
 }
 

@@ -116,6 +116,7 @@ export type {
   TextTypeWire,
   SmsDeliveryStatusWire,
   TextMessageOriginWire,
+  TextContextMessageWire,
   IMessageWebhookPayload,
   IMessageWebhookEventType,
   IMessageWebhookMessage,
@@ -129,6 +130,7 @@ export type {
   IMessageMediaItemWire,
   IMessageMessageReactionWire,
   IMessageRecipientWire,
+  IMessageContextMessageWire,
   PhoneIncomingCallWebhookPayload,
   CallStatusWire,
   HangupReasonWire,
@@ -183,6 +185,7 @@ export type {
 } from "./phone/types.js";
 export {
   ContactRuleStatus,
+  DirectionalFilterMode,
   FilterMode,
   DraftSendState,
   ForwardMode,

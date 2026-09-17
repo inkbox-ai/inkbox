@@ -16,6 +16,7 @@ import type { TOTPCode, TOTPConfig } from "./vault/totp.js";
 import type { DecryptedVaultSecret, SecretPayload, VaultSecret } from "./vault/types.js";
 import { ForwardMode, MessageDirection } from "./mail/types.js";
 import type {
+  DirectionalFilterMode,
   DraftDetail,
   DraftSummary,
   FilterMode,
@@ -152,6 +153,18 @@ export class AgentIdentity {
 
   /** Whitelist/blacklist mode for this identity's phone contact rules. */
   get phoneFilterMode(): FilterMode { return this._data.phoneFilterMode; }
+
+  /** Mode governing who can email this identity. */
+  get mailInboundFilterMode(): DirectionalFilterMode { return this._data.mailInboundFilterMode; }
+
+  /** Mode governing who this identity can email. */
+  get mailOutboundFilterMode(): DirectionalFilterMode { return this._data.mailOutboundFilterMode; }
+
+  /** Mode governing who can call or message this identity. */
+  get phoneInboundFilterMode(): DirectionalFilterMode { return this._data.phoneInboundFilterMode; }
+
+  /** Mode governing who this identity can call or message. */
+  get phoneOutboundFilterMode(): DirectionalFilterMode { return this._data.phoneOutboundFilterMode; }
 
   /** Whether this identity has a webhook signing key configured. Status only — never the secret. */
   get signingKeyConfigured(): boolean { return this._data.signingKeyConfigured; }
@@ -823,6 +836,10 @@ export class AgentIdentity {
    * Identity-scoped credentials never see contact-rule-blocked rows
    * regardless of `isBlocked` (server-side access policy).
    *
+   * The exception is the `supervised` inbound phone mode: group messages from
+   * participants who are not allowed contacts are readable as context, marked
+   * `isBlocked: true` and already read.
+   *
    * @param options.limit - Maximum number of results. Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
    * @param options.isRead - Filter by read state.
@@ -980,6 +997,10 @@ export class AgentIdentity {
    *
    * Identity-scoped credentials never see contact-rule-blocked rows
    * regardless of `isBlocked` (server-side access policy).
+   *
+   * The exception is the `supervised` inbound phone mode: group messages from
+   * participants who are not allowed contacts are readable as context, marked
+   * `isBlocked: true` and already read.
    *
    * @param options.conversationId - Narrow to one conversation.
    * @param options.limit - Maximum number of results. Defaults to 50.
@@ -1291,7 +1312,21 @@ export class AgentIdentity {
    *   `FilterModeChangeNotice`.
    * @param options.phoneFilterMode - `"whitelist"` or `"blacklist"` for this
    *   identity's phone contact rules (admin-only). Rejected with a 422 when
-   *   the identity has no phone number.
+   *   the identity has no phone number. Like `mailFilterMode` and
+   *   `imessageFilterMode`, this sets both directions of the channel to the
+   *   same mode.
+   * @param options.mailInboundFilterMode - `"whitelist"` or `"blacklist"` for
+   *   who can email this identity (admin-only). `"supervised"` is not
+   *   available for inbound mail.
+   * @param options.mailOutboundFilterMode - `"whitelist"`, `"blacklist"`, or
+   *   `"supervised"` for who this identity can email (admin-only).
+   * @param options.phoneInboundFilterMode - `"whitelist"`, `"blacklist"`, or
+   *   `"supervised"` for who can call or message this identity (admin-only).
+   * @param options.phoneOutboundFilterMode - `"whitelist"`, `"blacklist"`, or
+   *   `"supervised"` for who this identity can call or message (admin-only).
+   * @throws Error when a single-mode field is combined with a directional
+   *   field of the same channel (`imessageFilterMode` counts as phone), or
+   *   `mailInboundFilterMode` is `"supervised"`.
    */
   async update(options: UpdateIdentityOptions): Promise<void> {
     const data = await this._inkbox._idsResource.update(this.agentHandle, options);

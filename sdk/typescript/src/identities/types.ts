@@ -3,6 +3,7 @@
  */
 
 import type {
+  DirectionalFilterMode,
   FilterMode,
   FilterModeChangeNotice,
   RawFilterModeChangeNotice,
@@ -103,6 +104,18 @@ export interface UpdateIdentityOptions {
   imessageFilterMode?: "whitelist" | "blacklist";
   mailFilterMode?: "whitelist" | "blacklist";
   phoneFilterMode?: "whitelist" | "blacklist";
+  /** Who can email this identity. `"supervised"` is not available for inbound mail. */
+  mailInboundFilterMode?:
+    | DirectionalFilterMode.WHITELIST
+    | DirectionalFilterMode.BLACKLIST
+    | "whitelist"
+    | "blacklist";
+  /** Who this identity can email. */
+  mailOutboundFilterMode?: DirectionalFilterMode | "whitelist" | "blacklist" | "supervised";
+  /** Who can call or message this identity. */
+  phoneInboundFilterMode?: DirectionalFilterMode | "whitelist" | "blacklist" | "supervised";
+  /** Who this identity can call or message. */
+  phoneOutboundFilterMode?: DirectionalFilterMode | "whitelist" | "blacklist" | "supervised";
 }
 
 export interface IdentityMailbox {
@@ -190,6 +203,23 @@ export interface AgentIdentitySummary {
    * phone-number object is the deprecated legacy mirror.
    */
   phoneFilterMode: FilterMode;
+  /**
+   * Mode governing who can email this identity. `mailFilterMode` above
+   * reports this same inbound mode. Falls back to `mailFilterMode` when the
+   * response omits it.
+   */
+  mailInboundFilterMode: DirectionalFilterMode;
+  /** Mode governing who this identity can email. Falls back to the inbound mode when the response omits it. */
+  mailOutboundFilterMode: DirectionalFilterMode;
+  /**
+   * Mode governing who can call or message this identity. `phoneFilterMode`
+   * and `imessageFilterMode` report this inbound mode, with `supervised`
+   * shown as `whitelist`. Falls back to `phoneFilterMode` when the response
+   * omits it.
+   */
+  phoneInboundFilterMode: DirectionalFilterMode;
+  /** Mode governing who this identity can call or message. Falls back to the inbound mode when the response omits it. */
+  phoneOutboundFilterMode: DirectionalFilterMode;
   createdAt: Date;
   updatedAt: Date;
   /** Whether this identity has a webhook signing key configured. Status only — never the secret. */
@@ -273,6 +303,10 @@ export interface RawAgentIdentitySummary {
   imessage_filter_mode?: string | null;
   mail_filter_mode?: string | null;
   phone_filter_mode?: string | null;
+  mail_inbound_filter_mode?: string | null;
+  mail_outbound_filter_mode?: string | null;
+  phone_inbound_filter_mode?: string | null;
+  phone_outbound_filter_mode?: string | null;
   signing_key_configured?: boolean;
   signing_key_created_at?: string | null;
   created_at: string;
@@ -338,6 +372,10 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
 }
 
 export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIdentitySummary {
+  // Directional modes are absent on older responses: inbound falls back to
+  // the single mode, outbound falls back to inbound.
+  const mailInbound = (r.mail_inbound_filter_mode ?? r.mail_filter_mode ?? "blacklist") as DirectionalFilterMode;
+  const phoneInbound = (r.phone_inbound_filter_mode ?? r.phone_filter_mode ?? "blacklist") as DirectionalFilterMode;
   return {
     id: r.id,
     organizationId: r.organization_id,
@@ -350,6 +388,10 @@ export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIden
     imessageFilterMode: (r.imessage_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     mailFilterMode: (r.mail_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
     phoneFilterMode: (r.phone_filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    mailInboundFilterMode: mailInbound,
+    mailOutboundFilterMode: (r.mail_outbound_filter_mode as DirectionalFilterMode) ?? mailInbound,
+    phoneInboundFilterMode: phoneInbound,
+    phoneOutboundFilterMode: (r.phone_outbound_filter_mode as DirectionalFilterMode) ?? phoneInbound,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     signingKeyConfigured: r.signing_key_configured ?? false,

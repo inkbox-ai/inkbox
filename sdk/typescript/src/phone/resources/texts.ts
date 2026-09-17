@@ -84,6 +84,10 @@ export class TextsResource {
    * callers see everything by default; pass `isBlocked=true` for the
    * blocked-only listing or `isBlocked=false` to exclude blocked rows.
    *
+   * The exception is the `supervised` inbound phone mode: group messages from
+   * participants who are not allowed contacts are readable as context, marked
+   * `isBlocked: true` and already read.
+   *
    * @param phoneNumberId - UUID of the phone number.
    * @param options.limit - Max results (1–200). Defaults to 50.
    * @param options.offset - Pagination offset. Defaults to 0.
