@@ -1,12 +1,9 @@
 /** Live Slack reads and durable sends. Open invitation URLs for browser onboarding. */
 import type { HttpTransport } from "./_http.js";
+import { SlackOperationsResource } from "./slack-operations.js";
 
 export type SlackMessageKind =
-  | "dm"
-  | "group_dm"
-  | "mention"
-  | "channel"
-  | "thread";
+  "dm" | "group_dm" | "mention" | "channel" | "thread";
 export interface SlackWebhookFilter {
   connectionIds?: string[] | null;
   conversationIds?: string[] | null;
@@ -58,6 +55,10 @@ export interface SlackInvitation {
   status: string;
   expiresAt: Date;
   invitationUrl: string | null;
+}
+export interface SlackInstallation {
+  authorizationUrl: string;
+  expiresAt: Date;
 }
 export interface SlackAction {
   id: string;
@@ -153,8 +154,27 @@ const action = (r: RawAction): SlackAction => ({
 const base = (id: string): string =>
   `/slack/connections/${encodeURIComponent(id)}`;
 
-export class SlackResource {
-  constructor(private readonly http: HttpTransport) {}
+export class SlackResource extends SlackOperationsResource {
+  constructor(http: HttpTransport) {
+    super(http);
+  }
+  /** Organization management only. Open the short-lived opaque URL in a browser; do not log it. */
+  async startInstallation(
+    identityId: string,
+    options: { workspaceId?: string } = {},
+  ): Promise<SlackInstallation> {
+    const r = await this.http.post<{
+      authorization_url: string;
+      expires_at: string;
+    }>("/slack/installations", {
+      identity_id: identityId,
+      workspace_id: options.workspaceId,
+    });
+    return {
+      authorizationUrl: r.authorization_url,
+      expiresAt: new Date(r.expires_at),
+    };
+  }
   async listConnections(identityId: string): Promise<SlackConnectionsResponse> {
     const r = await this.http.get<{
       connections: RawConnection[];

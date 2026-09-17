@@ -10,6 +10,7 @@ from urllib.parse import quote
 from uuid import UUID
 
 from inkbox._http import HttpTransport
+from inkbox.slack_operations import SlackOperationsMixin
 
 SlackMessageKind = Literal["dm", "group_dm", "mention", "channel", "thread"]
 
@@ -47,6 +48,12 @@ class SlackInvitation:
     status: str
     expires_at: datetime
     invitation_url: str | None = None
+
+
+@dataclass
+class SlackInstallation:
+    authorization_url: str
+    expires_at: datetime
 
 
 @dataclass
@@ -98,7 +105,7 @@ def _connection(connection_id: UUID | str) -> str:
     return f"/slack/connections/{quote(str(connection_id), safe='')}"
 
 
-class SlackResource:
+class SlackResource(SlackOperationsMixin):
     """No eager pagination or automatic resend of ambiguous send outcomes."""
 
     def __init__(self, http: HttpTransport) -> None:
@@ -118,8 +125,7 @@ class SlackResource:
     ) -> SlackInvitation:
         """Create a one-time invitation URL to open in a browser (organization management only).
 
-        Direct installation/accept requests require a cookie in that browser, so
-        these browser-only endpoints are intentionally not exposed here.
+        The invitation remains usable by its recipient until expiry or revocation.
         """
         return _parse(
             SlackInvitation,
@@ -130,6 +136,17 @@ class SlackResource:
                     "expires_in_seconds": expires_in_seconds,
                 },
             ),
+        )
+
+    def start_installation(
+        self, identity_id: UUID | str, *, workspace_id: str | None = None
+    ) -> SlackInstallation:
+        """Organization management only. Open the short-lived authorization URL in a browser; do not log it."""
+        body = {"identity_id": str(identity_id)}
+        if workspace_id is not None:
+            body["workspace_id"] = workspace_id
+        return _parse(
+            SlackInstallation, self._http.post("/slack/installations", json=body)
         )
 
     def list_invitations(self, identity_id: UUID | str) -> list[SlackInvitation]:

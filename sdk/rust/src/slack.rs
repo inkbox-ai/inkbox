@@ -57,6 +57,11 @@ pub struct SlackInvitation {
     #[serde(default)]
     pub invitation_url: Option<String>,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlackInstallation {
+    pub authorization_url: String,
+    pub expires_at: String,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SlackActionStatus {
@@ -124,15 +129,15 @@ pub struct SlackSendMessageOptions {
     pub idempotency_key: String,
     pub thread_ts: Option<String>,
 }
-fn base(id: Uuid) -> String {
+pub(crate) fn base(id: Uuid) -> String {
     format!("/slack/connections/{id}")
 }
-fn segment(value: &str) -> String {
+pub(crate) fn segment(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 #[derive(Clone)]
 pub struct SlackResource {
-    http: Arc<HttpTransport>,
+    pub(crate) http: Arc<HttpTransport>,
 }
 impl SlackResource {
     pub(crate) fn new(http: Arc<HttpTransport>) -> Self {
@@ -145,13 +150,28 @@ impl SlackResource {
         )?)?)
     }
     /// Open the one-time invitation_url in a browser. Organization management only.
-    /// Browser-only installation/accept endpoints are intentionally not exposed here.
     pub fn create_invitation(
         &self,
         identity_id: Uuid,
         expires_in_seconds: Option<u32>,
     ) -> Result<SlackInvitation> {
         Ok(serde_json::from_value(self.http.post("/slack/invitations", Some(&json!({"identity_id":identity_id, "expires_in_seconds":expires_in_seconds.unwrap_or(86400)})), NO_QUERY)?)?)
+    }
+    /// Open the short-lived opaque URL in a browser; do not log it. Organization management only.
+    pub fn start_installation(
+        &self,
+        identity_id: Uuid,
+        workspace_id: Option<&str>,
+    ) -> Result<SlackInstallation> {
+        let mut body = json!({"identity_id":identity_id});
+        if let Some(workspace) = workspace_id {
+            body["workspace_id"] = json!(workspace);
+        }
+        Ok(serde_json::from_value(self.http.post(
+            "/slack/installations",
+            Some(&body),
+            NO_QUERY,
+        )?)?)
     }
     pub fn list_invitations(&self, identity_id: Uuid) -> Result<Vec<SlackInvitation>> {
         Ok(serde_json::from_value(self.http.get(

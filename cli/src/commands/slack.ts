@@ -1,3 +1,4 @@
+import { registerSlackOperationCommands } from "./slack-operations.js";
 import { writeFile } from "node:fs/promises";
 import { Command, InvalidArgumentError } from "commander";
 import { createClient, getGlobalOpts } from "../client.js";
@@ -280,4 +281,5 @@ export function registerSlackCommands(program: Command): void {
         output({ path: o.output, bytes: bytes.length }, { json: !!opts.json });
       }),
     );
+  registerSlackOperationCommands(slack, { conversations, messages, files });
 }
