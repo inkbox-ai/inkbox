@@ -6,6 +6,7 @@ import {
   CallOrigin,
   HostedAgentAuthorityMode,
   IncomingCallAction,
+  OnVoicemail,
   VoicemailDetection,
 } from "../src/phone/types.js";
 import { InkboxError } from "../src/_http.js";
@@ -471,6 +472,48 @@ describe("AgentIdentity phone helpers", () => {
     expect(ink._calls.place).toHaveBeenCalledWith(
       expect.objectContaining({
         voicemailDetection: VoicemailDetection.DISABLED,
+      }),
+    );
+  });
+
+  it("placeCall forwards onVoicemail and voicemailMessage on the dedicated branch", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+    const identity = new AgentIdentity(makeData(), ink);
+
+    await identity.placeCall({
+      toNumber: "+15551234567",
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Confirm the appointment",
+      onVoicemail: OnVoicemail.LEAVE_MESSAGE,
+      voicemailMessage: "Please call us back.",
+    });
+
+    expect(ink._calls.place).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fromNumber: "+18335794607",
+        onVoicemail: OnVoicemail.LEAVE_MESSAGE,
+        voicemailMessage: "Please call us back.",
+      }),
+    );
+  });
+
+  it("placeCall forwards onVoicemail on the iMessage branch", async () => {
+    const ink = mockInkbox();
+    vi.mocked(ink._calls.place).mockResolvedValue({ id: "call-1" } as never);
+    const identity = new AgentIdentity(makeData({ phoneNumber: null }), ink);
+
+    await identity.placeCall({
+      toNumber: "+15551234567",
+      origination: CallOrigin.SHARED_IMESSAGE_NUMBER,
+      onVoicemail: OnVoicemail.HANG_UP,
+    });
+
+    expect(ink._calls.place).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentIdentityId: identity.id,
+        onVoicemail: OnVoicemail.HANG_UP,
+        voicemailMessage: undefined,
       }),
     );
   });

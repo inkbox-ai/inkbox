@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.2 — Voicemail handling on outbound calls
+
+- Added the `OnVoicemail` enum (`leave_message`, `hang_up`, `ignore`).
+  `calls.place()` and `AgentIdentity.placeCall()` accept `onVoicemail` and
+  `voicemailMessage`; both are omitted from the request when undefined, so the
+  server default applies (`leave_message` for hosted-agent calls, `hang_up`
+  otherwise). `voicemailMessage` requires `onVoicemail=leave_message`.
+- `PhoneCall.onVoicemail` and the `call.ended` webhook `WebhookPhoneCall`
+  expose the persisted choice (`OnVoicemailWire`). Missing, null, or unknown
+  values parse as `hang_up`.
+- `VoicemailDetection` is deprecated in favor of `OnVoicemail`; it remains
+  accepted (`enabled` = `hang_up`, `disabled` = `ignore`) and call responses
+  keep reporting it.
+- Outbound calls now ring for up to 60 seconds before `no_answer`.
+- Bump `@inkbox/sdk` to 0.7.2.
+- **Source-breaking migration:** `PhoneCall` now requires `onVoicemail`.
+  Manually constructed objects and test fixtures should add
+  `onVoicemail: OnVoicemail.HANG_UP` (the pre-feature behavior). Older API
+  responses still parse with that default.
+
 ## 0.7.1 — Custom email signatures
 
 - `mailboxes.update()` accepts `signatureHtml`, `signatureText`, and
