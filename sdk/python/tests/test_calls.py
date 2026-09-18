@@ -17,6 +17,7 @@ from inkbox.phone.types import (
     CallMode,
     CallOrigin,
     HostedAgentAuthorityMode,
+    OnVoicemail,
     PhoneCall,
     VoicemailDetection,
 )
@@ -343,6 +344,33 @@ class TestCallsPlace:
 
         _, kwargs = transport.post.call_args
         assert kwargs["json"]["voicemail_detection"] == "disabled"
+        assert "on_voicemail" not in kwargs["json"]
+        assert "voicemail_message" not in kwargs["json"]
+
+    def test_on_voicemail_and_message_forwarded_when_set(self, client, transport):
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.place(
+            to_number="+15551234567",
+            mode=CallMode.HOSTED_AGENT,
+            reason="Confirm the appointment.",
+            on_voicemail=OnVoicemail.LEAVE_MESSAGE,
+            voicemail_message="Please call us back.",
+        )
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["on_voicemail"] == "leave_message"
+        assert kwargs["json"]["voicemail_message"] == "Please call us back."
+        assert "voicemail_detection" not in kwargs["json"]
+
+    def test_on_voicemail_string_passed_verbatim(self, client, transport):
+        transport.post.return_value = PHONE_CALL_DICT
+
+        client._calls.place(to_number="+15551234567", on_voicemail="ignore")
+
+        _, kwargs = transport.post.call_args
+        assert kwargs["json"]["on_voicemail"] == "ignore"
+        assert "voicemail_message" not in kwargs["json"]
 
     def test_string_origination_passed_verbatim(self, client, transport):
         """A raw string origination is forwarded as-is (no enum coercion)."""
