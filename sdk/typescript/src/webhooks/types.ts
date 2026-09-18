@@ -59,6 +59,7 @@ export type CallStatusWire =
 export type CallModeWire = "client_websocket" | "hosted_agent";
 export type HostedAgentAuthorityModeWire = "contact_scoped" | "yolo";
 export type VoicemailDetectionWire = "enabled" | "disabled";
+export type OnVoicemailWire = "leave_message" | "hang_up" | "ignore";
 
 export type CallOutcomeWire = "completed" | "no_answer" | "declined" | "failed";
 
@@ -656,6 +657,8 @@ export interface WebhookPhoneCall {
   hosted_agent_authority_mode?: HostedAgentAuthorityModeWire | null;
   /** Optional/nullable on webhook replays that predate this control. */
   voicemail_detection?: VoicemailDetectionWire | null;
+  /** What the call did when voicemail answered; absent on older replays (treat as `hang_up`). */
+  on_voicemail?: OnVoicemailWire | null;
   /** Chronological forwarding attempts; absent on older webhook replays. */
   forwardings?: WebhookPhoneCallForwarding[];
 }

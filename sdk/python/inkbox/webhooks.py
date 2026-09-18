@@ -72,6 +72,7 @@ HangupReasonWire = Literal[
 CallModeWire = Literal["client_websocket", "hosted_agent"]
 HostedAgentAuthorityModeWire = Literal["contact_scoped", "yolo"]
 VoicemailDetectionWire = Literal["enabled", "disabled"]
+OnVoicemailWire = Literal["leave_message", "hang_up", "ignore"]
 
 CallOutcomeWire = Literal["completed", "no_answer", "declined", "failed"]
 
@@ -698,6 +699,9 @@ class WebhookPhoneCall(TypedDict):
     hosted_agent_authority_mode: NotRequired[HostedAgentAuthorityModeWire | None]
     # Optional for webhook replays that predate voicemail detection controls.
     voicemail_detection: NotRequired[VoicemailDetectionWire | None]
+    # What the call did when voicemail answered. Omitted by replays that
+    # predate the setting; treat a missing value as ``hang_up``.
+    on_voicemail: NotRequired[OnVoicemailWire | None]
     # Chronological forwarding attempts; omitted by older webhook replays.
     forwardings: NotRequired[list[WebhookPhoneCallForwarding]]
 

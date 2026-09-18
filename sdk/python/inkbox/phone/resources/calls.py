@@ -17,6 +17,7 @@ from inkbox.phone.types import (
     PhoneCall,
     PhoneCallWithRateLimit,
     PhoneTranscript,
+    OnVoicemail,
     VoicemailDetection,
 )
 
@@ -151,6 +152,8 @@ class CallsResource:
         mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
         hosted_agent_authority_mode: HostedAgentAuthorityMode | str | None = None,
         voicemail_detection: VoicemailDetection | str | None = None,
+        on_voicemail: OnVoicemail | str | None = None,
+        voicemail_message: str | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call.
@@ -180,8 +183,18 @@ class CallsResource:
                 authority is already ``yolo``. ``yolo`` is valid only with
                 ``mode=hosted_agent``; invalid combinations surface the
                 server's 422 response.
-            voicemail_detection: Whether to hang up when voicemail is detected.
-                Omit for the server's ``enabled`` default.
+            voicemail_detection: Deprecated alias for ``on_voicemail``:
+                ``enabled`` means ``hang_up`` and ``disabled`` means
+                ``ignore``. Sending both with conflicting values surfaces
+                the server's 422 response.
+            on_voicemail: What to do when voicemail answers. See
+                :class:`OnVoicemail`. Omit for the server default:
+                ``leave_message`` with ``mode=hosted_agent``, ``hang_up``
+                otherwise.
+            voicemail_message: What Voice AI says on the voicemail (max
+                1000 characters). Valid only with
+                ``on_voicemail=leave_message`` (server 422 otherwise). When
+                omitted the agent composes a short message from ``reason``.
             reason: Voice AI's task brief for the call — what to
                 accomplish. Required with ``mode=hosted_agent``, invalid
                 otherwise.
@@ -210,6 +223,14 @@ class CallsResource:
                 if isinstance(voicemail_detection, VoicemailDetection)
                 else voicemail_detection
             )
+        if on_voicemail is not None:
+            body["on_voicemail"] = (
+                on_voicemail.value
+                if isinstance(on_voicemail, OnVoicemail)
+                else on_voicemail
+            )
+        if voicemail_message is not None:
+            body["voicemail_message"] = voicemail_message
         if from_number is not None:
             body["from_number"] = from_number
         if agent_identity_id is not None:

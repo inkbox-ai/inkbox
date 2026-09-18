@@ -1970,7 +1970,7 @@ mod tests {
 
     use super::*;
     use crate::identities::types::AgentIdentityData;
-    use crate::phone::types::VoicemailDetection;
+    use crate::phone::types::{OnVoicemail, VoicemailDetection};
 
     /// The fixture identity's UUID, shared by the scoping assertions below.
     const IDENTITY_ID: &str = "11111111-1111-1111-1111-111111111111";
@@ -2164,6 +2164,38 @@ mod tests {
                 None,
                 &CallPlacementOptions {
                     voicemail_detection: Some(VoicemailDetection::Disabled),
+                    on_voicemail: None,
+                    voicemail_message: None,
+                },
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn place_call_with_options_forwards_on_voicemail() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "from_number": "+15550001111",
+                    "on_voicemail": "hang_up"
+                }));
+            then.status(200)
+                .json_body(call_json("dedicated_number", json!("+15550001111")));
+        });
+        let identity = identity_at(&server.base_url(), true);
+        identity
+            .place_call_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                None,
+                &CallPlacementOptions {
+                    on_voicemail: Some(OnVoicemail::HangUp),
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -2260,6 +2292,42 @@ mod tests {
                 &HostedCallPlacementOptions {
                     authority_mode: None,
                     voicemail_detection: Some(VoicemailDetection::Disabled),
+                    on_voicemail: None,
+                    voicemail_message: None,
+                },
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn place_hosted_call_with_options_forwards_on_voicemail_and_message() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "shared_imessage_number",
+                    "mode": "hosted_agent",
+                    "reason": "Confirm the appointment",
+                    "agent_identity_id": IDENTITY_ID,
+                    "on_voicemail": "leave_message",
+                    "voicemail_message": "Please call us back."
+                }));
+            then.status(200)
+                .json_body(call_json("shared_imessage_number", serde_json::Value::Null));
+        });
+        let identity = identity_at(&server.base_url(), false);
+        identity
+            .place_hosted_call_with_options(
+                "+15550002222",
+                CallOrigin::SharedImessageNumber,
+                "Confirm the appointment",
+                &HostedCallPlacementOptions {
+                    on_voicemail: Some(OnVoicemail::LeaveMessage),
+                    voicemail_message: Some("Please call us back.".to_string()),
+                    ..Default::default()
                 },
             )
             .unwrap();

@@ -9,6 +9,7 @@ import {
   parsePhoneTranscript,
   parseIncomingCallActionConfig,
   CallOrigin,
+  OnVoicemail,
   VoicemailDetection,
   IncomingCallAction,
   CallForwardingStatus,
@@ -93,6 +94,7 @@ describe("parsePhoneCall", () => {
     expect(c.isBlocked).toBe(false);
     expect(c.origin).toBe(CallOrigin.DEDICATED_NUMBER);
     expect(c.voicemailDetection).toBe(VoicemailDetection.ENABLED);
+    expect(c.onVoicemail).toBe(OnVoicemail.HANG_UP);
     expect(c.forwardings).toEqual([]);
   });
 
@@ -135,6 +137,29 @@ describe("parsePhoneCall", () => {
         voicemail_detection: "disabled",
       }).voicemailDetection,
     ).toBe(VoicemailDetection.DISABLED);
+  });
+
+  it("defaults on_voicemail to hang_up and tolerates unknown values", () => {
+    const { on_voicemail: _ignored, ...legacyPayload } = RAW_PHONE_CALL;
+    void _ignored;
+    // Missing (pre-feature responses) and null both fall back to hang_up.
+    expect(parsePhoneCall(legacyPayload).onVoicemail).toBe(OnVoicemail.HANG_UP);
+    expect(parsePhoneCall({ ...RAW_PHONE_CALL, on_voicemail: null }).onVoicemail).toBe(
+      OnVoicemail.HANG_UP,
+    );
+    for (const [wire, member] of [
+      ["leave_message", OnVoicemail.LEAVE_MESSAGE],
+      ["hang_up", OnVoicemail.HANG_UP],
+      ["ignore", OnVoicemail.IGNORE],
+    ] as const) {
+      expect(parsePhoneCall({ ...RAW_PHONE_CALL, on_voicemail: wire }).onVoicemail).toBe(
+        member,
+      );
+    }
+    // A value this SDK doesn't know must not throw.
+    expect(
+      parsePhoneCall({ ...RAW_PHONE_CALL, on_voicemail: "something_new" }).onVoicemail,
+    ).toBe(OnVoicemail.HANG_UP);
   });
 
   it("handles null timestamps", () => {

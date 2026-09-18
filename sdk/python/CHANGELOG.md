@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.2 — Voicemail handling on outbound calls
+
+- Added `OnVoicemail` (`leave_message`, `hang_up`, `ignore`). `calls.place()`
+  and `AgentIdentity.place_call()` accept `on_voicemail` and
+  `voicemail_message`; both are omitted from the request when unset, so the
+  server default applies (`leave_message` for hosted-agent calls, `hang_up`
+  otherwise). `voicemail_message` requires `on_voicemail=leave_message`.
+- `PhoneCall.on_voicemail` and the `call.ended` webhook `WebhookPhoneCall`
+  expose the persisted choice (`OnVoicemailWire`). Missing, null, or unknown
+  values parse as `hang_up`.
+- `VoicemailDetection` is deprecated in favor of `OnVoicemail`; it remains
+  accepted (`enabled` = `hang_up`, `disabled` = `ignore`) and call responses
+  keep reporting it.
+- Outbound calls now ring for up to 60 seconds before `no_answer`.
+- Bump the Python package to 0.7.2.
+
 ## 0.7.1 — Custom email signatures
 
 - `mailboxes.update()` accepts `signature_html`, `signature_text`, and

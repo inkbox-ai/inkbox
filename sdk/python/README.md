@@ -402,7 +402,7 @@ call = identity.place_call(
 print(call.status, call.rate_limit.calls_remaining)
 
 # Let Voice AI handle the call using this identity's saved authority.
-from inkbox import CallMode, HostedAgentAuthorityMode, VoicemailDetection
+from inkbox import CallMode, HostedAgentAuthorityMode, OnVoicemail
 
 # Discover voices for your organization; no identity argument is needed.
 catalog = inkbox.hosted_agent.list_voices()
@@ -420,12 +420,17 @@ if selected is not None:
         instructions=config.instructions,
     )
 
+# Hosted-agent calls leave a voicemail by default (on_voicemail=leave_message);
+# pass voicemail_message to control what is said, or hang_up / ignore to
+# end the call at the beep or skip detection entirely.
 hosted_call = identity.place_call(
     to_number="+15551234567",
     mode=CallMode.HOSTED_AGENT,
     reason="Coordinate the appointment and send confirmations.",
-    voicemail_detection=VoicemailDetection.DISABLED,
+    on_voicemail=OnVoicemail.LEAVE_MESSAGE,
+    voicemail_message="Hi, this is Ava calling about your appointment. Please call us back.",
 )
+print(hosted_call.on_voicemail)  # OnVoicemail.LEAVE_MESSAGE
 
 # Set the saved default for future inbound and outbound Voice AI calls.
 # Changing the saved default requires an admin API key.

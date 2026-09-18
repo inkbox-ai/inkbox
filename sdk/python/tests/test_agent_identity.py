@@ -21,6 +21,7 @@ from inkbox.phone.types import (
     CallOrigin,
     IncomingCallAction,
     IncomingCallActionConfig,
+    OnVoicemail,
     PhoneCall,
     PhoneCallWithRateLimit,
     HostedAgentToolInvocationPage,
@@ -359,6 +360,50 @@ class TestAgentIdentityPlaceCall:
             mode=CallMode.CLIENT_WEBSOCKET,
             reason=None,
             voicemail_detection="disabled",
+        )
+
+    def test_place_call_forwards_on_voicemail_and_message_dedicated(self):
+        identity, inkbox = _identity_with_mailbox()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        identity.place_call(
+            to_number="+15551234567",
+            mode=CallMode.HOSTED_AGENT,
+            reason="Confirm the appointment.",
+            on_voicemail=OnVoicemail.LEAVE_MESSAGE,
+            voicemail_message="Please call us back.",
+        )
+
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination=CallOrigin.DEDICATED_NUMBER,
+            from_number="+18335794607",
+            client_websocket_url=None,
+            mode=CallMode.HOSTED_AGENT,
+            reason="Confirm the appointment.",
+            on_voicemail=OnVoicemail.LEAVE_MESSAGE,
+            voicemail_message="Please call us back.",
+        )
+
+    def test_place_call_forwards_on_voicemail_shared(self):
+        # The iMessage branch forwards the same options without from_number.
+        identity, inkbox = _identity_without_phone()
+        inkbox._calls.place.return_value = MagicMock(spec=PhoneCallWithRateLimit)
+
+        identity.place_call(
+            to_number="+15551234567",
+            origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
+            on_voicemail="hang_up",
+        )
+
+        inkbox._calls.place.assert_called_once_with(
+            to_number="+15551234567",
+            origination=CallOrigin.SHARED_IMESSAGE_NUMBER,
+            agent_identity_id=IDENTITY_UUID,
+            client_websocket_url=None,
+            mode=CallMode.CLIENT_WEBSOCKET,
+            reason=None,
+            on_voicemail="hang_up",
         )
 
 

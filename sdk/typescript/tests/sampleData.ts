@@ -114,6 +114,7 @@ export const RAW_PHONE_CALL = {
   mode: "client_websocket",
   hosted_agent_authority_mode: "contact_scoped",
   voicemail_detection: "enabled",
+  on_voicemail: "hang_up",
   reason: null,
   created_at: "2026-03-09T00:00:00Z",
   updated_at: "2026-03-09T00:05:00Z",
