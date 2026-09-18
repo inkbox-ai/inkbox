@@ -330,8 +330,11 @@ call = identity.place_call(
     to_number="+15551234567",
     mode="hosted_agent",     # CallMode.HOSTED_AGENT; default "client_websocket"
     reason="Confirm tomorrow's 3pm appointment; reschedule if needed.",
+    # Optional: on_voicemail (OnVoicemail.LEAVE_MESSAGE | HANG_UP | IGNORE;
+    # hosted calls default to leave_message) and voicemail_message (what Voice
+    # AI says; requires leave_message). VoicemailDetection is deprecated.
 )
-print(call.mode, call.reason)
+print(call.mode, call.reason, call.on_voicemail)
 # where Voice AI isn't available (or is at capacity), the server's
 # 503 (hosted_agent_unavailable / hosted_agent_at_capacity) surfaces verbatim.
 

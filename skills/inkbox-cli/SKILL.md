@@ -281,6 +281,7 @@ which discovers the organization-scoped voice catalog without an identity.
 ```bash
 inkbox phone call -i <handle> --to +15551234567 --ws-url wss://example.com/ws
 inkbox phone call -i <handle> --to +15551234567 --hosted --reason "Confirm tomorrow's 3pm appointment"
+inkbox phone call -i <handle> --to +15551234567 --hosted --reason "..." --on-voicemail leave_message --voicemail-message "Please call us back."
 inkbox phone call -i <handle> --to +15551234567 --origination shared_imessage_number
 inkbox phone calls -i <handle> --limit 10 --offset 0
 inkbox phone hangup <call-id> -i <handle>
@@ -304,6 +305,12 @@ websocket URL (or the `--reason` task brief for Voice AI calls) with the user.
 assignment and do not require a dedicated phone number. The recipient must
 already have a shared iMessage connection to the identity; otherwise the call
 fails with `409 no_shared_connection`.
+
+`--on-voicemail <leave_message|hang_up|ignore>` controls what happens when
+voicemail answers; omit it for the default (`leave_message` with `--hosted`,
+`hang_up` otherwise). `--voicemail-message <text>` sets what Voice AI says
+and requires `--on-voicemail leave_message`. `--no-voicemail-detection` is
+deprecated (same as `--on-voicemail ignore`).
 
 `--hosted` places a call Inkbox Voice AI drives end to end
 — no WebSocket, no code. It requires `--reason` (the agent's task brief)
