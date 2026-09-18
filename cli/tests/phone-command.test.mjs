@@ -71,7 +71,10 @@ const IDENTITY = {
 
 test("phone help exposes authority controls", () => {
   assert.match(help("phone", "call"), /--authority-mode <mode>/);
-  assert.match(help("phone", "call"), /--no-voicemail-detection/);
+  assert.match(help("phone", "call"), /--no-voicemail-detection\s+Deprecated; use --on-voicemail ignore/);
+  assert.match(help("phone", "call"), /--on-voicemail <action>/);
+  assert.match(help("phone", "call"), /leave_message,\s+hang_up, or ignore/);
+  assert.match(help("phone", "call"), /--voicemail-message <text>/);
   assert.match(help("phone", "call"), /dedicated_imessage_number/);
   assert.match(help("phone", "tool-activity"), /--limit <n>/);
   assert.match(help("phone", "tool-activity"), /--offset <n>/);
@@ -236,6 +239,120 @@ test("buildPlaceCallOptions disables voicemail detection only when requested", (
       toNumber: "+15551234567",
       voicemailDetection: "disabled",
     },
+  });
+});
+
+test("buildPlaceCallOptions forwards every --on-voicemail action verbatim", () => {
+  for (const onVoicemail of ["leave_message", "hang_up", "ignore"]) {
+    const result = buildPlaceCallOptions({
+      identity: "support-bot",
+      to: "+15551234567",
+      hosted: true,
+      reason: "Coordinate the appointment",
+      onVoicemail,
+    });
+
+    assert.deepEqual(result, {
+      callOptions: {
+        toNumber: "+15551234567",
+        mode: "hosted_agent",
+        reason: "Coordinate the appointment",
+        onVoicemail,
+      },
+    });
+  }
+});
+
+test("buildPlaceCallOptions forwards --voicemail-message with leave_message", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    hosted: true,
+    reason: "Coordinate the appointment",
+    onVoicemail: "leave_message",
+    voicemailMessage: "Please call us back.",
+  });
+
+  assert.deepEqual(result, {
+    callOptions: {
+      toNumber: "+15551234567",
+      mode: "hosted_agent",
+      reason: "Coordinate the appointment",
+      onVoicemail: "leave_message",
+      voicemailMessage: "Please call us back.",
+    },
+  });
+});
+
+test("buildPlaceCallOptions allows --on-voicemail on client-driven calls", () => {
+  // Unlike --authority-mode, voicemail handling applies to every mode; the
+  // server decides whether a value fits the call.
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    wsUrl: "wss://agent.example.com/audio",
+    onVoicemail: "ignore",
+  });
+
+  assert.deepEqual(result, {
+    callOptions: {
+      toNumber: "+15551234567",
+      clientWebsocketUrl: "wss://agent.example.com/audio",
+      onVoicemail: "ignore",
+    },
+  });
+});
+
+test("buildPlaceCallOptions rejects an unknown --on-voicemail action", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    onVoicemail: "callback",
+  });
+
+  assert.deepEqual(result, {
+    error: "--on-voicemail must be leave_message, hang_up, or ignore.",
+  });
+});
+
+test("buildPlaceCallOptions rejects --voicemail-message without leave_message", () => {
+  const expected = {
+    error: "--voicemail-message requires --on-voicemail leave_message.",
+  };
+  // Missing --on-voicemail entirely.
+  assert.deepEqual(buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    hosted: true,
+    reason: "Coordinate the appointment",
+    voicemailMessage: "Please call us back.",
+  }), expected);
+  // Explicit non-leave_message actions.
+  for (const onVoicemail of ["hang_up", "ignore"]) {
+    assert.deepEqual(buildPlaceCallOptions({
+      identity: "support-bot",
+      to: "+15551234567",
+      hosted: true,
+      reason: "Coordinate the appointment",
+      onVoicemail,
+      voicemailMessage: "Please call us back.",
+    }), expected);
+  }
+});
+
+test("buildPlaceCallOptions rejects --voicemail-message with --no-voicemail-detection", () => {
+  const result = buildPlaceCallOptions({
+    identity: "support-bot",
+    to: "+15551234567",
+    hosted: true,
+    reason: "Coordinate the appointment",
+    onVoicemail: "leave_message",
+    voicemailMessage: "Please call us back.",
+    voicemailDetection: false,
+  });
+
+  assert.deepEqual(result, {
+    error: "--voicemail-message conflicts with --no-voicemail-detection.",
   });
 });
 
@@ -523,9 +640,124 @@ test("phone call forwards voicemail opt-out and prints the persisted value", asy
       },
     ]);
     assert.equal(JSON.parse(result.stdout).voicemailDetection, "disabled");
+    // Legacy responses without on_voicemail print the hang_up fallback.
+    assert.equal(JSON.parse(result.stdout).onVoicemail, "hang_up");
   } finally {
     mock.server.close();
   }
+});
+
+test("phone call forwards --on-voicemail and --voicemail-message and prints the persisted value", async () => {
+  const requests = [];
+  const mock = await listen((req, res) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", () => {
+      requests.push({
+        method: req.method,
+        url: req.url,
+        body: body ? JSON.parse(body) : null,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      if (req.url === "/api/v1/identities/support-bot") {
+        res.end(JSON.stringify(IDENTITY));
+        return;
+      }
+      res.end(JSON.stringify({
+        id: "22222222-2222-2222-2222-222222222222",
+        local_phone_number: "+15550000001",
+        remote_phone_number: "+15551234567",
+        direction: "outbound",
+        status: "initiated",
+        client_websocket_url: null,
+        use_inkbox_tts: null,
+        use_inkbox_stt: null,
+        hangup_reason: null,
+        started_at: null,
+        ended_at: null,
+        is_blocked: false,
+        origin: "dedicated_number",
+        mode: "hosted_agent",
+        hosted_agent_authority_mode: "contact_scoped",
+        voicemail_detection: "enabled",
+        on_voicemail: "leave_message",
+        reason: "Confirm the appointment",
+        post_call_action_items: [],
+        created_at: "2026-07-29T00:00:00Z",
+        updated_at: "2026-07-29T00:00:00Z",
+        rate_limit: {
+          calls_used: 1,
+          calls_remaining: 99,
+          calls_limit: 100,
+          minutes_used: 0,
+          minutes_remaining: 1000,
+          minutes_limit: 1000,
+        },
+      }));
+    });
+  });
+
+  try {
+    const result = await runCli([
+      "--api-key", "test-key",
+      "--base-url", `http://127.0.0.1:${mock.port}`,
+      "--json",
+      "phone", "call",
+      "-i", "support-bot",
+      "--to", "+15551234567",
+      "--hosted",
+      "--reason", "Confirm the appointment",
+      "--on-voicemail", "leave_message",
+      "--voicemail-message", "Please call us back.",
+    ]);
+
+    assert.ifError(result.error);
+    assert.equal(result.stderr, "");
+    assert.deepEqual(requests, [
+      {
+        method: "GET",
+        url: "/api/v1/identities/support-bot",
+        body: null,
+      },
+      {
+        method: "POST",
+        url: "/api/v1/phone/place-call",
+        body: {
+          from_number: "+15550000001",
+          to_number: "+15551234567",
+          mode: "hosted_agent",
+          reason: "Confirm the appointment",
+          origination: "dedicated_number",
+          on_voicemail: "leave_message",
+          voicemail_message: "Please call us back.",
+        },
+      },
+    ]);
+    const printed = JSON.parse(result.stdout);
+    assert.equal(printed.onVoicemail, "leave_message");
+    assert.equal(printed.voicemailDetection, "enabled");
+  } finally {
+    mock.server.close();
+  }
+});
+
+test("phone call rejects --voicemail-message without --on-voicemail leave_message before any request", async () => {
+  const result = await runCli([
+    "--api-key", "test-key",
+    "--base-url", "http://127.0.0.1:9",
+    "phone", "call",
+    "-i", "support-bot",
+    "--to", "+15551234567",
+    "--hosted",
+    "--reason", "Confirm the appointment",
+    "--voicemail-message", "Please call us back.",
+  ]);
+
+  assert.equal(result.error?.code, 1);
+  assert.match(result.stderr, /--voicemail-message requires --on-voicemail leave_message\./);
 });
 
 test("tool-activity calls the paginated SDK surface and prints the page", async () => {
