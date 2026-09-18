@@ -159,6 +159,11 @@ impl CallOrigin {
 }
 
 /// Whether Inkbox should end an outbound call after detecting voicemail.
+///
+/// Deprecated alias for [`OnVoicemail`]: `Enabled` maps to
+/// [`OnVoicemail::HangUp`] and `Disabled` to [`OnVoicemail::Ignore`]. Call
+/// responses keep reporting this field, with `leave_message` calls reading
+/// as `Enabled`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum VoicemailDetection {
@@ -179,11 +184,55 @@ impl VoicemailDetection {
     }
 }
 
+/// What an outbound call does when voicemail answers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum OnVoicemail {
+    /// Wait for the beep, let Voice AI leave a message, then end the call
+    /// (`hangup_reason=voicemail`). The server default for hosted-agent calls.
+    LeaveMessage,
+    /// End the call as soon as a voicemail beep is detected. The server
+    /// default for client-driven calls, and the SDK default for missing
+    /// values.
+    #[default]
+    HangUp,
+    /// Skip detection and treat whatever answers as a person.
+    Ignore,
+}
+
+impl OnVoicemail {
+    /// The wire string value (`"leave_message"` / `"hang_up"` / `"ignore"`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            OnVoicemail::LeaveMessage => "leave_message",
+            OnVoicemail::HangUp => "hang_up",
+            OnVoicemail::Ignore => "ignore",
+        }
+    }
+
+    /// Parse a wire value, returning `None` for values this SDK doesn't know.
+    pub fn from_wire(value: &str) -> Option<Self> {
+        match value {
+            "leave_message" => Some(OnVoicemail::LeaveMessage),
+            "hang_up" => Some(OnVoicemail::HangUp),
+            "ignore" => Some(OnVoicemail::Ignore),
+            _ => None,
+        }
+    }
+}
+
 /// Optional controls for a client-driven outbound call.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CallPlacementOptions {
-    /// Omit to retain the server default (`enabled`).
+    /// Deprecated alias for `on_voicemail` (`Enabled` = `HangUp`,
+    /// `Disabled` = `Ignore`). Omit to retain the server default.
     pub voicemail_detection: Option<VoicemailDetection>,
+    /// Omit to retain the server default (`hang_up` for client-driven calls).
+    pub on_voicemail: Option<OnVoicemail>,
+    /// What Voice AI says on the voicemail (max 1000 characters). Valid only
+    /// with `on_voicemail = Some(OnVoicemail::LeaveMessage)`; the server
+    /// rejects other combinations with 422.
+    pub voicemail_message: Option<String>,
 }
 
 /// Optional controls for an Inkbox Voice AI outbound call.
@@ -195,8 +244,16 @@ pub struct HostedCallPlacementOptions {
     /// requires an admin credential unless the saved authority is already
     /// `Yolo`.
     pub authority_mode: Option<HostedAgentAuthorityMode>,
-    /// Omit to retain the server default (`enabled`).
+    /// Deprecated alias for `on_voicemail` (`Enabled` = `HangUp`,
+    /// `Disabled` = `Ignore`). Omit to retain the server default.
     pub voicemail_detection: Option<VoicemailDetection>,
+    /// Omit to retain the server default (`leave_message` for hosted-agent
+    /// calls).
+    pub on_voicemail: Option<OnVoicemail>,
+    /// What Voice AI says on the voicemail (max 1000 characters). Valid only
+    /// with `on_voicemail = Some(OnVoicemail::LeaveMessage)`; when omitted
+    /// the agent composes a short message from the call's reason.
+    pub voicemail_message: Option<String>,
 }
 
 /// How broadly a hosted voice agent may act.
@@ -368,6 +425,20 @@ where
     Ok(Option::<VoicemailDetection>::deserialize(deserializer)?.unwrap_or_default())
 }
 
+/// Lenient `on_voicemail` parser: null and unknown values fall back to
+/// `HangUp` so a newer server value never fails deserialization.
+pub(crate) fn deserialize_on_voicemail_lenient<'de, D>(
+    deserializer: D,
+) -> Result<OnVoicemail, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?
+        .as_deref()
+        .and_then(OnVoicemail::from_wire)
+        .unwrap_or_default())
+}
+
 // ---------------------------------------------------------------------------
 // Phone structs.
 // ---------------------------------------------------------------------------
@@ -477,6 +548,10 @@ pub struct PhoneCall {
         deserialize_with = "deserialize_voicemail_detection_null_default"
     )]
     pub voicemail_detection: VoicemailDetection,
+    /// What the call does when voicemail answers. Missing, null, or unknown
+    /// values fall back to `HangUp`, matching the legacy `enabled` behavior.
+    #[serde(default, deserialize_with = "deserialize_on_voicemail_lenient")]
+    pub on_voicemail: OnVoicemail,
     /// Open action items Voice AI recorded, `seq`-ascending. Empty for
     /// client-driven calls and Voice AI calls with no open items.
     #[serde(default)]
@@ -1085,6 +1160,35 @@ mod tests {
         v["voicemail_detection"] = serde_json::Value::Null;
         let call: PhoneCall = serde_json::from_value(v).unwrap();
         assert_eq!(call.voicemail_detection, VoicemailDetection::Enabled);
+    }
+
+    #[test]
+    fn on_voicemail_parses_values_and_falls_back_to_hang_up() {
+        for (wire, expected) in [
+            ("leave_message", OnVoicemail::LeaveMessage),
+            ("hang_up", OnVoicemail::HangUp),
+            ("ignore", OnVoicemail::Ignore),
+        ] {
+            let mut v = call_json();
+            v["on_voicemail"] = json!(wire);
+            let call: PhoneCall = serde_json::from_value(v).unwrap();
+            assert_eq!(call.on_voicemail, expected);
+            assert_eq!(expected.as_str(), wire);
+        }
+
+        // Missing (pre-feature responses) and null both fall back to hang_up.
+        let call: PhoneCall = serde_json::from_value(call_json()).unwrap();
+        assert_eq!(call.on_voicemail, OnVoicemail::HangUp);
+        let mut v = call_json();
+        v["on_voicemail"] = serde_json::Value::Null;
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.on_voicemail, OnVoicemail::HangUp);
+
+        // A value this SDK doesn't know must not fail the whole parse.
+        let mut v = call_json();
+        v["on_voicemail"] = json!("something_new");
+        let call: PhoneCall = serde_json::from_value(v).unwrap();
+        assert_eq!(call.on_voicemail, OnVoicemail::HangUp);
     }
 
     #[test]
