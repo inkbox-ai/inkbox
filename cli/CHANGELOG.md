@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add Slack CLI identity-handle selection and require DM recipients before dispatch;
+  separate management onboarding from explicit connected-workspace selection in examples.
+- Remove unused archive message source URLs, type the Python purge result, and clarify
+  full-replacement capture settings and independent send/utility-operation outcomes.
+
 - Add direct Slack browser installation handoffs, capabilities/users/members, exact message
   context/permalinks, reactions/pins, own-message edits/deletions, bounded general file
   uploads, channel join/leave, native processing status, and durable operation lookup.

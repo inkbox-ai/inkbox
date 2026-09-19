@@ -17,6 +17,7 @@ from inkbox.slack_operations import (
     SlackArchiveMessagesResponse,
     SlackArchiveCoverage,
     SlackArchiveCoverageResponse,
+    SlackArchivePurgeResponse,
     SlackProcessingStatus,
     SlackOperationKind,
 )
@@ -476,6 +477,7 @@ __all__ = [
     "SlackArchiveMessagesResponse",
     "SlackArchiveCoverage",
     "SlackArchiveCoverageResponse",
+    "SlackArchivePurgeResponse",
     "SlackProcessingStatus",
     "SlackOperationKind",
     # Slack

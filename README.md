@@ -552,10 +552,6 @@ await inkbox.mailboxes.update("alex@example.com", {
 await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ```
 
-## License
-
-MIT
-
 ## Slack workspace connections
 
 Use an existing Inkbox identity across multiple Slack workspace connections. The
@@ -568,3 +564,7 @@ bounded imports, and coverage are separate from live reads. Retention has no tim
 limit by default; organization management can disable capture, restrict it, set a
 retention limit, or purge. Workspace approval, connection ownership,
 and current conversation access remain required.
+
+## License
+
+MIT

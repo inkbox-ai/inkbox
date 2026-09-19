@@ -280,9 +280,150 @@ test("Slack CLI sends exact requests, exposes onboarding and preserves file byte
     assert.ok(rejected.error);
     assert.match(rejected.stderr, /idempotency-key/);
     assert.equal(requests.length, 16);
+    const missingRecipient = await run([
+      ...globals,
+      "slack",
+      "conversation",
+      "open",
+      "--connection-id",
+      c,
+    ]);
+    assert.ok(missingRecipient.error);
+    assert.match(missingRecipient.stderr, /required option.*--user-id/);
+    assert.equal(requests.length, 16);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(tmp, { recursive: true, force: true });
+  }
+});
+test("identity-scoped Slack commands resolve handles and reject ambiguous selectors before dispatch", async () => {
+  const requests = [];
+  let reply = {};
+  let identityStatus = 200;
+  const identityId = f.connection.identity_id;
+  const identity = {
+    id: identityId,
+    organization_id: "org_test",
+    agent_handle: "example-agent",
+    email_address: null,
+    created_at: "2026-09-16T00:00:00Z",
+    updated_at: "2026-09-16T00:00:00Z",
+  };
+  const server = http.createServer(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const body = Buffer.concat(chunks).toString();
+    requests.push({
+      method: req.method,
+      url: req.url,
+      body: body ? JSON.parse(body) : null,
+    });
+    const lookup = req.url === "/api/v1/identities/example-agent";
+    res.writeHead(lookup ? identityStatus : 200, {
+      "Content-Type": "application/json",
+    });
+    res.end(
+      JSON.stringify(
+        lookup
+          ? identityStatus === 200
+            ? identity
+            : { detail: "Not found" }
+          : reply,
+      ),
+    );
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const globals = [
+    "--api-key",
+    "synthetic-test-key",
+    "--base-url",
+    `http://127.0.0.1:${server.address().port}`,
+    "--json",
+    "slack",
+  ];
+  const cases = [
+    {
+      args: ["connection", "list"],
+      response: { connections: [], installation_available: false },
+      method: "GET",
+      url: `/api/v1/slack/connections?identity_id=${identityId}`,
+      body: null,
+    },
+    {
+      args: ["invitation", "create", "--expires-in-seconds", "300"],
+      response: f.invitation,
+      method: "POST",
+      url: "/api/v1/slack/invitations",
+      body: { identity_id: identityId, expires_in_seconds: 300 },
+    },
+    {
+      args: ["invitation", "list"],
+      response: [],
+      method: "GET",
+      url: `/api/v1/slack/invitations?identity_id=${identityId}`,
+      body: null,
+    },
+    {
+      args: ["installation", "start", "--workspace-id", "TEXAMPLE"],
+      response: {
+        authorization_url: "https://example.com/opaque-handoff",
+        expires_at: "2026-09-16T00:15:00Z",
+      },
+      method: "POST",
+      url: "/api/v1/slack/installations",
+      body: { identity_id: identityId, workspace_id: "TEXAMPLE" },
+    },
+  ];
+  try {
+    for (const item of cases) {
+      for (const selectors of [
+        [],
+        ["--identity", "example-agent", "--identity-id", identityId],
+      ]) {
+        const before = requests.length;
+        const invalid = await run([...globals, ...item.args, ...selectors]);
+        assert.ok(invalid.error);
+        assert.match(
+          invalid.stderr,
+          /exactly one of --identity or --identity-id/,
+        );
+        assert.equal(requests.length, before);
+      }
+      reply = item.response;
+      for (const flag of ["--identity", "-i"]) {
+        const result = await run([
+          ...globals,
+          ...item.args,
+          flag,
+          "example-agent",
+        ]);
+        assert.equal(result.error, null, result.stderr);
+        assert.deepEqual(requests.at(-2), {
+          method: "GET",
+          url: "/api/v1/identities/example-agent",
+          body: null,
+        });
+        assert.deepEqual(requests.at(-1), {
+          method: item.method,
+          url: item.url,
+          body: item.body,
+        });
+      }
+    }
+    identityStatus = 404;
+    const before = requests.length;
+    const missingIdentity = await run([
+      ...globals,
+      "invitation",
+      "create",
+      "-i",
+      "example-agent",
+    ]);
+    assert.ok(missingIdentity.error);
+    assert.equal(requests.length, before + 1); // Failed lookup must not create an invitation.
+    assert.equal(requests.at(-1).url, "/api/v1/identities/example-agent");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 test("filter flags distinguish omitted, clear and explicit empty invalid shapes", () => {

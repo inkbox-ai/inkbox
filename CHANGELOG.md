@@ -1,6 +1,15 @@
 # Changelog
 
+All notable changes to the Inkbox SDK, CLI, and skills live here.
+Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
+(Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
+
 ## Unreleased
+
+- Add Slack CLI identity-handle selection and require DM recipients before dispatch;
+  separate management onboarding from explicit connected-workspace selection in examples.
+- Remove unused archive message source URLs, type the Python purge result, and clarify
+  full-replacement capture settings and independent send/utility-operation outcomes.
 
 - Add direct Slack browser installation handoffs, capabilities/users/members, exact message
   context/permalinks, reactions/pins, own-message edits/deletions, bounded general file
@@ -14,10 +23,6 @@
   filters, preserving omitted versus explicitly cleared filters on updates.
 - Document browser invitation onboarding, terminal unknown send outcomes, and
   metadata-only Slack delivery diagnostics without historical replay.
-
-All notable changes to the Inkbox SDK, CLI, and skills live here.
-Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
-(Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
 ## 0.7.2 — Voicemail handling on outbound calls
 

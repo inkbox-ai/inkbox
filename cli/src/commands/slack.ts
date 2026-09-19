@@ -14,8 +14,25 @@ export function slackInteger(value: string): number {
     throw new InvalidArgumentError("Expected a positive integer");
   return Number(value);
 }
+interface IdentityOptions {
+  identity?: string;
+  identityId?: string;
+}
 const identity = (c: Command): Command =>
-  c.requiredOption("--identity-id <id>", "Owning Inkbox identity UUID");
+  c
+    .option("-i, --identity <handle>", "Owning Inkbox identity handle")
+    .option("--identity-id <id>", "Owning identity UUID instead of --identity");
+async function resolveIdentityId(
+  client: ReturnType<typeof createClient>,
+  options: IdentityOptions,
+): Promise<string> {
+  if (!!options.identity === !!options.identityId)
+    throw new InvalidArgumentError(
+      "Provide exactly one of --identity or --identity-id",
+    );
+  if (options.identityId) return options.identityId;
+  return (await client.getIdentity(options.identity!)).id;
+}
 const connection = (c: Command): Command =>
   c.requiredOption("--connection-id <id>", "Slack workspace connection UUID");
 const conversation = (c: Command): Command =>
@@ -42,11 +59,15 @@ export function registerSlackCommands(program: Command): void {
       .command("list")
       .description("List connections and installation availability"),
   ).action(
-    withErrorHandler(async function (this: Command, o: { identityId: string }) {
+    withErrorHandler(async function (this: Command, o: IdentityOptions) {
       const opts = getGlobalOpts(this);
-      output(await createClient(opts).slack.listConnections(o.identityId), {
-        json: !!opts.json,
-      });
+      const client = createClient(opts);
+      output(
+        await client.slack.listConnections(await resolveIdentityId(client, o)),
+        {
+          json: !!opts.json,
+        },
+      );
     }),
   );
   connection(
@@ -82,11 +103,15 @@ export function registerSlackCommands(program: Command): void {
     .action(
       withErrorHandler(async function (
         this: Command,
-        o: { identityId: string; expiresInSeconds?: number },
+        o: IdentityOptions & { expiresInSeconds?: number },
       ) {
         const opts = getGlobalOpts(this);
+        const client = createClient(opts);
         output(
-          await createClient(opts).slack.createInvitation(o.identityId, o),
+          await client.slack.createInvitation(
+            await resolveIdentityId(client, o),
+            o,
+          ),
           { json: !!opts.json },
         );
       }),
@@ -98,13 +123,44 @@ export function registerSlackCommands(program: Command): void {
         "List invitation status; links are only returned at creation",
       ),
   ).action(
-    withErrorHandler(async function (this: Command, o: { identityId: string }) {
+    withErrorHandler(async function (this: Command, o: IdentityOptions) {
       const opts = getGlobalOpts(this);
-      output(await createClient(opts).slack.listInvitations(o.identityId), {
-        json: !!opts.json,
-      });
+      const client = createClient(opts);
+      output(
+        await client.slack.listInvitations(await resolveIdentityId(client, o)),
+        {
+          json: !!opts.json,
+        },
+      );
     }),
   );
+  const installations = slack
+    .command("installation")
+    .description("Organization management: browser installation handoff");
+  identity(
+    installations
+      .command("start")
+      .description(
+        "Return a short-lived secret URL to open in a browser; do not log or share it",
+      ),
+  )
+    .option("--workspace-id <id>", "Expected Slack workspace ID")
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        o: IdentityOptions & { workspaceId?: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const client = createClient(opts);
+        output(
+          await client.slack.startInstallation(
+            await resolveIdentityId(client, o),
+            o,
+          ),
+          { json: !!opts.json },
+        );
+      }),
+    );
   invites
     .command("revoke <invitation-id>")
     .description("Revoke an unconsumed invitation")
@@ -154,8 +210,7 @@ export function registerSlackCommands(program: Command): void {
     .requiredOption(
       "--user-id <id>",
       "Slack user ID (repeatable)",
-      (v: string, previous: string[]) => [...previous, v],
-      [] as string[],
+      (v: string, previous: string[] = []) => [...previous, v],
     )
     .action(
       withErrorHandler(async function (

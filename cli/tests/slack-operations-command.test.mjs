@@ -210,6 +210,27 @@ test("CLI exposes every new Slack operation with exact bytes, filters, keys and 
     assert.ok(tooLarge.error);
     assert.match(tooLarge.stderr, /10 MiB/);
     assert.equal(requests.length, data.cases.length);
+    reply = {
+      capture_enabled: true,
+      retention_days: null,
+      conversation_ids: [],
+      revision: 2,
+    };
+    const defaults = await run([
+      ...globals,
+      "archive",
+      "settings",
+      "update",
+      ...conn,
+      "--capture-enabled",
+      "true",
+    ]);
+    assert.equal(defaults.error, null, defaults.stderr);
+    assert.deepEqual(JSON.parse(requests.at(-1).body), {
+      capture_enabled: true,
+      retention_days: null,
+      conversation_ids: [],
+    });
   } finally {
     await new Promise((resolve) => server.close(resolve));
     await rm(tmp, { recursive: true, force: true });

@@ -1,4 +1,6 @@
 //! Scoped utility actions and retained history. No automatic pagination or mutation retry.
+//! Slack enums reject unrecognized values; a newer SDK may be required.
+//! Action/operation `Unknown` means terminal uncertainty, not a catch-all.
 use crate::error::{InkboxError, Result};
 use crate::http::NO_QUERY;
 use crate::slack::{base, segment, SlackPageOptions, SlackResource};
@@ -139,7 +141,6 @@ pub struct SlackArchivedMessage {
     pub files: Vec<Map<String, Value>>,
     pub mentioned: bool,
     pub source: SlackArchiveSource,
-    pub source_url: Option<String>,
     pub captured_at: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -488,7 +489,9 @@ impl SlackResource {
             NO_QUERY,
         )?)?)
     }
-    /// Organization management only. Replaces capture settings; None retention has no time limit.
+    /// Organization management only; replaces all capture settings.
+    /// None retention resets to no time limit; empty conversation IDs reset to all.
+    /// Read current settings and restate values to preserve them.
     pub fn update_archive_settings(
         &self,
         id: Uuid,

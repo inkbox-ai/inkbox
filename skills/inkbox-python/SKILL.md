@@ -1433,7 +1433,8 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 ## Slack
 
 See the [Slack API and onboarding guide](../../sdk/python/README.md#slack) for implemented SDK/CLI methods.
-Use an existing identity and list workspace connections and installation availability.
+Use an existing identity and select the intended connected workspace explicitly.
+Installation availability reports readiness, not organization-management permission.
 Organization management can create an invitation or start an installation. Open the
 returned invitation or short-lived authorization URL in a browser; treat the full URL
 as a secret. The direct installation URL is an opaque browser handoff. Join accessible
@@ -1443,16 +1444,20 @@ supported when the selected connection has access.
 Use explicit connection IDs and stable caller-provided idempotency keys for sends and
 utility mutations (reactions, pins, own-message edits/deletions, join/leave, uploads,
 and native processing status). Poll sends only while sending and operations only while
-in_progress. Unknown is terminal uncertainty and must not be blindly repeated. Inspect
+in_progress. Unknown is terminal uncertainty and must not be blindly repeated. Send
+and utility keys use independent per-connection namespaces; utilities emit no outcome
+webhook, so read their status through operation lookup. Inspect
 capabilities for missing scopes; native processing support remains workspace-dependent.
 General file uploads accept standard base64 for 1 byte..10 MiB (CLI: a local --file).
 
 Retained history is separate from bounded live reads and webhook diagnostics. Capture
 is on by default for observed messages in accessible conversations, with no time-based
 retention limit. Organization management can disable capture, restrict conversations,
-set retention, or purge. Use archive listing/search, bounded backfill/restart, and coverage; do not infer complete workspace/thread history
+set retention, or purge. Archive settings updates replace all fields: omitted
+retention resets to no time limit; omitted/empty conversations reset to all.
+Use archive listing/search, bounded backfill/restart, and coverage; do not infer complete workspace/thread history
 from one page or a completed channel import. Purge disables capture and queues retained
 content deletion. Archive reads require current connection/conversation access.
 Slack webhooks support optional connection/conversation/message-kind filters, not
 cross-channel context or historical delivery replay. The runtime owns attention rules,
-watched threads, and its own memory.
+watched threads, and its own memory. Webhook delivery order is not guaranteed.

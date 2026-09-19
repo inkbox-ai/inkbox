@@ -1,4 +1,6 @@
 //! Live Slack reads and durable sends; use invitation URLs for browser onboarding.
+//! Slack enums reject unrecognized values; a newer SDK may be required.
+//! Action/operation `Unknown` means terminal uncertainty, not a catch-all.
 use crate::error::{InkboxError, Result};
 use crate::http::{HttpTransport, NO_QUERY};
 use serde::{Deserialize, Serialize};

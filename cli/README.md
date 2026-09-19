@@ -860,16 +860,11 @@ inkbox mailbox get alex@example.com --json
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
 
-## License
-
-MIT
-
 ## Slack
 
 ```bash
-inkbox slack connection list --identity-id 22222222-2222-4222-8222-222222222222
-inkbox slack invitation create --identity-id 22222222-2222-4222-8222-222222222222
-# Open the returned invitationUrl in the installer's browser.
+inkbox slack connection list --identity example-agent
+# Select the intended workspace with status connected from the returned connections.
 inkbox slack message send --connection-id 11111111-1111-4111-8111-111111111111 \
   --conversation-id CEXAMPLE --text 'Hello from Inkbox' --idempotency-key greeting:2026-09-16
 inkbox slack message list --connection-id 11111111-1111-4111-8111-111111111111 \
@@ -877,6 +872,21 @@ inkbox slack message list --connection-id 11111111-1111-4111-8111-111111111111 \
 inkbox slack file download FEXAMPLE --connection-id 11111111-1111-4111-8111-111111111111 \
   --output example.bin
 ```
+
+Onboarding is a separate organization-management task. With organization-management
+credentials configured, create an invitation or start a direct browser installation:
+
+```bash
+inkbox slack invitation create --identity example-agent
+# Open the returned invitationUrl in the installer's browser; keep it secret.
+# Alternatively, open the secret authorizationUrl from:
+inkbox slack installation start --identity example-agent
+```
+
+Installation availability reports readiness, not permission to manage installations.
+`connection list`, `invitation create/list`, and `installation start` accept exactly
+one of `-i/--identity <handle>` or `--identity-id <uuid>`. Handles use the existing
+identity lookup; the UUID form avoids that lookup.
 
 | Command group | Operations |
 | --- | --- |
@@ -907,9 +917,9 @@ SDK; the CLI maps them to the API wire shape.
 
 An existing identity can connect to multiple Slack workspaces. Organization management
 credentials create/revoke invitations and disconnect connections; claimed identity
-credentials can read and use their own connections. Check the returned installation
-availability before offering onboarding. Invitation links are returned once: open the
-full link in a browser and treat it as a secret. The browser page handles installation.
+credentials can read and use their own connections. Installation availability is
+readiness, not management permission; offer onboarding only in a management flow.
+Invitation links are returned once: open the full link in a browser and treat it as a secret. The browser page handles installation.
 Direct installation is also supported: `start_installation` (Python/Rust),
 `startInstallation` (TypeScript), or `slack installation start` returns a short-lived
 opaque authorization URL to open in a browser. Treat it as a secret; the browser
@@ -931,8 +941,10 @@ operation. File downloads return bytes; unavailable or oversized files surface A
 errors. General file uploads accept standard base64 for 1 byte..10 MiB of decoded
 content (CLI: `slack file upload --file PATH`). Reactions, pins, own-message edits and
 deletions, channel join/leave, and native processing status use stable keys and return
-operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Native
-processing support depends on the workspace and may fail explicitly; no reaction is
+operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Send
+keys and utility-operation keys have independent per-connection namespaces. Utility
+operations emit no outcome webhook: inspect the returned status and operation lookup,
+not send-outcome events. Native processing support depends on the workspace and may fail explicitly; no reaction is
 used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
 Disconnect removes Inkbox authority, not the workspace's Slack app installation.
 
@@ -940,15 +952,19 @@ Retained history is separate from live reads and webhook diagnostics. Capture is
 by default for messages observed in conversations the connection can access, with no
 time-based retention limit. This is not an automatic whole-workspace or historical
 copy. Organization management can disable capture, restrict conversation selection,
-set retention, or purge. Archive messages/search return retained records only. Backfill queues bounded imports and reports coverage; a
-completed channel page does not prove every thread is complete. `restart=true`
+set retention, or purge. Updating archive settings replaces all fields: omitted
+retention resets to no time limit, and omitted/empty conversation selection resets
+to all conversations. Read current settings and restate values to preserve them.
+Unlike archive selection, webhook selectors use null for all and reject empty arrays.
+Archive messages/search return retained records only. Backfill queues bounded imports
+and reports coverage; a completed channel page does not prove every thread is complete. `restart=true`
 restarts a completed/failed import. Purge disables capture and queues retained-content
 deletion. Archive reads still require current connection/conversation access.
-Archive source URLs may be null; use the exact-message permalink method when needed.
+Use the live exact-message permalink method when a Slack link is needed.
 Live message context is a bounded window (`complete=false`), not full history.
 
 Slack webhook envelopes use the existing signature verification and stable `id`
-deduplication. All 19 event types are exported as `SlackWebhookEventType`, with
+deduplication; delivery order is not guaranteed. All 19 event types are exported as `SlackWebhookEventType`, with
 `SlackWebhookData` and `SlackWebhookPayload` types. Optional connection/conversation
 selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_dm`,
 `mention`, `channel`, `thread`) affect received/updated/deleted messages only. `thread`
@@ -963,7 +979,6 @@ owns attention rules, thread watches, and its own memory.
 ### Retained history and utility actions
 
 ```sh
-inkbox slack installation start --identity-id "$IDENTITY_ID"
 inkbox slack capabilities --connection-id "$CONNECTION_ID"
 inkbox slack archive search --connection-id "$CONNECTION_ID" --q 'release notes'
 inkbox slack reaction add --connection-id "$CONNECTION_ID" \
@@ -976,6 +991,12 @@ inkbox slack file upload --connection-id "$CONNECTION_ID" \
 Use `slack user`, `conversation members/join/leave`, `message get/context/permalink/
 update/delete`, `reaction`, `pin`, `processing-status set`, and `operation get
 --operation-id ID` for utilities. `slack archive settings update --capture-enabled
-true|false` replaces capture policy; `--retention-days null` removes the time limit
-and repeatable `--capture-conversation-id` restricts capture. Archive subcommands
+true|false` replaces all capture settings. Omitting `--retention-days` (or passing
+`null`) resets to no time limit; omitting `--capture-conversation-id` resets to all
+conversations. Repeat the latter flag to restrict capture. Read current settings and
+restate values you want to preserve. Archive subcommands
 include `messages`, `search`, `backfill [--restart]`, `coverage`, and `purge`.
+
+## License
+
+MIT
