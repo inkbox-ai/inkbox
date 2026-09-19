@@ -110,18 +110,16 @@ for (const testCase of data.cases) {
       });
     if (testCase.name === "list_archived_messages")
       expect(result).toMatchObject({
-        messages: [{ capturedAt: expect.any(Date), sourceUrl: null }],
+        messages: [{ capturedAt: expect.any(Date) }],
       });
   });
   if (testCase.idempotency_key)
     it(`does not retry ${testCase.name}`, async () => {
-      const fetch = vi
-        .fn<typeof globalThis.fetch>()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ detail: "Unavailable" }), {
-            status: 503,
-          }),
-        );
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "Unavailable" }), {
+          status: 503,
+        }),
+      );
       vi.stubGlobal("fetch", fetch);
       const client = new Inkbox({
         apiKey: "synthetic-test-key",

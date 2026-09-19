@@ -888,24 +888,35 @@ authority and must not trigger history loading.
 ## Slack
 
 ```rust,no_run
-use inkbox::{Inkbox, SlackSendMessageOptions};
+use inkbox::{Inkbox, SlackConnectionStatus, SlackSendMessageOptions};
 use uuid::Uuid;
 
 let client = Inkbox::new("ApiKey_...")?;
 let identity_id = Uuid::parse_str("22222222-2222-4222-8222-222222222222")?;
 let connections = client.slack().list_connections(identity_id)?;
-if connections.installation_available {
-    let invitation = client.slack().create_invitation(identity_id, None)?;
-    // Open invitation.invitation_url in the installer's browser.
-}
-if let Some(connection) = connections.connections.first() {
-    let action = client.slack().send_message(connection.id, &SlackSendMessageOptions {
-        conversation_id: "CEXAMPLE".into(),
-        text: "Hello from Inkbox".into(),
-        idempotency_key: "greeting:2026-09-16".into(),
-        thread_ts: None,
-    })?;
-}
+let connection = connections.connections.iter().find(|c| {
+    c.workspace_id == "TEXAMPLE" && c.status == SlackConnectionStatus::Connected
+}).ok_or("Connect or reauthorize the intended workspace first")?;
+let action = client.slack().send_message(connection.id, &SlackSendMessageOptions {
+    conversation_id: "CEXAMPLE".into(),
+    text: "Hello from Inkbox".into(),
+    idempotency_key: "greeting:2026-09-16".into(),
+    thread_ts: None,
+})?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Onboarding is a separate organization-management task, not part of normal agent usage.
+`installation_available` reports readiness, not permission to create invitations.
+
+```rust,no_run
+use inkbox::Inkbox;
+use uuid::Uuid;
+
+let management_client = Inkbox::new("YOUR_ORGANIZATION_MANAGEMENT_API_KEY")?;
+let identity_id = Uuid::parse_str("22222222-2222-4222-8222-222222222222")?;
+let invitation = management_client.slack().create_invitation(identity_id, None)?;
+// Open invitation.invitation_url in the installer's browser; keep it secret.
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -920,13 +931,17 @@ For webhook subscriptions use `create_with_slack_filter` and
 unchanged. The update filter argument is `None` to preserve, `Some(None)` to clear,
 or `Some(Some(&filter))` to replace a `SlackWebhookFilter`.
 
+Rust Slack enums parse strictly: an unrecognized response or webhook value fails
+deserialization and may require an SDK update. `Unknown` on action/operation status
+means terminal uncertainty, never an arbitrary unrecognized value.
+
 ### Slack behavior
 
 An existing identity can connect to multiple Slack workspaces. Organization management
 credentials create/revoke invitations and disconnect connections; claimed identity
-credentials can read and use their own connections. Check the returned installation
-availability before offering onboarding. Invitation links are returned once: open the
-full link in a browser and treat it as a secret. The browser page handles installation.
+credentials can read and use their own connections. Installation availability is
+readiness, not management permission; offer onboarding only in a management flow.
+Invitation links are returned once: open the full link in a browser and treat it as a secret. The browser page handles installation.
 Direct installation is also supported: `start_installation` (Python/Rust),
 `startInstallation` (TypeScript), or `slack installation start` returns a short-lived
 opaque authorization URL to open in a browser. Treat it as a secret; the browser
@@ -948,8 +963,10 @@ operation. File downloads return bytes; unavailable or oversized files surface A
 errors. General file uploads accept standard base64 for 1 byte..10 MiB of decoded
 content (CLI: `slack file upload --file PATH`). Reactions, pins, own-message edits and
 deletions, channel join/leave, and native processing status use stable keys and return
-operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Native
-processing support depends on the workspace and may fail explicitly; no reaction is
+operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Send
+keys and utility-operation keys have independent per-connection namespaces. Utility
+operations emit no outcome webhook: inspect the returned status and operation lookup,
+not send-outcome events. Native processing support depends on the workspace and may fail explicitly; no reaction is
 used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
 Disconnect removes Inkbox authority, not the workspace's Slack app installation.
 
@@ -957,15 +974,19 @@ Retained history is separate from live reads and webhook diagnostics. Capture is
 by default for messages observed in conversations the connection can access, with no
 time-based retention limit. This is not an automatic whole-workspace or historical
 copy. Organization management can disable capture, restrict conversation selection,
-set retention, or purge. Archive messages/search return retained records only. Backfill queues bounded imports and reports coverage; a
-completed channel page does not prove every thread is complete. `restart=true`
+set retention, or purge. Updating archive settings replaces all fields: omitted
+retention resets to no time limit, and omitted/empty conversation selection resets
+to all conversations. Read current settings and restate values to preserve them.
+Unlike archive selection, webhook selectors use null for all and reject empty arrays.
+Archive messages/search return retained records only. Backfill queues bounded imports
+and reports coverage; a completed channel page does not prove every thread is complete. `restart=true`
 restarts a completed/failed import. Purge disables capture and queues retained-content
 deletion. Archive reads still require current connection/conversation access.
-Archive source URLs may be null; use the exact-message permalink method when needed.
+Use the live exact-message permalink method when a Slack link is needed.
 Live message context is a bounded window (`complete=false`), not full history.
 
 Slack webhook envelopes use the existing signature verification and stable `id`
-deduplication. All 19 event types are exported as `SlackWebhookEventType`, with
+deduplication; delivery order is not guaranteed. All 19 event types are exported as `SlackWebhookEventType`, with
 `SlackWebhookData` and `SlackWebhookPayload` types. Optional connection/conversation
 selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_dm`,
 `mention`, `channel`, `thread`) affect received/updated/deleted messages only. `thread`
@@ -999,3 +1020,7 @@ Additional methods on `client.slack()` include users/members, exact message cont
 and permalinks, reactions/pins, own-message update/delete, join/leave, native processing
 status, general `upload_file`, and `get_operation`. Archive settings, listing/search,
 backfill, coverage, and purge use exported `SlackArchive*` response and option types.
+
+## License
+
+MIT

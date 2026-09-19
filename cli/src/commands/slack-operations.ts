@@ -12,8 +12,6 @@ interface Args {
   conversationId: string;
   messageTs: string;
   idempotencyKey: string;
-  identityId: string;
-  workspaceId?: string;
   userId: string;
   operationId: string;
   name: string;
@@ -103,19 +101,6 @@ export function registerSlackOperationCommands(
         ),
     ),
     (s, o) => s.capabilities(o.connectionId),
-  );
-  const installations = slack
-    .command("installation")
-    .description("Organization management: browser installation handoff");
-  action(
-    installations
-      .command("start")
-      .requiredOption("--identity-id <id>", "Owning identity UUID")
-      .option("--workspace-id <id>", "Expected Slack workspace ID")
-      .description(
-        "Return a short-lived secret URL to open in a browser; do not log or share it",
-      ),
-    (s, o) => s.startInstallation(o.identityId, { workspaceId: o.workspaceId }),
   );
   const users = slack
     .command("user")
@@ -269,17 +254,19 @@ export function registerSlackOperationCommands(
     connection(
       settings
         .command("update")
-        .description("Organization management: replace capture settings"),
+        .description(
+          "Organization management: replace all capture settings; omitted values reset",
+        ),
     )
       .requiredOption("--capture-enabled <boolean>", "true or false", boolean)
       .option(
         "--retention-days <days|null>",
-        "Retention limit or null for no time limit",
+        "Retention limit; null or omission resets to no time limit",
         (v) => (v === "null" ? "null" : slackInteger(v)),
       )
       .option(
         "--capture-conversation-id <id>",
-        "Capture only these conversations (repeatable); default all",
+        "Capture only these conversations (repeatable); omission resets to all",
         (v: string, previous: string[]) => [...previous, v],
         [] as string[],
       ),

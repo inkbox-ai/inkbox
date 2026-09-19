@@ -1889,10 +1889,6 @@ inkbox.mailboxes.update(
 inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 ```
 
-## License
-
-MIT
-
 ## Slack
 
 ```python
@@ -1901,18 +1897,32 @@ from inkbox import Inkbox
 client = Inkbox()
 identity_id = "22222222-2222-4222-8222-222222222222"
 connections = client.slack.list_connections(identity_id)
-if connections.installation_available:
-    invitation = client.slack.create_invitation(identity_id)
-    # Open invitation.invitation_url in the installer's browser.
-if connections.connections:
-    connection_id = connections.connections[0].id
-    action = client.slack.send_message(
-        connection_id,
-        conversation_id="CEXAMPLE",
-        text="Hello from Inkbox",
-        idempotency_key="greeting:2026-09-16",
-    )
-    page = client.slack.list_messages(connection_id, "CEXAMPLE")
+connection = next(
+    (
+        c for c in connections.connections
+        if c.workspace_id == "TEXAMPLE" and c.status == "connected"
+    ),
+    None,
+)
+if connection is None:
+    raise RuntimeError("Connect or reauthorize the intended workspace first")
+connection_id = connection.id
+action = client.slack.send_message(
+    connection_id,
+    conversation_id="CEXAMPLE",
+    text="Hello from Inkbox",
+    idempotency_key="greeting:2026-09-16",
+)
+page = client.slack.list_messages(connection_id, "CEXAMPLE")
+```
+
+Onboarding is a separate organization-management task, not part of normal agent usage.
+`installation_available` reports readiness, not permission to create invitations.
+
+```python
+management_client = Inkbox(api_key="YOUR_ORGANIZATION_MANAGEMENT_API_KEY")
+invitation = management_client.slack.create_invitation(identity_id)
+# Open invitation.invitation_url in the installer's browser; keep it secret.
 ```
 
 `client.slack` also provides `list_invitations`, `revoke_invitation`, `disconnect`,
@@ -1934,9 +1944,9 @@ client.webhooks.subscriptions.update(subscription.id, slack_filter=None)  # Clea
 
 An existing identity can connect to multiple Slack workspaces. Organization management
 credentials create/revoke invitations and disconnect connections; claimed identity
-credentials can read and use their own connections. Check the returned installation
-availability before offering onboarding. Invitation links are returned once: open the
-full link in a browser and treat it as a secret. The browser page handles installation.
+credentials can read and use their own connections. Installation availability is
+readiness, not management permission; offer onboarding only in a management flow.
+Invitation links are returned once: open the full link in a browser and treat it as a secret. The browser page handles installation.
 Direct installation is also supported: `start_installation` (Python/Rust),
 `startInstallation` (TypeScript), or `slack installation start` returns a short-lived
 opaque authorization URL to open in a browser. Treat it as a secret; the browser
@@ -1958,8 +1968,10 @@ operation. File downloads return bytes; unavailable or oversized files surface A
 errors. General file uploads accept standard base64 for 1 byte..10 MiB of decoded
 content (CLI: `slack file upload --file PATH`). Reactions, pins, own-message edits and
 deletions, channel join/leave, and native processing status use stable keys and return
-operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Native
-processing support depends on the workspace and may fail explicitly; no reaction is
+operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Send
+keys and utility-operation keys have independent per-connection namespaces. Utility
+operations emit no outcome webhook: inspect the returned status and operation lookup,
+not send-outcome events. Native processing support depends on the workspace and may fail explicitly; no reaction is
 used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
 Disconnect removes Inkbox authority, not the workspace's Slack app installation.
 
@@ -1967,15 +1979,19 @@ Retained history is separate from live reads and webhook diagnostics. Capture is
 by default for messages observed in conversations the connection can access, with no
 time-based retention limit. This is not an automatic whole-workspace or historical
 copy. Organization management can disable capture, restrict conversation selection,
-set retention, or purge. Archive messages/search return retained records only. Backfill queues bounded imports and reports coverage; a
-completed channel page does not prove every thread is complete. `restart=true`
+set retention, or purge. Updating archive settings replaces all fields: omitted
+retention resets to no time limit, and omitted/empty conversation selection resets
+to all conversations. Read current settings and restate values to preserve them.
+Unlike archive selection, webhook selectors use null for all and reject empty arrays.
+Archive messages/search return retained records only. Backfill queues bounded imports
+and reports coverage; a completed channel page does not prove every thread is complete. `restart=true`
 restarts a completed/failed import. Purge disables capture and queues retained-content
 deletion. Archive reads still require current connection/conversation access.
-Archive source URLs may be null; use the exact-message permalink method when needed.
+Use the live exact-message permalink method when a Slack link is needed.
 Live message context is a bounded window (`complete=false`), not full history.
 
 Slack webhook envelopes use the existing signature verification and stable `id`
-deduplication. All 19 event types are exported as `SlackWebhookEventType`, with
+deduplication; delivery order is not guaranteed. All 19 event types are exported as `SlackWebhookEventType`, with
 `SlackWebhookData` and `SlackWebhookPayload` types. Optional connection/conversation
 selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_dm`,
 `mention`, `channel`, `thread`) affect received/updated/deleted messages only. `thread`
@@ -2008,3 +2024,7 @@ The same resource exposes `capabilities`, `list_users`, `get_user`, `list_member
 Archive methods include `get_archive_settings`, `update_archive_settings`,
 `list_archived_messages`, `search_archived_messages`, `archive_backfill`,
 `list_archive_coverage`, and `purge_archive`.
+
+## License
+
+MIT

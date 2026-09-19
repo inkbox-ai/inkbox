@@ -120,7 +120,6 @@ class SlackArchivedMessage:
     mentioned: bool
     source: Literal["event", "backfill", "action"]
     captured_at: datetime
-    source_url: str | None = None
 
 
 @dataclass
@@ -148,6 +147,12 @@ class SlackArchiveCoverage:
 class SlackArchiveCoverageResponse:
     coverage: list[SlackArchiveCoverage]
     next_cursor: str | None = None
+
+
+@dataclass
+class SlackArchivePurgeResponse:
+    status: str
+    capture_enabled: bool
 
 
 def _parse(cls, raw):
@@ -478,7 +483,11 @@ class SlackOperationsMixin:
         retention_days: int | None = None,
         conversation_ids: list[str] | None = None,
     ) -> SlackArchiveSettings:
-        """Organization management only; replaces capture settings. Null retention has no time limit."""
+        """Organization management only; replaces all capture settings.
+
+        Omitted retention resets to no time limit. Omitted or empty conversation_ids
+        resets to all conversations. Read current settings and restate values to preserve them.
+        """
         return _parse(
             SlackArchiveSettings,
             self._http.patch(
@@ -582,6 +591,9 @@ class SlackOperationsMixin:
         ]
         return _parse(SlackArchiveCoverageResponse, raw)
 
-    def purge_archive(self, connection_id: UUID | str) -> dict[str, Any]:
+    def purge_archive(self, connection_id: UUID | str) -> SlackArchivePurgeResponse:
         """Organization management only; disables capture and queues retained-content deletion."""
-        return self._http.delete_with_response(f"{_base(connection_id)}/archive")
+        return _parse(
+            SlackArchivePurgeResponse,
+            self._http.delete_with_response(f"{_base(connection_id)}/archive"),
+        )

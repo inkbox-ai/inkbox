@@ -92,7 +92,6 @@ export interface SlackArchivedMessage {
   files: Record<string, unknown>[];
   mentioned: boolean;
   source: "event" | "backfill" | "action";
-  sourceUrl: string | null;
   capturedAt: Date;
 }
 export interface SlackArchiveMessagesResponse {
@@ -195,7 +194,6 @@ const archivedMessage = (
   files: r.files,
   mentioned: r.mentioned,
   source: r.source,
-  sourceUrl: r.source_url ?? null,
   capturedAt: new Date(r.captured_at),
 });
 const coverage = (r: Wire<SlackArchiveCoverage>): SlackArchiveCoverage => ({
@@ -501,7 +499,10 @@ export class SlackOperationsResource {
       await this.http.get(`${base(connectionId)}/archive/settings`),
     );
   }
-  /** Organization management only. Replaces capture settings; null retention has no time limit. */
+  /** Organization management only; replaces all capture settings.
+   * Omitted retention resets to no time limit; omitted/empty conversation IDs reset to all.
+   * Read current settings and restate values to preserve them.
+   */
   async updateArchiveSettings(
     connectionId: string,
     options: SlackArchiveSettingsOptions,

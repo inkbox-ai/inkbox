@@ -7,7 +7,7 @@ from uuid import UUID
 import pytest
 import test_slack as fixtures
 
-from inkbox import InkboxAPIError, SlackOperation
+from inkbox import InkboxAPIError, SlackArchivePurgeResponse, SlackOperation
 
 wire = fixtures.wire
 
@@ -117,7 +117,10 @@ def test_all_operations_exact_wire_and_typed_results(wire, case):
         )
     if case["name"] in {"list_archived_messages", "search_archived_messages"}:
         assert result.messages[0].captured_at.tzinfo is not None
-        assert result.messages[0].source_url is None
+        assert result.messages[0].message_ts == TS
+    if case["name"] == "purge_archive":
+        assert isinstance(result, SlackArchivePurgeResponse)
+        assert result.status == "pending" and result.capture_enabled is False
     if case["name"] == "capabilities":
         assert not result.capabilities["files_upload"].scopes_satisfied
 
