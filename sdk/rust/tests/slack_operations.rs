@@ -25,6 +25,12 @@ fn invoke(client: &Inkbox, name: &str, data: &Value) -> Value {
     }
     match name {
         "start_installation" => v!(s.start_installation(c, Some("T123"))),
+        "start_installation_defaults" => v!(s.start_installation_with_return_url(c, None, None)),
+        "start_installation_return_url" => v!(s.start_installation_with_return_url(
+            c,
+            Some("T123"),
+            Some("https://example.com/console/slack/complete")
+        )),
         "capabilities" => v!(s.capabilities(c)),
         "list_users" => v!(s.list_users(c, &page)),
         "get_user" => v!(s.get_user(c, "U123")),

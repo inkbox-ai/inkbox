@@ -165,9 +165,23 @@ impl SlackResource {
         identity_id: Uuid,
         workspace_id: Option<&str>,
     ) -> Result<SlackInstallation> {
+        self.start_installation_with_return_url(identity_id, workspace_id, None)
+    }
+    /// Start installation with an optional approved Console completion URL.
+    /// None uses the default completion page. Open the returned opaque URL in a browser;
+    /// do not log it. Organization management only.
+    pub fn start_installation_with_return_url(
+        &self,
+        identity_id: Uuid,
+        workspace_id: Option<&str>,
+        return_url: Option<&str>,
+    ) -> Result<SlackInstallation> {
         let mut body = json!({"identity_id":identity_id});
         if let Some(workspace) = workspace_id {
             body["workspace_id"] = json!(workspace);
+        }
+        if let Some(url) = return_url {
+            body["return_url"] = json!(url);
         }
         Ok(serde_json::from_value(self.http.post(
             "/slack/installations",

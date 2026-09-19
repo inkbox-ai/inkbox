@@ -949,6 +949,11 @@ handoff establishes installation state. Workspace approval and channel permissio
 still apply. Join accessible public channels or invite the agent to private channels;
 Slack Connect conversations are supported when the connection has access.
 
+`start_installation_with_return_url(identity_id, workspace_id, return_url)` accepts
+an optional approved Console completion URL with the exact path `/console/slack/complete`,
+no query or fragment, and at most 2048 characters. `None`, or the existing `start_installation` method,
+uses the default completion page.
+
 Conversation/history/file reads are live and scoped to the selected connection, not
 an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
 pages default to 15 (maximum 100). Pass the returned cursor explicitly for another

@@ -20,6 +20,10 @@ C, OP_ID, TS = DATA["connection_id"], DATA["operation_id"], DATA["message_ts"]
 def calls(s):
     return {
         "start_installation": lambda: s.start_installation(C, workspace_id="T123"),
+        "start_installation_defaults": lambda: s.start_installation(C, return_url=None),
+        "start_installation_return_url": lambda: s.start_installation(
+            C, workspace_id="T123", return_url="https://example.com/console/slack/complete"
+        ),
         "capabilities": lambda: s.capabilities(C),
         "list_users": lambda: s.list_users(C, limit=2, cursor="opaque"),
         "get_user": lambda: s.get_user(C, "U123"),

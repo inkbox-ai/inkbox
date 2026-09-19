@@ -145,10 +145,14 @@ export function registerSlackCommands(program: Command): void {
       ),
   )
     .option("--workspace-id <id>", "Expected Slack workspace ID")
+    .option(
+      "--return-url <url>",
+      "Approved Console completion URL (default: standard completion page)",
+    )
     .action(
       withErrorHandler(async function (
         this: Command,
-        o: IdentityOptions & { workspaceId?: string },
+        o: IdentityOptions & { workspaceId?: string; returnUrl?: string },
       ) {
         const opts = getGlobalOpts(this);
         const client = createClient(opts);

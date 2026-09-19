@@ -6,6 +6,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
+- Add optional approved Console completion URLs to Slack installation handoffs,
+  preserving existing default requests across Python, TypeScript, Rust, and CLI.
 - Add Slack CLI identity-handle selection and require DM recipients before dispatch;
   separate management onboarding from explicit connected-workspace selection in examples.
 - Remove unused archive message source URLs, type the Python purge result, and clarify

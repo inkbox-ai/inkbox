@@ -14,6 +14,11 @@ const key = { idempotencyKey: "stable-key" };
 function calls(s: Inkbox["slack"]): Record<string, () => Promise<unknown>> {
   return {
     start_installation: () => s.startInstallation(C, { workspaceId: "T123" }),
+    start_installation_defaults: () => s.startInstallation(C, { returnUrl: null }),
+    start_installation_return_url: () => s.startInstallation(C, {
+      workspaceId: "T123",
+      returnUrl: "https://example.com/console/slack/complete",
+    }),
     capabilities: () => s.capabilities(C),
     list_users: () => s.listUsers(C, { limit: 2, cursor: "opaque" }),
     get_user: () => s.getUser(C, "U123"),
