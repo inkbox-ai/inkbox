@@ -4,6 +4,56 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.2 — Voicemail handling on outbound calls
+
+### Added
+
+- **Voicemail actions.** Outbound call placement accepts `on_voicemail`
+  (`leave_message`, `hang_up`, or `ignore`). Python, TypeScript, and Rust
+  expose a typed `OnVoicemail` enum on placement options, call responses,
+  and `call.ended` webhook payloads. `leave_message` lets Voice AI wait for
+  the beep, leave a message, and end the call (`hangup_reason=voicemail`);
+  `hang_up` ends the call as soon as a voicemail beep is detected; `ignore`
+  skips detection and treats whatever answers as a person.
+- **Voicemail message.** `voicemail_message` (max 1000 characters) sets what
+  Voice AI says on the voicemail. It is valid only with
+  `on_voicemail=leave_message`; when omitted the agent composes a short
+  message from the call's `reason`.
+- **CLI controls.** `inkbox phone call` accepts `--on-voicemail <action>` and
+  `--voicemail-message <text>`, and prints the persisted `onVoicemail` value.
+
+### Changed
+
+- Version bumped to 0.7.2 across `@inkbox/sdk` (TypeScript), `inkbox`
+  (Python), `@inkbox/cli`, `inkbox` (Rust), and the bundled plugin. The CLI
+  depends on `@inkbox/sdk` `^0.7.2`.
+- Hosted-agent calls now default to `leave_message`; client WebSocket calls
+  default to `hang_up`. SDKs omit `on_voicemail` unless set, so the server
+  default applies.
+- Outbound calls now ring for up to 60 seconds before `no_answer` (was 30).
+- **Source-breaking migration:** manually constructed `PhoneCall` objects in
+  TypeScript need `onVoicemail: OnVoicemail.HANG_UP` (the pre-feature
+  behavior). Rust `CallPlacementOptions` and `HostedCallPlacementOptions`
+  struct literals gain `on_voicemail: None` and `voicemail_message: None`, or
+  use `..Default::default()`. Older API responses still parse with these
+  defaults; this migration applies to source literals when upgrading and
+  recompiling.
+
+### Deprecated
+
+- `voicemail_detection` (`VoicemailDetection` in every SDK and
+  `--no-voicemail-detection` in the CLI) remains accepted as an alias:
+  `enabled` maps to `hang_up` and `disabled` to `ignore`. Sending both with
+  conflicting values returns 422. Call responses keep reporting
+  `voicemail_detection` with only `enabled`/`disabled` values, so
+  `leave_message` calls read as `enabled` there.
+
+### Compatibility
+
+- Missing, null, or unrecognized `on_voicemail` values on older call and
+  webhook payloads parse as `hang_up`, matching the legacy `enabled` default.
+  Older `call.ended` replays may omit the optional field.
+
 ## 0.7.1 — Custom email signatures
 
 ### Added

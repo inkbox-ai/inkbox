@@ -92,10 +92,48 @@ class CallMode(StrEnum):
 
 
 class VoicemailDetection(StrEnum):
-    """Whether an outbound call hangs up when voicemail is detected."""
+    """Whether an outbound call hangs up when voicemail is detected.
+
+    .. deprecated:: 0.7.2
+        Use :class:`OnVoicemail` instead. ``enabled`` maps to
+        ``OnVoicemail.HANG_UP`` and ``disabled`` to ``OnVoicemail.IGNORE``.
+        Call responses keep reporting this field, with ``leave_message``
+        calls reading as ``enabled``.
+    """
 
     ENABLED = "enabled"
     DISABLED = "disabled"
+
+
+class OnVoicemail(StrEnum):
+    """What an outbound call does when voicemail answers.
+
+    ``leave_message`` waits for the beep, lets Voice AI leave a message,
+    then ends the call (``hangup_reason=voicemail``); hosted-agent calls
+    default to it. ``hang_up`` ends the call as soon as a voicemail beep is
+    detected; client WebSocket calls default to it. ``ignore`` skips
+    detection and treats whatever answers as a person.
+    """
+
+    LEAVE_MESSAGE = "leave_message"
+    HANG_UP = "hang_up"
+    IGNORE = "ignore"
+
+    @classmethod
+    def _parse(cls, value: Any) -> OnVoicemail:
+        """Coerce a wire value, falling back to ``hang_up``.
+
+        Args:
+            value: Raw ``on_voicemail`` wire value, possibly missing/null.
+
+        Returns:
+            The matching member, or ``HANG_UP`` for null/unknown values
+            (matching the legacy ``voicemail_detection=enabled`` default).
+        """
+        try:
+            return cls(value) if value else cls.HANG_UP
+        except ValueError:
+            return cls.HANG_UP
 
 
 class HostedAgentAuthorityMode(StrEnum):
@@ -287,6 +325,9 @@ class PhoneCall:
     # Whether voicemail detection ran. Missing/null legacy values preserve the
     # server default.
     voicemail_detection: VoicemailDetection = VoicemailDetection.ENABLED
+    # What the call does when voicemail answers. Missing/null/unknown values
+    # fall back to hang_up, which matches the legacy ``enabled`` behavior.
+    on_voicemail: OnVoicemail = OnVoicemail.HANG_UP
     # Voice AI's recorded action items, surfaced inline (open items only,
     # seq-ascending); empty for client_websocket calls and Voice AI calls with
     # no open items.
@@ -324,6 +365,7 @@ class PhoneCall:
             voicemail_detection=VoicemailDetection(
                 d.get("voicemail_detection") or "enabled"
             ),
+            on_voicemail=OnVoicemail._parse(d.get("on_voicemail")),
             # Open items only, seq-ascending; empty for client_websocket calls.
             post_call_action_items=[
                 PostCallActionItem._from_dict(a)

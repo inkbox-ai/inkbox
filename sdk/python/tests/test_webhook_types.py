@@ -23,6 +23,7 @@ from inkbox import (
     IMessageReactionTypeWire,
     IMessageWebhookReaction,
     MailWebhookPayload,
+    OnVoicemailWire,
     PhoneIncomingCallWebhookPayload,
     TextWebhookPayload,
     VoicemailDetectionWire,
@@ -48,6 +49,11 @@ def test_hosted_call_wire_types_are_exported_from_package_root():
     assert set(get_args(VoicemailDetectionWire)) == {
         "disabled",
         "enabled",
+    }
+    assert set(get_args(OnVoicemailWire)) == {
+        "leave_message",
+        "hang_up",
+        "ignore",
     }
 
 
@@ -515,7 +521,9 @@ def test_call_ended_hosted_mode_and_reason_ride_the_call_block():
     # mode/reason live on data.call (mirrors the call REST shape), not data.
     assert call["mode"] == "hosted_agent"
     assert call["hosted_agent_authority_mode"] == "yolo"
-    assert call["voicemail_detection"] == "disabled"
+    # leave_message calls keep reading as "enabled" on the legacy field.
+    assert call["voicemail_detection"] == "enabled"
+    assert call["on_voicemail"] == "leave_message"
     assert call["reason"].startswith("Call the dental office")
     assert "mode" not in payload["data"]
     assert "reason" not in payload["data"]

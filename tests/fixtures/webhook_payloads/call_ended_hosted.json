@@ -18,7 +18,8 @@
       "duration_seconds": 189,
       "mode": "hosted_agent",
       "hosted_agent_authority_mode": "yolo",
-      "voicemail_detection": "disabled",
+      "voicemail_detection": "enabled",
+      "on_voicemail": "leave_message",
       "reason": "Call the dental office and book a cleaning next week, mornings preferred"
     },
     "contacts": [

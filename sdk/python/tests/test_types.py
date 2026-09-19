@@ -22,6 +22,7 @@ from inkbox.phone.types import (
     ForwardingTargetType,
     IncomingCallAction,
     IncomingCallActionConfig,
+    OnVoicemail,
     PhoneNumber,
     PhoneCall,
     PhoneCallWithRateLimit,
@@ -149,6 +150,36 @@ class TestPhoneCallParsing:
                 {**PHONE_CALL_DICT, "voicemail_detection": "disabled"}
             ).voicemail_detection
             is VoicemailDetection.DISABLED
+        )
+
+    def test_on_voicemail_defaults_parses_and_tolerates_unknown(self):
+        legacy = {
+            key: value
+            for key, value in PHONE_CALL_DICT.items()
+            if key != "on_voicemail"
+        }
+        # Missing (pre-feature responses) falls back to hang_up.
+        assert PhoneCall._from_dict(legacy).on_voicemail is OnVoicemail.HANG_UP
+        # Null is treated like missing.
+        assert (
+            PhoneCall._from_dict({**PHONE_CALL_DICT, "on_voicemail": None}).on_voicemail
+            is OnVoicemail.HANG_UP
+        )
+        for wire, member in (
+            ("leave_message", OnVoicemail.LEAVE_MESSAGE),
+            ("hang_up", OnVoicemail.HANG_UP),
+            ("ignore", OnVoicemail.IGNORE),
+        ):
+            assert (
+                PhoneCall._from_dict({**PHONE_CALL_DICT, "on_voicemail": wire}).on_voicemail
+                is member
+            )
+        # A value this SDK doesn't know must not raise.
+        assert (
+            PhoneCall._from_dict(
+                {**PHONE_CALL_DICT, "on_voicemail": "something_new"}
+            ).on_voicemail
+            is OnVoicemail.HANG_UP
         )
 
     def test_origin_dedicated_explicit(self):

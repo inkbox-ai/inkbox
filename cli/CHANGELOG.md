@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.2 — Voicemail handling on outbound calls
+
+- `phone call` accepts `--on-voicemail <leave_message|hang_up|ignore>` and
+  `--voicemail-message <text>` (requires `--on-voicemail leave_message`). Omit
+  `--on-voicemail` for the server default: `leave_message` with `--hosted`,
+  `hang_up` otherwise.
+- `--no-voicemail-detection` is deprecated in favor of `--on-voicemail ignore`;
+  it still works, and combining it with `--voicemail-message` is rejected.
+- Call output includes the persisted `onVoicemail` value.
+- Bump `@inkbox/cli` and its SDK dependency to 0.7.2.
+
 ## 0.7.1 — Custom email signatures
 
 - `mailbox update` supports inline HTML/text, UTF-8 signature files, enable/disable,

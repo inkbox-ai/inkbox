@@ -5,7 +5,7 @@
 //! string enums whose `#[serde(rename = ...)]` values match the Python
 //! `Literal[...]` unions in `inkbox/webhooks.py` exactly.
 
-use crate::phone::types::{HostedAgentAuthorityMode, VoicemailDetection};
+use crate::phone::types::{HostedAgentAuthorityMode, OnVoicemail, VoicemailDetection};
 use serde::{Deserialize, Serialize};
 
 // ---- Wire union types ----------------------------------------------------
@@ -859,6 +859,13 @@ pub struct WebhookPhoneCall {
         deserialize_with = "deserialize_webhook_voicemail_detection_null_default"
     )]
     pub voicemail_detection: VoicemailDetection,
+    /// What the call did when voicemail answered. Absent on older replays;
+    /// missing, null, or unknown values fall back to `HangUp`.
+    #[serde(
+        default,
+        deserialize_with = "crate::phone::types::deserialize_on_voicemail_lenient"
+    )]
+    pub on_voicemail: OnVoicemail,
     /// Chronological forwarding attempts; absent on older webhook replays.
     #[serde(default)]
     pub forwardings: Vec<crate::phone::PhoneCallForwarding>,
@@ -1312,7 +1319,8 @@ mod tests {
                     "duration_seconds": 189,
                     "mode": "hosted_agent",
                     "hosted_agent_authority_mode": "yolo",
-                    "voicemail_detection": "disabled",
+                    "voicemail_detection": "enabled",
+                    "on_voicemail": "leave_message",
                     "reason": "Book a cleaning next week"
                 },
                 "contacts": [],
@@ -1339,10 +1347,12 @@ mod tests {
             payload.data.call.hosted_agent_authority_mode,
             HostedAgentAuthorityMode::Yolo
         );
+        // leave_message calls keep reading as `Enabled` on the legacy field.
         assert_eq!(
             payload.data.call.voicemail_detection,
-            VoicemailDetection::Disabled
+            VoicemailDetection::Enabled
         );
+        assert_eq!(payload.data.call.on_voicemail, OnVoicemail::LeaveMessage);
         assert_eq!(payload.data.outcome.as_deref(), Some("completed"));
         let actions = &payload.data.post_call_action_items;
         assert_eq!(actions.len(), 2);
