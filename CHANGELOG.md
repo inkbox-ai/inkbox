@@ -4,6 +4,17 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.3 — Identity-owned webhook subscriptions
+
+- Combine all notification families on one identity, regardless of configured channels;
+  legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
+- Add revision-checked subscription updates and deletion, plus CLI `--expected-revision`.
+  Event-list updates remain full replacement. Incoming-call actions remain separate.
+- Expose canonical delivery targets and replayability without changing original history IDs.
+  Conversation context applies only to received mail, text and iMessage events.
+
+- Bundled Codex plugin version `0.1.7` includes the identity-owned webhook skills.
+
 ## 0.7.2 — Voicemail handling on outbound calls
 
 ### Added

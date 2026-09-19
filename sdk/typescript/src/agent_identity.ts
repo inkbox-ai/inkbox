@@ -801,9 +801,9 @@ export class AgentIdentity {
    * The returned message is in `queued` state. The full outbound
    * lifecycle (`text.sent` → `text.delivered` / `text.delivery_failed`
    * / `text.delivery_unconfirmed`) arrives via any webhook
-   * subscription on the sender's phone number whose `eventTypes`
+   * subscription on the sender's identity whose `eventTypes`
    * include those lifecycle events
-   * (`inkbox.webhooks.subscriptions.create({ phoneNumberId, url,
+   * (`inkbox.webhooks.subscriptions.create({ agentIdentityId: this.id, url,
    * eventTypes })`). See `TextWebhookEventType` and `TextWebhookPayload`
    * for the typed receiver-side shapes.
    *
