@@ -158,10 +158,13 @@ export class SlackResource extends SlackOperationsResource {
   constructor(http: HttpTransport) {
     super(http);
   }
-  /** Organization management only. Open the short-lived opaque URL in a browser; do not log it. */
+  /**
+   * Organization management only. Open the short-lived opaque URL in a browser; do not log it.
+   * returnUrl optionally selects an approved Console completion URL; omit it for the default page.
+   */
   async startInstallation(
     identityId: string,
-    options: { workspaceId?: string } = {},
+    options: { workspaceId?: string; returnUrl?: string | null } = {},
   ): Promise<SlackInstallation> {
     const r = await this.http.post<{
       authorization_url: string;
@@ -169,6 +172,7 @@ export class SlackResource extends SlackOperationsResource {
     }>("/slack/installations", {
       identity_id: identityId,
       workspace_id: options.workspaceId,
+      return_url: options.returnUrl ?? undefined,
     });
     return {
       authorizationUrl: r.authorization_url,

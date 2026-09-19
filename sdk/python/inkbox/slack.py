@@ -139,12 +139,22 @@ class SlackResource(SlackOperationsMixin):
         )
 
     def start_installation(
-        self, identity_id: UUID | str, *, workspace_id: str | None = None
+        self,
+        identity_id: UUID | str,
+        *,
+        workspace_id: str | None = None,
+        return_url: str | None = None,
     ) -> SlackInstallation:
-        """Organization management only. Open the short-lived authorization URL in a browser; do not log it."""
+        """Organization management only. Open the short-lived authorization URL in a browser; do not log it.
+
+        ``return_url`` optionally selects an approved Console completion URL.
+        Omit it to use the default completion page.
+        """
         body = {"identity_id": str(identity_id)}
         if workspace_id is not None:
             body["workspace_id"] = workspace_id
+        if return_url is not None:
+            body["return_url"] = return_url
         return _parse(
             SlackInstallation, self._http.post("/slack/installations", json=body)
         )
