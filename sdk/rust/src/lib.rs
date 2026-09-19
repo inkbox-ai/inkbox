@@ -65,3 +65,9 @@ pub use client::{Inkbox, InkboxBuilder, DEFAULT_BASE_URL};
 pub use credentials::Credentials;
 pub use error::{ApiErrorDetail, InkboxError, Result};
 pub use filters::DateRangeFilter;
+
+pub mod slack;
+pub use slack::*;
+pub mod slack_operations;
+pub use slack_operations::*;
+pub use webhooks::types::{SlackWebhookData, SlackWebhookEventType, SlackWebhookPayload};

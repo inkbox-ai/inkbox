@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- Add Slack CLI identity-handle selection and require DM recipients before dispatch;
+  separate management onboarding from explicit connected-workspace selection in examples.
+- Remove unused archive message source URLs, type the Python purge result, and clarify
+  full-replacement capture settings and independent send/utility-operation outcomes.
+
+- Add direct Slack browser installation handoffs, capabilities/users/members, exact message
+  context/permalinks, reactions/pins, own-message edits/deletions, bounded general file
+  uploads, channel join/leave, native processing status, and durable operation lookup.
+- Add configurable retained-history settings, message search, bounded backfill/restart,
+  coverage, and purge with Python, TypeScript, Rust, and CLI parity.
+
+- Add Slack workspace invitations/connections, live conversations/messages, durable
+  idempotent sends/actions, and byte-preserving file downloads across the SDKs and CLI.
+- Add all 19 Slack webhook event types and optional connection/conversation/message-kind
+  filters, preserving omitted versus explicitly cleared filters on updates.
+- Document browser invitation onboarding, terminal unknown send outcomes, and
+  metadata-only Slack delivery diagnostics without historical replay.
+
 ## 0.7.2 — Voicemail handling on outbound calls
 
 - `phone call` accepts `--on-voicemail <leave_message|hang_up|ignore>` and

@@ -4,7 +4,7 @@
  * Replaces the legacy per-resource `webhook_url` columns on mailboxes
  * and phone numbers. Use this resource to attach HTTPS receivers to
  * mail (`message.*`), phone-text (`text.*`), iMessage (`imessage.*`),
- * post-call lifecycle (`call.ended`), or A2A (`a2a.*`) events. Mail and
+ * post-call lifecycle (`call.ended`), A2A (`a2a.*`), or Slack (`slack.*`) events. Mail and
  * text subscriptions are owned by the mailbox / phone number; the other
  * channels are owned by the agent identity. Each subscription contains
  * events from one channel. Incoming-call
@@ -14,6 +14,10 @@
  * meaningful.
  */
 
+import {
+  parseSlackFilter, slackFilterWire,
+  type SlackWebhookFilter, type RawSlackWebhookFilter,
+} from "../slack.js";
 import { HttpTransport } from "../_http.js";
 
 const PATH = "/webhooks/subscriptions";
@@ -66,6 +70,7 @@ export interface WebhookSubscription {
    * that predate the field). Unconfigured classes may echo as explicit `null`.
    */
   contextConfig: WebhookContextConfig | null;
+  slackFilter: SlackWebhookFilter | null;
   /**
    * Whether a delivery bearer token is configured. Defaults to `false` on
    * servers that predate the field.
@@ -103,6 +108,7 @@ export interface RawWebhookSubscription {
   created_at: string;
   updated_at: string;
   context_config?: WebhookContextConfig | null;
+  slack_filter?: RawSlackWebhookFilter | null;
   has_auth_token?: boolean;
   auth_token?: string | null;
 }
@@ -131,6 +137,7 @@ export function parseWebhookSubscription(
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     contextConfig: r.context_config ?? null,
+    slackFilter: parseSlackFilter(r.slack_filter),
     hasAuthToken: r.has_auth_token ?? false,
     authToken: r.auth_token ?? null,
   };
@@ -193,13 +200,14 @@ const EVENT_PREFIX_TO_OWNER: Array<[string, string]> = [
   ["imessage.", "agent_identity"],
   ["call.", "agent_identity"],
   ["a2a.", "agent_identity"],
+  ["slack.", "agent_identity"],
 ];
 
 // Owner resource → the event-type prefixes it may subscribe to.
 const OWNER_EVENT_PREFIXES: Record<string, string[]> = {
   mailbox: ["message."],
   phone_number: ["text."],
-  agent_identity: ["imessage.", "call.", "a2a."],
+  agent_identity: ["imessage.", "call.", "a2a.", "slack."],
 };
 
 function selectedEventPrefixes(eventTypes: string[]): Set<string> {
@@ -250,6 +258,7 @@ function assertA2AContextAbsent(
   eventTypes: string[],
   contextConfig: WebhookContextConfig | null,
 ): void {
+  if (contextConfig !== null && eventTypes.some(e => e.startsWith("slack."))) throw new Error("contextConfig is not supported for Slack subscriptions");
   if (
     contextConfig !== null
     && eventTypes.some((eventType) => eventType.startsWith("a2a."))
@@ -318,8 +327,9 @@ export interface CreateWebhookSubscriptionOptions {
   agentIdentityId?: string;
   url: string;
   eventTypes: string[];
-  /** Opt into context on received mail, text, or iMessage events; unsupported for A2A. */
+  /** Opt into context on received mail, text, or iMessage events; unsupported for A2A or Slack. */
   contextConfig?: WebhookContextConfig;
+  slackFilter?: SlackWebhookFilter | null;
   /**
    * Optional bearer token for endpoints that require `Authorization` on
    * deliveries; sent as `Authorization: Bearer <token>` alongside the
@@ -331,8 +341,9 @@ export interface CreateWebhookSubscriptionOptions {
 export interface UpdateWebhookSubscriptionOptions {
   url?: string;
   eventTypes?: string[];
-  /** Tri-state: omit = unchanged, `null` = clear, object = replace; unsupported for A2A. */
+  /** Tri-state: omit = unchanged, `null` = clear, object = replace; unsupported for A2A or Slack. */
   contextConfig?: WebhookContextConfig | null;
+  slackFilter?: SlackWebhookFilter | null;
   /** Tri-state: omit = unchanged, `null` = clear, string = replace the delivery bearer token. */
   authToken?: string | null;
 }
@@ -428,6 +439,10 @@ export class WebhookSubscriptionsResource {
     if (options.authToken !== undefined) {
       body["auth_token"] = options.authToken;
     }
+    if (options.slackFilter !== undefined) {
+      validateSlackFilter(options.slackFilter, options.eventTypes);
+      body["slack_filter"] = slackFilterWire(options.slackFilter);
+    }
     const data = await this.http.post<RawWebhookSubscriptionCreateResponse>(PATH, body);
     return parseWebhookSubscriptionCreateResponse(data);
   }
@@ -474,6 +489,10 @@ export class WebhookSubscriptionsResource {
       // `null` passes through as JSON null to clear the stored token.
       body["auth_token"] = options.authToken;
     }
+    if (options.slackFilter !== undefined) {
+      validateSlackFilter(options.slackFilter, options.eventTypes);
+      body["slack_filter"] = slackFilterWire(options.slackFilter);
+    }
     const data = await this.http.patch<RawWebhookSubscription>(
       `${PATH}/${subId}`,
       body,
@@ -484,5 +503,45 @@ export class WebhookSubscriptionsResource {
   /** Delete a subscription. Subsequent `list` / `get` calls will not return it. */
   async delete(subId: string): Promise<void> {
     await this.http.delete(`${PATH}/${subId}`);
+  }
+}
+
+export function validateSlackFilter(
+  config: SlackWebhookFilter | null,
+  events?: string[],
+): void {
+  if (config === null) return;
+  if (events?.some((e) => !e.startsWith("slack.")))
+    throw new TypeError(
+      "slackFilter is only supported for Slack subscriptions",
+    );
+  if (
+    typeof config !== "object" ||
+    Array.isArray(config) ||
+    Object.keys(config).some(
+      (k) => !["connectionIds", "conversationIds", "messageKinds"].includes(k),
+    )
+  )
+    throw new TypeError("Invalid slackFilter fields");
+  for (const [key, values] of Object.entries(config)) {
+    if (values == null) continue;
+    const max = key === "messageKinds" ? 5 : 100;
+    if (
+      !Array.isArray(values) ||
+      values.length < 1 ||
+      values.length > max ||
+      values.some((v) => typeof v !== "string") ||
+      new Set(values).size !== values.length
+    )
+      throw new TypeError(
+        `slackFilter ${key} must be a nonempty distinct string array, maximum ${max}`,
+      );
+    if (
+      key === "messageKinds" &&
+      values.some(
+        (v) => !["dm", "group_dm", "mention", "channel", "thread"].includes(v),
+      )
+    )
+      throw new TypeError("Invalid Slack message kind");
   }
 }

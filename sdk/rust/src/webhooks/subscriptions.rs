@@ -3,7 +3,7 @@
 //! Replaces the legacy per-resource `webhook_url` columns on mailboxes and
 //! phone numbers. Use this resource to attach HTTPS receivers to mail
 //! (`message.*`), phone-text (`text.*`), iMessage (`imessage.*`), post-call
-//! lifecycle (`call.ended`), or A2A (`a2a.*`) events. Mail and text
+//! lifecycle (`call.ended`), A2A (`a2a.*`), or Slack (`slack.*`) events. Mail and text
 //! subscriptions are owned by the mailbox / phone number; the other channels
 //! are owned by the agent identity. Each subscription contains events from
 //! one channel.
@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use crate::error::{InkboxError, Result};
 use crate::http::HttpTransport;
+use crate::slack::SlackWebhookFilter;
 
 const BASE: &str = "/webhooks/subscriptions";
 const INCOMING_CALL: &str = "phone.incoming_call";
@@ -130,6 +131,8 @@ pub struct WebhookSubscription {
     // opted in and on servers that predate the field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_config: Option<WebhookContextConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_filter: Option<SlackWebhookFilter>,
     /// Whether a delivery bearer token is configured. Defaults to `false`
     /// when the server omits the field.
     #[serde(default)]
@@ -169,13 +172,14 @@ const EVENT_PREFIX_TO_OWNER: &[(&str, &str)] = &[
     ("imessage.", "agent_identity"),
     ("call.", "agent_identity"),
     ("a2a.", "agent_identity"),
+    ("slack.", "agent_identity"),
 ];
 
 /// Owner resource -> the event-type prefixes it may subscribe to.
 const OWNER_EVENT_PREFIXES: &[(&str, &[&str])] = &[
     ("mailbox", &["message."]),
     ("phone_number", &["text."]),
-    ("agent_identity", &["imessage.", "call.", "a2a."]),
+    ("agent_identity", &["imessage.", "call.", "a2a.", "slack."]),
 ];
 
 /// Reject an empty list or one carrying duplicate values.
@@ -267,6 +271,11 @@ fn assert_a2a_context_absent(
     event_types: &[String],
     context_config: Option<&WebhookContextConfig>,
 ) -> Result<()> {
+    if context_config.is_some() && event_types.iter().any(|event| event.starts_with("slack.")) {
+        return Err(InkboxError::InvalidArgument(
+            "context_config is not supported for Slack subscriptions".into(),
+        ));
+    }
     if context_config.is_some() && event_types.iter().any(|event| event.starts_with("a2a.")) {
         return Err(InkboxError::InvalidArgument(
             "context_config is not supported for A2A subscriptions".into(),
@@ -349,7 +358,7 @@ impl WebhookSubscriptionsResource {
     ///
     /// `context_config` opts mail, text, or iMessage subscriptions into
     /// per-class conversation context (email/texts/calls) delivered on received
-    /// events. It is not supported for A2A subscriptions. See
+    /// events. It is not supported for A2A or Slack subscriptions. See
     /// [`WebhookContextConfig`].
     ///
     /// `auth_token` is an optional bearer token for endpoints that require an
@@ -380,6 +389,31 @@ impl WebhookSubscriptionsResource {
         agent_identity_id: Option<Uuid>,
         context_config: Option<&WebhookContextConfig>,
         auth_token: Option<&str>,
+    ) -> Result<WebhookSubscriptionCreateResponse> {
+        self.create_with_slack_filter(
+            url,
+            event_types,
+            mailbox_id,
+            phone_number_id,
+            agent_identity_id,
+            context_config,
+            auth_token,
+            None,
+        )
+    }
+
+    /// Create a subscription with an optional Slack filter.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_slack_filter(
+        &self,
+        url: &str,
+        event_types: &[String],
+        mailbox_id: Option<Uuid>,
+        phone_number_id: Option<Uuid>,
+        agent_identity_id: Option<Uuid>,
+        context_config: Option<&WebhookContextConfig>,
+        auth_token: Option<&str>,
+        slack_filter: Option<&SlackWebhookFilter>,
     ) -> Result<WebhookSubscriptionCreateResponse> {
         // Exactly one owner FK must be set.
         let owners: [(&str, Option<Uuid>); 3] = [
@@ -419,6 +453,10 @@ impl WebhookSubscriptionsResource {
         if let Some(token) = auth_token {
             body.insert("auth_token".into(), json!(token));
         }
+        if let Some(filter) = slack_filter {
+            validate_slack_filter(filter, Some(event_types))?;
+            body.insert("slack_filter".into(), json!(filter));
+        }
         let body = serde_json::Value::Object(body);
         let data = self.http.post(BASE, Some(&body), crate::http::NO_QUERY)?;
         Ok(serde_json::from_value(data)?)
@@ -457,6 +495,19 @@ impl WebhookSubscriptionsResource {
         context_config: Option<Option<&WebhookContextConfig>>,
         auth_token: Option<Option<&str>>,
     ) -> Result<WebhookSubscription> {
+        self.update_with_slack_filter(sub_id, url, event_types, context_config, auth_token, None)
+    }
+
+    /// Filter is tri-state: None preserves, Some(None) clears, Some(Some(filter)) replaces.
+    pub fn update_with_slack_filter(
+        &self,
+        sub_id: Uuid,
+        url: Option<&str>,
+        event_types: Option<&[String]>,
+        context_config: Option<Option<&WebhookContextConfig>>,
+        auth_token: Option<Option<&str>>,
+        slack_filter: Option<Option<&SlackWebhookFilter>>,
+    ) -> Result<WebhookSubscription> {
         // Only include keys the caller supplied (Python omits `_UNSET` keys).
         let mut body = serde_json::Map::new();
         if let Some(u) = url {
@@ -493,6 +544,12 @@ impl WebhookSubscriptionsResource {
                 }
             }
         }
+        if let Some(filter) = slack_filter {
+            if let Some(filter) = filter {
+                validate_slack_filter(filter, event_types)?;
+            }
+            body.insert("slack_filter".into(), json!(filter));
+        }
         let data = self.http.patch(
             &format!("{BASE}/{sub_id}"),
             &serde_json::Value::Object(body),
@@ -505,6 +562,30 @@ impl WebhookSubscriptionsResource {
     pub fn delete(&self, sub_id: Uuid) -> Result<()> {
         self.http.delete(&format!("{BASE}/{sub_id}"))
     }
+}
+
+fn validate_slack_filter(filter: &SlackWebhookFilter, events: Option<&[String]>) -> Result<()> {
+    if events.is_some_and(|events| events.iter().any(|e| !e.starts_with("slack."))) {
+        return Err(InkboxError::InvalidArgument(
+            "slack_filter is only supported for Slack subscriptions".into(),
+        ));
+    }
+    fn valid<T: PartialEq>(values: Option<&Vec<T>>, max: usize) -> bool {
+        values.map_or(true, |v| {
+            !v.is_empty()
+                && v.len() <= max
+                && v.iter().enumerate().all(|(i, x)| !v[..i].contains(x))
+        })
+    }
+    if !valid(filter.connection_ids.as_ref(), 100)
+        || !valid(filter.conversation_ids.as_ref(), 100)
+        || !valid(filter.message_kinds.as_ref(), 5)
+    {
+        return Err(InkboxError::InvalidArgument(
+            "Slack filter arrays must be nonempty, distinct, and within their limits".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -62,6 +62,7 @@ from inkbox.phone.resources.identity_contact_rules import (
 from inkbox.phone.resources.numbers import PhoneNumbersResource
 from inkbox.phone.resources.sms_opt_ins import SmsOptInsResource
 from inkbox.phone.resources.texts import TextsResource
+from inkbox.slack import SlackResource
 from inkbox.signing_keys import SigningKey, SigningKeysResource
 from inkbox.tunnels.resources.tunnels import TunnelsResource
 from inkbox.webhook_deliveries import WebhookDeliveriesResource
@@ -293,6 +294,7 @@ class Inkbox:
         )
         self._api_keys = ApiKeysResource(self._api_http)
         self._ids_resource = IdentitiesResource(self._ids_http)
+        self.slack = SlackResource(self._api_http)
         self._a2a = A2AResource(self._api_http, self._public_http)
         self._a2a_invitations = A2AInvitationsResource(self._api_http, self._base_url)
 

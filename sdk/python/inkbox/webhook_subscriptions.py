@@ -6,7 +6,7 @@ Webhook subscriptions -- fan-out per ``(owner, url, event_types)``.
 Replaces the legacy per-resource ``webhook_url`` columns on mailboxes
 and phone numbers. Use this resource to attach HTTPS receivers to mail
 (``message.*``), phone-text (``text.*``), iMessage (``imessage.*``),
-post-call lifecycle (``call.ended``), or A2A (``a2a.*``) events. Mail and
+post-call lifecycle (``call.ended``), A2A (``a2a.*``), or Slack (``slack.*``) events. Mail and
 text subscriptions are owned by the mailbox / phone number; the other
 channels are owned by the agent identity. Each subscription contains events
 from one channel. Incoming-call
@@ -27,6 +27,7 @@ from uuid import UUID
 # `is not _UNSET` checks must compare against the same object across
 # all layers. A module-local sentinel would leak onto the wire body.
 from inkbox.identities.types import _UNSET
+from inkbox.slack import SlackWebhookFilter
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -44,12 +45,14 @@ _CONTEXT_MAX_WINDOW_HOURS = 168
 
 class WebhookContextCountConfig(TypedDict):
     """Count-mode context: the last ``count`` items of a class (1..50)."""
+
     mode: Literal["count"]
     count: int
 
 
 class WebhookContextWindowConfig(TypedDict):
     """Window-mode context: items from the last ``hours`` hours (1..168)."""
+
     mode: Literal["window"]
     hours: int
 
@@ -64,6 +67,7 @@ class WebhookContextConfig(TypedDict, total=False):
     classes back as explicit ``null``, so a round-tripped value may carry
     ``None`` per class — truthy-check a class, don't test key presence.
     """
+
     email: WebhookContextClassConfig | None
     texts: WebhookContextClassConfig | None
     calls: WebhookContextClassConfig | None
@@ -102,6 +106,7 @@ class WebhookSubscription:
     context_config: WebhookContextConfig | None = None
     has_auth_token: bool = False
     auth_token: str | None = None
+    slack_filter: SlackWebhookFilter | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookSubscription:
@@ -109,7 +114,9 @@ class WebhookSubscription:
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
             mailbox_id=UUID(d["mailbox_id"]) if d["mailbox_id"] else None,
-            phone_number_id=UUID(d["phone_number_id"]) if d["phone_number_id"] else None,
+            phone_number_id=UUID(d["phone_number_id"])
+            if d["phone_number_id"]
+            else None,
             agent_identity_id=(
                 UUID(d["agent_identity_id"]) if d.get("agent_identity_id") else None
             ),
@@ -124,6 +131,7 @@ class WebhookSubscription:
             context_config=d.get("context_config"),
             has_auth_token=bool(d.get("has_auth_token", False)),
             auth_token=d.get("auth_token"),
+            slack_filter=d.get("slack_filter"),
         )
 
 
@@ -188,13 +196,14 @@ _EVENT_PREFIX_TO_OWNER = {
     "imessage.": "agent_identity",
     "call.": "agent_identity",
     "a2a.": "agent_identity",
+    "slack.": "agent_identity",
 }
 
 # Owner resource -> the event-type prefixes it may subscribe to.
 _OWNER_EVENT_PREFIXES = {
     "mailbox": ("message.",),
     "phone_number": ("text.",),
-    "agent_identity": ("imessage.", "call.", "a2a."),
+    "agent_identity": ("imessage.", "call.", "a2a.", "slack."),
 }
 
 
@@ -244,6 +253,10 @@ def _assert_a2a_context_absent(
     context_config: Any,
 ) -> None:
     if context_config is not None and any(
+        event.startswith("slack.") for event in event_types
+    ):
+        raise ValueError("context_config is not supported for Slack subscriptions")
+    if context_config is not None and any(
         event_type.startswith("a2a.") for event_type in event_types
     ):
         raise ValueError(
@@ -281,8 +294,7 @@ def _assert_valid_context_entry(klass: str, entry: Any) -> None:
         _assert_context_int(klass, entry, "hours", _CONTEXT_MAX_WINDOW_HOURS)
     else:
         raise ValueError(
-            f"context_config[{klass!r}].mode must be 'count' or 'window', "
-            f"got {mode!r}",
+            f"context_config[{klass!r}].mode must be 'count' or 'window', got {mode!r}",
         )
 
 
@@ -306,7 +318,6 @@ def _uuid_str(value: UUID | str) -> str:
 
 
 class WebhookSubscriptionsResource:
-
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
@@ -354,6 +365,7 @@ class WebhookSubscriptionsResource:
         agent_identity_id: UUID | str | None = None,
         context_config: WebhookContextConfig | None = None,
         auth_token: str | None = None,
+        slack_filter: SlackWebhookFilter | None = None,
     ) -> WebhookSubscriptionCreateResponse:
         """Create a webhook subscription.
 
@@ -367,7 +379,7 @@ class WebhookSubscriptionsResource:
 
         ``context_config`` opts mail, text, or iMessage subscriptions into
         per-class conversation context (email/texts/calls) delivered on
-        received events. It is not supported for A2A subscriptions. See
+        received events. It is not supported for A2A or Slack subscriptions. See
         :class:`WebhookContextConfig`.
 
         ``auth_token`` is an optional bearer token for endpoints that
@@ -414,6 +426,8 @@ class WebhookSubscriptionsResource:
             body["context_config"] = context_config
         if auth_token is not None:
             body["auth_token"] = auth_token
+        if slack_filter is not None:
+            body["slack_filter"] = _validate_slack_filter(slack_filter, event_types)
         data = self._http.post(_BASE, json=body)
         return WebhookSubscriptionCreateResponse._from_dict(data)
 
@@ -425,6 +439,7 @@ class WebhookSubscriptionsResource:
         event_types: list[str] = _UNSET,  # type: ignore[assignment]
         context_config: WebhookContextConfig | None = _UNSET,  # type: ignore[assignment]
         auth_token: str | None = _UNSET,  # type: ignore[assignment]
+        slack_filter: SlackWebhookFilter | None = _UNSET,  # type: ignore[assignment]
     ) -> WebhookSubscription:
         """Update the URL, event-type list, context config, and/or auth token.
 
@@ -461,9 +476,55 @@ class WebhookSubscriptionsResource:
         if auth_token is not _UNSET:
             # `None` passes through as JSON null to clear the stored token.
             body["auth_token"] = auth_token
+        if slack_filter is not _UNSET:
+            body["slack_filter"] = _validate_slack_filter(
+                slack_filter, None if event_types is _UNSET else event_types
+            )
         data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}", json=body)
         return WebhookSubscription._from_dict(data)
 
     def delete(self, sub_id: UUID | str) -> None:
         """Delete a subscription. Subsequent ``list`` / ``get`` calls will not return it."""
         self._http.delete(f"{_BASE}/{_uuid_str(sub_id)}")
+
+
+def _validate_slack_filter(
+    config: SlackWebhookFilter | None, events: list[str] | None
+) -> SlackWebhookFilter | None:
+    if config is None:
+        return None
+    if events is not None and any(not e.startswith("slack.") for e in events):
+        raise ValueError("slack_filter is only supported for Slack subscriptions")
+    if not isinstance(config, dict) or set(config) - {
+        "connection_ids",
+        "conversation_ids",
+        "message_kinds",
+    }:
+        raise ValueError(
+            "slack_filter must contain only connection_ids, conversation_ids, message_kinds"
+        )
+    config = dict(config)
+    if isinstance(config.get("connection_ids"), list):
+        config["connection_ids"] = [
+            str(value) if isinstance(value, UUID) else value
+            for value in config["connection_ids"]
+        ]
+    for key, values in config.items():
+        if values is None:
+            continue
+        maximum = 5 if key == "message_kinds" else 100
+        if (
+            not isinstance(values, list)
+            or not 1 <= len(values) <= maximum
+            or any(not isinstance(v, str) for v in values)
+            or len(set(values)) != len(values)
+        ):
+            raise ValueError(
+                f"slack_filter {key} must be a nonempty distinct string array, maximum {maximum}"
+            )
+        if key == "message_kinds" and any(
+            v not in {"dm", "group_dm", "mention", "channel", "thread"} for v in values
+        ):
+            raise ValueError("Invalid Slack message kind")
+
+    return config
