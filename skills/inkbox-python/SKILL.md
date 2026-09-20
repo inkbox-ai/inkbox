@@ -1446,7 +1446,7 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 
 ## Slack
 
-See the [Slack API and onboarding guide](../../sdk/python/README.md#slack) for implemented SDK/CLI methods.
+See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/sdk/python/README.md#slack) for implemented SDK/CLI methods.
 Use an existing identity and select the intended connected workspace explicitly.
 Installation availability reports readiness, not organization-management permission.
 Organization management can create an invitation or start an installation. Open the

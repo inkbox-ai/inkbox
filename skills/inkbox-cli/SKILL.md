@@ -913,7 +913,7 @@ For each format, choose inline content, a file, or its clear flag, not more than
 Identity-scoped Slack commands accept `-i/--identity <handle>` or
 `--identity-id <uuid>` (exactly one); workspace operations require `--connection-id`.
 
-See the [Slack API and onboarding guide](../../cli/README.md#slack) for implemented SDK/CLI methods.
+See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/cli/README.md#slack) for implemented SDK/CLI methods.
 Use an existing identity and select the intended connected workspace explicitly.
 Installation availability reports readiness, not organization-management permission.
 Organization management can create an invitation or start an installation. Open the

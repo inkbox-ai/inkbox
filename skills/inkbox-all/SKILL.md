@@ -147,7 +147,7 @@ available. The Inkbox watermark is separate from the custom signature.
 
 ## Slack
 
-See the [Slack API and onboarding guide](../../README.md#slack-workspace-connections) for implemented SDK/CLI methods.
+See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/README.md#slack-workspace-connections) for implemented SDK/CLI methods.
 Use an existing identity and select the intended connected workspace explicitly.
 Installation availability reports readiness, not organization-management permission.
 Organization management can create an invitation or start an installation. Open the
