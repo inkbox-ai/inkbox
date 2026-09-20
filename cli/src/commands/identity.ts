@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { registerCompanionCommands } from "./companion.js";
 import { addDirectionalRuleOptions, directionalRuleOptions } from "../contact-rules.js";
 import { parsePolicyPagination } from "../pagination.js";
 import { createClient, getGlobalOpts } from "../client.js";
@@ -1046,6 +1047,7 @@ export function registerIdentityCommands(program: Command): void {
     );
 
   registerIdentityMailRuleCommands(identity);
+  registerCompanionCommands(identity);
   registerIdentityPhoneRuleCommands(identity);
   registerIdentitySigningKeyCommands(identity);
 }

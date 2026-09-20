@@ -10,6 +10,76 @@ pip install inkbox
 
 Requires Python ≥ 3.11.
 
+## Companion mode
+
+Companion mode is off by default. An administrator selects one sponsor; the
+sponsor's own qualifying group message activates that conversation. Blocks and
+existing sending requirements still apply. A sponsored group does not authorize
+a private message or another group. Group iMessage requires a dedicated line;
+MMS with identical participants represents one logical conversation.
+
+```python
+from inkbox import Inkbox
+
+with Inkbox() as client:
+    config = client.companion.get("example-agent")
+    # Administrator credentials; selected addresses must already be permitted.
+    config = client.companion.update(
+        "example-agent", enabled=True,
+        sponsor={"emails": ["sponsor@example.com"], "phone_numbers": []},
+    )
+    states = client.companion.conversations("example-agent", channel="mail", limit=50, offset=0)
+```
+
+Claimed agent configuration reads omit sponsor selections. Conversation state
+reports `reply_ready` separately from history access, including existing SMS
+consent requirements. PATCH preserves omitted fields and replaces a supplied
+sponsor atomically; `enabled=False` explicitly disables the feature.
+
+For an authenticated initialization/live webhook, use its `activation_id`:
+
+```python
+activation_id = "22222222-2222-4222-8222-222222222222"
+with Inkbox() as client:
+    initial = client.companion.load_initialization(
+        "example-agent", activation_id, max_bytes=8 * 1024 * 1024,
+    )
+    # Queue initial.text once, keeping initial.reply_context on that same turn.
+    reply = initial.reply_context
+    if reply.channel == "mail":
+        client.messages.reply_all(
+            "example-agent@example.com", reply.reply_to_message_id,
+            body_text="Thanks, I have the conversation context.",
+        )
+```
+
+The stored mail parent is a message UUID, not an RFC Message-ID. Use `reply_all`
+with that parent. For phone/iMessage use `texts.send(..., conversation_id=...)`
+or `imessages.send(..., conversation_id=...)` with the canonical conversation.
+Do not convert group replies into raw-address sends. The server rechecks the
+actual reply audience and current permission; an out-of-scope reply fails.
+
+The helper returns `scope_id`, `activation_id`, `conversation_id`, `channel`,
+`entries`, `reply_context`, one combined `text`, and `notices`. It preserves
+server order and attachment references, deduplicates identical source IDs, and
+requires exactly one trigger. It exhausts pages and performs a final authorized
+read. The default limits are 8 MiB of serialized fetched pages plus UTF-8
+transcript text and 1,000 pages, with one additional revalidation request. Set
+`max_bytes`/`max_pages` explicitly for larger supported host inputs. Exceeding a
+bound raises `CompanionInitializationError`; 403/409 responses remain API errors.
+For lossless streaming use
+`client.companion.activation_messages(handle, activation_id, limit=100, cursor=...)`.
+Pages expose `history_complete` and `next_cursor`; page sizes are 1-200.
+
+Persist a checkpoint keyed by identity, channel, scope, and activation before
+submitting **one** host input. Buffer live events until initialization completes.
+On retries, revalidate through the helper; reconcile uncertain host acceptance
+instead of blindly submitting again. Historical `/clear`, `YES`, and similar
+text is conversation data, never a fresh command or approval. Ordinary-phase
+webhooks have no activation authority and use a separate conversation-scoped
+session. Keep Companion context out of private contact sessions. Notices may
+describe unavailable history; unknown notice codes/levels are preserved.
+
 ## Authentication
 
 You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://inkbox.ai/console).

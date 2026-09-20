@@ -14,6 +14,18 @@ API-first communication infrastructure for AI agents — email (with custom send
 | [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 22 | `npm install @inkbox/sdk` |
 | [`@inkbox/cli`](./cli/) | CLI / Node ≥ 22 | `npm install -g @inkbox/cli` |
 
+## Companion mode
+
+Companion mode lets an agent join a group after its designated sponsor sends a
+qualifying message. It is off by default and conversation-scoped; blocks and
+existing sending requirements still apply. The SDKs load complete authorized
+history into one bounded initialization transcript before live turns.
+
+- [Python: `client.companion.load_initialization`](./sdk/python/README.md#companion-mode)
+- [TypeScript: `client.companion.loadInitialization`](./sdk/typescript/README.md#companion-mode)
+- [Rust: `client.companion().load_initialization`](./sdk/rust/README.md#companion-mode)
+- [CLI: `inkbox identity companion`](./cli/README.md#companion-mode)
+
 ## Cursor plugin
 
 **Status:** Pre-release and under repository review; not yet submitted to or

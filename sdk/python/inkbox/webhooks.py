@@ -13,6 +13,7 @@ since ``json.loads`` produces bare strings.
 from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
+from inkbox.companion import CompanionMetadata
 
 
 # ---- Wire union types ____________________________________________________
@@ -378,6 +379,7 @@ class MailWebhookData(TypedDict):
 
 
 class MailWebhookPayload(TypedDict):
+    companion: NotRequired[CompanionMetadata]
     id: str  # stable per-event id (evt_...); idempotency key, stable across replays
     event_type: MailWebhookEventType
     timestamp: str
@@ -449,6 +451,7 @@ class TextWebhookData(TypedDict):
 
 
 class TextWebhookPayload(TypedDict):
+    companion: NotRequired[CompanionMetadata]
     id: str  # stable per-event id (evt_...); idempotency key, stable across replays
     event_type: TextWebhookEventType
     timestamp: str
@@ -624,6 +627,7 @@ class IMessageWebhookData(TypedDict):
 
 
 class IMessageWebhookPayload(TypedDict):
+    companion: NotRequired[CompanionMetadata]
     id: str  # stable per-event id (evt_...); idempotency key, stable across replays
     event_type: IMessageWebhookEventType
     timestamp: str

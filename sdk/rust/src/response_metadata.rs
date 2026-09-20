@@ -93,6 +93,17 @@ pub(crate) fn declares_body_metadata(url: &str, method: &reqwest::Method) -> boo
         path.as_slice(),
         ["api", "v1", "identities"]
             | ["api", "v1", "identities", _]
+            | ["api", "v1", "identities", _, "companion"]
+            | [
+                "api",
+                "v1",
+                "identities",
+                _,
+                "companion",
+                "activations",
+                _,
+                "messages"
+            ]
             | [
                 "api",
                 "v1",

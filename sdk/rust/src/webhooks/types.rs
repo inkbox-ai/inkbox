@@ -8,6 +8,10 @@
 use crate::phone::types::{HostedAgentAuthorityMode, OnVoicemail, VoicemailDetection};
 use serde::{Deserialize, Serialize};
 
+pub type CompanionMailWebhookPayload = crate::companion::WithCompanion<MailWebhookPayload>;
+pub type CompanionTextWebhookPayload = crate::companion::WithCompanion<TextWebhookPayload>;
+pub type CompanionIMessageWebhookPayload = crate::companion::WithCompanion<IMessageWebhookPayload>;
+
 // ---- Wire union types ----------------------------------------------------
 
 /// Direction of a mail message on the wire.

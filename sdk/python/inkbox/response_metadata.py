@@ -53,6 +53,7 @@ _BODY_METADATA_PATH = re.compile(
     r"/api/v1/(?:identities(?:/[^/]+)?"
     r"|identities/[^/]+/contacts/[^/]+/(?:access|permissions)"
     r"|identities/[^/]+/(?:contact-permissions|contact-communication-policies)"
+    r"|identities/[^/]+/companion(?:/activations/[^/]+/messages)?"
     r"|contacts/[^/]+/(?:communication-policy|communication-preview)"
     r"|mail/mailboxes/[^/]+|phone/numbers/[^/]+)/?"
 )

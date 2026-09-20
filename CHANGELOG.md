@@ -4,10 +4,14 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
-## 0.7.3 - Directional contact rules and response notices
+## 0.7.3 - Directional contact rules, Companion mode, and response notices
 
 ### Added
 
+- Companion mode configuration, paged conversation state, and typed activation history through `client.companion` in Python/TypeScript and `client.companion()` in Rust.
+- Complete initialization helpers: Python/Rust `load_initialization`, TypeScript `loadInitialization`. They validate scope and cursor progress, deduplicate source messages, require one sponsor trigger, preserve attachment references and notices, and revalidate access before returning one combined transcript. Byte/page limits fail explicitly without truncation.
+- Optional Companion metadata on received webhooks. Rust provides additive `WithCompanion<T>` and `CompanionMailWebhookPayload`, `CompanionTextWebhookPayload`, and `CompanionIMessageWebhookPayload` aliases without changing existing payload literals.
+- CLI `identity companion get`, `update`, `conversations` (`state`), `history`, and `initialization`, including paged JSON and explicit opt-in configuration.
 - Independent inbound and outbound email/phone filter modes, with phone permissions shared by calls, SMS, and iMessage.
 - Directional contact-rule creation, filtering, and updates across Python, TypeScript, Rust, and the CLI. Atomic one-sided edits preserve the opposite direction, and consolidated rules retain usable earlier IDs.
 - Separate receiving and sending permissions for saved contact addresses, including creation, access settings, permission maps, and previews.

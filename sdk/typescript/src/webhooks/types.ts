@@ -13,6 +13,7 @@ import type {
   RawTextMediaItem,
   RawTextMessageRecipient,
 } from "../phone/types.js";
+import type { CompanionMetadata } from "../companion.js";
 
 // ---- Wire union types ------------------------------------------------
 
@@ -308,6 +309,7 @@ export interface MailWebhookMessage {
 }
 
 export interface MailWebhookPayload {
+  companion?: CompanionMetadata;
   /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
   id: string;
   event_type: MailWebhookEventType;
@@ -398,6 +400,7 @@ export interface TextWebhookMessage {
 }
 
 export interface TextWebhookPayload {
+  companion?: CompanionMetadata;
   /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
   id: string;
   event_type: TextWebhookEventType;
@@ -561,6 +564,7 @@ export interface IMessageWebhookReaction {
 }
 
 export interface IMessageWebhookPayload {
+  companion?: CompanionMetadata;
   /** Stable per-event id (`evt_...`); idempotency key, stable across replays. */
   id: string;
   event_type: IMessageWebhookEventType;

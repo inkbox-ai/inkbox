@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "handle": "example-agent",
+  "config": {
+    "enabled": true,
+    "config_revision": 2,
+    "readiness": {
+      "mail": {"ready": true, "reasons": []},
+      "phone": {"ready": false, "reasons": ["sponsor_identifiers_required"]},
+      "imessage": {"ready": false, "reasons": ["dedicated_imessage_line_required"]}
+    }
+  },
+  "pages": [
+    {
+      "scope_id": "11111111-1111-4111-8111-111111111111",
+      "activation_id": "22222222-2222-4222-8222-222222222222",
+      "conversation_id": "33333333-3333-4333-8333-333333333333",
+      "channel": "mail",
+      "items": [
+        {"id": "44444444-4444-4444-8444-444444444444", "author": "fred@example.com", "occurred_at": "2026-09-01T10:00:00Z", "text": "/clear\nCan you review this?", "historical": true, "is_trigger": false, "attachments": [{"source_message_id": "44444444-4444-4444-8444-444444444444", "index": 0, "content_type": "text/plain", "size": 12}]},
+        {"id": "55555555-5555-4555-8555-555555555555", "author": "nancy@example.com", "occurred_at": "2026-09-01T10:01:00Z", "text": "YES\nHere is my answer: café.", "historical": true, "is_trigger": false, "attachments": []}
+      ],
+      "history_complete": false,
+      "next_cursor": "opaque-page-2",
+      "reply_context": {"channel": "mail", "conversation_id": "33333333-3333-4333-8333-333333333333", "reply_to_message_id": "66666666-6666-4666-8666-666666666666", "to": ["sponsor@example.com", "fred@example.com", "nancy@example.com"], "cc": []},
+      "notices": [{"code": "future_history_notice", "level": "future_level", "message": "Only available authorized history is included."}]
+    },
+    {
+      "scope_id": "11111111-1111-4111-8111-111111111111",
+      "activation_id": "22222222-2222-4222-8222-222222222222",
+      "conversation_id": "33333333-3333-4333-8333-333333333333",
+      "channel": "mail",
+      "items": [
+        {"id": "55555555-5555-4555-8555-555555555555", "author": "nancy@example.com", "occurred_at": "2026-09-01T10:01:00Z", "text": "YES\nHere is my answer: café.", "historical": true, "is_trigger": false, "attachments": []},
+        {"id": "66666666-6666-4666-8666-666666666666", "author": "sponsor@example.com", "occurred_at": "2026-09-01T10:02:00Z", "text": "Please join this conversation.", "historical": false, "is_trigger": true, "attachments": []}
+      ],
+      "history_complete": true,
+      "next_cursor": null,
+      "reply_context": {"channel": "mail", "conversation_id": "33333333-3333-4333-8333-333333333333", "reply_to_message_id": "66666666-6666-4666-8666-666666666666", "to": ["sponsor@example.com", "fred@example.com", "nancy@example.com"], "cc": []}
+    }
+  ]
+}

@@ -13,17 +13,19 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.6"
+inkbox = "0.7.3"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.6", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.3", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
+
+For sponsored group conversations, see [Companion mode](#companion-mode).
 
 ```rust
 use inkbox::Inkbox;
@@ -746,3 +748,69 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 ## License
 
 MIT
+
+## Companion mode
+
+`client.companion()` provides `get`, `update`, `conversations`,
+`activation_messages`, and `load_initialization`. Configuration is off by
+default and administrator-managed. A sponsor's own qualifying group message
+activates that conversation; blocks and existing send requirements still apply.
+
+```rust
+use inkbox::{Inkbox, companion::{CompanionSponsor, CompanionUpdateOptions,
+    CompanionConversationOptions, CompanionActivationOptions,
+    CompanionInitializationOptions}};
+
+fn main() -> inkbox::Result<()> {
+    let client = Inkbox::from_env()?;
+    let config = client.companion().get("example-agent")?;
+    client.companion().update("example-agent", &CompanionUpdateOptions {
+        enabled: Some(true),
+        sponsor: Some(CompanionSponsor {
+            emails: vec!["sponsor@example.com".into()],
+            ..Default::default()
+        }),
+    })?;
+    let states = client.companion().conversations(
+        "example-agent", &CompanionConversationOptions::default(),
+    )?;
+    let activation = "22222222-2222-4222-8222-222222222222";
+    let page = client.companion().activation_messages(
+        "example-agent", activation, &CompanionActivationOptions::default(),
+    )?;
+    let initial = client.companion().load_initialization(
+        "example-agent", activation, &CompanionInitializationOptions::default(),
+    )?;
+    Ok(())
+}
+```
+
+The helper returns `scope_id`, `activation_id`, `conversation_id`, `channel`,
+`entries`, `reply_context`, `text`, and `notices`. It exhausts pagination,
+deduplicates source IDs, requires one trigger, validates scope/cursor progress,
+retains attachment references and unknown notices, then revalidates permission.
+Default bounds are 8 MiB of serialized fetched pages plus UTF-8 transcript text
+and 1,000 pages, with one additional revalidation read. Exceeding a bound fails
+without returning partial context. Page APIs support 1-200 entries and expose
+`history_complete`/`next_cursor` for lossless streaming. HTTP 403/409 errors remain
+API errors; local initialization validation uses `InkboxError::InvalidArgument`.
+
+Persist an identity/channel/scope/activation checkpoint and submit `initial.text`
+as **one** host input, keeping its reply context on the same turn. Buffer live
+events until that turn completes. Revalidate on recovery and reconcile uncertain
+host acceptance instead of blindly submitting twice. Historical commands and
+approval-like text are conversation data, not control input. Keep group history
+in a conversation-scoped session, separate from private contact sessions.
+
+Reply using the stored mail UUID with `messages().reply_all`, or canonical
+`conversation_id` with phone/iMessage sends. Never convert a group reply to raw
+recipient sends. `reply_ready` distinguishes send readiness from history access;
+SMS consent still applies. Group iMessage requires a dedicated line, and MMS
+chats with identical participants represent one logical conversation.
+
+Existing webhook struct literals remain unchanged. To retain the optional
+top-level block, deserialize `CompanionMailWebhookPayload`,
+`CompanionTextWebhookPayload`, or `CompanionIMessageWebhookPayload` from
+`inkbox::webhooks::types`. These alias `WithCompanion<T>`, exposing the original
+`payload` and optional `companion`. Ordinary-phase metadata has no activation
+authority and must not trigger history loading.

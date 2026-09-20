@@ -36,6 +36,7 @@ import { SmsOptInsResource } from "./phone/resources/smsOptIns.js";
 import { IdentitiesResource } from "./identities/resources/identities.js";
 import { VaultResource } from "./vault/resources/vault.js";
 import { ContactsResource } from "./contacts/resources/contacts.js";
+import { CompanionResource } from "./companion.js";
 import { NotesResource } from "./notes/resources/notes.js";
 import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
@@ -154,6 +155,7 @@ export interface InkboxOptions {
  * ```
  */
 export class Inkbox {
+  readonly companion: CompanionResource;
   readonly _mailboxes: MailboxesResource;
   readonly _messages: MessagesResource;
   readonly _drafts: DraftsResource;
@@ -272,6 +274,7 @@ export class Inkbox {
     this._idsResource = new IdentitiesResource(idsHttp);
 
     this._contacts = new ContactsResource(apiHttp);
+    this.companion = new CompanionResource(apiHttp);
     this._notes = new NotesResource(apiHttp);
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);

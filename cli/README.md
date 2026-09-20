@@ -16,6 +16,50 @@ npx @inkbox/cli <command>
 
 Requires Node.js >= 22.
 
+## Companion mode
+
+Companion mode is off by default. An administrator explicitly selects a sponsor
+whose own qualifying group message activates one conversation. Configuration
+does not add contact permissions or SMS consent; blocks remain authoritative.
+
+```bash
+inkbox --json identity companion get example-agent
+inkbox --json identity companion update example-agent --enabled true \
+  --sponsor '{"emails":["sponsor@example.com"],"phone_numbers":[],"display_name":"Sponsor"}'
+inkbox --json identity companion conversations example-agent --channel mail --limit 50 --offset 0
+inkbox --json identity companion history example-agent 22222222-2222-4222-8222-222222222222 --limit 100
+inkbox --json identity companion history example-agent 22222222-2222-4222-8222-222222222222 --cursor opaque-cursor
+inkbox --json identity companion initialization example-agent 22222222-2222-4222-8222-222222222222 --max-bytes 8388608
+inkbox --json identity companion update example-agent --enabled false
+```
+
+`--sponsor` uses wire-format JSON: required `emails` and `phone_numbers` arrays,
+optional nullable `contact_id` and `display_name`. A replacement is atomic;
+omitted update fields stay unchanged. Agent-scoped reads omit sponsor selections.
+`state` aliases `conversations`. State pages retain `items`/`total`, while
+history JSON retains `historyComplete`, `nextCursor`, `replyContext`, and notices.
+Pages support limits 1-200; conversation offsets are 0-10,000.
+
+`initialization` loads all pages, deduplicates messages, validates scope and
+cursor progress, and revalidates permission before returning one combined
+`text` plus ordered `entries` and canonical reply context. Default bounds are
+8 MiB of fetched-page and transcript UTF-8 bytes and 1,000 pages; use
+`--max-bytes`/`--max-pages` for your host's capacity. Exceeding a bound fails
+before output; it never truncates. For lossless streaming use `history` pages.
+
+Persist a conversation/activation checkpoint before passing the combined text
+to a host once. Buffer live traffic until initialization completes, retain reply
+context per turn, and reconcile uncertain host acceptance on recovery. Historical
+commands are data, not fresh commands. Replies must use the existing stored mail
+parent or canonical phone/iMessage conversation, never a private last-sender
+address. Ordinary-phase events have no activation authority.
+
+Notices keep the normal stderr behavior; `--json --with-response-metadata`
+opts into one stdout envelope. HTTP errors remain nonzero exits with no partial
+stdout. Reply readiness remains separate from read access, including existing
+SMS consent and dedicated-line group iMessage requirements. MMS chats with the
+same participants represent one logical conversation.
+
 ## Authentication
 
 Set your API key as an environment variable or pass it as a flag:

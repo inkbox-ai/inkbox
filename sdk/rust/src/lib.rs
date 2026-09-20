@@ -43,6 +43,9 @@ pub mod signing_keys;
 pub mod a2a;
 pub mod agent_signup;
 pub mod api_keys;
+pub mod companion;
+#[cfg(test)]
+mod companion_tests;
 pub mod contact_rules;
 pub mod contacts;
 pub mod identities;

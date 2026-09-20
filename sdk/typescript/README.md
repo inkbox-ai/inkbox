@@ -4,6 +4,8 @@ TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first commun
 
 ## Install
 
+See [Companion mode](#companion-mode) for complete group-conversation initialization.
+
 ```bash
 npm install @inkbox/sdk
 ```
@@ -1860,3 +1862,71 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ## License
 
 MIT
+
+## Companion mode
+
+Companion mode is off by default. A configured sponsor's own qualifying group
+message activates one conversation. An administrator manages configuration;
+claimed agents can read their effective state without sponsor selections.
+
+```ts
+import { Inkbox } from "@inkbox/sdk";
+
+const client = new Inkbox();
+const config = await client.companion.get("example-agent");
+await client.companion.update("example-agent", {
+  enabled: true,
+  sponsor: { emails: ["sponsor@example.com"], phoneNumbers: [] },
+});
+const states = await client.companion.conversations("example-agent", {
+  channel: "mail", limit: 50, offset: 0,
+});
+```
+
+Omitted PATCH fields are preserved; a supplied sponsor replaces the selection
+atomically. Selected identifiers must already have the required ordinary
+permissions. Blocks, SMS consent, and other sending requirements remain in force.
+Conversation `replyReady` is independent of history access. Group iMessage
+requires a dedicated line; identical-participant MMS chats are one conversation.
+
+For an authenticated initialization/live webhook, load its activation before
+submitting any live turn:
+
+```ts
+const initial = await client.companion.loadInitialization(
+  "example-agent", "22222222-2222-4222-8222-222222222222",
+  { maxBytes: 8 * 1024 * 1024 },
+);
+// Queue initial.text once and retain initial.replyContext on that same turn.
+if (initial.replyContext.channel === "mail") {
+  await client.messages.replyAll(
+    "example-agent@example.com", initial.replyContext.replyToMessageId!,
+    { bodyText: "Thanks, I have the conversation context." },
+  );
+}
+```
+
+`replyToMessageId` is the stored message UUID for `replyAll`, not the RFC
+Message-ID used by a raw send. Phone/iMessage replies use `texts.send` or
+`imessages.send` with `conversationId`. Never infer a private destination from
+the last sender. The server rechecks the actual audience and current permission.
+
+The helper returns `scopeId`, `activationId`, `conversationId`, `channel`,
+`entries`, `replyContext`, one combined `text`, and `notices`. It preserves
+server order and attachment references, deduplicates source IDs, requires one
+trigger, validates every scope/cursor, and performs a final authorized read.
+Default bounds are 8 MiB of serialized fetched pages plus UTF-8 transcript text
+and 1,000 pages, excluding the additional final revalidation request from the
+page count. Set `maxBytes`/`maxPages` for the host's supported capacity.
+`CompanionInitializationError` reports bounds/inconsistency without truncating;
+HTTP errors retain their usual types. Streaming consumers can call
+`activationMessages(handle, activationId, { limit: 100, cursor })` and follow
+`nextCursor` until `historyComplete`. Page sizes are 1-200.
+
+Persist a checkpoint keyed by identity/channel/scope/activation before one host
+submission, buffer live events, and keep immutable reply context on each turn.
+Revalidate on recovery; reconcile uncertain host acceptance rather than blindly
+resubmitting. Historical commands and approval-like text remain conversation
+data, never control input. Ordinary-phase events have no activation authority
+and route to a separate conversation-scoped session. Keep group history out of
+private contact sessions. Unknown notice codes/levels remain available to callers.

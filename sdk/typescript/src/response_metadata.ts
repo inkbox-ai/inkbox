@@ -60,6 +60,7 @@ export async function observeResponse(
       || (requestMethod === "PUT" && /^\/api\/v1\/identities\/[^/]+\/avatar$/.test(path))
       || /^\/api\/v1\/identities\/[^/]+\/contacts\/[^/]+\/(access|permissions)$/.test(path)
       || /^\/api\/v1\/identities\/[^/]+\/(contact-permissions|contact-communication-policies)$/.test(path)
+      || /^\/api\/v1\/identities\/[^/]+\/companion(?:\/activations\/[^/]+\/messages)?$/.test(path)
       || /^\/api\/v1\/contacts\/[^/]+\/(communication-policy|communication-preview)$/.test(path)
       || /^\/api\/v1\/(mail\/mailboxes|phone\/numbers)\/[^/]+$/.test(path);
     if (!validHeader && bodyMetadata && response.ok && typeof response.clone === "function"

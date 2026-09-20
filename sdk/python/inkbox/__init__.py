@@ -3,6 +3,24 @@ inkbox — Python SDK for the Inkbox APIs.
 """
 
 from inkbox.client import Inkbox
+from inkbox.companion import (
+    DEFAULT_COMPANION_MAX_BYTES,
+    CompanionActivationPage,
+    CompanionChannel,
+    CompanionConfig,
+    CompanionConversation,
+    CompanionConversationPage,
+    CompanionHistoryEntry,
+    CompanionHistoryEntryWire,
+    CompanionInitialization,
+    CompanionInitializationError,
+    CompanionMetadata,
+    CompanionReadiness,
+    CompanionReplyContext,
+    CompanionReplyContextWire,
+    CompanionResource,
+    CompanionSponsor,
+)
 from inkbox.contact_rules import ContactRuleDirection
 from inkbox.response_metadata import APIResponse, ResponseMetadata, ResponseNotice, ResponseObserver
 from inkbox.agent_identity import AgentIdentity
@@ -417,6 +435,22 @@ from inkbox.webhook_deliveries import (
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
 __all__ = [
+    "DEFAULT_COMPANION_MAX_BYTES",
+    "CompanionActivationPage",
+    "CompanionChannel",
+    "CompanionConfig",
+    "CompanionConversation",
+    "CompanionConversationPage",
+    "CompanionHistoryEntry",
+    "CompanionHistoryEntryWire",
+    "CompanionInitialization",
+    "CompanionInitializationError",
+    "CompanionMetadata",
+    "CompanionReadiness",
+    "CompanionReplyContext",
+    "CompanionReplyContextWire",
+    "CompanionResource",
+    "CompanionSponsor",
     "APIResponse",
     "ResponseMetadata",
     "ResponseNotice",
