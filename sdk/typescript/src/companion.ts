@@ -137,9 +137,11 @@ function parseConfig(data: any): CompanionConfig {
 function parsePage(data: any, activationId: string): CompanionActivationPage {
   const invalid = () => { throw new CompanionInitializationError("Invalid Companion activation page or reply scope"); };
   if (!object(data) || !uuid(data.scope_id) || !uuid(data.activation_id)
-    || !uuid(data.conversation_id) || data.activation_id !== activationId || !channel(data.channel)) invalid();
+    || !uuid(data.conversation_id) || data.activation_id.toLowerCase() !== activationId || !channel(data.channel)) invalid();
   const reply = data.reply_context;
-  if (!object(reply) || reply.channel !== data.channel || reply.conversation_id !== data.conversation_id) invalid();
+  if (!object(reply) || reply.channel !== data.channel || !uuid(reply.conversation_id)
+    || reply.conversation_id.toLowerCase() !== data.conversation_id.toLowerCase()) invalid();
+  if (reply.reply_to_message_id != null && !uuid(reply.reply_to_message_id)) invalid();
   if (data.channel === "mail" && (!uuid(reply.reply_to_message_id) || (!reply.to?.length && !reply.cc?.length))) invalid();
   for (const key of ["to", "cc"]) {
     if (reply[key] != null && (!Array.isArray(reply[key]) || reply[key].some((v: unknown) => typeof v !== "string" || !v))) invalid();
@@ -151,13 +153,13 @@ function parsePage(data: any, activationId: string): CompanionActivationPage {
     if (!object(entry) || !uuid(entry.id) || typeof entry.author !== "string" || typeof entry.occurred_at !== "string"
       || typeof entry.text !== "string" || typeof entry.historical !== "boolean" || typeof entry.is_trigger !== "boolean"
       || (entry.historical && entry.is_trigger) || !Array.isArray(entry.attachments) || !entry.attachments.every(object)) invalid();
-    return { id: entry.id, author: entry.author, occurredAt: entry.occurred_at, text: entry.text,
+    return { id: entry.id.toLowerCase(), author: entry.author, occurredAt: entry.occurred_at, text: entry.text,
       historical: entry.historical, isTrigger: entry.is_trigger, attachments: entry.attachments };
   });
-  return { scopeId: data.scope_id, activationId: data.activation_id, conversationId: data.conversation_id,
+  return { scopeId: data.scope_id.toLowerCase(), activationId: data.activation_id.toLowerCase(), conversationId: data.conversation_id.toLowerCase(),
     channel: data.channel, items, historyComplete: data.history_complete, nextCursor: data.next_cursor,
-    replyContext: { channel: reply.channel, conversationId: reply.conversation_id,
-      replyToMessageId: reply.reply_to_message_id, to: reply.to, cc: reply.cc },
+    replyContext: { channel: reply.channel, conversationId: reply.conversation_id.toLowerCase(),
+      replyToMessageId: reply.reply_to_message_id == null ? reply.reply_to_message_id : reply.reply_to_message_id.toLowerCase(), to: reply.to, cc: reply.cc },
     notices: parseResponseNotices(data.notices) };
 }
 
@@ -194,6 +196,7 @@ export class CompanionResource {
   async activationMessages(handle: string, activationId: string, options: CompanionActivationOptions = {}): Promise<CompanionActivationPage> {
     positive(options.limit ?? 100, "limit", 200);
     if (!uuid(activationId)) throw new Error("activationId must be a UUID");
+    activationId = activationId.toLowerCase();
     if (options.cursor !== undefined && (typeof options.cursor !== "string" || !options.cursor || options.cursor.length > 1024)) throw new Error("cursor must contain 1 to 1024 characters");
     return parsePage(await this.http.get(`${path(handle)}/activations/${activationId}/messages`,
       { limit: options.limit ?? 100, cursor: options.cursor }), activationId);

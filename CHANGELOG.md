@@ -21,6 +21,7 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- Companion history and initialization normalize UUID letter case when matching activations, reply scopes, and source messages in Python, TypeScript, and the CLI.
 - Existing shared filter-mode writes still set both directions. Legacy mode reads show the common effective mode when directions agree, or the shared baseline when they differ.
 - Legacy contactable values describe sending permission; new fields report receiving and sending separately. Either direction can contribute to contact visibility under the existing visibility settings.
 - Shared-line iMessage connection setup requires permission in both directions without granting new communication access.

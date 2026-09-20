@@ -5,8 +5,8 @@ use serde_json::{json, Value};
 use crate::companion::*;
 use crate::Inkbox;
 
-const ACTIVATION: &str = "22222222-2222-4222-8222-222222222222";
-const PATH: &str = "/api/v1/identities/example-agent/companion/activations/22222222-2222-4222-8222-222222222222/messages";
+const ACTIVATION: &str = "b2222222-2222-4222-8222-222222222222";
+const PATH: &str = "/api/v1/identities/example-agent/companion/activations/b2222222-2222-4222-8222-222222222222/messages";
 
 fn fixture() -> Value {
     serde_json::from_str(
@@ -81,7 +81,7 @@ fn companion_config_patch_and_state_preserve_wire_shape() {
 }
 
 #[test]
-fn companion_complete_hydration_deduplicates_preserves_notices_and_revalidates() {
+fn companion_complete_hydration_normalizes_uuid_case_deduplicates_and_revalidates() {
     for channel in ["mail", "phone", "imessage"] {
         let server = MockServer::start();
         let mut fixture = fixture();
@@ -94,6 +94,19 @@ fn companion_complete_hydration_deduplicates_preserves_notices_and_revalidates()
                 page["reply_context"]["cc"] = Value::Null;
             }
         }
+        let second = &mut fixture["pages"][1];
+        for key in ["scope_id", "activation_id", "conversation_id"] {
+            second[key] = json!(second[key].as_str().unwrap().to_uppercase());
+        }
+        for key in ["conversation_id", "reply_to_message_id"] {
+            if let Some(value) = second["reply_context"][key].as_str() {
+                second["reply_context"][key] = json!(value.to_uppercase());
+            }
+        }
+        for entry in second["items"].as_array_mut().unwrap() {
+            entry["id"] = json!(entry["id"].as_str().unwrap().to_uppercase());
+        }
+        fixture["pages"][0]["reply_context"]["conversation_id"] = second["conversation_id"].clone();
         let first = server.mock(|when, then| {
             when.method(GET).path(PATH).matches(|request| {
                 !request
@@ -119,7 +132,7 @@ fn companion_complete_hydration_deduplicates_preserves_notices_and_revalidates()
             .with_response_metadata(|scoped| {
                 scoped.companion().load_initialization(
                     "example-agent",
-                    ACTIVATION,
+                    &ACTIVATION.to_uppercase(),
                     &Default::default(),
                 )
             })
@@ -178,7 +191,11 @@ fn companion_rejects_mixed_scopes_incomplete_snapshots_and_limits() {
             "audience" => {
                 fixture["pages"][1]["reply_context"]["to"] = json!(["someone@example.com"])
             }
-            "conflict" => fixture["pages"][1]["items"][0]["text"] = json!("different"),
+            "conflict" => {
+                let entry = &mut fixture["pages"][1]["items"][0];
+                entry["id"] = json!(entry["id"].as_str().unwrap().to_uppercase());
+                entry["text"] = json!("different");
+            }
             "cursor" => {
                 fixture["pages"][1]["history_complete"] = json!(false);
                 fixture["pages"][1]["next_cursor"] = json!("opaque-page-2");

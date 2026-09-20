@@ -100,3 +100,29 @@ test("complete initialization exhausts pages, revalidates and errors never emit 
     assert.equal(JSON.parse(failed.stderr).error.statusCode, 403);
   });
 });
+
+test("history and initialization accept either UUID case and reject different activation IDs", async () => {
+  const requests = [];
+  await serve((req, res) => {
+    requests.push(req.url);
+    respond(res, fixture.pages[req.url.includes("cursor=") ? 1 : 0]);
+  }, async (url) => {
+    for (const command of ["history", "initialization"]) {
+      for (const id of [activation, activation.toUpperCase()]) {
+        const result = await run(url, ["identity", "companion", command, "example-agent", id]);
+        assert.ifError(result.error);
+        const data = JSON.parse(result.stdout);
+        assert.equal(data.activationId, activation);
+        assert.equal(data.replyContext.conversationId, fixture.pages[0].conversation_id);
+        assert.equal(command === "history" ? data.items.length : data.entries.length, command === "history" ? 2 : 3);
+      }
+      for (const id of [fixture.pages[0].scope_id, fixture.pages[0].scope_id.toUpperCase()]) {
+        const result = await run(url, ["identity", "companion", command, "example-agent", id]);
+        assert.equal(result.error?.code, 1);
+        assert.equal(result.stdout, "");
+        assert.match(result.stderr, /Invalid Companion activation page or reply scope/);
+      }
+    }
+    assert.equal(requests.length, 12);
+  });
+});

@@ -152,12 +152,14 @@ def _path(handle: str) -> str:
 
 def _page(data: dict[str, Any], activation_id: str) -> CompanionActivationPage:
     try:
-        for key in ("scope_id", "activation_id", "conversation_id"):
-            UUID(data[key])
-        if data["activation_id"] != activation_id or data["channel"] not in ("mail", "phone", "imessage"):
+        ids = {key: str(UUID(data[key])) for key in ("scope_id", "activation_id", "conversation_id")}
+        if ids["activation_id"] != activation_id or data["channel"] not in ("mail", "phone", "imessage"):
             raise ValueError()
-        reply = data["reply_context"]
-        if reply["channel"] != data["channel"] or reply["conversation_id"] != data["conversation_id"]:
+        reply = dict(data["reply_context"])
+        reply["conversation_id"] = str(UUID(reply["conversation_id"]))
+        if reply.get("reply_to_message_id") is not None:
+            reply["reply_to_message_id"] = str(UUID(reply["reply_to_message_id"]))
+        if reply["channel"] != data["channel"] or reply["conversation_id"] != ids["conversation_id"]:
             raise ValueError()
         if data["channel"] == "mail":
             UUID(reply["reply_to_message_id"])
@@ -177,7 +179,7 @@ def _page(data: dict[str, Any], activation_id: str) -> CompanionActivationPage:
             raise ValueError()
         entries = []
         for item in data["items"]:
-            UUID(item["id"])
+            item = {**item, "id": str(UUID(item["id"]))}
             if any(not isinstance(item[k], str) for k in ("author", "occurred_at", "text")):
                 raise ValueError()
             if any(type(item[k]) is not bool for k in ("historical", "is_trigger")):
@@ -188,8 +190,7 @@ def _page(data: dict[str, Any], activation_id: str) -> CompanionActivationPage:
                 raise ValueError()
             entries.append(CompanionHistoryEntry(**{k: item[k] for k in CompanionHistoryEntry.__dataclass_fields__}))
         return CompanionActivationPage(
-            scope_id=data["scope_id"], activation_id=data["activation_id"],
-            conversation_id=data["conversation_id"], channel=data["channel"], items=entries,
+            **ids, channel=data["channel"], items=entries,
             history_complete=complete, next_cursor=cursor,
             reply_context=CompanionReplyContext(**{k: reply[k] for k in CompanionReplyContext.__dataclass_fields__ if k in reply}),
             notices=_parse_notices(data.get("notices")) or [],
