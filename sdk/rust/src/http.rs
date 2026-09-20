@@ -356,9 +356,10 @@ impl HttpTransport {
             Some(cookie) => rb.header(reqwest::header::COOKIE, cookie),
             None => rb,
         };
-        let request = rb.build()?;
+        let (client, request) = rb.build_split();
+        let request = request?;
         let method = request.method().clone();
-        let resp = self.client.execute(request)?;
+        let resp = RequestBuilder::from_parts(client, request).send()?;
         let set_cookies: Vec<String> = resp
             .headers()
             .get_all(reqwest::header::SET_COOKIE)

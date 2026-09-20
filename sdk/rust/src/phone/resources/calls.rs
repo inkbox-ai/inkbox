@@ -183,8 +183,9 @@ impl CallsResource {
 
     /// Place an outbound call with optional call controls.
     ///
-    /// `voicemail_detection` is omitted when unset, preserving the server's
-    /// default behavior and the wire shape of [`CallsResource::place`].
+    /// `voicemail_detection`, `on_voicemail`, and `voicemail_message` are
+    /// omitted when unset, preserving the server's default behavior and the
+    /// wire shape of [`CallsResource::place`].
     pub fn place_with_options(
         &self,
         to_number: &str,
@@ -209,6 +210,12 @@ impl CallsResource {
         }
         if let Some(detection) = options.voicemail_detection {
             body.insert("voicemail_detection".into(), detection.as_str().into());
+        }
+        if let Some(on_voicemail) = options.on_voicemail {
+            body.insert("on_voicemail".into(), on_voicemail.as_str().into());
+        }
+        if let Some(message) = &options.voicemail_message {
+            body.insert("voicemail_message".into(), message.as_str().into());
         }
         let data = self
             .http
@@ -276,6 +283,12 @@ impl CallsResource {
         if let Some(detection) = options.voicemail_detection {
             body.insert("voicemail_detection".into(), detection.as_str().into());
         }
+        if let Some(on_voicemail) = options.on_voicemail {
+            body.insert("on_voicemail".into(), on_voicemail.as_str().into());
+        }
+        if let Some(message) = &options.voicemail_message {
+            body.insert("voicemail_message".into(), message.as_str().into());
+        }
         if let Some(n) = from_number {
             body.insert("from_number".into(), n.into());
         }
@@ -307,6 +320,8 @@ impl CallsResource {
             &HostedCallPlacementOptions {
                 authority_mode: Some(authority_mode),
                 voicemail_detection: None,
+                on_voicemail: None,
+                voicemail_message: None,
             },
         )
     }
@@ -321,7 +336,7 @@ mod tests {
     use crate::error::{ApiErrorDetail, InkboxError};
     use crate::phone::types::{
         CallOrigin, CallPlacementOptions, HostedAgentAuthorityMode, HostedCallPlacementOptions,
-        VoicemailDetection,
+        OnVoicemail, VoicemailDetection,
     };
 
     /// Client whose phone transport points at the mock server (phone resources
@@ -731,6 +746,40 @@ mod tests {
                 None,
                 &CallPlacementOptions {
                     voicemail_detection: Some(VoicemailDetection::Disabled),
+                    on_voicemail: None,
+                    voicemail_message: None,
+                },
+            )
+            .unwrap();
+        mock.assert();
+    }
+
+    #[test]
+    fn place_with_options_sends_on_voicemail_and_omits_message_when_unset() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "from_number": "+15550001111",
+                    "on_voicemail": "ignore"
+                }));
+            then.status(200)
+                .json_body(placed_json("dedicated_number", json!("+15550001111")));
+        });
+        client(&server)
+            .calls()
+            .place_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                None,
+                &CallPlacementOptions {
+                    on_voicemail: Some(OnVoicemail::Ignore),
+                    ..Default::default()
                 },
             )
             .unwrap();
@@ -923,11 +972,57 @@ mod tests {
                 &HostedCallPlacementOptions {
                     authority_mode: Some(HostedAgentAuthorityMode::Yolo),
                     voicemail_detection: Some(VoicemailDetection::Disabled),
+                    on_voicemail: None,
+                    voicemail_message: None,
                 },
             )
             .unwrap();
 
         mock.assert();
+    }
+
+    #[test]
+    fn place_hosted_with_options_sends_on_voicemail_and_message() {
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/phone/place-call")
+                .json_body(json!({
+                    "to_number": "+15550002222",
+                    "origination": "dedicated_number",
+                    "mode": "hosted_agent",
+                    "reason": "Confirm the appointment",
+                    "on_voicemail": "leave_message",
+                    "voicemail_message": "Please call us back.",
+                    "from_number": "+15550001111"
+                }));
+            then.status(200).json_body({
+                let mut v = placed_json("dedicated_number", json!("+15550001111"));
+                v["mode"] = json!("hosted_agent");
+                v["on_voicemail"] = json!("leave_message");
+                v
+            });
+        });
+
+        let placed = client(&server)
+            .calls()
+            .place_hosted_with_options(
+                "+15550002222",
+                CallOrigin::DedicatedNumber,
+                Some("+15550001111"),
+                None,
+                "Confirm the appointment",
+                &HostedCallPlacementOptions {
+                    authority_mode: None,
+                    voicemail_detection: None,
+                    on_voicemail: Some(OnVoicemail::LeaveMessage),
+                    voicemail_message: Some("Please call us back.".to_string()),
+                },
+            )
+            .unwrap();
+
+        mock.assert();
+        assert_eq!(placed.call.on_voicemail, OnVoicemail::LeaveMessage);
     }
 
     #[test]

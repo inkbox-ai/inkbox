@@ -6,7 +6,7 @@ import type { Command } from "commander";
 import { observeResponse } from "./response-metadata.js";
 
 // Keep in sync with package.json "version".
-export const CLI_VERSION = "0.7.2";
+export const CLI_VERSION = "0.7.3";
 
 export interface GlobalOpts {
   apiKey?: string;

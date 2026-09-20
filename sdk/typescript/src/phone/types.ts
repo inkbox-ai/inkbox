@@ -90,10 +90,38 @@ export enum CallMode {
   HOSTED_AGENT = "hosted_agent",
 }
 
-/** Whether an outbound call hangs up when voicemail is detected. */
+/**
+ * Whether an outbound call hangs up when voicemail is detected.
+ *
+ * @deprecated Use {@link OnVoicemail}. `enabled` maps to `hang_up` and
+ *   `disabled` to `ignore`. Call responses keep reporting this field, with
+ *   `leave_message` calls reading as `enabled`.
+ */
 export enum VoicemailDetection {
   ENABLED = "enabled",
   DISABLED = "disabled",
+}
+
+/**
+ * What an outbound call does when voicemail answers.
+ *
+ * `leave_message` waits for the beep, lets Voice AI leave a message, then
+ * ends the call (`hangup_reason=voicemail`); hosted-agent calls default to
+ * it. `hang_up` ends the call as soon as a voicemail beep is detected;
+ * client WebSocket calls default to it. `ignore` skips detection and treats
+ * whatever answers as a person.
+ */
+export enum OnVoicemail {
+  LEAVE_MESSAGE = "leave_message",
+  HANG_UP = "hang_up",
+  IGNORE = "ignore",
+}
+
+/** Coerce a wire `on_voicemail` value; null/unknown fall back to `hang_up`. */
+function parseOnVoicemail(value: string | null | undefined): OnVoicemail {
+  return (Object.values(OnVoicemail) as string[]).includes(value ?? "")
+    ? (value as OnVoicemail)
+    : OnVoicemail.HANG_UP;
 }
 
 /** How broadly a hosted voice agent may act. */
@@ -298,6 +326,11 @@ export interface PhoneCall {
   hostedAgentAuthorityMode: HostedAgentAuthorityMode;
   /** Whether voicemail detection ran. Defaults to `enabled`. */
   voicemailDetection: VoicemailDetection;
+  /**
+   * What the call does when voicemail answers. Missing or unknown values
+   * parse as `hang_up`, matching the legacy `enabled` behavior.
+   */
+  onVoicemail: OnVoicemail;
   /**
    * Open action items Inkbox Voice AI recorded, `seq`-ascending.
    * Empty for client_websocket calls and Voice AI calls with no open items.
@@ -602,6 +635,8 @@ export interface RawPhoneCall {
   hosted_agent_authority_mode?: HostedAgentAuthorityMode | string | null;
   // Optional/nullable for compatibility; parser defaults to enabled.
   voicemail_detection?: VoicemailDetection | string | null;
+  // Optional/nullable for compatibility; parser defaults to hang_up.
+  on_voicemail?: OnVoicemail | string | null;
   // Absent/empty for client_websocket calls and Voice AI calls with no open items.
   post_call_action_items?: RawPostCallActionItem[];
   forwardings?: RawPhoneCallForwarding[];
@@ -861,6 +896,7 @@ export function parsePhoneCall(r: RawPhoneCall): PhoneCall {
     voicemailDetection:
       (r.voicemail_detection as VoicemailDetection | null | undefined)
       ?? VoicemailDetection.ENABLED,
+    onVoicemail: parseOnVoicemail(r.on_voicemail),
     postCallActionItems: (r.post_call_action_items ?? []).map(parsePostCallActionItem),
     forwardings: (r.forwardings ?? []).map(parsePhoneCallForwarding),
     createdAt: new Date(r.created_at),

@@ -87,6 +87,7 @@ from inkbox.phone.types import (
     PhoneRuleMatchType,
     PhoneTranscript,
     TextConversationSummary,
+    OnVoicemail,
     VoicemailDetection,
     TextConversationUpdateResult,
     TextMessage,
@@ -841,6 +842,8 @@ class AgentIdentity:
         mode: CallMode | str = CallMode.CLIENT_WEBSOCKET,
         hosted_agent_authority_mode: HostedAgentAuthorityMode | str | None = None,
         voicemail_detection: VoicemailDetection | str | None = None,
+        on_voicemail: OnVoicemail | str | None = None,
+        voicemail_message: str | None = None,
         reason: str | None = None,
     ) -> PhoneCallWithRateLimit:
         """Place an outbound call as this identity.
@@ -862,8 +865,14 @@ class AgentIdentity:
                 Explicit ``contact_scoped`` downscopes the call. Explicit
                 ``yolo`` requires an admin credential unless the saved
                 authority is already ``yolo``.
-            voicemail_detection: Whether to hang up when voicemail is detected.
-                Omit for the server's ``enabled`` default.
+            voicemail_detection: Deprecated alias for ``on_voicemail``
+                (``enabled`` = ``hang_up``, ``disabled`` = ``ignore``).
+            on_voicemail: What to do when voicemail answers. See
+                :class:`OnVoicemail`. Omit for the server default
+                (``leave_message`` for hosted-agent calls, ``hang_up``
+                otherwise).
+            voicemail_message: What Voice AI says on the voicemail (max
+                1000 characters); requires ``on_voicemail=leave_message``.
             reason: Voice AI's task brief for the call. Required
                 with ``mode=hosted_agent``, invalid otherwise (server 422).
         """
@@ -888,6 +897,10 @@ class AgentIdentity:
                 )
             if voicemail_detection is not None:
                 call_options["voicemail_detection"] = voicemail_detection
+            if on_voicemail is not None:
+                call_options["on_voicemail"] = on_voicemail
+            if voicemail_message is not None:
+                call_options["voicemail_message"] = voicemail_message
             return self._inkbox._calls.place(**call_options)
         # iMessage origination scopes by identity id, no from_number.
         call_options = {
@@ -902,6 +915,10 @@ class AgentIdentity:
             call_options["hosted_agent_authority_mode"] = hosted_agent_authority_mode
         if voicemail_detection is not None:
             call_options["voicemail_detection"] = voicemail_detection
+        if on_voicemail is not None:
+            call_options["on_voicemail"] = on_voicemail
+        if voicemail_message is not None:
+            call_options["voicemail_message"] = voicemail_message
         return self._inkbox._calls.place(**call_options)
 
     def list_calls(

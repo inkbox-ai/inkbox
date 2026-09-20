@@ -17,6 +17,7 @@ import {
   RawPhoneCallWithRateLimit,
   RawHostedAgentToolInvocationPage,
   RawPhoneTranscript,
+  OnVoicemail,
   VoicemailDetection,
   parsePhoneCall,
   parsePhoneCallWithRateLimit,
@@ -149,8 +150,16 @@ export class CallsResource {
    *   `contact_scoped` downscopes the call. Explicit `yolo` requires an admin
    *   credential unless the saved authority is already `yolo`. `yolo` is
    *   valid only with `mode=hosted_agent`.
-   * @param options.voicemailDetection - Whether to hang up when voicemail is
-   *   detected. Omit for the server's `enabled` default.
+   * @param options.voicemailDetection - Deprecated alias for `onVoicemail`
+   *   (`enabled` = `hang_up`, `disabled` = `ignore`). Sending both with
+   *   conflicting values surfaces the server's 422 response.
+   * @param options.onVoicemail - What to do when voicemail answers. Omit for
+   *   the server default: `leave_message` with `mode=hosted_agent`, `hang_up`
+   *   otherwise.
+   * @param options.voicemailMessage - What Voice AI says on the voicemail
+   *   (max 1000 characters). Valid only with `onVoicemail=leave_message`
+   *   (server 422 otherwise). When omitted the agent composes a short
+   *   message from `reason`.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise.
    * @returns The created call record with current rate limit info.
@@ -164,6 +173,8 @@ export class CallsResource {
     mode?: CallMode;
     hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
     voicemailDetection?: VoicemailDetection;
+    onVoicemail?: OnVoicemail;
+    voicemailMessage?: string;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const body: Record<string, unknown> = {
@@ -178,6 +189,12 @@ export class CallsResource {
     }
     if (options.voicemailDetection !== undefined) {
       body["voicemail_detection"] = options.voicemailDetection;
+    }
+    if (options.onVoicemail !== undefined) {
+      body["on_voicemail"] = options.onVoicemail;
+    }
+    if (options.voicemailMessage !== undefined) {
+      body["voicemail_message"] = options.voicemailMessage;
     }
     if (options.fromNumber !== undefined) {
       body["from_number"] = options.fromNumber;

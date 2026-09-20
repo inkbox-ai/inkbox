@@ -5,6 +5,7 @@ import {
   CallMode,
   CallOrigin,
   HostedAgentAuthorityMode,
+  OnVoicemail,
   VoicemailDetection,
 } from "../../src/phone/types.js";
 import { HttpTransport, InkboxAPIError } from "../../src/_http.js";
@@ -333,6 +334,45 @@ describe("CallsResource.place", () => {
     expect(body["mode"]).toBe("client_websocket");
     expect(body["hosted_agent_authority_mode"]).toBeUndefined();
     expect(body["voicemail_detection"]).toBeUndefined();
+    expect(body["on_voicemail"]).toBeUndefined();
+    expect(body["voicemail_message"]).toBeUndefined();
+  });
+
+  it("forwards on_voicemail and voicemail_message when provided", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
+    const res = new CallsResource(http);
+
+    await res.place({
+      toNumber: "+15551234567",
+      mode: CallMode.HOSTED_AGENT,
+      reason: "Confirm the appointment.",
+      onVoicemail: OnVoicemail.LEAVE_MESSAGE,
+      voicemailMessage: "Please call us back.",
+    });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["on_voicemail"]).toBe("leave_message");
+    expect(body["voicemail_message"]).toBe("Please call us back.");
+    expect(body["voicemail_detection"]).toBeUndefined();
+  });
+
+  it("forwards on_voicemail alone without a message", async () => {
+    const http = mockHttp();
+    vi.mocked(http.post).mockResolvedValue(RAW_PHONE_CALL_WITH_RATE_LIMIT);
+    const res = new CallsResource(http);
+
+    await res.place({ toNumber: "+15551234567", onVoicemail: OnVoicemail.IGNORE });
+
+    const [, body] = vi.mocked(http.post).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(body["on_voicemail"]).toBe("ignore");
+    expect(body["voicemail_message"]).toBeUndefined();
   });
 
   it("forwards voicemail detection only when provided", async () => {

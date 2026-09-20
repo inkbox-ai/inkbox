@@ -40,6 +40,7 @@ import {
   HostedAgentAuthorityMode,
   IncomingCallAction,
   ForwardingTargetType,
+  OnVoicemail,
   VoicemailDetection,
 } from "./phone/types.js";
 import type {
@@ -613,8 +614,13 @@ export class AgentIdentity {
    *   Omit to inherit this identity's saved Voice AI authority. Explicit
    *   `contact_scoped` downscopes the call. Explicit `yolo` requires an admin
    *   credential unless the saved authority is already `yolo`.
-   * @param options.voicemailDetection - Whether to hang up when voicemail is
-   *   detected. Omit for the server's `enabled` default.
+   * @param options.voicemailDetection - Deprecated alias for `onVoicemail`
+   *   (`enabled` = `hang_up`, `disabled` = `ignore`).
+   * @param options.onVoicemail - What to do when voicemail answers. Omit for
+   *   the server default (`leave_message` for hosted-agent calls, `hang_up`
+   *   otherwise).
+   * @param options.voicemailMessage - What Voice AI says on the voicemail
+   *   (max 1000 characters); requires `onVoicemail=leave_message`.
    * @param options.reason - Voice AI's task brief for the call.
    *   Required with `mode=hosted_agent`, invalid otherwise (server 422).
    */
@@ -625,6 +631,8 @@ export class AgentIdentity {
     mode?: CallMode;
     hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
     voicemailDetection?: VoicemailDetection;
+    onVoicemail?: OnVoicemail;
+    voicemailMessage?: string;
     reason?: string;
   }): Promise<PhoneCallWithRateLimit> {
     const origination = options.origination ?? CallOrigin.DEDICATED_NUMBER;
@@ -639,6 +647,8 @@ export class AgentIdentity {
         mode:                options.mode,
         hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
         voicemailDetection: options.voicemailDetection,
+        onVoicemail:         options.onVoicemail,
+        voicemailMessage:    options.voicemailMessage,
         reason:              options.reason,
       });
     }
@@ -651,6 +661,8 @@ export class AgentIdentity {
       mode:                options.mode,
       hostedAgentAuthorityMode: options.hostedAgentAuthorityMode,
       voicemailDetection: options.voicemailDetection,
+      onVoicemail:         options.onVoicemail,
+      voicemailMessage:    options.voicemailMessage,
       reason:              options.reason,
     });
   }

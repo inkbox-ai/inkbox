@@ -76,6 +76,8 @@ output. Notices never authorize an operation or cause a retry.
 
 ## Directional contact rules
 
+Requires CLI `0.7.3` or later.
+
 All identity mail/phone rules, deprecated mailbox/number rules, and iMessage
 contact-rule commands accept `--direction inbound|outbound|both` on create,
 update, and list operations. Inbound is communication from the counterparty to
@@ -316,7 +318,11 @@ inkbox phone call -i <handle>                # Place an outbound call
   --reason <text>                            #   Voice AI's task brief — what to accomplish
   --authority-mode <mode>                    #   Optional contact_scoped or yolo override;
                                              #     omit to inherit the saved Voice AI authority
-  --no-voicemail-detection                   #   Stay connected after voicemail is detected
+  --on-voicemail <action>                    #   leave_message, hang_up, or ignore; omit for the
+                                             #     default (leave_message with --hosted, else hang_up)
+  --voicemail-message <text>                 #   What Voice AI says on the voicemail
+                                             #     (requires --on-voicemail leave_message)
+  --no-voicemail-detection                   #   Deprecated; same as --on-voicemail ignore
   --origination <origin>                     #   dedicated_number (default) or
                                              #     shared_imessage_number or
                                              #     dedicated_imessage_number

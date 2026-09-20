@@ -29,6 +29,8 @@ You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://i
 
 ## Directional communication permissions
 
+Requires SDK `0.7.3` or later.
+
 Mail and phone rules accept `direction: "inbound" | "outbound" | "both"`
 (`RuleDirection`). Inbound means communication from the counterparty to the agent;
 outbound means communication from the agent to the counterparty. Phone policy
@@ -535,7 +537,7 @@ by 1024 and label the result GiB/MiB.
 import {
   CallMode,
   HostedAgentAuthorityMode,
-  VoicemailDetection,
+  OnVoicemail,
 } from "@inkbox/sdk";
 
 // Place an outbound call — stream audio over WebSocket
@@ -546,12 +548,17 @@ const call = await identity.placeCall({
 console.log(call.status, call.rateLimit.callsRemaining);
 
 // Let Voice AI handle the call using this identity's saved authority.
+// Hosted-agent calls leave a voicemail by default (onVoicemail=leave_message);
+// pass voicemailMessage to control what is said, or hang_up / ignore to end
+// the call at the beep or skip detection entirely.
 const hostedCall = await identity.placeCall({
   toNumber: "+15551234567",
   mode: CallMode.HOSTED_AGENT,
   reason: "Coordinate the appointment and send confirmations.",
-  voicemailDetection: VoicemailDetection.DISABLED,
+  onVoicemail: OnVoicemail.LEAVE_MESSAGE,
+  voicemailMessage: "Hi, this is Ava calling about your appointment. Please call us back.",
 });
+console.log(hostedCall.onVoicemail); // "leave_message"
 
 // Set the saved default for future inbound and outbound Voice AI calls.
 // Changing the saved default requires an admin API key.

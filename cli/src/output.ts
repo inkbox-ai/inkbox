@@ -1,3 +1,4 @@
+import { format } from "node:util";
 import { commandOutput } from "./response-metadata.js";
 
 function formatValue(v: unknown): string {
@@ -86,5 +87,5 @@ export function outputContactRules(
 
 /** Preserve status text unless a structured response envelope was requested. */
 export function printStatus(...values: unknown[]): void {
-  if (!commandOutput.getStore()?.envelope) console.log(...values);
+  if (!commandOutput.getStore()?.envelope) process.stdout.write(`${format(...values)}\n`);
 }

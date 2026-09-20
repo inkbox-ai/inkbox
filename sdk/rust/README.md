@@ -54,6 +54,8 @@ fn main() -> inkbox::Result<()> {
 
 ### Directional contact rules
 
+Requires SDK `0.7.3` or later.
+
 Existing positional methods and response structs remain supported. Use the
 additive `*_with_options` rule methods to read and configure inbound, outbound,
 or both directions. Mail, phone, and iMessage resources all support
@@ -187,6 +189,30 @@ let scoped_call = identity.place_hosted_call_with_authority(
     "Confirm only this caller's appointment.",
     HostedAgentAuthorityMode::ContactScoped,
 )?;
+```
+
+### Voicemail handling
+
+`on_voicemail` selects what happens when voicemail answers: `LeaveMessage`
+(the hosted-agent default; Voice AI waits for the beep and leaves a message),
+`HangUp` (the client-driven default), or `Ignore` (no detection).
+`voicemail_message` sets what Voice AI says and requires `LeaveMessage`. Both
+are omitted from the request when `None`. `VoicemailDetection` is deprecated.
+
+```rust
+use inkbox::phone::{CallOrigin, HostedCallPlacementOptions, OnVoicemail};
+
+let call = identity.place_hosted_call_with_options(
+    "+15551234567",
+    CallOrigin::DedicatedNumber,
+    "Coordinate the appointment and send confirmations.",
+    &HostedCallPlacementOptions {
+        on_voicemail: Some(OnVoicemail::LeaveMessage),
+        voicemail_message: Some("Hi, this is Ava about your appointment. Please call us back.".into()),
+        ..Default::default()
+    },
+)?;
+println!("{}", call.call.on_voicemail.as_str());
 ```
 
 ### Discover Voice AI voices

@@ -6,6 +6,7 @@ import {
   HostedAgentAuthorityMode,
   IncomingCallAction,
   ForwardingTargetType,
+  OnVoicemail,
   VoicemailDetection,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
@@ -21,6 +22,8 @@ interface PlaceCallCommandOptions {
   origination?: string;
   authorityMode?: string;
   voicemailDetection?: boolean;
+  onVoicemail?: string;
+  voicemailMessage?: string;
 }
 
 interface PlaceCallOptions {
@@ -31,6 +34,8 @@ interface PlaceCallOptions {
   origination?: CallOrigin;
   hostedAgentAuthorityMode?: HostedAgentAuthorityMode;
   voicemailDetection?: VoicemailDetection;
+  onVoicemail?: OnVoicemail;
+  voicemailMessage?: string;
 }
 
 export function buildPlaceCallOptions(
@@ -68,6 +73,23 @@ export function buildPlaceCallOptions(
   if (!cmdOpts.hosted && cmdOpts.authorityMode !== undefined) {
     return { error: "--authority-mode requires --hosted." };
   }
+  if (
+    cmdOpts.onVoicemail !== undefined
+    && !Object.values(OnVoicemail).includes(cmdOpts.onVoicemail as OnVoicemail)
+  ) {
+    return { error: "--on-voicemail must be leave_message, hang_up, or ignore." };
+  }
+  // --voicemail-message only makes sense when the agent will leave one;
+  // the deprecated opt-out flag means "ignore", which contradicts that.
+  if (
+    cmdOpts.voicemailMessage !== undefined
+    && cmdOpts.onVoicemail !== OnVoicemail.LEAVE_MESSAGE
+  ) {
+    return { error: "--voicemail-message requires --on-voicemail leave_message." };
+  }
+  if (cmdOpts.voicemailMessage !== undefined && cmdOpts.voicemailDetection === false) {
+    return { error: "--voicemail-message conflicts with --no-voicemail-detection." };
+  }
 
   const callOptions: PlaceCallOptions = { toNumber: cmdOpts.to };
   if (cmdOpts.wsUrl) {
@@ -86,6 +108,12 @@ export function buildPlaceCallOptions(
   }
   if (cmdOpts.voicemailDetection === false) {
     callOptions.voicemailDetection = VoicemailDetection.DISABLED;
+  }
+  if (cmdOpts.onVoicemail !== undefined) {
+    callOptions.onVoicemail = cmdOpts.onVoicemail as OnVoicemail;
+  }
+  if (cmdOpts.voicemailMessage !== undefined) {
+    callOptions.voicemailMessage = cmdOpts.voicemailMessage;
   }
   return { callOptions };
 }
@@ -112,8 +140,17 @@ export function registerPhoneCommands(program: Command): void {
       "Call origin: dedicated_number, shared_imessage_number, or dedicated_imessage_number",
     )
     .option(
+      "--on-voicemail <action>",
+      "What to do when voicemail answers: leave_message, hang_up, or ignore; "
+        + "omit for the default (leave_message with --hosted, hang_up otherwise)",
+    )
+    .option(
+      "--voicemail-message <text>",
+      "What Voice AI says on the voicemail (requires --on-voicemail leave_message)",
+    )
+    .option(
       "--no-voicemail-detection",
-      "Keep the call connected when voicemail is detected",
+      "Deprecated; use --on-voicemail ignore. Keep the call connected when voicemail is detected",
     )
     .action(
       withErrorHandler(async function (
@@ -141,6 +178,7 @@ export function registerPhoneCommands(program: Command): void {
             reason: call.reason,
             authorityMode: call.hostedAgentAuthorityMode,
             voicemailDetection: call.voicemailDetection,
+            onVoicemail: call.onVoicemail,
             callsRemaining: call.rateLimit.callsRemaining,
           },
           { json: !!opts.json },
