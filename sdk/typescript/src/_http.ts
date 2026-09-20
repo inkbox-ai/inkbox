@@ -5,6 +5,7 @@
  */
 
 import { parseAgentSupport } from "./error-guidance.js";
+import { observeResponse, notifyResponseObservers, type ResponseObserver } from "./response_metadata.js";
 
 export class InkboxError extends Error {
   constructor(message: string) {
@@ -514,12 +515,24 @@ export class HttpTransport {
     timeoutMs: number = 30_000,
     cookieJar?: CookieJar,
     userAgent?: string,
+    private readonly onResponse?: ResponseObserver,
+    private readonly collectMetadata?: ResponseObserver,
   ) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
     this.timeoutMs = timeoutMs;
     this.cookieJar = cookieJar ?? new CookieJar();
     this.userAgent = userAgent;
+  }
+
+  /** @internal Share authentication and cookies, but isolate metadata collection. */
+  scoped(collector: ResponseObserver): HttpTransport {
+    return new HttpTransport(this.apiKey, this.baseUrl, this.timeoutMs, this.cookieJar, this.userAgent, this.onResponse, collector);
+  }
+
+  /** @internal Forward metadata from protocol-specific HTTP requests. */
+  get responseObserver(): ResponseObserver {
+    return (metadata) => notifyResponseObservers(metadata, this.collectMetadata, this.onResponse);
   }
 
   async get<T>(path: string, params?: Params, opts?: { timeoutMs?: number }): Promise<T> {
@@ -730,6 +743,7 @@ export class HttpTransport {
     }
 
     this.cookieJar.storeFromResponse(url, resp);
+    await observeResponse(resp, url, method, this.collectMetadata, this.onResponse);
 
     if (!resp.ok) {
       const envelope = await readErrorEnvelope(resp);

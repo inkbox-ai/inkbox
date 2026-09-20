@@ -31,7 +31,7 @@ pub struct VaultResource {
     api_http: Arc<HttpTransport>,
     // Cached unlocked vault, so `identity.credentials` has the full set to
     // filter from even when `unlock` was called with an `identity_id`.
-    unlocked: Mutex<Option<UnlockedVault>>,
+    unlocked: Arc<Mutex<Option<UnlockedVault>>>,
 }
 
 impl VaultResource {
@@ -47,7 +47,7 @@ impl VaultResource {
         Self {
             http,
             api_http,
-            unlocked: Mutex::new(None),
+            unlocked: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -55,7 +55,18 @@ impl VaultResource {
 
     /// The cached [`UnlockedVault`], or `None` if not yet unlocked.
     pub fn unlocked(&self) -> Option<UnlockedVault> {
-        self.unlocked.lock().unwrap().clone()
+        self.unlocked.lock().unwrap().clone().map(|mut vault| {
+            vault.http = self.http.clone();
+            vault
+        })
+    }
+
+    pub(crate) fn scoped(&self, http: Arc<HttpTransport>, api_http: Arc<HttpTransport>) -> Self {
+        Self {
+            http,
+            api_http,
+            unlocked: self.unlocked.clone(),
+        }
     }
 
     /// Get vault metadata for the caller's organisation.
@@ -677,4 +688,52 @@ fn parse_uuid(data: &Value, field: &str) -> Result<Uuid> {
                 "missing/invalid {field}"
             )))
         })
+}
+
+#[cfg(test)]
+mod scoped_tests {
+    use super::*;
+    use httpmock::prelude::*;
+
+    #[test]
+    fn scoped_unlocked_vault_reuses_state_and_rebinds_response_collection() {
+        let server = MockServer::start();
+        let request = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/vault/secrets/secret");
+            then.status(403)
+                .header(
+                    "Inkbox-Notices",
+                    r#"[{"code":"advice","level":"info","message":"Example notice"}]"#,
+                )
+                .json_body(serde_json::json!({"detail":"Denied"}));
+        });
+        let client = crate::Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        *client.vault().unlocked.lock().unwrap() = Some(UnlockedVault::new(
+            client.vault().http.clone(),
+            vec![0; 32],
+            vec![],
+        ));
+        let response = client
+            .with_response_metadata(|scoped| {
+                assert!(Arc::ptr_eq(
+                    &client.vault().unlocked,
+                    &scoped.vault().unlocked
+                ));
+                assert!(scoped
+                    .vault()
+                    .unlocked()
+                    .unwrap()
+                    .get_secret("secret")
+                    .is_err());
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(response.notices.unwrap()[0].code, "advice");
+        request.assert();
+        let next = client.with_response_metadata(|_| Ok(())).unwrap();
+        assert!(next.notices.is_none());
+    }
 }

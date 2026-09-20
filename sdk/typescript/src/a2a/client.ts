@@ -1,6 +1,7 @@
 /** Stateless A2A 1.0 client with strict credential-origin pinning. */
 
 import { InkboxError } from "../_http.js";
+import { observeResponse, type ResponseObserver } from "../response_metadata.js";
 import type {
   A2ACard,
   A2AResolvedTarget,
@@ -92,7 +93,7 @@ export class A2AClient {
   constructor(
     private readonly apiKey: string,
     platformBaseUrl: string,
-    options: { requestTimeoutMs?: number } = {},
+    private readonly options: { requestTimeoutMs?: number; onResponse?: ResponseObserver } = {},
   ) {
     this.platformOrigin = origin(platformBaseUrl);
     this.requestTimeoutMs = requestTimeout(
@@ -124,6 +125,7 @@ export class A2AClient {
           redirect: "manual",
           signal,
         });
+        await observeResponse(response, canonicalCardUrl, false, this.options.onResponse);
         if (response.status >= 300 && response.status < 400) {
           throw new InkboxError("A2A Agent Card redirects are refused");
         }
@@ -363,6 +365,7 @@ export class A2AClient {
           }),
           signal,
         });
+        await observeResponse(response, rpcUrl, false, this.options.onResponse);
         if (response.status >= 300 && response.status < 400) {
           throw new InkboxError("A2A RPC redirects are refused");
         }

@@ -139,6 +139,7 @@ describe("AgentIdentity A2A client", () => {
       _apiKey: "ApiKey_secret",
       _baseUrl: "https://inkbox.ai",
       _timeoutMs: 7_250,
+      _rootApiHttp: { responseObserver: vi.fn() },
       whoami: vi.fn().mockResolvedValue({
         authType: "api_key",
         authSubtype: "api_key.agent_scoped.claimed",

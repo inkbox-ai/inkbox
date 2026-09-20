@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { printStatus } from "../output.js";
 import type { AgentIdentity } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
@@ -340,7 +341,7 @@ export function registerTextCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         await identity.markTextRead(textId);
-        console.log(`Marked text ${textId} as read.`);
+        printStatus(`Marked text ${textId} as read.`);
       }),
     );
 
@@ -359,7 +360,7 @@ export function registerTextCommands(program: Command): void {
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const result = await identity.markTextConversationRead(conversationKey);
         const displayKey = result.remotePhoneNumber ?? result.conversationId ?? conversationKey;
-        console.log(
+        printStatus(
           `Marked ${result.updatedCount} message(s) in conversation ${displayKey} as read.`,
         );
       }),

@@ -15,6 +15,29 @@ pub struct ContactAccessResource {
 }
 
 impl ContactAccessResource {
+    pub fn get_with_options(
+        &self,
+        handle: &str,
+        contact_id: &str,
+    ) -> Result<crate::contacts::DirectionalContactAccessSettings> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/identities/{handle}/contacts/{contact_id}/access"),
+            NO_QUERY,
+        )?)?)
+    }
+
+    pub fn update_with_options(
+        &self,
+        handle: &str,
+        contact_id: &str,
+        options: &crate::contacts::UpdateDirectionalContactAccess,
+    ) -> Result<crate::contacts::DirectionalContactAccessSettings> {
+        options.validate()?;
+        Ok(serde_json::from_value(self.http.patch(
+            &format!("/identities/{handle}/contacts/{contact_id}/access"),
+            options,
+        )?)?)
+    }
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
     }

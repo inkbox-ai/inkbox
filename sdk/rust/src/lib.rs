@@ -31,6 +31,7 @@ mod cookies;
 pub mod error;
 pub mod filters;
 pub mod http;
+pub mod response_metadata;
 
 // Org-level entry point + per-identity facade.
 pub mod agent_identity;
@@ -42,6 +43,7 @@ pub mod signing_keys;
 pub mod a2a;
 pub mod agent_signup;
 pub mod api_keys;
+pub mod contact_rules;
 pub mod contacts;
 pub mod identities;
 pub mod imessage;
@@ -62,6 +64,16 @@ pub use a2a::{
 };
 pub use agent_identity::AgentIdentity;
 pub use client::{Inkbox, InkboxBuilder, DEFAULT_BASE_URL};
+pub use contact_rules::{
+    ContactRuleApplyTo, ContactRuleCreateOptions, ContactRuleDirection, ContactRuleListOptions,
+    ContactRuleUpdateOptions, DirectionalContactRule,
+};
 pub use credentials::Credentials;
 pub use error::{ApiErrorDetail, InkboxError, Result};
 pub use filters::DateRangeFilter;
+pub use response_metadata::{APIResponse, ResponseMetadata, ResponseNotice, ResponseObserver};
+
+#[cfg(test)]
+mod directional_tests;
+#[cfg(test)]
+mod response_metadata_tests;

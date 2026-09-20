@@ -3,15 +3,17 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { Inkbox } from "@inkbox/sdk";
 import type { Command } from "commander";
+import { observeResponse } from "./response-metadata.js";
 
 // Keep in sync with package.json "version".
-export const CLI_VERSION = "0.7.1";
+export const CLI_VERSION = "0.7.2";
 
 export interface GlobalOpts {
   apiKey?: string;
   vaultKey?: string;
   baseUrl?: string;
   json?: boolean;
+  withResponseMetadata?: boolean;
 }
 
 export function getGlobalOpts(cmd: Command): GlobalOpts {
@@ -70,5 +72,6 @@ export function createClient(opts: GlobalOpts, timeoutMs?: number): Inkbox {
     baseUrl,
     timeoutMs,
     userAgentPrefix: `inkbox-cli/${CLI_VERSION}`,
+    onResponse: observeResponse,
   });
 }

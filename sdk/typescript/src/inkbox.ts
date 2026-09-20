@@ -5,6 +5,7 @@
  */
 
 import { CookieJar, HttpTransport, InkboxAPIError } from "./_http.js";
+import { collectResponseNotices, observeResponse, type APIResponse, type ResponseNotice, type ResponseObserver } from "./response_metadata.js";
 import type { InkboxAPIErrorDetail } from "./_http.js";
 import { parseAgentSupport } from "./error-guidance.js";
 import { VERSION } from "./version.js";
@@ -83,6 +84,7 @@ function sdkUserAgent(prefix?: string): string {
 }
 
 export interface SignupOptions {
+  onResponse?: ResponseObserver;
   /** Override the API base URL (useful for self-hosting or testing). */
   baseUrl?: string;
   /** Request timeout in milliseconds. Defaults to 30 000. */
@@ -90,6 +92,8 @@ export interface SignupOptions {
 }
 
 export interface InkboxOptions {
+  /** Called for each HTTP response, including errors and empty responses. */
+  onResponse?: ResponseObserver;
   /**
    * Your Inkbox API key (sent as `X-API-Key`). Falls back to the
    * `INKBOX_API_KEY` env var, then `~/.inkbox/config`.
@@ -225,15 +229,15 @@ export class Inkbox {
     const userAgent = sdkUserAgent(options.userAgentPrefix);
     const cookieJar = new CookieJar();
 
-    const mailHttp     = new HttpTransport(apiKey, `${apiRoot}/mail`, ms, cookieJar, userAgent);
-    const phoneHttp    = new HttpTransport(apiKey, `${apiRoot}/phone`, ms, cookieJar, userAgent);
-    const imessageHttp = new HttpTransport(apiKey, `${apiRoot}/imessage`, ms, cookieJar, userAgent);
-    const idsHttp      = new HttpTransport(apiKey, `${apiRoot}/identities`, ms, cookieJar, userAgent);
-    const vaultHttp    = new HttpTransport(apiKey, `${apiRoot}/vault`, ms, cookieJar, userAgent);
-    const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar, userAgent);
-    const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar, userAgent);
-    const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar, userAgent);
-    const publicHttp   = new HttpTransport(apiKey, this._baseUrl, ms, cookieJar, userAgent);
+    const mailHttp     = new HttpTransport(apiKey, `${apiRoot}/mail`, ms, cookieJar, userAgent, options.onResponse);
+    const phoneHttp    = new HttpTransport(apiKey, `${apiRoot}/phone`, ms, cookieJar, userAgent, options.onResponse);
+    const imessageHttp = new HttpTransport(apiKey, `${apiRoot}/imessage`, ms, cookieJar, userAgent, options.onResponse);
+    const idsHttp      = new HttpTransport(apiKey, `${apiRoot}/identities`, ms, cookieJar, userAgent, options.onResponse);
+    const vaultHttp    = new HttpTransport(apiKey, `${apiRoot}/vault`, ms, cookieJar, userAgent, options.onResponse);
+    const domainsHttp  = new HttpTransport(apiKey, `${apiRoot}/domains`, ms, cookieJar, userAgent, options.onResponse);
+    const rootApiHttp  = new HttpTransport(apiKey, `${baseUrl.replace(/\/$/, "")}/api`, ms, cookieJar, userAgent, options.onResponse);
+    const apiHttp      = new HttpTransport(apiKey, apiRoot, ms, cookieJar, userAgent, options.onResponse);
+    const publicHttp   = new HttpTransport(apiKey, this._baseUrl, ms, cookieJar, userAgent, options.onResponse);
 
     this._mailboxes        = new MailboxesResource(mailHttp);
     this._messages         = new MessagesResource(mailHttp);
@@ -307,6 +311,40 @@ export class Inkbox {
       await this._vaultUnlockPromise;
     }
     return this;
+  }
+
+  /** Collect notices only from calls made through the supplied scoped client. */
+  async withResponseMetadata<T>(callback: (client: Inkbox) => T | Promise<T>): Promise<APIResponse<T>> {
+    const notices: ResponseNotice[] = [];
+    const collector: ResponseObserver = (metadata) => collectResponseNotices(notices, metadata);
+    const copies = new Map<object, object>();
+    const scope = (value: unknown): unknown => {
+      if (value === null || typeof value !== "object") return value;
+      if (copies.has(value)) return copies.get(value);
+      if (value instanceof HttpTransport) {
+        const transport = value.scoped(collector);
+        copies.set(value, transport);
+        return transport;
+      }
+      // Copy resource bindings, retaining data, key material, and pending state.
+      if (!(value instanceof Inkbox) && value !== this._webhooks
+        && !Object.values(value).some((item) => item instanceof HttpTransport)) return value;
+      const copy = Object.create(Object.getPrototypeOf(value));
+      copies.set(value, copy);
+      for (const [key, item] of Object.entries(value)) copy[key] = scope(item);
+      if (value instanceof VaultResource) {
+        // An existing unlock may finish after this scope is created.
+        let local: VaultResource["_unlocked"] | undefined;
+        Object.defineProperty(copy, "_unlocked", {
+          enumerable: true,
+          get: () => local === undefined ? scope(value._unlocked) : local,
+          set: (unlocked: VaultResource["_unlocked"]) => { local = unlocked; },
+        });
+      }
+      return copy;
+    };
+    const data = await callback(scope(this) as Inkbox);
+    return { data: data === undefined ? null : data, ...(notices.length ? { notices: [...notices] } : {}) } as APIResponse<T>;
   }
 
   // ------------------------------------------------------------------
@@ -541,7 +579,7 @@ export class Inkbox {
   private static async _oneShotFetch<T>(
     method: string,
     path: string,
-    opts: { apiKey?: string; body?: unknown; baseUrl?: string; timeoutMs?: number },
+    opts: { apiKey?: string; body?: unknown; baseUrl?: string; timeoutMs?: number; onResponse?: ResponseObserver },
   ): Promise<T> {
     const base = opts.baseUrl ?? DEFAULT_BASE_URL;
     if (!base.startsWith("https://")) {
@@ -578,6 +616,7 @@ export class Inkbox {
       clearTimeout(timer);
     }
 
+    await observeResponse(resp, url, false, opts.onResponse);
     if (!resp.ok) {
       let detail: InkboxAPIErrorDetail;
       let agentSupport: string | null = null;

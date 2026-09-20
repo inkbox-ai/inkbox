@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { printStatus } from "../output.js";
 import { createClient, getGlobalOpts } from "../client.js";
 import { readSecretFromStdin } from "../invitation-token.js";
 import { output } from "../output.js";
@@ -290,7 +291,7 @@ function registerSubscriptionCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.webhooks.subscriptions.delete(subId);
-        console.log(`Deleted webhook subscription '${subId}'.`);
+        printStatus(`Deleted webhook subscription '${subId}'.`);
       }),
     );
 }
@@ -440,7 +441,7 @@ export function registerWebhookCommands(program: Command): void {
         if (opts.json) {
           output({ valid }, { json: true });
         } else if (valid) {
-          console.log("Valid signature.");
+          printStatus("Valid signature.");
         } else {
           console.error("Invalid signature.");
           process.exit(1);

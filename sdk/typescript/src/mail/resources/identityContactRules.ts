@@ -16,6 +16,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import { type RuleDirection, ruleUpdateToWire } from "../../contact_rules.js";
 import {
   MailIdentityContactRule,
   MailRuleAction,
@@ -32,6 +33,7 @@ function rulePath(agentHandle: string, ruleId?: string): string {
 }
 
 export interface ListMailIdentityContactRulesOptions {
+  direction?: RuleDirection;
   action?: MailRuleAction;
   matchType?: MailRuleMatchType;
   limit?: number;
@@ -39,16 +41,20 @@ export interface ListMailIdentityContactRulesOptions {
 }
 
 export interface CreateMailIdentityContactRuleOptions {
+  direction?: RuleDirection;
   action: MailRuleAction;
   matchType: MailRuleMatchType;
   matchTarget: string;
 }
 
 export interface UpdateMailIdentityContactRuleOptions {
-  action: MailRuleAction;
+  action?: MailRuleAction;
+  direction?: RuleDirection;
+  applyTo?: "inbound" | "outbound";
 }
 
 export interface ListAllMailIdentityContactRulesOptions {
+  direction?: RuleDirection;
   agentIdentityId?: string;
   action?: MailRuleAction;
   matchType?: MailRuleMatchType;
@@ -65,6 +71,7 @@ export class MailIdentityContactRulesResource {
     options: ListMailIdentityContactRulesOptions = {},
   ): Promise<MailIdentityContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;
     if (options.limit !== undefined) params.limit = options.limit;
@@ -86,8 +93,8 @@ export class MailIdentityContactRulesResource {
   /**
    * Create a rule for an agent identity.
    *
-   * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
-   *   the same `(matchType, matchTarget)` already exists.
+   * Compatible coverage may widen an existing rule and retain its ID.
+   * @throws {DuplicateContactRuleError} 409 when the coverage already exists.
    */
   async create(
     agentHandle: string,
@@ -98,6 +105,7 @@ export class MailIdentityContactRulesResource {
       match_type: options.matchType,
       match_target: options.matchTarget,
     };
+    if (options.direction !== undefined) body.direction = options.direction;
     const data = await this.http.post<RawMailIdentityContactRule>(
       rulePath(agentHandle),
       body,
@@ -106,7 +114,7 @@ export class MailIdentityContactRulesResource {
   }
 
   /**
-   * Update `action` (admin-only).
+   * Update action or coverage, or atomically edit one covered side (admin-only).
    *
    * `matchType` and `matchTarget` are immutable — delete + re-create to
    * change them.
@@ -116,7 +124,7 @@ export class MailIdentityContactRulesResource {
     ruleId: string,
     options: UpdateMailIdentityContactRuleOptions,
   ): Promise<MailIdentityContactRule> {
-    const body = { action: options.action };
+    const body = ruleUpdateToWire(options);
     const data = await this.http.patch<RawMailIdentityContactRule>(
       rulePath(agentHandle, ruleId),
       body,
@@ -134,6 +142,7 @@ export class MailIdentityContactRulesResource {
     options: ListAllMailIdentityContactRulesOptions = {},
   ): Promise<MailIdentityContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.agentIdentityId !== undefined) params.agent_identity_id = options.agentIdentityId;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;

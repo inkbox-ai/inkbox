@@ -5,6 +5,7 @@ Dataclasses mirroring the Inkbox Mail API response models.
 """
 
 from __future__ import annotations
+from inkbox.contact_rules import ContactRuleDirection
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -219,6 +220,14 @@ class Mailbox:
     signature_html: str | None = None
     signature_text: str | None = None
     signature_enabled: bool = False
+    inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        self.inbound_filter_mode = FilterMode(self.inbound_filter_mode or self.filter_mode)
+        self.outbound_filter_mode = FilterMode(self.outbound_filter_mode or self.filter_mode)
+        if self.inbound_filter_mode == self.outbound_filter_mode:
+            self.filter_mode = self.inbound_filter_mode
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Mailbox:
@@ -231,6 +240,8 @@ class Mailbox:
         storage_limit = d.get("storage_limit_bytes")
 
         return cls(
+            inbound_filter_mode=d.get("inbound_filter_mode"),
+            outbound_filter_mode=d.get("outbound_filter_mode"),
             signature_html=d.get("signature_html"),
             signature_text=d.get("signature_text"),
             signature_enabled=d.get("signature_enabled", False),
@@ -667,10 +678,12 @@ class MailContactRule:
     status: ContactRuleStatus
     created_at: datetime
     updated_at: datetime
+    direction: ContactRuleDirection = ContactRuleDirection.BOTH
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> MailContactRule:
         return cls(
+            direction=ContactRuleDirection(d.get("direction", "both")),
             id=UUID(d["id"]),
             mailbox_id=UUID(d["mailbox_id"]),
             action=MailRuleAction(d["action"]),
@@ -702,10 +715,12 @@ class MailIdentityContactRule:
     created_at: datetime
     updated_at: datetime
     contact: Contact | None = None
+    direction: ContactRuleDirection = ContactRuleDirection.BOTH
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> MailIdentityContactRule:
         return cls(
+            direction=ContactRuleDirection(d.get("direction", "both")),
             contact=Contact._from_dict(d["contact"]) if d.get("contact") is not None else None,
             id=UUID(d["id"]),
             agent_identity_id=UUID(d["agent_identity_id"]),

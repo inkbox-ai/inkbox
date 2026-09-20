@@ -1,4 +1,6 @@
 import { Command, Option } from "commander";
+import { addDirectionalRuleOptions, directionalRuleOptions } from "../contact-rules.js";
+import { printStatus } from "../output.js";
 import { openAsBlob } from "node:fs";
 import { stat, open } from "node:fs/promises";
 import { basename } from "node:path";
@@ -21,6 +23,8 @@ const MAILBOX_LIST_COLUMNS = [
   "storage",
   "id",
   "filterMode",
+  "inboundFilterMode",
+  "outboundFilterMode",
   "agentIdentityId",
   "createdAt",
 ];
@@ -70,6 +74,8 @@ export function mailboxGetRecord(
     sendingDomain: mb.sendingDomain,
     id: mb.id,
     filterMode: mb.filterMode,
+    inboundFilterMode: mb.inboundFilterMode ?? mb.filterMode,
+    outboundFilterMode: mb.outboundFilterMode ?? mb.filterMode,
     agentIdentityId: mb.agentIdentityId,
     createdAt: mb.createdAt,
     storageUsedBytes: mb.storageUsedBytes,
@@ -449,6 +455,7 @@ function registerMailboxRulesCommands(parent: Command): void {
         let rows;
         if (cmdOpts.allMailboxes) {
           rows = await inkbox.mailContactRules.listAll({
+            ...directionalRuleOptions(this),
             mailboxId: cmdOpts.mailboxId,
             action: cmdOpts.action as MailRuleAction | undefined,
             matchType: cmdOpts.matchType as MailRuleMatchType | undefined,
@@ -460,6 +467,7 @@ function registerMailboxRulesCommands(parent: Command): void {
             throw new Error("--mailbox <email> or --all-mailboxes is required");
           }
           rows = await inkbox.mailContactRules.list(cmdOpts.mailbox, {
+            ...directionalRuleOptions(this),
             action: cmdOpts.action as MailRuleAction | undefined,
             matchType: cmdOpts.matchType as MailRuleMatchType | undefined,
             limit: cmdOpts.limit,
@@ -468,7 +476,7 @@ function registerMailboxRulesCommands(parent: Command): void {
         }
         output(rows, {
           json: !!opts.json,
-          columns: ["id", "mailboxId", "action", "matchType", "matchTarget", "status"],
+          columns: ["id", "mailboxId", "action", "direction", "matchType", "matchTarget", "status"],
         });
       }),
     );
@@ -510,6 +518,7 @@ function registerMailboxRulesCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.mailContactRules.create(cmdOpts.mailbox, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as MailRuleAction,
           matchType: cmdOpts.matchType as MailRuleMatchType,
           matchTarget: cmdOpts.matchTarget,
@@ -532,6 +541,7 @@ function registerMailboxRulesCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.mailContactRules.update(cmdOpts.mailbox, ruleId, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as MailRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -551,9 +561,10 @@ function registerMailboxRulesCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.mailContactRules.delete(cmdOpts.mailbox, ruleId);
-        console.log(`Deleted mail contact rule '${ruleId}' on ${cmdOpts.mailbox}.`);
+        printStatus(`Deleted mail contact rule '${ruleId}' on ${cmdOpts.mailbox}.`);
       }),
     );
+  addDirectionalRuleOptions(rules);
 }
 
 export function registerMailboxCommands(program: Command): void {
@@ -649,6 +660,8 @@ export function registerMailboxCommands(program: Command): void {
             signatureText: mb.signatureText,
             signatureEnabled: mb.signatureEnabled,
             filterMode: mb.filterMode,
+            inboundFilterMode: mb.inboundFilterMode ?? mb.filterMode,
+            outboundFilterMode: mb.outboundFilterMode ?? mb.filterMode,
             agentIdentityId: mb.agentIdentityId,
           },
           { json: !!opts.json },
@@ -674,13 +687,13 @@ export function registerMailboxCommands(program: Command): void {
         const settings = clientSettings(mb.emailAddress, mailDomain);
         output(settings, { json: !!opts.json });
         if (opts.json) return;
-        console.log("");
-        console.log(
+        printStatus("");
+        printStatus(
           "Password: use an identity-scoped API key — mint one with " +
             "'inkbox api-keys create --label <name> --identity-id <uuid>'. " +
             "Admin-scoped keys are rejected (one key maps to one mailbox).",
         );
-        console.log(
+        printStatus(
           `The message From must be exactly ${mb.emailAddress}; aliases and ` +
             "'send as' are rejected. On the Free plan, signed/encrypted mail " +
             "(S/MIME, PGP) cannot be sent over SMTP.",

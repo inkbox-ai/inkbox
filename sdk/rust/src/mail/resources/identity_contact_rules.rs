@@ -22,6 +22,14 @@ use crate::http::HttpTransport;
 use crate::mail::types::{MailIdentityContactRule, MailRuleAction, MailRuleMatchType};
 
 const ORG_BASE: &str = "/mail/contact-rules";
+crate::contact_rules::directional_rule_methods!(
+    MailIdentityContactRulesResource,
+    MailIdentityContactRule,
+    MailRuleAction,
+    MailRuleMatchType,
+    "agent_identity_id",
+    &Uuid
+);
 
 /// Build the per-identity contact-rule path, optionally addressing one rule.
 fn rule_path(agent_handle: &str, rule_id: Option<&str>) -> String {

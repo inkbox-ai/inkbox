@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getGlobalOpts, resolveBaseUrl, type GlobalOpts } from "../client.js";
-import { output } from "../output.js";
+import { output, printStatus } from "../output.js";
+import { observeResponse } from "../response-metadata.js";
 import { withErrorHandler } from "../errors.js";
 import { Inkbox, extractA2AInvitationToken } from "@inkbox/sdk";
 import {
@@ -69,7 +70,7 @@ export function registerSignupCommands(program: Command): void {
               harness: cmdOpts.harness,
               invitationToken,
             },
-            { baseUrl: resolveBaseUrl(globalOpts) },
+            { baseUrl: resolveBaseUrl(globalOpts), onResponse: observeResponse },
           );
         } catch (error) {
           throw invitation
@@ -79,18 +80,18 @@ export function registerSignupCommands(program: Command): void {
         if (globalOpts.json) {
           output(result, { json: true });
         } else {
-          console.log();
-          console.log("Agent registered successfully!");
-          console.log();
-          console.log(`  Email:    ${result.emailAddress}`);
-          console.log(`  Handle:   ${result.agentHandle}`);
-          console.log(`  Org:      ${result.organizationId}`);
-          console.log(`  Status:   ${result.claimStatus}`);
-          console.log();
-          console.log(`  API Key:  ${result.apiKey}`);
-          console.log();
-          console.log("Save the API key — it is shown only once.");
-          console.log(result.message);
+          printStatus();
+          printStatus("Agent registered successfully!");
+          printStatus();
+          printStatus(`  Email:    ${result.emailAddress}`);
+          printStatus(`  Handle:   ${result.agentHandle}`);
+          printStatus(`  Org:      ${result.organizationId}`);
+          printStatus(`  Status:   ${result.claimStatus}`);
+          printStatus();
+          printStatus(`  API Key:  ${result.apiKey}`);
+          printStatus();
+          printStatus("Save the API key — it is shown only once.");
+          printStatus(result.message);
         }
         if (invitationToken && !result.invitation) {
           console.warn(
@@ -113,7 +114,7 @@ export function registerSignupCommands(program: Command): void {
         const result = await Inkbox.verifySignup(
           apiKey,
           { verificationCode: cmdOpts.code },
-          { baseUrl: globalOpts.baseUrl },
+          { baseUrl: globalOpts.baseUrl, onResponse: observeResponse },
         );
         output(result, { json: !!globalOpts.json });
       }),
@@ -128,7 +129,7 @@ export function registerSignupCommands(program: Command): void {
         const apiKey = requireApiKey(globalOpts);
         const result = await Inkbox.resendSignupVerification(
           apiKey,
-          { baseUrl: globalOpts.baseUrl },
+          { baseUrl: globalOpts.baseUrl, onResponse: observeResponse },
         );
         output(result, { json: !!globalOpts.json });
       }),
@@ -143,7 +144,7 @@ export function registerSignupCommands(program: Command): void {
         const apiKey = requireApiKey(globalOpts);
         const result = await Inkbox.getSignupStatus(
           apiKey,
-          { baseUrl: globalOpts.baseUrl },
+          { baseUrl: globalOpts.baseUrl, onResponse: observeResponse },
         );
         if (globalOpts.json) {
           output(result, { json: true });

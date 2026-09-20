@@ -23,6 +23,14 @@ use crate::http::HttpTransport;
 use crate::phone::types::{PhoneIdentityContactRule, PhoneRuleAction, PhoneRuleMatchType};
 
 const ORG_BASE: &str = "/phone/contact-rules";
+crate::contact_rules::directional_rule_methods!(
+    PhoneIdentityContactRulesResource,
+    PhoneIdentityContactRule,
+    PhoneRuleAction,
+    PhoneRuleMatchType,
+    "agent_identity_id",
+    &str
+);
 
 /// Build the per-identity contact-rule path, optionally addressing one rule.
 fn rule_path(agent_handle: &str, rule_id: Option<&str>) -> String {

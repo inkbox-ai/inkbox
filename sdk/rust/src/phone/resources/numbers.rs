@@ -15,6 +15,21 @@ pub struct PhoneNumbersResource {
 }
 
 impl PhoneNumbersResource {
+    pub fn get_with_options(
+        &self,
+        phone_number_id: &str,
+    ) -> Result<crate::identities::DirectionalChannel<PhoneNumber>> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/numbers/{phone_number_id}"),
+            crate::http::NO_QUERY,
+        )?)?)
+    }
+
+    pub fn list_with_options(
+        &self,
+    ) -> Result<Vec<crate::identities::DirectionalChannel<PhoneNumber>>> {
+        crate::contact_rules::parse_list(self.http.get("/numbers", crate::http::NO_QUERY)?)
+    }
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
     }

@@ -50,6 +50,82 @@ With `--json`, successful output is written to stdout. API errors are written as
 one JSON object to stderr with `error.type`, `error.message`, `error.statusCode`,
 `error.detail`, `error.retryAfterSeconds`, and `error.agentSupport`.
 
+## Response notices
+
+Advisory notices are printed to stderr without changing ordinary stdout. With
+`--json`, successful stdout keeps its existing shape and notices appear in one
+`{"notices": [...]}` stderr record. Each notice has string `code`, `level`, and
+`message` fields; unfamiliar codes and levels are preserved.
+
+For finite structured commands, opt into a single result document:
+
+```bash
+inkbox --json --with-response-metadata identity phone-rules list support-bot
+```
+
+The result is `{"data": <original result>, "notices": [...]}`. Notices are omitted
+when absent and empty success uses `"data": null`. Identical notices from internal
+lookups or pagination appear once. Errors keep the existing stderr error envelope
+and nonzero exit status, with optional top-level `notices` and unchanged
+`error.agentSupport` guidance.
+
+`--with-response-metadata` requires `--json`. Raw certificate stdout from
+`tunnel sign-csr` rejects it before making requests; use `--out` for a structured
+file result. File downloads retain their existing bytes and structured status
+output. Notices never authorize an operation or cause a retry.
+
+## Directional contact rules
+
+All identity mail/phone rules, deprecated mailbox/number rules, and iMessage
+contact-rule commands accept `--direction inbound|outbound|both` on create,
+update, and list operations. Inbound is communication from the counterparty to
+the agent; outbound is communication from the agent to the counterparty.
+
+```bash
+inkbox identity update support-bot \
+  --mail-inbound-filter-mode blacklist --mail-outbound-filter-mode whitelist
+inkbox identity mail-rules create support-bot \
+  --action allow --match-type exact_email --match-target x@example.com \
+  --direction outbound
+inkbox identity mail-rules update support-bot RULE_ID \
+  --action block --apply-to outbound
+```
+
+Omitting create direction means Both; omitting update direction preserves it.
+Updates accept action, direction, or both. `--apply-to inbound|outbound` requires
+`--action`, excludes `--direction`, and atomically preserves the opposite side.
+List filters for inbound/outbound include Both rules; `both` is exact. A2A's
+existing exact-direction behavior is unchanged. Compatible rules can consolidate,
+so a successful create may return an existing ID. Trust the returned rule.
+
+Identity update also accepts `--phone-inbound-filter-mode` and
+`--phone-outbound-filter-mode`. Existing shared mode flags set both directions;
+do not combine shared and directional flags for the same channel. Identity
+details expose both effective modes. Phone modes also apply to iMessage.
+
+`contacts access set --file` accepts `inboundContactable` and
+`outboundContactable` lists inside email/phone groups:
+
+```json
+{"email":{"inboundContactable":["x@example.com"],"outboundContactable":[]}}
+```
+
+Legacy `contactable` reads mean outbound; writes still affect both directions.
+Omitted lists preserve state and empty lists block current addresses on the named
+side. Mixing legacy and directional lists in one group, or supplying null, is
+invalid. Communication-policy files also accept address `direction` and
+`expectedInboundAction`/`expectedOutboundAction` concurrency checks. A one-way
+edit requires only the matching directional guard; Both requires both when
+`expectedAction` is omitted.
+
+`contacts permissions set --file` also accepts `inboundEmails`, `outboundEmails`,
+`inboundPhones`, and `outboundPhones` boolean maps. Each map may contain up to 50
+addresses. Shared `emails`/`phones` maps cannot be combined with directional maps
+for the same channel, and null is invalid. These maps also work in the initial
+`permissions` of a `contacts create --json` payload. The alternative initial
+`permissions.addresses` form accepts up to 200 directional decisions, while the
+contact remains limited to 50 email and 50 phone identifiers.
+
 ## Commands
 
 ### signup

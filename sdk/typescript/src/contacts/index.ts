@@ -7,6 +7,8 @@ export * from "./resources/contactAccess.js";
 export type {
   CreateContactOptions,
   ContactCreatePermissions,
+  ContactCreateAddressPermissions,
+  CreateContactWithAddressPermissionsOptions,
   ListContactsOptions,
   LookupContactsOptions,
   ContactMergeField,

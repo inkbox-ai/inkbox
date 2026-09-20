@@ -225,6 +225,95 @@ pub struct ContactCommunicationPolicyResource {
 }
 
 impl ContactCommunicationPolicyResource {
+    pub fn preview_with_options(
+        &self,
+        contact_id: &str,
+        identity_id: &str,
+    ) -> Result<crate::contacts::DirectionalContactCommunicationPreview> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/contacts/{contact_id}/communication-preview"),
+            &[("identity_id", identity_id.to_string())],
+        )?)?)
+    }
+
+    pub fn list_for_identity_with_options(
+        &self,
+        handle: &str,
+        limit: u64,
+        offset: u64,
+    ) -> Result<crate::contacts::DirectionalContactCommunicationPolicyPage> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/identities/{handle}/contact-communication-policies"),
+            &[("limit", limit.to_string()), ("offset", offset.to_string())],
+        )?)?)
+    }
+    pub fn get_with_options(
+        &self,
+        contact_id: &str,
+        identity_id: Option<&str>,
+    ) -> Result<crate::contacts::DirectionalContactCommunicationPolicy> {
+        let query: Vec<_> = identity_id
+            .map(|id| ("identity_id", id.to_string()))
+            .into_iter()
+            .collect();
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/contacts/{contact_id}/communication-policy"),
+            &query,
+        )?)?)
+    }
+
+    pub fn replace_with_options(
+        &self,
+        contact_id: &str,
+        options: &crate::contacts::ReplaceDirectionalContactCommunicationPolicy,
+    ) -> Result<crate::contacts::DirectionalContactCommunicationPolicy> {
+        if let Some(visibility) = &options.visibility {
+            let addresses: Vec<_> = options
+                .addresses
+                .iter()
+                .map(|address| ContactAddressUpdate {
+                    kind: address.kind,
+                    value: address.value.clone(),
+                    action: address.action,
+                    expected_action: address.expected_action.unwrap_or_default(),
+                })
+                .collect();
+            visibility
+                .validate(options.identity_id, &addresses)
+                .map_err(|m| InkboxError::InvalidArgument(m.into()))?;
+        }
+        Ok(serde_json::from_value(self.http.put(
+            &format!("/contacts/{contact_id}/communication-policy"),
+            options,
+        )?)?)
+    }
+
+    pub fn list_management_for_identity_with_options(
+        &self,
+        handle: &str,
+        params: &ListContactsParams,
+    ) -> Result<crate::contacts::DirectionalContactPermissionPage> {
+        let mut query = Vec::new();
+        if let Some(q) = &params.q {
+            query.push(("q", q.clone()));
+        }
+        if let Some(order) = &params.order {
+            query.push(("order", order.clone()));
+        }
+        if let Some(limit) = params.limit {
+            query.push(("limit", limit.to_string()));
+        }
+        if let Some(offset) = params.offset {
+            query.push(("offset", offset.to_string()));
+        }
+        for status in &params.review_status {
+            query.push(("review_status", status.as_str().to_string()));
+        }
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/identities/{handle}/contact-permissions"),
+            &query,
+        )?)?)
+    }
     /// Use the client's authenticated transport.
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }

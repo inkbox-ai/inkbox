@@ -10,6 +10,14 @@ use crate::phone::types::{PhoneContactRule, PhoneRuleAction, PhoneRuleMatchType}
 
 const BASE: &str = "/numbers";
 const ORG_BASE: &str = "/contact-rules";
+crate::contact_rules::directional_rule_methods!(
+    PhoneContactRulesResource,
+    PhoneContactRule,
+    PhoneRuleAction,
+    PhoneRuleMatchType,
+    "phone_number_id",
+    &str
+);
 
 /// Build the per-number contact-rule path, optionally addressing one rule.
 fn rule_path(phone_number_id: &str, rule_id: Option<&str>) -> String {

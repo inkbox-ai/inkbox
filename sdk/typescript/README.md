@@ -27,6 +27,134 @@ You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://i
 
 **Behind a proxy?** The SDK uses Node's `fetch`, which ignores `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` by default — run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or, on older versions, configure a proxy-aware fetch dispatcher (e.g. undici's `EnvHttpProxyAgent`). A request that can't connect throws `InkboxConnectionError` naming the URL and underlying cause, with this hint attached when proxy variables are set but unused.
 
+## Directional communication permissions
+
+Mail and phone rules accept `direction: "inbound" | "outbound" | "both"`
+(`RuleDirection`). Inbound means communication from the counterparty to the agent;
+outbound means communication from the agent to the counterparty. Phone policy
+also applies to iMessage.
+
+```ts
+import { Inkbox, MailRuleAction, MailRuleMatchType } from "@inkbox/sdk";
+
+const inkbox = new Inkbox();
+const identity = await inkbox.getIdentity("support-bot");
+await identity.update({
+  mailInboundFilterMode: "blacklist",
+  mailOutboundFilterMode: "whitelist",
+});
+const rule = await identity.createMailContactRule({
+  action: MailRuleAction.ALLOW,
+  matchType: MailRuleMatchType.EXACT_EMAIL,
+  matchTarget: "x@example.com",
+  direction: "outbound",
+});
+await identity.updateMailContactRule(rule.id, {
+  action: MailRuleAction.BLOCK,
+  applyTo: "outbound",
+});
+```
+
+- Create omits direction by default, meaning Both. PATCH omission preserves
+  coverage; action-only and direction-only updates are supported.
+- `applyTo` requires `action`, excludes `direction`, and changes one covered side
+  atomically while preserving the opposite side. The response remains one rule;
+  refresh the list to see any retained opposite-side rule.
+- List and listAll accept `direction`. Inbound/outbound include Both rules;
+  Both selects only Both rules. A2A retains its separate exact-direction behavior.
+- Compatible coverage may consolidate under an existing ID. Trust the returned
+  ID and direction; a successful create does not necessarily allocate a new ID.
+- Identity effective fields are `mailInboundFilterMode`, `mailOutboundFilterMode`,
+  `phoneInboundFilterMode`, and `phoneOutboundFilterMode`. Shared mode writes set
+  both directions. Shared reads report the common effective mode when equal,
+  otherwise the stored shared baseline. Do not combine shared and directional
+  mode writes for the same channel.
+- Legacy mailbox, number, and iMessage rule resources remain supported. Rule
+  parsers default missing direction to Both; effective modes fall back to shared
+  values on older responses. Directional operations require a supporting API.
+
+Contact access groups expose optional `inboundContactable` and
+`outboundContactable` lists. Legacy `contactable` means outbound on reads and both
+directions on writes. Omit unchanged lists; an empty directional list blocks that
+side's current addresses. Do not mix legacy and directional lists in one group or
+supply null.
+
+```ts
+await inkbox.contacts.access.update("support-bot", "contact-id", {
+  email: { inboundContactable: ["x@example.com"], outboundContactable: [] },
+});
+```
+
+Address policy results also expose `inboundAction`, `outboundAction`,
+`allowedInbound`, and `allowedOutbound`. Guarded address edits accept `direction`
+and `expectedInboundAction`/`expectedOutboundAction` for pair-aware updates. A
+one-way edit needs only its corresponding expected action; Both needs the pair
+when `expectedAction` is omitted.
+
+`contacts.permissions.get/update` expose `inboundEmails`, `outboundEmails`,
+`inboundPhones`, and `outboundPhones` address-to-boolean maps. Legacy `emails` and
+`phones` reads project outbound permissions; their writes still affect both
+directions. Do not mix a shared map with a directional map for the same channel,
+or supply null. Each map accepts up to 50 addresses; false and empty maps remain
+explicit choices. Omitted maps preserve the existing choices.
+
+These maps also work in `contacts.create({ permissions: ... })`. Alternatively,
+initial `permissions.addresses` accepts up to 200 `{ kind, value, action,
+direction? }` decisions: 50 emails and 50 phone numbers, each with two directions.
+This additive create overload accepts `CreateContactWithAddressPermissionsOptions`
+with `ContactCreateAddressPermissions`, preserving existing boolean permission types.
+Use one permission shape per creation request: maps, access groups, or address
+decisions. The contact's identifier limits remain 50 per kind.
+
+Visibility does not imply permission to send. Establishing a shared-line iMessage
+connection requires both effective permissions and never grants either one.
+
+## Response metadata
+
+Existing resource methods keep their return types. To receive advisory notices
+alongside a result, use `withResponseMetadata` and make calls through its scoped
+client:
+
+```ts
+const response = await inkbox.withResponseMetadata(async (client) => {
+  const identity = await client.getIdentity("support-bot");
+  return identity.listMailContactRules({ direction: "outbound" });
+});
+console.log(response.data);
+for (const notice of response.notices ?? []) {
+  console.log(notice.code, notice.level, notice.message);
+}
+```
+
+The result is `APIResponse<T>` with `data` and optional `ResponseNotice[]`.
+Void success becomes `data: null`. Notices are deduplicated by code, level, and
+message across the callback's requests. Concurrent and nested scopes collect
+independently while retaining authentication, cookies, timeout, and unlocked
+vault state. No extra requests are made to collect metadata.
+
+For every completed HTTP response, including errors, downloads, and empty
+responses, an optional `onResponse: ResponseObserver` receives
+`ResponseMetadata`. It is available on `InkboxOptions`, `SignupOptions`, and
+`A2AClient` options. The SDK is silent by default; observer failures do not alter
+API results or retry requests.
+
+```ts
+const observed = new Inkbox({
+  onResponse(metadata) {
+    for (const notice of metadata.notices ?? []) console.log(notice.message);
+  },
+});
+await observed.listIdentities();
+```
+
+Notices use the `Inkbox-Notices` JSON response header, with top-level body fallback
+only on declared identity, channel, and contact-permission response contracts,
+including identity creation and avatar upload. Avatar downloads remain binary.
+Unknown codes and levels remain strings. Missing, null, empty, or malformed
+optional metadata never changes the primary result. Errors still throw their
+ordinary exceptions, including `agentSupport` guidance; they are not returned as
+successful metadata envelopes.
+
 ## Quick start
 
 ```ts

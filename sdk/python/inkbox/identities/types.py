@@ -195,6 +195,14 @@ class IdentityMailbox:
     signature_html: str | None = None
     signature_text: str | None = None
     signature_enabled: bool = False
+    inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        self.inbound_filter_mode = FilterMode(self.inbound_filter_mode or self.filter_mode)
+        self.outbound_filter_mode = FilterMode(self.outbound_filter_mode or self.filter_mode)
+        if self.inbound_filter_mode == self.outbound_filter_mode:
+            self.filter_mode = self.inbound_filter_mode
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityMailbox:
@@ -205,6 +213,8 @@ class IdentityMailbox:
             email_address = d["email_address"]
             _, _, sending_domain = email_address.partition("@")
         return cls(
+            inbound_filter_mode=d.get("inbound_filter_mode"),
+            outbound_filter_mode=d.get("outbound_filter_mode"),
             signature_html=d.get("signature_html"),
             signature_text=d.get("signature_text"),
             signature_enabled=d.get("signature_enabled", False),
@@ -254,6 +264,14 @@ class IdentityPhoneNumber:
     forwarding_target_type: ForwardingTargetType | None = None
     forwarding_phone_number: str | None = None
     forwarding_sip_uri: str | None = None
+    inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        self.inbound_filter_mode = FilterMode(self.inbound_filter_mode or self.filter_mode)
+        self.outbound_filter_mode = FilterMode(self.outbound_filter_mode or self.filter_mode)
+        if self.inbound_filter_mode == self.outbound_filter_mode:
+            self.filter_mode = self.inbound_filter_mode
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IdentityPhoneNumber:
@@ -262,6 +280,8 @@ class IdentityPhoneNumber:
         raw_sms_status = d.get("sms_status")
         raw_sms_ready_at = d.get("sms_ready_at")
         return cls(
+            inbound_filter_mode=d.get("inbound_filter_mode"),
+            outbound_filter_mode=d.get("outbound_filter_mode"),
             id=UUID(d["id"]),
             number=d["number"],
             type=d["type"],
@@ -349,15 +369,36 @@ class AgentIdentitySummary:
     phone_number: IdentityPhoneNumber | None = field(default=None)
     imessage_number: IdentityIMessageNumber | None = field(default=None)
     tunnel: TunnelSummary | None = field(default=None)
+    mail_inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    mail_outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    phone_inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    phone_outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        for channel in ("mail", "phone"):
+            shared = getattr(self, f"{channel}_filter_mode")
+            for side in ("inbound", "outbound"):
+                name = f"{channel}_{side}_filter_mode"
+                setattr(self, name, FilterMode(getattr(self, name) or shared))
+            inbound = getattr(self, f"{channel}_inbound_filter_mode")
+            if inbound == getattr(self, f"{channel}_outbound_filter_mode"):
+                setattr(self, f"{channel}_filter_mode", inbound)
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> AgentIdentitySummary:
         raw_signing_created_at = d.get("signing_key_created_at")
+        imessage_mode = d.get("imessage_filter_mode") or "blacklist"
+        if d.get("phone_inbound_filter_mode") is not None and d.get("phone_inbound_filter_mode") == d.get("phone_outbound_filter_mode"):
+            imessage_mode = d["phone_inbound_filter_mode"]
         mailbox_data = d.get("mailbox")
         phone_data = d.get("phone_number")
         imessage_data = d.get("imessage_number")
         tunnel_data = d.get("tunnel")
         return cls(
+            mail_inbound_filter_mode=d.get("mail_inbound_filter_mode"),
+            mail_outbound_filter_mode=d.get("mail_outbound_filter_mode"),
+            phone_inbound_filter_mode=d.get("phone_inbound_filter_mode"),
+            phone_outbound_filter_mode=d.get("phone_outbound_filter_mode"),
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
             agent_handle=d["agent_handle"],
@@ -368,11 +409,9 @@ class AgentIdentitySummary:
             updated_at=datetime.fromisoformat(d["updated_at"]),
             imessage_enabled=d.get("imessage_enabled", False),
             contact_sharing_enabled=d.get("contact_sharing_enabled", True),
-            imessage_filter_mode=FilterMode(
-                d.get("imessage_filter_mode") or "blacklist"
-            ),
+            imessage_filter_mode=FilterMode(imessage_mode),
             mail_filter_mode=FilterMode(d.get("mail_filter_mode") or "blacklist"),
-            phone_filter_mode=FilterMode(d.get("phone_filter_mode") or "blacklist"),
+            phone_filter_mode=FilterMode(d.get("phone_filter_mode") or d.get("imessage_filter_mode") or "blacklist"),
             signing_key_configured=d.get("signing_key_configured", False),
             signing_key_created_at=(
                 datetime.fromisoformat(raw_signing_created_at)

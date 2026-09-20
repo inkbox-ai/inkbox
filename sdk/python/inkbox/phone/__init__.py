@@ -3,6 +3,7 @@ inkbox.phone — phone types and exceptions.
 """
 
 from inkbox.phone.exceptions import InkboxAPIError, InkboxError
+from inkbox.contact_rules import ContactRuleDirection
 from inkbox.phone.types import (
     CallMode,
     CallOrigin,
@@ -38,6 +39,7 @@ from inkbox.phone.types import (
 from inkbox.signing_keys import SigningKey
 
 __all__ = [
+    "ContactRuleDirection",
     "InkboxError",
     "InkboxAPIError",
     "CallMode",

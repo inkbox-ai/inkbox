@@ -4,6 +4,24 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.2 - Directional contact rules and response notices
+
+### Added
+
+- Independent inbound and outbound email/phone filter modes, with phone permissions shared by calls, SMS, and iMessage.
+- Directional contact-rule creation, filtering, and updates across Python, TypeScript, Rust, and the CLI. Atomic one-sided edits preserve the opposite direction, and consolidated rules retain usable earlier IDs.
+- Separate receiving and sending permissions for saved contact addresses, including creation, access settings, permission maps, and previews.
+- Optional structured response notices, per-response observers, and scoped response-metadata access without changing existing SDK return types or errors.
+- CLI `--direction`, `--apply-to`, directional mode flags, and opt-in `--json --with-response-metadata` output. Ordinary JSON output remains unchanged; notices use stderr by default.
+- Additive Rust options and enriched response types that preserve existing method signatures and response struct literals.
+
+### Changed
+
+- Existing shared filter-mode writes still set both directions. Legacy mode reads show the common effective mode when directions agree, or the shared baseline when they differ.
+- Legacy contactable values describe sending permission; new fields report receiving and sending separately. Either direction can contribute to contact visibility under the existing visibility settings.
+- Shared-line iMessage connection setup requires permission in both directions without granting new communication access.
+- Missing directional preview permissions remain unspecified when an earlier response reports only contact visibility.
+
 ## 0.7.1 — Custom email signatures
 
 ### Added

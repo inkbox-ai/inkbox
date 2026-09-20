@@ -14,7 +14,7 @@ import type {
   UpdateContactAccess,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
-import { output } from "../output.js";
+import { output, printStatus } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import { parsePolicyPagination } from "../pagination.js";
 
@@ -73,10 +73,17 @@ export function parseContactPolicyFile(raw: string): ReplaceContactCommunication
   if (!Array.isArray(body.addresses) || body.addresses.length > 500) throw new Error("policy.addresses must be an array of at most 500 entries");
   for (const [index, value] of body.addresses.entries()) {
     const label = `policy.addresses[${index}]`;
-    const row = policyObject(value, ["kind", "value", "action", "expectedAction"], label);
+    const row = policyObject(value, ["kind", "value", "action", "expectedAction", "direction", "expectedInboundAction", "expectedOutboundAction"], label);
     if (!["email", "phone"].includes(row.kind as string)) throw new Error(`${label}.kind must be email or phone`);
     if (typeof row.value !== "string" || !row.value) throw new Error(`${label}.value is required`);
-    for (const key of ["action", "expectedAction"]) {
+    if (row.direction !== undefined && !["inbound", "outbound", "both"].includes(row.direction as string)) throw new Error(`${label}.direction must be inbound, outbound, or both`);
+    const expected = row.direction === "inbound" ? ["expectedInboundAction"]
+      : row.direction === "outbound" ? ["expectedOutboundAction"] : ["expectedInboundAction", "expectedOutboundAction"];
+    if (row.expectedAction === undefined && expected.some((key) => row[key] === undefined)) {
+      throw new Error(`${label} requires expectedAction or expected actions for every edited direction`);
+    }
+    for (const key of ["action", "expectedAction", "expectedInboundAction", "expectedOutboundAction"]) {
+      if (key !== "action" && row[key] === undefined) continue;
       if (!["inherit", "allow", "block"].includes(row[key] as string)) throw new Error(`${label}.${key} must be inherit, allow, or block`);
     }
   }
@@ -104,8 +111,14 @@ export function parseContactPolicyFile(raw: string): ReplaceContactCommunication
 }
 
 export function parseContactPermissionsFile(raw: string): UpdateContactPermissions {
-  const body = policyObject(parseJsonArg<unknown>(raw, "permissions file"), ["emails", "phones", "profile", "memories"], "permissions");
-  for (const key of ["emails", "phones"]) {
+  const maps = ["emails", "phones", "inboundEmails", "outboundEmails", "inboundPhones", "outboundPhones"];
+  const body = policyObject(parseJsonArg<unknown>(raw, "permissions file"), [...maps, "profile", "memories"], "permissions");
+  for (const [shared, inbound, outbound] of [["emails", "inboundEmails", "outboundEmails"], ["phones", "inboundPhones", "outboundPhones"]]) {
+    if (Object.hasOwn(body, shared) && (Object.hasOwn(body, inbound) || Object.hasOwn(body, outbound))) {
+      throw new Error(`permissions: cannot combine shared and directional ${shared}`);
+    }
+  }
+  for (const key of maps) {
     if (!Object.hasOwn(body, key)) continue;
     const value = body[key];
     if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`permissions.${key} must be an address-to-boolean object`);
@@ -119,7 +132,7 @@ export function parseContactPermissionsFile(raw: string): UpdateContactPermissio
   }
   if (body.profile === false && (
     body.memories === true
-    || [body.emails, body.phones].some((value) => value && Object.values(value).some(Boolean))
+    || maps.some((key) => body[key] && Object.values(body[key] as Record<string, boolean>).some(Boolean))
   )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
   return body as UpdateContactPermissions;
 }
@@ -131,12 +144,16 @@ export function parseContactAccessFile(raw: string): UpdateContactAccess {
   }
   for (const key of ["email", "phone"]) {
     if (!Object.hasOwn(body, key)) continue;
-    const group = policyObject(body[key], ["visible", "contactable"], `access.${key}`);
+    const group = policyObject(body[key], ["visible", "contactable", "inboundContactable", "outboundContactable"], `access.${key}`);
     if (Object.hasOwn(group, "visible") && typeof group.visible !== "boolean") throw new Error(`access.${key}.visible must be true or false`);
-    if (Object.hasOwn(group, "contactable")) {
-      const values = group.contactable;
+    if (Object.hasOwn(group, "contactable") && (Object.hasOwn(group, "inboundContactable") || Object.hasOwn(group, "outboundContactable"))) {
+      throw new Error(`access.${key}: contactable cannot be combined with directional lists`);
+    }
+    for (const field of ["contactable", "inboundContactable", "outboundContactable"]) {
+      if (!Object.hasOwn(group, field)) continue;
+      const values = group[field];
       if (!Array.isArray(values) || values.length > 50 || values.some((value) => typeof value !== "string" || !value.trim())) {
-        throw new Error(`access.${key}.contactable must be an array of at most 50 addresses`);
+        throw new Error(`access.${key}.${field} must be an array of at most 50 addresses`);
       }
       if (new Set(values).size !== values.length) throw new Error(`access.${key}.contactable must not contain duplicates`);
       if (group.visible === false && values.length) throw new Error(`access.${key}: hidden addresses cannot be contactable`);
@@ -146,7 +163,7 @@ export function parseContactAccessFile(raw: string): UpdateContactAccess {
     body.memories === true
     || [body.email, body.phone].some((value) => {
       const group = value as Record<string, unknown> | undefined;
-      return group?.visible === true || (Array.isArray(group?.contactable) && group.contactable.length > 0);
+      return group?.visible === true || [group?.contactable, group?.inboundContactable, group?.outboundContactable].some((values) => Array.isArray(values) && values.length > 0);
     })
   )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
   return body as UpdateContactAccess;
@@ -160,7 +177,7 @@ function registerContactsAccessCommands(parent: Command): void {
       output(await createClient(opts).contacts.permissions.get(handle, contactId) as unknown as Record<string, unknown>, { json: !!opts.json });
     }));
   permissions.command("set <handle> <contact-id>").description("Save yes/no choices; omitted fields and addresses stay unchanged")
-    .requiredOption("--file <path>", "JSON file with optional emails/phones boolean maps and profile/memories booleans")
+    .requiredOption("--file <path>", "JSON file with emails/phones or inboundEmails/outboundEmails/inboundPhones/outboundPhones maps and profile/memories booleans")
     .action(withErrorHandler(async function (this: Command, handle: string, contactId: string, options: { file: string }): Promise<void> {
       const opts = getGlobalOpts(this);
       const body = parseContactPermissionsFile(readFileSync(options.file, "utf8"));
@@ -221,7 +238,7 @@ function registerContactsAccessCommands(parent: Command): void {
     }));
   access.command("set <handle> <contact-id>")
     .description("Save partial access choices (admin credentials)")
-    .requiredOption("--file <path>", "JSON file with email/phone visible/contactable objects and profile/memories booleans")
+    .requiredOption("--file <path>", "JSON file with email/phone visible, contactable or inboundContactable/outboundContactable lists, and profile/memories")
     .action(withErrorHandler(async function (this: Command, handle: string, contactId: string, options: { file: string }): Promise<void> {
       const opts = getGlobalOpts(this);
       const body = parseContactAccessFile(readFileSync(options.file, "utf8"));
@@ -566,7 +583,7 @@ export function registerContactsCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.contacts.delete(contactId);
-        console.log(`Deleted contact ${contactId}.`);
+        printStatus(`Deleted contact ${contactId}.`);
       }),
     );
 
@@ -637,7 +654,7 @@ export function registerContactsCommands(program: Command): void {
         const result = await createClient(opts).contacts.vcards.exportMany(contactIds);
         if (cmdOpts.out) {
           writeFileSync(cmdOpts.out, result.vcard, "utf8");
-          if (!opts.json) console.log(`Wrote ${cmdOpts.out}`);
+          if (!opts.json) printStatus(`Wrote ${cmdOpts.out}`);
         } else if (opts.json) {
           output(result as unknown as Record<string, unknown>, { json: true });
         } else {
@@ -661,7 +678,7 @@ export function registerContactsCommands(program: Command): void {
         const vcf = await inkbox.contacts.vcards.export(contactId);
         if (cmdOpts.out) {
           writeFileSync(cmdOpts.out, vcf, "utf8");
-          if (!opts.json) console.log(`Wrote ${cmdOpts.out}`);
+          if (!opts.json) printStatus(`Wrote ${cmdOpts.out}`);
         } else {
           if (opts.json) {
             output({ vcard: vcf }, { json: true });

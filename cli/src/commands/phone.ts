@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { printStatus } from "../output.js";
 import {
   CallMode,
   CallOrigin,
@@ -400,7 +401,7 @@ export function registerPhoneCommands(program: Command): void {
           output(catalog, { json: true });
           return;
         }
-        console.log(`Default voice: ${catalog.defaultVoice}`);
+        printStatus(`Default voice: ${catalog.defaultVoice}`);
         output(catalog.voices, {
           json: false,
           columns: ["id", "name", "description", "available", "previewUrl"],

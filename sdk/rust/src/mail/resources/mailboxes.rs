@@ -34,6 +34,32 @@ pub struct MailboxesResource {
 }
 
 impl MailboxesResource {
+    pub fn get_with_options(
+        &self,
+        email_address: &str,
+    ) -> Result<crate::identities::DirectionalChannel<Mailbox>> {
+        let value = self
+            .http
+            .get(&format!("{BASE}/{email_address}"), crate::http::NO_QUERY)?;
+        let mut response: crate::identities::DirectionalChannel<Mailbox> =
+            serde_json::from_value(value.clone())?;
+        response.channel = Mailbox::from_value(value)?;
+        Ok(response)
+    }
+
+    pub fn list_with_options(&self) -> Result<Vec<crate::identities::DirectionalChannel<Mailbox>>> {
+        let values: Vec<Value> =
+            serde_json::from_value(self.http.get(BASE, crate::http::NO_QUERY)?)?;
+        values
+            .into_iter()
+            .map(|value| {
+                let mut response: crate::identities::DirectionalChannel<Mailbox> =
+                    serde_json::from_value(value.clone())?;
+                response.channel = Mailbox::from_value(value)?;
+                Ok(response)
+            })
+            .collect()
+    }
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self {
             imports: MailboxImportsResource::new(http.clone()),

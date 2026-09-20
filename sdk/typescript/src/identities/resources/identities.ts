@@ -178,6 +178,18 @@ export class IdentitiesResource {
     if (options.imessageFilterMode !== undefined) body["imessage_filter_mode"] = options.imessageFilterMode;
     if (options.mailFilterMode !== undefined) body["mail_filter_mode"] = options.mailFilterMode;
     if (options.phoneFilterMode !== undefined) body["phone_filter_mode"] = options.phoneFilterMode;
+    for (const channel of ["mail", "phone"] as const) {
+      const inbound = options[`${channel}InboundFilterMode`];
+      const outbound = options[`${channel}OutboundFilterMode`];
+      const shared = options[`${channel}FilterMode`] !== undefined
+        || (channel === "phone" && options.imessageFilterMode !== undefined);
+      if (shared && (inbound !== undefined || outbound !== undefined)) {
+        throw new TypeError(`Shared and directional ${channel} filter modes cannot be combined`);
+      }
+      if (inbound === null || outbound === null) throw new TypeError("Filter modes cannot be null");
+      if (inbound !== undefined) body[`${channel}_inbound_filter_mode`] = inbound;
+      if (outbound !== undefined) body[`${channel}_outbound_filter_mode`] = outbound;
+    }
     try {
       const data = options.idempotencyKey === undefined
         ? await this.http.patch<RawAgentIdentityData>(`/${agentHandle}`, body)

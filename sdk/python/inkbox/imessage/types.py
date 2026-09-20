@@ -10,6 +10,7 @@ separately by ``IMessageNumber``.
 """
 
 from __future__ import annotations
+from inkbox.contact_rules import ContactRuleDirection
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -528,10 +529,12 @@ class IMessageContactRule:
     created_at: datetime
     updated_at: datetime
     contact: Contact | None = None
+    direction: ContactRuleDirection = ContactRuleDirection.BOTH
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessageContactRule:
         return cls(
+            direction=ContactRuleDirection(d.get("direction", "both")),
             contact=Contact._from_dict(d["contact"]) if d.get("contact") is not None else None,
             id=UUID(d["id"]),
             agent_identity_id=UUID(d["agent_identity_id"]),

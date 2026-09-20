@@ -9,7 +9,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::blocking::{Client, RequestBuilder, Response};
+use reqwest::blocking::{Client, RequestBuilder};
 use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
@@ -54,11 +54,12 @@ pub(crate) fn validate_idempotency_key(key: &str) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HttpTransport {
     client: Client,
     base_url: String,
     cookie_jar: Arc<CookieJar>,
+    pub(crate) response_context: crate::response_metadata::ResponseContext,
 }
 
 impl HttpTransport {
@@ -92,6 +93,7 @@ impl HttpTransport {
             client,
             base_url: base_url.into(),
             cookie_jar,
+            response_context: Default::default(),
         })
     }
 
@@ -102,6 +104,18 @@ impl HttpTransport {
             self.base_url.trim_end_matches('/'),
             path.trim_start_matches('/')
         )
+    }
+
+    pub(crate) fn scoped(
+        &self,
+        base_url: String,
+        response_context: crate::response_metadata::ResponseContext,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            base_url,
+            response_context,
+            ..self.clone()
+        })
     }
 
     pub fn get(&self, path: &str, params: Query) -> Result<Value> {
@@ -306,7 +320,7 @@ impl HttpTransport {
             .header(reqwest::header::ACCEPT, accept)
             .query(params);
         let resp = raise_for_status(self.send(rb, &self.url(path))?)?;
-        Ok(resp.0.bytes()?.to_vec())
+        resp.0.bytes()
     }
 
     /// GET a binary response while preserving attachment response metadata.
@@ -327,7 +341,7 @@ impl HttpTransport {
             .get(reqwest::header::CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
             .map(str::to_string);
-        let bytes = resp.bytes()?.to_vec();
+        let bytes = resp.bytes()?;
         Ok(BinaryResponse {
             bytes,
             filename,
@@ -342,7 +356,9 @@ impl HttpTransport {
             Some(cookie) => rb.header(reqwest::header::COOKIE, cookie),
             None => rb,
         };
-        let resp = rb.send()?;
+        let request = rb.build()?;
+        let method = request.method().clone();
+        let resp = self.client.execute(request)?;
         let set_cookies: Vec<String> = resp
             .headers()
             .get_all(reqwest::header::SET_COOKIE)
@@ -351,7 +367,40 @@ impl HttpTransport {
             .collect();
         self.cookie_jar
             .store_from_headers(url, set_cookies.iter().map(|s| s.as_str()));
-        Ok(RawResponse(resp))
+        let status = resp.status();
+        let headers = resp.headers().clone();
+        let header = headers
+            .get("Inkbox-Notices")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| serde_json::from_str::<Value>(v).ok())
+            .filter(|v| {
+                v.is_null()
+                    || v.as_array().is_some_and(|items| {
+                        items.is_empty() || crate::response_metadata::notices(v).is_some()
+                    })
+            });
+        let bytes = resp.bytes().map(|b| b.to_vec());
+        let notices = if let Some(header) = header {
+            crate::response_metadata::notices(&header)
+        } else if crate::response_metadata::declares_body_metadata(url, &method) {
+            bytes
+                .as_ref()
+                .ok()
+                .and_then(|b| serde_json::from_slice::<Value>(b).ok())
+                .and_then(|body| {
+                    body.get("notices")
+                        .and_then(crate::response_metadata::notices)
+                })
+        } else {
+            None
+        };
+        self.response_context
+            .observe(crate::ResponseMetadata { notices });
+        Ok(RawResponse(BufferedResponse {
+            status,
+            headers,
+            bytes,
+        }))
     }
 
     /// Per-request timeout override (the SDK's `timeout=` kwargs). Reserved for
@@ -402,7 +451,28 @@ fn hex_value(byte: u8) -> Option<u8> {
 }
 
 /// Thin newtype so we can attach status/body helpers without leaking reqwest.
-pub struct RawResponse(Response);
+pub struct RawResponse(BufferedResponse);
+
+struct BufferedResponse {
+    status: reqwest::StatusCode,
+    headers: reqwest::header::HeaderMap,
+    bytes: std::result::Result<Vec<u8>, reqwest::Error>,
+}
+
+impl BufferedResponse {
+    fn status(&self) -> reqwest::StatusCode {
+        self.status
+    }
+    fn headers(&self) -> &reqwest::header::HeaderMap {
+        &self.headers
+    }
+    fn bytes(self) -> Result<Vec<u8>> {
+        Ok(self.bytes?)
+    }
+    fn text(self) -> Result<String> {
+        Ok(String::from_utf8_lossy(&self.bytes()?).into_owned())
+    }
+}
 
 impl RawResponse {
     fn status(&self) -> u16 {

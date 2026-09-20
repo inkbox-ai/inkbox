@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { addDirectionalRuleOptions, directionalRuleOptions } from "../contact-rules.js";
 import {
   FilterMode,
   ForwardingTargetType,
@@ -6,7 +7,7 @@ import {
   PhoneRuleMatchType,
 } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
-import { output } from "../output.js";
+import { output, printStatus } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 
 function renderFilterModeChangeNotice(
@@ -68,6 +69,7 @@ function registerNumberRulesCommands(parent: Command): void {
         let rows;
         if (cmdOpts.allNumbers) {
           rows = await inkbox.phoneContactRules.listAll({
+            ...directionalRuleOptions(this),
             phoneNumberId: cmdOpts.phoneNumberId,
             action: cmdOpts.action as PhoneRuleAction | undefined,
             matchType: cmdOpts.matchType as PhoneRuleMatchType | undefined,
@@ -79,6 +81,7 @@ function registerNumberRulesCommands(parent: Command): void {
             throw new Error("--number <id> or --all-numbers is required");
           }
           rows = await inkbox.phoneContactRules.list(cmdOpts.number, {
+            ...directionalRuleOptions(this),
             action: cmdOpts.action as PhoneRuleAction | undefined,
             matchType: cmdOpts.matchType as PhoneRuleMatchType | undefined,
             limit: cmdOpts.limit,
@@ -87,7 +90,7 @@ function registerNumberRulesCommands(parent: Command): void {
         }
         output(rows, {
           json: !!opts.json,
-          columns: ["id", "phoneNumberId", "action", "matchType", "matchTarget", "status"],
+          columns: ["id", "phoneNumberId", "action", "direction", "matchType", "matchTarget", "status"],
         });
       }),
     );
@@ -129,6 +132,7 @@ function registerNumberRulesCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.phoneContactRules.create(cmdOpts.number, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as PhoneRuleAction,
           matchType: cmdOpts.matchType as PhoneRuleMatchType,
           matchTarget: cmdOpts.matchTarget,
@@ -151,6 +155,7 @@ function registerNumberRulesCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.phoneContactRules.update(cmdOpts.number, ruleId, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as PhoneRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -170,9 +175,10 @@ function registerNumberRulesCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.phoneContactRules.delete(cmdOpts.number, ruleId);
-        console.log(`Deleted phone contact rule '${ruleId}' on ${cmdOpts.number}.`);
+        printStatus(`Deleted phone contact rule '${ruleId}' on ${cmdOpts.number}.`);
       }),
     );
+  addDirectionalRuleOptions(rules);
 }
 
 export function registerNumberCommands(program: Command): void {
@@ -190,7 +196,7 @@ export function registerNumberCommands(program: Command): void {
         const numbers = await inkbox.phoneNumbers.list();
         output(numbers, {
           json: !!opts.json,
-          columns: ["number", "id", "type", "status", "filterMode", "agentIdentityId", "createdAt"],
+          columns: ["number", "id", "type", "status", "filterMode", "inboundFilterMode", "outboundFilterMode", "agentIdentityId", "createdAt"],
         });
       }),
     );
@@ -220,6 +226,8 @@ export function registerNumberCommands(program: Command): void {
             type: num.type,
             status: num.status,
             filterMode: num.filterMode,
+            inboundFilterMode: num.inboundFilterMode ?? num.filterMode,
+            outboundFilterMode: num.outboundFilterMode ?? num.filterMode,
             agentIdentityId: num.agentIdentityId,
           },
           { json: !!opts.json },
@@ -252,6 +260,8 @@ export function registerNumberCommands(program: Command): void {
             forwardingPhoneNumber: num.forwardingPhoneNumber ?? null,
             forwardingSipUri: num.forwardingSipUri ?? null,
             filterMode: num.filterMode,
+            inboundFilterMode: num.inboundFilterMode ?? num.filterMode,
+            outboundFilterMode: num.outboundFilterMode ?? num.filterMode,
             state: num.state,
             agentIdentityId: num.agentIdentityId,
             createdAt: num.createdAt,
@@ -326,6 +336,8 @@ export function registerNumberCommands(program: Command): void {
             forwardingPhoneNumber: num.forwardingPhoneNumber ?? null,
             forwardingSipUri: num.forwardingSipUri ?? null,
             filterMode: num.filterMode,
+            inboundFilterMode: num.inboundFilterMode ?? num.filterMode,
+            outboundFilterMode: num.outboundFilterMode ?? num.filterMode,
             agentIdentityId: num.agentIdentityId,
           },
           { json: !!opts.json },
@@ -342,7 +354,7 @@ export function registerNumberCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.phoneNumbers.release(id);
-        console.log(`Released phone number '${id}'.`);
+        printStatus(`Released phone number '${id}'.`);
       }),
     );
 

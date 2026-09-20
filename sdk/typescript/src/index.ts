@@ -391,6 +391,8 @@ export type {
   CallCorrespondenceItem,
   CreateContactOptions,
   ContactCreatePermissions,
+  ContactCreateAddressPermissions,
+  CreateContactWithAddressPermissionsOptions,
   GetContactCorrespondenceOptions,
   ListContactsOptions,
   LookupContactsOptions,
@@ -459,3 +461,5 @@ export {
   TunnelStateConflict,
   TunnelTLSModeMismatch,
 } from "./tunnels/exceptions.js";
+export type { RuleDirection } from "./contact_rules.js";
+export type { ResponseNotice, ResponseMetadata, ResponseObserver, APIResponse } from "./response_metadata.js";

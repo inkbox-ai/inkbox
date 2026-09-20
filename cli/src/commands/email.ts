@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { printStatus } from "../output.js";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -425,7 +426,7 @@ export function registerEmailCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         await identity.markEmailsRead(messageIds);
-        console.log(`Marked ${messageIds.length} message(s) as read.`);
+        printStatus(`Marked ${messageIds.length} message(s) as read.`);
       }),
     );
 
@@ -443,7 +444,7 @@ export function registerEmailCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         await identity.markEmailsUnread(messageIds);
-        console.log(`Marked ${messageIds.length} message(s) as unread.`);
+        printStatus(`Marked ${messageIds.length} message(s) as unread.`);
       }),
     );
 
@@ -502,7 +503,7 @@ export function registerEmailCommands(program: Command): void {
           identity.mailbox.emailAddress,
           messageId,
         );
-        console.log(`Deleted message '${messageId}'.`);
+        printStatus(`Deleted message '${messageId}'.`);
       }),
     );
 
@@ -529,7 +530,7 @@ export function registerEmailCommands(program: Command): void {
           identity.mailbox.emailAddress,
           threadId,
         );
-        console.log(`Deleted thread '${threadId}'.`);
+        printStatus(`Deleted thread '${threadId}'.`);
       }),
     );
 
@@ -622,7 +623,7 @@ export function registerEmailCommands(program: Command): void {
             { id: thread.id, subject: thread.subject, messageCount: thread.messages.length },
             { json: false },
           );
-          console.log("");
+          printStatus("");
           output(thread.messages, {
             json: false,
             columns: [

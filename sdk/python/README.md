@@ -1552,6 +1552,117 @@ Wire shapes are intentionally **snake_case** (the raw JSON body, not the SDK's p
 
 ---
 
+## Directional contact rules
+
+Email and phone policies have independent inbound (receive) and outbound (send)
+settings. Phone policy also applies to iMessage. Management requires admin
+credentials.
+
+```python
+from inkbox import ContactChannelAccessUpdate, ContactRuleDirection
+
+agent = inkbox.get_identity("support-agent")
+agent.update(
+    mail_inbound_filter_mode="blacklist",
+    mail_outbound_filter_mode="whitelist",
+)
+rule = agent.create_mail_contact_rule(
+    action="allow",
+    match_type="exact_email",
+    match_target="x@example.com",
+    direction=ContactRuleDirection.OUTBOUND,
+)
+agent.update_mail_contact_rule(rule.id, direction="both")
+agent.update_mail_contact_rule(rule.id, action="block", apply_to="inbound")
+rules = agent.list_mail_contact_rules(direction="outbound")
+
+inkbox.contacts.access.update(
+    agent.agent_handle,
+    contact_id,
+    email=ContactChannelAccessUpdate(inbound_contactable=["x@example.com"]),
+)
+```
+
+- `direction` is optional on `create`, `list`, `list_all`, and `update` across
+  `mail_identity_contact_rules`, `phone_identity_contact_rules`,
+  `imessage_contact_rules`, and the legacy `mail_contact_rules` and
+  `phone_contact_rules` resources. Omitted create direction means `both`;
+  omitted update direction preserves coverage. An action-only update changes
+  the rule across its current coverage. A direction-only update is valid.
+- `apply_to="inbound"` or `"outbound"` with `action` edits one covered side
+  atomically while preserving the other. It cannot be combined with `direction`.
+  Refresh the list after an edit to see any resulting split or consolidation.
+- Inbound/outbound list filters include `both` rules; `direction="both"` selects
+  only bidirectional rules. A2A retains its separate exact-direction filtering.
+- Matching rules can consolidate. Use the returned ID and direction rather than
+  assuming every create allocates a new ID. Previously issued IDs continue to
+  address the consolidated logical rule. Duplicate requests still raise
+  `DuplicateContactRuleError`.
+- Identities expose `mail_inbound_filter_mode`, `mail_outbound_filter_mode`,
+  `phone_inbound_filter_mode`, and `phone_outbound_filter_mode`. The existing
+  `mail_filter_mode`, `phone_filter_mode`, and `imessage_filter_mode` writes set
+  both directions. Do not mix shared and directional writes for the same channel.
+  Shared reads report the common effective mode when equal, otherwise the legacy
+  baseline. Older responses fall back to their shared modes and `both` rules.
+- Contact groups expose `inbound_contactable` and `outbound_contactable`.
+  Legacy `contactable` reads mean outbound permission; legacy writes affect both
+  directions. Omit unchanged lists; an empty list denies that direction for all
+  current addresses. Null lists and mixing legacy/directional lists are invalid.
+  These group options also work in `ContactCreatePermissions`.
+- `ContactAddressUpdate` accepts `direction`, `expected_inbound_action`, and
+  `expected_outbound_action` for communication-policy edits. Opposite directions
+  can be edited in one request. Use both expected actions when editing a split
+  pair to `both`, together with the observed revision.
+
+Receiving permission does not imply permission to reply. Shared-line iMessage
+connection setup requires permission in both directions and does not grant it.
+Directional operations require an API version supporting these fields.
+
+## Response notices
+
+Existing resource methods retain their return types. To receive optional advisory
+metadata alongside any result, use a scoped operation:
+
+```python
+result = inkbox.with_response_metadata(
+    lambda scoped: scoped.mail_identity_contact_rules.list("support-agent")
+)
+rules = result.data
+for notice in result.notices or []:
+    print(notice.code, notice.level, notice.message)
+```
+
+`APIResponse[T]` contains the original `data` and optional
+`list[ResponseNotice]`. Empty results such as deletes keep `data=None`.
+Each notice has open-string `code`, `level`, and `message` fields, so unfamiliar
+codes and levels remain available.
+
+An optional observer receives `ResponseMetadata` once per completed HTTP response,
+including failed requests, downloads, and bodyless responses:
+
+```python
+from inkbox import Inkbox, ResponseMetadata
+
+def observe(metadata: ResponseMetadata) -> None:
+    for notice in metadata.notices or []:
+        print(notice.message)
+
+inkbox = Inkbox(response_observer=observe)
+```
+
+The SDK stays silent by default. Notices prefer the `Inkbox-Notices` response
+header, with top-level body fallback only on declared metadata contracts. Nested
+user content is never treated as metadata. Missing, null, and empty notices become
+`None`; malformed entries are ignored. Notices and observer failures do not change
+API errors or retry a completed request.
+
+The callback must use the supplied scoped client and consume any paginated
+iterator within the callback. Notices are deduplicated across its requests.
+Concurrent and nested scopes collect independently; connections, cookies, and
+unlocked vault state are shared without extra requests or another unlock.
+Standalone signup and invitation-preview class methods accept their own
+`response_observer` argument because they do not use an existing client.
+
 ## API errors
 
 All REST endpoint failures raised as `InkboxAPIError` retain the optional

@@ -30,6 +30,10 @@ test("access get and set preserve nested choices and reject invalid files before
   const path = join(directory, "access.json");
   const requests = [];
   const access = { email: { visible: true, contactable: ["person@example.com"] }, phone: { visible: true, contactable: [] }, profile: true, memories: false };
+  const parsedAccess = { ...access,
+    email: { ...access.email, inboundContactable: access.email.contactable, outboundContactable: access.email.contactable },
+    phone: { ...access.phone, inboundContactable: [], outboundContactable: [] },
+  };
   const mock = await listen(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
@@ -41,14 +45,14 @@ test("access get and set preserve nested choices and reject invalid files before
     const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "contacts", "access"];
     const get = await runCli([...args, "get", "test-agent", "contact-1"]);
     assert.equal(get.error, null, get.stderr);
-    assert.deepEqual(JSON.parse(get.stdout), access);
+    assert.deepEqual(JSON.parse(get.stdout), parsedAccess);
     const update = { email: { visible: false, contactable: [] }, phone: { visible: false }, profile: false };
     const setArgs = [...args, "set", "test-agent", "contact-1", "--file", path];
     for (const body of [update, { email: {} }, {}]) {
       await writeFile(path, JSON.stringify(body));
       const result = await runCli(setArgs);
       assert.equal(result.error, null, result.stderr);
-      assert.deepEqual(JSON.parse(result.stdout), access);
+      assert.deepEqual(JSON.parse(result.stdout), parsedAccess);
     }
     await writeFile(path, '{"email":{"visible":false,"contactable":["person@example.com"]}}');
     assert.ok((await runCli(setArgs)).error);
@@ -80,6 +84,8 @@ test("boolean permissions get and set preserve false, empty maps, and omission",
   const path = join(directory, "permissions.json");
   const requests = [];
   const effective = { emails: { "person@example.com": false }, phones: { "+15555550123": true }, profile: false, memories: true };
+  const parsedEffective = { ...effective, inboundEmails: effective.emails, outboundEmails: effective.emails,
+    inboundPhones: effective.phones, outboundPhones: effective.phones };
   const mock = await listen(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
@@ -91,13 +97,13 @@ test("boolean permissions get and set preserve false, empty maps, and omission",
     const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "contacts", "permissions"];
     const get = await runCli([...args, "get", "test-agent", "contact-1"]);
     assert.equal(get.error, null, get.stderr);
-    assert.deepEqual(JSON.parse(get.stdout), effective);
+    assert.deepEqual(JSON.parse(get.stdout), parsedEffective);
     const update = { emails: { "person@example.com": false }, phones: {}, profile: false };
     await writeFile(path, JSON.stringify(update));
     const setArgs = [...args, "set", "test-agent", "contact-1", "--file", path];
     const set = await runCli(setArgs);
     assert.equal(set.error, null, set.stderr);
-    assert.deepEqual(JSON.parse(set.stdout), effective);
+    assert.deepEqual(JSON.parse(set.stdout), parsedEffective);
     await writeFile(path, "{}");
     assert.equal((await runCli(setArgs)).error, null);
     await writeFile(path, '{"profile":"block"}');
@@ -140,6 +146,111 @@ test("contact creation forwards permissions in one atomic request", async () => 
     assert.deepEqual(requests[1], { path: "/api/v1/contacts/with-permissions", body: { given_name: "Person", permissions: {
       identity_id: "11111111-1111-4111-8111-111111111111", email: { visible: true, contactable: [] },
     } } });
+  } finally { await new Promise((resolve) => mock.server.close(resolve)); }
+});
+
+test("directional permission files validate each map independently and reject same-channel mixtures", () => {
+  const maps = ["inboundEmails", "outboundEmails", "inboundPhones", "outboundPhones"];
+  for (const key of maps) {
+    for (const values of [{}, { "person@example.com": false }]) {
+      const body = { [key]: values };
+      assert.deepEqual(parseContactPermissionsFile(JSON.stringify(body)), body);
+    }
+    for (const value of [null, [], { "person@example.com": "false" }, Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`person${i}@example.com`, false]))]) {
+      assert.throws(() => parseContactPermissionsFile(JSON.stringify({ [key]: value })));
+    }
+    assert.throws(() => parseContactPermissionsFile(JSON.stringify({ profile: false, [key]: { "person@example.com": true } })));
+  }
+  for (const body of [{ emails: {}, inboundEmails: {} }, { emails: {}, outboundEmails: {} }, { phones: {}, inboundPhones: {} }, { phones: {}, outboundPhones: {} }]) {
+    assert.throws(() => parseContactPermissionsFile(JSON.stringify(body)), /cannot combine/);
+  }
+  const crossChannel = { emails: {}, inboundPhones: {}, outboundPhones: {} };
+  assert.deepEqual(parseContactPermissionsFile(JSON.stringify(crossChannel)), crossChannel);
+});
+
+test("directional permission files serialize all four maps and preserve receive-only responses", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "directional-permissions-"));
+  const path = join(directory, "permissions.json");
+  const requests = [];
+  const effective = { emails: {}, phones: {}, profile: true, memories: false,
+    inbound_emails: { "person@example.com": true }, outbound_emails: {}, inbound_phones: {}, outbound_phones: {} };
+  const mock = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    requests.push({ method: req.method, body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : null });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(effective));
+  });
+  try {
+    const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "--json", "contacts", "permissions", "set", "test-agent", "contact-1", "--file", path];
+    const update = { inboundEmails: { "person@example.com": true }, outboundEmails: {}, inboundPhones: {}, outboundPhones: { "+15555550123": false } };
+    await writeFile(path, JSON.stringify(update));
+    const result = await runCli(args);
+    assert.ifError(result.error);
+    assert.deepEqual(requests, [{ method: "PATCH", body: {
+      inbound_emails: update.inboundEmails, outbound_emails: {}, inbound_phones: {}, outbound_phones: update.outboundPhones,
+    } }]);
+    assert.deepEqual(JSON.parse(result.stdout), { emails: {}, phones: {}, profile: true, memories: false,
+      inboundEmails: effective.inbound_emails, outboundEmails: {}, inboundPhones: {}, outboundPhones: {} });
+    await writeFile(path, JSON.stringify({ emails: {}, inboundEmails: {} }));
+    assert.ok((await runCli(args)).error);
+    assert.equal(requests.length, 1);
+  } finally {
+    await new Promise((resolve) => mock.server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("policy guards require only the edited directions and retain legacy expectedAction", () => {
+  const policy = (change) => JSON.stringify({ expectedRevision: 1, identityId: "identity-1", addresses: [{
+    kind: "email", value: "person@example.com", action: "allow", ...change,
+  }] });
+  for (const change of [
+    { direction: "inbound", expectedInboundAction: "block" },
+    { direction: "outbound", expectedOutboundAction: "inherit" },
+    { direction: "both", expectedInboundAction: "allow", expectedOutboundAction: "block" },
+    { expectedInboundAction: "allow", expectedOutboundAction: "block" },
+    { expectedAction: "inherit" }, { direction: "inbound", expectedAction: "block" },
+  ]) assert.deepEqual(parseContactPolicyFile(policy(change)), JSON.parse(policy(change)));
+  for (const change of [
+    { direction: "inbound", expectedOutboundAction: "block" },
+    { direction: "outbound", expectedInboundAction: "block" },
+    { direction: "both", expectedInboundAction: "block" },
+    { expectedOutboundAction: "block" },
+    { direction: "inbound", expectedInboundAction: null },
+    { direction: "outbound", expectedAction: "block", expectedInboundAction: null },
+  ]) assert.throws(() => parseContactPolicyFile(policy(change)));
+});
+
+test("contact creation accepts 200 directional address decisions without raising identifier limits", async () => {
+  const emails = Array.from({ length: 50 }, (_, i) => ({ value: `person${i}@example.com`, label: null, isPrimary: false }));
+  const phones = Array.from({ length: 50 }, (_, i) => ({ value: `+1555555${String(i).padStart(4, "0")}`, label: null, isPrimary: false }));
+  const addresses = [["email", emails], ["phone", phones]].flatMap(([kind, identifiers]) => identifiers.flatMap(({ value }) => [
+    { kind, value, action: "allow", direction: "inbound" }, { kind, value, action: "block", direction: "outbound" },
+  ]));
+  const requests = [];
+  const mock = await listen(async (req, res) => {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    requests.push(JSON.parse(Buffer.concat(chunks).toString()));
+    res.writeHead(201, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ id: "contact-1", created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z" }));
+  });
+  try {
+    const args = ["--api-key", "test-key", "--base-url", `http://127.0.0.1:${mock.port}`, "contacts", "create"];
+    const payload = { givenName: "Person", emails, phones, permissions: { identityId: "identity-1", addresses } };
+    const result = await runCli([...args, `--json=${JSON.stringify(payload)}`]);
+    assert.ifError(result.error);
+    assert.equal(requests[0].emails.length, 50);
+    assert.equal(requests[0].phones.length, 50);
+    assert.deepEqual(requests[0].permissions, { identity_id: "identity-1", addresses });
+    payload.permissions.addresses = [...addresses, addresses[0]];
+    assert.ok((await runCli([...args, `--json=${JSON.stringify(payload)}`])).error);
+    assert.equal(requests.length, 1);
+    const policy = { expectedRevision: 1, identityId: "identity-1", addresses: addresses.map((row) => ({
+      ...row, ...(row.direction === "inbound" ? { expectedInboundAction: "inherit" } : { expectedOutboundAction: "inherit" }),
+    })) };
+    assert.deepEqual(parseContactPolicyFile(JSON.stringify(policy)), policy);
   } finally { await new Promise((resolve) => mock.server.close(resolve)); }
 });
 

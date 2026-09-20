@@ -3,6 +3,8 @@ inkbox — Python SDK for the Inkbox APIs.
 """
 
 from inkbox.client import Inkbox
+from inkbox.contact_rules import ContactRuleDirection
+from inkbox.response_metadata import APIResponse, ResponseMetadata, ResponseNotice, ResponseObserver
 from inkbox.agent_identity import AgentIdentity
 from inkbox.credentials import Credentials
 from inkbox.a2a import (
@@ -413,6 +415,11 @@ from inkbox.webhook_deliveries import (
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
 __all__ = [
+    "APIResponse",
+    "ResponseMetadata",
+    "ResponseNotice",
+    "ResponseObserver",
+    "ContactRuleDirection",
     # A2A
     "A2ACard",
     "A2ACaller",

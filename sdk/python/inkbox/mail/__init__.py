@@ -3,6 +3,7 @@ inkbox.mail — mail types and exceptions.
 """
 
 from inkbox.mail.exceptions import InkboxAPIError, InkboxError
+from inkbox.contact_rules import ContactRuleDirection
 from inkbox.mail.types import (
     DraftAttachment,
     DraftAttachmentContent,
@@ -26,6 +27,7 @@ from inkbox.mail.types import (
 from inkbox.signing_keys import SigningKey
 
 __all__ = [
+    "ContactRuleDirection",
     "InkboxError",
     "InkboxAPIError",
     "DraftAttachment",

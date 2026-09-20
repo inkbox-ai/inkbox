@@ -25,6 +25,34 @@ pub struct IdentitiesResource {
 }
 
 impl IdentitiesResource {
+    pub fn get_with_options(
+        &self,
+        agent_handle: &str,
+    ) -> Result<crate::identities::DirectionalAgentIdentityData> {
+        Ok(serde_json::from_value(self.http.get(
+            &format!("/{agent_handle}"),
+            crate::http::NO_QUERY,
+        )?)?)
+    }
+
+    pub fn list_with_options(
+        &self,
+    ) -> Result<Vec<crate::identities::DirectionalAgentIdentitySummary>> {
+        crate::contact_rules::parse_list(self.http.get("", crate::http::NO_QUERY)?)
+    }
+
+    pub fn update_filter_modes(
+        &self,
+        agent_handle: &str,
+        options: &crate::identities::IdentityFilterModeOptions,
+    ) -> Result<crate::identities::DirectionalAgentIdentityData> {
+        options.validate()?;
+        Ok(serde_json::from_value(
+            self.http
+                .patch(&format!("/{agent_handle}"), options)
+                .map_err(map_identity_conflict_error)?,
+        )?)
+    }
     pub fn new(http: Arc<HttpTransport>) -> Self {
         Self { http }
     }

@@ -10,6 +10,7 @@ or phone number ID explicitly.
 """
 
 from __future__ import annotations
+from inkbox.contact_rules import ContactRuleDirection, _UNSET as _RULE_UNSET, _direction_fields, _rule_update
 
 from inkbox.contacts.resources.communication_policy import ContactCommunicationPolicyPage
 
@@ -188,6 +189,22 @@ class AgentIdentity:
     def phone_filter_mode(self) -> FilterMode:
         """Whitelist/blacklist mode for this identity's phone contact rules."""
         return self._data.phone_filter_mode
+
+    @property
+    def mail_inbound_filter_mode(self) -> FilterMode:
+        return self._data.mail_inbound_filter_mode
+
+    @property
+    def mail_outbound_filter_mode(self) -> FilterMode:
+        return self._data.mail_outbound_filter_mode
+
+    @property
+    def phone_inbound_filter_mode(self) -> FilterMode:
+        return self._data.phone_inbound_filter_mode
+
+    @property
+    def phone_outbound_filter_mode(self) -> FilterMode:
+        return self._data.phone_outbound_filter_mode
 
     @property
     def signing_key_configured(self) -> bool:
@@ -1496,6 +1513,7 @@ class AgentIdentity:
         match_type: MailRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
     ) -> list[MailIdentityContactRule]:
         """List this identity's mail allow/block rules, newest first."""
         return self._inkbox._mail_identity_contact_rules.list(
@@ -1504,6 +1522,7 @@ class AgentIdentity:
             match_type=match_type,
             limit=limit,
             offset=offset,
+            **_direction_fields(direction),
         )
 
     def get_mail_contact_rule(self, rule_id: UUID | str) -> MailIdentityContactRule:
@@ -1516,6 +1535,7 @@ class AgentIdentity:
         action: MailRuleAction | str,
         match_type: MailRuleMatchType | str,
         match_target: str,
+        direction: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
     ) -> MailIdentityContactRule:
         """Create a mail allow/block rule for this identity."""
         return self._inkbox._mail_identity_contact_rules.create(
@@ -1523,19 +1543,22 @@ class AgentIdentity:
             action=action,
             match_type=match_type,
             match_target=match_target,
+            **_direction_fields(direction),
         )
 
     def update_mail_contact_rule(
         self,
         rule_id: UUID | str,
         *,
-        action: MailRuleAction | str,
+        action: MailRuleAction | str | None = None,
+        direction: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
+        apply_to: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
     ) -> MailIdentityContactRule:
-        """Update a mail rule's ``action`` (admin-only)."""
+        """Update action or coverage; apply_to changes one covered side atomically."""
         return self._inkbox._mail_identity_contact_rules.update(
             self.agent_handle,
             rule_id,
-            action=action,
+            **_rule_update(action, direction, apply_to),
         )
 
     def delete_mail_contact_rule(self, rule_id: UUID | str) -> None:
@@ -1551,6 +1574,7 @@ class AgentIdentity:
         match_type: PhoneRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
     ) -> list[PhoneIdentityContactRule]:
         """List this identity's phone allow/block rules, newest first.
 
@@ -1562,6 +1586,7 @@ class AgentIdentity:
             match_type=match_type,
             limit=limit,
             offset=offset,
+            **_direction_fields(direction),
         )
 
     def get_phone_contact_rule(self, rule_id: UUID | str) -> PhoneIdentityContactRule:
@@ -1576,6 +1601,7 @@ class AgentIdentity:
         action: PhoneRuleAction | str,
         match_target: str,
         match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
+        direction: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
     ) -> PhoneIdentityContactRule:
         """Create a phone allow/block rule for this identity.
 
@@ -1586,19 +1612,22 @@ class AgentIdentity:
             action=action,
             match_target=match_target,
             match_type=match_type,
+            **_direction_fields(direction),
         )
 
     def update_phone_contact_rule(
         self,
         rule_id: UUID | str,
         *,
-        action: PhoneRuleAction | str,
+        action: PhoneRuleAction | str | None = None,
+        direction: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
+        apply_to: ContactRuleDirection | str = _RULE_UNSET,  # type: ignore[assignment]
     ) -> PhoneIdentityContactRule:
-        """Update a phone rule's ``action`` (admin-only)."""
+        """Update action or coverage; apply_to changes one covered side atomically."""
         return self._inkbox._phone_identity_contact_rules.update(
             self.agent_handle,
             rule_id,
-            action=action,
+            **_rule_update(action, direction, apply_to),
         )
 
     def delete_phone_contact_rule(self, rule_id: UUID | str) -> None:
@@ -1958,11 +1987,14 @@ class AgentIdentity:
             raise InkboxError(
                 "A2A calls require this claimed identity's agent-scoped API key"
             )
-        return A2AClient(
+        client = A2AClient(
             api_key=self._inkbox._api_key,
             platform_base_url=self._inkbox._base_url,
             timeout=self._inkbox._timeout,
         )
+        client._response_observer = self._inkbox._api_http._response_observer
+        client._notice_collector = self._inkbox._api_http._notice_collector
+        return client
 
     ## Signing key
 
@@ -1994,6 +2026,10 @@ class AgentIdentity:
         imessage_filter_mode: FilterMode | str | None = None,
         mail_filter_mode: FilterMode | str | None = None,
         phone_filter_mode: FilterMode | str | None = None,
+        mail_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        mail_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        phone_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        phone_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> None:
         """Update this identity's handle, display name, description,
         iMessage reachability, and contact-rule filter modes.
@@ -2025,8 +2061,11 @@ class AgentIdentity:
                 deprecated ``mailboxes.update(filter_mode=...)``, this does
                 not return a ``FilterModeChangeNotice``.
             phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
-                identity's phone contact rules (admin-only). Rejected with a
-                422 when the identity has no phone number.
+                identity's phone contact rules (admin-only).
+            mail_inbound_filter_mode: Effective receive mode for email.
+            mail_outbound_filter_mode: Effective send mode for email.
+            phone_inbound_filter_mode: Effective receive mode for phone/iMessage.
+            phone_outbound_filter_mode: Effective send mode for phone/iMessage.
         """
         update_kwargs: dict[str, Any] = {}
         if new_handle is not None:
@@ -2063,6 +2102,14 @@ class AgentIdentity:
                 if isinstance(phone_filter_mode, FilterMode)
                 else phone_filter_mode
             )
+        for name, value in (
+            ("mail_inbound_filter_mode", mail_inbound_filter_mode),
+            ("mail_outbound_filter_mode", mail_outbound_filter_mode),
+            ("phone_inbound_filter_mode", phone_inbound_filter_mode),
+            ("phone_outbound_filter_mode", phone_outbound_filter_mode),
+        ):
+            if value is not _UNSET:
+                update_kwargs[name] = value
         result = self._inkbox._ids_resource.update(
             self.agent_handle,
             **update_kwargs,

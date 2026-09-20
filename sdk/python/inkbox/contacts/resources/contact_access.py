@@ -51,7 +51,7 @@ class ContactAccessResource:
         if profile is False and (
             memories is True
             or any(
-                group is not None and (group.visible is True or bool(group.contactable))
+                group is not None and (group.visible is True or group._has_contactable())
                 for group in (email, phone)
             )
         ):
