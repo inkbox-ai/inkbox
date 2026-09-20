@@ -352,6 +352,8 @@ pub struct Message {
     pub thread_id: Option<Uuid>,
     pub message_id: String,
     pub from_address: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_display_name: Option<String>,
     pub to_addresses: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cc_addresses: Option<Vec<String>>,

@@ -328,6 +328,7 @@ class Message:
     first_opened_at: datetime | None = None
     open_count: int = 0
     import_job_id: UUID | None = None
+    from_display_name: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> Message:
@@ -337,6 +338,7 @@ class Message:
             thread_id=UUID(d["thread_id"]) if d.get("thread_id") else None,
             message_id=d["message_id"],
             from_address=d["from_address"],
+            from_display_name=d.get("from_display_name"),
             to_addresses=d["to_addresses"],
             cc_addresses=d.get("cc_addresses"),
             subject=d.get("subject"),
