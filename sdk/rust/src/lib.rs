@@ -83,7 +83,6 @@ mod directional_tests;
 #[cfg(test)]
 mod response_metadata_tests;
 
-
 pub mod slack;
 pub use slack::*;
 pub mod slack_operations;
