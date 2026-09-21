@@ -19,7 +19,7 @@ Two TLS modes:
 
 Both modes accept either a **`forward_to` URL** (proxy to a local HTTP server) or an **in-process callable** (Fetch handler in TS, ASGI app in Python). WebSocket upgrades work on either.
 
-Platform: tunnels require POSIX. `connect()` raises on Windows; read-only control-plane calls work everywhere.
+Platform: the Python tunnel runtime supports Linux, macOS, and native Windows on Python 3.11+. WSL is not required. Keep Python updated to the latest patch release and store tunnel state in a private user directory. The Rust tunnel runtime requires POSIX.
 
 ---
 

@@ -4,6 +4,13 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.4 - Native Windows Python tunnels
+
+- Python `tunnels.connect()` now supports native Windows as well as Linux and macOS, without requiring WSL.
+- Preserve tunnel certificate and private-key bytes on Windows when creating or replacing files.
+- Exercise tunnel startup, HTTP/2 forwarding, reconnect, shutdown, and persistence in Windows CI.
+- Bump Python, TypeScript, Rust, CLI, and bundled plugin versions together to 0.7.4. TypeScript, Rust, and CLI runtime behavior is unchanged.
+
 ## 0.7.3 - Directional contact rules, Companion mode, and response notices
 
 ### Added

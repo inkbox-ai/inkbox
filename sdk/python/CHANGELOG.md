@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.4 - Native Windows Python tunnels
+
+- Python `tunnels.connect()` now supports native Windows as well as Linux and macOS, without requiring WSL.
+- Preserve tunnel certificate and private-key bytes on Windows when creating or replacing files.
+- Exercise tunnel startup, HTTP/2 forwarding, reconnect, shutdown, and persistence in Windows CI.
+- Bump Python, TypeScript, Rust, CLI, and bundled plugin versions together to 0.7.4. TypeScript, Rust, and CLI runtime behavior is unchanged.
+
 ## 0.7.2 — Voicemail handling on outbound calls
 
 - Added `OnVoicemail` (`leave_message`, `hang_up`, `ignore`). `calls.place()`

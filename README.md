@@ -279,7 +279,7 @@ Task detail includes current state and message history.
 
 ```python
 # Bring a local server online at https://my-app.inkboxwire.com.
-# Outbound HTTP/2 only — no inbound port to open. POSIX only.
+# Outbound HTTP/2 only — no inbound port to open. Linux, macOS, and Windows.
 listener = inkbox.tunnels.connect(name="my-app", forward_to="http://127.0.0.1:8080")
 print(listener.public_url)
 print(listener.status, listener.is_connected, listener.last_connected_at)
