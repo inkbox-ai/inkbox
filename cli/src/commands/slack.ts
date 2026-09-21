@@ -51,6 +51,36 @@ export function registerSlackCommands(program: Command): void {
     .description(
       "Slack workspace connections, live conversations, messages, and files",
     );
+  page(identity(slack.command("search")))
+    .description(
+      "Search retained messages across an identity's workspaces; agent credentials infer identity",
+    )
+    .requiredOption("--q <query>", "Retained message text query (1..512 characters)")
+    .option("--connection-id <id>", "Narrow to one workspace connection UUID")
+    .option("--conversation-id <id>", "Conversation filter")
+    .option("--user-id <id>", "Slack author filter")
+    .option("--before-ts <timestamp>", "Exclusive upper timestamp, as a string")
+    .option("--after-ts <timestamp>", "Exclusive lower timestamp, as a string")
+    .addHelpText(
+      "after",
+      "\nOther credentials require --identity or --identity-id. Page size: 1..100 (default 50). Follow nextCursor even for short or empty pages.",
+    )
+    .action(
+      withErrorHandler(async function (
+        this: Command,
+        o: IdentityOptions & { q: string },
+      ) {
+        const opts = getGlobalOpts(this);
+        const client = createClient(opts);
+        const identityId =
+          o.identity !== undefined || o.identityId !== undefined
+            ? await resolveIdentityId(client, o)
+            : undefined;
+        output(await client.slack.searchMessages({ ...o, identityId }), {
+          json: !!opts.json,
+        });
+      }),
+    );
   const connections = slack
     .command("connection")
     .description("Manage workspace connections");

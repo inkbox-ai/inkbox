@@ -6,6 +6,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## Unreleased
 
+- Add identity-wide Slack message search across workspace connections in all SDKs and
+  `inkbox slack search`, with optional narrowing filters and agent identity inference.
+
 - Add optional approved Console completion URLs to Slack installation handoffs,
   preserving existing default requests across Python, TypeScript, Rust, and CLI.
 - Add Slack CLI identity-handle selection and require DM recipients before dispatch;

@@ -1927,7 +1927,7 @@ invitation = management_client.slack.create_invitation(identity_id)
 
 `client.slack` also provides `list_invitations`, `revoke_invitation`, `disconnect`,
 `list_conversations`, `open_conversation`, `get_conversation`, `get_action`, `get_file`,
-and `download_file` (returns `bytes`). Methods use explicit connection IDs so a
+and `download_file` (returns `bytes`). Live workspace operations use explicit connection IDs so a
 multi-workspace identity never silently picks a workspace.
 
 ```python
@@ -2010,10 +2010,22 @@ owns attention rules, thread watches, and its own memory.
 
 ### Retained history and utility actions
 
+Start with `search_messages` to search retained message text across all workspace
+connections owned by one identity. Agent credentials infer their identity; other
+credentials must supply an explicit identity. A connection filter narrows that
+identity's results; it is not required. Each result includes its connection ID.
+Search uses plain English keywords, ranked by relevance and then recency, not
+Slack query operators or semantic search. Attachment bodies are not indexed.
+The query accepts 1..512 characters and page sizes are 1..100 (default 50).
+Follow the returned cursor with the same filters even for short or empty pages;
+stop only when the cursor is absent. Results require current access and may not
+cover all workspace history. Search errors are raised, not returned as empty results.
+The connection-specific archive search remains available.
+
 ```python
 # Capture is on by default for observed accessible messages; check archive settings.
-history = client.slack.search_archived_messages(
-    connection_id, "release notes", conversation_id="CEXAMPLE", limit=20
+history = client.slack.search_messages(
+    "release notes", limit=20
 )
 operation = client.slack.add_reaction(
     connection_id, "CEXAMPLE", "1780000000.000001", "eyes",

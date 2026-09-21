@@ -127,6 +127,11 @@ export interface SlackArchiveSearchOptions extends Omit<
 > {
   userId?: string;
 }
+export interface SlackSearchMessagesOptions extends SlackArchiveSearchOptions {
+  q: string;
+  identityId?: string | null;
+  connectionId?: string | null;
+}
 export interface SlackUploadFileOptions {
   conversationId: string;
   filename: string;
@@ -516,16 +521,15 @@ export class SlackOperationsResource {
     );
   }
   private async archiveMessages(
-    connectionId: string,
     path: string,
     options: SlackArchiveMessagesOptions,
-    extra: Record<string, string | undefined> = {},
+    extra: Record<string, string | null | undefined> = {},
   ): Promise<SlackArchiveMessagesResponse> {
     const r = await this.http.get<{
       messages: Wire<SlackArchivedMessage>[];
       next_cursor?: string | null;
       source: "archive";
-    }>(`${base(connectionId)}/archive/${path}`, {
+    }>(path, {
       conversation_id: options.conversationId,
       thread_ts: timestamp(options.threadTs),
       before_ts: timestamp(options.beforeTs),
@@ -544,15 +548,29 @@ export class SlackOperationsResource {
     connectionId: string,
     options: SlackArchiveMessagesOptions = {},
   ): Promise<SlackArchiveMessagesResponse> {
-    return this.archiveMessages(connectionId, "messages", options);
+    return this.archiveMessages(`${base(connectionId)}/archive/messages`, options);
   }
   async searchArchivedMessages(
     connectionId: string,
     q: string,
     options: SlackArchiveSearchOptions = {},
   ): Promise<SlackArchiveMessagesResponse> {
-    return this.archiveMessages(connectionId, "search", options, {
+    return this.archiveMessages(`${base(connectionId)}/archive/search`, options, {
       q,
+      user_id: options.userId,
+    });
+  }
+  /** Search retained messages across an identity's workspace connections.
+   * Agent credentials infer the identity; other credentials require identityId.
+   * Follow nextCursor even when a page is short or empty.
+   */
+  async searchMessages(
+    options: SlackSearchMessagesOptions,
+  ): Promise<SlackArchiveMessagesResponse> {
+    return this.archiveMessages("/slack/search", options, {
+      q: options.q,
+      identity_id: options.identityId,
+      connection_id: options.connectionId,
       user_id: options.userId,
     });
   }

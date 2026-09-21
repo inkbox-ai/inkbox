@@ -629,6 +629,103 @@
       "body": null,
       "query": {},
       "idempotency_key": null
+    },
+    {
+      "name": "search_messages",
+      "method": "GET",
+      "path": "/slack/search",
+      "response": {
+        "messages": [
+          {
+            "id": "22222222-2222-4222-8222-222222222222",
+            "connection_id": "11111111-1111-4111-8111-111111111111",
+            "conversation_id": "C123",
+            "message_ts": "1234567890.000001",
+            "thread_ts": null,
+            "user_id": "U123",
+            "text": "retained message",
+            "files": [],
+            "mentioned": false,
+            "source": "backfill",
+            "captured_at": "2026-09-17T00:00:00+00:00"
+          }
+        ],
+        "next_cursor": null,
+        "source": "archive"
+      },
+      "body": null,
+      "query": {
+        "q": "retained message",
+        "conversation_id": "C123",
+        "user_id": "U123",
+        "before_ts": "1234567891.000000",
+        "after_ts": "1234567889.000000",
+        "limit": "2",
+        "cursor": "opaque",
+        "identity_id": "33333333-3333-4333-8333-333333333333",
+        "connection_id": "11111111-1111-4111-8111-111111111111"
+      },
+      "idempotency_key": null
+    },
+    {
+      "name": "search_messages_defaults",
+      "method": "GET",
+      "path": "/slack/search",
+      "response": {
+        "messages": [
+          {
+            "id": "22222222-2222-4222-8222-222222222222",
+            "connection_id": "11111111-1111-4111-8111-111111111111",
+            "conversation_id": "C123",
+            "message_ts": "1234567890.000001",
+            "thread_ts": null,
+            "user_id": "U123",
+            "text": "retained message",
+            "files": [],
+            "mentioned": false,
+            "source": "backfill",
+            "captured_at": "2026-09-17T00:00:00+00:00"
+          },
+          {
+            "id": "44444444-4444-4444-8444-444444444444",
+            "connection_id": "55555555-5555-4555-8555-555555555555",
+            "conversation_id": "C123",
+            "message_ts": "1234567889.000009",
+            "thread_ts": null,
+            "user_id": "U123",
+            "text": "retained message",
+            "files": [],
+            "mentioned": false,
+            "source": "backfill",
+            "captured_at": "2026-09-17T00:00:00+00:00"
+          }
+        ],
+        "next_cursor": "next",
+        "source": "archive"
+      },
+      "body": null,
+      "query": {
+        "q": "release + café & notes?",
+        "limit": "50"
+      },
+      "idempotency_key": null
+    },
+    {
+      "name": "search_messages_continuation",
+      "method": "GET",
+      "path": "/slack/search",
+      "response": {
+        "messages": [],
+        "next_cursor": "next",
+        "source": "archive"
+      },
+      "body": null,
+      "query": {
+        "q": "retained message",
+        "limit": "50",
+        "cursor": "opaque+/="
+      },
+      "idempotency_key": null
     }
   ]
 }

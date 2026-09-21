@@ -22,7 +22,9 @@ def calls(s):
         "start_installation": lambda: s.start_installation(C, workspace_id="T123"),
         "start_installation_defaults": lambda: s.start_installation(C, return_url=None),
         "start_installation_return_url": lambda: s.start_installation(
-            C, workspace_id="T123", return_url="https://example.com/console/slack/complete"
+            C,
+            workspace_id="T123",
+            return_url="https://example.com/console/slack/complete",
         ),
         "capabilities": lambda: s.capabilities(C),
         "list_users": lambda: s.list_users(C, limit=2, cursor="opaque"),
@@ -90,6 +92,27 @@ def calls(s):
             limit=2,
             cursor="opaque",
         ),
+        "search_messages": lambda: s.search_messages(
+            "retained message",
+            identity_id=UUID("33333333-3333-4333-8333-333333333333"),
+            connection_id=UUID(C),
+            conversation_id="C123",
+            user_id="U123",
+            before_ts="1234567891.000000",
+            after_ts="1234567889.000000",
+            limit=2,
+            cursor="opaque",
+        ),
+        "search_messages_defaults": lambda: s.search_messages(
+            "release + café & notes?",
+            identity_id=None,
+            connection_id=None,
+            before_ts=None,
+            after_ts=None,
+        ),
+        "search_messages_continuation": lambda: s.search_messages(
+            "retained message", cursor="opaque+/="
+        ),
         "archive_backfill": lambda: s.archive_backfill(
             C, "C123", thread_ts=TS, restart=True
         ),
@@ -122,6 +145,16 @@ def test_all_operations_exact_wire_and_typed_results(wire, case):
     if case["name"] in {"list_archived_messages", "search_archived_messages"}:
         assert result.messages[0].captured_at.tzinfo is not None
         assert result.messages[0].message_ts == TS
+    if case["name"].startswith("search_messages"):
+        assert result.source == "archive"
+        assert result.next_cursor == case["response"]["next_cursor"]
+        assert [str(m.connection_id) for m in result.messages] == [
+            m["connection_id"] for m in case["response"]["messages"]
+        ]
+        assert [m.message_ts for m in result.messages] == [
+            m["message_ts"] for m in case["response"]["messages"]
+        ]
+        assert all(m.captured_at.tzinfo is not None for m in result.messages)
     if case["name"] == "purge_archive":
         assert isinstance(result, SlackArchivePurgeResponse)
         assert result.status == "pending" and result.capture_enabled is False
@@ -146,6 +179,8 @@ def test_every_mutation_preserves_errors_without_retry(wire, name):
         lambda s: s.get_message(C, "C123", 1234567890.1),
         lambda s: s.add_pin(C, "C123", 1234567890.1, idempotency_key="stable-key"),
         lambda s: s.list_archived_messages(C, before_ts=1234567890.1),
+        lambda s: s.search_messages("message", before_ts=1234567890.1),
+        lambda s: s.search_messages("message", after_ts=1234567890.1),
         lambda s: s.archive_backfill(C, "C123", thread_ts=1234567890.1),
         lambda s: s.set_processing_status(
             C, "C123", 1234567890.1, "processing", idempotency_key="stable-key"
@@ -158,3 +193,15 @@ def test_invalid_timestamp_types_and_keys_fail_without_dispatch(wire, call):
     with pytest.raises(ValueError):
         call(client.slack)
     assert requests == []
+
+
+@pytest.mark.parametrize("status", [403, 422, 429, 503])
+def test_identity_search_preserves_errors(wire, status):
+    client, requests, replies = wire
+    replies.append(
+        (status, {"detail": {"code": "search_failed", "message": "Search failed"}})
+    )
+    with pytest.raises(InkboxAPIError) as exc:
+        client.slack.search_messages("message")
+    assert exc.value.status_code == status
+    assert len(requests) == 1

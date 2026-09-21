@@ -502,6 +502,7 @@ export type {
   SlackArchiveCoverageResponse,
   SlackArchiveMessagesOptions,
   SlackArchiveSearchOptions,
+  SlackSearchMessagesOptions,
   SlackUploadFileOptions,
   SlackMutationOptions,
 } from "./slack-operations.js";

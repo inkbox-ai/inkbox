@@ -74,6 +74,15 @@ function calls(s: Inkbox["slack"]): Record<string, () => Promise<unknown>> {
         limit: 2,
         cursor: "opaque",
       }),
+    search_messages: () => s.searchMessages({
+      q: "retained message", identityId: "33333333-3333-4333-8333-333333333333",
+      connectionId: C, conversationId: "C123", userId: "U123",
+      beforeTs: "1234567891.000000", afterTs: "1234567889.000000", limit: 2, cursor: "opaque",
+    }),
+    search_messages_defaults: () => s.searchMessages({
+      q: "release + café & notes?", identityId: null, connectionId: null, beforeTs: null, afterTs: null,
+    }),
+    search_messages_continuation: () => s.searchMessages({ q: "retained message", cursor: "opaque+/=" }),
     archive_backfill: () =>
       s.archiveBackfill(C, "C123", { threadTs: TS, restart: true }),
     list_archive_coverage: () =>
@@ -113,6 +122,13 @@ for (const testCase of data.cases) {
       expect(result).toMatchObject({
         capabilities: { files_upload: { scopesSatisfied: false } },
       });
+    if (testCase.name.startsWith("search_messages"))
+      expect(result).toMatchObject({
+        source: "archive", nextCursor: testCase.response.next_cursor,
+        messages: testCase.response.messages.map((m: Record<string, unknown>) => ({
+          connectionId: m.connection_id, messageTs: m.message_ts, capturedAt: expect.any(Date), threadTs: null,
+        })),
+      });
     if (testCase.name === "list_archived_messages")
       expect(result).toMatchObject({
         messages: [{ capturedAt: expect.any(Date) }],
@@ -147,8 +163,20 @@ it("rejects runtime numeric timestamps and invalid keys before dispatch", async 
   await expect(
     s.listArchivedMessages(C, { beforeTs: 123.1 as unknown as string }),
   ).rejects.toThrow("timestamps");
+  await expect(s.searchMessages({ q: "message", beforeTs: 123.1 as unknown as string })).rejects.toThrow("timestamps");
+  await expect(s.searchMessages({ q: "message", afterTs: 123.1 as unknown as string })).rejects.toThrow("timestamps");
   await expect(
     s.deleteMessage(C, "C123", TS, { idempotencyKey: "" }),
   ).rejects.toThrow("idempotencyKey");
   expect(fetch).not.toHaveBeenCalled();
+});
+
+it.each([403, 422, 429, 503])("preserves identity search errors (%s)", async (status) => {
+  const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(
+    JSON.stringify({ detail: { code: "search_failed", message: "Search failed" } }), { status },
+  ));
+  vi.stubGlobal("fetch", fetch);
+  const client = new Inkbox({ apiKey: "synthetic-test-key", baseUrl: "https://example.com" });
+  await expect(client.slack.searchMessages({ q: "message" })).rejects.toMatchObject({ statusCode: status });
+  expect(fetch).toHaveBeenCalledTimes(1);
 });

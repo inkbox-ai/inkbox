@@ -1059,6 +1059,7 @@ identity lookup; the UUID form avoids that lookup.
 
 | Command group | Operations |
 | --- | --- |
+| `slack search` | Search retained messages across an identity's workspace connections |
 | `slack connection` | `list`, `disconnect` |
 | `slack invitation` | `create`, `list`, `revoke <invitation-id>` |
 | `slack conversation` | `list`, `get`, `open` (repeat `--user-id`) |
@@ -1152,9 +1153,23 @@ owns attention rules, thread watches, and its own memory.
 
 ### Retained history and utility actions
 
+Start with `inkbox slack search --q "release notes"` to search retained message text across all workspace
+connections owned by one identity. Agent credentials infer their identity; other
+credentials must supply an explicit identity. A connection filter narrows that
+identity's results; it is not required. Each result includes its connection ID.
+Search uses plain English keywords, ranked by relevance and then recency, not
+Slack query operators or semantic search. Attachment bodies are not indexed.
+The query accepts 1..512 characters and page sizes are 1..100 (default 50).
+Follow the returned cursor with the same filters even for short or empty pages;
+stop only when the cursor is absent. Results require current access and may not
+cover all workspace history. Search errors are raised, not returned as empty results.
+The connection-specific archive search remains available.
+
 ```sh
 inkbox slack capabilities --connection-id "$CONNECTION_ID"
-inkbox slack archive search --connection-id "$CONNECTION_ID" --q 'release notes'
+inkbox slack search --q 'release notes'
+# Non-agent credentials: add --identity example-agent or --identity-id UUID.
+# Narrow to one workspace only when needed: add --connection-id "$CONNECTION_ID".
 inkbox slack reaction add --connection-id "$CONNECTION_ID" \
   --conversation-id CEXAMPLE --message-ts 1780000000.000001 \
   --name eyes --idempotency-key review:release:1

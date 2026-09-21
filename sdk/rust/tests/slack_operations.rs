@@ -102,6 +102,30 @@ fn invoke(client: &Inkbox, name: &str, data: &Value) -> Value {
                 cursor: Some("opaque".into())
             }
         )),
+        "search_messages" => v!(s.search_messages(
+            "retained message",
+            &SlackSearchMessagesOptions {
+                identity_id: Some(Uuid::parse_str("33333333-3333-4333-8333-333333333333").unwrap()),
+                connection_id: Some(c),
+                conversation_id: Some("C123".into()),
+                user_id: Some("U123".into()),
+                before_ts: Some("1234567891.000000".into()),
+                after_ts: Some("1234567889.000000".into()),
+                limit: Some(2),
+                cursor: Some("opaque".into()),
+            }
+        )),
+        "search_messages_defaults" => v!(s.search_messages(
+            "release + café & notes?",
+            &SlackSearchMessagesOptions::default()
+        )),
+        "search_messages_continuation" => v!(s.search_messages(
+            "retained message",
+            &SlackSearchMessagesOptions {
+                cursor: Some("opaque+/=".into()),
+                ..Default::default()
+            }
+        )),
         "archive_backfill" => v!(s.archive_backfill(
             c,
             "C123",
@@ -143,6 +167,12 @@ fn every_public_operation_matches_exact_wire_and_typed_responses() {
             for (name, value) in case["query"].as_object().unwrap() {
                 when = when.query_param(name, value.as_str().unwrap());
             }
+            if case["name"] == "search_messages_defaults" {
+                when = when.matches(|req| req.query_params.as_ref().unwrap().len() == 2);
+            }
+            if case["name"] == "search_messages_continuation" {
+                when = when.matches(|req| req.query_params.as_ref().unwrap().len() == 3);
+            }
             if let Some(key) = case["idempotency_key"].as_str() {
                 when = when.header("Idempotency-Key", key);
             }
@@ -181,4 +211,26 @@ fn uncertain_outcomes_and_http_errors_do_not_retry_and_keys_are_required() {
         .delete_message(id, "C123", "1234567890.000001", "")
         .is_err());
     mock.assert_hits(1);
+}
+
+#[test]
+fn identity_search_preserves_http_errors() {
+    let server = MockServer::start();
+    let client = Inkbox::builder("synthetic-test-key")
+        .base_url(server.base_url())
+        .build()
+        .unwrap();
+    for status in [403, 422, 429, 503] {
+        let mut mock = server.mock(|when, then| {
+            when.method(Method::GET).path("/api/v1/slack/search");
+            then.status(status)
+                .json_body(json!({"detail":{"code":"search_failed","message":"Search failed"}}));
+        });
+        assert!(client
+            .slack()
+            .search_messages("message", &SlackSearchMessagesOptions::default())
+            .is_err());
+        mock.assert_hits(1);
+        mock.delete();
+    }
 }

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add identity-wide Slack message search across workspace connections in all SDKs and
+  `inkbox slack search`, with optional narrowing filters and agent identity inference.
+
 - Add Slack CLI identity-handle selection and require DM recipients before dispatch;
   separate management onboarding from explicit connected-workspace selection in examples.
 - Remove unused archive message source URLs, type the Python purge result, and clarify

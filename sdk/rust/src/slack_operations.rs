@@ -198,6 +198,17 @@ pub struct SlackArchiveSearchOptions {
     pub limit: Option<u32>,
 }
 #[derive(Debug, Clone, Default)]
+pub struct SlackSearchMessagesOptions {
+    pub identity_id: Option<Uuid>,
+    pub connection_id: Option<Uuid>,
+    pub conversation_id: Option<String>,
+    pub user_id: Option<String>,
+    pub before_ts: Option<String>,
+    pub after_ts: Option<String>,
+    pub cursor: Option<String>,
+    pub limit: Option<u32>,
+}
+#[derive(Debug, Clone, Default)]
 pub struct SlackMessageContextOptions {
     pub thread_ts: Option<String>,
     pub limit: Option<u32>,
@@ -548,6 +559,38 @@ impl SlackResource {
         Ok(serde_json::from_value(
             self.http
                 .get(&format!("{}/archive/search", base(id)), &params)?,
+        )?)
+    }
+    /// Search retained messages across an identity's workspace connections.
+    /// Agent credentials infer the identity; other credentials require identity_id.
+    /// Follow next_cursor even when a page is short or empty.
+    pub fn search_messages(
+        &self,
+        q: &str,
+        options: &SlackSearchMessagesOptions,
+    ) -> Result<SlackArchiveMessagesResponse> {
+        let mut params = vec![
+            ("limit", options.limit.unwrap_or(50).to_string()),
+            ("q", q.to_string()),
+        ];
+        for (key, value) in [
+            ("identity_id", options.identity_id.map(|id| id.to_string())),
+            (
+                "connection_id",
+                options.connection_id.map(|id| id.to_string()),
+            ),
+            ("conversation_id", options.conversation_id.clone()),
+            ("user_id", options.user_id.clone()),
+            ("before_ts", options.before_ts.clone()),
+            ("after_ts", options.after_ts.clone()),
+            ("cursor", options.cursor.clone()),
+        ] {
+            if let Some(value) = value {
+                params.push((key, value));
+            }
+        }
+        Ok(serde_json::from_value(
+            self.http.get("/slack/search", &params)?,
         )?)
     }
     pub fn archive_backfill(

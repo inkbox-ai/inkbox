@@ -132,6 +132,13 @@ function commands(file) {
       "--cursor",
       "opaque",
     ],
+    search_messages: [
+      "search", "--q", "retained message", "--identity-id", "33333333-3333-4333-8333-333333333333",
+      ...conv, "--user-id", "U123", "--before-ts", "1234567891.000000", "--after-ts", "1234567889.000000",
+      "--limit", "2", "--cursor", "opaque",
+    ],
+    search_messages_defaults: ["search", "--q", "release + café & notes?"],
+    search_messages_continuation: ["search", "--q", "retained message", "--cursor", "opaque+/="],
     archive_backfill: [
       "archive",
       "backfill",

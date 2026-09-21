@@ -503,11 +503,11 @@ class SlackOperationsMixin:
         )
 
     def _archive_messages(
-        self, connection_id: UUID | str, path: str, params: dict
+        self, path: str, params: dict
     ) -> SlackArchiveMessagesResponse:
         for key in ("thread_ts", "before_ts", "after_ts"):
             _timestamp(params.get(key))
-        raw = self._http.get(f"{_base(connection_id)}/archive/{path}", params=params)
+        raw = self._http.get(path, params=params)
         raw["messages"] = [
             _parse(SlackArchivedMessage, item) for item in raw["messages"]
         ]
@@ -525,8 +525,7 @@ class SlackOperationsMixin:
         limit: int = 50,
     ) -> SlackArchiveMessagesResponse:
         return self._archive_messages(
-            connection_id,
-            "messages",
+            f"{_base(connection_id)}/archive/messages",
             {
                 "conversation_id": conversation_id,
                 "thread_ts": thread_ts,
@@ -550,10 +549,44 @@ class SlackOperationsMixin:
         limit: int = 50,
     ) -> SlackArchiveMessagesResponse:
         return self._archive_messages(
-            connection_id,
-            "search",
+            f"{_base(connection_id)}/archive/search",
             {
                 "q": q,
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "before_ts": before_ts,
+                "after_ts": after_ts,
+                "cursor": cursor,
+                "limit": limit,
+            },
+        )
+
+    def search_messages(
+        self,
+        q: str,
+        *,
+        identity_id: UUID | str | None = None,
+        connection_id: UUID | str | None = None,
+        conversation_id: str | None = None,
+        user_id: str | None = None,
+        before_ts: str | None = None,
+        after_ts: str | None = None,
+        cursor: str | None = None,
+        limit: int = 50,
+    ) -> SlackArchiveMessagesResponse:
+        """Search retained messages across an identity's workspace connections.
+
+        Agent credentials infer the identity; other credentials require identity_id.
+        Follow next_cursor even when a page is short or empty.
+        """
+        return self._archive_messages(
+            "/slack/search",
+            {
+                "q": q,
+                "identity_id": str(identity_id) if identity_id is not None else None,
+                "connection_id": str(connection_id)
+                if connection_id is not None
+                else None,
                 "conversation_id": conversation_id,
                 "user_id": user_id,
                 "before_ts": before_ts,

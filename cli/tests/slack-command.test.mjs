@@ -343,6 +343,14 @@ test("identity-scoped Slack commands resolve handles and reject ambiguous select
   ];
   const cases = [
     {
+      args: ["search", "--q", "message"],
+      response: { messages: [], next_cursor: "next", source: "archive" },
+      method: "GET",
+      url: `/api/v1/slack/search?limit=50&q=message&identity_id=${identityId}`,
+      body: null,
+      identityOptional: true,
+    },
+    {
       args: ["connection", "list"],
       response: { connections: [], installation_available: false },
       method: "GET",
@@ -380,6 +388,7 @@ test("identity-scoped Slack commands resolve handles and reject ambiguous select
         [],
         ["--identity", "example-agent", "--identity-id", identityId],
       ]) {
+        if (item.identityOptional && selectors.length === 0) continue;
         const before = requests.length;
         const invalid = await run([...globals, ...item.args, ...selectors]);
         assert.ok(invalid.error);
@@ -421,6 +430,11 @@ test("identity-scoped Slack commands resolve handles and reject ambiguous select
     ]);
     assert.ok(missingIdentity.error);
     assert.equal(requests.length, before + 1); // Failed lookup must not create an invitation.
+    assert.equal(requests.at(-1).url, "/api/v1/identities/example-agent");
+    const beforeSearch = requests.length;
+    const failedSearch = await run([...globals, "search", "--q", "message", "--identity", "example-agent"]);
+    assert.ok(failedSearch.error);
+    assert.equal(requests.length, beforeSearch + 1);
     assert.equal(requests.at(-1).url, "/api/v1/identities/example-agent");
   } finally {
     await new Promise((resolve) => server.close(resolve));

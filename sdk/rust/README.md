@@ -1005,12 +1005,24 @@ owns attention rules, thread watches, and its own memory.
 
 ### Retained history and utility actions
 
+Start with `search_messages` to search retained message text across all workspace
+connections owned by one identity. Agent credentials infer their identity; other
+credentials must supply an explicit identity. A connection filter narrows that
+identity's results; it is not required. Each result includes its connection ID.
+Search uses plain English keywords, ranked by relevance and then recency, not
+Slack query operators or semantic search. Attachment bodies are not indexed.
+The query accepts 1..512 characters and page sizes are 1..100 (default 50).
+Follow the returned cursor with the same filters even for short or empty pages;
+stop only when the cursor is absent. Results require current access and may not
+cover all workspace history. Search errors are raised, not returned as empty results.
+The connection-specific archive search remains available.
+
 ```rust,no_run
 # fn example(client: &inkbox::Inkbox, connection_id: uuid::Uuid) -> inkbox::Result<()> {
-let history = client.slack().search_archived_messages(
-    connection_id, "release notes",
-    &inkbox::SlackArchiveSearchOptions {
-        conversation_id: Some("CEXAMPLE".into()), limit: Some(20), ..Default::default()
+let history = client.slack().search_messages(
+    "release notes",
+    &inkbox::SlackSearchMessagesOptions {
+        limit: Some(20), ..Default::default()
     },
 )?;
 let operation = client.slack().add_reaction(
