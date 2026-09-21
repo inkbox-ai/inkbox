@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, patch
 
 import httpx
 import pytest
@@ -903,14 +903,15 @@ def test_a2a_wait_caps_get_task_request_to_remaining_deadline() -> None:
 
     client._get_task = stalled_get_task  # type: ignore[method-assign]
 
-    with pytest.raises(
-        TimeoutError,
-        match="task-1 did not stop before timeout",
-    ):
-        client.wait(target, "task-1", timeout=0.05, interval=1)
+    # Use elapsed time explicitly instead of depending on OS clock resolution.
+    with patch("inkbox.a2a.client.time.monotonic", side_effect=[100.0, 100.02]):
+        with pytest.raises(
+            TimeoutError,
+            match="task-1 did not stop before timeout",
+        ):
+            client.wait(target, "task-1", timeout=0.05, interval=1)
 
-    assert len(observed_timeouts) == 1
-    assert 0 < observed_timeouts[0] <= 0.05
+    assert observed_timeouts == [pytest.approx(0.03)]
     client.close()
 
 
