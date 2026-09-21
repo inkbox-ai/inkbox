@@ -329,21 +329,17 @@ export class Inkbox {
         copies.set(value, transport);
         return transport;
       }
+      if (value instanceof VaultResource) {
+        const vault = value._scoped(collector);
+        copies.set(value, vault);
+        return vault;
+      }
       // Copy resource bindings, retaining data, key material, and pending state.
       if (!(value instanceof Inkbox) && value !== this._webhooks
         && !Object.values(value).some((item) => item instanceof HttpTransport)) return value;
       const copy = Object.create(Object.getPrototypeOf(value));
       copies.set(value, copy);
       for (const [key, item] of Object.entries(value)) copy[key] = scope(item);
-      if (value instanceof VaultResource) {
-        // An existing unlock may finish after this scope is created.
-        let local: VaultResource["_unlocked"] | undefined;
-        Object.defineProperty(copy, "_unlocked", {
-          enumerable: true,
-          get: () => local === undefined ? scope(value._unlocked) : local,
-          set: (unlocked: VaultResource["_unlocked"]) => { local = unlocked; },
-        });
-      }
       return copy;
     };
     const data = await callback(scope(this) as Inkbox);
