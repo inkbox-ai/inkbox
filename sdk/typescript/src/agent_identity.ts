@@ -153,6 +153,10 @@ export class AgentIdentity {
 
   /** Whitelist/blacklist mode for this identity's phone contact rules. */
   get phoneFilterMode(): FilterMode { return this._data.phoneFilterMode; }
+  get mailInboundFilterMode(): FilterMode { return this._data.mailInboundFilterMode ?? this.mailFilterMode; }
+  get mailOutboundFilterMode(): FilterMode { return this._data.mailOutboundFilterMode ?? this.mailFilterMode; }
+  get phoneInboundFilterMode(): FilterMode { return this._data.phoneInboundFilterMode ?? this.phoneFilterMode; }
+  get phoneOutboundFilterMode(): FilterMode { return this._data.phoneOutboundFilterMode ?? this.phoneFilterMode; }
 
   /** Whether this identity has a webhook signing key configured. Status only — never the secret. */
   get signingKeyConfigured(): boolean { return this._data.signingKeyConfigured; }
@@ -1548,7 +1552,7 @@ export class AgentIdentity {
     return new A2AClient(
       this._inkbox._apiKey,
       this._inkbox._baseUrl,
-      { requestTimeoutMs: this._inkbox._timeoutMs },
+      { requestTimeoutMs: this._inkbox._timeoutMs, onResponse: this._inkbox._rootApiHttp.responseObserver },
     );
   }
 

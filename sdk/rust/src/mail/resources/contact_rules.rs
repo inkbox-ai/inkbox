@@ -11,6 +11,14 @@ use crate::mail::types::{MailContactRule, MailRuleAction, MailRuleMatchType};
 
 const BASE: &str = "/mailboxes";
 const ORG_BASE: &str = "/contact-rules";
+crate::contact_rules::directional_rule_methods!(
+    MailContactRulesResource,
+    MailContactRule,
+    MailRuleAction,
+    MailRuleMatchType,
+    "mailbox_id",
+    Uuid
+);
 
 /// Build the per-mailbox contact-rules path, optionally targeting one rule.
 fn rule_path(email_address: &str, rule_id: Option<&str>) -> String {

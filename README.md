@@ -14,6 +14,34 @@ API-first communication infrastructure for AI agents — email (with custom send
 | [`@inkbox/sdk`](./sdk/typescript/) | TypeScript / Node ≥ 22 | `npm install @inkbox/sdk` |
 | [`@inkbox/cli`](./cli/) | CLI / Node ≥ 22 | `npm install -g @inkbox/cli` |
 
+## Companion mode
+
+Companion mode is off by default and separate from whitelist/blacklist settings.
+An eligible sender can introduce the agent to a group by sending a qualifying
+message there. Eligibility requires active exact email/number allow rules for
+both inbound and outbound communication, either one Both rule or two applicable
+one-way allows. It is per normalized identifier and channel, not per saved contact;
+phone and iMessage share one policy. Domain allowances, default access, contact
+visibility, and access through another Companion conversation do not qualify.
+
+Multiple senders may qualify. The first qualifying message activates the group;
+listing an eligible participant is insufficient, and additional eligible senders
+do not repeat initialization. Continued access depends on the actual trigger
+sender's permissions and membership, without transferring to another participant.
+Blocks and existing sending requirements still apply. The SDKs load complete
+authorized history into one bounded initialization transcript before live turns.
+
+An administrator can set `enabled=true` before any eligible sender or channel
+resource exists. This saves the preference; per-channel readiness reports unmet
+prerequisites, including `bidirectional_allow_required`, independently of the
+enabled setting. Configuration contains enabled state, revision, readiness, and
+optional notices. See the [Companion mode guide](https://inkbox.ai/docs/capabilities/companion-mode).
+
+- [Python: `client.companion.load_initialization`](./sdk/python/README.md#companion-mode)
+- [TypeScript: `client.companion.loadInitialization`](./sdk/typescript/README.md#companion-mode)
+- [Rust: `client.companion().load_initialization`](./sdk/rust/README.md#companion-mode)
+- [CLI: `inkbox identity companion`](./cli/README.md#companion-mode)
+
 ## Cursor plugin
 
 **Status:** Pre-release and under repository review; not yet submitted to or

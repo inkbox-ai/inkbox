@@ -7,11 +7,13 @@ Sync HTTP transport (internal). Shared by all resource packages.
 from __future__ import annotations
 
 import importlib.metadata
+from copy import copy
 from typing import Any
 
 import httpx
 
 from inkbox._cookies import CookieJar
+from inkbox.response_metadata import ResponseObserver, _observe_response
 from inkbox.exceptions import (
     DedicatedIMessageNumberInventoryPendingError,
     DedicatedIMessageNumberQuotaExceededError,
@@ -52,6 +54,7 @@ class HttpTransport:
         timeout: float = _DEFAULT_TIMEOUT,
         cookie_jar: CookieJar | None = None,
         user_agent: str | None = None,
+        response_observer: ResponseObserver | None = None,
     ) -> None:
         headers = {
             "X-API-Key": api_key,
@@ -66,6 +69,15 @@ class HttpTransport:
             transport=httpx.HTTPTransport(retries=CONNECT_RETRIES),
         )
         self._cookie_jar = cookie_jar or CookieJar()
+        self._response_observer = response_observer
+        self._notice_collector: ResponseObserver | None = None
+        self._owns_connections = True
+
+    def _scoped(self, collector: ResponseObserver) -> HttpTransport:
+        scoped = copy(self)
+        scoped._notice_collector = collector
+        scoped._owns_connections = False
+        return scoped
 
     def get(
         self,
@@ -244,10 +256,12 @@ class HttpTransport:
             request.headers["Cookie"] = cookie
         resp = self._client.send(request)
         self._cookie_jar.store_from_headers(str(request.url), resp.headers)
+        _observe_response(resp, self._notice_collector, self._response_observer)
         return resp
 
     def close(self) -> None:
-        self._client.close()
+        if self._owns_connections:
+            self._client.close()
 
     def __enter__(self) -> HttpTransport:
         return self

@@ -10,6 +10,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import { type RuleDirection, ruleUpdateToWire } from "../../contact_rules.js";
 import {
   PhoneContactRule,
   PhoneRuleAction,
@@ -27,6 +28,7 @@ function rulePath(phoneNumberId: string, ruleId?: string): string {
 }
 
 export interface ListPhoneContactRulesOptions {
+  direction?: RuleDirection;
   action?: PhoneRuleAction;
   matchType?: PhoneRuleMatchType;
   limit?: number;
@@ -34,16 +36,20 @@ export interface ListPhoneContactRulesOptions {
 }
 
 export interface CreatePhoneContactRuleOptions {
+  direction?: RuleDirection;
   action: PhoneRuleAction;
   matchTarget: string;
   matchType?: PhoneRuleMatchType;
 }
 
 export interface UpdatePhoneContactRuleOptions {
-  action: PhoneRuleAction;
+  action?: PhoneRuleAction;
+  direction?: RuleDirection;
+  applyTo?: "inbound" | "outbound";
 }
 
 export interface ListAllPhoneContactRulesOptions {
+  direction?: RuleDirection;
   phoneNumberId?: string;
   action?: PhoneRuleAction;
   matchType?: PhoneRuleMatchType;
@@ -59,6 +65,7 @@ export class PhoneContactRulesResource {
     options: ListPhoneContactRulesOptions = {},
   ): Promise<PhoneContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;
     if (options.limit !== undefined) params.limit = options.limit;
@@ -86,6 +93,7 @@ export class PhoneContactRulesResource {
       match_type: options.matchType ?? PhoneRuleMatchType.EXACT_NUMBER,
       match_target: options.matchTarget,
     };
+    if (options.direction !== undefined) body.direction = options.direction;
     const data = await this.http.post<RawPhoneContactRule>(
       rulePath(phoneNumberId),
       body,
@@ -98,7 +106,7 @@ export class PhoneContactRulesResource {
     ruleId: string,
     options: UpdatePhoneContactRuleOptions,
   ): Promise<PhoneContactRule> {
-    const body = { action: options.action };
+    const body = ruleUpdateToWire(options);
     const data = await this.http.patch<RawPhoneContactRule>(
       rulePath(phoneNumberId, ruleId),
       body,
@@ -114,6 +122,7 @@ export class PhoneContactRulesResource {
     options: ListAllPhoneContactRulesOptions = {},
   ): Promise<PhoneContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.phoneNumberId !== undefined) params.phone_number_id = options.phoneNumberId;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;

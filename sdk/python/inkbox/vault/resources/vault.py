@@ -6,6 +6,7 @@ UnlockedVault: crypto-enabled wrapper for secret CRUD after unlock.
 """
 
 from __future__ import annotations
+from copy import copy
 
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
@@ -60,7 +61,31 @@ class VaultResource:
     ) -> None:
         self._http = http
         self._api_http = api_http
-        self._unlocked: UnlockedVault | None = None
+        self._unlock_state: list[UnlockedVault | None] = [None]
+        self._unlocked_source: UnlockedVault | None = None
+        self._unlocked_view: UnlockedVault | None = None
+
+    def _scoped(self, http: HttpTransport, api_http: HttpTransport) -> VaultResource:
+        scoped = copy(self)
+        scoped._http = http
+        scoped._api_http = api_http
+        scoped._unlocked_source = None
+        scoped._unlocked_view = None
+        return scoped
+
+    @property
+    def _unlocked(self) -> UnlockedVault | None:
+        source = self._unlock_state[0]
+        if source is not self._unlocked_source:
+            self._unlocked_source = source
+            self._unlocked_view = copy(source) if source is not None else None
+            if self._unlocked_view is not None:
+                self._unlocked_view._http = self._http
+        return self._unlocked_view
+
+    @_unlocked.setter
+    def _unlocked(self, value: UnlockedVault | None) -> None:
+        self._unlock_state[0] = value
 
     ## Vault metadata
 
@@ -528,7 +553,7 @@ class UnlockedVault:
         except Exception:
             return
         sid = str(secret_id)
-        self._secrets_cache = [
+        self._secrets_cache[:] = [
             updated if str(s.id) == sid else s
             for s in self._secrets_cache
         ]
@@ -687,7 +712,7 @@ class UnlockedVault:
         """
         self._http.delete(f"/secrets/{secret_id}")
         sid = str(secret_id)
-        self._secrets_cache = [
+        self._secrets_cache[:] = [
             s for s in self._secrets_cache if str(s.id) != sid
         ]
 

@@ -92,7 +92,111 @@ pub struct AgentIdentity {
     tunnel: RefCell<Option<TunnelSummary>>,
 }
 
+macro_rules! directional_identity_rules {
+    ($resource:ident, $list:ident, $get:ident, $create:ident, $update:ident, $rule:ty, $action:ty, $match:ty) => {
+        impl AgentIdentity {
+            pub fn $list(
+                &self,
+                options: &crate::ContactRuleListOptions<$action, $match>,
+            ) -> Result<Vec<crate::DirectionalContactRule<$rule>>> {
+                self.inkbox
+                    .$resource()
+                    .list_with_options(&self.agent_handle(), options)
+            }
+            pub fn $get(&self, rule_id: &str) -> Result<crate::DirectionalContactRule<$rule>> {
+                self.inkbox
+                    .$resource()
+                    .get_with_options(&self.agent_handle(), rule_id)
+            }
+            pub fn $create(
+                &self,
+                options: &crate::ContactRuleCreateOptions<$action, $match>,
+            ) -> Result<crate::DirectionalContactRule<$rule>> {
+                self.inkbox
+                    .$resource()
+                    .create_with_options(&self.agent_handle(), options)
+            }
+            pub fn $update(
+                &self,
+                rule_id: &str,
+                options: &crate::ContactRuleUpdateOptions<$action>,
+            ) -> Result<crate::DirectionalContactRule<$rule>> {
+                self.inkbox
+                    .$resource()
+                    .update_with_options(&self.agent_handle(), rule_id, options)
+            }
+        }
+    };
+}
+
+directional_identity_rules!(
+    mail_identity_contact_rules,
+    list_mail_contact_rules_with_options,
+    get_mail_contact_rule_with_options,
+    create_mail_contact_rule_with_options,
+    update_mail_contact_rule_with_options,
+    MailIdentityContactRule,
+    MailRuleAction,
+    MailRuleMatchType
+);
+directional_identity_rules!(
+    phone_identity_contact_rules,
+    list_phone_contact_rules_with_options,
+    get_phone_contact_rule_with_options,
+    create_phone_contact_rule_with_options,
+    update_phone_contact_rule_with_options,
+    PhoneIdentityContactRule,
+    PhoneRuleAction,
+    PhoneRuleMatchType
+);
+directional_identity_rules!(
+    imessage_contact_rules,
+    list_imessage_contact_rules_with_options,
+    get_imessage_contact_rule_with_options,
+    create_imessage_contact_rule_with_options,
+    update_imessage_contact_rule_with_options,
+    crate::imessage::types::IMessageContactRule,
+    crate::imessage::types::IMessageRuleAction,
+    crate::imessage::types::IMessageRuleMatchType
+);
+
 impl AgentIdentity {
+    /// Fetch effective modes without projecting away directional differences.
+    pub fn get_with_options(&self) -> Result<crate::identities::DirectionalAgentIdentityData> {
+        self.inkbox
+            .identities()
+            .get_with_options(&self.agent_handle())
+    }
+
+    pub fn update_filter_modes(
+        &self,
+        options: &crate::identities::IdentityFilterModeOptions,
+    ) -> Result<crate::identities::DirectionalAgentIdentityData> {
+        let result = self
+            .inkbox
+            .identities()
+            .update_filter_modes(&self.agent_handle(), options)?;
+        let data = result.clone().into_legacy();
+        *self.mailbox.borrow_mut() = data.mailbox.clone();
+        *self.phone_number.borrow_mut() = data.phone_number.clone();
+        *self.tunnel.borrow_mut() = data.tunnel.clone();
+        *self.data.borrow_mut() = data;
+        Ok(result)
+    }
+
+    /// Run existing identity helpers through an isolated metadata scope.
+    pub fn with_response_metadata<T>(
+        &self,
+        operation: impl FnOnce(&AgentIdentity) -> Result<T>,
+    ) -> Result<crate::APIResponse<T>> {
+        self.inkbox.with_response_metadata(|client| {
+            let scoped = AgentIdentity::new(self.data.borrow().clone(), client.clone());
+            *scoped.mailbox.borrow_mut() = self.mailbox.borrow().clone();
+            *scoped.phone_number.borrow_mut() = self.phone_number.borrow().clone();
+            *scoped.tunnel.borrow_mut() = self.tunnel.borrow().clone();
+            operation(&scoped)
+        })
+    }
     /// Build a facade from an identity-create / identity-get payload and the
     /// owning client. Mirrors the Python `AgentIdentity.__init__`.
     pub fn new(data: AgentIdentityData, inkbox: Arc<Inkbox>) -> Self {

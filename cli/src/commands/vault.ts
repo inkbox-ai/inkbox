@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { printStatus } from "../output.js";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -42,7 +43,7 @@ export function registerVaultCommands(program: Command): void {
         const inkbox = createClient(opts);
         const info = await inkbox.vault.info();
         if (info === null) {
-          console.log("No vault initialized for this organization.");
+          printStatus("No vault initialized for this organization.");
           return;
         }
         output(info, { json: !!opts.json });
@@ -271,7 +272,7 @@ export function registerVaultCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.vault.deleteSecret(secretId);
-        console.log(`Deleted secret '${secretId}'.`);
+        printStatus(`Deleted secret '${secretId}'.`);
       }),
     );
 
@@ -334,7 +335,7 @@ export function registerVaultCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.vault.deleteKey(authHash);
-        console.log(`Deleted vault key '${authHash}'.`);
+        printStatus(`Deleted vault key '${authHash}'.`);
       }),
     );
 
@@ -378,7 +379,7 @@ export function registerVaultCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         await inkbox.vault.revokeAccess(secretId, identity.id);
-        console.log(
+        printStatus(
           `Revoked access to secret '${secretId}' for identity '${cmdOpts.identity}'.`,
         );
       }),

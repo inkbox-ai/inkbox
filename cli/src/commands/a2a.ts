@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Command, Option } from "commander";
+import { observeResponse } from "../response-metadata.js";
 import type {
   A2AContext,
   A2AHistoryDirection,
@@ -197,7 +198,7 @@ export function registerA2ACommands(program: Command): void {
       let token: string | undefined;
       try {
         token = extractA2AInvitationToken(invitation, baseUrl);
-        const result = await Inkbox.previewA2AInvitation(token, { baseUrl });
+        const result = await Inkbox.previewA2AInvitation(token, { baseUrl, onResponse: observeResponse });
         output(result, { json: !!globalOpts.json });
       } catch (error) {
         throw redactSecretError(error, invitation, token ?? "");

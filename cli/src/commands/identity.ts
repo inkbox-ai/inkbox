@@ -1,7 +1,9 @@
 import { Command } from "commander";
+import { registerCompanionCommands } from "./companion.js";
+import { addDirectionalRuleOptions, directionalRuleOptions } from "../contact-rules.js";
 import { parsePolicyPagination } from "../pagination.js";
 import { createClient, getGlobalOpts } from "../client.js";
-import { output, outputContactRules } from "../output.js";
+import { output, outputContactRules, printStatus } from "../output.js";
 import { withErrorHandler } from "../errors.js";
 import type {
   SecretPayload,
@@ -16,6 +18,7 @@ const RULE_COLUMNS = [
   "id",
   "agentIdentityId",
   "action",
+  "direction",
   "matchType",
   "matchTarget",
   "contact",
@@ -43,6 +46,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rows = await inkbox.mailIdentityContactRules.list(handle, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as MailRuleAction | undefined,
           matchType: cmdOpts.matchType as MailRuleMatchType | undefined,
           limit: cmdOpts.limit,
@@ -74,6 +78,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rows = await inkbox.mailIdentityContactRules.listAll({
+          ...directionalRuleOptions(this),
           agentIdentityId: cmdOpts.agentIdentityId,
           action: cmdOpts.action as MailRuleAction | undefined,
           matchType: cmdOpts.matchType as MailRuleMatchType | undefined,
@@ -111,6 +116,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.mailIdentityContactRules.create(handle, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as MailRuleAction,
           matchType: cmdOpts.matchType as MailRuleMatchType,
           matchTarget: cmdOpts.matchTarget,
@@ -133,6 +139,7 @@ function registerIdentityMailRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.mailIdentityContactRules.update(handle, ruleId, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as MailRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -147,9 +154,10 @@ function registerIdentityMailRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.mailIdentityContactRules.delete(handle, ruleId);
-        console.log(`Deleted mail contact rule '${ruleId}' on '${handle}'.`);
+        printStatus(`Deleted mail contact rule '${ruleId}' on '${handle}'.`);
       }),
     );
+  addDirectionalRuleOptions(rules);
 }
 
 function registerIdentityPhoneRuleCommands(parent: Command): void {
@@ -173,6 +181,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rows = await inkbox.phoneIdentityContactRules.list(handle, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as PhoneRuleAction | undefined,
           matchType: cmdOpts.matchType as PhoneRuleMatchType | undefined,
           limit: cmdOpts.limit,
@@ -204,6 +213,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rows = await inkbox.phoneIdentityContactRules.listAll({
+          ...directionalRuleOptions(this),
           agentIdentityId: cmdOpts.agentIdentityId,
           action: cmdOpts.action as PhoneRuleAction | undefined,
           matchType: cmdOpts.matchType as PhoneRuleMatchType | undefined,
@@ -241,6 +251,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.phoneIdentityContactRules.create(handle, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as PhoneRuleAction,
           matchTarget: cmdOpts.matchTarget,
           matchType: cmdOpts.matchType as PhoneRuleMatchType,
@@ -263,6 +274,7 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rule = await inkbox.phoneIdentityContactRules.update(handle, ruleId, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as PhoneRuleAction,
         });
         output(rule as unknown as Record<string, unknown>, { json: !!opts.json });
@@ -277,9 +289,10 @@ function registerIdentityPhoneRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.phoneIdentityContactRules.delete(handle, ruleId);
-        console.log(`Deleted phone contact rule '${ruleId}' on '${handle}'.`);
+        printStatus(`Deleted phone contact rule '${ruleId}' on '${handle}'.`);
       }),
     );
+  addDirectionalRuleOptions(rules);
 }
 
 function registerIdentitySigningKeyCommands(parent: Command): void {
@@ -376,6 +389,10 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            mailInboundFilterMode: id.mailInboundFilterMode,
+            mailOutboundFilterMode: id.mailOutboundFilterMode,
+            phoneInboundFilterMode: id.phoneInboundFilterMode,
+            phoneOutboundFilterMode: id.phoneOutboundFilterMode,
             signingKeyConfigured: id.signingKeyConfigured,
             signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel
@@ -517,7 +534,7 @@ export function registerIdentityCommands(program: Command): void {
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
         await id.delete();
-        console.log(`Deleted identity '${handle}'.`);
+        printStatus(`Deleted identity '${handle}'.`);
       }),
     );
 
@@ -537,6 +554,10 @@ export function registerIdentityCommands(program: Command): void {
     .option("--imessage-filter-mode <mode>", "Alias for the shared phone and iMessage contact-rule mode (admin API key required)")
     .option("--mail-filter-mode <mode>", "Mail contact-rule mode: whitelist or blacklist (admin-only)")
     .option("--phone-filter-mode <mode>", "Shared phone and iMessage contact-rule mode: whitelist or blacklist (admin API key required)")
+    .option("--mail-inbound-filter-mode <mode>", "Inbound mail mode: whitelist or blacklist")
+    .option("--mail-outbound-filter-mode <mode>", "Outbound mail mode: whitelist or blacklist")
+    .option("--phone-inbound-filter-mode <mode>", "Inbound phone and iMessage mode: whitelist or blacklist")
+    .option("--phone-outbound-filter-mode <mode>", "Outbound phone and iMessage mode: whitelist or blacklist")
     .action(
       withErrorHandler(async function (
         this: Command,
@@ -551,6 +572,10 @@ export function registerIdentityCommands(program: Command): void {
           imessageFilterMode?: string;
           mailFilterMode?: string;
           phoneFilterMode?: string;
+          mailInboundFilterMode?: string;
+          mailOutboundFilterMode?: string;
+          phoneInboundFilterMode?: string;
+          phoneOutboundFilterMode?: string;
         },
       ) {
         if (cmdOpts.description !== undefined && cmdOpts.clearDescription) {
@@ -566,15 +591,29 @@ export function registerIdentityCommands(program: Command): void {
           ["--imessage-filter-mode", cmdOpts.imessageFilterMode],
           ["--mail-filter-mode", cmdOpts.mailFilterMode],
           ["--phone-filter-mode", cmdOpts.phoneFilterMode],
+          ["--mail-inbound-filter-mode", cmdOpts.mailInboundFilterMode],
+          ["--mail-outbound-filter-mode", cmdOpts.mailOutboundFilterMode],
+          ["--phone-inbound-filter-mode", cmdOpts.phoneInboundFilterMode],
+          ["--phone-outbound-filter-mode", cmdOpts.phoneOutboundFilterMode],
         ] as const) {
           if (value !== undefined && value !== "whitelist" && value !== "blacklist") {
             throw new Error(`${flag} must be 'whitelist' or 'blacklist'`);
+          }
+        }
+        for (const channel of ["mail", "phone"] as const) {
+          if ((cmdOpts[`${channel}FilterMode`] !== undefined || (channel === "phone" && cmdOpts.imessageFilterMode !== undefined))
+            && (cmdOpts[`${channel}InboundFilterMode`] !== undefined || cmdOpts[`${channel}OutboundFilterMode`] !== undefined)) {
+            throw new Error(`Shared and directional ${channel} filter modes cannot be combined`);
           }
         }
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
         const updateOpts: {
+          mailInboundFilterMode?: "whitelist" | "blacklist";
+          mailOutboundFilterMode?: "whitelist" | "blacklist";
+          phoneInboundFilterMode?: "whitelist" | "blacklist";
+          phoneOutboundFilterMode?: "whitelist" | "blacklist";
           newHandle?: string;
           displayName?: string | null;
           description?: string | null;
@@ -584,6 +623,9 @@ export function registerIdentityCommands(program: Command): void {
           mailFilterMode?: "whitelist" | "blacklist";
           phoneFilterMode?: "whitelist" | "blacklist";
         } = {};
+        for (const key of ["mailInboundFilterMode", "mailOutboundFilterMode", "phoneInboundFilterMode", "phoneOutboundFilterMode"] as const) {
+          if (cmdOpts[key] !== undefined) updateOpts[key] = cmdOpts[key] as "whitelist" | "blacklist";
+        }
         if (cmdOpts.newHandle !== undefined) updateOpts.newHandle = cmdOpts.newHandle;
         if (cmdOpts.displayName !== undefined) {
           updateOpts.displayName = cmdOpts.displayName === "" ? null : cmdOpts.displayName;
@@ -609,7 +651,7 @@ export function registerIdentityCommands(program: Command): void {
           updateOpts.phoneFilterMode = cmdOpts.phoneFilterMode as "whitelist" | "blacklist";
         }
         await id.update(updateOpts);
-        console.log(`Updated identity '${handle}'.`);
+        printStatus(`Updated identity '${handle}'.`);
       }),
     );
 
@@ -635,6 +677,10 @@ export function registerIdentityCommands(program: Command): void {
             imessageFilterMode: id.imessageFilterMode,
             mailFilterMode: id.mailFilterMode,
             phoneFilterMode: id.phoneFilterMode,
+            mailInboundFilterMode: id.mailInboundFilterMode,
+            mailOutboundFilterMode: id.mailOutboundFilterMode,
+            phoneInboundFilterMode: id.phoneInboundFilterMode,
+            phoneOutboundFilterMode: id.phoneOutboundFilterMode,
             signingKeyConfigured: id.signingKeyConfigured,
             signingKeyCreatedAt: id.signingKeyCreatedAt,
             tunnel: id.tunnel
@@ -865,7 +911,7 @@ export function registerIdentityCommands(program: Command): void {
         await inkbox.ready();
         const id = await inkbox.getIdentity(handle);
         await id.deleteSecret(secretId);
-        console.log(`Deleted secret '${secretId}'.`);
+        printStatus(`Deleted secret '${secretId}'.`);
       }),
     );
 
@@ -882,7 +928,7 @@ export function registerIdentityCommands(program: Command): void {
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
         await id.revokeCredentialAccess(secretId);
-        console.log(
+        printStatus(
           `Revoked access to secret '${secretId}' for identity '${handle}'.`,
         );
       }),
@@ -996,11 +1042,12 @@ export function registerIdentityCommands(program: Command): void {
         const inkbox = createClient(opts);
         const id = await inkbox.getIdentity(handle);
         await id.releasePhoneNumber();
-        console.log(`Released phone number from identity '${handle}'.`);
+        printStatus(`Released phone number from identity '${handle}'.`);
       }),
     );
 
   registerIdentityMailRuleCommands(identity);
+  registerCompanionCommands(identity);
   registerIdentityPhoneRuleCommands(identity);
   registerIdentitySigningKeyCommands(identity);
 }

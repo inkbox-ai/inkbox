@@ -10,6 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from inkbox._http import CONNECT_RETRIES
+from inkbox.response_metadata import ResponseObserver, _observe_response
 from inkbox.a2a.types import (
     A2ACard,
     A2AResolvedTarget,
@@ -62,6 +63,7 @@ class A2AClient:
         api_key: str,
         platform_base_url: str,
         timeout: float = 30.0,
+        response_observer: ResponseObserver | None = None,
     ) -> None:
         self._api_key = api_key
         self._platform_origin = _origin(platform_base_url)
@@ -71,6 +73,8 @@ class A2AClient:
             transport=httpx.HTTPTransport(retries=CONNECT_RETRIES),
         )
         self._next_id = 0
+        self._response_observer = response_observer
+        self._notice_collector: ResponseObserver | None = None
 
     def close(self) -> None:
         self._client.close()
@@ -95,6 +99,7 @@ class A2AClient:
             else None
         )
         response = self._client.get(canonical_card_url, headers=headers)
+        _observe_response(response, self._notice_collector, self._response_observer, allow_body=False)
         if 300 <= response.status_code < 400:
             raise InkboxError("A2A Agent Card redirects are refused")
         response.raise_for_status()
@@ -315,6 +320,7 @@ class A2AClient:
         if request_timeout is not None:
             request_kwargs["timeout"] = request_timeout
         response = self._client.post(target.rpc_url, **request_kwargs)
+        _observe_response(response, self._notice_collector, self._response_observer, allow_body=False)
         if 300 <= response.status_code < 400:
             raise InkboxError("A2A RPC redirects are refused")
         response.raise_for_status()

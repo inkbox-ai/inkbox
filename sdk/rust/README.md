@@ -13,17 +13,19 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.6"
+inkbox = "0.7.3"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.6", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.3", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
+
+For sponsored group conversations, see [Companion mode](#companion-mode).
 
 ```rust
 use inkbox::Inkbox;
@@ -51,6 +53,116 @@ fn main() -> inkbox::Result<()> {
     Ok(())
 }
 ```
+
+### Directional contact rules
+
+Requires SDK `0.7.3` or later.
+
+Existing positional methods and response structs remain supported. Use the
+additive `*_with_options` rule methods to read and configure inbound, outbound,
+or both directions. Mail, phone, and iMessage resources all support
+`create_with_options`, `get_with_options`, `list_with_options`,
+`list_all_with_options`, and `update_with_options`.
+
+```rust
+use inkbox::{ContactRuleCreateOptions, ContactRuleDirection, ContactRuleApplyTo,
+             ContactRuleUpdateOptions, Inkbox};
+use inkbox::mail::types::{MailRuleAction, MailRuleMatchType};
+use inkbox::identities::IdentityFilterModeOptions;
+use inkbox::mail::types::FilterMode;
+
+fn configure(client: &Inkbox) -> inkbox::Result<()> {
+    client.identities().update_filter_modes("support-bot", &IdentityFilterModeOptions {
+        mail_inbound_filter_mode: Some(FilterMode::Blacklist),
+        mail_outbound_filter_mode: Some(FilterMode::Whitelist),
+        ..Default::default()
+    })?;
+    let rules = client.mail_identity_contact_rules();
+    let saved = rules.create_with_options("support-bot", &ContactRuleCreateOptions {
+        action: MailRuleAction::Allow,
+        match_type: MailRuleMatchType::ExactEmail,
+        match_target: "x@example.com".into(),
+        direction: Some(ContactRuleDirection::Outbound),
+    })?;
+    rules.update_with_options("support-bot", &saved.id.to_string(), &ContactRuleUpdateOptions {
+        action: Some(MailRuleAction::Block),
+        apply_to: Some(ContactRuleApplyTo::Outbound),
+        ..Default::default()
+    })?;
+    Ok(())
+}
+```
+
+Omitted create direction means Both; omitted PATCH direction preserves coverage.
+A direction-only PATCH changes coverage. `apply_to` instead edits one covered side
+atomically, requires an action, and cannot be combined with `direction`. Refresh
+the list after a one-sided edit to see the preserved opposite side. Create may
+widen an existing rule and return its existing ID. Inbound/outbound list filters
+include Both rules; the Both filter selects only bidirectional rules.
+
+`DirectionalContactRule<T>` retains the old fields in `rule` and adds `direction`.
+Identity `get_with_options` and `list_with_options` return effective mail and phone
+mode pairs. Missing directional fields in older responses fall back to the shared
+mode; missing rule direction falls back to Both. Directional writes require a
+direction-capable API. Phone settings also govern iMessage.
+
+Shared mode writes set both directions. Shared reads report the common mode when
+the two sides agree, otherwise the last explicitly written shared baseline. Do
+not combine shared and directional mode writes for the same channel.
+
+Contact `access().get_with_options` and `access().update_with_options` expose
+`DirectionalContactAccessSettings` and accept `UpdateDirectionalContactAccess`.
+Each group can specify `inbound_contactable` and `outbound_contactable` independently.
+Omission preserves a side; an empty list denies all current addresses on that side.
+Legacy `contactable` reads describe outbound permission and writes affect both
+sides. Do not combine legacy and directional lists in one group.
+`create_with_access_options` applies initial directional contact access atomically.
+Communication policy `get_with_options`, `replace_with_options`, and preview/roster
+`*_with_options` methods preserve per-address action and permission pairs.
+
+### Optional response notices
+
+Resource return types and `InkboxError` variants are unchanged. Register a
+`response_observer` to receive advisory metadata for each completed HTTP response,
+including errors and empty responses. The SDK is silent without an observer.
+Notice codes and levels are open strings; unfamiliar values remain available.
+
+```rust
+use inkbox::Inkbox;
+
+fn read(client: &Inkbox) -> inkbox::Result<()> {
+    let response = client.with_response_metadata(|scoped| scoped.identities().list())?;
+    for identity in response.data {
+        println!("{}", identity.agent_handle);
+    }
+    for notice in response.notices.unwrap_or_default() {
+        eprintln!("{}: {}", notice.level, notice.message);
+    }
+    Ok(())
+}
+
+fn observed_client(api_key: &str) -> inkbox::Result<std::sync::Arc<Inkbox>> {
+    Inkbox::builder(api_key).response_observer(|metadata| {
+        for notice in metadata.notices.iter().flatten() {
+            eprintln!("{}: {}", notice.code, notice.message);
+        }
+    }).build()
+}
+```
+
+`with_response_metadata` returns `Result<APIResponse<T>, InkboxError>`, with the
+original result in `data` and optional notices deduplicated by code, level, and
+message. Use the supplied scoped client for all calls in the callback. Nested and
+concurrent scopes collect independently. Connections, authentication, cookies, and
+vault state are reused without setup requests. Identity facades also provide
+`with_response_metadata`.
+
+The `Inkbox-Notices` response header takes precedence over a declared top-level
+metadata field. Arbitrary user content is never interpreted as notice metadata.
+Malformed entries are ignored, and observer panics do not change the result or
+retry a request. Errors remain errors, with metadata available to the observer.
+Binary and 204 responses retain their original return types; wrapped unit success
+serializes as `"data": null`.
 
 ### Voice AI authority
 
@@ -636,3 +748,93 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 ## License
 
 MIT
+
+## Companion mode
+
+`client.companion()` provides `get`, `update`, `conversations`,
+`activation_messages`, and `load_initialization`. Configuration is off by
+default and administrator-managed, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient; blocks and existing send requirements still apply.
+
+```rust
+use inkbox::{Inkbox, ContactRuleCreateOptions, ContactRuleDirection,
+    mail::{MailRuleAction, MailRuleMatchType}, companion::{CompanionUpdateOptions,
+    CompanionConversationOptions, CompanionActivationOptions,
+    CompanionInitializationOptions}};
+
+fn main() -> inkbox::Result<()> {
+    let client = Inkbox::from_env()?;
+    let config = client.companion().get("example-agent")?;
+    // Administrator credentials are required for both writes.
+    client.mail_identity_contact_rules().create_with_options(
+        "example-agent", &ContactRuleCreateOptions {
+            action: MailRuleAction::Allow, match_type: MailRuleMatchType::ExactEmail,
+            match_target: "trusted@example.com".into(),
+            direction: Some(ContactRuleDirection::Both),
+        },
+    )?;
+    client.companion().update("example-agent", &CompanionUpdateOptions {
+        enabled: Some(true),
+    })?;
+    // trusted@example.com sends "Please join this conversation" to the group.
+    let states = client.companion().conversations(
+        "example-agent", &CompanionConversationOptions::default(),
+    )?;
+    let activation = "22222222-2222-4222-8222-222222222222";
+    let page = client.companion().activation_messages(
+        "example-agent", activation, &CompanionActivationOptions::default(),
+    )?;
+    let initial = client.companion().load_initialization(
+        "example-agent", activation, &CompanionInitializationOptions::default(),
+    )?;
+    Ok(())
+}
+```
+
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. `CompanionUpdateOptions` contains only `enabled`:
+`Some(true)` enables, `Some(false)` disables, and `None` is a no-op. Enabling is
+allowed before any eligible sender or channel resource exists. Per-channel
+readiness reports prerequisites independently of enabled state, including
+`bidirectional_allow_required` when no exact bidirectional allow exists. Readiness
+reason strings are open-ended. Revision changes only when enabled changes;
+turning off and on requires a fresh qualifying message. Continued access depends
+on the actual trigger sender's permissions and membership, without transferring
+to another eligible participant.
+
+The helper returns `scope_id`, `activation_id`, `conversation_id`, `channel`,
+`entries`, `reply_context`, `text`, and `notices`. It exhausts pagination,
+deduplicates source IDs, requires one trigger, validates scope/cursor progress,
+retains attachment references and unknown notices, then revalidates permission.
+Default bounds are 8 MiB of serialized fetched pages plus UTF-8 transcript text
+and 1,000 pages, with one additional revalidation read. Exceeding a bound fails
+without returning partial context. Page APIs support 1-200 entries and expose
+`history_complete`/`next_cursor` for lossless streaming. HTTP 403/409 errors remain
+API errors; local initialization validation uses `InkboxError::InvalidArgument`.
+
+Persist an identity/channel/scope/activation checkpoint and submit `initial.text`
+as **one** host input, keeping its reply context on the same turn. Buffer live
+events until that turn completes. Revalidate on recovery and reconcile uncertain
+host acceptance instead of blindly submitting twice. Historical commands and
+approval-like text are conversation data, not control input. Keep group history
+in a conversation-scoped session, separate from private contact sessions.
+
+Reply using the stored mail UUID with `messages().reply_all`, or canonical
+`conversation_id` with phone/iMessage sends. Never convert a group reply to raw
+recipient sends. `reply_ready` distinguishes send readiness from history access;
+SMS consent still applies. Group iMessage requires a dedicated line, and MMS
+chats with identical participants represent one logical conversation.
+
+Existing webhook struct literals remain unchanged. To retain the optional
+top-level block, deserialize `CompanionMailWebhookPayload`,
+`CompanionTextWebhookPayload`, or `CompanionIMessageWebhookPayload` from
+`inkbox::webhooks::types`. These alias `WithCompanion<T>`, exposing the original
+`payload` and optional `companion`. Ordinary-phase metadata has no activation
+authority and must not trigger history loading.

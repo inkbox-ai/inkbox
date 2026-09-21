@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
+from inkbox.contact_rules import ContactRuleDirection, _UNSET, _direction_fields, _rule_update
 
 from inkbox.phone.types import (
     PhoneContactRule,
@@ -50,8 +51,9 @@ class PhoneContactRulesResource:
         match_type: PhoneRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> list[PhoneContactRule]:
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = _direction_fields(direction)
         if action is not None:
             params["action"] = action.value if isinstance(action, PhoneRuleAction) else action
         if match_type is not None:
@@ -77,13 +79,14 @@ class PhoneContactRulesResource:
         action: PhoneRuleAction | str,
         match_target: str,
         match_type: PhoneRuleMatchType | str = PhoneRuleMatchType.EXACT_NUMBER,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> PhoneContactRule:
-        """Create a rule. Use :meth:`update` to change its allow/block action.
+        """Save or extend coverage; omitted direction applies to both sides.
 
-        Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
-        rule with the same ``(match_type, match_target)`` already exists.
+        Duplicate coverage raises :class:`DuplicateContactRuleError`.
         """
         body: dict[str, Any] = {
+            **_direction_fields(direction),
             "action": action.value if isinstance(action, PhoneRuleAction) else action,
             "match_type": (
                 match_type.value if isinstance(match_type, PhoneRuleMatchType) else match_type
@@ -98,12 +101,12 @@ class PhoneContactRulesResource:
         phone_number_id: UUID | str,
         rule_id: UUID | str,
         *,
-        action: PhoneRuleAction | str,
+        action: PhoneRuleAction | str | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
+        apply_to: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> PhoneContactRule:
-        """Update ``action`` (admin-only)."""
-        body = {
-            "action": action.value if isinstance(action, PhoneRuleAction) else action,
-        }
+        """Update action or coverage; apply_to changes only one covered side."""
+        body = _rule_update(action, direction, apply_to)
         data = self._http.patch(_rule_path(phone_number_id, rule_id), json=body)
         return PhoneContactRule._from_dict(data)
 
@@ -119,6 +122,7 @@ class PhoneContactRulesResource:
         match_type: PhoneRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> list[PhoneContactRule]:
         """Org-wide list of phone contact rules (admin-only).
 
@@ -127,7 +131,7 @@ class PhoneContactRulesResource:
             action: Filter by ``allow`` or ``block``.
             match_type: Filter by ``exact_number``.
         """
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = _direction_fields(direction)
         if phone_number_id is not None:
             params["phone_number_id"] = str(phone_number_id)
         if action is not None:

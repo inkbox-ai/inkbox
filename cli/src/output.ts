@@ -1,3 +1,6 @@
+import { format } from "node:util";
+import { commandOutput } from "./response-metadata.js";
+
 function formatValue(v: unknown): string {
   if (v === null || v === undefined) return "-";
   if (v instanceof Date) return v.toISOString().slice(0, 16).replace("T", " ");
@@ -44,6 +47,11 @@ export function printRecord(obj: Record<string, unknown>): void {
 }
 
 export function printJson(data: unknown): void {
+  const state = commandOutput.getStore();
+  if (state?.envelope) {
+    state.data = data ?? null;
+    return;
+  }
   console.log(
     JSON.stringify(
       data,
@@ -75,4 +83,9 @@ export function outputContactRules(
   opts: { json: boolean; columns: string[] },
 ): void {
   output(opts.json ? rows : rows.map((row) => ({ ...row, contact: row.contact?.preferredName ?? null })), opts);
+}
+
+/** Preserve status text unless a structured response envelope was requested. */
+export function printStatus(...values: unknown[]): void {
+  if (!commandOutput.getStore()?.envelope) process.stdout.write(`${format(...values)}\n`);
 }

@@ -14,6 +14,14 @@ use crate::http::HttpTransport;
 use crate::imessage::types::{IMessageContactRule, IMessageRuleAction, IMessageRuleMatchType};
 
 const ORG_BASE: &str = "/contact-rules";
+crate::contact_rules::directional_rule_methods!(
+    IMessageContactRulesResource,
+    IMessageContactRule,
+    IMessageRuleAction,
+    IMessageRuleMatchType,
+    "agent_identity_id",
+    &Uuid
+);
 
 /// Build the per-identity contact-rule path, optionally addressing a rule by id.
 fn rule_path(agent_handle: &str, rule_id: Option<&str>) -> String {

@@ -282,6 +282,7 @@ export interface IMessageMediaUpload {
 
 /** An allow/block rule scoped to an agent identity for iMessage. */
 export interface IMessageContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   contact?: Contact | null;
   id: string;
   agentIdentityId: string;
@@ -426,6 +427,7 @@ function parseCompatibilityNumberType(value: string): "dedicated_outbound" {
 }
 
 export interface RawIMessageContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   contact?: RawContact | null;
   id: string;
   agent_identity_id: string;
@@ -613,6 +615,7 @@ export function parseIMessageContactRule(
   r: RawIMessageContactRule,
 ): IMessageContactRule {
   return {
+    direction: r.direction ?? "both",
     contact: r.contact == null ? null : parseContact(r.contact),
     id: r.id,
     agentIdentityId: r.agent_identity_id,

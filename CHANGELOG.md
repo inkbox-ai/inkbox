@@ -4,6 +4,31 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.3 - Directional contact rules, Companion mode, and response notices
+
+### Added
+
+- Companion mode configuration, paged conversation state, and typed activation history through `client.companion` in Python/TypeScript and `client.companion()` in Rust.
+- Complete initialization helpers: Python/Rust `load_initialization`, TypeScript `loadInitialization`. They validate scope and cursor progress, deduplicate source messages, require one sponsor trigger, preserve attachment references and notices, and revalidate access before returning one combined transcript. Byte/page limits fail explicitly without truncation.
+- Optional Companion metadata on received webhooks. Rust provides additive `WithCompanion<T>` and `CompanionMailWebhookPayload`, `CompanionTextWebhookPayload`, and `CompanionIMessageWebhookPayload` aliases without changing existing payload literals.
+- CLI `identity companion get`, `update`, `conversations` (`state`), `history`, and `initialization`, including paged JSON and explicit opt-in configuration.
+- Independent inbound and outbound email/phone filter modes, with phone permissions shared by calls, SMS, and iMessage.
+- Directional contact-rule creation, filtering, and updates across Python, TypeScript, Rust, and the CLI. Atomic one-sided edits preserve the opposite direction, and consolidated rules retain usable earlier IDs.
+- Separate receiving and sending permissions for saved contact addresses, including creation, access settings, permission maps, and previews.
+- Optional structured response notices, per-response observers, and scoped response-metadata access without changing existing SDK return types or errors.
+- CLI `--direction`, `--apply-to`, directional mode flags, and opt-in `--json --with-response-metadata` output. Ordinary JSON output remains unchanged; notices use stderr by default.
+- Additive Rust options and enriched response types that preserve existing method signatures and response struct literals.
+
+### Changed
+
+- **Source-contract change in unreleased 0.7.3:** Companion updates now accept only `enabled`. Remove `CompanionSponsor` imports and `sponsor` arguments/options in Python, TypeScript, and Rust, and remove CLI `--sponsor`. Configuration responses no longer expose a sponsor field to administrators or agents. Existing activation history, webhook metadata, and reply context remain unchanged.
+- Companion eligibility comes from active exact email/number allow rules covering both directions, per normalized identifier and channel. Multiple senders may qualify; the first qualifying group message activates the conversation without repeated initialization. Domain/default access, contact visibility, and borrowed Companion access do not qualify. Enabling can precede any eligible sender or channel resource; readiness reports prerequisites independently, including `bidirectional_allow_required`.
+- Companion history and initialization normalize UUID letter case when matching activations, reply scopes, and source messages in Python, TypeScript, and the CLI.
+- Existing shared filter-mode writes still set both directions. Legacy mode reads show the common effective mode when directions agree, or the shared baseline when they differ.
+- Legacy contactable values describe sending permission; new fields report receiving and sending separately. Either direction can contribute to contact visibility under the existing visibility settings.
+- Shared-line iMessage connection setup requires permission in both directions without granting new communication access.
+- Missing directional preview permissions remain unspecified when an earlier response reports only contact visibility.
+
 ## 0.7.2 — Voicemail handling on outbound calls
 
 ### Added

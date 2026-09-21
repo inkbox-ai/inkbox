@@ -18,6 +18,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import { type RuleDirection, ruleUpdateToWire } from "../../contact_rules.js";
 import {
   PhoneIdentityContactRule,
   PhoneRuleAction,
@@ -34,6 +35,7 @@ function rulePath(agentHandle: string, ruleId?: string): string {
 }
 
 export interface ListPhoneIdentityContactRulesOptions {
+  direction?: RuleDirection;
   action?: PhoneRuleAction;
   matchType?: PhoneRuleMatchType;
   limit?: number;
@@ -41,16 +43,20 @@ export interface ListPhoneIdentityContactRulesOptions {
 }
 
 export interface CreatePhoneIdentityContactRuleOptions {
+  direction?: RuleDirection;
   action: PhoneRuleAction;
   matchTarget: string;
   matchType?: PhoneRuleMatchType;
 }
 
 export interface UpdatePhoneIdentityContactRuleOptions {
-  action: PhoneRuleAction;
+  action?: PhoneRuleAction;
+  direction?: RuleDirection;
+  applyTo?: "inbound" | "outbound";
 }
 
 export interface ListAllPhoneIdentityContactRulesOptions {
+  direction?: RuleDirection;
   agentIdentityId?: string;
   action?: PhoneRuleAction;
   matchType?: PhoneRuleMatchType;
@@ -70,6 +76,7 @@ export class PhoneIdentityContactRulesResource {
     options: ListPhoneIdentityContactRulesOptions = {},
   ): Promise<PhoneIdentityContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;
     if (options.limit !== undefined) params.limit = options.limit;
@@ -92,8 +99,8 @@ export class PhoneIdentityContactRulesResource {
    * Create a rule for an agent identity.
    * Requires admin credentials; channel provisioning is not required.
    *
-   * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
-   *   the same `(matchType, matchTarget)` already exists.
+   * Compatible coverage may widen an existing rule and retain its ID.
+   * @throws {DuplicateContactRuleError} 409 when the coverage already exists.
    */
   async create(
     agentHandle: string,
@@ -104,6 +111,7 @@ export class PhoneIdentityContactRulesResource {
       match_type: options.matchType ?? PhoneRuleMatchType.EXACT_NUMBER,
       match_target: options.matchTarget,
     };
+    if (options.direction !== undefined) body.direction = options.direction;
     const data = await this.http.post<RawPhoneIdentityContactRule>(
       rulePath(agentHandle),
       body,
@@ -111,13 +119,13 @@ export class PhoneIdentityContactRulesResource {
     return parsePhoneIdentityContactRule(data);
   }
 
-  /** Update `action` (admin-only). */
+  /** Update action or coverage, or atomically edit one covered side (admin-only). */
   async update(
     agentHandle: string,
     ruleId: string,
     options: UpdatePhoneIdentityContactRuleOptions,
   ): Promise<PhoneIdentityContactRule> {
-    const body = { action: options.action };
+    const body = ruleUpdateToWire(options);
     const data = await this.http.patch<RawPhoneIdentityContactRule>(
       rulePath(agentHandle, ruleId),
       body,
@@ -135,6 +143,7 @@ export class PhoneIdentityContactRulesResource {
     options: ListAllPhoneIdentityContactRulesOptions = {},
   ): Promise<PhoneIdentityContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.agentIdentityId !== undefined) params.agent_identity_id = options.agentIdentityId;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;

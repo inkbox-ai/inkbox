@@ -9,6 +9,7 @@ import {
 } from "@inkbox/sdk";
 import type { Command } from "commander";
 import { getGlobalOpts } from "./client.js";
+import { commandOutput, diagnosticJson, finishCommandOutput, noticeFields, renderNotices, validateMetadataOutput } from "./response-metadata.js";
 
 function importAlreadyInFlight(err: InkboxAPIError): boolean {
   return (
@@ -40,7 +41,8 @@ function wantsJson(command: unknown): boolean {
 
 function renderJsonError(err: unknown): void {
   if (err instanceof InkboxAPIError) {
-    console.error(JSON.stringify({
+    console.error(diagnosticJson({
+      ...noticeFields(),
       error: {
         type: err.name,
         message: renderDetail(err.detail),
@@ -53,73 +55,80 @@ function renderJsonError(err: unknown): void {
     return;
   }
   if (err instanceof Error) {
-    console.error(JSON.stringify({ error: { type: err.name, message: err.message } }));
+    console.error(diagnosticJson({ error: { type: err.name, message: err.message }, ...noticeFields() }));
     return;
   }
-  console.error(JSON.stringify({ error: { type: "UnknownError", message: "An unknown error occurred." } }));
+  console.error(diagnosticJson({ error: { type: "UnknownError", message: "An unknown error occurred." }, ...noticeFields() }));
 }
 
 export function withErrorHandler<T extends unknown[]>(
   fn: (...args: T) => Promise<void>,
 ): (...args: T) => Promise<void> {
   return async function (this: unknown, ...args: T) {
-    try {
-      await fn.call(this, ...args);
-    } catch (err) {
-      if (wantsJson(this)) {
-        renderJsonError(err);
-      } else if (err instanceof DuplicateContactRuleError) {
-        console.error(
-          `Error: HTTP ${err.statusCode}: duplicate rule (existing_rule_id=${err.existingRuleId})`,
-        );
-      } else if (err instanceof RedundantContactAccessGrantError) {
-        console.error(
-          `Error: HTTP ${err.statusCode}: redundant grant — ${err.detailMessage}`,
-        );
-      } else if (err instanceof StorageLimitExceededError) {
-        console.error(
-          `Error: HTTP ${err.statusCode}: ${err.detailMessage || renderDetail(err.detail)}`,
-        );
-        console.error(
-          "Hint: Free space with 'inkbox email delete <message-id> -i <handle>' " +
-            "or 'inkbox email delete-thread <thread-id> -i <handle>' " +
-            "(reclaim is immediate), or upgrade the plan" +
-            (err.upgradeUrl ? `: ${err.upgradeUrl}` : "."),
-        );
-      } else if (err instanceof MailImportQuotaExceededError) {
-        console.error(`Error: HTTP ${err.statusCode}: ${err.detailMessage || renderDetail(err.detail)}`);
-        if (err.retryAfterSeconds !== null) {
-          console.error(`Hint: Retry in ${err.retryAfterSeconds} seconds.`);
-        }
-      } else if (err instanceof InkboxAPIError) {
-        console.error(`Error: HTTP ${err.statusCode}: ${renderDetail(err.detail)}`);
-        if (err.retryAfterSeconds !== null) {
-          console.error(`Hint: Retry in ${err.retryAfterSeconds} seconds.`);
-        }
-        if (err.statusCode === 401) {
-          console.error("Hint: Check your API key.");
-        }
-        if (importAlreadyInFlight(err)) {
+    const command = this && typeof (this as Command).opts === "function" ? this as Command : undefined;
+    const opts = command ? getGlobalOpts(command) : {};
+    return commandOutput.run({ json: !!opts.json, envelope: !!opts.withResponseMetadata, notices: [], data: null }, async () => {
+      try {
+        validateMetadataOutput(command);
+        await fn.call(this, ...args);
+        finishCommandOutput();
+      } catch (err) {
+        if (wantsJson(this)) {
+          renderJsonError(err);
+        } else if (err instanceof DuplicateContactRuleError) {
           console.error(
-            "Hint: List the mailbox's jobs with 'inkbox mailbox imports list <email>' " +
-              "and release an abandoned one with 'inkbox mailbox imports cancel <email> <job-id>'.",
+            `Error: HTTP ${err.statusCode}: duplicate rule (existing_rule_id=${err.existingRuleId})`,
           );
+        } else if (err instanceof RedundantContactAccessGrantError) {
+          console.error(
+            `Error: HTTP ${err.statusCode}: redundant grant — ${err.detailMessage}`,
+          );
+        } else if (err instanceof StorageLimitExceededError) {
+          console.error(
+            `Error: HTTP ${err.statusCode}: ${err.detailMessage || renderDetail(err.detail)}`,
+          );
+          console.error(
+            "Hint: Free space with 'inkbox email delete <message-id> -i <handle>' " +
+              "or 'inkbox email delete-thread <thread-id> -i <handle>' " +
+              "(reclaim is immediate), or upgrade the plan" +
+              (err.upgradeUrl ? `: ${err.upgradeUrl}` : "."),
+          );
+        } else if (err instanceof MailImportQuotaExceededError) {
+          console.error(`Error: HTTP ${err.statusCode}: ${err.detailMessage || renderDetail(err.detail)}`);
+          if (err.retryAfterSeconds !== null) {
+            console.error(`Hint: Retry in ${err.retryAfterSeconds} seconds.`);
+          }
+        } else if (err instanceof InkboxAPIError) {
+          console.error(`Error: HTTP ${err.statusCode}: ${renderDetail(err.detail)}`);
+          if (err.retryAfterSeconds !== null) {
+            console.error(`Hint: Retry in ${err.retryAfterSeconds} seconds.`);
+          }
+          if (err.statusCode === 401) {
+            console.error("Hint: Check your API key.");
+          }
+          if (importAlreadyInFlight(err)) {
+            console.error(
+              "Hint: List the mailbox's jobs with 'inkbox mailbox imports list <email>' " +
+                "and release an abandoned one with 'inkbox mailbox imports cancel <email> <job-id>'.",
+            );
+          }
+        } else if (err instanceof InkboxVaultKeyError) {
+          console.error(`Error: ${err.message}`);
+          console.error(
+            "Hint: Set INKBOX_VAULT_KEY or pass --vault-key.",
+          );
+        } else if (err instanceof InkboxError) {
+          console.error(`Error: ${err.message}`);
+        } else if (err instanceof Error) {
+          console.error(`Error: ${err.message}`);
+        } else {
+          console.error("An unknown error occurred.");
         }
-      } else if (err instanceof InkboxVaultKeyError) {
-        console.error(`Error: ${err.message}`);
-        console.error(
-          "Hint: Set INKBOX_VAULT_KEY or pass --vault-key.",
-        );
-      } else if (err instanceof InkboxError) {
-        console.error(`Error: ${err.message}`);
-      } else if (err instanceof Error) {
-        console.error(`Error: ${err.message}`);
-      } else {
-        console.error("An unknown error occurred.");
+        if (!wantsJson(this) && err instanceof InkboxAPIError) renderAgentSupport(err);
+        if (!wantsJson(this)) renderNotices();
+        // Allow piped stderr to drain before exiting, including large JSON errors.
+        process.exitCode = 1;
       }
-      if (!wantsJson(this) && err instanceof InkboxAPIError) renderAgentSupport(err);
-      // Allow piped stderr to drain before exiting, including large JSON errors.
-      process.exitCode = 1;
-    }
+    });
   };
 }

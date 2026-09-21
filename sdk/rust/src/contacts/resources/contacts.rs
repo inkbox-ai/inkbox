@@ -219,6 +219,43 @@ impl ContactsResource {
 
     /// Create a new contact.
     pub fn create(&self, params: &CreateContactParams) -> Result<Contact> {
+        self.create_with_access_options(params, None)
+    }
+
+    /// Create a contact with atomic directional access choices.
+    pub fn create_with_access_options(
+        &self,
+        params: &CreateContactParams,
+        permissions: Option<&crate::contacts::DirectionalContactCreatePermissions>,
+    ) -> Result<Contact> {
+        if let Some(permissions) = permissions {
+            permissions.access.validate()?;
+        }
+        self.create_with_permissions_value(
+            params,
+            permissions.map(serde_json::to_value).transpose()?,
+        )
+    }
+
+    pub fn create_with_permission_options(
+        &self,
+        params: &CreateContactParams,
+        permissions: &crate::contacts::DirectionalContactInitialPermissions,
+    ) -> Result<Contact> {
+        permissions.permissions.validate()?;
+        self.create_with_permissions_value(params, Some(serde_json::to_value(permissions)?))
+    }
+
+    fn create_with_permissions_value(
+        &self,
+        params: &CreateContactParams,
+        permissions: Option<Value>,
+    ) -> Result<Contact> {
+        if permissions.is_some() && params.permissions.is_some() {
+            return Err(InkboxError::InvalidArgument(
+                "supply only one creation permissions object".into(),
+            ));
+        }
         let mut body = Map::new();
         // Scalar fields: emit only when present.
         insert_opt_str(&mut body, "preferred_name", &params.preferred_name);
@@ -267,7 +304,10 @@ impl ContactsResource {
                 .map_err(|message| InkboxError::InvalidArgument(message.into()))?;
             body.insert("permissions".into(), serde_json::to_value(permissions)?);
         }
-        let path = if params.permissions.is_some() {
+        if let Some(permissions) = &permissions {
+            body.insert("permissions".into(), permissions.clone());
+        }
+        let path = if params.permissions.is_some() || permissions.is_some() {
             "/contacts/with-permissions"
         } else {
             BASE

@@ -1,4 +1,5 @@
 import { Command } from "commander";
+import { printStatus } from "../output.js";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output } from "../output.js";
 import { withErrorHandler } from "../errors.js";
@@ -51,7 +52,7 @@ function registerNotesAccessCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.notes.access.revoke(noteId, identityId);
-        console.log(`Revoked identity ${identityId} on note ${noteId}.`);
+        printStatus(`Revoked identity ${identityId} on note ${noteId}.`);
       }),
     );
 }
@@ -159,7 +160,7 @@ export function registerNotesCommands(program: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.notes.delete(noteId);
-        console.log(`Deleted note ${noteId}.`);
+        printStatus(`Deleted note ${noteId}.`);
       }),
     );
 

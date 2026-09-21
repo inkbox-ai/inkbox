@@ -10,6 +10,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import { type RuleDirection, ruleUpdateToWire } from "../../contact_rules.js";
 import {
   MailContactRule,
   MailRuleAction,
@@ -27,6 +28,7 @@ function rulePath(emailAddress: string, ruleId?: string): string {
 }
 
 export interface ListMailContactRulesOptions {
+  direction?: RuleDirection;
   action?: MailRuleAction;
   matchType?: MailRuleMatchType;
   limit?: number;
@@ -34,16 +36,20 @@ export interface ListMailContactRulesOptions {
 }
 
 export interface CreateMailContactRuleOptions {
+  direction?: RuleDirection;
   action: MailRuleAction;
   matchType: MailRuleMatchType;
   matchTarget: string;
 }
 
 export interface UpdateMailContactRuleOptions {
-  action: MailRuleAction;
+  action?: MailRuleAction;
+  direction?: RuleDirection;
+  applyTo?: "inbound" | "outbound";
 }
 
 export interface ListAllMailContactRulesOptions {
+  direction?: RuleDirection;
   mailboxId?: string;
   action?: MailRuleAction;
   matchType?: MailRuleMatchType;
@@ -59,6 +65,7 @@ export class MailContactRulesResource {
     options: ListMailContactRulesOptions = {},
   ): Promise<MailContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;
     if (options.limit !== undefined) params.limit = options.limit;
@@ -86,6 +93,7 @@ export class MailContactRulesResource {
       match_type: options.matchType,
       match_target: options.matchTarget,
     };
+    if (options.direction !== undefined) body.direction = options.direction;
     const data = await this.http.post<RawMailContactRule>(
       rulePath(emailAddress),
       body,
@@ -98,7 +106,7 @@ export class MailContactRulesResource {
     ruleId: string,
     options: UpdateMailContactRuleOptions,
   ): Promise<MailContactRule> {
-    const body = { action: options.action };
+    const body = ruleUpdateToWire(options);
     const data = await this.http.patch<RawMailContactRule>(
       rulePath(emailAddress, ruleId),
       body,
@@ -114,6 +122,7 @@ export class MailContactRulesResource {
     options: ListAllMailContactRulesOptions = {},
   ): Promise<MailContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.mailboxId !== undefined) params.mailbox_id = options.mailboxId;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;

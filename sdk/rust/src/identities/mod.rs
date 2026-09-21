@@ -10,9 +10,11 @@
 //! surface. The per-identity facade with convenience methods lives at
 //! [`crate::agent_identity::AgentIdentity`].
 
+pub mod directional;
 pub mod exceptions;
 pub mod resources;
 pub mod types;
+pub use directional::*;
 
 // Re-export the public types.
 pub use types::{

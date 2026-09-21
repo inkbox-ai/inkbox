@@ -10,6 +10,92 @@ pip install inkbox
 
 Requires Python ≥ 3.11.
 
+## Companion mode
+
+Companion mode is off by default, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient. Blocks and existing sending requirements still apply.
+
+```python
+from inkbox import ContactRuleDirection, Inkbox
+
+with Inkbox() as client:
+    config = client.companion.get("example-agent")
+    # Administrator credentials are required for both writes.
+    client.mail_identity_contact_rules.create(
+        "example-agent", action="allow", match_type="exact_email",
+        match_target="trusted@example.com", direction=ContactRuleDirection.BOTH,
+    )
+    config = client.companion.update("example-agent", enabled=True)
+    # trusted@example.com sends "Please join this conversation" to the group.
+    states = client.companion.conversations("example-agent", channel="mail", limit=50, offset=0)
+```
+
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. Only `enabled` can be updated; omission is a no-op, and
+`None` or unknown keywords are rejected locally. Enabling is allowed before any
+eligible sender or channel resource exists. Per-channel readiness reports
+prerequisites independently of enabled state, including
+`bidirectional_allow_required` when no exact bidirectional allow exists. Readiness
+reason strings are open-ended. Revision changes only when enabled changes;
+turning off and on requires a fresh qualifying message.
+
+Continued access depends on the actual trigger sender's permissions and membership,
+without transferring to another eligible participant. Conversation state reports
+`reply_ready` separately from history access, including SMS consent requirements.
+A group does not authorize private messages or another group. Group iMessage
+requires a dedicated line; identical-participant MMS chats are one conversation.
+
+For an authenticated initialization/live webhook, use its `activation_id`:
+
+```python
+activation_id = "22222222-2222-4222-8222-222222222222"
+with Inkbox() as client:
+    initial = client.companion.load_initialization(
+        "example-agent", activation_id, max_bytes=8 * 1024 * 1024,
+    )
+    # Queue initial.text once, keeping initial.reply_context on that same turn.
+    reply = initial.reply_context
+    if reply.channel == "mail":
+        client.messages.reply_all(
+            "example-agent@example.com", reply.reply_to_message_id,
+            body_text="Thanks, I have the conversation context.",
+        )
+```
+
+The stored mail parent is a message UUID, not an RFC Message-ID. Use `reply_all`
+with that parent. For phone/iMessage use `texts.send(..., conversation_id=...)`
+or `imessages.send(..., conversation_id=...)` with the canonical conversation.
+Do not convert group replies into raw-address sends. The server rechecks the
+actual reply audience and current permission; an out-of-scope reply fails.
+
+The helper returns `scope_id`, `activation_id`, `conversation_id`, `channel`,
+`entries`, `reply_context`, one combined `text`, and `notices`. It preserves
+server order and attachment references, deduplicates identical source IDs, and
+requires exactly one trigger. It exhausts pages and performs a final authorized
+read. The default limits are 8 MiB of serialized fetched pages plus UTF-8
+transcript text and 1,000 pages, with one additional revalidation request. Set
+`max_bytes`/`max_pages` explicitly for larger supported host inputs. Exceeding a
+bound raises `CompanionInitializationError`; 403/409 responses remain API errors.
+For lossless streaming use
+`client.companion.activation_messages(handle, activation_id, limit=100, cursor=...)`.
+Pages expose `history_complete` and `next_cursor`; page sizes are 1-200.
+
+Persist a checkpoint keyed by identity, channel, scope, and activation before
+submitting **one** host input. Buffer live events until initialization completes.
+On retries, revalidate through the helper; reconcile uncertain host acceptance
+instead of blindly submitting again. Historical `/clear`, `YES`, and similar
+text is conversation data, never a fresh command or approval. Ordinary-phase
+webhooks have no activation authority and use a separate conversation-scoped
+session. Keep Companion context out of private contact sessions. Notices may
+describe unavailable history; unknown notice codes/levels are preserved.
+
 ## Authentication
 
 You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://inkbox.ai/console).
@@ -1556,6 +1642,119 @@ async def text_hook(request: Request):
 Wire shapes are intentionally **snake_case** (the raw JSON body, not the SDK's parsed dataclasses) so `json.loads(body)` round-trips into the `TypedDict` without a transformer. Enum-valued fields like `direction`, `status`, and `delivery_status` are `Literal[...]` string unions rather than the SDK's `StrEnum`s — `json.loads` produces bare strings, and `Literal` unions narrow cleanly under mypy / pyright.
 
 ---
+
+## Directional contact rules
+
+Requires SDK `0.7.3` or later.
+
+Email and phone policies have independent inbound (receive) and outbound (send)
+settings. Phone policy also applies to iMessage. Management requires admin
+credentials.
+
+```python
+from inkbox import ContactChannelAccessUpdate, ContactRuleDirection
+
+agent = inkbox.get_identity("support-agent")
+agent.update(
+    mail_inbound_filter_mode="blacklist",
+    mail_outbound_filter_mode="whitelist",
+)
+rule = agent.create_mail_contact_rule(
+    action="allow",
+    match_type="exact_email",
+    match_target="x@example.com",
+    direction=ContactRuleDirection.OUTBOUND,
+)
+agent.update_mail_contact_rule(rule.id, direction="both")
+agent.update_mail_contact_rule(rule.id, action="block", apply_to="inbound")
+rules = agent.list_mail_contact_rules(direction="outbound")
+
+inkbox.contacts.access.update(
+    agent.agent_handle,
+    contact_id,
+    email=ContactChannelAccessUpdate(inbound_contactable=["x@example.com"]),
+)
+```
+
+- `direction` is optional on `create`, `list`, `list_all`, and `update` across
+  `mail_identity_contact_rules`, `phone_identity_contact_rules`,
+  `imessage_contact_rules`, and the legacy `mail_contact_rules` and
+  `phone_contact_rules` resources. Omitted create direction means `both`;
+  omitted update direction preserves coverage. An action-only update changes
+  the rule across its current coverage. A direction-only update is valid.
+- `apply_to="inbound"` or `"outbound"` with `action` edits one covered side
+  atomically while preserving the other. It cannot be combined with `direction`.
+  Refresh the list after an edit to see any resulting split or consolidation.
+- Inbound/outbound list filters include `both` rules; `direction="both"` selects
+  only bidirectional rules. A2A retains its separate exact-direction filtering.
+- Matching rules can consolidate. Use the returned ID and direction rather than
+  assuming every create allocates a new ID. Previously issued IDs continue to
+  address the consolidated logical rule. Duplicate requests still raise
+  `DuplicateContactRuleError`.
+- Identities expose `mail_inbound_filter_mode`, `mail_outbound_filter_mode`,
+  `phone_inbound_filter_mode`, and `phone_outbound_filter_mode`. The existing
+  `mail_filter_mode`, `phone_filter_mode`, and `imessage_filter_mode` writes set
+  both directions. Do not mix shared and directional writes for the same channel.
+  Shared reads report the common effective mode when equal, otherwise the legacy
+  baseline. Older responses fall back to their shared modes and `both` rules.
+- Contact groups expose `inbound_contactable` and `outbound_contactable`.
+  Legacy `contactable` reads mean outbound permission; legacy writes affect both
+  directions. Omit unchanged lists; an empty list denies that direction for all
+  current addresses. Null lists and mixing legacy/directional lists are invalid.
+  These group options also work in `ContactCreatePermissions`.
+- `ContactAddressUpdate` accepts `direction`, `expected_inbound_action`, and
+  `expected_outbound_action` for communication-policy edits. Opposite directions
+  can be edited in one request. Use both expected actions when editing a split
+  pair to `both`, together with the observed revision.
+
+Receiving permission does not imply permission to reply. Shared-line iMessage
+connection setup requires permission in both directions and does not grant it.
+Directional operations require an API version supporting these fields.
+
+## Response notices
+
+Existing resource methods retain their return types. To receive optional advisory
+metadata alongside any result, use a scoped operation:
+
+```python
+result = inkbox.with_response_metadata(
+    lambda scoped: scoped.mail_identity_contact_rules.list("support-agent")
+)
+rules = result.data
+for notice in result.notices or []:
+    print(notice.code, notice.level, notice.message)
+```
+
+`APIResponse[T]` contains the original `data` and optional
+`list[ResponseNotice]`. Empty results such as deletes keep `data=None`.
+Each notice has open-string `code`, `level`, and `message` fields, so unfamiliar
+codes and levels remain available.
+
+An optional observer receives `ResponseMetadata` once per completed HTTP response,
+including failed requests, downloads, and bodyless responses:
+
+```python
+from inkbox import Inkbox, ResponseMetadata
+
+def observe(metadata: ResponseMetadata) -> None:
+    for notice in metadata.notices or []:
+        print(notice.message)
+
+inkbox = Inkbox(response_observer=observe)
+```
+
+The SDK stays silent by default. Notices prefer the `Inkbox-Notices` response
+header, with top-level body fallback only on declared metadata contracts. Nested
+user content is never treated as metadata. Missing, null, and empty notices become
+`None`; malformed entries are ignored. Notices and observer failures do not change
+API errors or retry a completed request.
+
+The callback must use the supplied scoped client and consume any paginated
+iterator within the callback. Notices are deduplicated across its requests.
+Concurrent and nested scopes collect independently; connections, cookies, and
+unlocked vault state are shared without extra requests or another unlock.
+Standalone signup and invitation-preview class methods accept their own
+`response_observer` argument because they do not use an existing client.
 
 ## API errors
 

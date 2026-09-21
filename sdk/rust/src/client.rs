@@ -19,6 +19,7 @@ use crate::agent_signup::types::{
     AgentSignupVerifyResponse,
 };
 use crate::api_keys::resources::api_keys::ApiKeysResource;
+use crate::companion::CompanionResource;
 use crate::contacts::resources::contacts::ContactsResource;
 use crate::cookies::CookieJar;
 use crate::error::{parse_agent_support, InkboxError, Result};
@@ -74,9 +75,18 @@ pub struct InkboxBuilder {
     timeout_secs: f64,
     vault_key: Option<String>,
     user_agent_prefix: Option<String>,
+    response_observer: Option<crate::ResponseObserver>,
 }
 
 impl InkboxBuilder {
+    /// Observe every completed response without changing resource return types.
+    pub fn response_observer(
+        mut self,
+        observer: impl Fn(&crate::ResponseMetadata) + Send + Sync + 'static,
+    ) -> Self {
+        self.response_observer = Some(Arc::new(observer));
+        self
+    }
     /// Override the API base URL (self-hosting / tests). Must be HTTPS unless
     /// the host is `localhost` / `127.0.0.1`.
     pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
@@ -112,6 +122,7 @@ impl InkboxBuilder {
             self.timeout_secs,
             self.vault_key,
             self.user_agent_prefix,
+            self.response_observer,
         )
     }
 }
@@ -160,6 +171,7 @@ pub struct Inkbox {
     // Vault / contacts / notes
     vault: VaultResource,
     contacts: ContactsResource,
+    companion: CompanionResource,
     notes: NotesResource,
 
     // Org-level
@@ -190,6 +202,7 @@ impl Inkbox {
             timeout_secs: default_timeout(),
             vault_key: None,
             user_agent_prefix: None,
+            response_observer: None,
         }
     }
 
@@ -223,46 +236,50 @@ impl Inkbox {
         timeout: f64,
         vault_key: Option<String>,
         user_agent_prefix: Option<String>,
+        response_observer: Option<crate::ResponseObserver>,
     ) -> Result<Arc<Self>> {
         validate_base_url(&base_url)?;
         let trimmed = base_url.trim_end_matches('/');
         let api_base = format!("{trimmed}/api");
-        let api_root = format!("{trimmed}/api/v1");
         let jar = Arc::new(CookieJar::new());
         let user_agent = sdk_user_agent(user_agent_prefix.as_deref());
-
-        // One transport per sub-base, mirroring client.py.
-        let mk = |suffix: &str| -> Result<Arc<HttpTransport>> {
-            Ok(Arc::new(HttpTransport::new(
-                &api_key,
-                suffix.to_string(),
-                timeout,
-                jar.clone(),
-                &user_agent,
-            )?))
-        };
-        let mail_http = mk(&format!("{api_root}/mail"))?;
-        let contacts_http = mk(&api_root)?;
-        let phone_http = mk(&format!("{api_root}/phone"))?;
-        let imessage_http = mk(&format!("{api_root}/imessage"))?;
-        let ids_http = mk(&format!("{api_root}/identities"))?;
-        let vault_http = mk(&format!("{api_root}/vault"))?;
-        let domains_http = mk(&format!("{api_root}/domains"))?;
-        let root_api_http = mk(&api_base)?;
-        let api_http = mk(&api_root)?;
-        let public_http = mk(trimmed)?;
-
-        let vault = VaultResource::new(vault_http, root_api_http.clone());
+        let mut root = HttpTransport::new(&api_key, api_base, timeout, jar, &user_agent)?;
+        root.response_context.observer = response_observer;
+        let client = Self::from_transport(api_key, trimmed.to_string(), Arc::new(root), None);
         if let Some(key) = vault_key.as_deref() {
-            // Unlock the whole vault at construction (no identity filter), so
-            // `identity.credentials()` is immediately available — matching the
-            // Python `vault_key=` kwarg behaviour.
-            vault.unlock(key, None)?;
+            client.vault.unlock(key, None)?;
         }
+        Ok(client)
+    }
+
+    fn from_transport(
+        api_key: String,
+        base_url: String,
+        root_api_http: Arc<HttpTransport>,
+        previous_vault: Option<&VaultResource>,
+    ) -> Arc<Self> {
+        let trimmed = base_url.as_str();
+        let api_root = format!("{trimmed}/api/v1");
+        let mk = |suffix: &str| {
+            root_api_http.scoped(suffix.to_string(), root_api_http.response_context.clone())
+        };
+        let mail_http = mk(&format!("{api_root}/mail"));
+        let contacts_http = mk(&api_root);
+        let phone_http = mk(&format!("{api_root}/phone"));
+        let imessage_http = mk(&format!("{api_root}/imessage"));
+        let ids_http = mk(&format!("{api_root}/identities"));
+        let vault_http = mk(&format!("{api_root}/vault"));
+        let domains_http = mk(&format!("{api_root}/domains"));
+        let api_http = mk(&api_root);
+        let public_http = mk(trimmed);
+        let vault = match previous_vault {
+            Some(vault) => vault.scoped(vault_http, root_api_http.clone()),
+            None => VaultResource::new(vault_http, root_api_http.clone()),
+        };
 
         // `Arc::new_cyclic` hands the tunnels resource a `Weak<Inkbox>` so it
         // can launch the runtime against this client without a refcount cycle.
-        let inkbox = Arc::new_cyclic(|weak: &Weak<Inkbox>| Inkbox {
+        Arc::new_cyclic(|weak: &Weak<Inkbox>| Inkbox {
             mailboxes: MailboxesResource::new(mail_http.clone()),
             messages: MessagesResource::new(mail_http.clone()),
             drafts: DraftsResource::new(mail_http.clone()),
@@ -289,6 +306,7 @@ impl Inkbox {
 
             vault,
             contacts: ContactsResource::new(contacts_http.clone()),
+            companion: CompanionResource::new(api_http.clone()),
             notes: NotesResource::new(contacts_http.clone()),
 
             signing_keys: SigningKeysResource::new(api_http.clone()),
@@ -302,8 +320,35 @@ impl Inkbox {
             root_api_http: root_api_http.clone(),
             api_key: api_key.clone(),
             base_url: trimmed.to_string(),
-        });
-        Ok(inkbox)
+        })
+    }
+
+    /// Collect this callback's notices. Use only the supplied client inside it.
+    /// Nested scopes collect independently; errors keep their existing variants.
+    pub fn with_response_metadata<T>(
+        &self,
+        operation: impl FnOnce(&Arc<Self>) -> Result<T>,
+    ) -> Result<crate::APIResponse<T>> {
+        let collector = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let context = crate::response_metadata::ResponseContext {
+            observer: self.root_api_http.response_context.observer.clone(),
+            collector: Some(collector.clone()),
+        };
+        let root = self
+            .root_api_http
+            .scoped(format!("{}/api", self.base_url), context);
+        let scoped = Self::from_transport(
+            self.api_key.clone(),
+            self.base_url.clone(),
+            root,
+            Some(&self.vault),
+        );
+        let data = operation(&scoped)?;
+        let notices = collector.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        Ok(crate::APIResponse {
+            data,
+            notices: (!notices.is_empty()).then_some(notices),
+        })
     }
 
     /// The API key this client authenticates with. Held for the tunnel-agent
@@ -321,6 +366,9 @@ impl Inkbox {
 
     pub fn mailboxes(&self) -> &MailboxesResource {
         &self.mailboxes
+    }
+    pub fn companion(&self) -> &CompanionResource {
+        &self.companion
     }
     pub fn messages(&self) -> &MessagesResource {
         &self.messages
@@ -561,6 +609,19 @@ impl Inkbox {
     pub fn get_identity(self: &Arc<Self>, agent_handle: &str) -> Result<AgentIdentity> {
         let data = self.identities.get(agent_handle)?;
         Ok(AgentIdentity::new(data, self.clone()))
+    }
+
+    pub fn get_identity_with_options(
+        &self,
+        agent_handle: &str,
+    ) -> Result<crate::identities::DirectionalAgentIdentityData> {
+        self.identities.get_with_options(agent_handle)
+    }
+
+    pub fn list_identities_with_options(
+        &self,
+    ) -> Result<Vec<crate::identities::DirectionalAgentIdentitySummary>> {
+        self.identities.list_with_options()
     }
 
     /// List identities visible to this credential.

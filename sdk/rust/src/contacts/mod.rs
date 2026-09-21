@@ -1,8 +1,10 @@
 //! Org-scoped contacts, memory, correspondence, and vCard import/export.
 
 pub mod correspondence;
+pub mod directional;
 pub mod resources;
 pub mod types;
+pub use directional::*;
 
 pub use correspondence::{
     CallCorrespondenceItem, ContactCorrespondence, CorrespondenceAttachmentMetadata,

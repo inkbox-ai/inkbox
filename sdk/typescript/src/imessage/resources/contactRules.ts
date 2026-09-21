@@ -9,6 +9,7 @@
  */
 
 import { HttpTransport } from "../../_http.js";
+import { type RuleDirection, ruleUpdateToWire } from "../../contact_rules.js";
 import {
   IMessageContactRule,
   IMessageRuleAction,
@@ -25,6 +26,7 @@ function rulePath(agentHandle: string, ruleId?: string): string {
 }
 
 export interface ListIMessageContactRulesOptions {
+  direction?: RuleDirection;
   action?: IMessageRuleAction;
   matchType?: IMessageRuleMatchType;
   limit?: number;
@@ -32,16 +34,20 @@ export interface ListIMessageContactRulesOptions {
 }
 
 export interface CreateIMessageContactRuleOptions {
+  direction?: RuleDirection;
   action: IMessageRuleAction;
   matchTarget: string;
   matchType?: IMessageRuleMatchType;
 }
 
 export interface UpdateIMessageContactRuleOptions {
-  action: IMessageRuleAction;
+  action?: IMessageRuleAction;
+  direction?: RuleDirection;
+  applyTo?: "inbound" | "outbound";
 }
 
 export interface ListAllIMessageContactRulesOptions {
+  direction?: RuleDirection;
   agentIdentityId?: string;
   action?: IMessageRuleAction;
   matchType?: IMessageRuleMatchType;
@@ -57,6 +63,7 @@ export class IMessageContactRulesResource {
     options: ListIMessageContactRulesOptions = {},
   ): Promise<IMessageContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;
     if (options.limit !== undefined) params.limit = options.limit;
@@ -78,8 +85,8 @@ export class IMessageContactRulesResource {
   /**
    * Create a rule with an allow/block action.
    *
-   * @throws {DuplicateContactRuleError} 409 when a non-deleted rule with
-   *   the same `(matchType, matchTarget)` already exists.
+   * Compatible coverage may widen an existing rule and retain its ID.
+   * @throws {DuplicateContactRuleError} 409 when the coverage already exists.
    */
   async create(
     agentHandle: string,
@@ -90,6 +97,7 @@ export class IMessageContactRulesResource {
       match_type: options.matchType ?? IMessageRuleMatchType.EXACT_NUMBER,
       match_target: options.matchTarget,
     };
+    if (options.direction !== undefined) body.direction = options.direction;
     const data = await this.http.post<RawIMessageContactRule>(
       rulePath(agentHandle),
       body,
@@ -97,13 +105,13 @@ export class IMessageContactRulesResource {
     return parseIMessageContactRule(data);
   }
 
-  /** Update `action` (admin-only). */
+  /** Update action or coverage, or atomically edit one covered side (admin-only). */
   async update(
     agentHandle: string,
     ruleId: string,
     options: UpdateIMessageContactRuleOptions,
   ): Promise<IMessageContactRule> {
-    const body = { action: options.action };
+    const body = ruleUpdateToWire(options);
     const data = await this.http.patch<RawIMessageContactRule>(
       rulePath(agentHandle, ruleId),
       body,
@@ -121,6 +129,7 @@ export class IMessageContactRulesResource {
     options: ListAllIMessageContactRulesOptions = {},
   ): Promise<IMessageContactRule[]> {
     const params: Record<string, string | number | undefined> = {};
+    if (options.direction !== undefined) params.direction = options.direction;
     if (options.agentIdentityId !== undefined) params.agent_identity_id = options.agentIdentityId;
     if (options.action !== undefined) params.action = options.action;
     if (options.matchType !== undefined) params.match_type = options.matchType;

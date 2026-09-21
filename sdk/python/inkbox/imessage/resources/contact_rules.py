@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
+from inkbox.contact_rules import ContactRuleDirection, _UNSET, _direction_fields, _rule_update
 
 from inkbox.imessage.types import (
     IMessageContactRule,
@@ -44,8 +45,9 @@ class IMessageContactRulesResource:
         match_type: IMessageRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> list[IMessageContactRule]:
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = _direction_fields(direction)
         if action is not None:
             params["action"] = (
                 action.value if isinstance(action, IMessageRuleAction) else action
@@ -74,13 +76,14 @@ class IMessageContactRulesResource:
         action: IMessageRuleAction | str,
         match_target: str,
         match_type: IMessageRuleMatchType | str = IMessageRuleMatchType.EXACT_NUMBER,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> IMessageContactRule:
-        """Create a rule. Use :meth:`update` to change its allow/block action.
+        """Save or extend coverage; omitted direction applies to both sides.
 
-        Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
-        rule with the same ``(match_type, match_target)`` already exists.
+        Duplicate coverage raises :class:`DuplicateContactRuleError`.
         """
         body: dict[str, Any] = {
+            **_direction_fields(direction),
             "action": action.value if isinstance(action, IMessageRuleAction) else action,
             "match_type": (
                 match_type.value
@@ -97,12 +100,12 @@ class IMessageContactRulesResource:
         agent_handle: str,
         rule_id: UUID | str,
         *,
-        action: IMessageRuleAction | str,
+        action: IMessageRuleAction | str | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
+        apply_to: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> IMessageContactRule:
-        """Update ``action`` (admin-only)."""
-        body = {
-            "action": action.value if isinstance(action, IMessageRuleAction) else action,
-        }
+        """Update action or coverage; apply_to changes only one covered side."""
+        body = _rule_update(action, direction, apply_to)
         data = self._http.patch(_rule_path(agent_handle, rule_id), json=body)
         return IMessageContactRule._from_dict(data)
 
@@ -118,6 +121,7 @@ class IMessageContactRulesResource:
         match_type: IMessageRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> list[IMessageContactRule]:
         """Org-wide list of iMessage contact rules (admin-only).
 
@@ -126,7 +130,7 @@ class IMessageContactRulesResource:
             action: Filter by ``allow`` or ``block``.
             match_type: Filter by ``exact_number``.
         """
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = _direction_fields(direction)
         if agent_identity_id is not None:
             params["agent_identity_id"] = str(agent_identity_id)
         if action is not None:

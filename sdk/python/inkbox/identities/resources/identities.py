@@ -22,6 +22,7 @@ from inkbox.identities.types import (
     vault_secret_ids_to_wire,
 )
 from inkbox.imessage.types import _validate_idempotency_key
+from inkbox.mail.types import FilterMode
 
 if TYPE_CHECKING:
     from inkbox._http import HttpTransport
@@ -133,6 +134,10 @@ class IdentitiesResource:
         imessage_filter_mode: str | None = None,
         mail_filter_mode: str | None = None,
         phone_filter_mode: str | None = None,
+        mail_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        mail_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        phone_inbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
+        phone_outbound_filter_mode: FilterMode | str = _UNSET,  # type: ignore[assignment]
     ) -> _AgentIdentityData:
         """Update an identity's handle, display name, description,
         iMessage reachability, and contact-rule filter modes.
@@ -163,8 +168,11 @@ class IdentitiesResource:
             mail_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
                 identity's mail contact rules (admin-only).
             phone_filter_mode: ``"whitelist"`` or ``"blacklist"`` for this
-                identity's phone contact rules (admin-only). The server
-                rejects this with 422 when the identity has no phone number.
+                identity's phone contact rules (admin-only).
+            mail_inbound_filter_mode: Effective receive mode for email.
+            mail_outbound_filter_mode: Effective send mode for email.
+            phone_inbound_filter_mode: Effective receive mode for phone/iMessage.
+            phone_outbound_filter_mode: Effective send mode for phone/iMessage.
         """
         if claim_imessage_number is not None and claim_imessage_number is not True:
             raise ValueError("claim_imessage_number must be True when supplied")
@@ -210,6 +218,19 @@ class IdentitiesResource:
             body["mail_filter_mode"] = mail_filter_mode
         if phone_filter_mode is not None:
             body["phone_filter_mode"] = phone_filter_mode
+        for channel, inbound, outbound, shared in (
+            ("mail", mail_inbound_filter_mode, mail_outbound_filter_mode, mail_filter_mode),
+            ("phone", phone_inbound_filter_mode, phone_outbound_filter_mode,
+             phone_filter_mode if phone_filter_mode is not None else imessage_filter_mode),
+        ):
+            if shared is not None and (inbound is not _UNSET or outbound is not _UNSET):
+                raise ValueError(f"Cannot combine shared and directional {channel} filter modes")
+            for side, value in (("inbound", inbound), ("outbound", outbound)):
+                if value is not _UNSET:
+                    body[f"{channel}_{side}_filter_mode"] = FilterMode(value).value
+        if (phone_filter_mode is not None and imessage_filter_mode is not None
+                and phone_filter_mode != imessage_filter_mode):
+            raise ValueError("phone_filter_mode and imessage_filter_mode must agree")
         headers = None
         if idempotency_key is not None:
             headers = {

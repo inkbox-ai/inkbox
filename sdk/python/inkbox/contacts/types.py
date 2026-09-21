@@ -12,6 +12,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
+from inkbox.contact_rules import _UNSET
 
 
 def _opt_uuid(value: Any) -> UUID | None:
@@ -70,7 +71,7 @@ class ContactCreatePermissions:
             or any((self.emails or {}).values())
             or any((self.phones or {}).values())
             or any(
-                group is not None and (group.visible is True or bool(group.contactable))
+                group is not None and (group.visible is True or group._has_contactable())
                 for group in (self.email, self.phone)
             )
         ):
@@ -89,10 +90,24 @@ class ContactCreatePermissions:
 
 @dataclass(frozen=True)
 class ContactChannelAccess:
-    """Whole-group visibility and individually contactable addresses."""
+    """Group visibility and directional access; contactable means outbound."""
 
     visible: bool
     contactable: list[str]
+    inbound_contactable: list[str] | None = None
+    outbound_contactable: list[str] | None = None
+
+    def __post_init__(self) -> None:
+        for side in ("inbound", "outbound"):
+            name = f"{side}_contactable"
+            if getattr(self, name) is None:
+                object.__setattr__(self, name, list(self.contactable))
+        object.__setattr__(self, "contactable", list(self.outbound_contactable))
+
+    @classmethod
+    def _from_dict(cls, data: dict[str, Any]) -> ContactChannelAccess:
+        return cls(data["visible"], data["contactable"],
+                   data.get("inbound_contactable"), data.get("outbound_contactable"))
 
 
 @dataclass(frozen=True)
@@ -107,8 +122,8 @@ class ContactAccessSettings:
     @classmethod
     def _from_dict(cls, data: dict[str, Any]) -> ContactAccessSettings:
         return cls(
-            email=ContactChannelAccess(visible=data["email"]["visible"], contactable=data["email"]["contactable"]),
-            phone=ContactChannelAccess(visible=data["phone"]["visible"], contactable=data["phone"]["contactable"]),
+            email=ContactChannelAccess._from_dict(data["email"]),
+            phone=ContactChannelAccess._from_dict(data["phone"]),
             profile=data["profile"],
             memories=data["memories"],
         )
@@ -116,17 +131,31 @@ class ContactAccessSettings:
 
 @dataclass
 class ContactChannelAccessUpdate:
-    """Omit unchanged fields; an empty contactable list blocks all current addresses."""
+    """Omit unchanged lists. Legacy contactable writes apply to both directions."""
 
     visible: bool | None = None
-    contactable: list[str] | None = None
+    contactable: list[str] = _UNSET  # type: ignore[assignment]
+    inbound_contactable: list[str] = _UNSET  # type: ignore[assignment]
+    outbound_contactable: list[str] = _UNSET  # type: ignore[assignment]
+
+    def _has_contactable(self) -> bool:
+        return any(value is not _UNSET and bool(value) for value in (
+            self.contactable, self.inbound_contactable, self.outbound_contactable,
+        ))
 
     def to_wire(self) -> dict[str, Any]:
-        return {
-            key: value
-            for key, value in (("visible", self.visible), ("contactable", self.contactable))
-            if value is not None
-        }
+        lists = {key: value for key, value in (
+            ("contactable", self.contactable),
+            ("inbound_contactable", self.inbound_contactable),
+            ("outbound_contactable", self.outbound_contactable),
+        ) if value is not _UNSET}
+        if any(value is None for value in lists.values()):
+            raise ValueError("Contactable lists cannot be null; omit unchanged lists")
+        if "contactable" in lists and len(lists) > 1:
+            raise ValueError("Cannot combine contactable with directional lists")
+        if self.visible is False and self._has_contactable():
+            raise ValueError("Hidden groups cannot contain contactable addresses")
+        return {**({"visible": self.visible} if self.visible is not None else {}), **lists}
 
 
 @dataclass

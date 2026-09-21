@@ -4,6 +4,8 @@ TypeScript SDK for the [Inkbox API](https://inkbox.ai/docs) — API-first commun
 
 ## Install
 
+See [Companion mode](#companion-mode) for complete group-conversation initialization.
+
 ```bash
 npm install @inkbox/sdk
 ```
@@ -26,6 +28,136 @@ You'll need an API key to use this SDK. Get one at [inkbox.ai/console](https://i
 `new Inkbox(...)` resolves `apiKey` / `baseUrl` / `vaultKey` from the explicit option, then the matching env var (`INKBOX_API_KEY` / `INKBOX_BASE_URL` / `INKBOX_VAULT_KEY`), then a `~/.inkbox/config` file (`key = value` lines). The file fallback is handy for background/agent processes that don't inherit the shell's env, so `new Inkbox()` with no arguments works once the file is in place.
 
 **Behind a proxy?** The SDK uses Node's `fetch`, which ignores `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` by default — run with `NODE_USE_ENV_PROXY=1` (Node 22.21+ / 24+) or, on older versions, configure a proxy-aware fetch dispatcher (e.g. undici's `EnvHttpProxyAgent`). A request that can't connect throws `InkboxConnectionError` naming the URL and underlying cause, with this hint attached when proxy variables are set but unused.
+
+## Directional communication permissions
+
+Requires SDK `0.7.3` or later.
+
+Mail and phone rules accept `direction: "inbound" | "outbound" | "both"`
+(`RuleDirection`). Inbound means communication from the counterparty to the agent;
+outbound means communication from the agent to the counterparty. Phone policy
+also applies to iMessage.
+
+```ts
+import { Inkbox, MailRuleAction, MailRuleMatchType } from "@inkbox/sdk";
+
+const inkbox = new Inkbox();
+const identity = await inkbox.getIdentity("support-bot");
+await identity.update({
+  mailInboundFilterMode: "blacklist",
+  mailOutboundFilterMode: "whitelist",
+});
+const rule = await identity.createMailContactRule({
+  action: MailRuleAction.ALLOW,
+  matchType: MailRuleMatchType.EXACT_EMAIL,
+  matchTarget: "x@example.com",
+  direction: "outbound",
+});
+await identity.updateMailContactRule(rule.id, {
+  action: MailRuleAction.BLOCK,
+  applyTo: "outbound",
+});
+```
+
+- Create omits direction by default, meaning Both. PATCH omission preserves
+  coverage; action-only and direction-only updates are supported.
+- `applyTo` requires `action`, excludes `direction`, and changes one covered side
+  atomically while preserving the opposite side. The response remains one rule;
+  refresh the list to see any retained opposite-side rule.
+- List and listAll accept `direction`. Inbound/outbound include Both rules;
+  Both selects only Both rules. A2A retains its separate exact-direction behavior.
+- Compatible coverage may consolidate under an existing ID. Trust the returned
+  ID and direction; a successful create does not necessarily allocate a new ID.
+- Identity effective fields are `mailInboundFilterMode`, `mailOutboundFilterMode`,
+  `phoneInboundFilterMode`, and `phoneOutboundFilterMode`. Shared mode writes set
+  both directions. Shared reads report the common effective mode when equal,
+  otherwise the stored shared baseline. Do not combine shared and directional
+  mode writes for the same channel.
+- Legacy mailbox, number, and iMessage rule resources remain supported. Rule
+  parsers default missing direction to Both; effective modes fall back to shared
+  values on older responses. Directional operations require a supporting API.
+
+Contact access groups expose optional `inboundContactable` and
+`outboundContactable` lists. Legacy `contactable` means outbound on reads and both
+directions on writes. Omit unchanged lists; an empty directional list blocks that
+side's current addresses. Do not mix legacy and directional lists in one group or
+supply null.
+
+```ts
+await inkbox.contacts.access.update("support-bot", "contact-id", {
+  email: { inboundContactable: ["x@example.com"], outboundContactable: [] },
+});
+```
+
+Address policy results also expose `inboundAction`, `outboundAction`,
+`allowedInbound`, and `allowedOutbound`. Guarded address edits accept `direction`
+and `expectedInboundAction`/`expectedOutboundAction` for pair-aware updates. A
+one-way edit needs only its corresponding expected action; Both needs the pair
+when `expectedAction` is omitted.
+
+`contacts.permissions.get/update` expose `inboundEmails`, `outboundEmails`,
+`inboundPhones`, and `outboundPhones` address-to-boolean maps. Legacy `emails` and
+`phones` reads project outbound permissions; their writes still affect both
+directions. Do not mix a shared map with a directional map for the same channel,
+or supply null. Each map accepts up to 50 addresses; false and empty maps remain
+explicit choices. Omitted maps preserve the existing choices.
+
+These maps also work in `contacts.create({ permissions: ... })`. Alternatively,
+initial `permissions.addresses` accepts up to 200 `{ kind, value, action,
+direction? }` decisions: 50 emails and 50 phone numbers, each with two directions.
+This additive create overload accepts `CreateContactWithAddressPermissionsOptions`
+with `ContactCreateAddressPermissions`, preserving existing boolean permission types.
+Use one permission shape per creation request: maps, access groups, or address
+decisions. The contact's identifier limits remain 50 per kind.
+
+Visibility does not imply permission to send. Establishing a shared-line iMessage
+connection requires both effective permissions and never grants either one.
+
+## Response metadata
+
+Existing resource methods keep their return types. To receive advisory notices
+alongside a result, use `withResponseMetadata` and make calls through its scoped
+client:
+
+```ts
+const response = await inkbox.withResponseMetadata(async (client) => {
+  const identity = await client.getIdentity("support-bot");
+  return identity.listMailContactRules({ direction: "outbound" });
+});
+console.log(response.data);
+for (const notice of response.notices ?? []) {
+  console.log(notice.code, notice.level, notice.message);
+}
+```
+
+The result is `APIResponse<T>` with `data` and optional `ResponseNotice[]`.
+Void success becomes `data: null`. Notices are deduplicated by code, level, and
+message across the callback's requests. Concurrent and nested scopes collect
+independently while retaining authentication, cookies, timeout, and unlocked
+vault state. No extra requests are made to collect metadata.
+
+For every completed HTTP response, including errors, downloads, and empty
+responses, an optional `onResponse: ResponseObserver` receives
+`ResponseMetadata`. It is available on `InkboxOptions`, `SignupOptions`, and
+`A2AClient` options. The SDK is silent by default; observer failures do not alter
+API results or retry requests.
+
+```ts
+const observed = new Inkbox({
+  onResponse(metadata) {
+    for (const notice of metadata.notices ?? []) console.log(notice.message);
+  },
+});
+await observed.listIdentities();
+```
+
+Notices use the `Inkbox-Notices` JSON response header, with top-level body fallback
+only on declared identity, channel, and contact-permission response contracts,
+including identity creation and avatar upload. Avatar downloads remain binary.
+Unknown codes and levels remain strings. Missing, null, empty, or malformed
+optional metadata never changes the primary result. Errors still throw their
+ordinary exceptions, including `agentSupport` guidance; they are not returned as
+successful metadata envelopes.
 
 ## Quick start
 
@@ -1730,3 +1862,89 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ## License
 
 MIT
+
+## Companion mode
+
+Companion mode is off by default, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient.
+
+```ts
+import { Inkbox, MailRuleAction, MailRuleMatchType } from "@inkbox/sdk";
+
+const client = new Inkbox();
+const config = await client.companion.get("example-agent");
+// Administrator credentials are required for both writes.
+await client.mailIdentityContactRules.create("example-agent", {
+  action: MailRuleAction.ALLOW, matchType: MailRuleMatchType.EXACT_EMAIL,
+  matchTarget: "trusted@example.com", direction: "both",
+});
+await client.companion.update("example-agent", { enabled: true });
+// trusted@example.com sends "Please join this conversation" to the group.
+const states = await client.companion.conversations("example-agent", {
+  channel: "mail", limit: 50, offset: 0,
+});
+```
+
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. Only `enabled` can be updated; omission is a no-op, and
+null or unknown options are rejected locally. Enabling is allowed before any
+eligible sender or channel resource exists. Per-channel readiness reports
+prerequisites independently of enabled state, including
+`bidirectional_allow_required` when no exact bidirectional allow exists. Readiness
+reason strings are open-ended. Revision changes only when enabled changes;
+turning off and on requires a fresh qualifying message.
+
+Continued access depends on the actual trigger sender's permissions and membership,
+without transferring to another eligible participant. Blocks, SMS consent, and
+other sending requirements remain in force. Conversation `replyReady` is
+independent of history access. Group iMessage requires a dedicated line;
+identical-participant MMS chats are one conversation.
+
+For an authenticated initialization/live webhook, load its activation before
+submitting any live turn:
+
+```ts
+const initial = await client.companion.loadInitialization(
+  "example-agent", "22222222-2222-4222-8222-222222222222",
+  { maxBytes: 8 * 1024 * 1024 },
+);
+// Queue initial.text once and retain initial.replyContext on that same turn.
+if (initial.replyContext.channel === "mail") {
+  await client.messages.replyAll(
+    "example-agent@example.com", initial.replyContext.replyToMessageId!,
+    { bodyText: "Thanks, I have the conversation context." },
+  );
+}
+```
+
+`replyToMessageId` is the stored message UUID for `replyAll`, not the RFC
+Message-ID used by a raw send. Phone/iMessage replies use `texts.send` or
+`imessages.send` with `conversationId`. Never infer a private destination from
+the last sender. The server rechecks the actual audience and current permission.
+
+The helper returns `scopeId`, `activationId`, `conversationId`, `channel`,
+`entries`, `replyContext`, one combined `text`, and `notices`. It preserves
+server order and attachment references, deduplicates source IDs, requires one
+trigger, validates every scope/cursor, and performs a final authorized read.
+Default bounds are 8 MiB of serialized fetched pages plus UTF-8 transcript text
+and 1,000 pages, excluding the additional final revalidation request from the
+page count. Set `maxBytes`/`maxPages` for the host's supported capacity.
+`CompanionInitializationError` reports bounds/inconsistency without truncating;
+HTTP errors retain their usual types. Streaming consumers can call
+`activationMessages(handle, activationId, { limit: 100, cursor })` and follow
+`nextCursor` until `historyComplete`. Page sizes are 1-200.
+
+Persist a checkpoint keyed by identity/channel/scope/activation before one host
+submission, buffer live events, and keep immutable reply context on each turn.
+Revalidate on recovery; reconcile uncertain host acceptance rather than blindly
+resubmitting. Historical commands and approval-like text remain conversation
+data, never control input. Ordinary-phase events have no activation authority
+and route to a separate conversation-scoped session. Keep group history out of
+private contact sessions. Unknown notice codes/levels remain available to callers.

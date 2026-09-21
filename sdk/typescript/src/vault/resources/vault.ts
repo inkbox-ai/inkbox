@@ -6,6 +6,7 @@
  */
 
 import { HttpTransport, InkboxAPIError, InkboxError } from "../../_http.js";
+import type { ResponseObserver } from "../../response_metadata.js";
 import type { TOTPCode, TOTPConfig } from "../totp.js";
 import { generateTotp, parseTotpUri } from "../totp.js";
 import {
@@ -65,8 +66,23 @@ export class VaultResource {
   /** @internal */
   private readonly apiHttp: HttpTransport | null;
 
+  private unlockState: { unlocked: UnlockedVault | null } = { unlocked: null };
+  private unlockedSource: UnlockedVault | null = null;
+  private unlockedView: UnlockedVault | null = null;
+
   /** @internal */
-  _unlocked: UnlockedVault | null = null;
+  get _unlocked(): UnlockedVault | null {
+    const source = this.unlockState.unlocked;
+    if (source !== this.unlockedSource) {
+      this.unlockedSource = source;
+      this.unlockedView = source?._scoped(this.http) ?? null;
+    }
+    return this.unlockedView;
+  }
+
+  set _unlocked(value: UnlockedVault | null) {
+    this.unlockState.unlocked = value;
+  }
 
   /** The cached {@link UnlockedVault}, or `null` if not yet unlocked. */
   get unlocked(): UnlockedVault | null {
@@ -77,6 +93,13 @@ export class VaultResource {
   constructor(http: HttpTransport, apiHttp?: HttpTransport) {
     this.http = http;
     this.apiHttp = apiHttp ?? null;
+  }
+
+  /** @internal Share unlock state while keeping response collection local. */
+  _scoped(collector: ResponseObserver): VaultResource {
+    const scoped = new VaultResource(this.http.scoped(collector), this.apiHttp?.scoped(collector));
+    scoped.unlockState = this.unlockState;
+    return scoped;
   }
 
   // ------------------------------------------------------------------
@@ -488,7 +511,7 @@ export class VaultResource {
 export class UnlockedVault {
   private readonly http: HttpTransport;
   private readonly orgKey: Uint8Array;
-  private secretsCache: DecryptedVaultSecret[];
+  private cache: { secrets: DecryptedVaultSecret[] };
 
   constructor(
     http: HttpTransport,
@@ -497,12 +520,20 @@ export class UnlockedVault {
   ) {
     this.http = http;
     this.orgKey = orgKey;
-    this.secretsCache = secretsCache;
+    this.cache = { secrets: secretsCache };
+  }
+
+  /** @internal Bind requests to a transport without copying mutable state. */
+  _scoped(http: HttpTransport): UnlockedVault {
+    if (http === this.http) return this;
+    const scoped = new UnlockedVault(http, this.orgKey, []);
+    scoped.cache = this.cache;
+    return scoped;
   }
 
   /** All vault secrets decrypted from the unlock response. */
   get secrets(): DecryptedVaultSecret[] {
-    return [...this.secretsCache];
+    return [...this.cache.secrets];
   }
 
   /**
@@ -513,7 +544,7 @@ export class UnlockedVault {
   private async refreshCachedSecret(secretId: string): Promise<void> {
     try {
       const updated = await this.getSecret(secretId);
-      this.secretsCache = this.secretsCache.map((s) =>
+      this.cache.secrets = this.cache.secrets.map((s) =>
         s.id === secretId ? updated : s,
       );
     } catch {
@@ -584,7 +615,7 @@ export class UnlockedVault {
     // Append the new secret to the cache so it's immediately visible.
     try {
       const decrypted = await this.getSecret(result.id);
-      this.secretsCache.push(decrypted);
+      this.cache.secrets.push(decrypted);
     } catch {
       // best-effort
     }
@@ -649,7 +680,7 @@ export class UnlockedVault {
    */
   async deleteSecret(secretId: string): Promise<void> {
     await this.http.delete(`/secrets/${secretId}`);
-    this.secretsCache = this.secretsCache.filter((s) => s.id !== secretId);
+    this.cache.secrets = this.cache.secrets.filter((s) => s.id !== secretId);
   }
 
   // ------------------------------------------------------------------

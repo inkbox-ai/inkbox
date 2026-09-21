@@ -1,4 +1,5 @@
 import { HttpTransport, MailImportUploadError } from "../../_http.js";
+import { observeResponse } from "../../response_metadata.js";
 import {
   MailImportCreateResult,
   MailImportFormat,
@@ -105,6 +106,7 @@ export class MailboxImportsResource {
         credentials: "omit",
         signal: controller.signal,
       });
+      await observeResponse(response, uploadTarget.url, false, this.http.responseObserver);
       if (!response.ok) {
         throw new MailImportUploadError(response.status, await response.text());
       }

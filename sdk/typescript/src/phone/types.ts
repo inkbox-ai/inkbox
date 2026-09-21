@@ -198,6 +198,8 @@ export interface PhoneNumber {
   forwardingPhoneNumber: string | null;
   forwardingSipUri: string | null;
   filterMode: FilterMode;
+  inboundFilterMode?: FilterMode;
+  outboundFilterMode?: FilterMode;
   /**
    * 2-letter US state abbreviation (e.g. `"NY"`); `null` if not set.
    */
@@ -221,6 +223,7 @@ export interface PhoneNumber {
  *   shape is {@link PhoneIdentityContactRule}.
  */
 export interface PhoneContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   id: string;
   phoneNumberId: string;
   action: PhoneRuleAction;
@@ -241,6 +244,7 @@ export interface PhoneContactRule {
  * `phoneNumberId`.
  */
 export interface PhoneIdentityContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   contact?: Contact | null;
   id: string;
   agentIdentityId: string;
@@ -558,6 +562,8 @@ export interface RawPhoneNumber {
   forwarding_phone_number?: string | null;
   forwarding_sip_uri?: string | null;
   filter_mode?: string;
+  inbound_filter_mode?: string;
+  outbound_filter_mode?: string;
   state?: string | null;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
@@ -566,6 +572,7 @@ export interface RawPhoneNumber {
 }
 
 export interface RawPhoneContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   id: string;
   phone_number_id: string;
   action: string;
@@ -577,6 +584,7 @@ export interface RawPhoneContactRule {
 }
 
 export interface RawPhoneIdentityContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   contact?: RawContact | null;
   id: string;
   agent_identity_id: string;
@@ -807,6 +815,8 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
     forwardingPhoneNumber: r.forwarding_phone_number ?? null,
     forwardingSipUri: r.forwarding_sip_uri ?? null,
     filterMode: (r.filter_mode as FilterMode) ?? FilterModeEnum.BLACKLIST,
+    inboundFilterMode: (r.inbound_filter_mode ?? r.filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    outboundFilterMode: (r.outbound_filter_mode ?? r.filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     state: r.state ?? null,
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
@@ -819,6 +829,7 @@ export function parsePhoneNumber(r: RawPhoneNumber): PhoneNumber {
 
 export function parsePhoneContactRule(r: RawPhoneContactRule): PhoneContactRule {
   return {
+    direction: r.direction ?? "both",
     id: r.id,
     phoneNumberId: r.phone_number_id,
     action: r.action as PhoneRuleAction,
@@ -834,6 +845,7 @@ export function parsePhoneIdentityContactRule(
   r: RawPhoneIdentityContactRule,
 ): PhoneIdentityContactRule {
   return {
+    direction: r.direction ?? "both",
     contact: r.contact == null ? null : parseContact(r.contact),
     id: r.id,
     agentIdentityId: r.agent_identity_id,

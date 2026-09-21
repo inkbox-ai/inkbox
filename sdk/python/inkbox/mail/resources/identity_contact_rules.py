@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
+from inkbox.contact_rules import ContactRuleDirection, _UNSET, _direction_fields, _rule_update
 
 from inkbox.mail.types import (
     MailIdentityContactRule,
@@ -51,8 +52,9 @@ class MailIdentityContactRulesResource:
         match_type: MailRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> list[MailIdentityContactRule]:
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = _direction_fields(direction)
         if action is not None:
             params["action"] = action.value if isinstance(action, MailRuleAction) else action
         if match_type is not None:
@@ -78,13 +80,14 @@ class MailIdentityContactRulesResource:
         action: MailRuleAction | str,
         match_type: MailRuleMatchType | str,
         match_target: str,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> MailIdentityContactRule:
-        """Create a rule for an agent identity.
+        """Save or extend coverage; omitted direction applies to both sides.
 
-        Raises :class:`DuplicateContactRuleError` on 409 when a non-deleted
-        rule with the same ``(match_type, match_target)`` already exists.
+        Duplicate coverage raises :class:`DuplicateContactRuleError`.
         """
         body: dict[str, Any] = {
+            **_direction_fields(direction),
             "action": action.value if isinstance(action, MailRuleAction) else action,
             "match_type": (
                 match_type.value if isinstance(match_type, MailRuleMatchType) else match_type
@@ -99,16 +102,16 @@ class MailIdentityContactRulesResource:
         agent_handle: str,
         rule_id: UUID | str,
         *,
-        action: MailRuleAction | str,
+        action: MailRuleAction | str | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
+        apply_to: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> MailIdentityContactRule:
-        """Update ``action`` (admin-only).
+        """Update action or coverage; apply_to changes only one covered side.
 
         ``match_type`` and ``match_target`` are immutable — delete + re-create
         to change them.
         """
-        body = {
-            "action": action.value if isinstance(action, MailRuleAction) else action,
-        }
+        body = _rule_update(action, direction, apply_to)
         data = self._http.patch(_rule_path(agent_handle, rule_id), json=body)
         return MailIdentityContactRule._from_dict(data)
 
@@ -124,6 +127,7 @@ class MailIdentityContactRulesResource:
         match_type: MailRuleMatchType | str | None = None,
         limit: int | None = None,
         offset: int | None = None,
+        direction: ContactRuleDirection | str = _UNSET,  # type: ignore[assignment]
     ) -> list[MailIdentityContactRule]:
         """Org-wide list of mail contact rules (admin-only).
 
@@ -132,7 +136,7 @@ class MailIdentityContactRulesResource:
             action: Filter by ``allow`` or ``block``.
             match_type: Filter by ``exact_email`` or ``domain``.
         """
-        params: dict[str, Any] = {}
+        params: dict[str, Any] = _direction_fields(direction)
         if agent_identity_id is not None:
             params["agent_identity_id"] = str(agent_identity_id)
         if action is not None:

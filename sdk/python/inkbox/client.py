@@ -6,7 +6,9 @@ Inkbox — org-level entry point for all Inkbox APIs.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from copy import copy
+from threading import Lock
+from typing import Any, Callable, Literal, TypeVar
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -15,6 +17,7 @@ import httpx
 from inkbox._http import CONNECT_RETRIES, HttpTransport, sdk_user_agent
 from inkbox._config import resolve_client_settings
 from inkbox._cookies import CookieJar
+from inkbox.response_metadata import APIResponse, ResponseMetadata, ResponseNotice, ResponseObserver, _observe_response
 from inkbox.a2a.resource import A2AResource
 from inkbox.a2a.invitations import (
     A2AInvitationPreview,
@@ -25,6 +28,7 @@ from inkbox.a2a.invitations import (
 from inkbox.agent_identity import AgentIdentity
 from inkbox.api_keys.resources.api_keys import ApiKeysResource
 from inkbox.contacts.resources.contacts import ContactsResource
+from inkbox.companion import CompanionResource
 from inkbox.notes.resources.notes import NotesResource
 from inkbox.agent_signup.types import (
     AgentSignupResponse,
@@ -70,6 +74,7 @@ from inkbox.vault.resources.vault import VaultResource
 from inkbox.whoami.types import WhoamiResponse, _parse_whoami
 
 _DEFAULT_BASE_URL = "https://inkbox.ai"
+_T = TypeVar("_T")
 
 # `_UNSET` is imported from inkbox.identities.types above. Identity-based
 # `is not _UNSET` checks must compare against the SAME object across all
@@ -129,6 +134,7 @@ class Inkbox:
         timeout: float = 30.0,
         vault_key: str | None = None,
         user_agent_prefix: str | None = None,
+        response_observer: ResponseObserver | None = None,
     ) -> None:
         """
         Create an Inkbox client.
@@ -149,6 +155,8 @@ class Inkbox:
             user_agent_prefix: Optional token prepended to the ``User-Agent``
                 header (e.g. ``"inkbox-cli/1.2.3"``) so a downstream tool
                 identifies itself ahead of the SDK's own token.
+            response_observer: Receives advisory metadata before status handling
+                for every completed response. Observer failures are contained.
         """
         api_key, base_url, vault_key = resolve_client_settings(
             api_key=api_key,
@@ -252,6 +260,14 @@ class Inkbox:
             user_agent=_ua,
         )
 
+        for transport in self.__dict__.values():
+            if isinstance(transport, HttpTransport):
+                transport._response_observer = response_observer
+        self._bind_resources()
+        if vault_key is not None:
+            self._vault_resource.unlock(vault_key)
+
+    def _bind_resources(self) -> None:
         self._mailboxes = MailboxesResource(self._mail_http)
         self._messages = MessagesResource(self._mail_http)
         self._drafts = DraftsResource(self._mail_http)
@@ -297,12 +313,42 @@ class Inkbox:
         self._a2a_invitations = A2AInvitationsResource(self._api_http, self._base_url)
 
         self._contacts = ContactsResource(self._contacts_http)
+        self.companion = CompanionResource(self._api_http)
         self._notes = NotesResource(self._contacts_http)
 
         self._tunnels = TunnelsResource(self._api_http, inkbox=self)
 
-        if vault_key is not None:
-            self._vault_resource.unlock(vault_key)
+    def with_response_metadata(self, callback: Callable[[Inkbox], _T]) -> APIResponse[_T]:
+        """Collect notices from calls made through the supplied scoped client.
+
+        Nested scopes collect independently. Connections, cookies and unlocked
+        vault state are shared; closing a scoped client leaves its parent open.
+        """
+        notices: list[ResponseNotice] = []
+        collecting = True
+        lock = Lock()
+
+        def collect(metadata: ResponseMetadata) -> None:
+            with lock:
+                if collecting:
+                    for notice in metadata.notices or ():
+                        if notice not in notices:
+                            notices.append(notice)
+
+        scoped = copy(self)
+        for name, value in self.__dict__.items():
+            if isinstance(value, HttpTransport):
+                setattr(scoped, name, value._scoped(collect))
+        scoped._bind_resources()
+        scoped._vault_resource = self._vault_resource._scoped(
+            scoped._vault_http, scoped._root_api_http,
+        )
+        try:
+            data = callback(scoped)
+        finally:
+            with lock:
+                collecting = False
+        return APIResponse(data, list(notices) or None)
 
     def __enter__(self) -> Inkbox:
         return self
@@ -624,6 +670,7 @@ class Inkbox:
         json: dict | None = None,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
+        response_observer: ResponseObserver | None = None,
     ) -> dict:
         """One-shot HTTP request that does not require an ``Inkbox`` instance."""
         cls._validate_base_url(base_url)
@@ -641,6 +688,7 @@ class Inkbox:
         ) as client:
             resp = client.request(method, url, headers=headers, json=json)
 
+        _observe_response(resp, response_observer)
         if resp.status_code >= 400:
             from inkbox.error_guidance import parse_agent_support
 
@@ -668,6 +716,7 @@ class Inkbox:
         *,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
+        response_observer: ResponseObserver | None = None,
     ) -> A2AInvitationPreview:
         """Review an A2A invitation without accepting it or supplying an API key."""
         invitation_token = extract_a2a_invitation_token(invitation, base_url=base_url)
@@ -677,6 +726,7 @@ class Inkbox:
             json={"invitation_token": invitation_token},
             base_url=base_url,
             timeout=timeout,
+            response_observer=response_observer,
         )
         return _parse_invitation_preview(data)
 
@@ -693,6 +743,7 @@ class Inkbox:
         invitation_token: str | None = None,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
+        response_observer: ResponseObserver | None = None,
     ) -> AgentSignupResponse:
         """
         Register a new agent (public — no API key required).
@@ -739,6 +790,7 @@ class Inkbox:
             json=body,
             base_url=base_url,
             timeout=timeout,
+            response_observer=response_observer,
         )
         return AgentSignupResponse._from_dict(data)
 
@@ -750,6 +802,7 @@ class Inkbox:
         *,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
+        response_observer: ResponseObserver | None = None,
     ) -> AgentSignupVerifyResponse:
         """
         Submit a 6-digit verification code to unlock full capabilities.
@@ -767,6 +820,7 @@ class Inkbox:
             json={"verification_code": verification_code},
             base_url=base_url,
             timeout=timeout,
+            response_observer=response_observer,
         )
         return AgentSignupVerifyResponse._from_dict(data)
 
@@ -777,6 +831,7 @@ class Inkbox:
         *,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
+        response_observer: ResponseObserver | None = None,
     ) -> AgentSignupResendResponse:
         """
         Resend the verification email (5-minute cooldown).
@@ -792,6 +847,7 @@ class Inkbox:
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
+            response_observer=response_observer,
         )
         return AgentSignupResendResponse._from_dict(data)
 
@@ -802,6 +858,7 @@ class Inkbox:
         *,
         base_url: str = _DEFAULT_BASE_URL,
         timeout: float = 30.0,
+        response_observer: ResponseObserver | None = None,
     ) -> AgentSignupStatusResponse:
         """
         Check the current signup claim status and restrictions.
@@ -817,5 +874,6 @@ class Inkbox:
             api_key=api_key,
             base_url=base_url,
             timeout=timeout,
+            response_observer=response_observer,
         )
         return AgentSignupStatusResponse._from_dict(data)

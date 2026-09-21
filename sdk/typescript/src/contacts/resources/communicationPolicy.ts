@@ -1,10 +1,15 @@
 import { HttpTransport } from "../../_http.js";
-import type { ContactAccessSettings } from "./contactAccess.js";
+import { type ContactAccessSettings, type RawContactAccessSettings, parseContactAccessSettings } from "./contactAccess.js";
+import type { RuleDirection } from "../../contact_rules.js";
 import { type Contact, type RawContact, type ContactReviewStatus, parseContact, parseContactEmail, parseContactPhone } from "../types.js";
 
 /** An explicit exact-address choice overrides the agent's channel mode. */
 export type ContactDecision = "inherit" | "allow" | "block";
 export interface ContactAddressPermission {
+  inboundAction?: ContactDecision;
+  outboundAction?: ContactDecision;
+  allowedInbound?: boolean;
+  allowedOutbound?: boolean;
   kind: "email" | "phone";
   value: string;
   label: string | null;
@@ -12,10 +17,13 @@ export interface ContactAddressPermission {
   allowed: boolean;
 }
 export interface ContactAddressUpdate {
+  direction?: RuleDirection;
+  expectedInboundAction?: ContactDecision;
+  expectedOutboundAction?: ContactDecision;
   kind: "email" | "phone";
   value: string;
   action: ContactDecision;
-  expectedAction: ContactDecision;
+  expectedAction?: ContactDecision;
 }
 /** Profile and dependent memory visibility decisions. */
 export interface ContactVisibilityDecisions { profile: ContactDecision; memories: ContactDecision }
@@ -43,6 +51,10 @@ export interface ReplaceContactCommunicationPolicy {
   visibility?: ContactVisibilityPolicy;
 }
 export interface ContactCommunicationPreview {
+  inboundEmail?: boolean;
+  outboundEmail?: boolean;
+  inboundPhone?: boolean;
+  outboundPhone?: boolean;
   identityId: string;
   contact: Contact | null;
   email: boolean;
@@ -63,6 +75,10 @@ export interface ContactPermissionVisibility {
   identityOverride: ContactVisibilityDecisions;
 }
 export interface ContactPermissionEffective extends ContactVisibilityResult {
+  inboundEmail?: IdentifierPermission;
+  outboundEmail?: IdentifierPermission;
+  inboundPhone?: IdentifierPermission;
+  outboundPhone?: IdentifierPermission;
   email: IdentifierPermission;
   phone: IdentifierPermission;
 }
@@ -86,22 +102,35 @@ export interface ListContactPermissionsOptions {
   offset?: number;
   reviewStatus?: ContactReviewStatus[];
 }
+interface RawPermissionEffective extends ContactPermissionEffective {
+  inbound_email?: IdentifierPermission;
+  outbound_email?: IdentifierPermission;
+  inbound_phone?: IdentifierPermission;
+  outbound_phone?: IdentifierPermission;
+}
 interface RawPermissionEntry {
   contact: Pick<RawContact, "id" | "preferred_name" | "given_name" | "family_name" | "company_name" | "emails" | "phones"> & { review_status: ContactReviewStatus };
   revision: number;
   visibility: { defaults: ContactVisibilityDecisions; identity_override: ContactVisibilityDecisions };
-  effective: ContactPermissionEffective;
-  access?: ContactAccessSettings | null;
+  effective: RawPermissionEffective;
+  access?: RawContactAccessSettings | null;
 }
 interface RawPolicy {
   contact_id: string;
   revision: number;
   identity_id: string | null;
-  addresses: ContactAddressPermission[];
+  addresses: (ContactAddressPermission & {
+    inbound_action?: ContactDecision; outbound_action?: ContactDecision;
+    allowed_inbound?: boolean; allowed_outbound?: boolean;
+  })[];
   effective_visibility: ContactVisibilityResult | null;
   visibility: { defaults: ContactVisibilityDecisions; identities: (ContactVisibilityDecisions & { identity_id: string })[] };
 }
 interface RawPreview {
+  inbound_email?: boolean;
+  outbound_email?: boolean;
+  inbound_phone?: boolean;
+  outbound_phone?: boolean;
   identity_id: string;
   contact: RawContact | null;
   email: boolean;
@@ -112,13 +141,18 @@ interface RawPreview {
 /** Parse both required policy portions. */
 function parsePolicy(raw: RawPolicy): ContactCommunicationPolicy {
   return { contactId: raw.contact_id, revision: raw.revision, identityId: raw.identity_id,
-    addresses: raw.addresses, effectiveVisibility: raw.effective_visibility,
+    addresses: raw.addresses.map(({ inbound_action, outbound_action, allowed_inbound, allowed_outbound, ...row }) => ({
+      ...row, inboundAction: inbound_action ?? row.action, outboundAction: outbound_action ?? row.action,
+      allowedInbound: allowed_inbound ?? row.allowed, allowedOutbound: allowed_outbound ?? row.allowed,
+    })), effectiveVisibility: raw.effective_visibility,
     visibility: { defaults: raw.visibility.defaults,
       identities: raw.visibility.identities.map((row) => ({ identityId: row.identity_id, profile: row.profile, memories: row.memories })) } };
 }
 /** Parse a filtered contact and independently reported visibility. */
 function parsePreview(raw: RawPreview): ContactCommunicationPreview {
   return { identityId: raw.identity_id, contact: raw.contact ? parseContact(raw.contact) : null,
+    inboundEmail: raw.inbound_email, outboundEmail: raw.outbound_email,
+    inboundPhone: raw.inbound_phone, outboundPhone: raw.outbound_phone,
     email: raw.email, phone: raw.phone, fullProfile: raw.full_profile,
     visibility: raw.visibility };
 }
@@ -155,7 +189,11 @@ export class ContactCommunicationPolicyResource {
     }
     return parsePolicy(await this.http.put<RawPolicy>(`/contacts/${encodeURIComponent(contactId)}/communication-policy`, {
       expected_revision: options.expectedRevision, identity_id: options.identityId,
-      addresses: options.addresses.map((row) => ({ kind: row.kind, value: row.value, action: row.action, expected_action: row.expectedAction })),
+      addresses: options.addresses.map((row) => ({ kind: row.kind, value: row.value, action: row.action, expected_action: row.expectedAction,
+        ...(row.direction !== undefined ? { direction: row.direction } : {}),
+        ...(row.expectedInboundAction !== undefined ? { expected_inbound_action: row.expectedInboundAction } : {}),
+        ...(row.expectedOutboundAction !== undefined ? { expected_outbound_action: row.expectedOutboundAction } : {}),
+      })),
       ...(options.visibility !== undefined ? { visibility: {
         defaults: options.visibility.defaults,
         identities: options.visibility.identities.map((row) => ({ identity_id: row.identityId, profile: row.profile, memories: row.memories })),
@@ -189,8 +227,15 @@ export class ContactCommunicationPolicyResource {
         reviewStatus: row.contact.review_status, emails: (row.contact.emails ?? []).map(parseContactEmail), phones: (row.contact.phones ?? []).map(parseContactPhone) },
       revision: row.revision,
       visibility: { defaults: row.visibility.defaults, identityOverride: row.visibility.identity_override },
-      effective: row.effective,
-      ...(row.access !== undefined ? { access: row.access } : {}),
+      effective: {
+        profile: row.effective.profile, memories: row.effective.memories,
+        email: row.effective.email, phone: row.effective.phone,
+        inboundEmail: row.effective.inbound_email ?? row.effective.email,
+        outboundEmail: row.effective.outbound_email ?? row.effective.email,
+        inboundPhone: row.effective.inbound_phone ?? row.effective.phone,
+        outboundPhone: row.effective.outbound_phone ?? row.effective.phone,
+      },
+      ...(row.access !== undefined ? { access: row.access === null ? null : parseContactAccessSettings(row.access) } : {}),
     })) };
   }
 }

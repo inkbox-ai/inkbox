@@ -4,6 +4,17 @@ import { ContactCommunicationPolicyResource } from "../src/contacts/resources/co
 import { HttpTransport } from "../src/_http.js";
 
 describe("contact communication policies", () => {
+  it("does not infer communication permissions from legacy preview visibility", async () => {
+    const get = vi.fn().mockResolvedValue({ identity_id: "agent", contact: null,
+      email: true, phone: true, full_profile: true, visibility: { profile: true, memories: true } });
+    const preview = await new ContactCommunicationPolicyResource({ get } as unknown as HttpTransport)
+      .preview("contact", "agent");
+    expect(preview.email).toBe(true);
+    expect(preview.inboundEmail).toBeUndefined();
+    expect(preview.outboundEmail).toBeUndefined();
+    expect(preview.inboundPhone).toBeUndefined();
+    expect(preview.outboundPhone).toBeUndefined();
+  });
   it("uses the shared wire fixture through the HTTP transport", async () => {
     const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/contact_communication_policy.json", import.meta.url), "utf8"));
     const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -51,7 +62,11 @@ describe("contact communication policies", () => {
     expect(page.items[0].effective.phone).toBe("some");
     expect(page.items[0].revision).toBe(8);
     expect(page.items[0].contact).not.toHaveProperty("notes");
-    expect(page.items[0].access).toEqual(access);
+    if (access == null) expect(page.items[0].access).toBe(access);
+    else {
+      expect(page.items[0].access).toMatchObject(access);
+      expect(page.items[0].access?.email.inboundContactable).toEqual(access.email.contactable);
+    }
   });
   it("serializes independent visibility while preserving omission", async () => {
     const put = vi.fn().mockResolvedValue({ contact_id: "contact", revision: 2,

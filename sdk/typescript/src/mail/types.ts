@@ -229,6 +229,8 @@ export interface Mailbox {
    */
   sendingDomain: string;
   filterMode: FilterMode;
+  inboundFilterMode?: FilterMode;
+  outboundFilterMode?: FilterMode;
   /**
    * UUID of the owning agent identity. Non-null for live customer
    * mailboxes (1:1 invariant); null only on deleted rows and system
@@ -351,6 +353,8 @@ export interface ThreadDetail extends Thread {
  *   shape is {@link MailIdentityContactRule}.
  */
 export interface MailContactRule {
+  /** Parsers use both when an older response omits direction. */
+  direction?: import("../contact_rules.js").RuleDirection;
   id: string;
   mailboxId: string;
   action: MailRuleAction;
@@ -370,6 +374,7 @@ export interface MailContactRule {
  * instead of `mailboxId`.
  */
 export interface MailIdentityContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   contact?: Contact | null;
   id: string;
   agentIdentityId: string;
@@ -397,6 +402,8 @@ export interface RawMailbox {
   email_address: string;
   sending_domain?: string;
   filter_mode?: string;
+  inbound_filter_mode?: string;
+  outbound_filter_mode?: string;
   agent_identity_id?: string | null;
   filter_mode_change_notice?: RawFilterModeChangeNotice | null;
   created_at: string;
@@ -532,6 +539,7 @@ export interface RawThread {
 }
 
 export interface RawMailContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   id: string;
   mailbox_id: string;
   action: string;
@@ -543,6 +551,7 @@ export interface RawMailContactRule {
 }
 
 export interface RawMailIdentityContactRule {
+  direction?: import("../contact_rules.js").RuleDirection;
   contact?: RawContact | null;
   id: string;
   agent_identity_id: string;
@@ -581,6 +590,8 @@ export function parseMailbox(r: RawMailbox): Mailbox {
     emailAddress: r.email_address,
     sendingDomain: r.sending_domain ?? r.email_address.split("@")[1] ?? "",
     filterMode: (r.filter_mode as FilterMode) ?? FilterMode.BLACKLIST,
+    inboundFilterMode: (r.inbound_filter_mode ?? r.filter_mode ?? FilterMode.BLACKLIST) as FilterMode,
+    outboundFilterMode: (r.outbound_filter_mode ?? r.filter_mode ?? FilterMode.BLACKLIST) as FilterMode,
     agentIdentityId: r.agent_identity_id ?? null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
@@ -747,6 +758,7 @@ export function parseThreadDetail(r: RawThread): ThreadDetail {
 
 export function parseMailContactRule(r: RawMailContactRule): MailContactRule {
   return {
+    direction: r.direction ?? "both",
     id: r.id,
     mailboxId: r.mailbox_id,
     action: r.action as MailRuleAction,
@@ -762,6 +774,7 @@ export function parseMailIdentityContactRule(
   r: RawMailIdentityContactRule,
 ): MailIdentityContactRule {
   return {
+    direction: r.direction ?? "both",
     contact: r.contact == null ? null : parseContact(r.contact),
     id: r.id,
     agentIdentityId: r.agent_identity_id,

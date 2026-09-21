@@ -82,6 +82,10 @@ export interface CreateIdentityOptions {
 
 /** Fields accepted by identity PATCH. Omitted fields remain unchanged. */
 export interface UpdateIdentityOptions {
+  mailInboundFilterMode?: "whitelist" | "blacklist";
+  mailOutboundFilterMode?: "whitelist" | "blacklist";
+  phoneInboundFilterMode?: "whitelist" | "blacklist";
+  phoneOutboundFilterMode?: "whitelist" | "blacklist";
   newHandle?: string;
   displayName?: string | null;
   description?: string | null;
@@ -106,6 +110,8 @@ export interface UpdateIdentityOptions {
 }
 
 export interface IdentityMailbox {
+  inboundFilterMode?: FilterMode;
+  outboundFilterMode?: FilterMode;
   signatureHtml: string | null;
   signatureText: string | null;
   signatureEnabled: boolean;
@@ -128,6 +134,8 @@ export interface IdentityMailbox {
 }
 
 export interface IdentityPhoneNumber {
+  inboundFilterMode?: FilterMode;
+  outboundFilterMode?: FilterMode;
   id: string;
   number: string;
   /** Number type. Always `"local"`. */
@@ -163,6 +171,10 @@ export interface IdentityPhoneNumber {
 
 /** Identity returned by list endpoints. */
 export interface AgentIdentitySummary {
+  mailInboundFilterMode?: FilterMode;
+  mailOutboundFilterMode?: FilterMode;
+  phoneInboundFilterMode?: FilterMode;
+  phoneOutboundFilterMode?: FilterMode;
   id: string;
   organizationId: string;
   agentHandle: string;
@@ -225,6 +237,8 @@ export interface _AgentIdentityData extends AgentIdentitySummary {
 // ---- internal raw API shapes (snake_case from JSON) ----
 
 export interface RawIdentityMailbox {
+  inbound_filter_mode?: string;
+  outbound_filter_mode?: string;
   signature_html?: string | null;
   signature_text?: string | null;
   signature_enabled?: boolean;
@@ -239,6 +253,8 @@ export interface RawIdentityMailbox {
 }
 
 export interface RawIdentityPhoneNumber {
+  inbound_filter_mode?: string;
+  outbound_filter_mode?: string;
   id: string;
   number: string;
   type: string;
@@ -262,6 +278,10 @@ export interface RawIdentityPhoneNumber {
 }
 
 export interface RawAgentIdentitySummary {
+  mail_inbound_filter_mode?: string;
+  mail_outbound_filter_mode?: string;
+  phone_inbound_filter_mode?: string;
+  phone_outbound_filter_mode?: string;
   id: string;
   organization_id: string;
   agent_handle: string;
@@ -294,6 +314,8 @@ export interface RawAgentIdentityData extends RawAgentIdentitySummary {
 
 export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
   return {
+    inboundFilterMode: (r.inbound_filter_mode ?? r.filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    outboundFilterMode: (r.outbound_filter_mode ?? r.filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     signatureHtml: r.signature_html ?? null,
     signatureText: r.signature_text ?? null,
     signatureEnabled: r.signature_enabled ?? false,
@@ -312,6 +334,8 @@ export function parseIdentityMailbox(r: RawIdentityMailbox): IdentityMailbox {
 
 export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPhoneNumber {
   return {
+    inboundFilterMode: (r.inbound_filter_mode ?? r.filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    outboundFilterMode: (r.outbound_filter_mode ?? r.filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     id: r.id,
     number: r.number,
     type: r.type,
@@ -339,6 +363,10 @@ export function parseIdentityPhoneNumber(r: RawIdentityPhoneNumber): IdentityPho
 
 export function parseAgentIdentitySummary(r: RawAgentIdentitySummary): AgentIdentitySummary {
   return {
+    mailInboundFilterMode: (r.mail_inbound_filter_mode ?? r.mail_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    mailOutboundFilterMode: (r.mail_outbound_filter_mode ?? r.mail_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    phoneInboundFilterMode: (r.phone_inbound_filter_mode ?? r.phone_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
+    phoneOutboundFilterMode: (r.phone_outbound_filter_mode ?? r.phone_filter_mode ?? FilterModeEnum.BLACKLIST) as FilterMode,
     id: r.id,
     organizationId: r.organization_id,
     agentHandle: r.agent_handle,

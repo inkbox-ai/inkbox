@@ -5,6 +5,7 @@ Dataclasses mirroring the Inkbox Phone API response models.
 """
 
 from __future__ import annotations
+from inkbox.contact_rules import ContactRuleDirection
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -241,6 +242,14 @@ class PhoneNumber:
     forwarding_target_type: ForwardingTargetType | None = None
     forwarding_phone_number: str | None = None
     forwarding_sip_uri: str | None = None
+    inbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+    outbound_filter_mode: FilterMode = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        self.inbound_filter_mode = FilterMode(self.inbound_filter_mode or self.filter_mode)
+        self.outbound_filter_mode = FilterMode(self.outbound_filter_mode or self.filter_mode)
+        if self.inbound_filter_mode == self.outbound_filter_mode:
+            self.filter_mode = self.inbound_filter_mode
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneNumber:
@@ -250,6 +259,8 @@ class PhoneNumber:
         # responses that predate the sms_status field.
         raw_sms_status = d.get("sms_status")
         return cls(
+            inbound_filter_mode=d.get("inbound_filter_mode"),
+            outbound_filter_mode=d.get("outbound_filter_mode"),
             id=UUID(d["id"]),
             number=d["number"],
             type=d["type"],
@@ -915,10 +926,12 @@ class PhoneContactRule:
     status: ContactRuleStatus
     created_at: datetime
     updated_at: datetime
+    direction: ContactRuleDirection = ContactRuleDirection.BOTH
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneContactRule:
         return cls(
+            direction=ContactRuleDirection(d.get("direction", "both")),
             id=UUID(d["id"]),
             phone_number_id=UUID(d["phone_number_id"]),
             action=PhoneRuleAction(d["action"]),
@@ -950,10 +963,12 @@ class PhoneIdentityContactRule:
     created_at: datetime
     updated_at: datetime
     contact: Contact | None = None
+    direction: ContactRuleDirection = ContactRuleDirection.BOTH
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> PhoneIdentityContactRule:
         return cls(
+            direction=ContactRuleDirection(d.get("direction", "both")),
             contact=Contact._from_dict(d["contact"]) if d.get("contact") is not None else None,
             id=UUID(d["id"]),
             agent_identity_id=UUID(d["agent_identity_id"]),

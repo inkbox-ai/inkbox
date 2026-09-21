@@ -16,6 +16,66 @@ npx @inkbox/cli <command>
 
 Requires Node.js >= 22.
 
+## Companion mode
+
+Companion mode is off by default, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient. Configuration does not add permissions or SMS consent; blocks
+remain authoritative.
+
+```bash
+inkbox --json identity companion get example-agent
+# Administrator credentials are required for both writes.
+inkbox identity mail-rules create example-agent \
+  --action allow --match-type exact_email --match-target trusted@example.com --direction both
+inkbox --json identity companion update example-agent --enabled true
+# trusted@example.com sends "Please join this conversation" to the group.
+inkbox --json identity companion conversations example-agent --channel mail --limit 50 --offset 0
+inkbox --json identity companion history example-agent 22222222-2222-4222-8222-222222222222 --limit 100
+inkbox --json identity companion history example-agent 22222222-2222-4222-8222-222222222222 --cursor opaque-cursor
+inkbox --json identity companion initialization example-agent 22222222-2222-4222-8222-222222222222 --max-bytes 8388608
+inkbox --json identity companion update example-agent --enabled false
+```
+
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. Updates require `--enabled true|false`; unknown options are
+rejected. Enabling is allowed before any eligible sender or channel resource
+exists. Per-channel readiness reports prerequisites independently of enabled
+state, including `bidirectional_allow_required` when no exact bidirectional allow
+exists. Revision changes only when enabled changes; turning off and on requires a
+fresh qualifying message. Continued access depends on the actual trigger sender's
+permissions and membership, without transferring to another eligible participant.
+
+`state` aliases `conversations`. State pages retain `items`/`total`, while
+history JSON retains `historyComplete`, `nextCursor`, `replyContext`, and notices.
+Pages support limits 1-200; conversation offsets are 0-10,000.
+
+`initialization` loads all pages, deduplicates messages, validates scope and
+cursor progress, and revalidates permission before returning one combined
+`text` plus ordered `entries` and canonical reply context. Default bounds are
+8 MiB of fetched-page and transcript UTF-8 bytes and 1,000 pages; use
+`--max-bytes`/`--max-pages` for your host's capacity. Exceeding a bound fails
+before output; it never truncates. For lossless streaming use `history` pages.
+
+Persist a conversation/activation checkpoint before passing the combined text
+to a host once. Buffer live traffic until initialization completes, retain reply
+context per turn, and reconcile uncertain host acceptance on recovery. Historical
+commands are data, not fresh commands. Replies must use the existing stored mail
+parent or canonical phone/iMessage conversation, never a private last-sender
+address. Ordinary-phase events have no activation authority.
+
+Notices keep the normal stderr behavior; `--json --with-response-metadata`
+opts into one stdout envelope. HTTP errors remain nonzero exits with no partial
+stdout. Reply readiness remains separate from read access, including existing
+SMS consent and dedicated-line group iMessage requirements. MMS chats with the
+same participants represent one logical conversation.
+
 ## Authentication
 
 Set your API key as an environment variable or pass it as a flag:
@@ -49,6 +109,84 @@ inkbox --json identity list
 With `--json`, successful output is written to stdout. API errors are written as
 one JSON object to stderr with `error.type`, `error.message`, `error.statusCode`,
 `error.detail`, `error.retryAfterSeconds`, and `error.agentSupport`.
+
+## Response notices
+
+Advisory notices are printed to stderr without changing ordinary stdout. With
+`--json`, successful stdout keeps its existing shape and notices appear in one
+`{"notices": [...]}` stderr record. Each notice has string `code`, `level`, and
+`message` fields; unfamiliar codes and levels are preserved.
+
+For finite structured commands, opt into a single result document:
+
+```bash
+inkbox --json --with-response-metadata identity phone-rules list support-bot
+```
+
+The result is `{"data": <original result>, "notices": [...]}`. Notices are omitted
+when absent and empty success uses `"data": null`. Identical notices from internal
+lookups or pagination appear once. Errors keep the existing stderr error envelope
+and nonzero exit status, with optional top-level `notices` and unchanged
+`error.agentSupport` guidance.
+
+`--with-response-metadata` requires `--json`. Raw certificate stdout from
+`tunnel sign-csr` rejects it before making requests; use `--out` for a structured
+file result. File downloads retain their existing bytes and structured status
+output. Notices never authorize an operation or cause a retry.
+
+## Directional contact rules
+
+Requires CLI `0.7.3` or later.
+
+All identity mail/phone rules, deprecated mailbox/number rules, and iMessage
+contact-rule commands accept `--direction inbound|outbound|both` on create,
+update, and list operations. Inbound is communication from the counterparty to
+the agent; outbound is communication from the agent to the counterparty.
+
+```bash
+inkbox identity update support-bot \
+  --mail-inbound-filter-mode blacklist --mail-outbound-filter-mode whitelist
+inkbox identity mail-rules create support-bot \
+  --action allow --match-type exact_email --match-target x@example.com \
+  --direction outbound
+inkbox identity mail-rules update support-bot RULE_ID \
+  --action block --apply-to outbound
+```
+
+Omitting create direction means Both; omitting update direction preserves it.
+Updates accept action, direction, or both. `--apply-to inbound|outbound` requires
+`--action`, excludes `--direction`, and atomically preserves the opposite side.
+List filters for inbound/outbound include Both rules; `both` is exact. A2A's
+existing exact-direction behavior is unchanged. Compatible rules can consolidate,
+so a successful create may return an existing ID. Trust the returned rule.
+
+Identity update also accepts `--phone-inbound-filter-mode` and
+`--phone-outbound-filter-mode`. Existing shared mode flags set both directions;
+do not combine shared and directional flags for the same channel. Identity
+details expose both effective modes. Phone modes also apply to iMessage.
+
+`contacts access set --file` accepts `inboundContactable` and
+`outboundContactable` lists inside email/phone groups:
+
+```json
+{"email":{"inboundContactable":["x@example.com"],"outboundContactable":[]}}
+```
+
+Legacy `contactable` reads mean outbound; writes still affect both directions.
+Omitted lists preserve state and empty lists block current addresses on the named
+side. Mixing legacy and directional lists in one group, or supplying null, is
+invalid. Communication-policy files also accept address `direction` and
+`expectedInboundAction`/`expectedOutboundAction` concurrency checks. A one-way
+edit requires only the matching directional guard; Both requires both when
+`expectedAction` is omitted.
+
+`contacts permissions set --file` also accepts `inboundEmails`, `outboundEmails`,
+`inboundPhones`, and `outboundPhones` boolean maps. Each map may contain up to 50
+addresses. Shared `emails`/`phones` maps cannot be combined with directional maps
+for the same channel, and null is invalid. These maps also work in the initial
+`permissions` of a `contacts create --json` payload. The alternative initial
+`permissions.addresses` form accepts up to 200 directional decisions, while the
+contact remains limited to 50 email and 50 phone identifiers.
 
 ## Commands
 

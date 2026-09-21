@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { Command, Option } from "commander";
+import { addDirectionalRuleOptions, directionalRuleOptions } from "../contact-rules.js";
+import { printStatus } from "../output.js";
 import type { AgentIdentity } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { output, outputContactRules } from "../output.js";
@@ -67,6 +69,7 @@ const IMESSAGE_GROUP_CONVERSATION_COLUMNS = [
 ];
 
 const CONTACT_RULE_COLUMNS = [
+  "direction",
   "id",
   "agentIdentityId",
   "action",
@@ -135,6 +138,7 @@ function registerContactRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rules = await inkbox.imessageContactRules.list(cmdOpts.identity, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as never,
           limit: parseInt(cmdOpts.limit, 10),
           offset: parseInt(cmdOpts.offset, 10),
@@ -160,6 +164,7 @@ function registerContactRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const row = await inkbox.imessageContactRules.create(cmdOpts.identity, {
+          ...directionalRuleOptions(this),
           action: cmdOpts.action as never,
           matchTarget: cmdOpts.matchTarget,
         });
@@ -186,7 +191,7 @@ function registerContactRuleCommands(parent: Command): void {
         const row = await inkbox.imessageContactRules.update(
           cmdOpts.identity,
           ruleId,
-          { action: cmdOpts.action as never },
+          { action: cmdOpts.action as never, ...directionalRuleOptions(this) },
         );
         output(row, { json: !!opts.json });
       }),
@@ -205,7 +210,7 @@ function registerContactRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         await inkbox.imessageContactRules.delete(cmdOpts.identity, ruleId);
-        console.log(`Deleted iMessage contact rule '${ruleId}'.`);
+        printStatus(`Deleted iMessage contact rule '${ruleId}'.`);
       }),
     );
 
@@ -229,6 +234,7 @@ function registerContactRuleCommands(parent: Command): void {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
         const rules = await inkbox.imessageContactRules.listAll({
+          ...directionalRuleOptions(this),
           agentIdentityId: cmdOpts.agentIdentityId,
           action: cmdOpts.action as never,
           limit: parseInt(cmdOpts.limit, 10),
@@ -237,6 +243,7 @@ function registerContactRuleCommands(parent: Command): void {
         outputContactRules(rules, { json: !!opts.json, columns: CONTACT_RULE_COLUMNS });
       }),
     );
+  addDirectionalRuleOptions(rule);
 }
 
 export function registerIMessageCommands(program: Command): void {
@@ -546,7 +553,7 @@ export function registerIMessageCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         const result = await identity.markIMessageConversationRead(conversationId);
-        console.log(
+        printStatus(
           `Marked ${result.updatedCount} message(s) in conversation ${result.conversationId} as read.`,
         );
       }),
@@ -566,7 +573,7 @@ export function registerIMessageCommands(program: Command): void {
         const inkbox = createClient(opts);
         const identity = await inkbox.getIdentity(cmdOpts.identity);
         await identity.sendIMessageTyping(conversationId);
-        console.log(`Sent typing indicator for conversation ${conversationId}.`);
+        printStatus(`Sent typing indicator for conversation ${conversationId}.`);
       }),
     );
 

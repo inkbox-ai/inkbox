@@ -5,9 +5,9 @@
  */
 
 import { HttpTransport } from "../../_http.js";
-import { ContactAccessResource, type ContactChannelAccessUpdate } from "./contactAccess.js";
-import { ContactCommunicationPolicyResource } from "./communicationPolicy.js";
-import { ContactPermissionsResource, type UpdateContactPermissions } from "./permissions.js";
+import { ContactAccessResource, contactAccessToWire, type ContactChannelAccessUpdate } from "./contactAccess.js";
+import { ContactCommunicationPolicyResource, type ContactAddressUpdate, type ContactDecision } from "./communicationPolicy.js";
+import { ContactPermissionsResource, contactPermissionsToWire, type UpdateContactPermissions } from "./permissions.js";
 import { ContactCorrespondenceResource } from "./correspondence.js";
 import { ContactFactsResource } from "./contactFacts.js";
 import { VCardsResource } from "./vcards.js";
@@ -52,15 +52,27 @@ export interface LookupContactsOptions {
   phoneContains?: string;
 }
 
-interface ContactCreatePermissionsBase extends Omit<UpdateContactPermissions, "emails" | "phones"> {
+type ContactPermissionMaps = Omit<UpdateContactPermissions, "profile" | "memories">;
+
+interface ContactCreatePermissionsBase extends Pick<UpdateContactPermissions, "profile" | "memories"> {
   identityId: string;
 }
 
-/** Use group access objects or boolean address maps, without mixing the two shapes. */
+/** Use group access or boolean address maps without mixing shapes. */
 export type ContactCreatePermissions = ContactCreatePermissionsBase & (
-  | { emails?: Record<string, boolean>; phones?: Record<string, boolean>; email?: never; phone?: never }
-  | { emails?: never; phones?: never; email?: ContactChannelAccessUpdate; phone?: ContactChannelAccessUpdate }
+  | (ContactPermissionMaps & { email?: never; phone?: never; addresses?: never })
+  | ({ [Key in keyof ContactPermissionMaps]?: never } & { email?: ContactChannelAccessUpdate; phone?: ContactChannelAccessUpdate; addresses?: never })
 );
+
+/** Initial explicit address decisions, including independent choices for each direction. */
+export type ContactCreateAddressPermissions = { [Key in keyof ContactPermissionMaps]?: never } & {
+  identityId: string;
+  email?: never;
+  phone?: never;
+  addresses: Pick<ContactAddressUpdate, "kind" | "value" | "action" | "direction">[];
+  profile?: ContactDecision;
+  memories?: ContactDecision;
+};
 
 export interface CreateContactOptions {
   preferredName?: string;
@@ -83,6 +95,10 @@ export interface CreateContactOptions {
   /** Initial selected-agent access saved atomically; requires an admin API key. */
   permissions?: ContactCreatePermissions;
 }
+
+export type CreateContactWithAddressPermissionsOptions = Omit<CreateContactOptions, "permissions"> & {
+  permissions: ContactCreateAddressPermissions;
+};
 
 export interface UpdateContactOptions {
   preferredName?: string | null;
@@ -182,7 +198,9 @@ export class ContactsResource {
     return parseContact(data);
   }
 
-  async create(options: CreateContactOptions = {}): Promise<Contact> {
+  async create(options: CreateContactWithAddressPermissionsOptions): Promise<Contact>;
+  async create(options?: CreateContactOptions): Promise<Contact>;
+  async create(options: CreateContactOptions | CreateContactWithAddressPermissionsOptions = {}): Promise<Contact> {
     const body: Record<string, unknown> = {};
     if (options.preferredName !== undefined) body.preferred_name = options.preferredName;
     if (options.namePrefix !== undefined) body.name_prefix = options.namePrefix;
@@ -202,16 +220,22 @@ export class ContactsResource {
     if (options.customFields !== undefined) body.custom_fields = options.customFields.map(contactCustomFieldToWire);
     if (options.permissions !== undefined) {
       const { identityId, ...permissions } = options.permissions;
-      const usesMaps = permissions.emails !== undefined || permissions.phones !== undefined;
+      const usesMaps = [permissions.emails, permissions.phones, permissions.inboundEmails,
+        permissions.outboundEmails, permissions.inboundPhones, permissions.outboundPhones].some((value) => value !== undefined);
       const usesGroups = permissions.email !== undefined || permissions.phone !== undefined;
       if (usesMaps && usesGroups) throw new Error("Use boolean address maps or group access objects, not both");
-      if (permissions.profile === false && (
-        permissions.memories === true
-        || Object.values(permissions.emails ?? {}).some(Boolean)
-        || Object.values(permissions.phones ?? {}).some(Boolean)
-        || [permissions.email, permissions.phone].some((group) => group?.visible === true || Boolean(group?.contactable?.length))
-      )) throw new Error("Profile cannot be disabled while email, phone, or memories is enabled");
-      body.permissions = { ...permissions, identity_id: identityId };
+      if (permissions.addresses !== undefined) {
+        if (usesMaps || usesGroups) throw new Error("Address decisions cannot be combined with permission maps or groups");
+        if (!Array.isArray(permissions.addresses) || permissions.addresses.length > 200) {
+          throw new TypeError("Initial address decisions must be an array of at most 200 entries");
+        }
+        if (permissions.profile === "block" && (permissions.memories === "allow" || permissions.addresses.some((row) => row.action === "allow"))) {
+          throw new Error("Profile cannot be blocked while email, phone, or memories is allowed");
+        }
+        body.permissions = { ...permissions, identity_id: identityId };
+      } else {
+        body.permissions = { ...(usesGroups ? contactAccessToWire(permissions) : contactPermissionsToWire(permissions)), identity_id: identityId };
+      }
     }
     const data = await this.http.post<RawContact>(options.permissions !== undefined ? `${BASE}/with-permissions` : BASE, body);
     return parseContact(data);
