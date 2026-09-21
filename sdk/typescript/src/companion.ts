@@ -4,21 +4,14 @@ import { collectResponseNotices, parseResponseNotices, type ResponseNotice } fro
 export type CompanionChannel = "mail" | "phone" | "imessage";
 export const DEFAULT_COMPANION_MAX_BYTES = 8 * 1024 * 1024;
 
-export interface CompanionSponsor {
-  contactId?: string | null;
-  displayName?: string | null;
-  emails: string[];
-  phoneNumbers: string[];
-}
 export interface CompanionReadiness { ready: boolean; reasons: string[] }
 export interface CompanionConfig {
   enabled: boolean;
   configRevision: number;
-  sponsor?: CompanionSponsor;
   readiness: Record<CompanionChannel, CompanionReadiness>;
   notices?: ResponseNotice[];
 }
-export interface CompanionUpdateOptions { enabled?: boolean; sponsor?: CompanionSponsor }
+export interface CompanionUpdateOptions { enabled?: boolean }
 export interface CompanionConversation {
   scopeId: string;
   conversationId: string;
@@ -128,10 +121,6 @@ function parseConfig(data: any): CompanionConfig {
   return {
     enabled: data.enabled, configRevision: data.config_revision,
     readiness: data.readiness, notices: parseResponseNotices(data.notices),
-    ...(data.sponsor ? { sponsor: {
-      contactId: data.sponsor.contact_id, displayName: data.sponsor.display_name,
-      emails: data.sponsor.emails, phoneNumbers: data.sponsor.phone_numbers,
-    } } : {}),
   };
 }
 function parsePage(data: any, activationId: string): CompanionActivationPage {
@@ -171,14 +160,12 @@ export class CompanionResource {
   }
 
   async update(handle: string, options: CompanionUpdateOptions): Promise<CompanionConfig> {
+    if (!object(options) || Object.keys(options).some((key) => key !== "enabled")) {
+      throw new Error("Companion update accepts only enabled");
+    }
     if (options.enabled !== undefined && typeof options.enabled !== "boolean") throw new Error("enabled must be a boolean");
-    if (options.sponsor !== undefined && !object(options.sponsor)) throw new Error("sponsor must be an object");
     return parseConfig(await this.http.patch(path(handle), {
       ...(options.enabled === undefined ? {} : { enabled: options.enabled }),
-      ...(options.sponsor === undefined ? {} : { sponsor: {
-        contact_id: options.sponsor.contactId, display_name: options.sponsor.displayName,
-        emails: options.sponsor.emails, phone_numbers: options.sponsor.phoneNumbers,
-      } }),
     }));
   }
 

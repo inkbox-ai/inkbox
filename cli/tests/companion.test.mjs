@@ -9,8 +9,8 @@ const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const fixture = JSON.parse(readFileSync(new URL("../../tests/fixtures/companion-v1.json", import.meta.url), "utf8"));
 const activation = fixture.pages[0].activation_id;
 const notice = fixture.pages[0].notices[0];
-async function run(url, args) {
-  return new Promise((resolve) => execFile(process.execPath, [cli, "--api-key", "test-key", "--base-url", url, "--json", ...args], {
+async function run(url, args, apiKey = "test-key") {
+  return new Promise((resolve) => execFile(process.execPath, [cli, "--api-key", apiKey, "--base-url", url, "--json", ...args], {
     timeout: 15000, env: { ...process.env, NODE_USE_ENV_PROXY: "0", INKBOX_VAULT_KEY: "" },
   }, (error, stdout, stderr) => resolve({ error, stdout, stderr })));
 }
@@ -25,30 +25,63 @@ function respond(res, body, status = 200) {
   res.end(JSON.stringify(body));
 }
 
-test("Companion configuration writes preserve explicit false and replacement identifiers", async () => {
+for (const apiKey of ["test-agent-key", "test-admin-key"]) {
+  for (const name of ["config", "config_without_resources"]) {
+    for (const enabled of [false, true]) {
+      test(`Companion get returns only config fields: ${apiKey}, ${name}, enabled=${enabled}`, async () => {
+        const requests = [];
+        const config = { ...fixture[name], enabled };
+        await serve((req, res) => {
+          requests.push({ url: req.url, method: req.method, key: req.headers["x-api-key"] });
+          respond(res, config);
+        }, async (url) => {
+          const got = await run(url, ["identity", "companion", "get", "example-agent"], apiKey);
+          assert.ifError(got.error);
+          assert.deepEqual(JSON.parse(got.stdout), {
+            enabled, configRevision: config.config_revision, readiness: config.readiness,
+          });
+          assert.deepEqual(requests, [{ url: "/api/v1/identities/example-agent/companion", method: "GET", key: apiKey }]);
+        });
+      });
+    }
+  }
+}
+
+test("Companion configuration writes only enabled before resources exist", async () => {
   const requests = [];
   await serve(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     requests.push({ url: req.url, method: req.method, body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : null });
-    respond(res, fixture.config);
+    respond(res, { ...fixture.config_without_resources, enabled: requests.at(-1).body.enabled });
   }, async (url) => {
     const prefix = ["identity", "companion"];
-    const got = await run(url, [...prefix, "get", "example-agent"]);
-    assert.ifError(got.error);
-    assert.equal(JSON.parse(got.stdout).enabled, true);
-    const updated = await run(url, [...prefix, "update", "example-agent", "--enabled", "false"]);
-    assert.ifError(updated.error);
-    assert.deepEqual(requests.at(-1).body, { enabled: false });
-    const sponsor = { emails: ["sponsor@example.com"], phone_numbers: [], contact_id: null };
-    const replaced = await run(url, [...prefix, "update", "example-agent", "--sponsor", JSON.stringify(sponsor)]);
-    assert.ifError(replaced.error);
-    assert.deepEqual(requests.at(-1).body, { sponsor });
+    for (const enabled of [true, false]) {
+      const updated = await run(url, [...prefix, "update", "example-agent", "--enabled", String(enabled)]);
+      assert.ifError(updated.error);
+      assert.deepEqual(requests.at(-1), { url: "/api/v1/identities/example-agent/companion", method: "PATCH", body: { enabled } });
+      const result = JSON.parse(updated.stdout);
+      assert.equal(result.enabled, enabled);
+      assert.deepEqual(result.readiness, fixture.config_without_resources.readiness);
+    }
+    assert.equal(requests.length, 2);
+  });
+});
+
+test("Companion update rejects obsolete and invalid flags locally", async () => {
+  const requests = [];
+  await serve((req, res) => {
+    requests.push(req.url);
+    respond(res, fixture.config);
+  }, async (url) => {
     const count = requests.length;
-    for (const args of [["--enabled", "yes"], ["--sponsor", "null"], []]) {
-      const bad = await run(url, [...prefix, "update", "example-agent", ...args]);
+    for (const args of [["--enabled", "yes"], ["--enabled", "null"],
+      ["--enabled", "true", "--sponsor", "{}"], ["--sponsor", "null"],
+      ["--enabled", "true", "--enabld", "true"], []]) {
+      const bad = await run(url, ["identity", "companion", "update", "example-agent", ...args]);
       assert.equal(bad.error?.code, 1);
       assert.equal(bad.stdout, "");
+      if (args.includes("--sponsor") && args.includes("--enabled")) assert.match(bad.stderr, /unknown option '--sponsor'/);
     }
     assert.equal(requests.length, count);
   });

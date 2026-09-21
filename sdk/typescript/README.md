@@ -1865,29 +1865,47 @@ MIT
 
 ## Companion mode
 
-Companion mode is off by default. A configured sponsor's own qualifying group
-message activates one conversation. An administrator manages configuration;
-claimed agents can read their effective state without sponsor selections.
+Companion mode is off by default, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient.
 
 ```ts
-import { Inkbox } from "@inkbox/sdk";
+import { Inkbox, MailRuleAction, MailRuleMatchType } from "@inkbox/sdk";
 
 const client = new Inkbox();
 const config = await client.companion.get("example-agent");
-await client.companion.update("example-agent", {
-  enabled: true,
-  sponsor: { emails: ["sponsor@example.com"], phoneNumbers: [] },
+// Administrator credentials are required for both writes.
+await client.mailIdentityContactRules.create("example-agent", {
+  action: MailRuleAction.ALLOW, matchType: MailRuleMatchType.EXACT_EMAIL,
+  matchTarget: "trusted@example.com", direction: "both",
 });
+await client.companion.update("example-agent", { enabled: true });
+// trusted@example.com sends "Please join this conversation" to the group.
 const states = await client.companion.conversations("example-agent", {
   channel: "mail", limit: 50, offset: 0,
 });
 ```
 
-Omitted PATCH fields are preserved; a supplied sponsor replaces the selection
-atomically. Selected identifiers must already have the required ordinary
-permissions. Blocks, SMS consent, and other sending requirements remain in force.
-Conversation `replyReady` is independent of history access. Group iMessage
-requires a dedicated line; identical-participant MMS chats are one conversation.
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. Only `enabled` can be updated; omission is a no-op, and
+null or unknown options are rejected locally. Enabling is allowed before any
+eligible sender or channel resource exists. Per-channel readiness reports
+prerequisites independently of enabled state, including
+`bidirectional_allow_required` when no exact bidirectional allow exists. Readiness
+reason strings are open-ended. Revision changes only when enabled changes;
+turning off and on requires a fresh qualifying message.
+
+Continued access depends on the actual trigger sender's permissions and membership,
+without transferring to another eligible participant. Blocks, SMS consent, and
+other sending requirements remain in force. Conversation `replyReady` is
+independent of history access. Group iMessage requires a dedicated line;
+identical-participant MMS chats are one conversation.
 
 For an authenticated initialization/live webhook, load its activation before
 submitting any live turn:

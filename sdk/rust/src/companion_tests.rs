@@ -20,20 +20,70 @@ fn fixture() -> Value {
 }
 
 #[test]
-fn companion_config_patch_and_state_preserve_wire_shape() {
-    let server = MockServer::start();
+fn companion_config_reads_same_fields_for_agent_and_admin() {
     let fixture = fixture();
-    let get = server.mock(|when, then| {
-        when.method(GET)
-            .path("/api/v1/identities/example-agent/companion");
-        then.status(200).json_body(fixture["config"].clone());
-    });
-    let update = server.mock(|when, then| {
-        when.method(PATCH)
-            .path("/api/v1/identities/example-agent/companion")
-            .json_body(json!({"enabled": false}));
-        then.status(200).json_body(fixture["config"].clone());
-    });
+    for api_key in ["test-agent-key", "test-admin-key"] {
+        for name in ["config", "config_without_resources"] {
+            for enabled in [false, true] {
+                let server = MockServer::start();
+                let mut config = fixture[name].clone();
+                config["enabled"] = json!(enabled);
+                config["notices"] = fixture["pages"][0]["notices"].clone();
+                let get = server.mock(|when, then| {
+                    when.method(GET)
+                        .path("/api/v1/identities/example-agent/companion")
+                        .header("x-api-key", api_key);
+                    then.status(200).json_body(config.clone());
+                });
+                let sdk = Inkbox::builder(api_key)
+                    .base_url(server.base_url())
+                    .build()
+                    .unwrap();
+                let result = sdk.companion().get("example-agent").unwrap();
+                assert_eq!(serde_json::to_value(result).unwrap(), config);
+                get.assert_hits(1);
+            }
+        }
+    }
+}
+
+#[test]
+fn companion_config_patch_only_enabled_without_resources() {
+    for enabled in [None, Some(true), Some(false)] {
+        let server = MockServer::start();
+        let mut config = fixture()["config_without_resources"].clone();
+        config["enabled"] = json!(enabled.unwrap_or(true));
+        let body = enabled.map_or(json!({}), |value| json!({"enabled": value}));
+        let update = server.mock(|when, then| {
+            when.method(PATCH)
+                .path("/api/v1/identities/example-agent/companion")
+                .json_body(body)
+                .matches(|request| request.query_params.as_ref().map_or(true, Vec::is_empty));
+            then.status(200).json_body(config.clone());
+        });
+        let sdk = Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let result = sdk
+            .companion()
+            .update("example-agent", &CompanionUpdateOptions { enabled })
+            .unwrap();
+        assert_eq!(result.enabled, enabled.unwrap_or(true));
+        assert!(!result.readiness.mail.ready);
+        assert!(!result.readiness.phone.ready);
+        assert!(!result.readiness.imessage.ready);
+        assert_eq!(
+            result.readiness.mail.reasons[0],
+            "bidirectional_allow_required"
+        );
+        update.assert_hits(1);
+    }
+}
+
+#[test]
+fn companion_paged_state_preserves_wire_shape() {
+    let server = MockServer::start();
     let state = server.mock(|when, then| {
         when.method(GET)
             .path("/api/v1/identities/example-agent/companion/conversations")
@@ -45,21 +95,6 @@ fn companion_config_patch_and_state_preserve_wire_shape() {
     let sdk = Inkbox::builder("test-key")
         .base_url(server.base_url())
         .build()
-        .unwrap();
-    assert!(sdk
-        .companion()
-        .get("example-agent")
-        .unwrap()
-        .sponsor
-        .is_none());
-    sdk.companion()
-        .update(
-            "example-agent",
-            &CompanionUpdateOptions {
-                enabled: Some(false),
-                ..Default::default()
-            },
-        )
         .unwrap();
     assert_eq!(
         sdk.companion()
@@ -75,8 +110,6 @@ fn companion_config_patch_and_state_preserve_wire_shape() {
             .total,
         0
     );
-    get.assert();
-    update.assert();
     state.assert();
 }
 

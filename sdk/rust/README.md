@@ -753,24 +753,37 @@ MIT
 
 `client.companion()` provides `get`, `update`, `conversations`,
 `activation_messages`, and `load_initialization`. Configuration is off by
-default and administrator-managed. A sponsor's own qualifying group message
-activates that conversation; blocks and existing send requirements still apply.
+default and administrator-managed, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient; blocks and existing send requirements still apply.
 
 ```rust
-use inkbox::{Inkbox, companion::{CompanionSponsor, CompanionUpdateOptions,
+use inkbox::{Inkbox, ContactRuleCreateOptions, ContactRuleDirection,
+    mail::{MailRuleAction, MailRuleMatchType}, companion::{CompanionUpdateOptions,
     CompanionConversationOptions, CompanionActivationOptions,
     CompanionInitializationOptions}};
 
 fn main() -> inkbox::Result<()> {
     let client = Inkbox::from_env()?;
     let config = client.companion().get("example-agent")?;
+    // Administrator credentials are required for both writes.
+    client.mail_identity_contact_rules().create_with_options(
+        "example-agent", &ContactRuleCreateOptions {
+            action: MailRuleAction::Allow, match_type: MailRuleMatchType::ExactEmail,
+            match_target: "trusted@example.com".into(),
+            direction: Some(ContactRuleDirection::Both),
+        },
+    )?;
     client.companion().update("example-agent", &CompanionUpdateOptions {
         enabled: Some(true),
-        sponsor: Some(CompanionSponsor {
-            emails: vec!["sponsor@example.com".into()],
-            ..Default::default()
-        }),
     })?;
+    // trusted@example.com sends "Please join this conversation" to the group.
     let states = client.companion().conversations(
         "example-agent", &CompanionConversationOptions::default(),
     )?;
@@ -784,6 +797,17 @@ fn main() -> inkbox::Result<()> {
     Ok(())
 }
 ```
+
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. `CompanionUpdateOptions` contains only `enabled`:
+`Some(true)` enables, `Some(false)` disables, and `None` is a no-op. Enabling is
+allowed before any eligible sender or channel resource exists. Per-channel
+readiness reports prerequisites independently of enabled state, including
+`bidirectional_allow_required` when no exact bidirectional allow exists. Readiness
+reason strings are open-ended. Revision changes only when enabled changes;
+turning off and on requires a fresh qualifying message. Continued access depends
+on the actual trigger sender's permissions and membership, without transferring
+to another eligible participant.
 
 The helper returns `scope_id`, `activation_id`, `conversation_id`, `channel`,
 `entries`, `reply_context`, `text`, and `notices`. It exhausts pagination,

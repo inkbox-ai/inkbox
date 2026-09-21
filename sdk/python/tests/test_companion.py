@@ -1,5 +1,6 @@
 import copy
 import json
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,9 +14,9 @@ FIXTURE = json.loads((Path(__file__).parents[3] / "tests/fixtures/companion-v1.j
 ACTIVATION = FIXTURE["pages"][0]["activation_id"]
 
 
-def client_for(handler):
+def client_for(handler, api_key="test-key"):
     with patch("inkbox._http.httpx.HTTPTransport", return_value=httpx.MockTransport(handler)):
-        return Inkbox("test-key", base_url="https://example.com")
+        return Inkbox(api_key, base_url="https://example.com")
 
 
 def uppercase_ids(page):
@@ -67,27 +68,81 @@ def test_reject_different_valid_activation_uuid(method):
             getattr(client.companion, method)("example-agent", FIXTURE["pages"][0]["scope_id"].upper())
 
 
-def test_config_patch_omission_and_paged_state():
+@pytest.mark.parametrize("api_key", ["test-agent-key", "test-admin-key"])
+@pytest.mark.parametrize("config_name", ["config", "config_without_resources"])
+@pytest.mark.parametrize("enabled", [False, True])
+def test_config_reads_same_fields_for_agent_and_admin(api_key, config_name, enabled):
+    config = {**FIXTURE[config_name], "enabled": enabled, "notices": FIXTURE["pages"][0]["notices"]}
     requests = []
 
     def respond(request):
         requests.append(request)
-        return httpx.Response(200, json={"items": [], "total": 0} if request.url.path.endswith("conversations") else FIXTURE["config"])
+        return httpx.Response(200, json=config)
+
+    with client_for(respond, api_key) as client:
+        result = client.companion.get("example-agent")
+    assert asdict(result) == config
+    assert len(requests) == 1
+    assert requests[0].method == "GET"
+    assert requests[0].url.path == "/api/v1/identities/example-agent/companion"
+    assert requests[0].headers["x-api-key"] == api_key
+
+
+@pytest.mark.parametrize("options", [{}, {"enabled": True}, {"enabled": False}])
+def test_config_patch_only_enabled_without_resources(options):
+    config = {**FIXTURE["config_without_resources"], "enabled": options.get("enabled", True)}
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, json=config)
 
     with client_for(respond) as client:
-        assert client.companion.get("example-agent").sponsor is None
-        client.companion.update("example-agent", enabled=False)
-        assert json.loads(requests[-1].content) == {"enabled": False}
-        sponsor = {"emails": ["sponsor@example.com"], "phone_numbers": [], "contact_id": None}
-        client.companion.update("example-agent", sponsor=sponsor)
-        assert json.loads(requests[-1].content) == {"sponsor": sponsor}
+        result = client.companion.update("example-agent", **options)
+    assert result.enabled == config["enabled"]
+    assert all(not readiness.ready for readiness in result.readiness.values())
+    assert len(requests) == 1
+    assert requests[0].method == "PATCH"
+    assert requests[0].url.path == "/api/v1/identities/example-agent/companion"
+    assert not requests[0].url.params
+    assert json.loads(requests[0].content) == options
+
+
+@pytest.mark.parametrize("enabled", [None, "true", 1, {}])
+def test_config_rejects_non_boolean_enabled_locally(enabled):
+    def unexpected(request):
+        pytest.fail("Invalid update made an HTTP request")
+
+    with client_for(unexpected) as client:
+        with pytest.raises(ValueError, match="enabled must be a boolean"):
+            client.companion.update("example-agent", enabled=enabled)
+
+
+@pytest.mark.parametrize("options", [
+    {"sponsor": {"emails": ["trusted@example.com"], "phone_numbers": []}},
+    {"sponsor": None}, {"enabled": True, "sponsor": {}},
+    {"config_revision": 2}, {"enabld": True},
+])
+def test_config_rejects_unknown_options_locally(options):
+    def unexpected(request):
+        pytest.fail("Invalid update made an HTTP request")
+
+    with client_for(unexpected) as client:
+        with pytest.raises(TypeError, match="unexpected keyword argument"):
+            client.companion.update("example-agent", **options)
+
+
+def test_paged_state():
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        return httpx.Response(200, json={"items": [], "total": 0})
+
+    with client_for(respond) as client:
         page = client.companion.conversations("example-agent", channel="mail", limit=200, offset=10000)
         assert page.total == 0
         assert dict(requests[-1].url.params) == {"channel": "mail", "limit": "200", "offset": "10000"}
-        with pytest.raises(ValueError):
-            client.companion.update("example-agent", enabled=None)
-        with pytest.raises(ValueError):
-            client.companion.update("example-agent", sponsor=None)
 
 
 @pytest.mark.parametrize("channel", ["mail", "phone", "imessage"])

@@ -16,13 +16,6 @@ DEFAULT_COMPANION_MAX_BYTES = 8 * 1024 * 1024
 _UNSET = object()
 
 
-class CompanionSponsor(TypedDict):
-    emails: list[str]
-    phone_numbers: list[str]
-    contact_id: NotRequired[str | None]
-    display_name: NotRequired[str | None]
-
-
 class CompanionHistoryEntryWire(TypedDict):
     id: str
     author: str
@@ -65,7 +58,6 @@ class CompanionConfig:
     enabled: bool
     config_revision: int
     readiness: dict[CompanionChannel, CompanionReadiness]
-    sponsor: CompanionSponsor | None = None
     notices: list[ResponseNotice] = field(default_factory=list)
 
 
@@ -206,22 +198,20 @@ class CompanionResource:
     def get(self, handle: str) -> CompanionConfig:
         return self._config(self._http.get(_path(handle)))
 
-    def update(self, handle: str, *, enabled: bool = _UNSET, sponsor: CompanionSponsor = _UNSET) -> CompanionConfig:
-        body: dict[str, Any] = {}
+    def update(self, handle: str, *, enabled: bool = _UNSET) -> CompanionConfig:
+        """Set the enabled preference, or preserve it when omitted; reject non-booleans."""
+        body: dict[str, bool] = {}
         if enabled is not _UNSET:
             if type(enabled) is not bool:
                 raise ValueError("enabled must be a boolean")
             body["enabled"] = enabled
-        if sponsor is not _UNSET:
-            if not isinstance(sponsor, dict):
-                raise ValueError("sponsor must be an object")
-            body["sponsor"] = sponsor
         return self._config(self._http.patch(_path(handle), json=body))
 
     @staticmethod
     def _config(data: dict[str, Any]) -> CompanionConfig:
+        """Parse enabled state, channel prerequisites, and optional notices."""
         return CompanionConfig(
-            enabled=data["enabled"], config_revision=data["config_revision"], sponsor=data.get("sponsor"),
+            enabled=data["enabled"], config_revision=data["config_revision"],
             readiness={k: CompanionReadiness(**v) for k, v in data["readiness"].items()},
             notices=_parse_notices(data.get("notices")) or [],
         )

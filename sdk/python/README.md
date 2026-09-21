@@ -12,29 +12,45 @@ Requires Python ≥ 3.11.
 
 ## Companion mode
 
-Companion mode is off by default. An administrator selects one sponsor; the
-sponsor's own qualifying group message activates that conversation. Blocks and
-existing sending requirements still apply. A sponsored group does not authorize
-a private message or another group. Group iMessage requires a dedicated line;
-MMS with identical participants represents one logical conversation.
+Companion mode is off by default, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient. Blocks and existing sending requirements still apply.
 
 ```python
-from inkbox import Inkbox
+from inkbox import ContactRuleDirection, Inkbox
 
 with Inkbox() as client:
     config = client.companion.get("example-agent")
-    # Administrator credentials; selected addresses must already be permitted.
-    config = client.companion.update(
-        "example-agent", enabled=True,
-        sponsor={"emails": ["sponsor@example.com"], "phone_numbers": []},
+    # Administrator credentials are required for both writes.
+    client.mail_identity_contact_rules.create(
+        "example-agent", action="allow", match_type="exact_email",
+        match_target="trusted@example.com", direction=ContactRuleDirection.BOTH,
     )
+    config = client.companion.update("example-agent", enabled=True)
+    # trusted@example.com sends "Please join this conversation" to the group.
     states = client.companion.conversations("example-agent", channel="mail", limit=50, offset=0)
 ```
 
-Claimed agent configuration reads omit sponsor selections. Conversation state
-reports `reply_ready` separately from history access, including existing SMS
-consent requirements. PATCH preserves omitted fields and replaces a supplied
-sponsor atomically; `enabled=False` explicitly disables the feature.
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. Only `enabled` can be updated; omission is a no-op, and
+`None` or unknown keywords are rejected locally. Enabling is allowed before any
+eligible sender or channel resource exists. Per-channel readiness reports
+prerequisites independently of enabled state, including
+`bidirectional_allow_required` when no exact bidirectional allow exists. Readiness
+reason strings are open-ended. Revision changes only when enabled changes;
+turning off and on requires a fresh qualifying message.
+
+Continued access depends on the actual trigger sender's permissions and membership,
+without transferring to another eligible participant. Conversation state reports
+`reply_ready` separately from history access, including SMS consent requirements.
+A group does not authorize private messages or another group. Group iMessage
+requires a dedicated line; identical-participant MMS chats are one conversation.
 
 For an authenticated initialization/live webhook, use its `activation_id`:
 

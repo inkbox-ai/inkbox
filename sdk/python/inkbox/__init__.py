@@ -19,7 +19,6 @@ from inkbox.companion import (
     CompanionReplyContext,
     CompanionReplyContextWire,
     CompanionResource,
-    CompanionSponsor,
 )
 from inkbox.contact_rules import ContactRuleDirection
 from inkbox.response_metadata import APIResponse, ResponseMetadata, ResponseNotice, ResponseObserver
@@ -450,7 +449,6 @@ __all__ = [
     "CompanionReplyContext",
     "CompanionReplyContextWire",
     "CompanionResource",
-    "CompanionSponsor",
     "APIResponse",
     "ResponseMetadata",
     "ResponseNotice",

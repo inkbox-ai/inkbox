@@ -21,6 +21,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ### Changed
 
+- **Source-contract change in unreleased 0.7.3:** Companion updates now accept only `enabled`. Remove `CompanionSponsor` imports and `sponsor` arguments/options in Python, TypeScript, and Rust, and remove CLI `--sponsor`. Configuration responses no longer expose a sponsor field to administrators or agents. Existing activation history, webhook metadata, and reply context remain unchanged.
+- Companion eligibility comes from active exact email/number allow rules covering both directions, per normalized identifier and channel. Multiple senders may qualify; the first qualifying group message activates the conversation without repeated initialization. Domain/default access, contact visibility, and borrowed Companion access do not qualify. Enabling can precede any eligible sender or channel resource; readiness reports prerequisites independently, including `bidirectional_allow_required`.
 - Companion history and initialization normalize UUID letter case when matching activations, reply scopes, and source messages in Python, TypeScript, and the CLI.
 - Existing shared filter-mode writes still set both directions. Legacy mode reads show the common effective mode when directions agree, or the shared baseline when they differ.
 - Legacy contactable values describe sending permission; new fields report receiving and sending separately. Either direction can contribute to contact visibility under the existing visibility settings.

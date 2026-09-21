@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import type { CompanionChannel, CompanionSponsor } from "@inkbox/sdk";
+import type { CompanionChannel } from "@inkbox/sdk";
 import { createClient, getGlobalOpts } from "../client.js";
 import { withErrorHandler } from "../errors.js";
 import { output } from "../output.js";
@@ -12,17 +12,6 @@ function integer(value: string, name: string, minimum: number, maximum = Number.
   return result;
 }
 
-function sponsor(value: string): CompanionSponsor {
-  const data = JSON.parse(value);
-  if (!data || Array.isArray(data) || typeof data !== "object"
-    || !Array.isArray(data.emails) || !Array.isArray(data.phone_numbers)
-    || [...data.emails, ...data.phone_numbers].some((item) => typeof item !== "string")
-    || Object.keys(data).some((key) => !["emails", "phone_numbers", "contact_id", "display_name"].includes(key))) {
-    throw new Error("--sponsor requires a JSON object with emails and phone_numbers arrays; contact_id and display_name are optional");
-  }
-  return { emails: data.emails, phoneNumbers: data.phone_numbers, contactId: data.contact_id, displayName: data.display_name };
-}
-
 export function registerCompanionCommands(identity: Command): void {
   const companion = identity.command("companion").description("Companion mode configuration and conversation initialization");
   companion.command("get <handle>").description("Read configuration and channel readiness")
@@ -31,16 +20,13 @@ export function registerCompanionCommands(identity: Command): void {
       const result = await createClient(opts).companion.get(handle);
       output(result as unknown as Record<string, unknown>, { json: !!opts.json });
     }));
-  companion.command("update <handle>").description("Update Companion mode (administrator only; omitted fields stay unchanged)")
-    .option("--enabled <boolean>", "Explicitly enable or disable: true or false")
-    .option("--sponsor <json>", "Replace sponsor: JSON with emails, phone_numbers, optional contact_id/display_name")
-    .action(withErrorHandler(async function (this: Command, handle: string, options: { enabled?: string; sponsor?: string }) {
-      if (options.enabled !== undefined && options.enabled !== "true" && options.enabled !== "false") {
+  companion.command("update <handle>").description("Enable or disable Companion mode (administrator only)")
+    .requiredOption("--enabled <boolean>", "Explicitly enable or disable: true or false")
+    .action(withErrorHandler(async function (this: Command, handle: string, options: { enabled: string }) {
+      if (options.enabled !== "true" && options.enabled !== "false") {
         throw new Error("--enabled must be true or false");
       }
-      if (options.enabled === undefined && options.sponsor === undefined) throw new Error("Provide --enabled or --sponsor");
-      const update = { enabled: options.enabled === undefined ? undefined : options.enabled === "true",
-        sponsor: options.sponsor === undefined ? undefined : sponsor(options.sponsor) };
+      const update = { enabled: options.enabled === "true" };
       const opts = getGlobalOpts(this);
       const result = await createClient(opts).companion.update(handle, update);
       output(result as unknown as Record<string, unknown>, { json: !!opts.json });

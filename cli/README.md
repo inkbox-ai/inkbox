@@ -18,14 +18,24 @@ Requires Node.js >= 22.
 
 ## Companion mode
 
-Companion mode is off by default. An administrator explicitly selects a sponsor
-whose own qualifying group message activates one conversation. Configuration
-does not add contact permissions or SMS consent; blocks remain authoritative.
+Companion mode is off by default, separate from whitelist/blacklist settings.
+Eligibility requires active exact email/number allow rules covering both
+directions, either one Both rule or two applicable one-way allows. It is per
+normalized identifier and channel; phone and iMessage share one policy. Domain
+allowances, default access, contact visibility, and access borrowed from another
+Companion conversation do not qualify. Multiple senders may qualify; the first
+qualifying group message activates the conversation, without repeated
+initialization when another eligible sender messages. Mere participation is
+insufficient. Configuration does not add permissions or SMS consent; blocks
+remain authoritative.
 
 ```bash
 inkbox --json identity companion get example-agent
-inkbox --json identity companion update example-agent --enabled true \
-  --sponsor '{"emails":["sponsor@example.com"],"phone_numbers":[],"display_name":"Sponsor"}'
+# Administrator credentials are required for both writes.
+inkbox identity mail-rules create example-agent \
+  --action allow --match-type exact_email --match-target trusted@example.com --direction both
+inkbox --json identity companion update example-agent --enabled true
+# trusted@example.com sends "Please join this conversation" to the group.
 inkbox --json identity companion conversations example-agent --channel mail --limit 50 --offset 0
 inkbox --json identity companion history example-agent 22222222-2222-4222-8222-222222222222 --limit 100
 inkbox --json identity companion history example-agent 22222222-2222-4222-8222-222222222222 --cursor opaque-cursor
@@ -33,9 +43,15 @@ inkbox --json identity companion initialization example-agent 22222222-2222-4222
 inkbox --json identity companion update example-agent --enabled false
 ```
 
-`--sponsor` uses wire-format JSON: required `emails` and `phone_numbers` arrays,
-optional nullable `contact_id` and `display_name`. A replacement is atomic;
-omitted update fields stay unchanged. Agent-scoped reads omit sponsor selections.
+Administrator and claimed-agent reads return enabled state, revision, readiness,
+and optional notices. Updates require `--enabled true|false`; unknown options are
+rejected. Enabling is allowed before any eligible sender or channel resource
+exists. Per-channel readiness reports prerequisites independently of enabled
+state, including `bidirectional_allow_required` when no exact bidirectional allow
+exists. Revision changes only when enabled changes; turning off and on requires a
+fresh qualifying message. Continued access depends on the actual trigger sender's
+permissions and membership, without transferring to another eligible participant.
+
 `state` aliases `conversations`. State pages retain `items`/`total`, while
 history JSON retains `historyComplete`, `nextCursor`, `replyContext`, and notices.
 Pages support limits 1-200; conversation offsets are 0-10,000.

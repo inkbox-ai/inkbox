@@ -20,16 +20,6 @@ pub enum CompanionChannel {
     Imessage,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct CompanionSponsor {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub contact_id: Option<Uuid>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub display_name: Option<String>,
-    pub emails: Vec<String>,
-    pub phone_numbers: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompanionReadiness {
     pub ready: bool,
@@ -47,8 +37,6 @@ pub struct CompanionChannelReadiness {
 pub struct CompanionConfig {
     pub enabled: bool,
     pub config_revision: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sponsor: Option<CompanionSponsor>,
     pub readiness: CompanionChannelReadiness,
     #[serde(
         default,
@@ -61,8 +49,6 @@ pub struct CompanionConfig {
 pub struct CompanionUpdateOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sponsor: Option<CompanionSponsor>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

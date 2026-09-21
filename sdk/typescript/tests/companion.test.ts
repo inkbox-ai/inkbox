@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CompanionInitializationError, Inkbox } from "../src/index.js";
 
 const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/companion-v1.json", import.meta.url), "utf8"));
 const activation = fixture.pages[0].activation_id;
-const client = () => new Inkbox({ apiKey: "test-key", baseUrl: "https://example.com" });
+const client = (apiKey = "test-key") => new Inkbox({ apiKey, baseUrl: "https://example.com" });
 afterEach(() => vi.restoreAllMocks());
 
 function uppercaseIds(page: any) {
@@ -55,20 +55,58 @@ it.each(["activationMessages", "loadInitialization"] as const)("rejects a differ
     .rejects.toBeInstanceOf(CompanionInitializationError);
 });
 
-it("preserves PATCH omission, explicit false, sponsor replacement and bounded state pagination", async () => {
-  const request = vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(fixture.config));
-  const sdk = client();
-  expect((await sdk.companion.get("example-agent")).sponsor).toBeUndefined();
-  await sdk.companion.update("example-agent", { enabled: false });
-  expect(JSON.parse(request.mock.calls.at(-1)![1]!.body as string)).toEqual({ enabled: false });
-  await sdk.companion.update("example-agent", { sponsor: { emails: ["sponsor@example.com"], phoneNumbers: [], contactId: null } });
-  expect(JSON.parse(request.mock.calls.at(-1)![1]!.body as string)).toEqual({ sponsor: { emails: ["sponsor@example.com"], phone_numbers: [], contact_id: null } });
-  request.mockResolvedValueOnce(Response.json({ items: [], total: 0 }));
-  expect(await sdk.companion.conversations("example-agent", { channel: "mail", limit: 200, offset: 10000 })).toEqual({ items: [], total: 0 });
+describe.each(["test-agent-key", "test-admin-key"])("configuration reads with %s", (apiKey) => {
+  describe.each(["config", "config_without_resources"])("%s", (configName) => {
+    it.each([false, true])("returns only enabled state, readiness and notices with enabled=%s", async (enabled) => {
+      const config = { ...fixture[configName], enabled, notices: fixture.pages[0].notices };
+      const request = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(config));
+      expect(await client(apiKey).companion.get("example-agent")).toEqual({
+        enabled, configRevision: config.config_revision, readiness: config.readiness, notices: config.notices,
+      });
+      expect(request).toHaveBeenCalledTimes(1);
+      const [url, init] = request.mock.calls[0];
+      expect(new URL(String(url)).pathname).toBe("/api/v1/identities/example-agent/companion");
+      expect(init?.method).toBe("GET");
+      expect(new Headers(init?.headers).get("x-api-key")).toBe(apiKey);
+    });
+  });
+});
+
+it.each([{}, { enabled: true }, { enabled: false }, { enabled: undefined }])("PATCH sends only enabled without resources: %j", async (options) => {
+  const config = { ...fixture.config_without_resources, enabled: options.enabled ?? true };
+  const request = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json(config));
+  const result = await client().companion.update("example-agent", options);
+  expect(result.enabled).toBe(config.enabled);
+  expect(Object.values(result.readiness).every((readiness) => !readiness.ready)).toBe(true);
+  expect(request).toHaveBeenCalledTimes(1);
+  const [url, init] = request.mock.calls[0];
+  expect(new URL(String(url)).pathname).toBe("/api/v1/identities/example-agent/companion");
+  expect(new URL(String(url)).search).toBe("");
+  expect(init?.method).toBe("PATCH");
+  expect(JSON.parse(init?.body as string)).toEqual(options.enabled === undefined ? {} : options);
+});
+
+it.each([null, "true", 1, {}])("rejects non-boolean enabled locally: %j", async (enabled) => {
+  const request = vi.spyOn(globalThis, "fetch");
+  await expect(client().companion.update("example-agent", { enabled } as never)).rejects.toThrow("enabled must be a boolean");
+  expect(request).not.toHaveBeenCalled();
+});
+
+it.each([
+  { sponsor: { emails: ["trusted@example.com"], phoneNumbers: [] } },
+  { sponsor: null }, { sponsor: undefined }, { enabled: true, sponsor: {} },
+  { configRevision: 2 }, { enabld: true }, null, [], "true",
+])("rejects unknown or malformed update options locally: %j", async (options) => {
+  const request = vi.spyOn(globalThis, "fetch");
+  await expect(client().companion.update("example-agent", options as never)).rejects.toThrow("Companion update accepts only enabled");
+  expect(request).not.toHaveBeenCalled();
+});
+
+it("preserves bounded state pagination", async () => {
+  const request = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ items: [], total: 0 }));
+  expect(await client().companion.conversations("example-agent", { channel: "mail", limit: 200, offset: 10000 })).toEqual({ items: [], total: 0 });
   const url = new URL(String(request.mock.calls.at(-1)![0]));
   expect(Object.fromEntries(url.searchParams)).toEqual({ channel: "mail", limit: "200", offset: "10000" });
-  await expect(sdk.companion.update("example-agent", { enabled: null } as any)).rejects.toThrow();
-  await expect(sdk.companion.update("example-agent", { sponsor: null } as any)).rejects.toThrow();
 });
 
 it.each(["mail", "phone", "imessage"])("hydrates %s once with canonical scope, duplicate removal, notices and attachment refs", async (channel) => {

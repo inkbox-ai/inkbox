@@ -6,8 +6,17 @@
     "config_revision": 2,
     "readiness": {
       "mail": {"ready": true, "reasons": []},
-      "phone": {"ready": false, "reasons": ["sponsor_identifiers_required"]},
+      "phone": {"ready": false, "reasons": ["bidirectional_allow_required"]},
       "imessage": {"ready": false, "reasons": ["dedicated_imessage_line_required"]}
+    }
+  },
+  "config_without_resources": {
+    "enabled": true,
+    "config_revision": 1,
+    "readiness": {
+      "mail": {"ready": false, "reasons": ["bidirectional_allow_required", "channel_unavailable"]},
+      "phone": {"ready": false, "reasons": ["bidirectional_allow_required", "channel_unavailable"]},
+      "imessage": {"ready": false, "reasons": ["bidirectional_allow_required", "channel_unavailable", "dedicated_imessage_line_required", "imessage_disabled"]}
     }
   },
   "pages": [
