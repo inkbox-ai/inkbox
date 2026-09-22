@@ -162,6 +162,10 @@ def test_complete_hydration_dedup_scope_notices_and_attachments(channel):
         observed = client.with_response_metadata(lambda scoped: scoped.companion.load_initialization("example-agent", ACTIVATION))
     result = observed.data
     assert calls == [None, "opaque-page-2", None]
+    assert [entry.sender_access for entry in result.entries] == ["sponsored", None, "direct"]
+    assert '"sender_access":"sponsored"' in result.text
+    assert '"sender_access":"direct"' in result.text
+    assert '"sender_access":null' not in result.text
     assert len(result.entries) == 3
     assert sum(entry.is_trigger for entry in result.entries) == 1
     assert result.text.count("Please join this conversation.") == 1
@@ -258,3 +262,21 @@ def test_one_page_attachment_only_trigger_revalidates_and_webhooks_are_additive(
         assert len(requests) == 2
     for payload in (MailWebhookPayload, TextWebhookPayload, IMessageWebhookPayload):
         assert "companion" in payload.__annotations__
+
+
+@pytest.mark.parametrize("invalid", ["trusted", "ordinary", "", None, True])
+def test_sender_access_rejects_unknown_enum_values(invalid):
+    page = copy.deepcopy(FIXTURE["pages"][0])
+    page["items"][0]["sender_access"] = invalid
+    with client_for(lambda _: httpx.Response(200, json=page)) as client:
+        with pytest.raises(CompanionInitializationError):
+            client.companion.activation_messages("example-agent", ACTIVATION)
+
+
+def test_legacy_history_does_not_invent_direct_admission():
+    page = copy.deepcopy(FIXTURE["pages"][0])
+    for entry in page["items"]:
+        entry.pop("sender_access", None)
+    with client_for(lambda _: httpx.Response(200, json=page)) as client:
+        result = client.companion.activation_messages("example-agent", ACTIVATION)
+    assert all(entry.sender_access is None for entry in result.items)

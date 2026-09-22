@@ -189,3 +189,32 @@ it("revalidates a single-page attachment-only trigger", async () => {
   expect(result.entries).toHaveLength(1);
   expect(request).toHaveBeenCalledTimes(2);
 });
+
+
+it("retains mixed sender access through all initialization pages and rendered context", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = new URL(String(input));
+    return Response.json(fixture.pages[url.searchParams.has("cursor") ? 1 : 0]);
+  });
+  const result = await client().companion.loadInitialization("example-agent", activation);
+  expect(result.entries.map((entry) => entry.senderAccess)).toEqual(["sponsored", undefined, "direct"]);
+  expect(result.text).toContain('"senderAccess":"sponsored"');
+  expect(result.text).toContain('"senderAccess":"direct"');
+  expect(result.entries[1]).not.toHaveProperty("senderAccess");
+});
+
+it.each(["trusted", "ordinary", "", null, true])("rejects invalid sender access %s", async (senderAccess) => {
+  const page = structuredClone(fixture.pages[0]);
+  page.items[0].sender_access = senderAccess;
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(page));
+  await expect(client().companion.activationMessages("example-agent", activation))
+    .rejects.toBeInstanceOf(CompanionInitializationError);
+});
+
+it("does not infer direct admission for legacy history", async () => {
+  const page = structuredClone(fixture.pages[0]);
+  for (const entry of page.items) delete entry.sender_access;
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(page));
+  const result = await client().companion.activationMessages("example-agent", activation);
+  for (const entry of result.items) expect(entry).not.toHaveProperty("senderAccess");
+});
