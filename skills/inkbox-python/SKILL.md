@@ -1235,7 +1235,7 @@ if info.auth_type == "api_key" and info.auth_subtype == AUTH_SUBTYPE_API_KEY_ADM
 
 ## Tunnels
 
-Bring a local process online at a public `https://{name}.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. POSIX only.
+Bring a local process online at a public `https://{name}.inkboxwire.com` URL. Outbound HTTP/2 only — no inbound port to open. Linux, macOS, and Windows.
 
 ```python
 # Forward to a local URL (edge mode — Inkbox terminates TLS at the edge)

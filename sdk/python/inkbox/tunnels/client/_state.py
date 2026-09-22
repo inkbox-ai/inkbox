@@ -79,9 +79,11 @@ def ensure_private_state_dir(state_dir: Path) -> None:
     """Create ``state_dir`` (mode 0o700) and refuse symlinked targets."""
     if state_dir.exists() or state_dir.is_symlink():
         st = os.lstat(state_dir)
-        if _stat.S_ISLNK(st.st_mode):
+        if _stat.S_ISLNK(st.st_mode) or (
+            getattr(st, "st_file_attributes", 0) & _stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
             raise TunnelStateError(
-                f"refusing to use a symlinked state_dir ({state_dir}); "
+                f"refusing to use a linked state_dir ({state_dir}); "
                 "resolve and pass the real path",
             )
     state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -120,7 +122,10 @@ def write_private_file(target: Path, content: bytes) -> None:
     if target.exists() or target.is_symlink():
         _atomic_write(target, content)
         return
-    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_CREAT | os.O_EXCL | os.O_WRONLY
+        | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    )
     fd = os.open(target, flags, 0o600)
     try:
         os.write(fd, content)

@@ -289,6 +289,7 @@ def test_bootstrap_stale_tunnel_preserves_agent_support(tmp_path: Path):
     assert info.value.agent_support == support
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions and symlinks")
 def test_state_file_is_chmod_0600(tmp_path: Path):
     entry = StateEntry(
         tunnel_id="abc",
@@ -305,6 +306,7 @@ def test_state_file_is_chmod_0600(tmp_path: Path):
     assert mode == 0o600
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions and symlinks")
 def test_state_dir_mode_0700(tmp_path: Path):
     state_dir = tmp_path / "tunnel"
     ensure_private_state_dir(state_dir)
@@ -323,6 +325,7 @@ def test_load_state_returns_none_for_corrupt(tmp_path: Path):
     assert load_state(state_dir) is None
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions and symlinks")
 def test_symlinked_state_dir_is_refused(tmp_path: Path):
     real = tmp_path / "real"
     real.mkdir()
@@ -334,6 +337,7 @@ def test_symlinked_state_dir_is_refused(tmp_path: Path):
         ensure_private_state_dir(link)
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file permissions and symlinks")
 def test_write_private_file_creates_with_0600(tmp_path: Path):
     target = tmp_path / "private.pem"
     write_private_file(target, b"secret bytes")
@@ -357,3 +361,32 @@ def test_pool_size_validation():
         validate_pool_size(-1)
     with pytest.raises(ValueError):
         validate_pool_size(33)
+
+
+@pytest.mark.parametrize("content", [b"line one\nline two\r\n\x1a\x00\xff", b""])
+def test_private_file_preserves_bytes_on_create_and_replace(tmp_path: Path, content: bytes):
+    target = tmp_path / "private.pem"
+    write_private_file(target, content)
+    assert target.read_bytes() == content
+    write_private_file(target, content + b"\nreplacement")
+    assert target.read_bytes() == content + b"\nreplacement"
+    assert not list(tmp_path.glob(".tmp-*"))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows directory junctions")
+def test_junction_state_dir_is_refused(tmp_path: Path):
+    import subprocess
+
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "junction"
+    subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(real)], check=True,
+                   capture_output=True)
+    from inkbox.tunnels.client._state import TunnelStateError
+
+    try:
+        with pytest.raises(TunnelStateError):
+            ensure_private_state_dir(link)
+        assert not list(real.iterdir())
+    finally:
+        link.rmdir()

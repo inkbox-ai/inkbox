@@ -1313,7 +1313,9 @@ inkbox.phone_numbers.release(number.id)
 
 ## Tunnels
 
-Bring a local Python process online at a public `https://{name}.inkboxwire.com` URL via outbound HTTP/2. No inbound port to open, no static IP needed. POSIX only.
+Bring a local Python process online at a public `https://{name}.inkboxwire.com` URL via outbound HTTP/2. No inbound port to open, no static IP needed. Supports Linux, macOS, and native Windows with Python 3.11 or newer; WSL is not required.
+
+Keep Python current with the latest patch release. Tunnel state defaults to your user profile; if you set `state_dir`, use a directory accessible only to your account.
 
 ```python
 with Inkbox(api_key="ApiKey_...") as inkbox:

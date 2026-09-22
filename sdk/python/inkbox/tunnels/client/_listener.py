@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
-import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -41,14 +40,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger("inkbox.tunnels")
-
-
-def _check_posix() -> None:
-    if sys.platform.startswith("win"):
-        raise NotImplementedError(
-            "inkbox.tunnels.connect requires a POSIX platform; "
-            "control-plane reads (list, get, update, sign_csr) work on Windows.",
-        )
 
 
 class TunnelListener:
@@ -298,7 +289,6 @@ def connect(
         enable_h2_transcode: Default ``True``. When ``False``,
             passthrough advertises only ``http/1.1`` in ALPN.
     """
-    _check_posix()
     validate_pool_size(pool_size)
 
     if isinstance(forward_to, str):
