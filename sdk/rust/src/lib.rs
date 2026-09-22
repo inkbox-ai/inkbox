@@ -44,6 +44,8 @@ pub mod a2a;
 pub mod agent_signup;
 pub mod api_keys;
 pub mod companion;
+pub mod sender_access;
+pub use sender_access::SenderAccess;
 #[cfg(test)]
 mod companion_tests;
 pub mod contact_rules;

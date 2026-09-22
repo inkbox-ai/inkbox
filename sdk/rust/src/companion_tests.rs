@@ -176,6 +176,22 @@ fn companion_complete_hydration_normalizes_uuid_case_deduplicates_and_revalidate
                 .data
                 .entries
                 .iter()
+                .map(|entry| entry.sender_access)
+                .collect::<Vec<_>>(),
+            vec![
+                Some(crate::SenderAccess::Sponsored),
+                None,
+                Some(crate::SenderAccess::Direct)
+            ]
+        );
+        assert!(result.data.text.contains("\"sender_access\":\"sponsored\""));
+        assert!(result.data.text.contains("\"sender_access\":\"direct\""));
+        assert!(!result.data.text.contains("\"sender_access\":null"));
+        assert_eq!(
+            result
+                .data
+                .entries
+                .iter()
                 .filter(|entry| entry.is_trigger)
                 .count(),
             1
@@ -211,6 +227,7 @@ fn companion_rejects_mixed_scopes_incomplete_snapshots_and_limits() {
         "two_triggers",
         "bytes",
         "pages",
+        "null_access",
     ] {
         let server = MockServer::start();
         let mut fixture = fixture();
@@ -243,6 +260,7 @@ fn companion_rejects_mixed_scopes_incomplete_snapshots_and_limits() {
             }
             "bytes" => options.max_bytes = 100,
             "pages" => options.max_pages = 1,
+            "null_access" => fixture["pages"][1]["items"][0]["sender_access"] = Value::Null,
             _ => unreachable!(),
         }
         server.mock(|when, then| {
@@ -308,4 +326,26 @@ fn companion_revocation_preserves_error_and_old_webhook_literals() {
         "scope_id": ACTIVATION, "conversation_id": ACTIVATION, "channel": "mail", "phase": "ordinary", "sequence": 1
     }})).unwrap();
     assert_eq!(enriched.companion.unwrap().phase, CompanionPhase::Ordinary);
+}
+
+#[test]
+fn companion_sender_access_is_optional_and_rejects_unknown_values() {
+    let mut value = fixture()["pages"][0]["items"][0].clone();
+    value.as_object_mut().unwrap().remove("sender_access");
+    let entry: CompanionHistoryEntry = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(entry.sender_access, None);
+    assert!(serde_json::to_value(&entry)
+        .unwrap()
+        .get("sender_access")
+        .is_none());
+    for invalid in [
+        json!("trusted"),
+        json!("ordinary"),
+        json!(""),
+        Value::Null,
+        json!(true),
+    ] {
+        value["sender_access"] = invalid;
+        assert!(serde_json::from_value::<CompanionHistoryEntry>(value.clone()).is_err());
+    }
 }

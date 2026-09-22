@@ -3,6 +3,7 @@ inkbox — Python SDK for the Inkbox APIs.
 """
 
 from inkbox.client import Inkbox
+from inkbox.sender_access import SenderAccess
 from inkbox.companion import (
     DEFAULT_COMPANION_MAX_BYTES,
     CompanionActivationPage,
@@ -434,6 +435,7 @@ from inkbox.webhook_deliveries import (
 from inkbox.api_keys.types import ApiKey, ApiKeyStatus, CreatedApiKey
 
 __all__ = [
+    "SenderAccess",
     "DEFAULT_COMPANION_MAX_BYTES",
     "CompanionActivationPage",
     "CompanionChannel",

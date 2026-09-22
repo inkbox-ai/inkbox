@@ -13,6 +13,7 @@ import type {
   RawTextMediaItem,
   RawTextMessageRecipient,
 } from "../phone/types.js";
+import type { SenderAccess } from "../sender_access.js";
 import type { CompanionMetadata } from "../companion.js";
 
 // ---- Wire union types ------------------------------------------------
@@ -274,6 +275,8 @@ export interface WebhookMailAgentIdentity {
  * (BCC is not visible to recipients).
  */
 export interface MailWebhookMessage {
+  /** Receipt-time admission; absent for unknown, system, and outbound messages. */
+  sender_access?: SenderAccess;
   id: string;
   mailbox_id: string;
   thread_id: string | null;
@@ -371,6 +374,8 @@ export type TextWebhookEventType =
  *     so all five are `null`.
  */
 export interface TextWebhookMessage {
+  /** Receipt-time admission; absent for unknown, system, and outbound messages. */
+  sender_access?: SenderAccess;
   id: string;
   direction: TextDirectionWire;
   local_phone_number: string;
@@ -518,6 +523,8 @@ export interface IMessageMessageReactionWire {
  * include sender/participant fields.
  */
 export interface IMessageWebhookMessage {
+  /** Receipt-time admission; absent for unknown, system, and outbound messages. */
+  sender_access?: SenderAccess;
   id: string;
   conversation_id: string;
   assignment_id: string | null;

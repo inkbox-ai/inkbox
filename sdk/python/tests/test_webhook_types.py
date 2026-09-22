@@ -583,3 +583,13 @@ def test_a2a_message_payload_includes_message_fields():
     }
     assert payload["data"]["message_id"] == "message-id"
     assert payload["data"]["parts"] == [{"text": "Continue"}]
+
+
+@pytest.mark.parametrize("name", ["MailWebhookMessage", "TextWebhookMessage", "IMessageWebhookMessage"])
+def test_sender_access_is_optional_on_each_received_message(name):
+    from inkbox import SenderAccess
+    from inkbox import webhooks
+    from typing import NotRequired
+    model = getattr(webhooks, name)
+    assert get_type_hints(model, include_extras=True)["sender_access"] == NotRequired[SenderAccess]
+    assert get_args(SenderAccess) == ("direct", "sponsored")

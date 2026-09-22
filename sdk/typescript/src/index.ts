@@ -466,3 +466,5 @@ export {
 export type { RuleDirection } from "./contact_rules.js";
 export type { ResponseNotice, ResponseMetadata, ResponseObserver, APIResponse } from "./response_metadata.js";
 export * from "./companion.js";
+
+export type { SenderAccess } from "./sender_access.js";

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Literal, NotRequired, TypedDict
 from inkbox.companion import CompanionMetadata
+from inkbox.sender_access import SenderAccess
 
 
 # ---- Wire union types ____________________________________________________
@@ -331,6 +332,7 @@ class MailWebhookMessage(TypedDict):
     """
 
     id: str
+    sender_access: NotRequired[SenderAccess]
     mailbox_id: str
     thread_id: str | None
     message_id: str | None
@@ -400,7 +402,7 @@ TextWebhookEventType = Literal[
 class TextWebhookMessage(TypedDict):
     """
     Stored text message. ``is_blocked`` is not part of the wire body
-    -- blocked texts never reach the webhook.
+    -- default-filtered texts may arrive under Companion sponsorship.
 
     Field population by traffic shape:
       * ``remote_phone_number``: populated on inbound and on outbound
@@ -417,6 +419,7 @@ class TextWebhookMessage(TypedDict):
     """
 
     id: str
+    sender_access: NotRequired[SenderAccess]
     direction: TextDirectionWire
     local_phone_number: str
     remote_phone_number: str | None
@@ -552,11 +555,12 @@ class IMessageMessageReactionWire(TypedDict):
 class IMessageWebhookMessage(TypedDict):
     """
     Stored iMessage. ``is_blocked`` is not part of the wire body -- blocked
-    messages never reach the webhook. Group messages have no assignment and
+    messages require Companion sponsorship unless directly admitted. Group messages have no assignment and
     include sender/participant fields.
     """
 
     id: str
+    sender_access: NotRequired[SenderAccess]
     conversation_id: str
     assignment_id: str | None
     direction: IMessageDirectionWire

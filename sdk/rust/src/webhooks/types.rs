@@ -422,6 +422,13 @@ pub enum MailBodyState {
 /// recipients).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MailWebhookMessage {
+    /// Receipt-time admission; omitted when unknown or inapplicable.
+    #[serde(
+        default,
+        deserialize_with = "crate::sender_access::deserialize_optional",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sender_access: Option<crate::SenderAccess>,
     pub id: String,
     pub mailbox_id: String,
     pub thread_id: Option<String>,
@@ -521,6 +528,13 @@ pub enum TextWebhookEventType {
 ///     inbound all five are `None`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextWebhookMessage {
+    /// Receipt-time admission; omitted when unknown or inapplicable.
+    #[serde(
+        default,
+        deserialize_with = "crate::sender_access::deserialize_optional",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sender_access: Option<crate::SenderAccess>,
     pub id: String,
     pub direction: TextDirectionWire,
     pub local_phone_number: String,
@@ -702,6 +716,13 @@ pub struct IMessageMessageReactionWire {
 /// include sender/participant fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IMessageWebhookMessage {
+    /// Receipt-time admission; omitted when unknown or inapplicable.
+    #[serde(
+        default,
+        deserialize_with = "crate::sender_access::deserialize_optional",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sender_access: Option<crate::SenderAccess>,
     pub id: String,
     pub conversation_id: String,
     pub assignment_id: Option<String>,
@@ -1085,6 +1106,7 @@ mod tests {
                 "message": {
                     "id": "imsg_1", "conversation_id": "conv_1",
                     "assignment_id": null, "direction": "inbound",
+                    "sender_access": "sponsored",
                     "remote_number": "+15551234567",
                     "sender_number": "+15551234567",
                     "participants": ["+15551234567", "+15557654321"],
@@ -1102,9 +1124,12 @@ mod tests {
             }
         }"#;
 
+        let value: serde_json::Value = serde_json::from_str(raw).unwrap();
+        assert_sender_access_contract::<IMessageWebhookMessage>(value["data"]["message"].clone());
         let payload: IMessageWebhookPayload = serde_json::from_str(raw).unwrap();
         let message = payload.data.message.unwrap();
         assert!(message.is_group);
+        assert_eq!(message.sender_access, Some(crate::SenderAccess::Sponsored));
         assert_eq!(message.assignment_id, None);
         assert_eq!(message.sender_number.as_deref(), Some("+15551234567"));
         assert_eq!(message.participants.unwrap().len(), 2);
@@ -1398,5 +1423,65 @@ mod tests {
         assert!(payload.data.transcript.is_none());
         // transcript_url is always present.
         assert!(payload.data.transcript_url.ends_with("/transcripts"));
+    }
+    fn assert_sender_access_contract<T>(mut value: serde_json::Value)
+    where
+        T: serde::de::DeserializeOwned + serde::Serialize,
+    {
+        value.as_object_mut().unwrap().remove("sender_access");
+        let parsed: T = serde_json::from_value(value.clone()).unwrap();
+        assert!(serde_json::to_value(parsed)
+            .unwrap()
+            .get("sender_access")
+            .is_none());
+        for access in ["direct", "sponsored"] {
+            value["sender_access"] = serde_json::json!(access);
+            let parsed: T = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(
+                serde_json::to_value(parsed).unwrap()["sender_access"],
+                access
+            );
+        }
+        for invalid in [
+            serde_json::Value::Null,
+            serde_json::json!("trusted"),
+            serde_json::json!(true),
+        ] {
+            value["sender_access"] = invalid;
+            assert!(serde_json::from_value::<T>(value.clone()).is_err());
+        }
+    }
+
+    #[test]
+    fn sender_access_survives_mail_and_text_webhook_parsing() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/webhook_payloads");
+        for (file, key) in [
+            ("message_received.json", "message"),
+            ("text_received.json", "text_message"),
+        ] {
+            let mut payload: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(root.join(file)).unwrap()).unwrap();
+            if key == "message" {
+                assert_sender_access_contract::<MailWebhookMessage>(payload["data"][key].clone());
+            } else {
+                assert_sender_access_contract::<TextWebhookMessage>(payload["data"][key].clone());
+            }
+            for access in ["direct", "sponsored"] {
+                payload["data"][key]["sender_access"] = serde_json::json!(access);
+                let parsed = if key == "message" {
+                    serde_json::to_value(
+                        serde_json::from_value::<MailWebhookPayload>(payload.clone()).unwrap(),
+                    )
+                    .unwrap()
+                } else {
+                    serde_json::to_value(
+                        serde_json::from_value::<TextWebhookPayload>(payload.clone()).unwrap(),
+                    )
+                    .unwrap()
+                };
+                assert_eq!(parsed["data"][key]["sender_access"], access);
+            }
+        }
     }
 }

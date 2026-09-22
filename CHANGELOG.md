@@ -4,6 +4,28 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## Unreleased
+
+### Added
+
+- Optional `sender_access` on inbound email, SMS/MMS, and iMessage webhooks and
+  Companion history entries, retained across initialization pages in all three SDKs.
+  `direct` means the message passed contact rules at receipt, including allowed by
+  default; `sponsored` means it was admitted through conversation sponsorship.
+  Neither value grants trust or command permission. Unknown or inapplicable access
+  is omitted, never inferred as `direct`.
+
+### Changed
+
+- Companion history parsing consistently accepts omission and rejects explicit
+  `null` or unrecognized `sender_access` values in Python, TypeScript, and Rust.
+- **Rust source compatibility:** `MailWebhookMessage`, `TextWebhookMessage`,
+  `IMessageWebhookMessage`, and `CompanionHistoryEntry` now have a public
+  `sender_access` field. Existing exhaustive struct literals must add
+  `sender_access: None`, or `Some(SenderAccess::Direct)` /
+  `Some(SenderAccess::Sponsored)` when known. Existing JSON with the field omitted
+  remains compatible.
+
 ## 0.7.5 - Email sender display names
 
 ### Added

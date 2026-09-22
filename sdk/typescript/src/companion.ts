@@ -1,3 +1,4 @@
+import type { SenderAccess } from "./sender_access.js";
 import { HttpTransport } from "./_http.js";
 import { collectResponseNotices, parseResponseNotices, type ResponseNotice } from "./response_metadata.js";
 
@@ -29,6 +30,7 @@ export interface CompanionHistoryEntry {
   text: string;
   historical: boolean;
   isTrigger: boolean;
+  senderAccess?: SenderAccess;
   attachments: Record<string, unknown>[];
 }
 export interface CompanionReplyContext {
@@ -66,6 +68,7 @@ export interface CompanionHistoryEntryWire {
   text: string;
   historical: boolean;
   is_trigger: boolean;
+  sender_access?: SenderAccess;
   attachments: Record<string, unknown>[];
 }
 export interface CompanionReplyContextWire {
@@ -142,7 +145,8 @@ function parsePage(data: any, activationId: string): CompanionActivationPage {
     if (!object(entry) || !uuid(entry.id) || typeof entry.author !== "string" || typeof entry.occurred_at !== "string"
       || typeof entry.text !== "string" || typeof entry.historical !== "boolean" || typeof entry.is_trigger !== "boolean"
       || (entry.historical && entry.is_trigger) || !Array.isArray(entry.attachments) || !entry.attachments.every(object)) invalid();
-    return { id: entry.id.toLowerCase(), author: entry.author, occurredAt: entry.occurred_at, text: entry.text,
+    if ("sender_access" in entry && entry.sender_access !== "direct" && entry.sender_access !== "sponsored") invalid();
+    return { ...(entry.sender_access === undefined ? {} : { senderAccess: entry.sender_access }), id: entry.id.toLowerCase(), author: entry.author, occurredAt: entry.occurred_at, text: entry.text,
       historical: entry.historical, isTrigger: entry.is_trigger, attachments: entry.attachments };
   });
   return { scopeId: data.scope_id.toLowerCase(), activationId: data.activation_id.toLowerCase(), conversationId: data.conversation_id.toLowerCase(),
