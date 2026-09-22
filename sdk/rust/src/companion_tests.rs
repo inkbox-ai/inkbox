@@ -227,6 +227,7 @@ fn companion_rejects_mixed_scopes_incomplete_snapshots_and_limits() {
         "two_triggers",
         "bytes",
         "pages",
+        "null_access",
     ] {
         let server = MockServer::start();
         let mut fixture = fixture();
@@ -259,6 +260,7 @@ fn companion_rejects_mixed_scopes_incomplete_snapshots_and_limits() {
             }
             "bytes" => options.max_bytes = 100,
             "pages" => options.max_pages = 1,
+            "null_access" => fixture["pages"][1]["items"][0]["sender_access"] = Value::Null,
             _ => unreachable!(),
         }
         server.mock(|when, then| {
@@ -336,7 +338,13 @@ fn companion_sender_access_is_optional_and_rejects_unknown_values() {
         .unwrap()
         .get("sender_access")
         .is_none());
-    for invalid in [json!("trusted"), json!("ordinary"), json!(true)] {
+    for invalid in [
+        json!("trusted"),
+        json!("ordinary"),
+        json!(""),
+        Value::Null,
+        json!(true),
+    ] {
         value["sender_access"] = invalid;
         assert!(serde_json::from_value::<CompanionHistoryEntry>(value.clone()).is_err());
     }

@@ -71,7 +71,11 @@ pub struct CompanionConversationPage {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompanionHistoryEntry {
     /// Receipt-time admission; omitted when unknown or inapplicable.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "crate::sender_access::deserialize_optional",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub sender_access: Option<crate::SenderAccess>,
     pub id: Uuid,
     pub author: String,

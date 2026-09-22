@@ -10,3 +10,13 @@ pub enum SenderAccess {
     /// Default-filtered at receipt and admitted through conversation sponsorship.
     Sponsored,
 }
+
+/// Accept omission through the field default, but require an enum when present.
+pub(crate) fn deserialize_optional<'de, D>(
+    deserializer: D,
+) -> Result<Option<SenderAccess>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    SenderAccess::deserialize(deserializer).map(Some)
+}
