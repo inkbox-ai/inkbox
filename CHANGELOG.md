@@ -4,6 +4,21 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.7 - Phone number country metadata
+
+### Added
+
+- Add ISO 3166-1 alpha-2 country metadata to phone-number responses and CLI output.
+- Preserve the legacy US default for responses that predate country metadata.
+
+### Changed
+
+- Allow non-US phone numbers to omit the US-only state field while preserving existing API behavior.
+- Keep phone-number provisioning and purchasing options unchanged.
+- **Rust source compatibility:** `PhoneNumber` and `IdentityPhoneNumber` now have a public
+  `country` field. Existing exhaustive struct literals must add `country: "US".into()`;
+  existing JSON with the field omitted remains compatible.
+
 ## 0.7.6 - Sender access metadata
 
 ### Added

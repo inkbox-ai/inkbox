@@ -47,6 +47,7 @@ fn legacy_response_literals_remain_constructible() {
         sms_error_detail: None,
         sms_ready_at: None,
         state: None,
+        country: "US".into(),
         agent_identity_id: None,
         filter_mode_change_notice: None,
     };
