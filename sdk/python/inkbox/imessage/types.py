@@ -274,6 +274,7 @@ class IMessage:
     sender_number: str | None = None
     participants: list[str] | None = None
     is_group: bool = False
+    occurred_at: datetime | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> IMessage:
@@ -291,6 +292,7 @@ class IMessage:
             sender_number=d.get("sender_number"),
             participants=d.get("participants"),
             is_group=d.get("is_group", False),
+            occurred_at=datetime.fromisoformat(d["occurred_at"]) if d.get("occurred_at") else None,
             content=d.get("content"),
             message_type=d["message_type"],
             service=IMessageService(d["service"]),

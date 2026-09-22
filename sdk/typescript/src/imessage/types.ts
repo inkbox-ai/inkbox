@@ -191,6 +191,8 @@ export interface IMessage {
   recipients: IMessageRecipient[] | null;
   /** Live (non-removed) tapbacks targeting this message, oldest first. */
   reactions: IMessageMessageReaction[] | null;
+  /** Original message time when available; unchanged by delivery updates. */
+  occurredAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -349,6 +351,7 @@ export interface RawIMessage {
   is_blocked?: boolean;
   recipients?: RawIMessageRecipient[] | null;
   reactions?: RawIMessageMessageReaction[] | null;
+  occurred_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -503,6 +506,7 @@ export function parseIMessage(r: RawIMessage): IMessage {
     isBlocked: r.is_blocked ?? false,
     recipients: r.recipients ? r.recipients.map(parseIMessageRecipient) : null,
     reactions: r.reactions ? r.reactions.map(parseIMessageMessageReaction) : null,
+    occurredAt: r.occurred_at ? new Date(r.occurred_at) : null,
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
   };
