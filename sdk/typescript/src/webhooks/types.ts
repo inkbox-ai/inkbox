@@ -523,8 +523,6 @@ export interface IMessageMessageReactionWire {
  * include sender/participant fields.
  */
 export interface IMessageWebhookMessage {
-  /** Original message time; fall back to created_at for older payloads. */
-  occurred_at?: string | null;
   /** Receipt-time admission; absent for unknown, system, and outbound messages. */
   sender_access?: SenderAccess;
   id: string;

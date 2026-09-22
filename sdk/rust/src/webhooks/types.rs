@@ -708,9 +708,6 @@ pub struct IMessageMessageReactionWire {
 /// include sender/participant fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IMessageWebhookMessage {
-    /// Original message time, when available.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub occurred_at: Option<String>,
     /// Receipt-time admission; omitted when unknown or inapplicable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sender_access: Option<crate::SenderAccess>,
@@ -1097,7 +1094,7 @@ mod tests {
                 "message": {
                     "id": "imsg_1", "conversation_id": "conv_1",
                     "assignment_id": null, "direction": "inbound",
-                    "sender_access": "sponsored", "occurred_at": "2026-07-21T23:59:59Z",
+                    "sender_access": "sponsored",
                     "remote_number": "+15551234567",
                     "sender_number": "+15551234567",
                     "participants": ["+15551234567", "+15557654321"],
@@ -1119,7 +1116,6 @@ mod tests {
         let message = payload.data.message.unwrap();
         assert!(message.is_group);
         assert_eq!(message.sender_access, Some(crate::SenderAccess::Sponsored));
-        assert_eq!(message.occurred_at.as_deref(), Some("2026-07-21T23:59:59Z"));
         assert_eq!(message.assignment_id, None);
         assert_eq!(message.sender_number.as_deref(), Some("+15551234567"));
         assert_eq!(message.participants.unwrap().len(), 2);

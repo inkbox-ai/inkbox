@@ -561,7 +561,6 @@ class IMessageWebhookMessage(TypedDict):
 
     id: str
     sender_access: NotRequired[SenderAccess]
-    occurred_at: NotRequired[str | None]
     conversation_id: str
     assignment_id: str | None
     direction: IMessageDirectionWire

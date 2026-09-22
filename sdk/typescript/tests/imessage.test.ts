@@ -555,16 +555,6 @@ describe("IMessagesResource", () => {
 });
 
 describe("parseIMessage", () => {
-  it("parses original message time without changing creation time and accepts older responses", () => {
-    const legacy = parseIMessage(IMESSAGE_DICT);
-    expect(legacy.occurredAt).toBeNull();
-    const timestamp = "2026-05-31T23:59:00Z";
-    const message = parseIMessage({ ...IMESSAGE_DICT, occurred_at: timestamp });
-    expect(message.occurredAt).toEqual(new Date(timestamp));
-    expect(message.createdAt).toEqual(legacy.createdAt);
-    expect(parseIMessage({ ...IMESSAGE_DICT, occurred_at: null }).occurredAt).toBeNull();
-  });
-
   it("maps the full wire shape to camelCase", () => {
     const msg = parseIMessage(IMESSAGE_DICT);
 

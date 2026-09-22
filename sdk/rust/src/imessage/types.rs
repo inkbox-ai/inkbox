@@ -324,9 +324,6 @@ pub struct IMessage {
     /// Live (non-removed) tapbacks targeting this message, oldest first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reactions: Option<Vec<IMessageMessageReaction>>,
-    /// Original message time when available; unchanged by delivery updates.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub occurred_at: Option<String>,
 }
 
 /// One iMessage conversation.
@@ -545,15 +542,6 @@ mod tests {
         .unwrap();
 
         assert!(message.is_group);
-        assert_eq!(message.occurred_at, None);
-        let mut payload = serde_json::to_value(&message).unwrap();
-        payload["occurred_at"] = json!("2026-07-21T23:59:00.123456Z");
-        let with_time: IMessage = serde_json::from_value(payload).unwrap();
-        assert_eq!(
-            with_time.occurred_at.as_deref(),
-            Some("2026-07-21T23:59:00.123456Z")
-        );
-        assert_eq!(with_time.created_at, message.created_at);
         assert_eq!(message.assignment_id, None);
         assert_eq!(message.remote_number.as_deref(), Some("+15550001111"));
         assert_eq!(message.sender_number.as_deref(), Some("+15550001111"));

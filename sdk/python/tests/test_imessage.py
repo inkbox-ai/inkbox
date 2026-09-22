@@ -4,14 +4,12 @@ sdk/python/tests/test_imessage.py
 Tests for IMessagesResource and IMessageContactRulesResource.
 """
 
-from datetime import datetime
 from uuid import UUID
 
 import pytest
 import inkbox
 
 from inkbox.imessage.types import (
-    IMessage,
     IMessageNumberStatus,
     IMessageDeliveryStatus,
     IMessageGroupCreationStatus,
@@ -153,15 +151,6 @@ IMESSAGE_CONTACT_RULE_DICT = {
     "created_at": "2026-06-01T00:00:00+00:00",
     "updated_at": "2026-06-01T00:00:00+00:00",
 }
-
-
-@pytest.mark.parametrize("timestamp", [None, "2026-06-01T00:00:00.123456+00:00"])
-def test_message_chronology_is_optional_and_preserves_original_time(timestamp):
-    legacy = IMessage._from_dict(IMESSAGE_DICT)
-    assert legacy.occurred_at is None
-    message = IMessage._from_dict({**IMESSAGE_DICT, "occurred_at": timestamp})
-    assert message.occurred_at == (datetime.fromisoformat(timestamp) if timestamp else None)
-    assert message.created_at == legacy.created_at
 
 
 class TestIMessagesSend:
