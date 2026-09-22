@@ -305,6 +305,7 @@ export function registerEmailCommands(program: Command): void {
             id: msg.id,
             threadId: msg.threadId,
             from: msg.fromAddress,
+            fromDisplayName: msg.fromDisplayName ?? null,
             to: msg.toAddresses.join(", "),
             subject: msg.subject,
             direction: msg.direction,

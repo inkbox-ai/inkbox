@@ -13,6 +13,9 @@ Each package has its own `publish.sh`: **dry run by default**, `--prod` to publi
 
 ## 1. Bump versions (all four, same number)
 
+When a PR bumps a package version, prefix its title with the new semantic version
+in backticks, followed by a colon and space: `` `0.0.0`: PR title ``.
+
 | File | Field |
 |---|---|
 | `sdk/python/pyproject.toml` (+ `uv.lock` self-entry — run `uv lock`) | `version` |

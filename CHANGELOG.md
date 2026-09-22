@@ -4,6 +4,20 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.5 - Email sender display names
+
+### Added
+
+- Email messages expose the optional From display name in Python, TypeScript,
+  Rust, and CLI message detail output.
+
+### Changed
+
+- Versions move to 0.7.5 across the Python, TypeScript, and Rust SDKs, CLI, and
+  bundled plugin. The CLI depends on `@inkbox/sdk` `^0.7.5`.
+- Rust `Message` has a new `from_display_name` field. Exhaustive struct literals
+  must include it; use `None` when no display name is available.
+
 ## 0.7.4 - Native Windows Python tunnels
 
 - Python `tunnels.connect()` now supports native Windows as well as Linux and macOS, without requiring WSL.

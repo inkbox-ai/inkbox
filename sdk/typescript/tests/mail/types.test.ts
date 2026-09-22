@@ -27,6 +27,15 @@ describe("parseMailbox", () => {
 });
 
 describe("parseMessage", () => {
+  it("preserves optional sender names in metadata and detail", () => {
+    expect(parseMessage(RAW_MESSAGE).fromDisplayName).toBeNull();
+    for (const name of [null, "Jamie Chen"]) {
+      const raw = { ...RAW_MESSAGE_DETAIL, from_display_name: name };
+      expect(parseMessage(raw).fromDisplayName).toBe(name);
+      expect(parseMessageDetail(raw).fromDisplayName).toBe(name);
+    }
+  });
+
   it("converts all fields", () => {
     const msg = parseMessage(RAW_MESSAGE);
     expect(msg.id).toBe(RAW_MESSAGE.id);

@@ -253,6 +253,8 @@ export interface Message {
   /** RFC 5322 Message-ID header value */
   messageId: string;
   fromAddress: string;
+  /** Sender-supplied From name, when available. */
+  fromDisplayName?: string | null;
   toAddresses: string[];
   ccAddresses: string[] | null;
   subject: string | null;
@@ -430,6 +432,7 @@ export interface RawMessage {
   thread_id: string | null;
   message_id: string;
   from_address: string;
+  from_display_name?: string | null;
   to_addresses: string[];
   cc_addresses: string[] | null;
   subject: string | null;
@@ -621,6 +624,7 @@ export function parseMessage(r: RawMessage): Message {
     threadId: r.thread_id,
     messageId: r.message_id,
     fromAddress: r.from_address,
+    fromDisplayName: r.from_display_name ?? null,
     toAddresses: r.to_addresses,
     ccAddresses: r.cc_addresses ?? null,
     subject: r.subject,

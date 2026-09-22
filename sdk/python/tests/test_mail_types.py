@@ -45,6 +45,13 @@ class TestMailboxParsing:
 
 
 class TestMessageParsing:
+    def test_sender_display_name_is_optional_and_preserved_in_details(self):
+        assert Message._from_dict(MESSAGE_DICT).from_display_name is None
+        for name in (None, "Jamie Chen"):
+            data = {**MESSAGE_DETAIL_DICT, "from_display_name": name}
+            assert Message._from_dict(data).from_display_name == name
+            assert MessageDetail._from_dict(data).from_display_name == name
+
     def test_from_dict(self):
         m = Message._from_dict(MESSAGE_DICT)
 
