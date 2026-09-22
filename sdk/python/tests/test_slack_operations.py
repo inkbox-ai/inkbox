@@ -12,7 +12,9 @@ from inkbox import InkboxAPIError, SlackArchivePurgeResponse, SlackOperation
 wire = fixtures.wire
 
 DATA = json.loads(
-    (Path(__file__).parents[3] / "tests/fixtures/slack_operations.json").read_text()
+    (Path(__file__).parents[3] / "tests/fixtures/slack_operations.json").read_text(
+        encoding="utf-8"
+    )
 )
 C, OP_ID, TS = DATA["connection_id"], DATA["operation_id"], DATA["message_ts"]
 

@@ -11,7 +11,7 @@ import pytest
 from inkbox import Inkbox, InkboxAPIError, SlackWebhookEventType
 
 FIXTURES = Path(__file__).parents[3] / "tests" / "fixtures"
-DATA = json.loads((FIXTURES / "slack.json").read_text())
+DATA = json.loads((FIXTURES / "slack.json").read_text(encoding="utf-8"))
 C = DATA["connection"]["id"]
 IDENTITY_ID = DATA["connection"]["identity_id"]
 
@@ -251,6 +251,8 @@ def test_filters_preserve_clear_replace_and_channel_rules(wire):
 
 
 def test_exact_webhook_event_vocabulary():
-    payloads = json.loads((FIXTURES / "slack_webhook_events.json").read_text())
+    payloads = json.loads(
+        (FIXTURES / "slack_webhook_events.json").read_text(encoding="utf-8")
+    )
     assert len(payloads) == 19
     assert {p["event_type"] for p in payloads} == set(get_args(SlackWebhookEventType))
