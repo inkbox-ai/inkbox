@@ -14,6 +14,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   Event-list updates remain full replacement. Incoming-call actions remain separate.
 - Expose canonical delivery targets and replayability without changing original history IDs.
   Conversation context applies only to received mail, text and iMessage events.
+- **Rust source compatibility:** When recompiling against 0.7.8, direct `WebhookSubscription`
+  literals must add `revision: 1`. Direct `WebhookDelivery` literals must add
+  `canonical_subscription_id: None`, `replayable: false`, and `replay_unavailable_reason: None`.
+  Already compiled SDKs remain compatible, and response deserialization accepts older JSON
+  with these fields omitted.
 
 - Bundled Codex plugin version `0.1.7` includes the identity-owned webhook skills.
 
