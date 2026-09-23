@@ -661,6 +661,7 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
 
     expect(http.get).toHaveBeenCalledWith("/webhooks/subscriptions", {
       agent_identity_id: IDENTITY_ID,
+      scope: "identity",
     });
     expect(rows[0].agentIdentityId).toBe(IDENTITY_ID);
   });

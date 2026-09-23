@@ -8,6 +8,8 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Combine all notification families on one identity, regardless of configured channels;
   legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
+- Identity-filtered lists opt in to all notification families; older clients retain
+  their event-family views so existing integrations keep managing their own subscriptions.
 - Add revision-checked subscription updates and deletion, plus CLI `--expected-revision`.
   Event-list updates remain full replacement. Incoming-call actions remain separate.
 - Expose canonical delivery targets and replayability without changing original history IDs.

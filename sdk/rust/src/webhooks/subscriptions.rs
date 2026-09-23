@@ -221,8 +221,8 @@ impl WebhookSubscriptionsResource {
 
     /// List webhook subscriptions visible to the caller.
     ///
-    /// Legacy mailbox/phone filters resolve the identity and select rows with
-    /// mail/text events without narrowing their complete event selections.
+    /// Identity filters include every notification family. Legacy mailbox/phone
+    /// filters retain their single-family views and exclude mixed subscriptions.
     /// Filters AND-combine. `mailbox_id` / `phone_number_id` /
     /// `agent_identity_id` are mutually exclusive -- passing more than one
     /// yields a 422. Deleted subscriptions are not returned.
@@ -254,6 +254,7 @@ impl WebhookSubscriptionsResource {
         }
         if let Some(id) = agent_identity_id {
             params.push(("agent_identity_id", id.to_string()));
+            params.push(("scope", "identity".to_string()));
         }
         if let Some(u) = url {
             params.push(("url", u.to_string()));
@@ -568,6 +569,16 @@ mod tests {
         });
         let resource = client.webhooks();
         let subs = resource.subscriptions();
+        let list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/webhooks/subscriptions")
+                .query_param("agent_identity_id", identity.to_string())
+                .query_param("scope", "identity");
+            then.status(200).json_body(json!({"subscriptions": [row.clone()]}));
+        });
+        let rows = subs.list(None, None, Some(identity), None, None).unwrap();
+        assert_eq!(rows[0].event_types, events);
+        list.assert();
         let created = subs
             .create_for_identity(
                 identity,

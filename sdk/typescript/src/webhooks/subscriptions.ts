@@ -292,8 +292,8 @@ export class WebhookSubscriptionsResource {
    * List webhook subscriptions visible to the caller. Filters AND-combine;
    * unmatched filters return an empty list. `mailboxId` / `phoneNumberId`
    * / `agentIdentityId` are mutually exclusive — passing more than one
-   * yields a 422. Legacy mailbox/phone filters resolve the identity and select
-   * rows containing mail/text events; mixed rows keep their complete selections.
+   * yields a 422. Identity filters include every notification family. Legacy
+   * mailbox/phone filters retain their single-family views and exclude mixed rows.
    * Deleted subscriptions are not returned.
    */
   async list(
@@ -302,7 +302,10 @@ export class WebhookSubscriptionsResource {
     const params: Record<string, string> = {};
     if (filters.mailboxId !== undefined) params["mailbox_id"] = filters.mailboxId;
     if (filters.phoneNumberId !== undefined) params["phone_number_id"] = filters.phoneNumberId;
-    if (filters.agentIdentityId !== undefined) params["agent_identity_id"] = filters.agentIdentityId;
+    if (filters.agentIdentityId !== undefined) {
+      params["agent_identity_id"] = filters.agentIdentityId;
+      params["scope"] = "identity";
+    }
     if (filters.url !== undefined) params["url"] = filters.url;
     if (filters.eventType !== undefined) params["event_type"] = filters.eventType;
     const data = await this.http.get<RawListWebhookSubscriptionsResponse>(PATH, params);

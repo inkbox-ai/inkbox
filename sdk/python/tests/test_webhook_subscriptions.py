@@ -376,7 +376,7 @@ class TestAgentIdentityOwner:
 
         http.get.assert_called_once_with(
             "/webhooks/subscriptions",
-            params={"agent_identity_id": _IDENTITY_ID},
+            params={"agent_identity_id": _IDENTITY_ID, "scope": "identity"},
         )
         assert rows[0].agent_identity_id == UUID(_IDENTITY_ID)
 

@@ -261,10 +261,10 @@ class WebhookSubscriptionsResource:
 
         Filters AND-combine. ``mailbox_id`` / ``phone_number_id`` /
         ``agent_identity_id`` are mutually exclusive -- passing more
-        than one yields a 422. Legacy mailbox/phone filters resolve the
-        identity and select subscriptions containing mail/text events;
-        mixed rows retain their complete event selection. Deleted
-        subscriptions are not returned.
+        than one yields a 422. Identity filters include every notification
+        family. Legacy mailbox/phone filters retain their single-family
+        views and exclude mixed subscriptions. Deleted subscriptions are
+        not returned.
         """
         params: dict[str, Any] = {}
         if mailbox_id is not None:
@@ -273,6 +273,7 @@ class WebhookSubscriptionsResource:
             params["phone_number_id"] = _uuid_str(phone_number_id)
         if agent_identity_id is not None:
             params["agent_identity_id"] = _uuid_str(agent_identity_id)
+            params["scope"] = "identity"
         if url is not None:
             params["url"] = url
         if event_type is not None:
