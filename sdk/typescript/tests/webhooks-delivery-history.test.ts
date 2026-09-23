@@ -9,18 +9,15 @@ const raw: RawWebhookDelivery = {
   duration_ms: 1, is_replay: false, created_at: "2026-09-15T00:00:00Z",
 };
 
-describe("canonical delivery history", () => {
+describe("delivery history", () => {
   it("preserves the original target while exposing current replayability", () => {
-    const row = parseWebhookDelivery({ ...raw,
-      canonical_subscription_id: "33333333-3333-3333-3333-333333333333", replayable: true });
+    const row = parseWebhookDelivery({ ...raw, replayable: true });
     expect(row.webhookSubscriptionId).toBe(raw.webhook_subscription_id);
-    expect(row.canonicalSubscriptionId).toBe("33333333-3333-3333-3333-333333333333");
     expect(row.replayable).toBe(true);
     expect(row.replayUnavailableReason).toBeNull();
   });
   it("does not infer replayability from an old response", () => {
-    expect(parseWebhookDelivery(raw)).toMatchObject({ canonicalSubscriptionId: null,
-      replayable: false, replayUnavailableReason: null });
+    expect(parseWebhookDelivery(raw)).toMatchObject({ replayable: false, replayUnavailableReason: null });
   });
   it("preserves an unavailable reason", () => {
     expect(parseWebhookDelivery({ ...raw, replayable: false,

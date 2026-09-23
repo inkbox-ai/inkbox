@@ -96,9 +96,6 @@ pub enum WebhookSubscriptionStatus {
 /// `get`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookSubscription {
-    /// Version for conditional updates and deletion; 1 on older responses.
-    #[serde(default = "initial_revision")]
-    pub revision: u64,
     pub id: Uuid,
     pub organization_id: String,
     pub mailbox_id: Option<Uuid>,
@@ -151,20 +148,7 @@ struct ListResponse {
     subscriptions: Vec<WebhookSubscription>,
 }
 
-fn initial_revision() -> u64 {
-    1
-}
-
 const EVENT_PREFIXES: &[&str] = &["message.", "text.", "imessage.", "call.", "a2a."];
-
-fn assert_revision(revision: u64) -> Result<()> {
-    if revision == 0 {
-        return Err(InkboxError::InvalidArgument(
-            "expected_revision must be positive".into(),
-        ));
-    }
-    Ok(())
-}
 
 /// Reject an empty list or one carrying duplicate values.
 fn assert_event_types_non_empty_distinct(event_types: &[String]) -> Result<()> {
@@ -381,26 +365,8 @@ impl WebhookSubscriptionsResource {
         context_config: Option<Option<&WebhookContextConfig>>,
         auth_token: Option<Option<&str>>,
     ) -> Result<WebhookSubscription> {
-        self.update_if_revision(sub_id, url, event_types, context_config, auth_token, None)
-    }
-
-    /// Update with an optional last-read revision; stale revisions fail with HTTP 409.
-    #[allow(clippy::too_many_arguments)]
-    pub fn update_if_revision(
-        &self,
-        sub_id: Uuid,
-        url: Option<&str>,
-        event_types: Option<&[String]>,
-        context_config: Option<Option<&WebhookContextConfig>>,
-        auth_token: Option<Option<&str>>,
-        expected_revision: Option<u64>,
-    ) -> Result<WebhookSubscription> {
         // Only include keys the caller supplied (Python omits `_UNSET` keys).
         let mut body = serde_json::Map::new();
-        if let Some(revision) = expected_revision {
-            assert_revision(revision)?;
-            body.insert("expected_revision".into(), json!(revision));
-        }
         if let Some(u) = url {
             body.insert("url".into(), json!(u));
         }
@@ -442,21 +408,7 @@ impl WebhookSubscriptionsResource {
     /// Delete a subscription. Subsequent `list` / `get` calls will not return
     /// it.
     pub fn delete(&self, sub_id: Uuid) -> Result<()> {
-        self.delete_if_revision(sub_id, None)
-    }
-
-    /// Delete with an optional last-read revision; stale revisions fail with HTTP 409.
-    pub fn delete_if_revision(&self, sub_id: Uuid, expected_revision: Option<u64>) -> Result<()> {
-        match expected_revision {
-            None => self.http.delete(&format!("{BASE}/{sub_id}")),
-            Some(revision) => {
-                assert_revision(revision)?;
-                self.http.delete_with_params(
-                    &format!("{BASE}/{sub_id}"),
-                    &[("expected_revision", revision.to_string())],
-                )
-            }
-        }
+        self.http.delete(&format!("{BASE}/{sub_id}"))
     }
 
     /// Create a subscription directly on an identity without legacy selectors.
@@ -521,7 +473,6 @@ mod tests {
             "updated_at": "2026-04-10T18:00:00+00:00",
         });
         let sub: WebhookSubscription = serde_json::from_value(base.clone()).unwrap();
-        assert_eq!(sub.revision, 1);
         assert!(!sub.has_auth_token);
         assert_eq!(sub.auth_token, None);
 
@@ -534,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn identity_requests_preserve_full_replacement_and_revision_wire_contract() {
+    fn identity_requests_preserve_full_replacement_wire_contract() {
         use httpmock::{prelude::*, Method::PATCH};
         let server = MockServer::start();
         let client = crate::client::Inkbox::builder("test-key")
@@ -555,7 +506,7 @@ mod tests {
             ..Default::default()
         };
         let row = json!({"id": id, "organization_id": "org_test", "mailbox_id": null,
-            "phone_number_id": null, "agent_identity_id": identity, "revision": 2,
+            "phone_number_id": null, "agent_identity_id": identity,
             "url": "https://example.com/hook", "event_types": events, "status": "active",
             "created_at": "2026-09-15T00:00:00Z", "updated_at": "2026-09-15T00:00:00Z"});
         let create = server.mock(|when, then| {
@@ -589,40 +540,37 @@ mod tests {
                 None,
             )
             .unwrap();
-        assert_eq!(created.subscription.revision, 2);
+        assert_eq!(created.subscription.event_types, events);
         create.assert();
         let update = server.mock(|when, then| {
             when.method(PATCH)
                 .path(format!("/api/v1/webhooks/subscriptions/{id}"))
                 .json_body(
                     json!({"event_types": ["a2a.task.created", "message.received"],
-                    "context_config": null, "auth_token": null, "expected_revision": 2}),
+                    "context_config": null, "auth_token": null}),
                 );
             then.status(200).json_body(row.clone());
         });
-        subs.update_if_revision(
+        subs.update(
             id,
             None,
             Some(&ev(&["a2a.task.created", "message.received"])),
             Some(None),
             Some(None),
-            Some(2),
         )
         .unwrap();
         update.assert();
         let delete = server.mock(|when, then| {
             when.method(DELETE)
-                .path(format!("/api/v1/webhooks/subscriptions/{id}"))
-                .query_param("expected_revision", "2");
+                .path(format!("/api/v1/webhooks/subscriptions/{id}"));
             then.status(204);
         });
-        subs.delete_if_revision(id, Some(2)).unwrap();
+        subs.delete(id).unwrap();
         delete.assert();
-        assert!(subs.delete_if_revision(id, Some(0)).is_err());
     }
 
     #[test]
-    fn conditional_update_preserves_conflict_without_retry() {
+    fn update_preserves_overlap_conflict_without_retry() {
         use httpmock::{prelude::*, Method::PATCH};
         let server = MockServer::start();
         let client = crate::client::Inkbox::builder("test-key")
@@ -635,17 +583,17 @@ mod tests {
                     "/api/v1/webhooks/subscriptions/{}",
                     Uuid::from_u128(1)
                 ))
-                .json_body(json!({"expected_revision": 1, "event_types": ["message.received"]}));
-            then.status(409)
-                .json_body(json!({"detail": "Subscription revision changed"}));
+                .json_body(json!({"event_types": ["message.received"]}));
+            then.status(409).json_body(
+                json!({"detail": "Subscription events overlap an existing destination"}),
+            );
         });
-        let result = client.webhooks().subscriptions().update_if_revision(
+        let result = client.webhooks().subscriptions().update(
             Uuid::from_u128(1),
             None,
             Some(&ev(&["message.received"])),
             None,
             None,
-            Some(1),
         );
         assert!(matches!(
             result,

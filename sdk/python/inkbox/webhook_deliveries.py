@@ -57,7 +57,6 @@ class WebhookDelivery:
     duration_ms: int | None
     is_replay: bool
     created_at: datetime
-    canonical_subscription_id: UUID | None = None
     replayable: bool = False
     replay_unavailable_reason: str | None = None
 
@@ -84,11 +83,6 @@ class WebhookDelivery:
             duration_ms=d.get("duration_ms"),
             is_replay=d["is_replay"],
             created_at=datetime.fromisoformat(d["created_at"]),
-            canonical_subscription_id=(
-                UUID(d["canonical_subscription_id"])
-                if d.get("canonical_subscription_id")
-                else None
-            ),
             replayable=bool(d.get("replayable", False)),
             replay_unavailable_reason=d.get("replay_unavailable_reason"),
         )

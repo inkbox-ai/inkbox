@@ -1486,13 +1486,11 @@ const sub = await inkbox.webhooks.subscriptions.create({
     "call.ended", "a2a.task.created"],
 });
 
-// Events on update replace the full selection. Check the version you read.
+// Events on update replace the full selection.
 const updated = await inkbox.webhooks.subscriptions.update(sub.id, {
   eventTypes: [...sub.eventTypes, "a2a.task.message"],
-  expectedRevision: sub.revision,
 });
-// A stale revision raises HTTP 409; re-read before deciding what to change.
-await inkbox.webhooks.subscriptions.delete(updated.id, { expectedRevision: updated.revision });
+await inkbox.webhooks.subscriptions.delete(updated.id);
 ```
 
 Available event types:

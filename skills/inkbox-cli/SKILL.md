@@ -865,8 +865,7 @@ SDK skills (`inkbox-ts`, `inkbox-python`).
 
 
 Subscriptions are identity-owned and may combine all notification event families
-without configured channels. Use `--expected-revision <revision>` on subscription
-update/delete to reject stale writes with HTTP 409. Update replaces the entire
+without configured channels. Update replaces the entire
 event selection, and delete removes the whole subscription. Legacy mailbox/phone
 selectors remain accepted for compatibility; prefer `--agent-identity-id`.
 

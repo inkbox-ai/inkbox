@@ -692,7 +692,7 @@ describe("identity-owned mixed notifications", () => {
       const { resource, http } = makeResource();
       const contextConfig = { email: { mode: "count" as const, count: 2 } };
       http.post.mockResolvedValue({ ...RAW_SUBSCRIPTION, mailbox_id: null,
-        phone_number_id: null, agent_identity_id: IDENTITY_ID, revision: 3,
+        phone_number_id: null, agent_identity_id: IDENTITY_ID,
         event_types: ALL_NOTIFICATION_EVENTS });
       const row = await resource.create({ [selector]: IDENTITY_ID,
         url: "https://example.com/hook", eventTypes: ALL_NOTIFICATION_EVENTS, contextConfig });
@@ -702,39 +702,27 @@ describe("identity-owned mixed notifications", () => {
         [wireSelector]: IDENTITY_ID, url: "https://example.com/hook",
         event_types: ALL_NOTIFICATION_EVENTS, context_config: contextConfig });
       expect(http.get).not.toHaveBeenCalled();
-      expect(row.revision).toBe(3);
       expect(row.eventTypes).toEqual(ALL_NOTIFICATION_EVENTS);
     });
 
-  it("sends conditional full replacement and deletion revisions", async () => {
+  it("sends full event replacement and direct subscription deletion", async () => {
     const { resource, http } = makeResource();
-    http.patch.mockResolvedValue({ ...RAW_SUBSCRIPTION, revision: 8 });
+    http.patch.mockResolvedValue({ ...RAW_SUBSCRIPTION, event_types: ALL_NOTIFICATION_EVENTS });
     const row = await resource.update(RAW_SUBSCRIPTION.id, { eventTypes: ALL_NOTIFICATION_EVENTS,
-      expectedRevision: 7, contextConfig: { email: { mode: "count", count: 2 } } });
+      contextConfig: { email: { mode: "count", count: 2 } } });
     expect(http.patch).toHaveBeenCalledWith(`/webhooks/subscriptions/${RAW_SUBSCRIPTION.id}`, {
-      event_types: ALL_NOTIFICATION_EVENTS, expected_revision: 7,
+      event_types: ALL_NOTIFICATION_EVENTS,
       context_config: { email: { mode: "count", count: 2 } } });
-    expect(row.revision).toBe(8);
-    await resource.delete(row.id, { expectedRevision: 8 });
-    expect(http.delete).toHaveBeenCalledWith(`/webhooks/subscriptions/${row.id}`,
-      { params: { expected_revision: "8" } });
+    expect(row.eventTypes).toEqual(ALL_NOTIFICATION_EVENTS);
+    await resource.delete(row.id);
+    expect(http.delete).toHaveBeenCalledWith(`/webhooks/subscriptions/${row.id}`);
   });
 
-  it.each([0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
-    "rejects invalid revision %s without a request", async (expectedRevision) => {
-      const { resource, http } = makeResource();
-      await expect(resource.update(RAW_SUBSCRIPTION.id, { expectedRevision })).rejects.toThrow(/positive/);
-      await expect(resource.delete(RAW_SUBSCRIPTION.id, { expectedRevision })).rejects.toThrow(/positive/);
-      expect(http.patch).not.toHaveBeenCalled();
-      expect(http.delete).not.toHaveBeenCalled();
-    });
-
-  it("preserves stale-revision errors without an unconditional retry", async () => {
+  it("preserves overlap conflicts without retrying", async () => {
     const { resource, http } = makeResource();
-    const error = new Error("Subscription revision changed");
+    const error = new Error("Subscription events overlap an existing destination");
     http.patch.mockRejectedValue(error);
-    await expect(resource.update(RAW_SUBSCRIPTION.id, { expectedRevision: 1,
-      eventTypes: ["message.received"] })).rejects.toBe(error);
+    await expect(resource.update(RAW_SUBSCRIPTION.id, { eventTypes: ["message.received"] })).rejects.toBe(error);
     expect(http.patch).toHaveBeenCalledTimes(1);
   });
 });

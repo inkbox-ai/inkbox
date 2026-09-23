@@ -10,13 +10,11 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
 - Identity-filtered lists opt in to all notification families; older clients retain
   their event-family views so existing integrations keep managing their own subscriptions.
-- Add revision-checked subscription updates and deletion, plus CLI `--expected-revision`.
-  Event-list updates remain full replacement. Incoming-call actions remain separate.
-- Expose canonical delivery targets and replayability without changing original history IDs.
+- Event-list updates remain full replacement. Incoming-call actions remain separate.
+- Expose delivery replayability without changing original history IDs.
   Conversation context applies only to received mail, text and iMessage events.
-- **Rust source compatibility:** When recompiling against 0.7.8, direct `WebhookSubscription`
-  literals must add `revision: 1`. Direct `WebhookDelivery` literals must add
-  `canonical_subscription_id: None`, `replayable: false`, and `replay_unavailable_reason: None`.
+- **Rust source compatibility:** When recompiling against 0.7.8, direct `WebhookDelivery`
+  literals must add `replayable: false` and `replay_unavailable_reason: None`.
   Already compiled SDKs remain compatible, and response deserialization accepts older JSON
   with these fields omitted.
 

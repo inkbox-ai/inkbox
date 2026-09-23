@@ -1016,12 +1016,12 @@ Combine notification families on one identity, including channels not yet config
 inkbox webhook subscription create --agent-identity-id <id> --url https://example.com/events \
   --event-type message.received --event-type text.received --event-type imessage.received \
   --event-type call.ended --event-type a2a.task.created
-inkbox webhook subscription update <sub-id> --expected-revision 1 --event-type message.received
-inkbox webhook subscription delete <sub-id> --expected-revision 2
+inkbox webhook subscription update <sub-id> --event-type message.received
+inkbox webhook subscription delete <sub-id>
 ```
 
-Update replaces the full event selection. Conditional update/delete rejects a stale
-revision with HTTP 409. Legacy mailbox and phone selectors resolve to their identity;
+Update replaces the full event selection. Legacy mailbox and phone selectors resolve
+to their identity;
 prefer `--agent-identity-id`. Incoming-call actions remain separate. Delivery output
-includes the canonical subscription ID, replayability and any unavailable reason,
+includes replayability and any unavailable reason,
 while retaining the original target ID.

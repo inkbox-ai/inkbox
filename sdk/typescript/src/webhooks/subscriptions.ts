@@ -29,8 +29,6 @@ export interface WebhookContextConfig {
 
 export interface WebhookSubscription {
   id: string;
-  /** Last-read version for conditional updates and deletion. */
-  revision: number;
   /** `"org_..."` token; not a UUID. */
   organizationId: string;
   /** Legacy mailbox owner; null for canonical identity-owned subscriptions. */
@@ -83,7 +81,6 @@ export interface WebhookSubscriptionCreateResponse extends WebhookSubscription {
 
 export interface RawWebhookSubscription {
   id: string;
-  revision?: number;
   organization_id: string;
   mailbox_id: string | null;
   phone_number_id: string | null;
@@ -112,7 +109,6 @@ export function parseWebhookSubscription(
 ): WebhookSubscription {
   return {
     id: r.id,
-    revision: r.revision ?? 1,
     organizationId: r.organization_id,
     mailboxId: r.mailbox_id ?? null,
     phoneNumberId: r.phone_number_id ?? null,
@@ -188,12 +184,6 @@ function assertKnownEventPrefixes(eventTypes: string[]): void {
   }
 }
 
-function assertRevision(revision: number): void {
-  if (!Number.isSafeInteger(revision) || revision < 1) {
-    throw new Error("expectedRevision must be a positive safe integer");
-  }
-}
-
 const CONTEXT_CLASSES = ["email", "texts", "calls"] as const;
 const CONTEXT_MAX_COUNT = 50;
 const CONTEXT_MAX_WINDOW_HOURS = 168;
@@ -263,18 +253,12 @@ export interface CreateWebhookSubscriptionOptions {
 }
 
 export interface UpdateWebhookSubscriptionOptions {
-  /** Reject a stale revision with HTTP 409 instead of overwriting changes. */
-  expectedRevision?: number;
   url?: string;
   eventTypes?: string[];
   /** Tri-state: omit = unchanged, `null` = clear, object = replace. */
   contextConfig?: WebhookContextConfig | null;
   /** Tri-state: omit = unchanged, `null` = clear, string = replace the delivery bearer token. */
   authToken?: string | null;
-}
-
-export interface DeleteWebhookSubscriptionOptions {
-  expectedRevision?: number;
 }
 
 export interface ListWebhookSubscriptionsOptions {
@@ -387,10 +371,6 @@ export class WebhookSubscriptionsResource {
     options: UpdateWebhookSubscriptionOptions,
   ): Promise<WebhookSubscription> {
     const body: Record<string, unknown> = {};
-    if (options.expectedRevision !== undefined) {
-      assertRevision(options.expectedRevision);
-      body["expected_revision"] = options.expectedRevision;
-    }
     if (options.url !== undefined) {
       assertUrlNotNull(options.url);
       body["url"] = options.url;
@@ -422,17 +402,7 @@ export class WebhookSubscriptionsResource {
   }
 
   /** Delete a subscription. Subsequent `list` / `get` calls will not return it. */
-  async delete(
-    subId: string,
-    options: DeleteWebhookSubscriptionOptions = {},
-  ): Promise<void> {
-    if (options.expectedRevision === undefined) {
-      await this.http.delete(`${PATH}/${subId}`);
-    } else {
-      assertRevision(options.expectedRevision);
-      await this.http.delete(`${PATH}/${subId}`, {
-        params: { expected_revision: String(options.expectedRevision) },
-      });
-    }
+  async delete(subId: string): Promise<void> {
+    await this.http.delete(`${PATH}/${subId}`);
   }
 }

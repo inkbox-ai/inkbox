@@ -1399,13 +1399,11 @@ sub = inkbox.webhooks.subscriptions.create(
                  "call.ended", "a2a.task.created"],
 )
 
-# Events on update replace the full selection. Check the version you read.
+# Events on update replace the full selection.
 updated = inkbox.webhooks.subscriptions.update(
     sub.id, event_types=[*sub.event_types, "a2a.task.message"],
-    expected_revision=sub.revision,
 )
-# A stale revision raises HTTP 409; re-read before deciding what to change.
-inkbox.webhooks.subscriptions.delete(updated.id, expected_revision=updated.revision)
+inkbox.webhooks.subscriptions.delete(updated.id)
 ```
 
 Available event types:

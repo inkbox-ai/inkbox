@@ -621,7 +621,6 @@ def test_all_notification_events_with_context_and_no_channel_lookup(selector):
         "phone_number_id": None,
         "agent_identity_id": _IDENTITY_ID,
         "owner_identity_id": _IDENTITY_ID,
-        "revision": 3,
         "event_types": ALL_NOTIFICATION_EVENTS,
         "context_config": cfg,
     }
@@ -641,75 +640,52 @@ def test_all_notification_events_with_context_and_no_channel_lookup(selector):
         },
     )
     http.get.assert_not_called()
-    assert row.revision == 3
     assert row.mailbox_id is None and row.phone_number_id is None
     assert row.event_types == ALL_NOTIFICATION_EVENTS
 
 
-def test_conditional_update_replaces_events_and_preserves_context_tristate():
+def test_update_replaces_events_and_preserves_context_tristate():
     res, http = _resource()
-    http.patch.return_value = {**RAW_SUBSCRIPTION, "revision": 8}
+    http.patch.return_value = {**RAW_SUBSCRIPTION, "event_types": ALL_NOTIFICATION_EVENTS}
     cfg = {"texts": {"mode": "count", "count": 2}}
     row = res.update(
         _SUB_ID,
         event_types=ALL_NOTIFICATION_EVENTS,
         context_config=cfg,
-        expected_revision=7,
     )
     http.patch.assert_called_once_with(
         f"/webhooks/subscriptions/{_SUB_ID}",
         json={
             "event_types": ALL_NOTIFICATION_EVENTS,
             "context_config": cfg,
-            "expected_revision": 7,
         },
     )
-    assert row.revision == 8
+    assert row.event_types == ALL_NOTIFICATION_EVENTS
 
 
-def test_conditional_delete_uses_query_revision():
-    res, http = _resource()
-    res.delete(_SUB_ID, expected_revision=7)
-    http.delete.assert_called_once_with(
-        f"/webhooks/subscriptions/{_SUB_ID}", params={"expected_revision": 7}
-    )
-
-
-@pytest.mark.parametrize("revision", [0, -1, 1.5, True, "1"])
-def test_invalid_revision_never_sends(revision):
-    res, http = _resource()
-    with pytest.raises(ValueError, match="positive integer"):
-        res.update(_SUB_ID, expected_revision=revision)
-    with pytest.raises(ValueError, match="positive integer"):
-        res.delete(_SUB_ID, expected_revision=revision)
-    http.patch.assert_not_called()
-    http.delete.assert_not_called()
-
-
-def test_missing_revision_and_legacy_response_keys_are_backward_readable():
+def test_missing_legacy_response_keys_are_backward_readable():
     raw = {
         k: v
         for k, v in RAW_SUBSCRIPTION.items()
         if k not in ("mailbox_id", "phone_number_id")
     }
     row = WebhookSubscription._from_dict(raw)
-    assert row.revision == 1
     assert row.mailbox_id is None and row.phone_number_id is None
 
 
-def test_stale_revision_error_is_not_swallowed_or_retried():
+def test_overlap_conflict_is_not_swallowed_or_retried():
     from inkbox.exceptions import InkboxAPIError
 
     res, http = _resource()
-    error = InkboxAPIError(status_code=409, detail="Subscription revision changed")
+    error = InkboxAPIError(status_code=409, detail="Subscription events overlap an existing destination")
     http.patch.side_effect = error
     with pytest.raises(InkboxAPIError) as caught:
-        res.update(_SUB_ID, event_types=["message.received"], expected_revision=1)
+        res.update(_SUB_ID, event_types=["message.received"])
     assert caught.value is error
     assert http.patch.call_count == 1
 
 
-def test_delivery_history_keeps_original_target_and_canonical_replay_state():
+def test_delivery_history_keeps_original_target_and_replay_state():
     from inkbox.webhook_deliveries import WebhookDelivery
 
     raw = {
@@ -725,16 +701,14 @@ def test_delivery_history_keeps_original_target_and_canonical_replay_state():
         "created_at": "2026-09-15T00:00:00+00:00",
     }
     old = WebhookDelivery._from_dict(raw)
-    assert old.canonical_subscription_id is None and old.replayable is False
+    assert old.replayable is False
     current = WebhookDelivery._from_dict(
         {
             **raw,
-            "canonical_subscription_id": _IDENTITY_ID,
             "replayable": True,
         }
     )
     assert current.webhook_subscription_id == UUID(_MAILBOX_ID)
-    assert current.canonical_subscription_id == UUID(_IDENTITY_ID)
     assert current.replayable is True
     unavailable = WebhookDelivery._from_dict(
         {

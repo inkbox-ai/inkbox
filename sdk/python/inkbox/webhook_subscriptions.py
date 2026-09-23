@@ -93,7 +93,6 @@ class WebhookSubscription:
     context_config: WebhookContextConfig | None = None
     has_auth_token: bool = False
     auth_token: str | None = None
-    revision: int = 1
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookSubscription:
@@ -118,7 +117,6 @@ class WebhookSubscription:
             context_config=d.get("context_config"),
             has_auth_token=bool(d.get("has_auth_token", False)),
             auth_token=d.get("auth_token"),
-            revision=d.get("revision", 1),
         )
 
 
@@ -184,11 +182,6 @@ def _assert_known_event_prefixes(event_types: list[str]) -> None:
             raise ValueError(
                 f"event_type {event_type!r} does not belong to any known channel",
             )
-
-
-def _assert_revision(revision: int) -> None:
-    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
-        raise ValueError("expected_revision must be a positive integer")
 
 
 def _assert_valid_context_config(cfg: Any) -> None:
@@ -359,7 +352,6 @@ class WebhookSubscriptionsResource:
         event_types: list[str] = _UNSET,  # type: ignore[assignment]
         context_config: WebhookContextConfig | None = _UNSET,  # type: ignore[assignment]
         auth_token: str | None = _UNSET,  # type: ignore[assignment]
-        expected_revision: int | None = None,
     ) -> WebhookSubscription:
         """Update the URL, event-type list, context config, and/or auth token.
 
@@ -371,16 +363,10 @@ class WebhookSubscriptionsResource:
         (send JSON ``null``), a dict = validate and replace. Context applies
         only to received mail, text and iMessage events.
 
-        Pass the last-read ``revision`` as ``expected_revision`` to reject
-        concurrent changes with HTTP 409 instead of overwriting them.
-
         ``auth_token`` is tri-state the same way: omitted = unchanged,
         ``None`` = clear the delivery bearer token, a string = replace it.
         """
         body: dict[str, Any] = {}
-        if expected_revision is not None:
-            _assert_revision(expected_revision)
-            body["expected_revision"] = expected_revision
         if url is not _UNSET:
             _assert_url_not_none(url)
             body["url"] = url
@@ -402,19 +388,6 @@ class WebhookSubscriptionsResource:
         data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}", json=body)
         return WebhookSubscription._from_dict(data)
 
-    def delete(
-        self,
-        sub_id: UUID | str,
-        *,
-        expected_revision: int | None = None,
-    ) -> None:
-        """Delete a subscription, optionally checking its last-read revision.
-
-        A stale ``expected_revision`` fails with HTTP 409 without deleting it.
-        """
-        path = f"{_BASE}/{_uuid_str(sub_id)}"
-        if expected_revision is None:
-            self._http.delete(path)
-        else:
-            _assert_revision(expected_revision)
-            self._http.delete(path, params={"expected_revision": expected_revision})
+    def delete(self, sub_id: UUID | str) -> None:
+        """Delete a subscription."""
+        self._http.delete(f"{_BASE}/{_uuid_str(sub_id)}")

@@ -101,15 +101,7 @@ test("resolveAuthTokenInput is a no-op without the stdin flag", async () => {
   assert.equal(await resolveAuthTokenInput({}), undefined);
 });
 
-test("conditional revision parser accepts only positive safe integers", async () => {
-  const { parseExpectedRevision } = await import("../dist/commands/webhook.js");
-  assert.equal(parseExpectedRevision("12"), 12);
-  for (const input of ["0", "-1", "1.5", "1junk", "9007199254740992"]) {
-    assert.throws(() => parseExpectedRevision(input), /positive safe integer/);
-  }
-});
-
-test("webhook CLI sends mixed identity events and conditional mutation revisions", async (t) => {
+test("webhook CLI sends mixed identity events and direct mutations", async (t) => {
   const http = await import("node:http");
   const { execFile } = await import("node:child_process");
   const { fileURLToPath } = await import("node:url");
@@ -117,7 +109,7 @@ test("webhook CLI sends mixed identity events and conditional mutation revisions
   const row = {
     id: "11111111-1111-1111-1111-111111111111", organization_id: "org_test",
     agent_identity_id: "33333333-3333-3333-3333-333333333333",
-    mailbox_id: null, phone_number_id: null, revision: 2,
+    mailbox_id: null, phone_number_id: null,
     url: "https://example.com/events", event_types: ["message.received", "a2a.task.created"],
     status: "active", created_at: "2026-09-15T00:00:00Z", updated_at: "2026-09-15T00:00:00Z",
   };
@@ -138,12 +130,12 @@ test("webhook CLI sends mixed identity events and conditional mutation revisions
     (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(stdout)));
   const created = JSON.parse(await run(["create", "--agent-identity-id", row.agent_identity_id,
     "--url", row.url, "--event-type", "message.received", "--event-type", "a2a.task.created"]));
-  assert.equal(created.revision, 2);
+  assert.deepEqual(created.eventTypes, row.event_types);
   assert.deepEqual(requests[0].body, { agent_identity_id: row.agent_identity_id,
     url: row.url, event_types: row.event_types });
-  await run(["update", row.id, "--expected-revision", "2", "--event-type", "message.received"]);
-  assert.deepEqual(requests[1].body, { expected_revision: 2, event_types: ["message.received"] });
-  await run(["delete", row.id, "--expected-revision", "2"]);
+  await run(["update", row.id, "--event-type", "message.received"]);
+  assert.deepEqual(requests[1].body, { event_types: ["message.received"] });
+  await run(["delete", row.id]);
   assert.equal(requests[2].method, "DELETE");
-  assert.match(requests[2].url, /\?expected_revision=2$/);
+  assert.equal(requests[2].url, `/api/v1/webhooks/subscriptions/${row.id}`);
 });
