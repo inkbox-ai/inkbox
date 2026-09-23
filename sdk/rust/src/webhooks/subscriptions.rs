@@ -574,7 +574,8 @@ mod tests {
                 .path("/api/v1/webhooks/subscriptions")
                 .query_param("agent_identity_id", identity.to_string())
                 .query_param("scope", "identity");
-            then.status(200).json_body(json!({"subscriptions": [row.clone()]}));
+            then.status(200)
+                .json_body(json!({"subscriptions": [row.clone()]}));
         });
         let rows = subs.list(None, None, Some(identity), None, None).unwrap();
         assert_eq!(rows[0].event_types, events);
