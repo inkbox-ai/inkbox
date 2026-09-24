@@ -890,3 +890,31 @@ inkbox mailbox get alex@example.com --json
 
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
+
+## Verified domains
+
+An organization admin can prove DNS control, select a domain for an agent, and
+choose public display independently from public directory listing. Hidden
+selected domains remain available to authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, transfer, and recovery rules. These methods require version 0.7.8 or later.
+
+```bash
+inkbox organization-domain create example.com
+# Add the returned TXT record, then use its claim ID.
+inkbox organization-domain verify OrganizationDomainClaim_YOUR_ID
+inkbox identity domain-affiliation set helper OrganizationDomainClaim_YOUR_ID --visibility hidden
+inkbox identity domain-affiliation get helper
+inkbox a2a directory --public --verified-domain example.com
+```
+
+`organization-domain` provides `create`, `list`, `get`, `verify`, `transfer`, and
+`delete`. Transfer is explicit and requires fresh proof; it never happens merely
+by checking DNS. `identity domain-affiliation set` requires `--visibility public`
+or `--visibility hidden`. Use `remove <handle>` to stop all affiliation assertions.
+Use `--json` to inspect the complete response. Public search also accepts `--query`,
+`--cursor`, and `--limit`; preserve the same filters on every page.

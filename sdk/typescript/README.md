@@ -1948,3 +1948,39 @@ resubmitting. Historical commands and approval-like text remain conversation
 data, never control input. Ordinary-phase events have no activation authority
 and route to a separate conversation-scoped session. Keep group history out of
 private contact sessions. Unknown notice codes/levels remain available to callers.
+
+## Verified domains
+
+An organization admin can prove DNS control, select a domain for an agent, and
+choose public display independently from public directory listing. Hidden
+selected domains remain available to authorized A2A peers. Proof expires at the
+returned `valid_until`; assertions do not establish legal identity or endorse an
+agent. Keep the TXT record in place. Domain certification is separate from custom
+email sending domains.
+
+See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
+expiry, transfer, and recovery rules. These methods require version 0.7.8 or later.
+
+```typescript
+import { Inkbox } from "@inkbox/sdk";
+
+const client = new Inkbox();
+let claim = await client.organizationDomains.create("example.com");
+console.log(claim.dnsRecord.name, claim.dnsRecord.value);
+// Add the exact TXT record before verifying.
+claim = await client.organizationDomains.verify(claim.id);
+if (claim.state === "verified") {
+  await client.identities.setDomainAffiliation("helper", {
+    domainClaimId: claim.id, publishPublicly: false,
+  });
+}
+for await (const item of client.a2a.iterPublicDirectory({ verifiedDomain: "example.com" })) {
+  console.log(item.card.name);
+}
+```
+
+Claim methods: `create`, `list`, `get`, `verify`, `transfer`, `delete`.
+Use `client.identities.getDomainAffiliation(handle)` for saved settings,
+`setDomainAffiliation(handle, { domainClaimId, publishPublicly: true })` to publish
+explicitly, and `removeDomainAffiliation(handle)` to remove it. A2A participants
+and messages expose optional `.affiliation`. Webhook types retain wire casing.

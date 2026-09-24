@@ -8,6 +8,8 @@
  */
 
 import { HttpTransport, InkboxAPIError, validateIdempotencyKey } from "../../_http.js";
+import { parseIdentityDomainAffiliation } from "../../organization_domains/types.js";
+import type { IdentityDomainAffiliation, SetDomainAffiliationOptions } from "../../organization_domains/types.js";
 import { mapIdentityConflictError } from "../exceptions.js";
 import {
   AgentIdentitySummary,
@@ -28,6 +30,20 @@ import {
 
 export class IdentitiesResource {
   constructor(private readonly http: HttpTransport) {}
+
+  async getDomainAffiliation(agentHandle: string): Promise<IdentityDomainAffiliation> {
+    return parseIdentityDomainAffiliation(await this.http.get(`/${encodeURIComponent(agentHandle)}/domain-affiliation`));
+  }
+
+  async setDomainAffiliation(agentHandle: string, options: SetDomainAffiliationOptions): Promise<IdentityDomainAffiliation> {
+    return parseIdentityDomainAffiliation(await this.http.put(`/${encodeURIComponent(agentHandle)}/domain-affiliation`, {
+      domain_claim_id: options.domainClaimId, publish_publicly: options.publishPublicly,
+    }));
+  }
+
+  async removeDomainAffiliation(agentHandle: string): Promise<void> {
+    await this.http.delete(`/${encodeURIComponent(agentHandle)}/domain-affiliation`);
+  }
 
   /**
    * Create a new agent identity. Atomically provisions the identity's

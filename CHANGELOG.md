@@ -4,6 +4,20 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.8 - Verified domains
+
+### Added
+
+- Manage organization domain claims, TXT verification, explicit transfer, and release from Python, TypeScript, Rust, and the CLI.
+- Select an agent domain with an explicit public-display choice while retaining authorized A2A visibility for hidden affiliations.
+- Filter public A2A directory results by exact verified domain and read optional affiliation assertions on A2A participants, messages, and webhooks.
+
+### Changed
+
+- Bump Python, TypeScript, Rust, CLI, and bundled Claude plugin versions together to 0.7.8.
+- Bump the bundled Codex and Cursor plugin manifests to 0.1.7 and 1.0.5.
+- Rust directory options and A2A response/webhook structs gain additive fields; exhaustive struct literals must include them, while directory options can use `..Default::default()`.
+
 ## 0.7.7 - Phone number country metadata
 
 ### Added
