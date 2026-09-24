@@ -1453,7 +1453,7 @@ agent. Keep the TXT record in place. Domain certification is separate from custo
 email sending domains.
 
 See [verified domains](https://inkbox.ai/docs/capabilities/verified-domains) for
-expiry, transfer, and recovery rules. These methods require version 0.7.5 or later.
+expiry, transfer, and recovery rules. These methods require version 0.7.8 or later.
 
 ```typescript
 import { Inkbox } from "@inkbox/sdk";
