@@ -26,7 +26,12 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 - Rust adds `create_for_identity` without changing the existing `create` signature.
 - TypeScript replay metadata fields are optional for existing typed literals and
   mocks; parsed responses always populate `replayable` and `replayUnavailableReason`.
-- Event-list updates remain full replacement. Incoming-call actions remain separate.
+- Mixed subscriptions require explicit identity scope for update/delete as well:
+  Python `scope="identity"`, TypeScript `{ scope: "identity" }`, Rust
+  `update_with_scope` / `delete_with_scope`, or CLI `--scope identity`. Mutation scope
+  defaults to omitted, adds no catalog request, and keeps old callers unchanged;
+  a mixed receiver rejects an unscoped mutation with 409. Event updates remain full
+  replacement. Incoming-call actions remain separate.
 - Expose delivery replayability without changing original history IDs.
   Conversation context applies only to received mail, text and iMessage events.
 - **Rust source compatibility:** When recompiling against 0.7.8, direct `WebhookDelivery`

@@ -139,6 +139,7 @@ test("webhook CLI sends mixed identity events and direct mutations", async (t) =
   await run(["update", row.id, "--event-type", "message.received"]);
   assert.deepEqual(requests[1].body, { event_types: ["message.received"] });
   await run(["delete", row.id]);
+  assert.equal(requests[1].url, `/api/v1/webhooks/subscriptions/${row.id}`);
   assert.equal(requests[2].method, "DELETE");
   assert.equal(requests[2].url, `/api/v1/webhooks/subscriptions/${row.id}`);
   await run(["list", "--agent-identity-id", row.agent_identity_id]);
@@ -158,6 +159,14 @@ test("webhook CLI sends mixed identity events and direct mutations", async (t) =
     assert.equal(requests.at(-1).url, "/api/v1/webhooks/catalog");
   }
   await assert.rejects(run(["list", "--scope", "unsupported"]), /Allowed choices are identity/);
+  const catalogCalls = requests.filter((request) => request.url === "/api/v1/webhooks/catalog").length;
+  await run(["update", row.id, "--event-type", "message.received", "--scope", "identity"]);
+  await run(["delete", row.id, "--scope", "identity"]);
+  assert.equal(requests.at(-2).url, `/api/v1/webhooks/subscriptions/${row.id}?scope=identity`);
+  assert.deepEqual(requests.at(-2).body, { event_types: ["message.received"] });
+  assert.equal(requests.at(-1).url, `/api/v1/webhooks/subscriptions/${row.id}?scope=identity`);
+  assert.equal(requests.filter((request) => request.url === "/api/v1/webhooks/catalog").length, catalogCalls);
+  await assert.rejects(run(["delete", row.id, "--scope", "unsupported"]), /Allowed choices are identity/);
   row.agent_identity_id = null;
   for (const owner of ["mailbox_id", "phone_number_id"]) {
     row.mailbox_id = null; row.phone_number_id = null;

@@ -1371,7 +1371,7 @@ inkbox.webhooks.subscriptions.create(
     event_types=["message.received"],
     context_config={"email": {"mode": "count", "count": 10}},
 )
-inkbox.webhooks.subscriptions.update(created.id, context_config=None)  # clear
+inkbox.webhooks.subscriptions.update(created.id, scope="identity", context_config=None)  # clear
 ```
 
 **Delivery auth token:** for endpoints that require their own `Authorization` header, pass `auth_token` on `create` / `update` — every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the stored token as `auth_token` (`None` when unset) plus the boolean `has_auth_token` flag; both default to unset on servers that predate the fields. On `update` it is tri-state: omit = unchanged, `None` = clear, string = replace.
@@ -1415,7 +1415,7 @@ except InkboxAPIError as e:
 - The `Inkbox` client **must** be used as a context manager (`with` statement) or `.close()` called manually
 - Mail/phone methods on `AgentIdentity` raise `InkboxError` if the relevant channel isn't assigned
 
-Use `subscriptions.update(sub.id, event_types=events)` to replace the selected events and `subscriptions.delete(sub.id)` to remove the subscription. Delivery rows expose `replayable` and `replay_unavailable_reason` without replacing their original `webhook_subscription_id`.
+Use `subscriptions.update(sub.id, scope="identity", event_types=events)` to replace the selected events and `subscriptions.delete(sub.id, scope="identity")` to remove the subscription. Delivery rows expose `replayable` and `replay_unavailable_reason` without replacing their original `webhook_subscription_id`.
 
 ## Custom email signatures
 

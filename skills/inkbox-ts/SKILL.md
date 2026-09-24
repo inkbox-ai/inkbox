@@ -1384,7 +1384,7 @@ await inkbox.webhooks.subscriptions.create({
   eventTypes: ["message.received"],
   contextConfig: { email: { mode: "count", count: 10 } },
 });
-await inkbox.webhooks.subscriptions.update(created.id, { contextConfig: null });  // clear
+await inkbox.webhooks.subscriptions.update(created.id, { scope: "identity", contextConfig: null });  // clear
 ```
 
 **Delivery auth token:** for endpoints that require their own `Authorization` header, pass `authToken` on `create` / `update` — every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the stored token as `authToken` (`null` when unset) plus the boolean `hasAuthToken` flag; both default to unset on servers that predate the fields. On `update` it is tri-state: omit = unchanged, `null` = clear, string = replace.
@@ -1431,7 +1431,7 @@ try {
 - No context manager needed — `new Inkbox({...})` is all that's required
 - All methods are `async` and return Promises — always `await` them
 
-Use `subscriptions.update(sub.id, { eventTypes })` to replace the selected events and `subscriptions.delete(sub.id)` to remove the subscription. Delivery rows expose `replayable` and `replayUnavailableReason` while retaining their original `webhookSubscriptionId`.
+Use `subscriptions.update(sub.id, { scope: "identity", eventTypes })` to replace the selected events and `subscriptions.delete(sub.id, { scope: "identity" })` to remove the subscription. Delivery rows expose `replayable` and `replayUnavailableReason` while retaining their original `webhookSubscriptionId`.
 
 ## Custom email signatures
 

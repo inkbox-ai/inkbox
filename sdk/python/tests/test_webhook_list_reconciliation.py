@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from inkbox.exceptions import InkboxAPIError
 from inkbox.webhook_subscriptions import WebhookSubscriptionsResource
 
 IDENTITY = "11111111-1111-4111-8111-111111111111"
@@ -48,7 +47,8 @@ def test_legacy_reconciler_does_not_modify_mixed_or_separate_rows(replacement, m
 
     def create_row(path, *, json):
         assert any(set(json["event_types"]) & set(row["event_types"]) for row in rows)
-        raise InkboxAPIError(status_code=409, detail="Overlapping event selection")
+        # The existing mixed receiver is reused without replacing its events.
+        return deepcopy(stored)
 
     http.get.side_effect = list_rows
     http.post.side_effect = create_row
@@ -68,12 +68,10 @@ def test_legacy_reconciler_does_not_modify_mixed_or_separate_rows(replacement, m
                 resource.delete(row.id)
         resource.create(agent_identity_id=IDENTITY, url=ROW["url"], event_types=desired)
 
+    reconcile()
     if mixed:
-        with pytest.raises(InkboxAPIError) as exc:
-            reconcile()
-        assert exc.value.status_code == 409
+        http.post.assert_called_once()
     else:
-        reconcile()
         http.post.assert_not_called()
     http.patch.assert_not_called()
     http.delete.assert_not_called()

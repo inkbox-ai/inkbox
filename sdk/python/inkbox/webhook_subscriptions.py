@@ -362,11 +362,13 @@ class WebhookSubscriptionsResource:
         event_types: list[str] = _UNSET,  # type: ignore[assignment]
         context_config: WebhookContextConfig | None = _UNSET,  # type: ignore[assignment]
         auth_token: str | None = _UNSET,  # type: ignore[assignment]
+        scope: Literal["identity"] | None = None,
     ) -> WebhookSubscription:
         """Update the URL, event-type list, context config, and/or auth token.
 
         ``event_types``, if supplied, replaces the stored list and must
-        be non-empty and distinct. Owner FKs are not mutable.
+        be non-empty and distinct. Owner FKs are not mutable. A mixed subscription
+        requires explicit ``scope="identity"``; omitted scope preserves legacy behavior.
 
         ``context_config`` is tri-state and a field where ``None`` is
         meaningful on the wire: omitted = unchanged, ``None`` = clear
@@ -395,9 +397,11 @@ class WebhookSubscriptionsResource:
         if auth_token is not _UNSET:
             # `None` passes through as JSON null to clear the stored token.
             body["auth_token"] = auth_token
-        data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}", json=body)
+        suffix = "?scope=identity" if scope == "identity" else ""
+        data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}{suffix}", json=body)
         return WebhookSubscription._from_dict(data)
 
-    def delete(self, sub_id: UUID | str) -> None:
-        """Delete a subscription."""
-        self._http.delete(f"{_BASE}/{_uuid_str(sub_id)}")
+    def delete(self, sub_id: UUID | str, *, scope: Literal["identity"] | None = None) -> None:
+        """Delete a subscription; mixed subscriptions require explicit identity scope."""
+        suffix = "?scope=identity" if scope == "identity" else ""
+        self._http.delete(f"{_BASE}/{_uuid_str(sub_id)}{suffix}")

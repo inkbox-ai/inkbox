@@ -761,7 +761,11 @@ remains available and resolves its mailbox/phone selector to the owning identity
 
 `update(sub_id, url, event_types, context_config, auth_token)` replaces each
 supplied field. `event_types` replaces the full selection; omitted fields remain
-unchanged. `delete(sub_id)` removes the whole subscription.
+unchanged. `delete(sub_id)` removes the whole subscription. Mixed subscriptions
+require explicit `Some(WebhookSubscriptionScope::Identity)` through
+`update_with_scope(sub_id, url, event_types, context_config, auth_token, scope)` or
+`delete_with_scope(sub_id, scope)`. The existing methods retain omitted scope;
+upgrading the SDK does not opt old callers into changing shared event selections.
 
 Context is included only for received mail/text/iMessage events; other selected
 events ignore it. Incoming-call actions remain separate. Delivery records retain

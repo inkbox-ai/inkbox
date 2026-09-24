@@ -759,3 +759,14 @@ describe("identity-owned mixed notifications", () => {
     expect(http.patch).toHaveBeenCalledTimes(1);
   });
 });
+
+it.each([undefined, "identity"] as const)("keeps mutation scope explicit (%s) without a catalog request", async (scope) => {
+  const { resource, http } = makeResource();
+  http.patch.mockResolvedValue(RAW_SUBSCRIPTION);
+  await resource.update("subid", { url: "https://example.com/new", scope });
+  await resource.delete("subid", { scope });
+  const suffix = scope ? "?scope=identity" : "";
+  expect(http.patch).toHaveBeenCalledWith(`/webhooks/subscriptions/subid${suffix}`, { url: "https://example.com/new" });
+  expect(http.delete).toHaveBeenCalledWith(`/webhooks/subscriptions/subid${suffix}`);
+  expect(http.get).not.toHaveBeenCalled();
+});

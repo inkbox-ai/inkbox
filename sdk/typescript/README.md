@@ -1494,10 +1494,10 @@ const sub = await inkbox.webhooks.subscriptions.create({
 });
 
 // Events on update replace the full selection.
-const updated = await inkbox.webhooks.subscriptions.update(sub.id, {
+const updated = await inkbox.webhooks.subscriptions.update(sub.id, { scope: "identity",
   eventTypes: [...sub.eventTypes, "a2a.task.message"],
 });
-await inkbox.webhooks.subscriptions.delete(updated.id);
+await inkbox.webhooks.subscriptions.delete(updated.id, { scope: "identity" });
 ```
 
 Available event types:
@@ -1554,7 +1554,7 @@ await inkbox.webhooks.subscriptions.create({
 
 // update() is tri-state: omit contextConfig to leave it unchanged, pass an
 // object to replace it, or pass null to clear it.
-await inkbox.webhooks.subscriptions.update(sub.id, { contextConfig: null });
+await inkbox.webhooks.subscriptions.update(sub.id, { scope: "identity", contextConfig: null });
 ```
 
 Received-event payloads then carry an optional `payload.data.context` keyed
@@ -1612,7 +1612,7 @@ await inkbox.webhooks.subscriptions.create({
 
 // update() is tri-state: omit authToken to leave it unchanged, pass a
 // string to replace it, or pass null to clear it.
-await inkbox.webhooks.subscriptions.update(sub.id, { authToken: null });
+await inkbox.webhooks.subscriptions.update(sub.id, { scope: "identity", authToken: null });
 ```
 
 ### Incoming-call webhooks (still per-number)

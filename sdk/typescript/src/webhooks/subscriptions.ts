@@ -253,6 +253,8 @@ export interface CreateWebhookSubscriptionOptions {
 }
 
 export interface UpdateWebhookSubscriptionOptions {
+  /** Explicit consent to replace fields on a subscription shared by event families. */
+  scope?: "identity";
   url?: string;
   eventTypes?: string[];
   /** Tri-state: omit = unchanged, `null` = clear, object = replace. */
@@ -377,7 +379,7 @@ export class WebhookSubscriptionsResource {
    * no-op. `eventTypes`, if supplied, replaces the stored list and must
    * be non-empty and distinct. Owner FKs are not mutable. `contextConfig`
    * and `authToken` are tri-state: omit = unchanged, `null` = clear,
-   * value = replace.
+   * value = replace. Mixed subscriptions require explicit `scope: "identity"`.
    */
   async update(
     subId: string,
@@ -408,14 +410,14 @@ export class WebhookSubscriptionsResource {
       body["auth_token"] = options.authToken;
     }
     const data = await this.http.patch<RawWebhookSubscription>(
-      `${PATH}/${subId}`,
+      `${PATH}/${subId}${options.scope === "identity" ? "?scope=identity" : ""}`,
       body,
     );
     return parseWebhookSubscription(data);
   }
 
-  /** Delete a subscription. Subsequent `list` / `get` calls will not return it. */
-  async delete(subId: string): Promise<void> {
-    await this.http.delete(`${PATH}/${subId}`);
+  /** Delete a subscription. Mixed subscriptions require explicit identity scope. */
+  async delete(subId: string, options: { scope?: "identity" } = {}): Promise<void> {
+    await this.http.delete(`${PATH}/${subId}${options.scope === "identity" ? "?scope=identity" : ""}`);
   }
 }

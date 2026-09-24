@@ -910,7 +910,7 @@ inkbox webhook subscription create           # Create a subscription
                                              #     stdin (never passed as an argument).
                                              #     Reads return the token; list tables
                                              #     show only hasAuthToken
-inkbox webhook subscription update <sub-id>  # Update url, event_types, context, and/or auth token
+inkbox webhook subscription update <sub-id> --scope identity  # Update url, event_types, context, and/or auth token
   --url <url>                                #   New HTTPS destination
   --event-type <type>                        #   Replacement event-type list (repeatable)
   --context-email <spec>                     #   Replace email context (count:N | window:H)
@@ -922,7 +922,7 @@ inkbox webhook subscription update <sub-id>  # Update url, event_types, context,
   --clear-auth-token                         #   Clear the delivery bearer token
                                              #     (mutually exclusive with
                                              #     --auth-token-stdin)
-inkbox webhook subscription delete <sub-id>  # Remove a subscription
+inkbox webhook subscription delete <sub-id> --scope identity  # Remove a subscription
 ```
 
 ## Mail clients (IMAP/SMTP)
@@ -1024,8 +1024,8 @@ Combine notification families on one identity, including channels not yet config
 inkbox webhook subscription create --agent-identity-id <id> --url https://example.com/events \
   --event-type message.received --event-type text.received --event-type imessage.received \
   --event-type call.ended --event-type a2a.task.created
-inkbox webhook subscription update <sub-id> --event-type message.received
-inkbox webhook subscription delete <sub-id>
+inkbox webhook subscription update <sub-id> --scope identity --event-type message.received
+inkbox webhook subscription delete <sub-id> --scope identity
 ```
 
 Update replaces the full event selection. Legacy mailbox and phone selectors resolve

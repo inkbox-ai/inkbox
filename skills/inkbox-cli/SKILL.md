@@ -804,10 +804,10 @@ inkbox webhook subscription create --agent-identity-id <id> --url <url> \
 # Bearer token sent as Authorization on every delivery (returned by reads):
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type message.received --auth-token-stdin   # token read from stdin
-inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>...] \
+inkbox webhook subscription update <sub-id> --scope identity [--url <url>] [--event-type <type>...] \
   [--context-email <spec>] [--context-texts <spec>] [--context-calls <spec>] [--clear-context] \
   [--auth-token-stdin] [--clear-auth-token]
-inkbox webhook subscription delete <sub-id>
+inkbox webhook subscription delete <sub-id> --scope identity
 ```
 
 Owner-filtered lists retain single-family views unless `--scope identity` is supplied. Use `--agent-identity-id <id> --scope identity` to include mixed subscriptions and every notification family.

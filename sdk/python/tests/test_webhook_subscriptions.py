@@ -745,3 +745,16 @@ def test_delivery_history_keeps_original_target_and_replay_state():
         }
     )
     assert unavailable.replay_unavailable_reason == "event_not_subscribed"
+
+@pytest.mark.parametrize("scope", [None, "identity"])
+def test_mutation_scope_is_explicit_and_never_fetches_catalog(scope):
+    res, http = _resource()
+    http.patch.return_value = RAW_SUBSCRIPTION
+    res.update(_SUB_ID, url="https://example.com/new", scope=scope)
+    res.delete(_SUB_ID, scope=scope)
+    suffix = "?scope=identity" if scope else ""
+    http.patch.assert_called_once_with(
+        f"/webhooks/subscriptions/{_SUB_ID}{suffix}", json={"url": "https://example.com/new"},
+    )
+    http.delete.assert_called_once_with(f"/webhooks/subscriptions/{_SUB_ID}{suffix}")
+    http.get.assert_not_called()

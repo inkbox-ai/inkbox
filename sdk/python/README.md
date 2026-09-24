@@ -1408,9 +1408,9 @@ sub = inkbox.webhooks.subscriptions.create(
 
 # Events on update replace the full selection.
 updated = inkbox.webhooks.subscriptions.update(
-    sub.id, event_types=[*sub.event_types, "a2a.task.message"],
+    sub.id, scope="identity", event_types=[*sub.event_types, "a2a.task.message"],
 )
-inkbox.webhooks.subscriptions.delete(updated.id)
+inkbox.webhooks.subscriptions.delete(updated.id, scope="identity")
 ```
 
 Available event types:
@@ -1467,7 +1467,7 @@ inkbox.webhooks.subscriptions.create(
 
 # update() is tri-state: omit context_config to leave it unchanged, pass a
 # dict to replace it, or pass None to clear it.
-inkbox.webhooks.subscriptions.update(sub.id, context_config=None)
+inkbox.webhooks.subscriptions.update(sub.id, scope="identity", context_config=None)
 ```
 
 Received-event payloads then carry an optional `data["context"]` keyed by
@@ -1520,7 +1520,7 @@ inkbox.webhooks.subscriptions.create(
 
 # update() is tri-state: omit auth_token to leave it unchanged, pass a
 # string to replace it, or pass None to clear it.
-inkbox.webhooks.subscriptions.update(sub.id, auth_token=None)
+inkbox.webhooks.subscriptions.update(sub.id, scope="identity", auth_token=None)
 ```
 
 ### Incoming-call webhooks (still per-number)

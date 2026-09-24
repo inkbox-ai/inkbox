@@ -595,6 +595,10 @@ Existing list calls keep their single-family views. Explicitly pass
 `scope="identity"` (Python), `scope: "identity"` (TypeScript), or use Rust's
 `list_with_scope` to include every family and mixed subscription. The CLI supports
 `inkbox webhook subscription list --agent-identity-id <id> --scope identity`.
+Mixed subscriptions also require explicit identity scope for updates and deletion:
+pass `scope="identity"` in Python, `{ scope: "identity" }` in TypeScript, use Rust's
+`update_with_scope` / `delete_with_scope`, or CLI `--scope identity`. Omitted scope
+preserves legacy behavior and receives 409 when targeting a mixed subscription.
 Event-list updates replace the complete selection. Incoming-call actions remain
 separate identity settings.
 

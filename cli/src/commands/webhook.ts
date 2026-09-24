@@ -217,6 +217,7 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("update <sub-id>")
+    .addOption(new Option("--scope <scope>", "Allow changes to a mixed-family subscription").choices(["identity"]))
     .description("Update url, event_types, context, and/or the delivery auth token on a subscription. --event-type replaces the stored list.")
     .option("--url <url>", "New HTTPS destination")
     .option(
@@ -247,6 +248,7 @@ function registerSubscriptionCommands(parent: Command): void {
           clearContext?: boolean;
           authTokenStdin?: boolean;
           clearAuthToken?: boolean;
+          scope?: "identity";
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -256,7 +258,9 @@ function registerSubscriptionCommands(parent: Command): void {
           eventTypes?: string[];
           contextConfig?: WebhookContextConfig | null;
           authToken?: string | null;
+          scope?: "identity";
         } = {};
+        if (cmdOpts.scope !== undefined) body.scope = cmdOpts.scope;
         if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
         if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
         const contextConfig = buildContextConfigFromFlags(cmdOpts);
@@ -289,11 +293,12 @@ function registerSubscriptionCommands(parent: Command): void {
   sub
     .command("delete <sub-id>")
     .description("Remove the whole subscription, including every selected event")
+    .addOption(new Option("--scope <scope>", "Allow deletion of a mixed-family subscription").choices(["identity"]))
     .action(
-      withErrorHandler(async function (this: Command, subId: string) {
+      withErrorHandler(async function (this: Command, subId: string, cmdOpts: { scope?: "identity" }) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        await inkbox.webhooks.subscriptions.delete(subId);
+        await inkbox.webhooks.subscriptions.delete(subId, { scope: cmdOpts.scope });
         printStatus(`Deleted webhook subscription '${subId}'.`);
       }),
     );

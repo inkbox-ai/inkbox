@@ -84,10 +84,10 @@ pub enum WebhookSubscriptionStatus {
     Deleted,
 }
 
-/// Explicitly broaden a list beyond the legacy single-family views.
+/// Explicit identity-wide lists and mutations of mixed subscriptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WebhookSubscriptionScope {
-    /// Include every notification family, including mixed subscriptions.
+    /// Include every notification family or explicitly mutate a mixed subscription.
     Identity,
 }
 
@@ -409,6 +409,20 @@ impl WebhookSubscriptionsResource {
         context_config: Option<Option<&WebhookContextConfig>>,
         auth_token: Option<Option<&str>>,
     ) -> Result<WebhookSubscription> {
+        self.update_with_scope(sub_id, url, event_types, context_config, auth_token, None)
+    }
+
+    /// Update with explicit identity scope when replacing a mixed subscription.
+    /// `None` preserves legacy behavior and does not opt into mixed-row mutations.
+    pub fn update_with_scope(
+        &self,
+        sub_id: Uuid,
+        url: Option<&str>,
+        event_types: Option<&[String]>,
+        context_config: Option<Option<&WebhookContextConfig>>,
+        auth_token: Option<Option<&str>>,
+        scope: Option<WebhookSubscriptionScope>,
+    ) -> Result<WebhookSubscription> {
         // Only include keys the caller supplied (Python omits `_UNSET` keys).
         let mut body = serde_json::Map::new();
         if let Some(u) = url {
@@ -442,8 +456,13 @@ impl WebhookSubscriptionsResource {
                 }
             }
         }
+        let suffix = if scope == Some(WebhookSubscriptionScope::Identity) {
+            "?scope=identity"
+        } else {
+            ""
+        };
         let data = self.http.patch(
-            &format!("{BASE}/{sub_id}"),
+            &format!("{BASE}/{sub_id}{suffix}"),
             &serde_json::Value::Object(body),
         )?;
         Ok(serde_json::from_value(data)?)
@@ -452,7 +471,21 @@ impl WebhookSubscriptionsResource {
     /// Delete a subscription. Subsequent `list` / `get` calls will not return
     /// it.
     pub fn delete(&self, sub_id: Uuid) -> Result<()> {
-        self.http.delete(&format!("{BASE}/{sub_id}"))
+        self.delete_with_scope(sub_id, None)
+    }
+
+    /// Delete with explicit identity scope when removing a mixed subscription.
+    pub fn delete_with_scope(
+        &self,
+        sub_id: Uuid,
+        scope: Option<WebhookSubscriptionScope>,
+    ) -> Result<()> {
+        let suffix = if scope == Some(WebhookSubscriptionScope::Identity) {
+            "?scope=identity"
+        } else {
+            ""
+        };
+        self.http.delete(&format!("{BASE}/{sub_id}{suffix}"))
     }
 
     /// Create a subscription directly on an identity without legacy selectors.
@@ -555,6 +588,67 @@ mod tests {
             .unwrap()
             .is_empty());
         request.assert();
+    }
+
+    #[test]
+    fn mutation_scope_is_explicit_without_catalog_requests() {
+        use httpmock::{prelude::*, Method::PATCH};
+        for scope in [None, Some(WebhookSubscriptionScope::Identity)] {
+            let server = MockServer::start();
+            let client = crate::client::Inkbox::builder("test-key")
+                .base_url(server.base_url())
+                .build()
+                .unwrap();
+            let id = Uuid::from_u128(1);
+            let has_scope = scope.is_some();
+            let row = json!({"id": id, "organization_id": "org_test", "url": "https://example.com/new",
+                "event_types": ["message.received"], "status": "active",
+                "created_at": "2026-09-01T00:00:00Z", "updated_at": "2026-09-01T00:00:00Z"});
+            let patch = server.mock(|when, then| {
+                let when = when
+                    .method(PATCH)
+                    .path(format!("/api/v1/webhooks/subscriptions/{id}"))
+                    .json_body(json!({"url": "https://example.com/new"}));
+                if has_scope {
+                    when.query_param("scope", "identity");
+                } else {
+                    when.matches(|r| {
+                        !r.query_params
+                            .as_ref()
+                            .is_some_and(|params| params.iter().any(|(key, _)| key == "scope"))
+                    });
+                }
+                then.status(200).json_body(row);
+            });
+            let delete = server.mock(|when, then| {
+                let when = when
+                    .method(DELETE)
+                    .path(format!("/api/v1/webhooks/subscriptions/{id}"));
+                if has_scope {
+                    when.query_param("scope", "identity");
+                } else {
+                    when.matches(|r| {
+                        !r.query_params
+                            .as_ref()
+                            .is_some_and(|params| params.iter().any(|(key, _)| key == "scope"))
+                    });
+                }
+                then.status(204);
+            });
+            let catalog = server.mock(|when, then| {
+                when.method(GET).path("/api/v1/webhooks/catalog");
+                then.status(500);
+            });
+            let resource = client.webhooks();
+            let subscriptions = resource.subscriptions();
+            subscriptions
+                .update_with_scope(id, Some("https://example.com/new"), None, None, None, scope)
+                .unwrap();
+            subscriptions.delete_with_scope(id, scope).unwrap();
+            patch.assert_hits(1);
+            delete.assert_hits(1);
+            catalog.assert_hits(0);
+        }
     }
 
     #[test]
