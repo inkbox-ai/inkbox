@@ -925,6 +925,31 @@ inkbox webhook subscription update <sub-id> --scope identity  # Update url, even
 inkbox webhook subscription delete <sub-id> --scope identity  # Remove a subscription
 ```
 
+### Identity-owned notification subscriptions
+
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
+Combine notification families on one identity, including channels not yet configured:
+
+```bash
+inkbox webhook subscription create --agent-identity-id <id> --url https://example.com/events \
+  --event-type message.received --event-type text.received --event-type imessage.received \
+  --event-type call.ended --event-type a2a.task.created
+inkbox webhook subscription update <sub-id> --scope identity --event-type message.received
+inkbox webhook subscription delete <sub-id> --scope identity
+```
+
+Update replaces the full event selection. Legacy mailbox and phone selectors resolve
+to their identity;
+prefer `--agent-identity-id`. Incoming-call actions remain separate. Delivery output
+includes replayability and any unavailable reason,
+while retaining the original target ID.
+
 ## Mail clients (IMAP/SMTP)
 
 An Inkbox inbox can also be attached to a regular mail client (Thunderbird,
@@ -1007,29 +1032,3 @@ For each format, choose inline content, a file, or its clear flag, not more than
 ## License
 
 MIT
-
-
-### Identity-owned notification subscriptions
-
-Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
-later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
-Until available, keep separate channel subscriptions using mailbox, phone, and
-identity selectors without explicit scope. Explicit identity scope checks the
-catalog once per list call and fails clearly when unsupported; omitted scope adds
-no request. The mixed-event examples below assume the capability is available.
-
-Combine notification families on one identity, including channels not yet configured:
-
-```bash
-inkbox webhook subscription create --agent-identity-id <id> --url https://example.com/events \
-  --event-type message.received --event-type text.received --event-type imessage.received \
-  --event-type call.ended --event-type a2a.task.created
-inkbox webhook subscription update <sub-id> --scope identity --event-type message.received
-inkbox webhook subscription delete <sub-id> --scope identity
-```
-
-Update replaces the full event selection. Legacy mailbox and phone selectors resolve
-to their identity;
-prefer `--agent-identity-id`. Incoming-call actions remain separate. Delivery output
-includes replayability and any unavailable reason,
-while retaining the original target ID.
