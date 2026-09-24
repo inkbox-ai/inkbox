@@ -84,6 +84,13 @@ pub enum WebhookSubscriptionStatus {
     Deleted,
 }
 
+/// Explicitly broaden a list beyond the legacy single-family views.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebhookSubscriptionScope {
+    /// Include every notification family, including mixed subscriptions.
+    Identity,
+}
+
 /// A webhook subscription row returned by the API.
 ///
 /// `agent_identity_id` is the canonical owner. Legacy responses may instead
@@ -205,8 +212,8 @@ impl WebhookSubscriptionsResource {
 
     /// List webhook subscriptions visible to the caller.
     ///
-    /// Identity filters include every notification family. Legacy mailbox/phone
-    /// filters retain their single-family views and exclude mixed subscriptions.
+    /// Resource selectors retain legacy single-family views and exclude mixed
+    /// subscriptions. Use [`Self::list_with_scope`] to include every family.
     /// Filters AND-combine. `mailbox_id` / `phone_number_id` /
     /// `agent_identity_id` are mutually exclusive -- passing more than one
     /// yields a 422. Deleted subscriptions are not returned.
@@ -228,6 +235,28 @@ impl WebhookSubscriptionsResource {
         url: Option<&str>,
         event_type: Option<&str>,
     ) -> Result<Vec<WebhookSubscription>> {
+        self.list_with_scope(
+            mailbox_id,
+            phone_number_id,
+            agent_identity_id,
+            url,
+            event_type,
+            None,
+        )
+    }
+
+    /// List subscriptions with an explicit scope. `None` preserves legacy
+    /// single-family views; `Identity` includes mixed subscriptions and all
+    /// notification families for the selected identity.
+    pub fn list_with_scope(
+        &self,
+        mailbox_id: Option<Uuid>,
+        phone_number_id: Option<Uuid>,
+        agent_identity_id: Option<Uuid>,
+        url: Option<&str>,
+        event_type: Option<&str>,
+        scope: Option<WebhookSubscriptionScope>,
+    ) -> Result<Vec<WebhookSubscription>> {
         // Build the query, omitting any filter the caller left as `None`.
         let mut params: Vec<(&str, String)> = Vec::new();
         if let Some(id) = mailbox_id {
@@ -238,6 +267,8 @@ impl WebhookSubscriptionsResource {
         }
         if let Some(id) = agent_identity_id {
             params.push(("agent_identity_id", id.to_string()));
+        }
+        if scope == Some(WebhookSubscriptionScope::Identity) {
             params.push(("scope", "identity".to_string()));
         }
         if let Some(u) = url {
@@ -485,6 +516,35 @@ mod tests {
     }
 
     #[test]
+    fn identity_list_keeps_legacy_scope_by_default() {
+        use httpmock::prelude::*;
+        let server = MockServer::start();
+        let client = crate::client::Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let identity = Uuid::from_u128(3);
+        let request = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/webhooks/subscriptions")
+                .query_param("agent_identity_id", identity.to_string())
+                .matches(|r| {
+                    r.query_params
+                        .as_ref()
+                        .is_some_and(|params| params.iter().all(|(key, _)| key != "scope"))
+                });
+            then.status(200).json_body(json!({"subscriptions": []}));
+        });
+        assert!(client
+            .webhooks()
+            .subscriptions()
+            .list(None, None, Some(identity), None, None)
+            .unwrap()
+            .is_empty());
+        request.assert();
+    }
+
+    #[test]
     fn identity_requests_preserve_full_replacement_wire_contract() {
         use httpmock::{prelude::*, Method::PATCH};
         let server = MockServer::start();
@@ -528,7 +588,16 @@ mod tests {
             then.status(200)
                 .json_body(json!({"subscriptions": [row.clone()]}));
         });
-        let rows = subs.list(None, None, Some(identity), None, None).unwrap();
+        let rows = subs
+            .list_with_scope(
+                None,
+                None,
+                Some(identity),
+                None,
+                None,
+                Some(WebhookSubscriptionScope::Identity),
+            )
+            .unwrap();
         assert_eq!(rows[0].event_types, events);
         list.assert();
         let created = subs

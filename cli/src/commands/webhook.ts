@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { printStatus } from "../output.js";
 import { createClient, getGlobalOpts } from "../client.js";
 import { readSecretFromStdin } from "../invitation-token.js";
@@ -117,6 +117,7 @@ function registerSubscriptionCommands(parent: Command): void {
     .option("--mailbox-id <id>", "Deprecated: filter the mailbox identity's mail events")
     .option("--phone-number-id <id>", "Deprecated: filter the phone identity's text events")
     .option("--agent-identity-id <id>", "Filter by owning agent identity id")
+    .addOption(new Option("--scope <scope>", "Include all notification families, including mixed subscriptions").choices(["identity"]))
     .option("--url <url>", "Filter by destination URL (exact match)")
     .option("--event-type <type>", "Filter by event type wire value")
     .action(
@@ -126,6 +127,7 @@ function registerSubscriptionCommands(parent: Command): void {
           mailboxId?: string;
           phoneNumberId?: string;
           agentIdentityId?: string;
+          scope?: "identity";
           url?: string;
           eventType?: string;
         },
@@ -136,6 +138,7 @@ function registerSubscriptionCommands(parent: Command): void {
           mailboxId: cmdOpts.mailboxId,
           phoneNumberId: cmdOpts.phoneNumberId,
           agentIdentityId: cmdOpts.agentIdentityId,
+          scope: cmdOpts.scope,
           url: cmdOpts.url,
           eventType: cmdOpts.eventType,
         });

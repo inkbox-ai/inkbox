@@ -891,7 +891,8 @@ inkbox webhook verify                        # Verify a webhook signature (local
 inkbox webhook subscription list             # List webhook subscriptions
   --mailbox-id <id>                          #   Deprecated mailbox-identity mail filter
   --phone-number-id <id>                     #   Deprecated phone-identity text filter
-  --agent-identity-id <id>                   #   Filter by owning agent identity id
+  --agent-identity-id <id>                    #   Filter by owning agent identity id
+  --scope identity                          #   Include all families and mixed subscriptions
   --url <url>                                #   Filter by destination URL (exact)
   --event-type <type>                        #   Filter by event_type wire value
 inkbox webhook subscription get <sub-id>     # Get one subscription

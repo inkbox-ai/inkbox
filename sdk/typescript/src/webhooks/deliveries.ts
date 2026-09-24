@@ -42,8 +42,10 @@ export interface WebhookDelivery {
   /** True if this row was produced by a manual replay. */
   isReplay: boolean;
   createdAt: Date;
-  replayable: boolean;
-  replayUnavailableReason: string | null;
+  /** Parsed responses always set this; older object literals may omit it. */
+  replayable?: boolean;
+  /** Parsed responses default to null when no reason is supplied. */
+  replayUnavailableReason?: string | null;
 }
 
 export interface RawWebhookDelivery {

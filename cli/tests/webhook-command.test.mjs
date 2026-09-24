@@ -118,7 +118,8 @@ test("webhook CLI sends mixed identity events and direct mutations", async (t) =
     for await (const chunk of request) body += chunk;
     requests.push({ method: request.method, url: request.url, body: body ? JSON.parse(body) : null });
     response.writeHead(request.method === "DELETE" ? 204 : 200, { "Content-Type": "application/json" });
-    response.end(request.method === "DELETE" ? undefined : JSON.stringify(row));
+    response.end(request.method === "DELETE" ? undefined : JSON.stringify(
+      request.method === "GET" ? { subscriptions: [row] } : row));
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
@@ -138,4 +139,13 @@ test("webhook CLI sends mixed identity events and direct mutations", async (t) =
   await run(["delete", row.id]);
   assert.equal(requests[2].method, "DELETE");
   assert.equal(requests[2].url, `/api/v1/webhooks/subscriptions/${row.id}`);
+  await run(["list", "--agent-identity-id", row.agent_identity_id]);
+  const legacyQuery = new URL(requests[3].url, "https://example.com").searchParams;
+  assert.equal(legacyQuery.get("agent_identity_id"), row.agent_identity_id);
+  assert.equal(legacyQuery.has("scope"), false);
+  const listed = JSON.parse(await run(["list", "--agent-identity-id", row.agent_identity_id,
+    "--scope", "identity"]));
+  assert.deepEqual(listed[0].eventTypes, row.event_types.join(", "));
+  assert.equal(new URL(requests[4].url, "https://example.com").searchParams.get("scope"), "identity");
+  await assert.rejects(run(["list", "--scope", "unsupported"]), /Allowed choices are identity/);
 });

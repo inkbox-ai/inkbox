@@ -780,7 +780,7 @@ inkbox signing-key create                     # DEPRECATED — use the per-ident
 inkbox webhook verify --payload <payload> --secret <secret> -H "X-Header: value"
 
 # Webhook subscriptions (fan-out per (owner, url, event_types)):
-inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>] [--agent-identity-id <id>]
+inkbox webhook subscription list [--mailbox-id <id>] [--phone-number-id <id>] [--agent-identity-id <id>] [--scope identity]
 inkbox webhook subscription create --agent-identity-id <id> --url <url> --event-type message.received
 inkbox webhook subscription create --agent-identity-id <id> --url <url> \
   --event-type text.received --event-type text.delivered
@@ -799,6 +799,8 @@ inkbox webhook subscription update <sub-id> [--url <url>] [--event-type <type>..
   [--auth-token-stdin] [--clear-auth-token]
 inkbox webhook subscription delete <sub-id>
 ```
+
+Owner-filtered lists retain single-family views unless `--scope identity` is supplied. Use `--agent-identity-id <id> --scope identity` to include mixed subscriptions and every notification family.
 
 Every subscription row carries `ownerIdentityId` (the resolved owning agent identity). The **first** subscription created for an identity that has no signing key yet returns that identity's `signingKey` **once** in the create output (otherwise null) — capture it then, it cannot be retrieved again (use `--json` to read it reliably).
 

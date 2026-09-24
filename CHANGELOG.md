@@ -8,8 +8,16 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 - Combine all notification families on one identity, regardless of configured channels;
   legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
-- Identity-filtered lists opt in to all notification families; older clients retain
-  their event-family views so existing integrations keep managing their own subscriptions.
+- List scope is explicit: pass `scope="identity"` (Python), `scope: "identity"`
+  (TypeScript), Rust's `list_with_scope` with `WebhookSubscriptionScope::Identity`,
+  or CLI `--scope identity` to include every family and mixed subscriptions.
+  Omitted scope preserves existing single-family list behavior.
+- Returned subscriptions use `agent_identity_id` / `agentIdentityId`; legacy mailbox
+  and phone owner fields are null. CLI subscription tables show the canonical
+  identity column instead of mailbox and phone owner columns.
+- Rust adds `create_for_identity` without changing the existing `create` signature.
+- TypeScript replay metadata fields are optional for existing typed literals and
+  mocks; parsed responses always populate `replayable` and `replayUnavailableReason`.
 - Event-list updates remain full replacement. Incoming-call actions remain separate.
 - Expose delivery replayability without changing original history IDs.
   Conversation context applies only to received mail, text and iMessage events.

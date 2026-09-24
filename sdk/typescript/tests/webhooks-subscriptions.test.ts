@@ -661,9 +661,21 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
 
     expect(http.get).toHaveBeenCalledWith("/webhooks/subscriptions", {
       agent_identity_id: IDENTITY_ID,
-      scope: "identity",
     });
     expect(rows[0].agentIdentityId).toBe(IDENTITY_ID);
+  });
+
+  it.each([
+    ["agentIdentityId", "agent_identity_id"],
+    ["mailboxId", "mailbox_id"],
+    ["phoneNumberId", "phone_number_id"],
+  ] as const)("explicitly broadens the %s view", async (filter, wireKey) => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValue({ subscriptions: [] });
+    await resource.list({ [filter]: IDENTITY_ID, scope: "identity" });
+    expect(http.get).toHaveBeenCalledWith("/webhooks/subscriptions", {
+      [wireKey]: IDENTITY_ID, scope: "identity",
+    });
   });
 
   it("defaults a missing agent_identity_id to null when parsing", async () => {

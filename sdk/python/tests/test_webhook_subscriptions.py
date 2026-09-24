@@ -376,9 +376,19 @@ class TestAgentIdentityOwner:
 
         http.get.assert_called_once_with(
             "/webhooks/subscriptions",
-            params={"agent_identity_id": _IDENTITY_ID, "scope": "identity"},
+            params={"agent_identity_id": _IDENTITY_ID},
         )
         assert rows[0].agent_identity_id == UUID(_IDENTITY_ID)
+
+    @pytest.mark.parametrize("owner", ["agent_identity_id", "mailbox_id", "phone_number_id"])
+    def test_list_scope_is_explicit(self, owner):
+        res, http = _resource()
+        http.get.return_value = {"subscriptions": []}
+        res.list(**{owner: _IDENTITY_ID}, scope="identity")
+        http.get.assert_called_once_with(
+            "/webhooks/subscriptions",
+            params={owner: _IDENTITY_ID, "scope": "identity"},
+        )
 
     def test_parse_defaults_missing_agent_identity_to_none(self):
         # Older payloads without the key must keep parsing.

@@ -745,12 +745,7 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 # }
 ```
 
-## License
-
-MIT
-
-
-### Identity-owned webhook subscriptions
+## Identity-owned webhook subscriptions
 
 `client.webhooks().subscriptions().create_for_identity(identity_id, url, &events,
 context_config, auth_token)` creates one receiver for any mix of notification
@@ -765,6 +760,29 @@ Context is included only for received mail/text/iMessage events; other selected
 events ignore it. Incoming-call actions remain separate. Delivery records retain
 the original subscription ID and expose `replayable` and
 `replay_unavailable_reason` for current replay status.
+
+`list` retains legacy single-family views and excludes mixed subscriptions.
+To include all notification families, opt in explicitly:
+
+```rust,no_run
+use inkbox::webhooks::WebhookSubscriptionScope;
+# fn main() -> inkbox::Result<()> {
+# let client = inkbox::Inkbox::builder("YOUR_API_KEY").build()?;
+# let identity_id = uuid::Uuid::nil();
+let subscriptions = client.webhooks().subscriptions().list_with_scope(
+    None, None, Some(identity_id), None, None,
+    Some(WebhookSubscriptionScope::Identity),
+)?;
+# Ok(())
+# }
+```
+
+Returned subscriptions use `agent_identity_id`; legacy mailbox and phone owner
+fields are null.
+
+## License
+
+MIT
 
 ## Companion mode
 

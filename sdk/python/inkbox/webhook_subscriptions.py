@@ -249,15 +249,16 @@ class WebhookSubscriptionsResource:
         agent_identity_id: UUID | str | None = None,
         url: str | None = None,
         event_type: str | None = None,
+        scope: Literal["identity"] | None = None,
     ) -> list[WebhookSubscription]:
         """List webhook subscriptions visible to the caller.
 
         Filters AND-combine. ``mailbox_id`` / ``phone_number_id`` /
         ``agent_identity_id`` are mutually exclusive -- passing more
-        than one yields a 422. Identity filters include every notification
-        family. Legacy mailbox/phone filters retain their single-family
-        views and exclude mixed subscriptions. Deleted subscriptions are
-        not returned.
+        than one yields a 422. Omit ``scope`` to retain legacy single-family
+        views, which exclude mixed subscriptions. Pass ``scope="identity"``
+        to include every notification family for the selected identity.
+        Deleted subscriptions are not returned.
         """
         params: dict[str, Any] = {}
         if mailbox_id is not None:
@@ -266,7 +267,8 @@ class WebhookSubscriptionsResource:
             params["phone_number_id"] = _uuid_str(phone_number_id)
         if agent_identity_id is not None:
             params["agent_identity_id"] = _uuid_str(agent_identity_id)
-            params["scope"] = "identity"
+        if scope is not None:
+            params["scope"] = scope
         if url is not None:
             params["url"] = url
         if event_type is not None:

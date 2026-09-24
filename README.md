@@ -580,12 +580,17 @@ await inkbox.mailboxes.update("alex@example.com", {
 await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 ```
 
+## Webhook subscriptions
+
+Subscriptions belong to an identity and can combine mail, text, iMessage,
+call-lifecycle and A2A notifications, even before channels are configured.
+Existing list calls keep their single-family views. Explicitly pass
+`scope="identity"` (Python), `scope: "identity"` (TypeScript), or use Rust's
+`list_with_scope` to include every family and mixed subscription. The CLI supports
+`inkbox webhook subscription list --agent-identity-id <id> --scope identity`.
+Event-list updates replace the complete selection. Incoming-call actions remain
+separate identity settings.
+
 ## License
 
 MIT
-
-
-Webhook subscriptions belong to an identity and can combine mail, text, iMessage,
-call-lifecycle and A2A notifications, even before channels are configured. All SDKs
-support revision-checked updates/deletion; the CLI exposes `--expected-revision`.
-Incoming-call actions remain a separate identity setting.

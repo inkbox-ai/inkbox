@@ -267,6 +267,8 @@ export interface ListWebhookSubscriptionsOptions {
   agentIdentityId?: string;
   url?: string;
   eventType?: string;
+  /** Omit for legacy single-family views; opt in to all notification families. */
+  scope?: "identity";
 }
 
 export class WebhookSubscriptionsResource {
@@ -276,8 +278,9 @@ export class WebhookSubscriptionsResource {
    * List webhook subscriptions visible to the caller. Filters AND-combine;
    * unmatched filters return an empty list. `mailboxId` / `phoneNumberId`
    * / `agentIdentityId` are mutually exclusive — passing more than one
-   * yields a 422. Identity filters include every notification family. Legacy
-   * mailbox/phone filters retain their single-family views and exclude mixed rows.
+   * yields a 422. Omit `scope` to retain legacy single-family views, which exclude
+   * mixed rows. Pass `scope: "identity"` to include every notification family
+   * for the selected identity.
    * Deleted subscriptions are not returned.
    */
   async list(
@@ -288,8 +291,8 @@ export class WebhookSubscriptionsResource {
     if (filters.phoneNumberId !== undefined) params["phone_number_id"] = filters.phoneNumberId;
     if (filters.agentIdentityId !== undefined) {
       params["agent_identity_id"] = filters.agentIdentityId;
-      params["scope"] = "identity";
     }
+    if (filters.scope !== undefined) params["scope"] = filters.scope;
     if (filters.url !== undefined) params["url"] = filters.url;
     if (filters.eventType !== undefined) params["event_type"] = filters.eventType;
     const data = await this.http.get<RawListWebhookSubscriptionsResponse>(PATH, params);

@@ -1421,6 +1421,23 @@ and resolve to their owning identity. Event lists must be nonempty and distinct;
 the API validates exact catalog values, while the SDK rejects unknown prefixes
 and `phone.incoming_call`. No wildcard or automatic channel provisioning is implied.
 
+### Listing and delivery history
+
+Owner-filtered lists preserve legacy single-family views by default and exclude
+mixed subscriptions. Explicitly opt in when listing all notification families:
+
+```python
+subscriptions = inkbox.webhooks.subscriptions.list(
+    agent_identity_id=identity.id, scope="identity",
+)
+```
+
+Subscriptions return the canonical identity owner; the legacy mailbox and phone
+owner fields are null. Event-list updates replace the full selection.
+Delivery history retains the original subscription ID and exposes `replayable`
+and `replay_unavailable_reason`. Older responses default these to false and null.
+Replay still checks whether the subscription is active and selects the event.
+
 ### Conversation context
 
 Opt a subscription into per-class conversation history on **received**
@@ -1868,9 +1885,3 @@ inkbox.mailboxes.update("alex@example.com", signature_enabled=False)
 ## License
 
 MIT
-
-
-Delivery history keeps the original subscription ID and exposes its current
-canonical target, replayability, and any unavailable reason. These projections
-are informational; replay still validates the current event selection and target.
-Older responses default replayability to false rather than guessing.
