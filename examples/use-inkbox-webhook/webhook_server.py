@@ -232,7 +232,7 @@ async def main() -> None:
 
             print("=> Creating webhook subscription (message.received)")
             sub = inkbox.webhooks.subscriptions.create(
-                agent_identity_id=identity.id,
+                mailbox_id=mailbox.id,
                 url=webhook_url,
                 event_types=["message.received"],
             )

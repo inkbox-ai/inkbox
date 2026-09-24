@@ -190,8 +190,11 @@ unread email and recent SMS, iMessage, calls, and A2A tasks; fetch only the
 bounded conversation context needed; then persist a cursor or last-success time
 so the next run does not reply twice.
 
-Use identity-owned webhooks when the agent needs prompt delivery. One subscription
-can combine notification families even before optional channels are configured.
+Use webhooks when the agent needs prompt delivery. With SDK/CLI 0.7.8 or later and
+`GET /webhooks/catalog` advertising `supports_identity_subscriptions: true`, one
+identity-owned subscription can combine notification families even before optional
+channels are configured. Until then, keep separate subscriptions using mailbox
+selectors for mail, phone selectors for text, and identity selectors for identity events.
 Subscribe to only the event types and identities the agent needs, verify every signature against the
 raw request body, return quickly, and process idempotently. Use an Inkbox tunnel
 when the receiver runs locally; see `inkbox-tunnels` for setup and recovery.

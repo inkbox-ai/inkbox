@@ -24,6 +24,9 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
   requests with conversation context return 422. After availability, a subscription
   can retain context settings, but only received mail/text/iMessage events include context.
 - Rust adds `create_for_identity` without changing the existing `create` signature.
+- Event-family/owner matching and A2A context compatibility are now validated by the
+  server, not the SDK. Unsupported combinations return an API 422 instead of a local
+  validation exception; valid mixed events are accepted when the capability is available.
 - TypeScript replay metadata fields are optional for existing typed literals and
   mocks; parsed responses always populate `replayable` and `replayUnavailableReason`.
 - Mixed subscriptions require explicit identity scope for update/delete as well:
