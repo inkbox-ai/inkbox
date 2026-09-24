@@ -1467,6 +1467,13 @@ WebSockets receive the matching CLOSE code on their local upstream connection.
 
 ## Webhooks
 
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
 Each notification subscription belongs to an agent identity and can combine all
 21 current mail, text, iMessage, call-lifecycle and A2A event types. Optional
 channels do not have to be configured before subscribing. Multiple receivers
@@ -1519,8 +1526,8 @@ const subscriptions = await inkbox.webhooks.subscriptions.list({
 });
 ```
 
-Subscriptions return the canonical identity owner; the legacy mailbox and phone
-owner fields are null. Event-list updates replace the full selection.
+Identity-owned subscriptions return the canonical identity owner with null legacy
+mailbox and phone owner fields. Older servers can still return legacy resource owners. Event-list updates replace the full selection.
 Delivery history retains the original subscription ID and exposes `replayable`
 and `replayUnavailableReason`. Older responses default these to false and null.
 Replay still checks whether the subscription is active and selects the event.

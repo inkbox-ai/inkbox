@@ -6,15 +6,23 @@ Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 
 ## 0.7.8 — Identity-owned webhook subscriptions
 
-- Combine all notification families on one identity, regardless of configured channels;
-  legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
+- When the server advertises `supports_identity_subscriptions: true` in
+  `GET /webhooks/catalog`, combine notification families on one identity regardless of
+  configured channels. Before availability, keep separate channel subscriptions and
+  mailbox/phone selectors; those selectors remain accepted after availability.
 - List scope is explicit: pass `scope="identity"` (Python), `scope: "identity"`
   (TypeScript), Rust's `list_with_scope` with `WebhookSubscriptionScope::Identity`,
   or CLI `--scope identity` to include every family and mixed subscriptions.
-  Omitted scope preserves existing single-family list behavior.
-- Returned subscriptions use `agent_identity_id` / `agentIdentityId`; legacy mailbox
-  and phone owner fields are null. CLI subscription tables show the canonical
-  identity column instead of mailbox and phone owner columns.
+  Explicit identity scope checks the catalog once per list call and raises an actionable
+  error when unsupported; it never silently returns a partial list. Omitted scope
+  preserves existing single-family list behavior without an extra request.
+- Ownership responses remain compatible across availability phases: older servers may
+  return mailbox/phone owners; identity-owned responses use `agent_identity_id` /
+  `agentIdentityId` with null legacy owners. CLI tables display all three owner columns.
+- A changed or unavailable owner can return 409 on mutation; refresh the subscription
+  and its owner before retrying. Before identity subscriptions are available, A2A-only
+  requests with conversation context return 422. After availability, a subscription
+  can retain context settings, but only received mail/text/iMessage events include context.
 - Rust adds `create_for_identity` without changing the existing `create` signature.
 - TypeScript replay metadata fields are optional for existing typed literals and
   mocks; parsed responses always populate `replayable` and `replayUnavailableReason`.

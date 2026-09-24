@@ -35,7 +35,9 @@ def test_legacy_reconciler_does_not_modify_mixed_or_separate_rows(replacement, m
     before = deepcopy(rows)
     http = MagicMock()
 
-    def list_rows(path, *, params):
+    def list_rows(path, *, params=None):
+        if path == "/webhooks/catalog":
+            return {"supports_identity_subscriptions": True}
         assert path == "/webhooks/subscriptions"
         selected = rows if params.get("scope") == "identity" else [
             row for row in rows if all(

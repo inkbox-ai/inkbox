@@ -18,6 +18,8 @@ import type {
 const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "id",
   "agentIdentityId",
+  "mailboxId",
+  "phoneNumberId",
   "url",
   "eventTypes",
   "contextConfig",

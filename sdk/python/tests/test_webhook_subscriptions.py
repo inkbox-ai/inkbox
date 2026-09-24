@@ -9,7 +9,7 @@ test_signing_keys.py).
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 from uuid import UUID
 
 import pytest
@@ -383,12 +383,29 @@ class TestAgentIdentityOwner:
     @pytest.mark.parametrize("owner", ["agent_identity_id", "mailbox_id", "phone_number_id"])
     def test_list_scope_is_explicit(self, owner):
         res, http = _resource()
-        http.get.return_value = {"subscriptions": []}
+        http.get.side_effect = [{"supports_identity_subscriptions": True}, {"subscriptions": []}]
         res.list(**{owner: _IDENTITY_ID}, scope="identity")
-        http.get.assert_called_once_with(
-            "/webhooks/subscriptions",
-            params={owner: _IDENTITY_ID, "scope": "identity"},
-        )
+        assert http.get.call_args_list == [
+            call("/webhooks/catalog"),
+            call("/webhooks/subscriptions", params={owner: _IDENTITY_ID, "scope": "identity"}),
+        ]
+
+    @pytest.mark.parametrize("catalog", [{}, {"supports_identity_subscriptions": False},
+                                         {"supports_identity_subscriptions": "true"}])
+    def test_identity_scope_rejects_unsupported_without_partial_list(self, catalog):
+        res, http = _resource()
+        http.get.return_value = catalog
+        with pytest.raises(ValueError, match="channel-filtered lists without scope"):
+            res.list(agent_identity_id=_IDENTITY_ID, scope="identity")
+        http.get.assert_called_once_with("/webhooks/catalog")
+
+    def test_capability_is_checked_again_after_activation(self):
+        res, http = _resource()
+        http.get.side_effect = [{}, {"supports_identity_subscriptions": True}, {"subscriptions": []}]
+        with pytest.raises(ValueError, match="not supported"):
+            res.list(scope="identity")
+        assert res.list(scope="identity") == []
+        assert http.get.call_count == 3
 
     def test_parse_defaults_missing_agent_identity_to_none(self):
         # Older payloads without the key must keep parsing.

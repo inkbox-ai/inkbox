@@ -663,6 +663,7 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
       agent_identity_id: IDENTITY_ID,
     });
     expect(rows[0].agentIdentityId).toBe(IDENTITY_ID);
+    expect(http.get).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -671,11 +672,31 @@ describe("WebhookSubscriptionsResource — agent identity owner", () => {
     ["phoneNumberId", "phone_number_id"],
   ] as const)("explicitly broadens the %s view", async (filter, wireKey) => {
     const { resource, http } = makeResource();
-    http.get.mockResolvedValue({ subscriptions: [] });
+    http.get.mockResolvedValueOnce({ supports_identity_subscriptions: true })
+      .mockResolvedValueOnce({ subscriptions: [] });
     await resource.list({ [filter]: IDENTITY_ID, scope: "identity" });
-    expect(http.get).toHaveBeenCalledWith("/webhooks/subscriptions", {
-      [wireKey]: IDENTITY_ID, scope: "identity",
-    });
+    expect(http.get.mock.calls).toEqual([
+      ["/webhooks/catalog"],
+      ["/webhooks/subscriptions", { [wireKey]: IDENTITY_ID, scope: "identity" }],
+    ]);
+  });
+
+  it.each([{}, { supports_identity_subscriptions: false }, { supports_identity_subscriptions: "true" }])(
+    "rejects unsupported identity scope without returning a partial list: %j", async (catalog) => {
+      const { resource, http } = makeResource();
+      http.get.mockResolvedValue(catalog);
+      await expect(resource.list({ scope: "identity" })).rejects.toThrow("channel-filtered lists without scope");
+      expect(http.get.mock.calls).toEqual([["/webhooks/catalog"]]);
+    },
+  );
+
+  it("checks availability again after activation", async () => {
+    const { resource, http } = makeResource();
+    http.get.mockResolvedValueOnce({}).mockResolvedValueOnce({ supports_identity_subscriptions: true })
+      .mockResolvedValueOnce({ subscriptions: [] });
+    await expect(resource.list({ scope: "identity" })).rejects.toThrow("not supported");
+    expect(await resource.list({ scope: "identity" })).toEqual([]);
+    expect(http.get).toHaveBeenCalledTimes(3);
   });
 
   it("defaults a missing agent_identity_id to null when parsing", async () => {

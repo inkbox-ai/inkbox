@@ -767,6 +767,16 @@ inkbox notes access revoke <note-id> <identity-id>
 
 ## Whoami, Signing Keys, Webhooks
 
+**Availability:** Mixed-event identity subscriptions and explicit identity-wide list scope
+require SDK/CLI **0.7.8 or later** and `GET /webhooks/catalog` returning
+`supports_identity_subscriptions: true`. Until then, use separate mail, text, and
+identity-event subscriptions with their existing mailbox, phone, and identity selectors;
+omit the scope option. The examples in this section that combine families or create
+mail/text subscriptions by identity assume that capability is available. Explicit
+identity scope fails clearly when the capability is missing; it does not fall back to
+a partial list.
+
+
 Each agent identity has its own webhook signing key. Manage it with the
 per-identity commands; the org-level `inkbox signing-key create` is deprecated
 (with an agent-scoped key it still rotates that identity's key; with an admin key

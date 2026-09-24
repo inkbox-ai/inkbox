@@ -247,7 +247,8 @@ impl WebhookSubscriptionsResource {
 
     /// List subscriptions with an explicit scope. `None` preserves legacy
     /// single-family views; `Identity` includes mixed subscriptions and all
-    /// notification families for the selected identity.
+    /// notification families for the selected identity. Explicit identity scope
+    /// checks server support and returns `InvalidArgument` when unavailable.
     pub fn list_with_scope(
         &self,
         mailbox_id: Option<Uuid>,
@@ -257,6 +258,18 @@ impl WebhookSubscriptionsResource {
         event_type: Option<&str>,
         scope: Option<WebhookSubscriptionScope>,
     ) -> Result<Vec<WebhookSubscription>> {
+        if scope == Some(WebhookSubscriptionScope::Identity) {
+            let catalog = self.http.get("/webhooks/catalog", crate::http::NO_QUERY)?;
+            if catalog
+                .get("supports_identity_subscriptions")
+                .and_then(Value::as_bool)
+                != Some(true)
+            {
+                return Err(InkboxError::InvalidArgument(
+                    "Identity-wide webhook subscriptions are not supported by this server yet. Use channel-filtered lists without scope or retry when identity subscriptions are available.".into(),
+                ));
+            }
+        }
         // Build the query, omitting any filter the caller left as `None`.
         let mut params: Vec<(&str, String)> = Vec::new();
         if let Some(id) = mailbox_id {
@@ -545,6 +558,42 @@ mod tests {
     }
 
     #[test]
+    fn identity_scope_requires_explicit_server_support() {
+        use httpmock::prelude::*;
+        for body in [
+            json!({}),
+            json!({"supports_identity_subscriptions": false}),
+            json!({"supports_identity_subscriptions": "true"}),
+        ] {
+            let server = MockServer::start();
+            let client = crate::client::Inkbox::builder("test-key")
+                .base_url(server.base_url())
+                .build()
+                .unwrap();
+            let catalog = server.mock(|when, then| {
+                when.method(GET).path("/api/v1/webhooks/catalog");
+                then.status(200).json_body(body);
+            });
+            let list = server.mock(|when, then| {
+                when.method(GET).path("/api/v1/webhooks/subscriptions");
+                then.status(200).json_body(json!({"subscriptions": []}));
+            });
+            let result = client.webhooks().subscriptions().list_with_scope(
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(WebhookSubscriptionScope::Identity),
+            );
+            assert!(matches!(result, Err(InkboxError::InvalidArgument(message))
+                if message.contains("channel-filtered lists without scope")));
+            catalog.assert_hits(1);
+            list.assert_hits(0);
+        }
+    }
+
+    #[test]
     fn identity_requests_preserve_full_replacement_wire_contract() {
         use httpmock::{prelude::*, Method::PATCH};
         let server = MockServer::start();
@@ -580,6 +629,11 @@ mod tests {
         });
         let resource = client.webhooks();
         let subs = resource.subscriptions();
+        let catalog = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/webhooks/catalog");
+            then.status(200)
+                .json_body(json!({"supports_identity_subscriptions": true}));
+        });
         let list = server.mock(|when, then| {
             when.method(GET)
                 .path("/api/v1/webhooks/subscriptions")
@@ -600,6 +654,7 @@ mod tests {
             .unwrap();
         assert_eq!(rows[0].event_types, events);
         list.assert();
+        catalog.assert_hits(1);
         let created = subs
             .create_for_identity(
                 identity,

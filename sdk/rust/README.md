@@ -747,6 +747,13 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 
 ## Identity-owned webhook subscriptions
 
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
 `client.webhooks().subscriptions().create_for_identity(identity_id, url, &events,
 context_config, auth_token)` creates one receiver for any mix of notification
 families, including channels not yet configured. The legacy `create` signature
@@ -777,8 +784,8 @@ let subscriptions = client.webhooks().subscriptions().list_with_scope(
 # }
 ```
 
-Returned subscriptions use `agent_identity_id`; legacy mailbox and phone owner
-fields are null.
+Identity-owned responses use `agent_identity_id` with null legacy mailbox and phone
+fields. Older servers can still return legacy resource owners.
 
 ## License
 

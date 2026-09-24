@@ -106,6 +106,7 @@ test("webhook CLI sends mixed identity events and direct mutations", async (t) =
   const { execFile } = await import("node:child_process");
   const { fileURLToPath } = await import("node:url");
   const requests = [];
+  let catalog = { supports_identity_subscriptions: true };
   const row = {
     id: "11111111-1111-1111-1111-111111111111", organization_id: "org_test",
     agent_identity_id: "33333333-3333-3333-3333-333333333333",
@@ -119,14 +120,15 @@ test("webhook CLI sends mixed identity events and direct mutations", async (t) =
     requests.push({ method: request.method, url: request.url, body: body ? JSON.parse(body) : null });
     response.writeHead(request.method === "DELETE" ? 204 : 200, { "Content-Type": "application/json" });
     response.end(request.method === "DELETE" ? undefined : JSON.stringify(
+      request.url === "/api/v1/webhooks/catalog" ? catalog :
       request.method === "GET" ? { subscriptions: [row] } : row));
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
-  const run = (args) => new Promise((resolve, reject) => execFile(process.execPath,
+  const run = (args, json = true) => new Promise((resolve, reject) => execFile(process.execPath,
     [cli, "--api-key", "test-key", "--base-url", `http://127.0.0.1:${server.address().port}`,
-      "--json", "webhook", "subscription", ...args],
+      ...(json ? ["--json"] : []), "webhook", "subscription", ...args],
     { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 15_000 },
     (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(stdout)));
   const created = JSON.parse(await run(["create", "--agent-identity-id", row.agent_identity_id,
@@ -146,6 +148,22 @@ test("webhook CLI sends mixed identity events and direct mutations", async (t) =
   const listed = JSON.parse(await run(["list", "--agent-identity-id", row.agent_identity_id,
     "--scope", "identity"]));
   assert.deepEqual(listed[0].eventTypes, row.event_types.join(", "));
-  assert.equal(new URL(requests[4].url, "https://example.com").searchParams.get("scope"), "identity");
+  assert.equal(requests[4].url, "/api/v1/webhooks/catalog");
+  assert.equal(new URL(requests[5].url, "https://example.com").searchParams.get("scope"), "identity");
+  for (const unsupported of [{}, { supports_identity_subscriptions: false }]) {
+    catalog = unsupported;
+    const before = requests.length;
+    await assert.rejects(run(["list", "--scope", "identity"]), /channel-filtered lists without scope/);
+    assert.equal(requests.length, before + 1);
+    assert.equal(requests.at(-1).url, "/api/v1/webhooks/catalog");
+  }
   await assert.rejects(run(["list", "--scope", "unsupported"]), /Allowed choices are identity/);
+  row.agent_identity_id = null;
+  for (const owner of ["mailbox_id", "phone_number_id"]) {
+    row.mailbox_id = null; row.phone_number_id = null;
+    row[owner] = "22222222-2222-2222-2222-222222222222";
+    const table = await run(["list"], false);
+    assert.match(table, /22222222-2222-2222-2222-222222222222/);
+    assert.match(table, owner === "mailbox_id" ? /mailboxId/ : /phoneNumberId/);
+  }
 });

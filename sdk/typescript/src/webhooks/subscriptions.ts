@@ -280,12 +280,22 @@ export class WebhookSubscriptionsResource {
    * / `agentIdentityId` are mutually exclusive — passing more than one
    * yields a 422. Omit `scope` to retain legacy single-family views, which exclude
    * mixed rows. Pass `scope: "identity"` to include every notification family
-   * for the selected identity.
-   * Deleted subscriptions are not returned.
+   * for the selected identity. Explicit identity scope checks server support and
+   * throws an Error when unavailable. Deleted subscriptions are not returned.
    */
   async list(
     filters: ListWebhookSubscriptionsOptions = {},
   ): Promise<WebhookSubscription[]> {
+    if (filters.scope === "identity") {
+      const catalog = await this.http.get<{ supports_identity_subscriptions?: unknown }>(
+        "/webhooks/catalog",
+      );
+      if (catalog.supports_identity_subscriptions !== true) {
+        throw new Error(
+          "Identity-wide webhook subscriptions are not supported by this server yet. Use channel-filtered lists without scope or retry when identity subscriptions are available.",
+        );
+      }
+    }
     const params: Record<string, string> = {};
     if (filters.mailboxId !== undefined) params["mailbox_id"] = filters.mailboxId;
     if (filters.phoneNumberId !== undefined) params["phone_number_id"] = filters.phoneNumberId;

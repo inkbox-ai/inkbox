@@ -1299,6 +1299,16 @@ For full options, lifecycle notes, and TS examples, see `skills/inkbox-tunnels/S
 
 ## Webhooks & Signature Verification
 
+**Availability:** Mixed-event identity subscriptions and explicit identity-wide list scope
+require SDK/CLI **0.7.8 or later** and `GET /webhooks/catalog` returning
+`supports_identity_subscriptions: true`. Until then, use separate mail, text, and
+identity-event subscriptions with their existing mailbox, phone, and identity selectors;
+omit the scope option. The examples in this section that combine families or create
+mail/text subscriptions by identity assume that capability is available. Explicit
+identity scope fails clearly when the capability is missing; it does not fall back to
+a partial list.
+
+
 Webhooks are configured directly on the mailbox or phone number — no separate registration.
 
 ```python

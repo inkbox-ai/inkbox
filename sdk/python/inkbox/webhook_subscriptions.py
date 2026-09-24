@@ -258,8 +258,16 @@ class WebhookSubscriptionsResource:
         than one yields a 422. Omit ``scope`` to retain legacy single-family
         views, which exclude mixed subscriptions. Pass ``scope="identity"``
         to include every notification family for the selected identity.
-        Deleted subscriptions are not returned.
+        Explicit identity scope checks server support and raises ``ValueError``
+        when unavailable. Deleted subscriptions are not returned.
         """
+        if scope == "identity":
+            catalog = self._http.get("/webhooks/catalog")
+            if catalog.get("supports_identity_subscriptions") is not True:
+                raise ValueError(
+                    "Identity-wide webhook subscriptions are not supported by this server yet. "
+                    "Use channel-filtered lists without scope or retry when identity subscriptions are available."
+                )
         params: dict[str, Any] = {}
         if mailbox_id is not None:
             params["mailbox_id"] = _uuid_str(mailbox_id)

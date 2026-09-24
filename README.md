@@ -582,6 +582,13 @@ await inkbox.mailboxes.update("alex@example.com", { signatureEnabled: false });
 
 ## Webhook subscriptions
 
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
 Subscriptions belong to an identity and can combine mail, text, iMessage,
 call-lifecycle and A2A notifications, even before channels are configured.
 Existing list calls keep their single-family views. Explicitly pass
