@@ -100,3 +100,79 @@ test("resolveAuthTokenInput is a no-op without the stdin flag", async () => {
   const { resolveAuthTokenInput } = await import("../dist/commands/webhook.js");
   assert.equal(await resolveAuthTokenInput({}), undefined);
 });
+
+test("webhook CLI sends mixed identity events and direct mutations", async (t) => {
+  const http = await import("node:http");
+  const { execFile } = await import("node:child_process");
+  const { fileURLToPath } = await import("node:url");
+  const requests = [];
+  let catalog = { supports_identity_subscriptions: true };
+  const row = {
+    id: "11111111-1111-1111-1111-111111111111", organization_id: "org_test",
+    agent_identity_id: "33333333-3333-3333-3333-333333333333",
+    mailbox_id: null, phone_number_id: null,
+    url: "https://example.com/events", event_types: ["message.received", "a2a.task.created"],
+    status: "active", created_at: "2026-09-15T00:00:00Z", updated_at: "2026-09-15T00:00:00Z",
+  };
+  const server = http.createServer(async (request, response) => {
+    let body = "";
+    for await (const chunk of request) body += chunk;
+    requests.push({ method: request.method, url: request.url, body: body ? JSON.parse(body) : null });
+    response.writeHead(request.method === "DELETE" ? 204 : 200, { "Content-Type": "application/json" });
+    response.end(request.method === "DELETE" ? undefined : JSON.stringify(
+      request.url === "/api/v1/webhooks/catalog" ? catalog :
+      request.method === "GET" ? { subscriptions: [row] } : row));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const cli = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+  const run = (args, json = true) => new Promise((resolve, reject) => execFile(process.execPath,
+    [cli, "--api-key", "test-key", "--base-url", `http://127.0.0.1:${server.address().port}`,
+      ...(json ? ["--json"] : []), "webhook", "subscription", ...args],
+    { env: { ...process.env, NODE_USE_ENV_PROXY: "0" }, timeout: 15_000 },
+    (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(stdout)));
+  const created = JSON.parse(await run(["create", "--agent-identity-id", row.agent_identity_id,
+    "--url", row.url, "--event-type", "message.received", "--event-type", "a2a.task.created"]));
+  assert.deepEqual(created.eventTypes, row.event_types);
+  assert.deepEqual(requests[0].body, { agent_identity_id: row.agent_identity_id,
+    url: row.url, event_types: row.event_types });
+  await run(["update", row.id, "--event-type", "message.received"]);
+  assert.deepEqual(requests[1].body, { event_types: ["message.received"] });
+  await run(["delete", row.id]);
+  assert.equal(requests[1].url, `/api/v1/webhooks/subscriptions/${row.id}`);
+  assert.equal(requests[2].method, "DELETE");
+  assert.equal(requests[2].url, `/api/v1/webhooks/subscriptions/${row.id}`);
+  await run(["list", "--agent-identity-id", row.agent_identity_id]);
+  const legacyQuery = new URL(requests[3].url, "https://example.com").searchParams;
+  assert.equal(legacyQuery.get("agent_identity_id"), row.agent_identity_id);
+  assert.equal(legacyQuery.has("scope"), false);
+  const listed = JSON.parse(await run(["list", "--agent-identity-id", row.agent_identity_id,
+    "--scope", "identity"]));
+  assert.deepEqual(listed[0].eventTypes, row.event_types.join(", "));
+  assert.equal(requests[4].url, "/api/v1/webhooks/catalog");
+  assert.equal(new URL(requests[5].url, "https://example.com").searchParams.get("scope"), "identity");
+  for (const unsupported of [{}, { supports_identity_subscriptions: false }]) {
+    catalog = unsupported;
+    const before = requests.length;
+    await assert.rejects(run(["list", "--scope", "identity"]), /channel-filtered lists without scope/);
+    assert.equal(requests.length, before + 1);
+    assert.equal(requests.at(-1).url, "/api/v1/webhooks/catalog");
+  }
+  await assert.rejects(run(["list", "--scope", "unsupported"]), /Allowed choices are identity/);
+  const catalogCalls = requests.filter((request) => request.url === "/api/v1/webhooks/catalog").length;
+  await run(["update", row.id, "--event-type", "message.received", "--scope", "identity"]);
+  await run(["delete", row.id, "--scope", "identity"]);
+  assert.equal(requests.at(-2).url, `/api/v1/webhooks/subscriptions/${row.id}?scope=identity`);
+  assert.deepEqual(requests.at(-2).body, { event_types: ["message.received"] });
+  assert.equal(requests.at(-1).url, `/api/v1/webhooks/subscriptions/${row.id}?scope=identity`);
+  assert.equal(requests.filter((request) => request.url === "/api/v1/webhooks/catalog").length, catalogCalls);
+  await assert.rejects(run(["delete", row.id, "--scope", "unsupported"]), /Allowed choices are identity/);
+  row.agent_identity_id = null;
+  for (const owner of ["mailbox_id", "phone_number_id"]) {
+    row.mailbox_id = null; row.phone_number_id = null;
+    row[owner] = "22222222-2222-2222-2222-222222222222";
+    const table = await run(["list"], false);
+    assert.match(table, /22222222-2222-2222-2222-222222222222/);
+    assert.match(table, owner === "mailbox_id" ? /mailboxId/ : /phoneNumberId/);
+  }
+});

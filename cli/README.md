@@ -746,7 +746,7 @@ inkbox mailbox update <email-address>        # Update a mailbox
   --filter-mode <mode>                       #   whitelist or blacklist (admin-only)
 inkbox mailbox client-settings <email-address>  # IMAP/SMTP settings for a mail client
 # To attach a webhook receiver, use `inkbox webhook subscription create
-# --mailbox-id <id> --url <url> --event-type message.received ...`.
+# --agent-identity-id <id> --url <url> --event-type message.received ...`.
 ```
 
 `mailbox list` shows a `storage` column (`1.2 GiB / 2 GiB`) and `mailbox get`
@@ -858,7 +858,7 @@ inkbox number update <id>                    # Update phone number config
   --incoming-call-webhook-url <url>          #   Webhook URL for incoming calls
 inkbox number release <number-id>             # Release a phone number
 # To attach a text-webhook receiver, use `inkbox webhook subscription
-# create --phone-number-id <id> --url <url> --event-type text.received ...`.
+# create --agent-identity-id <id> --url <url> --event-type text.received ...`.
 ```
 
 ### whoami
@@ -889,16 +889,17 @@ inkbox webhook verify                        # Verify a webhook signature (local
   -H, --header <header>                      #   Header in Key: Value format (repeatable)
 
 inkbox webhook subscription list             # List webhook subscriptions
-  --mailbox-id <id>                          #   Filter by owning mailbox id
-  --phone-number-id <id>                     #   Filter by owning phone number id
-  --agent-identity-id <id>                   #   Filter by owning agent identity id (iMessage / call.ended)
+  --mailbox-id <id>                          #   Deprecated mailbox-identity mail filter
+  --phone-number-id <id>                     #   Deprecated phone-identity text filter
+  --agent-identity-id <id>                    #   Filter by owning agent identity id
+  --scope identity                          #   Include all families and mixed subscriptions
   --url <url>                                #   Filter by destination URL (exact)
   --event-type <type>                        #   Filter by event_type wire value
 inkbox webhook subscription get <sub-id>     # Get one subscription
 inkbox webhook subscription create           # Create a subscription
-  --mailbox-id <id>                          #   Owning mailbox id (exactly one of the
-  --phone-number-id <id>                     #     three owner FKs is required)
-  --agent-identity-id <id>                   #   Owning agent identity id (iMessage / call.ended events)
+  --mailbox-id <id>                          #   Deprecated mailbox selector (exactly one
+  --phone-number-id <id>                     #     identity/resource selector is required)
+  --agent-identity-id <id>                   #   Owning agent identity id (all notification events)
   --url <url>                                #   HTTPS destination (required)
   --event-type <type>                        #   Event type (repeatable; ≥1 required)
   --context-email <spec>                     #   Conversation context for the email
@@ -909,7 +910,7 @@ inkbox webhook subscription create           # Create a subscription
                                              #     stdin (never passed as an argument).
                                              #     Reads return the token; list tables
                                              #     show only hasAuthToken
-inkbox webhook subscription update <sub-id>  # Update url, event_types, context, and/or auth token
+inkbox webhook subscription update <sub-id> --scope identity  # Update url, event_types, context, and/or auth token
   --url <url>                                #   New HTTPS destination
   --event-type <type>                        #   Replacement event-type list (repeatable)
   --context-email <spec>                     #   Replace email context (count:N | window:H)
@@ -921,8 +922,33 @@ inkbox webhook subscription update <sub-id>  # Update url, event_types, context,
   --clear-auth-token                         #   Clear the delivery bearer token
                                              #     (mutually exclusive with
                                              #     --auth-token-stdin)
-inkbox webhook subscription delete <sub-id>  # Remove a subscription
+inkbox webhook subscription delete <sub-id> --scope identity  # Remove a subscription
 ```
+
+### Identity-owned notification subscriptions
+
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
+Combine notification families on one identity, including channels not yet configured:
+
+```bash
+inkbox webhook subscription create --agent-identity-id <id> --url https://example.com/events \
+  --event-type message.received --event-type text.received --event-type imessage.received \
+  --event-type call.ended --event-type a2a.task.created
+inkbox webhook subscription update <sub-id> --scope identity --event-type message.received
+inkbox webhook subscription delete <sub-id> --scope identity
+```
+
+Update replaces the full event selection. Legacy mailbox and phone selectors resolve
+to their identity;
+prefer `--agent-identity-id`. Incoming-call actions remain separate. Delivery output
+includes replayability and any unavailable reason,
+while retaining the original target ID.
 
 ## Mail clients (IMAP/SMTP)
 

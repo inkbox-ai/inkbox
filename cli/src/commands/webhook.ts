@@ -1,4 +1,4 @@
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import { printStatus } from "../output.js";
 import { createClient, getGlobalOpts } from "../client.js";
 import { readSecretFromStdin } from "../invitation-token.js";
@@ -17,9 +17,9 @@ import type {
 // `get` output and `--json` everywhere via flattenForOutput.
 const WEBHOOK_SUBSCRIPTION_LIST_COLUMNS = [
   "id",
+  "agentIdentityId",
   "mailboxId",
   "phoneNumberId",
-  "agentIdentityId",
   "url",
   "eventTypes",
   "contextConfig",
@@ -111,14 +111,15 @@ function buildContextConfigFromFlags(cmdOpts: {
 function registerSubscriptionCommands(parent: Command): void {
   const sub = parent
     .command("subscription")
-    .description("Manage webhook subscriptions (fan-out per (owner, url, event_types))");
+    .description("Manage identity-owned notification subscriptions");
 
   sub
     .command("list")
     .description("List webhook subscriptions in the caller's org (filters AND-combine)")
-    .option("--mailbox-id <id>", "Filter by owning mailbox id")
-    .option("--phone-number-id <id>", "Filter by owning phone number id")
-    .option("--agent-identity-id <id>", "Filter by owning agent identity id (iMessage)")
+    .option("--mailbox-id <id>", "Deprecated: filter the mailbox identity's mail events")
+    .option("--phone-number-id <id>", "Deprecated: filter the phone identity's text events")
+    .option("--agent-identity-id <id>", "Filter by owning agent identity id")
+    .addOption(new Option("--scope <scope>", "Include all notification families, including mixed subscriptions").choices(["identity"]))
     .option("--url <url>", "Filter by destination URL (exact match)")
     .option("--event-type <type>", "Filter by event type wire value")
     .action(
@@ -128,6 +129,7 @@ function registerSubscriptionCommands(parent: Command): void {
           mailboxId?: string;
           phoneNumberId?: string;
           agentIdentityId?: string;
+          scope?: "identity";
           url?: string;
           eventType?: string;
         },
@@ -138,6 +140,7 @@ function registerSubscriptionCommands(parent: Command): void {
           mailboxId: cmdOpts.mailboxId,
           phoneNumberId: cmdOpts.phoneNumberId,
           agentIdentityId: cmdOpts.agentIdentityId,
+          scope: cmdOpts.scope,
           url: cmdOpts.url,
           eventType: cmdOpts.eventType,
         });
@@ -162,10 +165,10 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("create")
-    .description("Create a webhook subscription. Exactly one of --mailbox-id / --phone-number-id / --agent-identity-id is required.")
-    .option("--mailbox-id <id>", "Owning mailbox id")
-    .option("--phone-number-id <id>", "Owning phone number id")
-    .option("--agent-identity-id <id>", "Owning agent identity id (for imessage.* or call.ended events)")
+    .description("Create a subscription for any mix of notification events. Prefer --agent-identity-id; provide exactly one owner selector.")
+    .option("--mailbox-id <id>", "Deprecated: resolve the owning identity from a mailbox")
+    .option("--phone-number-id <id>", "Deprecated: resolve the owning identity from a phone number")
+    .option("--agent-identity-id <id>", "Owning agent identity id (all notification events)")
     .requiredOption("--url <url>", "HTTPS destination for delivered events")
     .requiredOption(
       "--event-type <type>",
@@ -214,6 +217,7 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("update <sub-id>")
+    .addOption(new Option("--scope <scope>", "Allow changes to a mixed-family subscription").choices(["identity"]))
     .description("Update url, event_types, context, and/or the delivery auth token on a subscription. --event-type replaces the stored list.")
     .option("--url <url>", "New HTTPS destination")
     .option(
@@ -244,6 +248,7 @@ function registerSubscriptionCommands(parent: Command): void {
           clearContext?: boolean;
           authTokenStdin?: boolean;
           clearAuthToken?: boolean;
+          scope?: "identity";
         },
       ) {
         const opts = getGlobalOpts(this);
@@ -253,7 +258,9 @@ function registerSubscriptionCommands(parent: Command): void {
           eventTypes?: string[];
           contextConfig?: WebhookContextConfig | null;
           authToken?: string | null;
+          scope?: "identity";
         } = {};
+        if (cmdOpts.scope !== undefined) body.scope = cmdOpts.scope;
         if (cmdOpts.url !== undefined) body.url = cmdOpts.url;
         if (cmdOpts.eventType !== undefined) body.eventTypes = cmdOpts.eventType;
         const contextConfig = buildContextConfigFromFlags(cmdOpts);
@@ -285,12 +292,13 @@ function registerSubscriptionCommands(parent: Command): void {
 
   sub
     .command("delete <sub-id>")
-    .description("Remove a webhook subscription")
+    .description("Remove the whole subscription, including every selected event")
+    .addOption(new Option("--scope <scope>", "Allow deletion of a mixed-family subscription").choices(["identity"]))
     .action(
-      withErrorHandler(async function (this: Command, subId: string) {
+      withErrorHandler(async function (this: Command, subId: string, cmdOpts: { scope?: "identity" }) {
         const opts = getGlobalOpts(this);
         const inkbox = createClient(opts);
-        await inkbox.webhooks.subscriptions.delete(subId);
+        await inkbox.webhooks.subscriptions.delete(subId, { scope: cmdOpts.scope });
         printStatus(`Deleted webhook subscription '${subId}'.`);
       }),
     );
@@ -303,6 +311,7 @@ const WEBHOOK_DELIVERY_LIST_COLUMNS = [
   "url",
   "responseStatus",
   "isReplay",
+  "replayable",
   "createdAt",
 ];
 
@@ -311,6 +320,8 @@ function flattenDeliveryForOutput(d: WebhookDelivery): Record<string, unknown> {
     id: d.id,
     organizationId: d.organizationId,
     webhookSubscriptionId: d.webhookSubscriptionId,
+    replayable: d.replayable,
+    replayUnavailableReason: d.replayUnavailableReason,
     phoneNumberId: d.phoneNumberId,
     eventId: d.eventId,
     eventType: d.eventType,

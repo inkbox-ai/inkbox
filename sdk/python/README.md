@@ -583,7 +583,7 @@ Customer-managed 10DLC brands and campaigns lift the default per-number cap to t
 
 ```python
 # Send SMS/MMS. Returns a queued TextMessage; final delivery state
-# arrives via any webhook subscription on the sender's phone number
+# arrives via any webhook subscription on the sender's identity
 # whose event_types include the text.* lifecycle events.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
@@ -1380,58 +1380,37 @@ like an SSH key dir. `forward_to` is loopback-only by default; pass
 
 ## Webhooks
 
-Webhook delivery uses a dedicated subscription resource. Each
-subscription names exactly one owner (a mailbox, a phone number, **or**
-an agent identity for iMessage), one HTTPS destination URL, and a
-non-empty subset of the catalog's event types. Multiple subscriptions
-on the same owner fan out independently.
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
 
-The one exception is `phone.incoming_call`, which is a synchronous
-control-plane callback (the response body decides whether Inkbox
-answers). That URL still lives on the phone-number resource as
-`incoming_call_webhook_url`.
+Each notification subscription belongs to an agent identity and can combine all
+21 current mail, text, iMessage, call-lifecycle and A2A event types. Optional
+channels do not have to be configured before subscribing. Multiple receivers
+remain supported; one identity and URL cannot have overlapping event selections.
 
-### Subscribing to mail, text, or iMessage events
+Incoming-call actions are separate identity settings: `phone.incoming_call` is a
+synchronous call-control callback, not a notification subscription.
+
+### Subscribe once across channels
 
 ```python
-# Mail subscription: pick the message.* events you want.
-inkbox.webhooks.subscriptions.create(
-    mailbox_id=mailbox.id,
-    url="https://example.com/hook",
-    event_types=["message.received", "message.bounced"],
-)
-
-# Text subscription: pick the text.* events you want.
-inkbox.webhooks.subscriptions.create(
-    phone_number_id=number.id,
-    url="https://example.com/texts",
-    event_types=[
-        "text.received",
-        "text.sent",
-        "text.delivered",
-        "text.delivery_failed",
-        "text.delivery_unconfirmed",
-    ],
-)
-
-# iMessage subscription: owned by the agent identity (the shared
-# pool lines aren't org resources).
-inkbox.webhooks.subscriptions.create(
+identity = inkbox.get_identity("my-agent")
+sub = inkbox.webhooks.subscriptions.create(
     agent_identity_id=identity.id,
-    url="https://example.com/imessage",
-    event_types=[
-        "imessage.received",
-        "imessage.reaction_received",
-        "imessage.sent",
-        "imessage.delivered",
-        "imessage.delivery_failed",
-    ],
+    url="https://example.com/hook",
+    event_types=["message.received", "text.received", "imessage.received",
+                 "call.ended", "a2a.task.created"],
 )
 
-# List, update, remove.
-subs = inkbox.webhooks.subscriptions.list(mailbox_id=mailbox.id)
-inkbox.webhooks.subscriptions.update(subs[0].id, url="https://new/hook")
-inkbox.webhooks.subscriptions.delete(subs[0].id)
+# Events on update replace the full selection.
+updated = inkbox.webhooks.subscriptions.update(
+    sub.id, scope="identity", event_types=[*sub.event_types, "a2a.task.message"],
+)
+inkbox.webhooks.subscriptions.delete(updated.id, scope="identity")
 ```
 
 Available event types:
@@ -1441,21 +1420,30 @@ Available event types:
 | Mail | `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed` |
 | Phone text | `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed` |
 | iMessage | `imessage.received`, `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` |
+| Call lifecycle | `call.ended` |
+| A2A | `a2a.task.created`, `a2a.task.message`, `a2a.task.canceled`, `a2a.sent_task.updated` |
 
-Server-side validation: exactly one of `mailbox_id` /
-`phone_number_id` / `agent_identity_id` must be set; `event_types`
-must be non-empty and distinct; every event type must belong to the
-owner's channel (mailbox -> `message.*`, phone number -> `text.*`,
-agent identity -> `imessage.*`). On `create` the SDK mirrors the
-structural checks (XOR owner, non-empty, distinct, no
-`phone.incoming_call`) plus the `message.` / `text.` / `imessage.`
-prefix check, so most shape mistakes surface as `ValueError` before
-the request leaves the client. The server remains authoritative for the exact event-name
-enum, so a typo with a valid prefix (e.g. `message.received_typo`)
-passes the SDK's check and is rejected as 422 by the server. On
-`update` the SDK also rejects mixed event families. Owner compatibility
-remains server-validated because the SDK doesn't know the owner FK from a
-subscription ID alone.
+Prefer `agent_identity_id`. Legacy mailbox/phone selectors remain mutually exclusive
+and resolve to their owning identity. Event lists must be nonempty and distinct;
+the API validates exact catalog values, while the SDK rejects unknown prefixes
+and `phone.incoming_call`. No wildcard or automatic channel provisioning is implied.
+
+### Listing and delivery history
+
+Owner-filtered lists preserve legacy single-family views by default and exclude
+mixed subscriptions. Explicitly opt in when listing all notification families:
+
+```python
+subscriptions = inkbox.webhooks.subscriptions.list(
+    agent_identity_id=identity.id, scope="identity",
+)
+```
+
+Identity-owned subscriptions return the canonical identity owner with null legacy
+mailbox and phone owner fields. Older servers can still return legacy resource owners. Event-list updates replace the full selection.
+Delivery history retains the original subscription ID and exposes `replayable`
+and `replay_unavailable_reason`. Older responses default these to false and null.
+Replay still checks whether the subscription is active and selects the event.
 
 ### Conversation context
 
@@ -1463,12 +1451,12 @@ Opt a subscription into per-class conversation history on **received**
 events (`message.received`, `text.received`, `imessage.received`) by
 passing `context_config`. Each class (`email`, `texts`, `calls`) takes a
 `count` mode (last N items, 1..50) or a `window` mode (last H hours,
-1..168); omit a class to leave it unconfigured. Conversation context is
-not supported for A2A subscriptions.
+1..168); omit a class to leave it unconfigured. Only these received events
+include context; A2A, call-lifecycle and other notifications ignore it.
 
 ```python
 inkbox.webhooks.subscriptions.create(
-    mailbox_id=mailbox.id,
+    agent_identity_id=identity.id,
     url="https://example.com/hook",
     event_types=["message.received"],
     context_config={
@@ -1479,7 +1467,7 @@ inkbox.webhooks.subscriptions.create(
 
 # update() is tri-state: omit context_config to leave it unchanged, pass a
 # dict to replace it, or pass None to clear it.
-inkbox.webhooks.subscriptions.update(sub.id, context_config=None)
+inkbox.webhooks.subscriptions.update(sub.id, scope="identity", context_config=None)
 ```
 
 Received-event payloads then carry an optional `data["context"]` keyed by
@@ -1524,7 +1512,7 @@ that predate the fields.
 
 ```python
 inkbox.webhooks.subscriptions.create(
-    mailbox_id=mailbox.id,
+    agent_identity_id=identity.id,
     url="https://example.com/hook",
     event_types=["message.received"],
     auth_token="your-endpoint-token",
@@ -1532,7 +1520,7 @@ inkbox.webhooks.subscriptions.create(
 
 # update() is tri-state: omit auth_token to leave it unchanged, pass a
 # string to replace it, or pass None to clear it.
-inkbox.webhooks.subscriptions.update(sub.id, auth_token=None)
+inkbox.webhooks.subscriptions.update(sub.id, scope="identity", auth_token=None)
 ```
 
 ### Incoming-call webhooks (still per-number)

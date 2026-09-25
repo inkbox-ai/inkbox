@@ -4,6 +4,46 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## 0.7.8 — Identity-owned webhook subscriptions
+
+- When the server advertises `supports_identity_subscriptions: true` in
+  `GET /webhooks/catalog`, combine notification families on one identity regardless of
+  configured channels. Before availability, keep separate channel subscriptions and
+  mailbox/phone selectors; those selectors remain accepted after availability.
+- List scope is explicit: pass `scope="identity"` (Python), `scope: "identity"`
+  (TypeScript), Rust's `list_with_scope` with `WebhookSubscriptionScope::Identity`,
+  or CLI `--scope identity` to include every family and mixed subscriptions.
+  Explicit identity scope checks the catalog once per list call and raises an actionable
+  error when unsupported; it never silently returns a partial list. Omitted scope
+  preserves existing single-family list behavior without an extra request.
+- Ownership responses remain compatible across availability phases: older servers may
+  return mailbox/phone owners; identity-owned responses use `agent_identity_id` /
+  `agentIdentityId` with null legacy owners. CLI tables display all three owner columns.
+- A changed or unavailable owner can return 409 on mutation; refresh the subscription
+  and its owner before retrying. Before identity subscriptions are available, A2A-only
+  requests with conversation context return 422. After availability, a subscription
+  can retain context settings, but only received mail/text/iMessage events include context.
+- Rust adds `create_for_identity` without changing the existing `create` signature.
+- Event-family/owner matching and A2A context compatibility are now validated by the
+  server, not the SDK. Unsupported combinations return an API 422 instead of a local
+  validation exception; valid mixed events are accepted when the capability is available.
+- TypeScript replay metadata fields are optional for existing typed literals and
+  mocks; parsed responses always populate `replayable` and `replayUnavailableReason`.
+- Mixed subscriptions require explicit identity scope for update/delete as well:
+  Python `scope="identity"`, TypeScript `{ scope: "identity" }`, Rust
+  `update_with_scope` / `delete_with_scope`, or CLI `--scope identity`. Mutation scope
+  defaults to omitted, adds no catalog request, and keeps old callers unchanged;
+  a mixed receiver rejects an unscoped mutation with 409. Event updates remain full
+  replacement. Incoming-call actions remain separate.
+- Expose delivery replayability without changing original history IDs.
+  Conversation context applies only to received mail, text and iMessage events.
+- **Rust source compatibility:** When recompiling against 0.7.8, direct `WebhookDelivery`
+  literals must add `replayable: false` and `replay_unavailable_reason: None`.
+  Already compiled SDKs remain compatible, and response deserialization accepts older JSON
+  with these fields omitted.
+
+- Bundled Codex plugin version `0.1.7` includes the identity-owned webhook skills.
+
 ## 0.7.7 - Phone number country metadata
 
 ### Added

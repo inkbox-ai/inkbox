@@ -1,16 +1,6 @@
-//! Webhook subscriptions -- fan-out per `(owner, url, event_types)`.
-//!
-//! Replaces the legacy per-resource `webhook_url` columns on mailboxes and
-//! phone numbers. Use this resource to attach HTTPS receivers to mail
-//! (`message.*`), phone-text (`text.*`), iMessage (`imessage.*`), post-call
-//! lifecycle (`call.ended`), or A2A (`a2a.*`) events. Mail and text
-//! subscriptions are owned by the mailbox / phone number; the other channels
-//! are owned by the agent identity. Each subscription contains events from
-//! one channel.
-//! Incoming-call webhooks (`phone.incoming_call`) are
-//! still set on the phone-number resource itself -- that channel is a
-//! synchronous control-plane callback whose response body drives call routing,
-//! so fan-out is not meaningful.
+//! Identity-owned subscriptions can combine notification events from every
+//! channel, including channels not yet configured. Incoming-call actions remain
+//! separate synchronous call-control settings.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -94,13 +84,18 @@ pub enum WebhookSubscriptionStatus {
     Deleted,
 }
 
+/// Explicit identity-wide lists and mutations of mixed subscriptions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WebhookSubscriptionScope {
+    /// Include every notification family or explicitly mutate a mixed subscription.
+    Identity,
+}
+
 /// A webhook subscription row returned by the API.
 ///
-/// Exactly one of `mailbox_id` / `phone_number_id` / `agent_identity_id` (the
-/// raw owner FK) is populated. `owner_identity_id` is the **resolved** owning
-/// agent identity for every subscription regardless of channel — mail/phone
-/// subs resolve it server-side through the mailbox / phone number, while
-/// identity-owned subscriptions carry it directly. (Optional for
+/// `agent_identity_id` is the canonical owner. Legacy responses may instead
+/// populate `mailbox_id` or `phone_number_id`. `owner_identity_id` provides
+/// the resolved identity for compatibility. (Optional for
 /// forward-compatibility: `None` on servers that predate the field.)
 /// `organization_id` is an `"org_..."`
 /// token string, not a UUID. `status` is always `"active"` for subscriptions
@@ -160,23 +155,7 @@ struct ListResponse {
     subscriptions: Vec<WebhookSubscription>,
 }
 
-/// Wire event-type prefix -> the owning resource whose channel it belongs to.
-///
-/// An agent identity owns iMessage, post-call lifecycle, and A2A channels.
-const EVENT_PREFIX_TO_OWNER: &[(&str, &str)] = &[
-    ("message.", "mailbox"),
-    ("text.", "phone_number"),
-    ("imessage.", "agent_identity"),
-    ("call.", "agent_identity"),
-    ("a2a.", "agent_identity"),
-];
-
-/// Owner resource -> the event-type prefixes it may subscribe to.
-const OWNER_EVENT_PREFIXES: &[(&str, &[&str])] = &[
-    ("mailbox", &["message."]),
-    ("phone_number", &["text."]),
-    ("agent_identity", &["imessage.", "call.", "a2a."]),
-];
+const EVENT_PREFIXES: &[&str] = &["message.", "text.", "imessage.", "call.", "a2a."];
 
 /// Reject an empty list or one carrying duplicate values.
 fn assert_event_types_non_empty_distinct(event_types: &[String]) -> Result<()> {
@@ -196,86 +175,32 @@ fn assert_event_types_non_empty_distinct(event_types: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// The incoming-call event is set on the phone number, not stored here.
+/// Incoming-call actions are separate identity settings, not subscriptions.
 fn assert_no_incoming_call(event_types: &[String]) -> Result<()> {
     if event_types.iter().any(|e| e == INCOMING_CALL) {
         return Err(InkboxError::InvalidArgument(format!(
             "event_type '{INCOMING_CALL}' is not stored in webhook \
-             subscriptions; set it on the phone number's \
-             `incoming_call_webhook_url` field instead"
+             subscriptions; configure the identity's incoming-call action instead"
         )));
     }
     Ok(())
 }
 
-/// Every event type must belong to a channel that the owner may subscribe to.
-fn selected_event_prefixes(event_types: &[String]) -> Result<HashSet<&'static str>> {
-    let mut selected_prefixes: HashSet<&str> = HashSet::new();
-    for e in event_types {
-        let matched = EVENT_PREFIX_TO_OWNER
+fn assert_known_event_prefixes(event_types: &[String]) -> Result<()> {
+    for event_type in event_types {
+        if !EVENT_PREFIXES
             .iter()
-            .find(|(prefix, _)| e.starts_with(prefix));
-        let prefix = match matched {
-            Some((prefix, _)) => *prefix,
-            None => {
-                return Err(InkboxError::InvalidArgument(format!(
-                    "event_type '{e}' does not belong to any known channel"
-                )));
-            }
-        };
-        selected_prefixes.insert(prefix);
-    }
-    if selected_prefixes.len() > 1 {
-        let mut prefixes: Vec<&str> = selected_prefixes.iter().copied().collect();
-        prefixes.sort_unstable();
-        return Err(InkboxError::InvalidArgument(format!(
-            "event_types must all belong to one channel; got {prefixes:?}"
-        )));
-    }
-    Ok(selected_prefixes)
-}
-
-/// Every event type must belong to a channel that the owner may subscribe to.
-fn assert_channel_coherence(owner: &str, event_types: &[String]) -> Result<()> {
-    let allowed = OWNER_EVENT_PREFIXES
-        .iter()
-        .find(|(name, _)| *name == owner)
-        .map(|(_, prefixes)| *prefixes)
-        .expect("owner must be one of the known channels");
-    let selected_prefixes = selected_event_prefixes(event_types)?;
-    for e in event_types {
-        let (prefix, target_owner) = EVENT_PREFIX_TO_OWNER
-            .iter()
-            .find(|(prefix, _)| e.starts_with(prefix))
-            .expect("selected_event_prefixes already validated event types");
-        if !allowed.contains(prefix) {
+            .any(|prefix| event_type.starts_with(prefix))
+        {
             return Err(InkboxError::InvalidArgument(format!(
-                "event_type '{e}' does not belong to the {owner} channel \
-                 (it belongs to {target_owner})"
+                "event_type '{event_type}' does not belong to any known channel"
             )));
         }
     }
-    if selected_prefixes.is_empty() {
-        return Err(InkboxError::InvalidArgument(
-            "event_types must be a non-empty list".into(),
-        ));
-    }
     Ok(())
 }
 
-fn assert_a2a_context_absent(
-    event_types: &[String],
-    context_config: Option<&WebhookContextConfig>,
-) -> Result<()> {
-    if context_config.is_some() && event_types.iter().any(|event| event.starts_with("a2a.")) {
-        return Err(InkboxError::InvalidArgument(
-            "context_config is not supported for A2A subscriptions".into(),
-        ));
-    }
-    Ok(())
-}
-
-/// Webhook subscription CRUD resource.
+/// Identity-owned notification subscription resource.
 pub struct WebhookSubscriptionsResource {
     http: Arc<HttpTransport>,
 }
@@ -287,6 +212,8 @@ impl WebhookSubscriptionsResource {
 
     /// List webhook subscriptions visible to the caller.
     ///
+    /// Resource selectors retain legacy single-family views and exclude mixed
+    /// subscriptions. Use [`Self::list_with_scope`] to include every family.
     /// Filters AND-combine. `mailbox_id` / `phone_number_id` /
     /// `agent_identity_id` are mutually exclusive -- passing more than one
     /// yields a 422. Deleted subscriptions are not returned.
@@ -308,6 +235,41 @@ impl WebhookSubscriptionsResource {
         url: Option<&str>,
         event_type: Option<&str>,
     ) -> Result<Vec<WebhookSubscription>> {
+        self.list_with_scope(
+            mailbox_id,
+            phone_number_id,
+            agent_identity_id,
+            url,
+            event_type,
+            None,
+        )
+    }
+
+    /// List subscriptions with an explicit scope. `None` preserves legacy
+    /// single-family views; `Identity` includes mixed subscriptions and all
+    /// notification families for the selected identity. Explicit identity scope
+    /// checks server support and returns `InvalidArgument` when unavailable.
+    pub fn list_with_scope(
+        &self,
+        mailbox_id: Option<Uuid>,
+        phone_number_id: Option<Uuid>,
+        agent_identity_id: Option<Uuid>,
+        url: Option<&str>,
+        event_type: Option<&str>,
+        scope: Option<WebhookSubscriptionScope>,
+    ) -> Result<Vec<WebhookSubscription>> {
+        if scope == Some(WebhookSubscriptionScope::Identity) {
+            let catalog = self.http.get("/webhooks/catalog", crate::http::NO_QUERY)?;
+            if catalog
+                .get("supports_identity_subscriptions")
+                .and_then(Value::as_bool)
+                != Some(true)
+            {
+                return Err(InkboxError::InvalidArgument(
+                    "Identity-wide webhook subscriptions are not supported by this server yet. Use channel-filtered lists without scope or retry when identity subscriptions are available.".into(),
+                ));
+            }
+        }
         // Build the query, omitting any filter the caller left as `None`.
         let mut params: Vec<(&str, String)> = Vec::new();
         if let Some(id) = mailbox_id {
@@ -318,6 +280,9 @@ impl WebhookSubscriptionsResource {
         }
         if let Some(id) = agent_identity_id {
             params.push(("agent_identity_id", id.to_string()));
+        }
+        if scope == Some(WebhookSubscriptionScope::Identity) {
+            params.push(("scope", "identity".to_string()));
         }
         if let Some(u) = url {
             params.push(("url", u.to_string()));
@@ -341,26 +306,14 @@ impl WebhookSubscriptionsResource {
 
     /// Create a webhook subscription.
     ///
-    /// Exactly one of `mailbox_id` / `phone_number_id` / `agent_identity_id` is
-    /// required. `event_types` must be a non-empty list of distinct values
-    /// belonging to the owner's channel (mailbox -> `message.*`, phone number
-    /// -> `text.*`, agent identity -> `imessage.*`, `call.ended`, or `a2a.*`).
-    /// One subscription carries a single channel.
-    ///
-    /// `context_config` opts mail, text, or iMessage subscriptions into
-    /// per-class conversation context (email/texts/calls) delivered on received
-    /// events. It is not supported for A2A subscriptions. See
-    /// [`WebhookContextConfig`].
-    ///
-    /// `auth_token` is an optional bearer token for endpoints that require an
-    /// `Authorization` header: when set, every delivery (and replay) carries
-    /// `Authorization: Bearer <token>` alongside the signature headers. Reads
-    /// return the stored token back in `auth_token` alongside the
-    /// `has_auth_token` flag.
+    /// Prefer `agent_identity_id`; exactly one identity, legacy mailbox, or
+    /// legacy phone selector is required. Legacy selectors resolve to their
+    /// identity. Any mix of notification events is allowed independently of
+    /// configured channels. Context applies only to received mail/text/iMessage.
     ///
     /// # Arguments
-    /// * `url` - HTTPS receiver endpoint.
-    /// * `event_types` - non-empty, distinct event-type strings.
+    /// * `url` - destination URL.
+    /// * `event_types` - nonempty distinct notification event names.
     /// * `mailbox_id` / `phone_number_id` / `agent_identity_id` - exactly one.
     /// * `context_config` - optional per-class conversation-context config.
     /// * `auth_token` - optional delivery bearer token.
@@ -400,10 +353,10 @@ impl WebhookSubscriptionsResource {
         }
         let (owner, owner_id) = populated[0];
 
-        // Validate the event-type list against the owner's channel.
+        // Catalog membership is independent of the identity's configured channels.
         assert_event_types_non_empty_distinct(event_types)?;
         assert_no_incoming_call(event_types)?;
-        assert_channel_coherence(owner, event_types)?;
+        assert_known_event_prefixes(event_types)?;
 
         // Body mirrors the Python dict: url, event_types, and the single
         // `{owner}_id` key (built on a Map since the owner key is computed).
@@ -413,7 +366,6 @@ impl WebhookSubscriptionsResource {
         body.insert(format!("{owner}_id"), json!(owner_id.to_string()));
         if let Some(cfg) = context_config {
             assert_valid_context_config(cfg)?;
-            assert_a2a_context_absent(event_types, Some(cfg))?;
             body.insert("context_config".into(), json!(cfg));
         }
         if let Some(token) = auth_token {
@@ -433,8 +385,8 @@ impl WebhookSubscriptionsResource {
     ///
     /// `context_config` is tri-state — a field where `null` is meaningful on
     /// the wire: `None` omits the key (unchanged), `Some(None)` sends JSON
-    /// `null` (clear), `Some(Some(cfg))` validates and replaces. A2A
-    /// subscriptions do not support a context object.
+    /// `null` (clear), `Some(Some(cfg))` validates and replaces. Context applies
+    /// only to received mail, text and iMessage events.
     ///
     /// `auth_token` is tri-state the same way: `None` leaves the delivery
     /// bearer token unchanged, `Some(None)` clears it, `Some(Some(token))`
@@ -457,6 +409,20 @@ impl WebhookSubscriptionsResource {
         context_config: Option<Option<&WebhookContextConfig>>,
         auth_token: Option<Option<&str>>,
     ) -> Result<WebhookSubscription> {
+        self.update_with_scope(sub_id, url, event_types, context_config, auth_token, None)
+    }
+
+    /// Update with explicit identity scope when replacing a mixed subscription.
+    /// `None` preserves legacy behavior and does not opt into mixed-row mutations.
+    pub fn update_with_scope(
+        &self,
+        sub_id: Uuid,
+        url: Option<&str>,
+        event_types: Option<&[String]>,
+        context_config: Option<Option<&WebhookContextConfig>>,
+        auth_token: Option<Option<&str>>,
+        scope: Option<WebhookSubscriptionScope>,
+    ) -> Result<WebhookSubscription> {
         // Only include keys the caller supplied (Python omits `_UNSET` keys).
         let mut body = serde_json::Map::new();
         if let Some(u) = url {
@@ -465,16 +431,13 @@ impl WebhookSubscriptionsResource {
         if let Some(events) = event_types {
             assert_event_types_non_empty_distinct(events)?;
             assert_no_incoming_call(events)?;
-            selected_event_prefixes(events)?;
+            assert_known_event_prefixes(events)?;
             body.insert("event_types".into(), json!(events));
         }
         if let Some(cfg) = context_config {
             match cfg {
                 Some(cfg) => {
                     assert_valid_context_config(cfg)?;
-                    if let Some(events) = event_types {
-                        assert_a2a_context_absent(events, Some(cfg))?;
-                    }
                     body.insert("context_config".into(), json!(cfg));
                 }
                 None => {
@@ -493,8 +456,13 @@ impl WebhookSubscriptionsResource {
                 }
             }
         }
+        let suffix = if scope == Some(WebhookSubscriptionScope::Identity) {
+            "?scope=identity"
+        } else {
+            ""
+        };
         let data = self.http.patch(
-            &format!("{BASE}/{sub_id}"),
+            &format!("{BASE}/{sub_id}{suffix}"),
             &serde_json::Value::Object(body),
         )?;
         Ok(serde_json::from_value(data)?)
@@ -503,7 +471,41 @@ impl WebhookSubscriptionsResource {
     /// Delete a subscription. Subsequent `list` / `get` calls will not return
     /// it.
     pub fn delete(&self, sub_id: Uuid) -> Result<()> {
-        self.http.delete(&format!("{BASE}/{sub_id}"))
+        self.delete_with_scope(sub_id, None)
+    }
+
+    /// Delete with explicit identity scope when removing a mixed subscription.
+    pub fn delete_with_scope(
+        &self,
+        sub_id: Uuid,
+        scope: Option<WebhookSubscriptionScope>,
+    ) -> Result<()> {
+        let suffix = if scope == Some(WebhookSubscriptionScope::Identity) {
+            "?scope=identity"
+        } else {
+            ""
+        };
+        self.http.delete(&format!("{BASE}/{sub_id}{suffix}"))
+    }
+
+    /// Create a subscription directly on an identity without legacy selectors.
+    pub fn create_for_identity(
+        &self,
+        agent_identity_id: Uuid,
+        url: &str,
+        event_types: &[String],
+        context_config: Option<&WebhookContextConfig>,
+        auth_token: Option<&str>,
+    ) -> Result<WebhookSubscriptionCreateResponse> {
+        self.create(
+            url,
+            event_types,
+            None,
+            None,
+            Some(agent_identity_id),
+            context_config,
+            auth_token,
+        )
     }
 }
 
@@ -516,63 +518,21 @@ mod tests {
     }
 
     #[test]
-    fn accepts_matching_channels() {
-        assert!(assert_channel_coherence("mailbox", &ev(&["message.received"])).is_ok());
-        assert!(assert_channel_coherence("phone_number", &ev(&["text.received"])).is_ok());
-        assert!(assert_channel_coherence("agent_identity", &ev(&["imessage.received"])).is_ok());
-        // Post-call lifecycle rides the identity-owned channel.
-        assert!(assert_channel_coherence("agent_identity", &ev(&["call.ended"])).is_ok());
-        assert!(assert_channel_coherence(
-            "agent_identity",
-            &ev(&["a2a.task.created", "a2a.task.message"]),
-        )
+    fn accepts_mixed_notification_channels() {
+        assert!(assert_known_event_prefixes(&ev(&[
+            "message.received",
+            "text.received",
+            "imessage.received",
+            "call.ended",
+            "a2a.task.created",
+        ]))
         .is_ok());
     }
 
     #[test]
-    fn rejects_call_ended_on_non_identity_owner() {
-        let err = assert_channel_coherence("mailbox", &ev(&["call.ended"])).unwrap_err();
-        assert!(matches!(err, InkboxError::InvalidArgument(m) if m.contains("agent_identity")));
-    }
-
-    #[test]
-    fn rejects_mixed_identity_owned_events() {
-        let err = assert_channel_coherence(
-            "agent_identity",
-            &ev(&["imessage.received", "call.ended", "a2a.sent_task.updated"]),
-        )
-        .unwrap_err();
-        assert!(matches!(err, InkboxError::InvalidArgument(m) if m.contains("one channel")));
-    }
-
-    #[test]
-    fn rejects_a2a_context_config() {
-        let config = WebhookContextConfig {
-            email: Some(WebhookContextClassConfig::Count { count: 1 }),
-            ..Default::default()
-        };
-        let err = assert_a2a_context_absent(&ev(&["a2a.task.created"]), Some(&config)).unwrap_err();
-        assert!(matches!(
-            err,
-            InkboxError::InvalidArgument(m)
-                if m.contains("context_config is not supported for A2A subscriptions")
-        ));
-    }
-
-    #[test]
-    fn update_family_validation_rejects_mixed_events() {
-        let err =
-            selected_event_prefixes(&ev(&["imessage.received", "a2a.task.created"])).unwrap_err();
-        assert!(matches!(
-            err,
-            InkboxError::InvalidArgument(m) if m.contains("one channel")
-        ));
-    }
-
-    #[test]
     fn rejects_unknown_channel() {
-        let err = assert_channel_coherence("mailbox", &ev(&["bogus.thing"])).unwrap_err();
-        assert!(matches!(err, InkboxError::InvalidArgument(m) if m.contains("any known channel")));
+        assert!(assert_known_event_prefixes(&ev(&["bogus.thing"])).is_err());
+        assert!(assert_no_incoming_call(&ev(&["phone.incoming_call"])).is_err());
     }
 
     #[test]
@@ -599,5 +559,267 @@ mod tests {
         let sub: WebhookSubscription = serde_json::from_value(with_token).unwrap();
         assert!(sub.has_auth_token);
         assert_eq!(sub.auth_token.as_deref(), Some("your-endpoint-token"));
+    }
+
+    #[test]
+    fn identity_list_keeps_legacy_scope_by_default() {
+        use httpmock::prelude::*;
+        let server = MockServer::start();
+        let client = crate::client::Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let identity = Uuid::from_u128(3);
+        let request = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/webhooks/subscriptions")
+                .query_param("agent_identity_id", identity.to_string())
+                .matches(|r| {
+                    r.query_params
+                        .as_ref()
+                        .is_some_and(|params| params.iter().all(|(key, _)| key != "scope"))
+                });
+            then.status(200).json_body(json!({"subscriptions": []}));
+        });
+        assert!(client
+            .webhooks()
+            .subscriptions()
+            .list(None, None, Some(identity), None, None)
+            .unwrap()
+            .is_empty());
+        request.assert();
+    }
+
+    #[test]
+    fn mutation_scope_is_explicit_without_catalog_requests() {
+        use httpmock::{prelude::*, Method::PATCH};
+        for scope in [None, Some(WebhookSubscriptionScope::Identity)] {
+            let server = MockServer::start();
+            let client = crate::client::Inkbox::builder("test-key")
+                .base_url(server.base_url())
+                .build()
+                .unwrap();
+            let id = Uuid::from_u128(1);
+            let has_scope = scope.is_some();
+            let row = json!({"id": id, "organization_id": "org_test", "url": "https://example.com/new",
+                "event_types": ["message.received"], "status": "active",
+                "created_at": "2026-09-01T00:00:00Z", "updated_at": "2026-09-01T00:00:00Z"});
+            let patch = server.mock(|when, then| {
+                let when = when
+                    .method(PATCH)
+                    .path(format!("/api/v1/webhooks/subscriptions/{id}"))
+                    .json_body(json!({"url": "https://example.com/new"}));
+                if has_scope {
+                    when.query_param("scope", "identity");
+                } else {
+                    when.matches(|r| {
+                        !r.query_params
+                            .as_ref()
+                            .is_some_and(|params| params.iter().any(|(key, _)| key == "scope"))
+                    });
+                }
+                then.status(200).json_body(row);
+            });
+            let delete = server.mock(|when, then| {
+                let when = when
+                    .method(DELETE)
+                    .path(format!("/api/v1/webhooks/subscriptions/{id}"));
+                if has_scope {
+                    when.query_param("scope", "identity");
+                } else {
+                    when.matches(|r| {
+                        !r.query_params
+                            .as_ref()
+                            .is_some_and(|params| params.iter().any(|(key, _)| key == "scope"))
+                    });
+                }
+                then.status(204);
+            });
+            let catalog = server.mock(|when, then| {
+                when.method(GET).path("/api/v1/webhooks/catalog");
+                then.status(500);
+            });
+            let resource = client.webhooks();
+            let subscriptions = resource.subscriptions();
+            subscriptions
+                .update_with_scope(id, Some("https://example.com/new"), None, None, None, scope)
+                .unwrap();
+            subscriptions.delete_with_scope(id, scope).unwrap();
+            patch.assert_hits(1);
+            delete.assert_hits(1);
+            catalog.assert_hits(0);
+        }
+    }
+
+    #[test]
+    fn identity_scope_requires_explicit_server_support() {
+        use httpmock::prelude::*;
+        for body in [
+            json!({}),
+            json!({"supports_identity_subscriptions": false}),
+            json!({"supports_identity_subscriptions": "true"}),
+        ] {
+            let server = MockServer::start();
+            let client = crate::client::Inkbox::builder("test-key")
+                .base_url(server.base_url())
+                .build()
+                .unwrap();
+            let catalog = server.mock(|when, then| {
+                when.method(GET).path("/api/v1/webhooks/catalog");
+                then.status(200).json_body(body);
+            });
+            let list = server.mock(|when, then| {
+                when.method(GET).path("/api/v1/webhooks/subscriptions");
+                then.status(200).json_body(json!({"subscriptions": []}));
+            });
+            let result = client.webhooks().subscriptions().list_with_scope(
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(WebhookSubscriptionScope::Identity),
+            );
+            assert!(matches!(result, Err(InkboxError::InvalidArgument(message))
+                if message.contains("channel-filtered lists without scope")));
+            catalog.assert_hits(1);
+            list.assert_hits(0);
+        }
+    }
+
+    #[test]
+    fn identity_requests_preserve_full_replacement_wire_contract() {
+        use httpmock::{prelude::*, Method::PATCH};
+        let server = MockServer::start();
+        let client = crate::client::Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let identity = Uuid::from_u128(3);
+        let id = Uuid::from_u128(1);
+        let events = ev(&[
+            "message.received",
+            "text.received",
+            "imessage.received",
+            "call.ended",
+            "a2a.task.created",
+        ]);
+        let cfg = WebhookContextConfig {
+            email: Some(WebhookContextClassConfig::Count { count: 2 }),
+            ..Default::default()
+        };
+        let row = json!({"id": id, "organization_id": "org_test", "mailbox_id": null,
+            "phone_number_id": null, "agent_identity_id": identity,
+            "url": "https://example.com/hook", "event_types": events, "status": "active",
+            "created_at": "2026-09-15T00:00:00Z", "updated_at": "2026-09-15T00:00:00Z"});
+        let create = server.mock(|when, then| {
+            when.method(POST)
+                .path("/api/v1/webhooks/subscriptions")
+                .json_body(json!({
+                    "agent_identity_id": identity, "url": "https://example.com/hook",
+                    "event_types": events, "context_config": cfg,
+                }));
+            then.status(200).json_body(row.clone());
+        });
+        let resource = client.webhooks();
+        let subs = resource.subscriptions();
+        let catalog = server.mock(|when, then| {
+            when.method(GET).path("/api/v1/webhooks/catalog");
+            then.status(200)
+                .json_body(json!({"supports_identity_subscriptions": true}));
+        });
+        let list = server.mock(|when, then| {
+            when.method(GET)
+                .path("/api/v1/webhooks/subscriptions")
+                .query_param("agent_identity_id", identity.to_string())
+                .query_param("scope", "identity");
+            then.status(200)
+                .json_body(json!({"subscriptions": [row.clone()]}));
+        });
+        let rows = subs
+            .list_with_scope(
+                None,
+                None,
+                Some(identity),
+                None,
+                None,
+                Some(WebhookSubscriptionScope::Identity),
+            )
+            .unwrap();
+        assert_eq!(rows[0].event_types, events);
+        list.assert();
+        catalog.assert_hits(1);
+        let created = subs
+            .create_for_identity(
+                identity,
+                "https://example.com/hook",
+                &events,
+                Some(&cfg),
+                None,
+            )
+            .unwrap();
+        assert_eq!(created.subscription.event_types, events);
+        create.assert();
+        let update = server.mock(|when, then| {
+            when.method(PATCH)
+                .path(format!("/api/v1/webhooks/subscriptions/{id}"))
+                .json_body(
+                    json!({"event_types": ["a2a.task.created", "message.received"],
+                    "context_config": null, "auth_token": null}),
+                );
+            then.status(200).json_body(row.clone());
+        });
+        subs.update(
+            id,
+            None,
+            Some(&ev(&["a2a.task.created", "message.received"])),
+            Some(None),
+            Some(None),
+        )
+        .unwrap();
+        update.assert();
+        let delete = server.mock(|when, then| {
+            when.method(DELETE)
+                .path(format!("/api/v1/webhooks/subscriptions/{id}"));
+            then.status(204);
+        });
+        subs.delete(id).unwrap();
+        delete.assert();
+    }
+
+    #[test]
+    fn update_preserves_overlap_conflict_without_retry() {
+        use httpmock::{prelude::*, Method::PATCH};
+        let server = MockServer::start();
+        let client = crate::client::Inkbox::builder("test-key")
+            .base_url(server.base_url())
+            .build()
+            .unwrap();
+        let conflict = server.mock(|when, then| {
+            when.method(PATCH)
+                .path(format!(
+                    "/api/v1/webhooks/subscriptions/{}",
+                    Uuid::from_u128(1)
+                ))
+                .json_body(json!({"event_types": ["message.received"]}));
+            then.status(409).json_body(
+                json!({"detail": "Subscription events overlap an existing destination"}),
+            );
+        });
+        let result = client.webhooks().subscriptions().update(
+            Uuid::from_u128(1),
+            None,
+            Some(&ev(&["message.received"])),
+            None,
+            None,
+        );
+        assert!(matches!(
+            result,
+            Err(InkboxError::Api {
+                status_code: 409,
+                ..
+            })
+        ));
+        conflict.assert_hits(1);
     }
 }

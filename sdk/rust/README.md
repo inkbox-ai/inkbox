@@ -13,14 +13,14 @@ match the other SDKs exactly — they all speak to the same server.
 
 ```toml
 [dependencies]
-inkbox = "0.7.3"
+inkbox = "0.7.8"
 ```
 
 The tunnels data-plane runtime is behind an optional feature:
 
 ```toml
 [dependencies]
-inkbox = { version = "0.7.3", features = ["tunnels-runtime"] }
+inkbox = { version = "0.7.8", features = ["tunnels-runtime"] }
 ```
 
 ## Quickstart
@@ -744,6 +744,52 @@ inkbox.mailboxes().update_with_options("alex@example.com", &MailboxUpdateOptions
 # Ok(())
 # }
 ```
+
+## Identity-owned webhook subscriptions
+
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
+
+`client.webhooks().subscriptions().create_for_identity(identity_id, url, &events,
+context_config, auth_token)` creates one receiver for any mix of notification
+families, including channels not yet configured. The legacy `create` signature
+remains available and resolves its mailbox/phone selector to the owning identity.
+
+`update(sub_id, url, event_types, context_config, auth_token)` replaces each
+supplied field. `event_types` replaces the full selection; omitted fields remain
+unchanged. `delete(sub_id)` removes the whole subscription. Mixed subscriptions
+require explicit `Some(WebhookSubscriptionScope::Identity)` through
+`update_with_scope(sub_id, url, event_types, context_config, auth_token, scope)` or
+`delete_with_scope(sub_id, scope)`. The existing methods retain omitted scope;
+upgrading the SDK does not opt old callers into changing shared event selections.
+
+Context is included only for received mail/text/iMessage events; other selected
+events ignore it. Incoming-call actions remain separate. Delivery records retain
+the original subscription ID and expose `replayable` and
+`replay_unavailable_reason` for current replay status.
+
+`list` retains legacy single-family views and excludes mixed subscriptions.
+To include all notification families, opt in explicitly:
+
+```rust,no_run
+use inkbox::webhooks::WebhookSubscriptionScope;
+# fn main() -> inkbox::Result<()> {
+# let client = inkbox::Inkbox::builder("YOUR_API_KEY").build()?;
+# let identity_id = uuid::Uuid::nil();
+let subscriptions = client.webhooks().subscriptions().list_with_scope(
+    None, None, Some(identity_id), None, None,
+    Some(WebhookSubscriptionScope::Identity),
+)?;
+# Ok(())
+# }
+```
+
+Identity-owned responses use `agent_identity_id` with null legacy mailbox and phone
+fields. Older servers can still return legacy resource owners.
 
 ## License
 

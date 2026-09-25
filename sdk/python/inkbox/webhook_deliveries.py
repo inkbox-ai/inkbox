@@ -57,6 +57,8 @@ class WebhookDelivery:
     duration_ms: int | None
     is_replay: bool
     created_at: datetime
+    replayable: bool = False
+    replay_unavailable_reason: str | None = None
 
     @classmethod
     def _from_dict(cls, d: dict[str, Any]) -> WebhookDelivery:
@@ -81,6 +83,8 @@ class WebhookDelivery:
             duration_ms=d.get("duration_ms"),
             is_replay=d["is_replay"],
             created_at=datetime.fromisoformat(d["created_at"]),
+            replayable=bool(d.get("replayable", False)),
+            replay_unavailable_reason=d.get("replay_unavailable_reason"),
         )
 
 
@@ -89,7 +93,6 @@ def _uuid_str(value: UUID | str) -> str:
 
 
 class WebhookDeliveriesResource:
-
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 

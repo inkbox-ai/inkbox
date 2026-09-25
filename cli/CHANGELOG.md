@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.8 — Identity-owned webhook subscriptions
+
+- Combine all notification families on one identity, regardless of configured channels;
+  legacy mailbox/phone selectors remain accepted and resolve to the owning identity.
+- Event-list updates remain full replacement. Incoming-call actions remain separate.
+- Event-family/owner and A2A context checks now follow server capability. Unsupported
+  combinations return an API 422 instead of a local validation error.
+- Expose delivery replayability without changing original history IDs.
+  Conversation context applies only to received mail, text and iMessage events.
+
 ## 0.7.2 — Voicemail handling on outbound calls
 
 - `phone call` accepts `--on-voicemail <leave_message|hang_up|ignore>` and

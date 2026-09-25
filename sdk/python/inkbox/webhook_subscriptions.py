@@ -1,19 +1,11 @@
 """
 inkbox/webhook_subscriptions.py
 
-Webhook subscriptions -- fan-out per ``(owner, url, event_types)``.
+Identity-owned webhook subscriptions.
 
-Replaces the legacy per-resource ``webhook_url`` columns on mailboxes
-and phone numbers. Use this resource to attach HTTPS receivers to mail
-(``message.*``), phone-text (``text.*``), iMessage (``imessage.*``),
-post-call lifecycle (``call.ended``), or A2A (``a2a.*``) events. Mail and
-text subscriptions are owned by the mailbox / phone number; the other
-channels are owned by the agent identity. Each subscription contains events
-from one channel. Incoming-call
-webhooks (``phone.incoming_call``) are still set on the phone-number
-resource itself -- that channel is a synchronous control-plane
-callback whose response body drives call routing, so fan-out is not
-meaningful.
+A subscription can combine mail, text, iMessage, call-lifecycle and A2A
+notifications, including channels not yet configured on the identity.
+Incoming-call actions remain separate synchronous call-control settings.
 """
 
 from __future__ import annotations
@@ -44,12 +36,14 @@ _CONTEXT_MAX_WINDOW_HOURS = 168
 
 class WebhookContextCountConfig(TypedDict):
     """Count-mode context: the last ``count`` items of a class (1..50)."""
+
     mode: Literal["count"]
     count: int
 
 
 class WebhookContextWindowConfig(TypedDict):
     """Window-mode context: items from the last ``hours`` hours (1..168)."""
+
     mode: Literal["window"]
     hours: int
 
@@ -64,6 +58,7 @@ class WebhookContextConfig(TypedDict, total=False):
     classes back as explicit ``null``, so a round-tripped value may carry
     ``None`` per class — truthy-check a class, don't test key presence.
     """
+
     email: WebhookContextClassConfig | None
     texts: WebhookContextClassConfig | None
     calls: WebhookContextClassConfig | None
@@ -73,13 +68,9 @@ class WebhookContextConfig(TypedDict, total=False):
 class WebhookSubscription:
     """A webhook subscription row returned by the API.
 
-    Exactly one of ``mailbox_id`` / ``phone_number_id`` /
-    ``agent_identity_id`` (the raw owner FK) is populated.
-    ``owner_identity_id`` is the **resolved** owning agent identity for
-    every subscription regardless of channel — mail/phone subs resolve
-    it server-side through the mailbox / phone number, while
-    identity-owned subscriptions carry it directly. (Optional for
-    forward-compatibility: ``None`` on servers that predate the field.)
+    ``agent_identity_id`` is the canonical owner. Legacy responses may
+    instead populate ``mailbox_id`` or ``phone_number_id``. The resolved
+    ``owner_identity_id`` remains available for compatibility.
     ``organization_id`` is an ``"org_..."`` token string, not a UUID.
     ``status`` is always ``"active"`` for subscriptions callers can
     observe; deleted subscriptions are not returned by ``list`` /
@@ -108,8 +99,10 @@ class WebhookSubscription:
         return cls(
             id=UUID(d["id"]),
             organization_id=d["organization_id"],
-            mailbox_id=UUID(d["mailbox_id"]) if d["mailbox_id"] else None,
-            phone_number_id=UUID(d["phone_number_id"]) if d["phone_number_id"] else None,
+            mailbox_id=UUID(d["mailbox_id"]) if d.get("mailbox_id") else None,
+            phone_number_id=UUID(d["phone_number_id"])
+            if d.get("phone_number_id")
+            else None,
             agent_identity_id=(
                 UUID(d["agent_identity_id"]) if d.get("agent_identity_id") else None
             ),
@@ -175,80 +168,20 @@ def _assert_no_incoming_call(event_types: list[str]) -> None:
     if _INCOMING_CALL in event_types:
         raise ValueError(
             f"event_type {_INCOMING_CALL!r} is not stored in webhook "
-            "subscriptions; set it on the phone number's "
-            "`incoming_call_webhook_url` field instead",
+            "subscriptions; configure the identity's incoming-call action instead",
         )
 
 
-# Wire event-type prefix -> the owning resource whose channel it belongs to.
-# An agent identity owns iMessage, post-call, and A2A channels.
-_EVENT_PREFIX_TO_OWNER = {
-    "message.": "mailbox",
-    "text.": "phone_number",
-    "imessage.": "agent_identity",
-    "call.": "agent_identity",
-    "a2a.": "agent_identity",
-}
-
-# Owner resource -> the event-type prefixes it may subscribe to.
-_OWNER_EVENT_PREFIXES = {
-    "mailbox": ("message.",),
-    "phone_number": ("text.",),
-    "agent_identity": ("imessage.", "call.", "a2a."),
-}
+_EVENT_PREFIXES = ("message.", "text.", "imessage.", "call.", "a2a.")
 
 
-def _selected_event_prefixes(event_types: list[str]) -> set[str]:
-    selected_prefixes: set[str] = set()
+def _assert_known_event_prefixes(event_types: list[str]) -> None:
+    # Exact event names are validated by the API so new catalog entries work.
     for event_type in event_types:
-        prefix = next(
-            (p for p in _EVENT_PREFIX_TO_OWNER if event_type.startswith(p)),
-            None,
-        )
-        if prefix is None:
+        if not event_type.startswith(_EVENT_PREFIXES):
             raise ValueError(
                 f"event_type {event_type!r} does not belong to any known channel",
             )
-        selected_prefixes.add(prefix)
-    if len(selected_prefixes) > 1:
-        raise ValueError(
-            "event_types must all belong to one channel; got "
-            f"{sorted(selected_prefixes)!r}",
-        )
-    return selected_prefixes
-
-
-def _assert_channel_coherence(
-    *,
-    owner: str,
-    event_types: list[str],
-) -> None:
-    allowed = _OWNER_EVENT_PREFIXES[owner]
-    selected_prefixes = _selected_event_prefixes(event_types)
-    for e in event_types:
-        prefix = next((p for p in _EVENT_PREFIX_TO_OWNER if e.startswith(p)), None)
-        assert prefix is not None
-        if prefix not in allowed:
-            raise ValueError(
-                f"event_type {e!r} does not belong to the {owner!r} channel "
-                f"(it belongs to {_EVENT_PREFIX_TO_OWNER[prefix]!r})",
-            )
-    if not selected_prefixes:
-        raise ValueError(
-            "event_types must be a non-empty list",
-        )
-
-
-def _assert_a2a_context_absent(
-    event_types: list[str],
-    context_config: Any,
-) -> None:
-    if context_config is not None and any(
-        event_type.startswith("a2a.") for event_type in event_types
-    ):
-        raise ValueError(
-            "context_config is not supported for A2A subscriptions",
-        )
 
 
 def _assert_valid_context_config(cfg: Any) -> None:
@@ -281,8 +214,7 @@ def _assert_valid_context_entry(klass: str, entry: Any) -> None:
         _assert_context_int(klass, entry, "hours", _CONTEXT_MAX_WINDOW_HOURS)
     else:
         raise ValueError(
-            f"context_config[{klass!r}].mode must be 'count' or 'window', "
-            f"got {mode!r}",
+            f"context_config[{klass!r}].mode must be 'count' or 'window', got {mode!r}",
         )
 
 
@@ -306,7 +238,6 @@ def _uuid_str(value: UUID | str) -> str:
 
 
 class WebhookSubscriptionsResource:
-
     def __init__(self, http: HttpTransport) -> None:
         self._http = http
 
@@ -318,13 +249,25 @@ class WebhookSubscriptionsResource:
         agent_identity_id: UUID | str | None = None,
         url: str | None = None,
         event_type: str | None = None,
+        scope: Literal["identity"] | None = None,
     ) -> list[WebhookSubscription]:
         """List webhook subscriptions visible to the caller.
 
         Filters AND-combine. ``mailbox_id`` / ``phone_number_id`` /
         ``agent_identity_id`` are mutually exclusive -- passing more
-        than one yields a 422. Deleted subscriptions are not returned.
+        than one yields a 422. Omit ``scope`` to retain legacy single-family
+        views, which exclude mixed subscriptions. Pass ``scope="identity"``
+        to include every notification family for the selected identity.
+        Explicit identity scope checks server support and raises ``ValueError``
+        when unavailable. Deleted subscriptions are not returned.
         """
+        if scope == "identity":
+            catalog = self._http.get("/webhooks/catalog")
+            if catalog.get("supports_identity_subscriptions") is not True:
+                raise ValueError(
+                    "Identity-wide webhook subscriptions are not supported by this server yet. "
+                    "Use channel-filtered lists without scope or retry when identity subscriptions are available."
+                )
         params: dict[str, Any] = {}
         if mailbox_id is not None:
             params["mailbox_id"] = _uuid_str(mailbox_id)
@@ -332,6 +275,8 @@ class WebhookSubscriptionsResource:
             params["phone_number_id"] = _uuid_str(phone_number_id)
         if agent_identity_id is not None:
             params["agent_identity_id"] = _uuid_str(agent_identity_id)
+        if scope is not None:
+            params["scope"] = scope
         if url is not None:
             params["url"] = url
         if event_type is not None:
@@ -357,18 +302,14 @@ class WebhookSubscriptionsResource:
     ) -> WebhookSubscriptionCreateResponse:
         """Create a webhook subscription.
 
-        Exactly one of ``mailbox_id`` / ``phone_number_id`` /
-        ``agent_identity_id`` is required. ``event_types`` must be a
-        non-empty list of distinct values belonging to the owner's
-        channel (mailbox -> ``message.*``, phone number -> ``text.*``,
-        agent identity -> ``imessage.*`` or ``call.ended``). One
-        subscription carries a single channel, so an identity sub may not
-        mix ``imessage.*`` with ``call.ended``.
+        Pass ``agent_identity_id`` for the owner. The mutually exclusive
+        legacy ``mailbox_id`` and ``phone_number_id`` selectors are still
+        accepted and resolved to their identity. Any non-empty list of
+        distinct notification event types may be combined, regardless of
+        configured channels.
 
-        ``context_config`` opts mail, text, or iMessage subscriptions into
-        per-class conversation context (email/texts/calls) delivered on
-        received events. It is not supported for A2A subscriptions. See
-        :class:`WebhookContextConfig`.
+        ``context_config`` applies only to received mail, text and iMessage
+        events; other events ignore it. See :class:`WebhookContextConfig`.
 
         ``auth_token`` is an optional bearer token for endpoints that
         require an ``Authorization`` header: when set, every delivery
@@ -398,10 +339,7 @@ class WebhookSubscriptionsResource:
         _assert_event_types_not_none(event_types)
         _assert_event_types_non_empty_distinct(event_types)
         _assert_no_incoming_call(event_types)
-        _assert_channel_coherence(
-            owner=owner,
-            event_types=event_types,
-        )
+        _assert_known_event_prefixes(event_types)
 
         body: dict[str, Any] = {
             "url": url,
@@ -410,7 +348,6 @@ class WebhookSubscriptionsResource:
         }
         if context_config is not None:
             _assert_valid_context_config(context_config)
-            _assert_a2a_context_absent(event_types, context_config)
             body["context_config"] = context_config
         if auth_token is not None:
             body["auth_token"] = auth_token
@@ -425,17 +362,18 @@ class WebhookSubscriptionsResource:
         event_types: list[str] = _UNSET,  # type: ignore[assignment]
         context_config: WebhookContextConfig | None = _UNSET,  # type: ignore[assignment]
         auth_token: str | None = _UNSET,  # type: ignore[assignment]
+        scope: Literal["identity"] | None = None,
     ) -> WebhookSubscription:
         """Update the URL, event-type list, context config, and/or auth token.
 
         ``event_types``, if supplied, replaces the stored list and must
-        be non-empty and distinct. Owner FKs are not mutable.
+        be non-empty and distinct. Owner FKs are not mutable. A mixed subscription
+        requires explicit ``scope="identity"``; omitted scope preserves legacy behavior.
 
         ``context_config`` is tri-state and a field where ``None`` is
         meaningful on the wire: omitted = unchanged, ``None`` = clear
-        (send JSON ``null``), a dict = validate and replace. A2A
-        subscriptions do not support a context object. Omitting every kwarg
-        is a no-op.
+        (send JSON ``null``), a dict = validate and replace. Context applies
+        only to received mail, text and iMessage events.
 
         ``auth_token`` is tri-state the same way: omitted = unchanged,
         ``None`` = clear the delivery bearer token, a string = replace it.
@@ -448,22 +386,22 @@ class WebhookSubscriptionsResource:
             _assert_event_types_not_none(event_types)
             _assert_event_types_non_empty_distinct(event_types)
             _assert_no_incoming_call(event_types)
-            _selected_event_prefixes(event_types)
+            _assert_known_event_prefixes(event_types)
             body["event_types"] = list(event_types)
         if context_config is not _UNSET:
             if context_config is None:
                 body["context_config"] = None
             else:
                 _assert_valid_context_config(context_config)
-                if event_types is not _UNSET:
-                    _assert_a2a_context_absent(event_types, context_config)
                 body["context_config"] = context_config
         if auth_token is not _UNSET:
             # `None` passes through as JSON null to clear the stored token.
             body["auth_token"] = auth_token
-        data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}", json=body)
+        suffix = "?scope=identity" if scope == "identity" else ""
+        data = self._http.patch(f"{_BASE}/{_uuid_str(sub_id)}{suffix}", json=body)
         return WebhookSubscription._from_dict(data)
 
-    def delete(self, sub_id: UUID | str) -> None:
-        """Delete a subscription. Subsequent ``list`` / ``get`` calls will not return it."""
-        self._http.delete(f"{_BASE}/{_uuid_str(sub_id)}")
+    def delete(self, sub_id: UUID | str, *, scope: Literal["identity"] | None = None) -> None:
+        """Delete a subscription; mixed subscriptions require explicit identity scope."""
+        suffix = "?scope=identity" if scope == "identity" else ""
+        self._http.delete(f"{_BASE}/{_uuid_str(sub_id)}{suffix}")

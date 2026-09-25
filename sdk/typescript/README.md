@@ -657,7 +657,7 @@ Customer-managed 10DLC brands and campaigns lift the default per-number cap to t
 
 ```ts
 // Send SMS/MMS. Returns a queued TextMessage; final delivery state
-// arrives via any webhook subscription on the sender's phone number
+// arrives via any webhook subscription on the sender's identity
 // whose eventTypes include the text.* lifecycle events.
 const sent = await identity.sendText({
   to: "+15551234567",
@@ -1467,58 +1467,37 @@ WebSockets receive the matching CLOSE code on their local upstream connection.
 
 ## Webhooks
 
-Webhook delivery uses a dedicated subscription resource. Each
-subscription names exactly one owner (a mailbox, a phone number, **or**
-an agent identity for iMessage), one HTTPS destination URL, and a
-non-empty subset of the catalog's event types. Multiple subscriptions
-on the same owner fan out independently.
+Mixed subscriptions and explicit identity-wide lists require SDK/CLI **0.7.8 or
+later** and `supports_identity_subscriptions: true` from `GET /webhooks/catalog`.
+Until available, keep separate channel subscriptions using mailbox, phone, and
+identity selectors without explicit scope. Explicit identity scope checks the
+catalog once per list call and fails clearly when unsupported; omitted scope adds
+no request. The mixed-event examples below assume the capability is available.
 
-The one exception is `phone.incoming_call`, which is a synchronous
-control-plane callback (the response body decides whether Inkbox
-answers). That URL still lives on the phone-number resource as
-`incomingCallWebhookUrl`.
+Each notification subscription belongs to an agent identity and can combine all
+21 current mail, text, iMessage, call-lifecycle and A2A event types. Optional
+channels do not have to be configured before subscribing. Multiple receivers
+remain supported; one identity and URL cannot have overlapping event selections.
 
-### Subscribing to mail, text, or iMessage events
+Incoming-call actions are separate identity settings: `phone.incoming_call` is a
+synchronous call-control callback, not a notification subscription.
+
+### Subscribe once across channels
 
 ```ts
-// Mail subscription: pick the message.* events you want.
-await inkbox.webhooks.subscriptions.create({
-  mailboxId: mb.id,
-  url: "https://example.com/hook",
-  eventTypes: ["message.received", "message.bounced"],
-});
-
-// Text subscription: pick the text.* events you want.
-await inkbox.webhooks.subscriptions.create({
-  phoneNumberId: number.id,
-  url: "https://example.com/texts",
-  eventTypes: [
-    "text.received",
-    "text.sent",
-    "text.delivered",
-    "text.delivery_failed",
-    "text.delivery_unconfirmed",
-  ],
-});
-
-// iMessage subscription: owned by the agent identity (the shared
-// pool lines aren't org resources).
-await inkbox.webhooks.subscriptions.create({
+const identity = await inkbox.getIdentity("my-agent");
+const sub = await inkbox.webhooks.subscriptions.create({
   agentIdentityId: identity.id,
-  url: "https://example.com/imessage",
-  eventTypes: [
-    "imessage.received",
-    "imessage.reaction_received",
-    "imessage.sent",
-    "imessage.delivered",
-    "imessage.delivery_failed",
-  ],
+  url: "https://example.com/hook",
+  eventTypes: ["message.received", "text.received", "imessage.received",
+    "call.ended", "a2a.task.created"],
 });
 
-// List, update, remove.
-const subs = await inkbox.webhooks.subscriptions.list({ mailboxId: mb.id });
-await inkbox.webhooks.subscriptions.update(subs[0].id, { url: "https://new/hook" });
-await inkbox.webhooks.subscriptions.delete(subs[0].id);
+// Events on update replace the full selection.
+const updated = await inkbox.webhooks.subscriptions.update(sub.id, { scope: "identity",
+  eventTypes: [...sub.eventTypes, "a2a.task.message"],
+});
+await inkbox.webhooks.subscriptions.delete(updated.id, { scope: "identity" });
 ```
 
 Available event types:
@@ -1528,20 +1507,30 @@ Available event types:
 | Mail | `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed` |
 | Phone text | `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed` |
 | iMessage | `imessage.received`, `imessage.reaction_received`, `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` |
+| Call lifecycle | `call.ended` |
+| A2A | `a2a.task.created`, `a2a.task.message`, `a2a.task.canceled`, `a2a.sent_task.updated` |
 
-Server-side validation: exactly one of `mailboxId` / `phoneNumberId` /
-`agentIdentityId` must be set; `eventTypes` must be non-empty and
-distinct; every event type must belong to the owner's channel (mailbox
-→ `message.*`, phone number → `text.*`, agent identity → `imessage.*`).
-On `create` the SDK mirrors the structural checks (XOR owner,
-non-empty, distinct, no `phone.incoming_call`) plus the `message.` /
-`text.` / `imessage.` prefix check, so most shape mistakes surface as
-`Error` before the request leaves the client. The server remains
-authoritative for the exact event-name enum, so a typo with a valid
-prefix (e.g. `message.received_typo`) passes the SDK's check and is
-rejected as 422 by the server. On `update` the SDK also rejects mixed
-event families. Owner compatibility remains server-validated because the
-SDK doesn't know the owner FK from a subscription ID alone.
+Prefer `agentIdentityId`. Legacy mailbox/phone selectors remain mutually exclusive
+and resolve to their owning identity. Event lists must be nonempty and distinct;
+the API validates exact catalog values, while the SDK rejects unknown prefixes
+and `phone.incoming_call`. No wildcard or automatic channel provisioning is implied.
+
+### Listing and delivery history
+
+Owner-filtered lists preserve legacy single-family views by default and exclude
+mixed subscriptions. Explicitly opt in when listing all notification families:
+
+```typescript
+const subscriptions = await inkbox.webhooks.subscriptions.list({
+  agentIdentityId: identity.id, scope: "identity",
+});
+```
+
+Identity-owned subscriptions return the canonical identity owner with null legacy
+mailbox and phone owner fields. Older servers can still return legacy resource owners. Event-list updates replace the full selection.
+Delivery history retains the original subscription ID and exposes `replayable`
+and `replayUnavailableReason`. Older responses default these to false and null.
+Replay still checks whether the subscription is active and selects the event.
 
 ### Conversation context
 
@@ -1549,8 +1538,8 @@ Opt a subscription into per-class conversation history on **received**
 events (`message.received`, `text.received`, `imessage.received`) by
 passing `contextConfig`. Each class (`email`, `texts`, `calls`) takes a
 `count` mode (last N items, 1..50) or a `window` mode (last H hours,
-1..168); omit a class to leave it unconfigured. Conversation context is
-not supported for A2A subscriptions.
+1..168); omit a class to leave it unconfigured. Only these received events
+include context; A2A, call-lifecycle and other notifications ignore it.
 
 ```ts
 await inkbox.webhooks.subscriptions.create({
@@ -1565,7 +1554,7 @@ await inkbox.webhooks.subscriptions.create({
 
 // update() is tri-state: omit contextConfig to leave it unchanged, pass an
 // object to replace it, or pass null to clear it.
-await inkbox.webhooks.subscriptions.update(sub.id, { contextConfig: null });
+await inkbox.webhooks.subscriptions.update(sub.id, { scope: "identity", contextConfig: null });
 ```
 
 Received-event payloads then carry an optional `payload.data.context` keyed
@@ -1623,7 +1612,7 @@ await inkbox.webhooks.subscriptions.create({
 
 // update() is tri-state: omit authToken to leave it unchanged, pass a
 // string to replace it, or pass null to clear it.
-await inkbox.webhooks.subscriptions.update(sub.id, { authToken: null });
+await inkbox.webhooks.subscriptions.update(sub.id, { scope: "identity", authToken: null });
 ```
 
 ### Incoming-call webhooks (still per-number)

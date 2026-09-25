@@ -54,6 +54,10 @@ pub struct WebhookDelivery {
     pub is_replay: bool,
     // ISO 8601 timestamp string (the contract keeps ISO strings as `String`).
     pub created_at: String,
+    #[serde(default)]
+    pub replayable: bool,
+    #[serde(default)]
+    pub replay_unavailable_reason: Option<String>,
 }
 
 /// Envelope for the `list` response.
@@ -148,5 +152,30 @@ impl WebhookDeliveriesResource {
             crate::http::NO_QUERY,
         )?;
         Ok(serde_json::from_value(data)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn history_preserves_original_target_and_optional_replay_projection() {
+        let original = Uuid::from_u128(2);
+        let raw = json!({
+            "id": Uuid::from_u128(1), "organization_id": "org_test",
+            "webhook_subscription_id": original, "event_id": "evt_example",
+            "event_type": "message.received", "url": "https://example.com/hook",
+            "request_payload": "{}", "is_replay": false,
+            "created_at": "2026-09-15T00:00:00Z"
+        });
+        let old: WebhookDelivery = serde_json::from_value(raw.clone()).unwrap();
+        assert!(!old.replayable);
+        let mut current = raw;
+        current["replayable"] = json!(true);
+        let row: WebhookDelivery = serde_json::from_value(current).unwrap();
+        assert_eq!(row.webhook_subscription_id, Some(original));
+        assert!(row.replayable);
     }
 }

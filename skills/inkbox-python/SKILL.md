@@ -399,7 +399,7 @@ Customer-managed 10DLC brands/campaigns lift the default per-number cap to the c
 ```python
 # Send SMS/MMS from this identity's phone number.
 # Returns a queued TextMessage; final delivery state arrives via any
-# webhook subscription on the sender's phone number whose event_types
+# webhook subscription on the sender's identity whose event_types
 # include the text.* lifecycle events.
 sent = identity.send_text(to="+15551234567", text="Hello from Inkbox")
 print(sent.id, sent.delivery_status)   # SmsDeliveryStatus.QUEUED
@@ -1299,6 +1299,16 @@ For full options, lifecycle notes, and TS examples, see `skills/inkbox-tunnels/S
 
 ## Webhooks & Signature Verification
 
+**Availability:** Mixed-event identity subscriptions and explicit identity-wide list scope
+require SDK/CLI **0.7.8 or later** and `GET /webhooks/catalog` returning
+`supports_identity_subscriptions: true`. Until then, use separate mail, text, and
+identity-event subscriptions with their existing mailbox, phone, and identity selectors;
+omit the scope option. The examples in this section that combine families or create
+mail/text subscriptions by identity assume that capability is available. Explicit
+identity scope fails clearly when the capability is missing; it does not fall back to
+a partial list.
+
+
 Webhooks are configured directly on the mailbox or phone number — no separate registration.
 
 ```python
@@ -1332,34 +1342,36 @@ Algorithm: HMAC-SHA256 over `"{request_id}.{timestamp}.{body}"`.
 
 **Event taxonomy:**
 
-- **Mail** (envelope, fire-and-forget) — `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed`. Subscribe via `inkbox.webhooks.subscriptions.create(mailbox_id=..., url=..., event_types=[...])`. On `message.received`, `data["message"]` includes the plain-text `body` (whole under a size cap, else a prefix with `body_truncated: True` / `body_state: "truncated"`); when truncated, fetch the full message with `inkbox.messages.get(message["email_address"], message["id"])` — use `id` (row id), not `message_id` (RFC 5322 header). These fields are present-with-`null` on the other events and absent on pre-feature payloads.
-- **Text** (envelope, fire-and-forget) — `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via `inkbox.webhooks.subscriptions.create(phone_number_id=..., url=..., event_types=[...])`. The text-message body carries `delivery_status` as an outbound message-level rollup; 1:1 traffic also hoists `error_code`, `error_detail`, `sent_at`, `delivered_at`, and `failed_at`. On group outbound those legacy detail fields are `None` and per-recipient state lives in `recipients[]`.
+Use `inkbox.webhooks.subscriptions.list(agent_identity_id=identity.id, scope="identity")` to list every notification family, including mixed subscriptions. Omitting scope preserves the legacy single-family views.
+
+- **Mail** (envelope, fire-and-forget) — `message.received`, `message.sent`, `message.forwarded`, `message.delivered`, `message.bounced`, `message.failed`. Subscribe via `inkbox.webhooks.subscriptions.create(agent_identity_id=..., url=..., event_types=[...])`. On `message.received`, `data["message"]` includes the plain-text `body` (whole under a size cap, else a prefix with `body_truncated: True` / `body_state: "truncated"`); when truncated, fetch the full message with `inkbox.messages.get(message["email_address"], message["id"])` — use `id` (row id), not `message_id` (RFC 5322 header). These fields are present-with-`null` on the other events and absent on pre-feature payloads.
+- **Text** (envelope, fire-and-forget) — `text.received`, `text.sent`, `text.delivered`, `text.delivery_failed`, `text.delivery_unconfirmed`. Subscribe via `inkbox.webhooks.subscriptions.create(agent_identity_id=..., url=..., event_types=[...])`. The text-message body carries `delivery_status` as an outbound message-level rollup; 1:1 traffic also hoists `error_code`, `error_detail`, `sent_at`, `delivered_at`, and `failed_at`. On group outbound those legacy detail fields are `None` and per-recipient state lives in `recipients[]`.
 - **iMessage** (envelope, fire-and-forget) — `imessage.received`, `imessage.reaction_received`, plus the outbound delivery lifecycle `imessage.sent`, `imessage.delivered`, `imessage.delivery_failed` (declined/error; details on the message object). Subscribe via `inkbox.webhooks.subscriptions.create(agent_identity_id=..., url=..., event_types=[...])` — owned by the **agent identity**, since shared iMessage pool numbers are not org resources. `data["message"]` is populated on `imessage.received` and the three delivery-lifecycle events; `data["reaction"]` on `imessage.reaction_received`. Fan-out only happens while the identity is active and `imessage_enabled`; contact-rule-blocked traffic is never delivered.
-- **Call lifecycle** (envelope, fire-and-forget + replayable) — `call.ended`, owned by the **agent identity** (like iMessage). Subscribe via `inkbox.webhooks.subscriptions.create(agent_identity_id=..., url=..., event_types=["call.ended"])`. `CallEndedWebhookPayload.data` carries the `call` (`WebhookPhoneCall`, with derived `duration_seconds`), resolved `contacts` / `agent_identities`, an always-present `transcript_url` (authoritative verbatim, fetch with an admin API key), and an inline `transcript` block (`WebhookCallTranscript`, middle-cut/abridged) present when the platform captured a transcript for the call, otherwise `None` — discriminate a turn from the abridgment marker on `"marker" in entry`. Voice AI call fields (all optional so pre-Voice AI payloads parse): `data["call"]` carries `mode` / `reason`; `data` carries `outcome` (`"completed" | "no_answer" | "declined" | "failed"`, `None` iff `mode` is `client_websocket`) and `post_call_action_items` (open items only, seq-ascending, mirroring `PhoneCall.post_call_action_items`). Voice AI calls fire `call.ended` on **every** terminal state (including never-connected ones like `no_answer`), not just connected calls. An identity may hold a `call.ended` sub and an `imessage.*` sub independently, but one subscription carries a single channel.
+- **Call lifecycle** (envelope, fire-and-forget + replayable) — `call.ended`, owned by the **agent identity** (like iMessage). Subscribe via `inkbox.webhooks.subscriptions.create(agent_identity_id=..., url=..., event_types=["call.ended"])`. `CallEndedWebhookPayload.data` carries the `call` (`WebhookPhoneCall`, with derived `duration_seconds`), resolved `contacts` / `agent_identities`, an always-present `transcript_url` (authoritative verbatim, fetch with an admin API key), and an inline `transcript` block (`WebhookCallTranscript`, middle-cut/abridged) present when the platform captured a transcript for the call, otherwise `None` — discriminate a turn from the abridgment marker on `"marker" in entry`. Voice AI call fields (all optional so pre-Voice AI payloads parse): `data["call"]` carries `mode` / `reason`; `data` carries `outcome` (`"completed" | "no_answer" | "declined" | "failed"`, `None` iff `mode` is `client_websocket`) and `post_call_action_items` (open items only, seq-ascending, mirroring `PhoneCall.post_call_action_items`). Voice AI calls fire `call.ended` on **every** terminal state (including never-connected ones like `no_answer`), not just connected calls. These events can share one subscription with mail, text and A2A notifications.
 - **Inbound call** (flat, synchronous) — `PhoneIncomingCallWebhookPayload` on a phone number's `incoming_call_webhook_url`. Not subscribable; the URL stays on the phone-number resource because the response (`action: "answer" | "reject"` + optional `client_websocket_url`) decides the call's fate. Non-200, invalid bodies, and timeouts are treated as "decline routing" by Inkbox. (Contrast `call.ended` above, which is the replayable post-call fan-out.)
 
-**Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. Each subscription names exactly one owner (mailbox, phone number, **or** agent identity), one HTTPS destination URL, and a non-empty subset of one channel's event types. Multiple subscriptions on the same owner fan out independently (cap: 20 active per owner). Identity-owned iMessage, call-lifecycle, and A2A subscriptions use separate rows; disjoint rows may share a destination URL. The SDK runs structural + prefix validation client-side (exactly-one-FK, non-empty distinct events, no `phone.incoming_call`, one channel per row, and event prefixes compatible with the owner). The server remains authoritative for the exact event-name enum, so a typo with a valid prefix (e.g. `message.received_typo`) passes the SDK's check and is rejected as 422 by the server.
+**Subscription resource:** `inkbox.webhooks.subscriptions.{list,get,create,update,delete}`. One identity owns each subscription, and its nonempty distinct event selection may combine all notification families even without configured channels. Multiple destinations are supported; overlapping events at the same identity and URL conflict. Use the identity selector; legacy mailbox/phone selectors remain mutually exclusive and resolve to the owning identity. PATCH replaces the full event list. The API validates exact catalog names; the SDK validates event prefixes and excludes `phone.incoming_call`.
 
 `create(...)` returns a `WebhookSubscriptionCreateResponse`. The **first** subscription created for an identity that has no signing key yet carries that identity's `signing_key` **once** (otherwise `None`) — capture it then, it cannot be retrieved again. Every subscription (read or created) also carries `owner_identity_id`, the resolved owning agent identity.
 
 ```python
 created = inkbox.webhooks.subscriptions.create(
-    mailbox_id=str(mailbox.id), url="https://example.com/hook", event_types=["message.received"],
+    agent_identity_id=identity.id, url="https://example.com/hook", event_types=["message.received"],
 )
 print(created.owner_identity_id)
 if created.signing_key:                # populated once if the identity had no key yet
     save_secret(created.signing_key)
 ```
 
-**Conversation context:** opt a mail, text, or iMessage subscription into per-class history on **received** events (`message.received`, `text.received`, `imessage.received`) with `context_config` — `email` / `texts` / `calls`, each `{"mode": "count", "count": N}` (1..50) or `{"mode": "window", "hours": H}` (1..168). A2A subscriptions do not support conversation context. On `update` it is tri-state: omit = unchanged, `None` = clear, dict = replace. Received-event payloads then carry an optional `data["context"]` keyed by class; optional fields are absent, not `null`, so read with `.get(...)`. A skipped class ships `items: []` plus a `skipped` reason; call transcript entries are turns or an abridgment marker, discriminated on `"marker" in entry`. Config types `WebhookContextConfig` / `WebhookContextClassConfig` and receiver wire shapes `WebhookContextWire` / `WebhookContextBlockWire` / `WebhookTranscriptEntryWire` (and the item wire types) are exported from `inkbox`.
+**Conversation context:** opt a mail, text, or iMessage subscription into per-class history on **received** events (`message.received`, `text.received`, `imessage.received`) with `context_config` — `email` / `texts` / `calls`, each `{"mode": "count", "count": N}` (1..50) or `{"mode": "window", "hours": H}` (1..168). Other event types, including A2A, ignore this configuration. On `update` it is tri-state: omit = unchanged, `None` = clear, dict = replace. Received-event payloads then carry an optional `data["context"]` keyed by class; optional fields are absent, not `null`, so read with `.get(...)`. A skipped class ships `items: []` plus a `skipped` reason; call transcript entries are turns or an abridgment marker, discriminated on `"marker" in entry`. Config types `WebhookContextConfig` / `WebhookContextClassConfig` and receiver wire shapes `WebhookContextWire` / `WebhookContextBlockWire` / `WebhookTranscriptEntryWire` (and the item wire types) are exported from `inkbox`.
 
 ```python
 inkbox.webhooks.subscriptions.create(
-    mailbox_id=str(mailbox.id), url="https://example.com/hook",
+    agent_identity_id=identity.id, url="https://example.com/hook",
     event_types=["message.received"],
     context_config={"email": {"mode": "count", "count": 10}},
 )
-inkbox.webhooks.subscriptions.update(created.id, context_config=None)  # clear
+inkbox.webhooks.subscriptions.update(created.id, scope="identity", context_config=None)  # clear
 ```
 
 **Delivery auth token:** for endpoints that require their own `Authorization` header, pass `auth_token` on `create` / `update` — every delivery (and replay) then carries `Authorization: Bearer <token>` alongside the signature headers. Reads return the stored token as `auth_token` (`None` when unset) plus the boolean `has_auth_token` flag; both default to unset on servers that predate the fields. On `update` it is tri-state: omit = unchanged, `None` = clear, string = replace.
@@ -1402,6 +1414,8 @@ except InkboxAPIError as e:
 - To clear a nullable field (e.g. webhook URL), pass `field=None`
 - The `Inkbox` client **must** be used as a context manager (`with` statement) or `.close()` called manually
 - Mail/phone methods on `AgentIdentity` raise `InkboxError` if the relevant channel isn't assigned
+
+Use `subscriptions.update(sub.id, scope="identity", event_types=events)` to replace the selected events and `subscriptions.delete(sub.id, scope="identity")` to remove the subscription. Delivery rows expose `replayable` and `replay_unavailable_reason` without replacing their original `webhook_subscription_id`.
 
 ## Custom email signatures
 

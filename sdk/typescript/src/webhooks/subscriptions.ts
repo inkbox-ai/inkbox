@@ -1,17 +1,6 @@
 /**
- * Webhook subscriptions — fan-out per (owner, url, event_types).
- *
- * Replaces the legacy per-resource `webhook_url` columns on mailboxes
- * and phone numbers. Use this resource to attach HTTPS receivers to
- * mail (`message.*`), phone-text (`text.*`), iMessage (`imessage.*`),
- * post-call lifecycle (`call.ended`), or A2A (`a2a.*`) events. Mail and
- * text subscriptions are owned by the mailbox / phone number; the other
- * channels are owned by the agent identity. Each subscription contains
- * events from one channel. Incoming-call
- * webhooks (`phone.incoming_call`) are still set on the phone-number
- * resource itself — that channel is a synchronous control-plane
- * callback whose response body drives call routing, so fan-out is not
- * meaningful.
+ * Identity-owned subscriptions combine notification events from every channel,
+ * including channels not yet configured. Incoming-call actions remain separate.
  */
 
 import { HttpTransport } from "../_http.js";
@@ -42,11 +31,11 @@ export interface WebhookSubscription {
   id: string;
   /** `"org_..."` token; not a UUID. */
   organizationId: string;
-  /** Owning mailbox. Exactly one of `mailboxId` / `phoneNumberId` / `agentIdentityId` is non-null. */
+  /** Legacy mailbox owner; null for canonical identity-owned subscriptions. */
   mailboxId: string | null;
-  /** Owning phone number. Exactly one of `mailboxId` / `phoneNumberId` / `agentIdentityId` is non-null. */
+  /** Legacy phone owner; null for canonical identity-owned subscriptions. */
   phoneNumberId: string | null;
-  /** Owning agent identity, for identity-owned iMessage subscriptions. */
+  /** Canonical owning identity for every notification family. */
   agentIdentityId: string | null;
   /**
    * Resolved owning agent identity for every subscription regardless of
@@ -121,8 +110,8 @@ export function parseWebhookSubscription(
   return {
     id: r.id,
     organizationId: r.organization_id,
-    mailboxId: r.mailbox_id,
-    phoneNumberId: r.phone_number_id,
+    mailboxId: r.mailbox_id ?? null,
+    phoneNumberId: r.phone_number_id ?? null,
     agentIdentityId: r.agent_identity_id ?? null,
     ownerIdentityId: r.owner_identity_id ?? null,
     url: r.url,
@@ -180,83 +169,18 @@ function assertNoIncomingCall(eventTypes: string[]): void {
   if (eventTypes.includes(INCOMING_CALL)) {
     throw new Error(
       `event_type '${INCOMING_CALL}' is not stored in webhook subscriptions; ` +
-      "set it on the phone number's `incomingCallWebhookUrl` field instead",
+      "configure the identity's incoming-call action instead",
     );
   }
 }
 
-// Wire event-type prefix → the owning resource whose channel it belongs to.
-// An agent identity owns iMessage, post-call lifecycle, and A2A channels.
-const EVENT_PREFIX_TO_OWNER: Array<[string, string]> = [
-  ["message.", "mailbox"],
-  ["text.", "phone_number"],
-  ["imessage.", "agent_identity"],
-  ["call.", "agent_identity"],
-  ["a2a.", "agent_identity"],
-];
+const EVENT_PREFIXES = ["message.", "text.", "imessage.", "call.", "a2a."];
 
-// Owner resource → the event-type prefixes it may subscribe to.
-const OWNER_EVENT_PREFIXES: Record<string, string[]> = {
-  mailbox: ["message."],
-  phone_number: ["text."],
-  agent_identity: ["imessage.", "call.", "a2a."],
-};
-
-function selectedEventPrefixes(eventTypes: string[]): Set<string> {
-  const selectedPrefixes = new Set<string>();
+function assertKnownEventPrefixes(eventTypes: string[]): void {
   for (const eventType of eventTypes) {
-    const match = EVENT_PREFIX_TO_OWNER.find(
-      ([prefix]) => eventType.startsWith(prefix),
-    );
-    if (match === undefined) {
-      throw new Error(
-        `event_type '${eventType}' does not belong to any known channel`,
-      );
+    if (!EVENT_PREFIXES.some((prefix) => eventType.startsWith(prefix))) {
+      throw new Error(`event_type '${eventType}' does not belong to any known channel`);
     }
-    selectedPrefixes.add(match[0]);
-  }
-  if (selectedPrefixes.size > 1) {
-    throw new Error(
-      `eventTypes must all belong to one channel; got ${[...selectedPrefixes].sort().join(", ")}`,
-    );
-  }
-  return selectedPrefixes;
-}
-
-function assertChannelCoherence(
-  owner: string,
-  eventTypes: string[],
-): void {
-  const allowed = OWNER_EVENT_PREFIXES[owner];
-  const selectedPrefixes = selectedEventPrefixes(eventTypes);
-  for (const e of eventTypes) {
-    const [prefix, targetOwner] = EVENT_PREFIX_TO_OWNER.find(
-      ([candidate]) => e.startsWith(candidate),
-    )!;
-    if (!allowed.includes(prefix)) {
-      throw new Error(
-        `event_type '${e}' does not belong to the ${owner} ` +
-        `channel (it belongs to ${targetOwner})`,
-      );
-    }
-  }
-  if (selectedPrefixes.size === 0) {
-    throw new Error("eventTypes must be a non-empty list");
-  }
-  // INCOMING_CALL is rejected by assertNoIncomingCall earlier.
-}
-
-function assertA2AContextAbsent(
-  eventTypes: string[],
-  contextConfig: WebhookContextConfig | null,
-): void {
-  if (
-    contextConfig !== null
-    && eventTypes.some((eventType) => eventType.startsWith("a2a."))
-  ) {
-    throw new Error(
-      "contextConfig is not supported for A2A subscriptions",
-    );
   }
 }
 
@@ -318,7 +242,7 @@ export interface CreateWebhookSubscriptionOptions {
   agentIdentityId?: string;
   url: string;
   eventTypes: string[];
-  /** Opt into context on received mail, text, or iMessage events; unsupported for A2A. */
+  /** Context applies to received mail, text, and iMessage events only. */
   contextConfig?: WebhookContextConfig;
   /**
    * Optional bearer token for endpoints that require `Authorization` on
@@ -329,9 +253,11 @@ export interface CreateWebhookSubscriptionOptions {
 }
 
 export interface UpdateWebhookSubscriptionOptions {
+  /** Explicit consent to replace fields on a subscription shared by event families. */
+  scope?: "identity";
   url?: string;
   eventTypes?: string[];
-  /** Tri-state: omit = unchanged, `null` = clear, object = replace; unsupported for A2A. */
+  /** Tri-state: omit = unchanged, `null` = clear, object = replace. */
   contextConfig?: WebhookContextConfig | null;
   /** Tri-state: omit = unchanged, `null` = clear, string = replace the delivery bearer token. */
   authToken?: string | null;
@@ -343,6 +269,8 @@ export interface ListWebhookSubscriptionsOptions {
   agentIdentityId?: string;
   url?: string;
   eventType?: string;
+  /** Omit for legacy single-family views; opt in to all notification families. */
+  scope?: "identity";
 }
 
 export class WebhookSubscriptionsResource {
@@ -352,15 +280,31 @@ export class WebhookSubscriptionsResource {
    * List webhook subscriptions visible to the caller. Filters AND-combine;
    * unmatched filters return an empty list. `mailboxId` / `phoneNumberId`
    * / `agentIdentityId` are mutually exclusive — passing more than one
-   * yields a 422. Deleted subscriptions are not returned.
+   * yields a 422. Omit `scope` to retain legacy single-family views, which exclude
+   * mixed rows. Pass `scope: "identity"` to include every notification family
+   * for the selected identity. Explicit identity scope checks server support and
+   * throws an Error when unavailable. Deleted subscriptions are not returned.
    */
   async list(
     filters: ListWebhookSubscriptionsOptions = {},
   ): Promise<WebhookSubscription[]> {
+    if (filters.scope === "identity") {
+      const catalog = await this.http.get<{ supports_identity_subscriptions?: unknown }>(
+        "/webhooks/catalog",
+      );
+      if (catalog.supports_identity_subscriptions !== true) {
+        throw new Error(
+          "Identity-wide webhook subscriptions are not supported by this server yet. Use channel-filtered lists without scope or retry when identity subscriptions are available.",
+        );
+      }
+    }
     const params: Record<string, string> = {};
     if (filters.mailboxId !== undefined) params["mailbox_id"] = filters.mailboxId;
     if (filters.phoneNumberId !== undefined) params["phone_number_id"] = filters.phoneNumberId;
-    if (filters.agentIdentityId !== undefined) params["agent_identity_id"] = filters.agentIdentityId;
+    if (filters.agentIdentityId !== undefined) {
+      params["agent_identity_id"] = filters.agentIdentityId;
+    }
+    if (filters.scope !== undefined) params["scope"] = filters.scope;
     if (filters.url !== undefined) params["url"] = filters.url;
     if (filters.eventType !== undefined) params["event_type"] = filters.eventType;
     const data = await this.http.get<RawListWebhookSubscriptionsResponse>(PATH, params);
@@ -374,13 +318,11 @@ export class WebhookSubscriptionsResource {
   }
 
   /**
-   * Create a webhook subscription. Exactly one of `mailboxId` /
-   * `phoneNumberId` / `agentIdentityId` is required; `eventTypes` must
-   * be a non-empty list of distinct values belonging to the owner's
-   * channel (mailbox → `message.*`, phone number → `text.*`, agent
-   * identity → `imessage.*`, `call.ended`, or `a2a.*`). One subscription
-   * carries a single channel. A2A subscriptions do not support
-   * `contextConfig`.
+   * Create an identity-owned subscription with any mix of notification events,
+   * regardless of channel availability. Prefer `agentIdentityId`; exactly one
+   * identity, legacy mailbox, or legacy phone selector is required. Legacy
+   * selectors resolve to their identity. Context applies only to received mail,
+   * text and iMessage events.
    *
    * `authToken` is an optional bearer token for endpoints that require an
    * `Authorization` header: when set, every delivery (and replay) carries
@@ -413,7 +355,7 @@ export class WebhookSubscriptionsResource {
     assertEventTypesNotNull(options.eventTypes);
     assertEventTypesNonEmptyDistinct(options.eventTypes);
     assertNoIncomingCall(options.eventTypes);
-    assertChannelCoherence(owner, options.eventTypes);
+    assertKnownEventPrefixes(options.eventTypes);
 
     const body: Record<string, unknown> = {
       url: options.url,
@@ -422,7 +364,6 @@ export class WebhookSubscriptionsResource {
     };
     if (options.contextConfig !== undefined) {
       assertValidContextConfig(options.contextConfig);
-      assertA2AContextAbsent(options.eventTypes, options.contextConfig);
       body["context_config"] = options.contextConfig;
     }
     if (options.authToken !== undefined) {
@@ -438,7 +379,7 @@ export class WebhookSubscriptionsResource {
    * no-op. `eventTypes`, if supplied, replaces the stored list and must
    * be non-empty and distinct. Owner FKs are not mutable. `contextConfig`
    * and `authToken` are tri-state: omit = unchanged, `null` = clear,
-   * value = replace.
+   * value = replace. Mixed subscriptions require explicit `scope: "identity"`.
    */
   async update(
     subId: string,
@@ -453,7 +394,7 @@ export class WebhookSubscriptionsResource {
       assertEventTypesNotNull(options.eventTypes);
       assertEventTypesNonEmptyDistinct(options.eventTypes);
       assertNoIncomingCall(options.eventTypes);
-      selectedEventPrefixes(options.eventTypes);
+      assertKnownEventPrefixes(options.eventTypes);
       body["event_types"] = options.eventTypes;
     }
     if (options.contextConfig !== undefined) {
@@ -461,12 +402,6 @@ export class WebhookSubscriptionsResource {
         body["context_config"] = null;
       } else {
         assertValidContextConfig(options.contextConfig);
-        if (options.eventTypes !== undefined) {
-          assertA2AContextAbsent(
-            options.eventTypes,
-            options.contextConfig,
-          );
-        }
         body["context_config"] = options.contextConfig;
       }
     }
@@ -475,14 +410,14 @@ export class WebhookSubscriptionsResource {
       body["auth_token"] = options.authToken;
     }
     const data = await this.http.patch<RawWebhookSubscription>(
-      `${PATH}/${subId}`,
+      `${PATH}/${subId}${options.scope === "identity" ? "?scope=identity" : ""}`,
       body,
     );
     return parseWebhookSubscription(data);
   }
 
-  /** Delete a subscription. Subsequent `list` / `get` calls will not return it. */
-  async delete(subId: string): Promise<void> {
-    await this.http.delete(`${PATH}/${subId}`);
+  /** Delete a subscription. Mixed subscriptions require explicit identity scope. */
+  async delete(subId: string, options: { scope?: "identity" } = {}): Promise<void> {
+    await this.http.delete(`${PATH}/${subId}${options.scope === "identity" ? "?scope=identity" : ""}`);
   }
 }
