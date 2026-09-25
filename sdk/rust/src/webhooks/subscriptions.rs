@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::error::{InkboxError, Result};
 use crate::http::HttpTransport;
+use crate::slack::SlackWebhookFilter;
 
 const BASE: &str = "/webhooks/subscriptions";
 const INCOMING_CALL: &str = "phone.incoming_call";
@@ -125,6 +126,8 @@ pub struct WebhookSubscription {
     // opted in and on servers that predate the field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_config: Option<WebhookContextConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slack_filter: Option<SlackWebhookFilter>,
     /// Whether a delivery bearer token is configured. Defaults to `false`
     /// when the server omits the field.
     #[serde(default)]
@@ -155,7 +158,7 @@ struct ListResponse {
     subscriptions: Vec<WebhookSubscription>,
 }
 
-const EVENT_PREFIXES: &[&str] = &["message.", "text.", "imessage.", "call.", "a2a."];
+const EVENT_PREFIXES: &[&str] = &["message.", "text.", "imessage.", "call.", "a2a.", "slack."];
 
 /// Reject an empty list or one carrying duplicate values.
 fn assert_event_types_non_empty_distinct(event_types: &[String]) -> Result<()> {
@@ -334,6 +337,31 @@ impl WebhookSubscriptionsResource {
         context_config: Option<&WebhookContextConfig>,
         auth_token: Option<&str>,
     ) -> Result<WebhookSubscriptionCreateResponse> {
+        self.create_with_slack_filter(
+            url,
+            event_types,
+            mailbox_id,
+            phone_number_id,
+            agent_identity_id,
+            context_config,
+            auth_token,
+            None,
+        )
+    }
+
+    /// Create a subscription with an optional Slack filter.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_slack_filter(
+        &self,
+        url: &str,
+        event_types: &[String],
+        mailbox_id: Option<Uuid>,
+        phone_number_id: Option<Uuid>,
+        agent_identity_id: Option<Uuid>,
+        context_config: Option<&WebhookContextConfig>,
+        auth_token: Option<&str>,
+        slack_filter: Option<&SlackWebhookFilter>,
+    ) -> Result<WebhookSubscriptionCreateResponse> {
         // Exactly one owner FK must be set.
         let owners: [(&str, Option<Uuid>); 3] = [
             ("mailbox", mailbox_id),
@@ -370,6 +398,10 @@ impl WebhookSubscriptionsResource {
         }
         if let Some(token) = auth_token {
             body.insert("auth_token".into(), json!(token));
+        }
+        if let Some(filter) = slack_filter {
+            validate_slack_filter(filter, Some(event_types))?;
+            body.insert("slack_filter".into(), json!(filter));
         }
         let body = serde_json::Value::Object(body);
         let data = self.http.post(BASE, Some(&body), crate::http::NO_QUERY)?;
@@ -423,6 +455,50 @@ impl WebhookSubscriptionsResource {
         auth_token: Option<Option<&str>>,
         scope: Option<WebhookSubscriptionScope>,
     ) -> Result<WebhookSubscription> {
+        self.update_with_slack_filter_and_scope(
+            sub_id,
+            url,
+            event_types,
+            context_config,
+            auth_token,
+            None,
+            scope,
+        )
+    }
+
+    /// Filter is tri-state: None preserves, Some(None) clears, Some(Some(..)) replaces.
+    pub fn update_with_slack_filter(
+        &self,
+        sub_id: Uuid,
+        url: Option<&str>,
+        event_types: Option<&[String]>,
+        context_config: Option<Option<&WebhookContextConfig>>,
+        auth_token: Option<Option<&str>>,
+        slack_filter: Option<Option<&SlackWebhookFilter>>,
+    ) -> Result<WebhookSubscription> {
+        self.update_with_slack_filter_and_scope(
+            sub_id,
+            url,
+            event_types,
+            context_config,
+            auth_token,
+            slack_filter,
+            None,
+        )
+    }
+
+    /// Update Slack filters with explicit identity scope for a mixed subscription.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_with_slack_filter_and_scope(
+        &self,
+        sub_id: Uuid,
+        url: Option<&str>,
+        event_types: Option<&[String]>,
+        context_config: Option<Option<&WebhookContextConfig>>,
+        auth_token: Option<Option<&str>>,
+        slack_filter: Option<Option<&SlackWebhookFilter>>,
+        scope: Option<WebhookSubscriptionScope>,
+    ) -> Result<WebhookSubscription> {
         // Only include keys the caller supplied (Python omits `_UNSET` keys).
         let mut body = serde_json::Map::new();
         if let Some(u) = url {
@@ -455,6 +531,12 @@ impl WebhookSubscriptionsResource {
                     body.insert("auth_token".into(), Value::Null);
                 }
             }
+        }
+        if let Some(filter) = slack_filter {
+            if let Some(filter) = filter {
+                validate_slack_filter(filter, event_types)?;
+            }
+            body.insert("slack_filter".into(), json!(filter));
         }
         let suffix = if scope == Some(WebhookSubscriptionScope::Identity) {
             "?scope=identity"
@@ -507,6 +589,30 @@ impl WebhookSubscriptionsResource {
             auth_token,
         )
     }
+}
+
+fn validate_slack_filter(filter: &SlackWebhookFilter, events: Option<&[String]>) -> Result<()> {
+    if events.is_some_and(|events| !events.iter().any(|e| e.starts_with("slack."))) {
+        return Err(InkboxError::InvalidArgument(
+            "slack_filter requires at least one Slack event".into(),
+        ));
+    }
+    fn valid<T: PartialEq>(values: Option<&Vec<T>>, max: usize) -> bool {
+        values.map_or(true, |v| {
+            !v.is_empty()
+                && v.len() <= max
+                && v.iter().enumerate().all(|(i, x)| !v[..i].contains(x))
+        })
+    }
+    if !valid(filter.connection_ids.as_ref(), 100)
+        || !valid(filter.conversation_ids.as_ref(), 100)
+        || !valid(filter.message_kinds.as_ref(), 5)
+    {
+        return Err(InkboxError::InvalidArgument(
+            "Slack filter arrays must be nonempty, distinct, and within their limits".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

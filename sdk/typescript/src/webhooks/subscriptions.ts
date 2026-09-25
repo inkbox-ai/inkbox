@@ -3,6 +3,10 @@
  * including channels not yet configured. Incoming-call actions remain separate.
  */
 
+import {
+  parseSlackFilter, slackFilterWire,
+  type SlackWebhookFilter, type RawSlackWebhookFilter,
+} from "../slack.js";
 import { HttpTransport } from "../_http.js";
 
 const PATH = "/webhooks/subscriptions";
@@ -55,6 +59,7 @@ export interface WebhookSubscription {
    * that predate the field). Unconfigured classes may echo as explicit `null`.
    */
   contextConfig: WebhookContextConfig | null;
+  slackFilter: SlackWebhookFilter | null;
   /**
    * Whether a delivery bearer token is configured. Defaults to `false` on
    * servers that predate the field.
@@ -92,6 +97,7 @@ export interface RawWebhookSubscription {
   created_at: string;
   updated_at: string;
   context_config?: WebhookContextConfig | null;
+  slack_filter?: RawSlackWebhookFilter | null;
   has_auth_token?: boolean;
   auth_token?: string | null;
 }
@@ -120,6 +126,7 @@ export function parseWebhookSubscription(
     createdAt: new Date(r.created_at),
     updatedAt: new Date(r.updated_at),
     contextConfig: r.context_config ?? null,
+    slackFilter: parseSlackFilter(r.slack_filter),
     hasAuthToken: r.has_auth_token ?? false,
     authToken: r.auth_token ?? null,
   };
@@ -174,7 +181,7 @@ function assertNoIncomingCall(eventTypes: string[]): void {
   }
 }
 
-const EVENT_PREFIXES = ["message.", "text.", "imessage.", "call.", "a2a."];
+const EVENT_PREFIXES = ["message.", "text.", "imessage.", "call.", "a2a.", "slack."];
 
 function assertKnownEventPrefixes(eventTypes: string[]): void {
   for (const eventType of eventTypes) {
@@ -244,6 +251,7 @@ export interface CreateWebhookSubscriptionOptions {
   eventTypes: string[];
   /** Context applies to received mail, text, and iMessage events only. */
   contextConfig?: WebhookContextConfig;
+  slackFilter?: SlackWebhookFilter | null;
   /**
    * Optional bearer token for endpoints that require `Authorization` on
    * deliveries; sent as `Authorization: Bearer <token>` alongside the
@@ -259,6 +267,7 @@ export interface UpdateWebhookSubscriptionOptions {
   eventTypes?: string[];
   /** Tri-state: omit = unchanged, `null` = clear, object = replace. */
   contextConfig?: WebhookContextConfig | null;
+  slackFilter?: SlackWebhookFilter | null;
   /** Tri-state: omit = unchanged, `null` = clear, string = replace the delivery bearer token. */
   authToken?: string | null;
 }
@@ -369,6 +378,10 @@ export class WebhookSubscriptionsResource {
     if (options.authToken !== undefined) {
       body["auth_token"] = options.authToken;
     }
+    if (options.slackFilter !== undefined) {
+      validateSlackFilter(options.slackFilter, options.eventTypes);
+      body["slack_filter"] = slackFilterWire(options.slackFilter);
+    }
     const data = await this.http.post<RawWebhookSubscriptionCreateResponse>(PATH, body);
     return parseWebhookSubscriptionCreateResponse(data);
   }
@@ -409,6 +422,10 @@ export class WebhookSubscriptionsResource {
       // `null` passes through as JSON null to clear the stored token.
       body["auth_token"] = options.authToken;
     }
+    if (options.slackFilter !== undefined) {
+      validateSlackFilter(options.slackFilter, options.eventTypes);
+      body["slack_filter"] = slackFilterWire(options.slackFilter);
+    }
     const data = await this.http.patch<RawWebhookSubscription>(
       `${PATH}/${subId}${options.scope === "identity" ? "?scope=identity" : ""}`,
       body,
@@ -419,5 +436,45 @@ export class WebhookSubscriptionsResource {
   /** Delete a subscription. Mixed subscriptions require explicit identity scope. */
   async delete(subId: string, options: { scope?: "identity" } = {}): Promise<void> {
     await this.http.delete(`${PATH}/${subId}${options.scope === "identity" ? "?scope=identity" : ""}`);
+  }
+}
+
+export function validateSlackFilter(
+  config: SlackWebhookFilter | null,
+  events?: string[],
+): void {
+  if (config === null) return;
+  if (events !== undefined && !events.some((e) => e.startsWith("slack.")))
+    throw new TypeError(
+      "slackFilter requires at least one Slack event",
+    );
+  if (
+    typeof config !== "object" ||
+    Array.isArray(config) ||
+    Object.keys(config).some(
+      (k) => !["connectionIds", "conversationIds", "messageKinds"].includes(k),
+    )
+  )
+    throw new TypeError("Invalid slackFilter fields");
+  for (const [key, values] of Object.entries(config)) {
+    if (values == null) continue;
+    const max = key === "messageKinds" ? 5 : 100;
+    if (
+      !Array.isArray(values) ||
+      values.length < 1 ||
+      values.length > max ||
+      values.some((v) => typeof v !== "string") ||
+      new Set(values).size !== values.length
+    )
+      throw new TypeError(
+        `slackFilter ${key} must be a nonempty distinct string array, maximum ${max}`,
+      );
+    if (
+      key === "messageKinds" &&
+      values.some(
+        (v) => !["dm", "group_dm", "mention", "channel", "thread"].includes(v),
+      )
+    )
+      throw new TypeError("Invalid Slack message kind");
   }
 }

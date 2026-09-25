@@ -1029,6 +1029,166 @@ inkbox mailbox get alex@example.com --json
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
 
+## Slack
+
+```bash
+inkbox slack connection list --identity example-agent
+# Select the intended workspace with status connected from the returned connections.
+inkbox slack message send --connection-id 11111111-1111-4111-8111-111111111111 \
+  --conversation-id CEXAMPLE --text 'Hello from Inkbox' --idempotency-key greeting:2026-09-16
+inkbox slack message list --connection-id 11111111-1111-4111-8111-111111111111 \
+  --conversation-id CEXAMPLE --limit 15
+inkbox slack file download FEXAMPLE --connection-id 11111111-1111-4111-8111-111111111111 \
+  --output example.bin
+```
+
+Onboarding is a separate organization-management task. With organization-management
+credentials configured, create an invitation or start a direct browser installation:
+
+```bash
+inkbox slack invitation create --identity example-agent
+# Open the returned invitationUrl in the installer's browser; keep it secret.
+# Alternatively, open the secret authorizationUrl from:
+inkbox slack installation start --identity example-agent
+```
+
+Installation availability reports readiness, not permission to manage installations.
+`connection list`, `invitation create/list`, and `installation start` accept exactly
+one of `-i/--identity <handle>` or `--identity-id <uuid>`. Handles use the existing
+identity lookup; the UUID form avoids that lookup.
+
+| Command group | Operations |
+| --- | --- |
+| `slack search` | Search retained messages across an identity's workspace connections |
+| `slack connection` | `list`, `disconnect` |
+| `slack invitation` | `create`, `list`, `revoke <invitation-id>` |
+| `slack conversation` | `list`, `get`, `open` (repeat `--user-id`) |
+| `slack message` | `list`, `send` |
+| `slack action` | `get <action-id>` |
+| `slack file` | `get <file-id>`, `download <file-id>` |
+
+All conversation/message/action/file operations require `--connection-id`.
+Use `--conversation-id` for an existing conversation, `--thread-ts` for a thread,
+`--cursor` for another page, and `--json` for structured output. Downloads refuse to
+overwrite an existing path. Invitation creation supports `--expires-in-seconds`.
+
+```bash
+inkbox webhook subscription create --agent-identity-id 22222222-2222-4222-8222-222222222222 \
+  --url https://example.com/hooks/slack --event-type slack.message_received \
+  --slack-filter '{"conversationIds":["CEXAMPLE"],"messageKinds":["mention"]}'
+inkbox webhook subscription update SUBSCRIPTION_ID --slack-filter null
+```
+
+`--slack-filter` replaces the full filter. Omit it to preserve a stored filter during
+an update; JSON `null` clears it. CLI filter fields are camelCase like the TypeScript
+SDK; the CLI maps them to the API wire shape.
+
+### Slack behavior
+
+An existing identity can connect to multiple Slack workspaces. Organization management
+credentials create/revoke invitations and disconnect connections; claimed identity
+credentials can read and use their own connections. Installation availability is
+readiness, not management permission; offer onboarding only in a management flow.
+Invitation links are returned once: open the full link in a browser and treat it as a secret. The browser page handles installation.
+Direct installation is also supported: `start_installation` (Python/Rust),
+`startInstallation` (TypeScript), or `slack installation start` returns a short-lived
+opaque authorization URL to open in a browser. Treat it as a secret; the browser
+handoff establishes installation state. Workspace approval and channel permissions
+still apply. Join accessible public channels or invite the agent to private channels;
+Slack Connect conversations are supported when the connection has access.
+
+`slack installation start --return-url <url>` optionally selects an approved Console
+completion URL with the exact path `/console/slack/complete`, no query or fragment,
+and at most 2048 characters.
+Omit it to use the default completion page.
+
+Conversation/history/file reads are live and scoped to the selected connection, not
+an entire-workspace archive. Conversation pages default to 100 (maximum 200); message
+pages default to 15 (maximum 100). Pass the returned cursor explicitly for another
+page. Slack timestamp identifiers are strings, never floating-point numbers. Direct
+messages accept 1..8 user IDs. Message text is 1..12000 characters; sends require a
+stable 1..128-character idempotency key using letters, digits, `.`, `_`, `:`, or `-`.
+Reuse a key only for the exact same operation. A different body with the same key is a
+conflict. Poll an action while it is `sending`; `sent` is not a delivered/read receipt.
+`unknown` is terminal uncertainty, not a promise of future reconciliation: do not
+blindly resend. Inspect authorized live history before deliberately starting a new
+operation. File downloads return bytes; unavailable or oversized files surface API
+errors. General file uploads accept standard base64 for 1 byte..10 MiB of decoded
+content (CLI: `slack file upload --file PATH`). Reactions, pins, own-message edits and
+deletions, channel join/leave, and native processing status use stable keys and return
+operations: poll only `in_progress`; `unknown` remains terminal uncertainty. Send
+keys and utility-operation keys have independent per-connection namespaces. Utility
+operations emit no outcome webhook: inspect the returned status and operation lookup,
+not send-outcome events. Native processing support depends on the workspace and may fail explicitly; no reaction is
+used as a fallback. Inspect capabilities for missing scopes before requesting an upgrade.
+Disconnect removes Inkbox authority, not the workspace's Slack app installation.
+
+Retained history is separate from live reads and webhook diagnostics. Capture is on
+by default for messages observed in conversations the connection can access, with no
+time-based retention limit. This is not an automatic whole-workspace or historical
+copy. Organization management can disable capture, restrict conversation selection,
+set retention, or purge. Updating archive settings replaces all fields: omitted
+retention resets to no time limit, and omitted/empty conversation selection resets
+to all conversations. Read current settings and restate values to preserve them.
+Unlike archive selection, webhook selectors use null for all and reject empty arrays.
+Archive messages/search return retained records only. Backfill queues bounded imports
+and reports coverage; a completed channel page does not prove every thread is complete. `restart=true`
+restarts a completed/failed import. Purge disables capture and queues retained-content
+deletion. Archive reads still require current connection/conversation access.
+Use the live exact-message permalink method when a Slack link is needed.
+Live message context is a bounded window (`complete=false`), not full history.
+
+Slack webhook envelopes use the existing signature verification and stable `id`
+deduplication; delivery order is not guaranteed. All 19 event types are exported as `SlackWebhookEventType`, with
+`SlackWebhookData` and `SlackWebhookPayload` types. Optional connection/conversation
+selectors combine with AND; message kinds combine with OR. Kinds (`dm`, `group_dm`,
+`mention`, `channel`, `thread`) affect received/updated/deleted messages only. `thread`
+means any reply, not a managed thread watch. Connection-status events bypass
+conversation/kind selectors but retain connection scope. A filter selector array must
+be nonempty and distinct (maximum 100 IDs or 5 kinds). Null means unrestricted.
+Slack events can share an identity-owned subscription with other notification families.
+A Slack filter requires at least one Slack event and affects only Slack deliveries.
+Conversation context applies only to received mail, text, and iMessage events.
+Mixed subscriptions require explicit identity scope for updates and deletion. Omitted
+filters on PATCH preserve the stored filter; explicit null clears it. Slack delivery
+logs contain metadata only; historical replay is not supported. The agent runtime
+owns attention rules, thread watches, and its own memory.
+
+### Retained history and utility actions
+
+Start with `inkbox slack search --q "release notes"` to search retained message text across all workspace
+connections owned by one identity. Agent credentials infer their identity; other
+credentials must supply an explicit identity. A connection filter narrows that
+identity's results; it is not required. Each result includes its connection ID.
+Search uses plain English keywords, ranked by relevance and then recency, not
+Slack query operators or semantic search. Attachment bodies are not indexed.
+The query accepts 1..512 characters and page sizes are 1..100 (default 50).
+Follow the returned cursor with the same filters even for short or empty pages;
+stop only when the cursor is absent. Results require current access and may not
+cover all workspace history. Search errors are raised, not returned as empty results.
+The connection-specific archive search remains available.
+
+```sh
+inkbox slack capabilities --connection-id "$CONNECTION_ID"
+inkbox slack search --q 'release notes'
+# Non-agent credentials: add --identity example-agent or --identity-id UUID.
+# Narrow to one workspace only when needed: add --connection-id "$CONNECTION_ID".
+inkbox slack reaction add --connection-id "$CONNECTION_ID" \
+  --conversation-id CEXAMPLE --message-ts 1780000000.000001 \
+  --name eyes --idempotency-key review:release:1
+inkbox slack file upload --connection-id "$CONNECTION_ID" \
+  --conversation-id CEXAMPLE --file ./report.pdf --idempotency-key report:1
+```
+
+Use `slack user`, `conversation members/join/leave`, `message get/context/permalink/
+update/delete`, `reaction`, `pin`, `processing-status set`, and `operation get
+--operation-id ID` for utilities. `slack archive settings update --capture-enabled
+true|false` replaces all capture settings. Omitting `--retention-days` (or passing
+`null`) resets to no time limit; omitting `--capture-conversation-id` resets to all
+conversations. Repeat the latter flag to restrict capture. Read current settings and
+restate values you want to preserve. Archive subcommands
+include `messages`, `search`, `backfill [--restart]`, `coverage`, and `purge`.
+
 ## License
 
 MIT

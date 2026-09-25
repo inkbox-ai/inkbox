@@ -315,9 +315,7 @@ export type {
   IMessageRecipient,
   IMessageTriageNumber,
 } from "./imessage/types.js";
-export type {
-  IMessagesResource,
-} from "./imessage/resources/imessages.js";
+export type { IMessagesResource } from "./imessage/resources/imessages.js";
 export type {
   IMessageContactRulesResource,
   CreateIMessageContactRuleOptions,
@@ -439,20 +437,12 @@ export {
 } from "./vault/crypto.js";
 
 // API keys
-export type {
-  ApiKey,
-  ApiKeyStatus,
-  CreatedApiKey,
-} from "./api_keys/types.js";
+export type { ApiKey, ApiKeyStatus, CreatedApiKey } from "./api_keys/types.js";
 export type { CreateApiKeyOptions } from "./api_keys/resources/apiKeys.js";
 
 // Tunnels
 export { TLSMode, TunnelStatus } from "./tunnels/types.js";
-export type {
-  SignedCert,
-  Tunnel,
-  TunnelSummary,
-} from "./tunnels/types.js";
+export type { SignedCert, Tunnel, TunnelSummary } from "./tunnels/types.js";
 export type { UpdateTunnelOptions } from "./tunnels/resources/tunnels.js";
 export {
   TunnelCSRStateConflict,
@@ -468,3 +458,51 @@ export type { ResponseNotice, ResponseMetadata, ResponseObserver, APIResponse } 
 export * from "./companion.js";
 
 export type { SenderAccess } from "./sender_access.js";
+
+export { SlackResource } from "./slack.js";
+export type {
+  SlackMessageKind,
+  SlackWebhookFilter,
+  RawSlackWebhookFilter,
+  SlackConnection,
+  SlackConnectionsResponse,
+  SlackInvitation,
+  SlackInstallation,
+  SlackAction,
+  SlackConversationsResponse,
+  SlackMessagesResponse,
+  SlackFile,
+  SlackSendMessageOptions,
+  SlackPageOptions,
+  SlackMessagesOptions,
+} from "./slack.js";
+export type {
+  SlackWebhookEventType,
+  SlackWebhookData,
+  SlackWebhookPayload,
+} from "./webhooks/types.js";
+
+export type {
+  SlackProcessingStatus,
+  SlackOperationKind,
+  SlackOperation,
+  SlackCapability,
+  SlackCapabilitiesResponse,
+  SlackUsersResponse,
+  SlackMembersResponse,
+  SlackPinsResponse,
+  SlackReactionsResponse,
+  SlackMessageContextResponse,
+  SlackPermalinkResponse,
+  SlackArchiveSettings,
+  SlackArchiveSettingsOptions,
+  SlackArchivedMessage,
+  SlackArchiveMessagesResponse,
+  SlackArchiveCoverage,
+  SlackArchiveCoverageResponse,
+  SlackArchiveMessagesOptions,
+  SlackArchiveSearchOptions,
+  SlackSearchMessagesOptions,
+  SlackUploadFileOptions,
+  SlackMutationOptions,
+} from "./slack-operations.js";

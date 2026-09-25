@@ -4,6 +4,34 @@ All notable changes to the Inkbox SDK, CLI, and skills live here.
 Versions move in lockstep across `@inkbox/sdk` (TypeScript), `inkbox`
 (Python), `@inkbox/cli`, `inkbox` (Rust, crates.io), and the bundled plugin.
 
+## Unreleased
+
+- Allow Slack events and filters in mixed identity-owned subscriptions; preserve explicit
+  identity scope, context settings, and unchanged/clear/replace filter updates.
+
+- Add identity-wide Slack message search across workspace connections in all SDKs and
+  `inkbox slack search`, with optional narrowing filters and agent identity inference.
+
+- Add optional approved Console completion URLs to Slack installation handoffs,
+  preserving existing default requests across Python, TypeScript, Rust, and CLI.
+- Add Slack CLI identity-handle selection and require DM recipients before dispatch;
+  separate management onboarding from explicit connected-workspace selection in examples.
+- Remove unused archive message source URLs, type the Python purge result, and clarify
+  full-replacement capture settings and independent send/utility-operation outcomes.
+
+- Add direct Slack browser installation handoffs, capabilities/users/members, exact message
+  context/permalinks, reactions/pins, own-message edits/deletions, bounded general file
+  uploads, channel join/leave, native processing status, and durable operation lookup.
+- Add configurable retained-history settings, message search, bounded backfill/restart,
+  coverage, and purge with Python, TypeScript, Rust, and CLI parity.
+
+- Add Slack workspace invitations/connections, live conversations/messages, durable
+  idempotent sends/actions, and byte-preserving file downloads across the SDKs and CLI.
+- Add all 19 Slack webhook event types and optional connection/conversation/message-kind
+  filters, preserving omitted versus explicitly cleared filters on updates.
+- Document browser invitation onboarding, terminal unknown send outcomes, and
+  metadata-only Slack delivery diagnostics without historical replay.
+
 ## 0.7.8 — Identity-owned webhook subscriptions
 
 - When the server advertises `supports_identity_subscriptions: true` in

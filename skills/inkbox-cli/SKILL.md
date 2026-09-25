@@ -907,3 +907,48 @@ inkbox mailbox get alex@example.com --json
 
 Inline content uses `--signature-html <html>` or `--signature-text <text>`.
 For each format, choose inline content, a file, or its clear flag, not more than one.
+
+## Slack
+
+Identity-scoped Slack commands accept `-i/--identity <handle>` or
+`--identity-id <uuid>` (exactly one when supplied). Search can omit both with
+agent credentials; other identity-scoped commands require one. Live workspace
+operations require `--connection-id`; search accepts it only as an optional filter.
+
+See the [Slack API and onboarding guide](https://github.com/inkbox-ai/inkbox/blob/main/cli/README.md#slack) for implemented SDK/CLI methods.
+Use an existing identity. Select a workspace explicitly for live reads and mutations.
+Installation availability reports readiness, not organization-management permission.
+Organization management can create an invitation or start an installation. Open the
+returned invitation or short-lived authorization URL in a browser; treat the full URL
+as a secret. The direct installation URL is an opaque browser handoff. Join accessible
+public channels or invite the agent to selected private channels. Slack Connect is
+supported when the selected connection has access.
+
+Use explicit connection IDs and stable caller-provided idempotency keys for sends and
+utility mutations (reactions, pins, own-message edits/deletions, join/leave, uploads,
+and native processing status). Poll sends only while sending and operations only while
+in_progress. Unknown is terminal uncertainty and must not be blindly repeated. Send
+and utility keys use independent per-connection namespaces; utilities emit no outcome
+webhook, so read their status through operation lookup. Inspect
+capabilities for missing scopes; native processing support remains workspace-dependent.
+General file uploads accept standard base64 for 1 byte..10 MiB (CLI: a local --file).
+
+Retained history is separate from bounded live reads and webhook diagnostics. Capture
+is on by default for observed messages in accessible conversations, with no time-based
+retention limit. Organization management can disable capture, restrict conversations,
+set retention, or purge. Archive settings updates replace all fields: omitted
+retention resets to no time limit; omitted/empty conversations reset to all.
+For search, start with `inkbox slack search --q "release notes"` across the identity's workspace connections.
+Do not loop over connections or require a connection ID for a general search.
+Agent credentials infer the identity; other credentials require an explicit identity.
+Use a connection filter only to narrow the search. Results include connection IDs.
+Use plain English keywords, ranked by relevance then recency; not Slack query
+operators or semantic search. Attachment bodies are not indexed. Follow the returned
+cursor with the same filters even for short or empty pages, until no cursor remains.
+Search errors are not evidence of no matches.
+Use archive listing, bounded backfill/restart, and coverage; do not infer complete workspace/thread history
+from one page or a completed channel import. Purge disables capture and queues retained
+content deletion. Archive reads require current connection/conversation access.
+Slack webhooks support optional connection/conversation/message-kind filters, not
+cross-channel context or historical delivery replay. The runtime owns attention rules,
+watched threads, and its own memory. Webhook delivery order is not guaranteed.

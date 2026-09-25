@@ -590,7 +590,7 @@ catalog once per list call and fails clearly when unsupported; omitted scope add
 no request. The mixed-event examples below assume the capability is available.
 
 Subscriptions belong to an identity and can combine mail, text, iMessage,
-call-lifecycle and A2A notifications, even before channels are configured.
+call-lifecycle, A2A, and Slack notifications, even before channels are configured.
 Existing list calls keep their single-family views. Explicitly pass
 `scope="identity"` (Python), `scope: "identity"` (TypeScript), or use Rust's
 `list_with_scope` to include every family and mixed subscription. The CLI supports
@@ -601,6 +601,20 @@ pass `scope="identity"` in Python, `{ scope: "identity" }` in TypeScript, use Ru
 preserves legacy behavior and receives 409 when targeting a mixed subscription.
 Event-list updates replace the complete selection. Incoming-call actions remain
 separate identity settings.
+
+## Slack workspace connections
+
+Use an existing Inkbox identity across multiple Slack workspace connections. The
+[Python SDK](sdk/python/README.md#slack), [TypeScript SDK](sdk/typescript/README.md#slack),
+[Rust SDK](sdk/rust/README.md#slack), and [CLI](cli/README.md#slack) support invitation
+onboarding and direct browser handoffs, live conversations/history, durable message
+and utility actions, general file uploads/downloads, and filtered identity-owned
+Slack webhooks. Identity-wide message search spans workspace connections by default.
+Default-on capture of observed accessible messages, searchable retained history,
+bounded imports, and coverage are separate from live reads. Retention has no time
+limit by default; organization management can disable capture, restrict it, set a
+retention limit, or purge. Workspace approval, connection ownership,
+and current conversation access remain required.
 
 ## License
 

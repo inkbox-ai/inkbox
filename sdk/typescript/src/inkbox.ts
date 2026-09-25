@@ -41,6 +41,7 @@ import { NotesResource } from "./notes/resources/notes.js";
 import { TunnelsResource } from "./tunnels/resources/tunnels.js";
 import { ApiKeysResource } from "./api_keys/resources/apiKeys.js";
 import { AgentIdentity } from "./agent_identity.js";
+import { SlackResource } from "./slack.js";
 import { A2AResource } from "./a2a/resource.js";
 import {
   A2AInvitationsResource,
@@ -187,6 +188,7 @@ export class Inkbox {
   readonly _tunnels: TunnelsResource;
   readonly _apiKeys: ApiKeysResource;
   readonly _rootApiHttp: HttpTransport;
+  readonly slack: SlackResource;
   readonly _a2a: A2AResource;
   readonly _a2aInvitations: A2AInvitationsResource;
   /** @internal — used by the tunnel-agent runtime for data-plane auth. */
@@ -278,6 +280,7 @@ export class Inkbox {
     this._notes = new NotesResource(apiHttp);
     this._tunnels = new TunnelsResource(apiHttp);
     this._apiKeys = new ApiKeysResource(apiHttp);
+    this.slack = new SlackResource(apiHttp);
     this._a2a = new A2AResource(apiHttp, publicHttp);
     this._a2aInvitations = new A2AInvitationsResource(apiHttp, this._baseUrl);
 

@@ -16,6 +16,8 @@ from typing import Literal, NotRequired, TypedDict
 from inkbox.companion import CompanionMetadata
 from inkbox.sender_access import SenderAccess
 
+from inkbox.slack import SlackMessageKind
+
 
 # ---- Wire union types ____________________________________________________
 
@@ -825,3 +827,45 @@ class A2AWebhookPayload(TypedDict):
     event_type: A2AWebhookEventType
     timestamp: str
     data: A2AWebhookData
+
+
+SlackWebhookEventType = Literal[
+    "slack.message_received",
+    "slack.message_updated",
+    "slack.message_deleted",
+    "slack.reaction_added",
+    "slack.reaction_removed",
+    "slack.member_joined",
+    "slack.member_left",
+    "slack.channel_updated",
+    "slack.file_shared",
+    "slack.file_changed",
+    "slack.file_deleted",
+    "slack.pin_added",
+    "slack.pin_removed",
+    "slack.connection_changed",
+    "slack.message_sent",
+    "slack.message_send_failed",
+    "slack.message_send_unknown",
+    "slack.interaction",
+    "slack.session_stopped",
+]
+
+
+class SlackWebhookData(TypedDict):
+    identity_id: str
+    connection_id: str
+    workspace_id: str
+    conversation_id: NotRequired[str | None]
+    message_ts: NotRequired[str | None]
+    thread_ts: NotRequired[str | None]
+    actor_id: NotRequired[str | None]
+    message_kinds: list[SlackMessageKind]
+    event: dict[str, object]
+
+
+class SlackWebhookPayload(TypedDict):
+    id: str
+    event_type: SlackWebhookEventType
+    timestamp: str
+    data: SlackWebhookData
