@@ -90,6 +90,8 @@ export function verifyWebhook({
   const message = Buffer.concat([Buffer.from(`${requestId}.${timestamp}.`), body]);
   const expected = createHmac("sha256", key).update(message).digest("hex");
   const received = signature.slice("sha256=".length);
+  // timingSafeEqual throws on length mismatch; Python/Rust return false.
+  if (expected.length !== received.length) return false;
   return timingSafeEqual(Buffer.from(expected), Buffer.from(received));
 }
 
